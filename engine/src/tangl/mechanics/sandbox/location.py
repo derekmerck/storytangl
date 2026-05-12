@@ -12,6 +12,7 @@ from tangl.story import MenuBlock
 from tangl.story.concepts.asset import HasAssets
 
 from .facets import ContainerFacet, LockableFacet, OpenableFacet
+from .interaction import SandboxInteraction
 from .schedule import ScheduledEvent
 from .visibility import SandboxVisibilityRule
 
@@ -218,6 +219,7 @@ class SandboxLocation(HasAssets, MenuBlock):
     """A visitable dynamic hub with location links and present assets."""
 
     links: dict[str, str | SandboxExit] = Field(default_factory=dict)
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     fixtures: list[SandboxFixture] = Field(default_factory=list)
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)

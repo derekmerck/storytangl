@@ -33,6 +33,9 @@ Current first-pass surface:
   traits.
 - `SandboxMob`: a graph-backed actor-like concept with stable location and
   mutable state that can project affordances when present.
+- `SandboxInteraction`: a sponsored local choice that lowers to an ordinary
+  `Action` with target, activation, optional call/return, availability,
+  effects, selected-action journal text, and provenance hints.
 - `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
   trait-bearing sandbox facts into a runtime `StoryGraph` for pressure tests.
 - `SandboxVisibilityRule` / `SandboxProjectionState`: a small projection filter
@@ -49,7 +52,9 @@ Current first-pass surface:
 - `project_sandbox_fixture_actions`: planning handler that projects openable
   local fixtures as open/close choices.
 - `project_sandbox_mob_actions`: planning handler that projects present mob
-  affordances as ordinary self-loop choices.
+  affordances and interactions as ordinary choices.
+- `project_sandbox_location_interactions`: planning handler that projects active
+  location-sponsored interactions as ordinary choices.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects matching
@@ -105,15 +110,23 @@ affordances. Carried light-source assets still project a turn-on/turn-off
 self-loop action, so a lamp can restore normal room detail and object choices
 without treating darkness as a movement gate.
 
-Mob projection is currently schedule/presence only. `SandboxScope.mobs` holds
-stable `SandboxMob` nodes, each with a fallback sandbox location label and an
-optional `Schedule`. At projection time the mob's effective location is derived
-from `WorldTime`; when that location matches the current sandbox location, its
-present description can enrich the journal and its authored mob affordances
-become ordinary sandbox actions. Scheduled mobs also count as present actors for
-scheduled-event gates. This establishes a runtime home for offscreen actors
-without adding pathing, fleeing, combat, inventory-bearing actors, or lazy dialog
-scene generation yet.
+Mob projection is schedule/presence plus simple asset holding. `SandboxScope.mobs`
+holds stable `SandboxMob` nodes, each with a fallback sandbox location label,
+optional `Schedule`, and the story-level `HasAssets` facet. At projection time
+the mob's effective location is derived from `WorldTime`; when that location
+matches the current sandbox location, its present description, authored mob
+affordances, and player/mob asset transfers become ordinary sandbox actions.
+Scheduled mobs also count as present actors for scheduled-event gates. This
+establishes a runtime home for offscreen actors without adding pathing, fleeing,
+combat, trade negotiation, or lazy dialog scene generation yet.
+
+Sponsored interactions are the first shared local-choice surface. A
+`SandboxInteraction` lowers to a normal `Action` edge with target, activation,
+optional call/return, availability, effects, selected-action journal text, and
+provenance hints. Present mobs and active locations can sponsor these
+interactions now; carried assets and reachable fixtures are the next likely
+reuse point. This is a sandbox instance of a broader StoryTangl pattern: a
+concept that is in scope can sponsor a choice without owning a separate runtime.
 
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,

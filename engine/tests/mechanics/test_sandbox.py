@@ -14,6 +14,7 @@ from tangl.mechanics.sandbox import (
     OpenableFacet,
     SandboxExit,
     SandboxFixture,
+    SandboxInteraction,
     SandboxLocation,
     SandboxMob,
     SandboxMobAffordance,
@@ -258,6 +259,284 @@ def test_scheduled_mob_presence_can_gate_scheduled_events() -> None:
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
     assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+
+
+def test_present_mob_projects_traversable_interaction_with_return() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        interactions=[
+            SandboxInteraction(
+                label="talk",
+                text="Talk to the pirate",
+                target="pirate_chat",
+                return_to_location=True,
+            )
+        ],
+    )
+    scope = SandboxScope(label="tiny_cave_scope", mobs=[pirate])
+    road = SandboxLocation(label="road", location_name="Road")
+    pirate_chat = Block(
+        label="pirate_chat",
+        content="The pirate tells you about the cave.",
+    )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(pirate_chat)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    interactions = _dynamic_sandbox_actions_with_tag(road, "interaction")
+
+    assert [action.text for action in interactions] == ["Talk to the pirate"]
+    assert interactions[0].successor is pirate_chat
+    assert interactions[0].return_phase is not None
+    assert interactions[0].ui_hints["source"] == "sandbox_mob"
+    assert interactions[0].ui_hints["source_label"] == "pirate"
+
+
+def test_scheduled_absent_mob_does_not_project_interaction() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="building",
+        schedule=Schedule(entries=[ScheduleEntry(label="away", location="building", period=1)]),
+        interactions=[
+            SandboxInteraction(
+                label="talk",
+                text="Talk to the pirate",
+                target="pirate_chat",
+            )
+        ],
+    )
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0}, mobs=[pirate])
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    pirate_chat = Block(
+        label="pirate_chat",
+        content="The pirate tells you about the cave.",
+    )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(pirate_chat)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(road, "interaction") == []
+
+
+def test_once_mob_interaction_is_suppressed_after_target_visit() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        interactions=[
+            SandboxInteraction(
+                label="talk",
+                text="Talk to the pirate",
+                target="pirate_chat",
+                once=True,
+            )
+        ],
+    )
+    scope = SandboxScope(label="tiny_cave_scope", mobs=[pirate])
+    road = SandboxLocation(label="road", location_name="Road")
+    pirate_chat = Block(
+        label="pirate_chat",
+        content="The pirate tells you about the cave.",
+        locals={"_visited": True},
+    )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(pirate_chat)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(road, "interaction") == []
+
+
+def test_location_interaction_can_be_trivial_self_loop_action() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    road = SandboxLocation(
+        label="road",
+        location_name="Road",
+        content="Cover is {cover}.",
+        locals={"cover": "thin"},
+        interactions=[
+            SandboxInteraction(
+                label="hide",
+                text="Hide in the roadside ruins",
+                target="current",
+                journal_text="You crouch behind the broken wall.",
+                effects=[Effect(expr="cover = 'good'")],
+            )
+        ],
+    )
+    graph.add(road)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    hide = _dynamic_sandbox_actions_with_tag(road, "interaction")[0]
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    ledger.resolve_choice(hide.uid)
+
+    assert road.locals["cover"] == "good"
+    content = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert content[:2] == [
+        "You crouch behind the broken wall.",
+        "Cover is good.",
+    ]
+
+
+def test_present_mob_projects_asset_transfer_actions() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    road = SandboxLocation(label="road", location_name="Road")
+    pirate = SandboxMob(label="pirate", name="pirate", location="road")
+    SandboxItemType(label="keys", name="keys")
+    SandboxItemType(label="coin", name="coin")
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    coin = Token[SandboxItemType](token_from="coin", label="coin")
+    scope.player_assets.add_asset(keys)
+    pirate.add_asset(coin)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(pirate)
+    graph.add(keys)
+    graph.add(coin)
+    scope.add_child(road)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+    fragments = render_block_choices(caller=road, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+    transfer_texts = {
+        choice.text
+        for choice in choices
+        if choice.ui_hints.get("source") == "sandbox_mob"
+        and choice.ui_hints.get("asset") in {"keys", "coin"}
+    }
+
+    assert transfer_texts == {"Give keys to pirate", "Take coin from pirate"}
+    mob_transfer_actions = [
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "mob")
+        if action.ui_hints.get("asset") in {"keys", "coin"}
+    ]
+    assert all("asset" not in action.tags for action in mob_transfer_actions)
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    take_coin = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "take")
+        if action.ui_hints.get("mob") == "pirate"
+    )
+    ledger.resolve_choice(take_coin.uid)
+
+    assert scope.player_assets.has_asset("coin")
+    assert not pirate.has_asset("coin")
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    give_keys = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "give")
+        if action.ui_hints.get("asset") == "keys"
+    )
+    ledger.resolve_choice(give_keys.uid)
+
+    assert pirate.has_asset("keys")
+    assert not scope.player_assets.has_asset("keys")
+
+
+def test_absent_mob_does_not_project_asset_transfer_actions() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    pirate = SandboxMob(label="pirate", name="pirate", location="building")
+    SandboxItemType(label="coin", name="coin")
+    coin = Token[SandboxItemType](token_from="coin", label="coin")
+    pirate.add_asset(coin)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(pirate)
+    graph.add(coin)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    assert [
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "mob")
+        if action.ui_hints.get("asset") == "coin"
+    ] == []
+
+
+def test_stale_mob_transfer_actions_are_unavailable_after_mob_moves() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0})
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        schedule=Schedule(
+            entries=[
+                ScheduleEntry(label="road_watch", location="road", period=1),
+                ScheduleEntry(label="building_watch", location="building", period=2),
+            ]
+        ),
+    )
+    SandboxItemType(label="coin", name="coin")
+    coin = Token[SandboxItemType](token_from="coin", label="coin")
+    pirate.add_asset(coin)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(pirate)
+    graph.add(coin)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+    take_coin = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "take")
+        if action.ui_hints.get("mob") == "pirate"
+    )
+
+    assert take_coin.available(ctx=ctx)
+
+    scope.locals["world_turn"] = 1
+
+    assert not take_coin.available(ctx=ctx)
 
 
 def test_sandbox_location_links_project_normal_actions() -> None:

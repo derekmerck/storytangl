@@ -15,6 +15,7 @@ import pytest
 from tangl.core import Selector, Token
 from tangl.mechanics.sandbox import (
     SandboxCompiledAssetType,
+    SandboxInteraction,
     SandboxLocation,
     SandboxMob,
     SandboxScope,
@@ -41,6 +42,17 @@ ARCHITECTURE_SLICE = {
             "traits": ["light"],
             "descriptions": {"look": "You are on the road."},
             "exits": {"east": "cave"},
+            "contributes": {
+                "interactions": {
+                    "listen": {
+                        "text": "Listen to the road",
+                        "target": "current",
+                        "journal": "The road hums underfoot.",
+                        "availability": "True",
+                        "effects": "locals['listened'] = True",
+                    }
+                }
+            },
         },
         "cave": {
             "name": "Cave",
@@ -67,6 +79,13 @@ ARCHITECTURE_SLICE = {
                     "greet": {
                         "text": "Greet the guide",
                         "journal": "The guide nods.",
+                    }
+                },
+                "interactions": {
+                    "ask": {
+                        "text": "Ask the guide about the cave",
+                        "target": "road",
+                        "return_to_location": True,
                     }
                 }
             },
@@ -141,6 +160,14 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert isinstance(compiled.assets["lamp"], Token)
     assert compiled.assets["lamp"].readable is True
     assert isinstance(compiled.mobs["guide"], SandboxMob)
+    assert isinstance(road.interactions[0], SandboxInteraction)
+    assert [predicate.expr for predicate in road.interactions[0].availability] == [
+        "True"
+    ]
+    assert [effect.expr for effect in road.interactions[0].effects] == [
+        "locals['listened'] = True"
+    ]
+    assert isinstance(compiled.mobs["guide"].interactions[0], SandboxInteraction)
     assert isinstance(compiled.mobs["guide"], Actor)
 
     road_ctx = PhaseCtx(graph=compiled.graph, cursor_id=road.uid)
@@ -151,8 +178,15 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
         for action in _sandbox_actions(road)
         if action.ui_hints.get("contribution") == "movement"
     )
+    interaction = next(
+        action
+        for action in _sandbox_actions(road)
+        if action.ui_hints.get("contribution") == "interaction"
+    )
     assert isinstance(movement, Action)
     assert movement.successor is cave
+    assert isinstance(interaction, Action)
+    assert interaction.successor is road
 
     choices = render_block_choices(caller=road, ctx=road_ctx)
     assert any(isinstance(fragment, ChoiceFragment) for fragment in choices or [])

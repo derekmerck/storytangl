@@ -356,6 +356,57 @@ def test_adventure_slice_compiler_rejects_unknown_mob_schedule_location() -> Non
         SandboxSliceCompiler().compile(data)
 
 
+def test_adventure_slice_compiler_places_asset_on_mob() -> None:
+    data: dict[str, Any] = {
+        "id": "mob_asset",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {"name": "Road"},
+        },
+        "assets": {
+            "coin": {
+                "name": "coin",
+                "traits": ["portable"],
+                "initial": {"mob": "pirate"},
+            },
+        },
+        "mobs": {
+            "pirate": {
+                "name": "pirate",
+                "initial": {"location": "road"},
+            },
+        },
+    }
+
+    compiled = SandboxSliceCompiler().compile(data)
+
+    assert compiled.mobs["pirate"].has_asset("coin")
+    assert not compiled.locations["road"].has_asset("coin")
+
+
+def test_adventure_slice_compiler_rejects_unknown_asset_mob() -> None:
+    data: dict[str, Any] = {
+        "id": "bad_asset_mob",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {"name": "Road"},
+        },
+        "assets": {
+            "coin": {
+                "name": "coin",
+                "traits": ["portable"],
+                "initial": {"mob": "missing_pirate"},
+            },
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Asset 'coin' starts on unknown sandbox mob 'missing_pirate'",
+    ):
+        SandboxSliceCompiler().compile(data)
+
+
 def test_adventure_slice_compiler_rejects_conflicting_asset_type_reuse() -> None:
     first: dict[str, Any] = {
         "id": "first_keys",

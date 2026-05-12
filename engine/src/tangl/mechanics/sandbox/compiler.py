@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tangl.core import Token
+from tangl.core.runtime_op import Effect, Predicate
 from tangl.story import StoryGraph
 from tangl.story.concepts.asset import AssetType
 
@@ -18,11 +19,14 @@ from .facets import (
     OpenableFacet,
     SwitchableFacet,
 )
+from .interaction import SandboxInteraction
 from .location import SandboxExit, SandboxFixture, SandboxLocation
 from .mob import SandboxMob, SandboxMobAffordance
 from .schedule import Schedule
 from .scope import SandboxScope
 from .visibility import SandboxVisibilityRule
+
+RuntimeOpT = TypeVar("RuntimeOpT", Predicate, Effect)
 
 
 class SandboxCompiledAssetType(AssetType):
@@ -148,6 +152,72 @@ class SandboxExitSpec(BaseModel):
         )
 
 
+def _normalize_runtime_ops(value: Any, op_kind: type[RuntimeOpT]) -> list[RuntimeOpT]:
+    if value is None:
+        return []
+    if isinstance(value, op_kind):
+        return [value]
+    if isinstance(value, str):
+        return [op_kind(expr=value)]
+    if isinstance(value, dict):
+        return [op_kind.model_validate(value)]
+    out: list[RuntimeOpT] = []
+    for item in value:
+        if isinstance(item, op_kind):
+            out.append(item)
+        elif isinstance(item, str):
+            out.append(op_kind(expr=item))
+        elif isinstance(item, dict):
+            out.append(op_kind.model_validate(item))
+        else:
+            raise TypeError(f"Expected {op_kind.__name__} expression, got {type(item)!r}")
+    return out
+
+
+class SandboxInteractionSpec(BaseModel):
+    """Authored compact interaction sponsored by a scoped concept."""
+
+    text: str
+    target: str
+    journal: str | None = None
+    journal_text: str | None = None
+    activation: str | None = None
+    once: bool = False
+    return_to_location: bool = False
+    availability: list[Predicate] = Field(default_factory=list)
+    effects: list[Effect] = Field(default_factory=list)
+
+    @field_validator("availability", mode="before")
+    @classmethod
+    def _normalize_availability(cls, value: Any) -> list[Predicate]:
+        return _normalize_runtime_ops(value, Predicate)
+
+    @field_validator("effects", mode="before")
+    @classmethod
+    def _normalize_effects(cls, value: Any) -> list[Effect]:
+        return _normalize_runtime_ops(value, Effect)
+
+    def as_interaction(self, label: str) -> SandboxInteraction:
+        """Return the runtime sponsored interaction."""
+        return SandboxInteraction(
+            label=label,
+            text=self.text,
+            target=self.target,
+            journal_text=self.journal_text or self.journal or "",
+            activation=self.activation,
+            once=self.once,
+            return_to_location=self.return_to_location,
+            availability=list(self.availability),
+            effects=list(self.effects),
+        )
+
+
+class SandboxLocationContributionsSpec(BaseModel):
+    """Authored contribution tables for one compact location."""
+
+    interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
+
+
 class SandboxLocationSpec(BaseModel):
     """Authored compact sandbox location."""
 
@@ -158,6 +228,9 @@ class SandboxLocationSpec(BaseModel):
     traits: list[str] = Field(default_factory=list)
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     exits: dict[str, str | SandboxExitSpec] = Field(default_factory=dict)
+    contributes: SandboxLocationContributionsSpec = Field(
+        default_factory=SandboxLocationContributionsSpec
+    )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
     )
@@ -166,7 +239,8 @@ class SandboxLocationSpec(BaseModel):
 class SandboxInitialAssetSpec(BaseModel):
     """Initial placement and state for one compiled asset."""
 
-    location: str
+    location: str | None = None
+    mob: str | None = None
     state: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -247,6 +321,7 @@ class SandboxMobContributionsSpec(BaseModel):
     """Authored contribution tables for one compact mob."""
 
     affordances: dict[str, SandboxMobActionSpec] = Field(default_factory=dict)
+    interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
 
 
 class SandboxMobSpec(BaseModel):
@@ -334,12 +409,17 @@ class SandboxSliceCompiler:
         graph.add(scope)
 
         locations = self._compile_locations(graph=graph, scope=scope, spec=spec)
-        assets = self._compile_assets(graph=graph, locations=locations, spec=spec)
         fixtures = self._compile_fixtures(locations=locations, spec=spec)
         mobs = self._compile_mobs(
             graph=graph,
             scope=scope,
             locations=locations,
+            spec=spec,
+        )
+        assets = self._compile_assets(
+            graph=graph,
+            locations=locations,
+            mobs=mobs,
             spec=spec,
         )
 
@@ -382,6 +462,11 @@ class SandboxSliceCompiler:
                 light="light" in traits,
                 content=descriptions.lit or descriptions.look or descriptions.first or "",
                 dark_text=descriptions.dark,
+                interactions=[
+                    interaction_spec.as_interaction(interaction_label)
+                    for interaction_label, interaction_spec
+                    in location_spec.contributes.interactions.items()
+                ],
             )
             links: dict[str, str | SandboxExit] = {}
             for direction, exit_spec in location_spec.exits.items():
@@ -429,6 +514,7 @@ class SandboxSliceCompiler:
         *,
         graph: StoryGraph,
         locations: dict[str, SandboxLocation],
+        mobs: dict[str, SandboxMob],
         spec: SandboxSliceSpec,
     ) -> dict[str, Token]:
         assets: dict[str, Token] = {}
@@ -438,13 +524,30 @@ class SandboxSliceCompiler:
             self._ensure_asset_type(label, asset_spec, traits, state)
             asset = Token[SandboxCompiledAssetType](token_from=label, label=label)
             graph.add(asset)
-            self._require_location(
-                locations,
-                asset_spec.initial.location,
-                source_kind="Asset",
-                source_label=label,
-                relation="starts in",
-            ).add_asset(asset)
+            initial = asset_spec.initial
+            if initial.location is not None and initial.mob is not None:
+                raise ValueError(
+                    f"Asset {label!r} initial placement must choose location or mob"
+                )
+            if initial.mob is not None:
+                if initial.mob not in mobs:
+                    raise ValueError(
+                        f"Asset {label!r} starts on unknown sandbox mob "
+                        f"{initial.mob!r}"
+                    )
+                mobs[initial.mob].add_asset(asset)
+            elif initial.location is not None:
+                self._require_location(
+                    locations,
+                    initial.location,
+                    source_kind="Asset",
+                    source_label=label,
+                    relation="starts in",
+                ).add_asset(asset)
+            else:
+                raise ValueError(
+                    f"Asset {label!r} initial placement requires location or mob"
+                )
             assets[label] = asset
         return assets
 
@@ -625,6 +728,11 @@ class SandboxSliceCompiler:
                     action_spec.as_affordance(action_label)
                     for action_label, action_spec
                     in mob_spec.contributes.affordances.items()
+                ],
+                interactions=[
+                    interaction_spec.as_interaction(interaction_label)
+                    for interaction_label, interaction_spec
+                    in mob_spec.contributes.interactions.items()
                 ],
             )
             graph.add(mob)
