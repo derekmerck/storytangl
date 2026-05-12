@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from tangl.core.runtime_op import Effect, Predicate
+
+from .interaction import SandboxInteraction, normalize_runtime_ops
 from .time import WorldTime
 
 
@@ -82,17 +85,45 @@ class Schedule(BaseModel):
 
 
 class ScheduledEvent(ScheduleEntry):
-    """A schedule-gated selectable event projected as a normal action."""
+    """A time/presence gate over a normal sandbox interaction."""
 
     target: str
     text: str = ""
+    journal: str | None = None
+    journal_text: str = ""
     activation: str | None = None
     once: bool = False
     return_to_location: bool = False
+    availability: list[Predicate] = Field(default_factory=list)
+    effects: list[Effect] = Field(default_factory=list)
+
+    @field_validator("availability", mode="before")
+    @classmethod
+    def _normalize_availability(cls, value: Any) -> list[Predicate]:
+        return normalize_runtime_ops(value, Predicate)
+
+    @field_validator("effects", mode="before")
+    @classmethod
+    def _normalize_effects(cls, value: Any) -> list[Effect]:
+        return normalize_runtime_ops(value, Effect)
 
     def action_text(self) -> str:
         """Return player-facing text for this scheduled event."""
         return self.text or self.label or self.target
+
+    def as_interaction(self, label: str | None = None) -> SandboxInteraction:
+        """Return the sandbox interaction primed by this schedule entry."""
+        return SandboxInteraction(
+            label=label or self.label or self.target,
+            text=self.action_text(),
+            target=self.target,
+            journal_text=self.journal_text or self.journal or "",
+            activation=self.activation,
+            once=self.once,
+            return_to_location=self.return_to_location,
+            availability=list(self.availability),
+            effects=list(self.effects),
+        )
 
 
 class ScheduledPresence(ScheduleEntry):

@@ -58,6 +58,7 @@ class SandboxItemType(AssetType):
     take_text: str | None = None
     drop_text: str | None = None
     interactions: list[SandboxInteraction] = Field(default_factory=list)
+    scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
 
 
 @pytest.fixture(autouse=True)
@@ -852,6 +853,85 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
     choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
 
     assert any(choice.text == "Talk to traveler" and choice.available for choice in choices)
+
+
+def test_scheduled_event_uses_interaction_journal_effects_and_availability() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.locals.update({"world_turn": 2, "can_ring": False, "bell_rung": False})
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="bell",
+            location="road",
+            period=3,
+            target="current",
+            text="Ring the bell",
+            journal_text="The bell rings once.",
+            availability=[Predicate(expr="can_ring")],
+            effects=[Effect(expr="bell_rung = True")],
+        )
+    ]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    assert event.text == "Ring the bell"
+    assert event.ui_hints["contribution"] == "event"
+    assert event.journal_text == "The bell rings once."
+    assert not event.available(ctx=ctx)
+
+    road.locals["can_ring"] = True
+    ctx._ns_cache.clear()
+    assert event.available(ctx=ctx)
+
+    Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert road.locals["bell_rung"] is True
+
+
+def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0})
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    parley = Block(label="parley", content="The pirate lowers his blade.")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        schedule=Schedule(
+            entries=[
+                ScheduleEntry(label="road_watch", location="road", period=1),
+                ScheduleEntry(label="building_watch", location="building", period=2),
+            ]
+        ),
+        scheduled_events=[
+            ScheduledEvent(
+                label="parley",
+                period=1,
+                target="parley",
+                text="Parley with the pirate",
+            )
+        ],
+    )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(parley)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+
+    road_events = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert [event.text for event in road_events] == ["Parley with the pirate"]
+    assert road_events[0].ui_hints["source_kind"] == "mob"
+    assert road_events[0].ui_hints["mob"] == "pirate"
+    assert _dynamic_sandbox_actions_with_tag(building, "event") == []
 
 
 def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:

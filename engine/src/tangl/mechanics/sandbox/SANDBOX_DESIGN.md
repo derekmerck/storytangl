@@ -506,19 +506,32 @@ successor, selected payload during UPDATE, and the normal ledger/journal
 pipeline. The syntax can vary by mechanic family, but the re-entrant provider
 pattern is shared.
 
-Selectable and triggered scheduled events can also use existing call/return and
-visit history directly. `activation` is the authored timing hint copied from
-story actions: unset means a normal visible choice, `first` maps to a PREREQS
-redirect before the current node journals, and `last` maps to a POSTREQS
-continue after the current node journals. `return_to_location` is orthogonal to
-activation; it is projected as a normal `Action` with `return_phase=PLANNING`,
-so when the target scene finishes, the frame returns to the originating
-location and reprojects dynamic choices before journaling that location.
-A `once` event is not projected after its target has generic VM `_visited`
-state. This covers scope-level "first time in this sandbox" beats without a
-sandbox ledger or custom flag system: donate the same once-only event to every
-child location, target a shared orientation block, trigger it on entry, and let
-target visit history suppress future projections.
+Selectable and triggered scheduled events are temporal gates over the same
+sponsored interaction surface used by locations, mobs, assets, and fixtures.
+The schedule fields decide whether the affordance is primed at the current
+`WorldTime`, location, and actor-presence set; the interaction fields then carry
+the ordinary `target`, `activation`, `return_to_location`, `availability`,
+`effects`, and selected-action journal text.
+
+`activation` is the authored timing hint copied from story actions: unset means
+a normal visible choice, `first` maps to a PREREQS redirect before the current
+node journals, and `last` maps to a POSTREQS continue after the current node
+journals. `return_to_location` is orthogonal to activation; it is projected as a
+normal `Action` with `return_phase=PLANNING`, so when the target scene finishes,
+the frame returns to the originating location and reprojects dynamic choices
+before journaling that location. A `once` event is not projected after its
+target has generic VM `_visited` state. This covers scope-level "first time in
+this sandbox" beats without a sandbox ledger or custom flag system: donate the
+same once-only event to every child location, target a shared orientation block,
+trigger it on entry, and let target visit history suppress future projections.
+
+Scheduled events can be attached at several sponsorship levels. Scope events
+are donated to child sandbox locations. Location events are available while
+that location is active. Mob events are available only while the mob is present.
+Asset events are available while the asset is present or carried, and fixture
+events are available while the fixture is reachable. All of these may still
+carry ordinary availability predicates such as "only if raining", "only if safe
+to talk", or "only if the sword is in player assets".
 
 Concepts can originate events too. The sandbox projector discovers providers
 from the gathered namespace and calls `get_sandbox_events(caller, ctx, ns)` on
@@ -538,7 +551,8 @@ forced events, and selectable events. In v38 those become:
 - derived `WorldTime`
 - explicit `advance_world_turn(...)`
 - schedule matching against time, location, and optional presence
-- forced scheduled events as ordinary redirects
+- scheduled events as time-gated sponsored interactions
+- forced scheduled events as ordinary triggered actions
 - selectable scheduled events as ordinary generated choices
 
 ### Parser As Client Adapter
@@ -863,8 +877,9 @@ room text and local object affordances return.
 Scheduled event:
 
 At `world_turn == 2`, if the player is at `road`, a traveler event appears.
-If forced, it is an ordinary redirect. If selectable, it is an ordinary dynamic
-choice.
+If forced, it is an ordinary triggered action. If selectable, it is an ordinary
+dynamic choice. Either way, it uses the same interaction payload as a
+location-, mob-, asset-, or fixture-sponsored affordance.
 
 Scope-level once event:
 

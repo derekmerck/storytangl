@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from tangl.core import Graph, Selector, Token
@@ -68,10 +69,22 @@ class SandboxAssetSurface(Protocol):
     take_text: str | None
     drop_text: str | None
     interactions: list[SandboxInteraction]
+    scheduled_events: list[ScheduledEvent]
 
     def get_label(self) -> str | None:
         """Return the graph/token label."""
         ...
+
+
+@dataclass(slots=True)
+class ScheduledEventContribution:
+    """One scheduled event plus the scoped concept that sponsored it."""
+
+    event: ScheduledEvent
+    source: str
+    source_label: str
+    source_kind: str
+    hints: dict[str, Any] = field(default_factory=dict)
 
 
 def _has_tags(value: TaggedEntity, *tags: str) -> bool:
@@ -326,13 +339,92 @@ def _nearest_wait_turn_delta(location: SandboxLocation) -> int:
     return 1
 
 
-def _scheduled_events(location: SandboxLocation, ctx: VmPhaseCtx) -> list[ScheduledEvent]:
-    events: list[ScheduledEvent] = []
+def _scheduled_event_contributions(
+    location: SandboxLocation,
+    ctx: VmPhaseCtx,
+) -> list[ScheduledEventContribution]:
+    contributions: list[ScheduledEventContribution] = []
     for scope in reversed(_sandbox_scopes(location)):
-        events.extend(scope.scheduled_events)
-    events.extend(location.scheduled_events)
-    events.extend(_provider_scheduled_events(location, ctx=ctx))
-    return events
+        scope_label = scope.get_label()
+        contributions.extend(
+            ScheduledEventContribution(
+                event=event,
+                source="sandbox_schedule",
+                source_label=scope_label,
+                source_kind="scope",
+            )
+            for event in scope.scheduled_events
+        )
+    location_label = location.get_label()
+    contributions.extend(
+        ScheduledEventContribution(
+            event=event,
+            source="sandbox_schedule",
+            source_label=location_label,
+            source_kind="location",
+        )
+        for event in location.scheduled_events
+    )
+    projection_state = _projection_state(location, ctx)
+    if not projection_state.suppress_fixture_affordances:
+        for fixture in location.fixtures:
+            contributions.extend(
+                ScheduledEventContribution(
+                    event=event,
+                    source="sandbox_schedule",
+                    source_label=fixture.label,
+                    source_kind="fixture",
+                    hints={"fixture": fixture.label},
+                )
+                for event in fixture.scheduled_events
+            )
+    for mob in _present_mobs(location):
+        mob_label = mob.get_label()
+        contributions.extend(
+            ScheduledEventContribution(
+                event=event,
+                source="sandbox_schedule",
+                source_label=mob_label,
+                source_kind="mob",
+                hints={"mob": mob_label},
+            )
+            for event in mob.scheduled_events
+        )
+    if not projection_state.suppress_asset_affordances:
+        for asset_label, asset in sorted(location.assets.items()):
+            contributions.extend(
+                ScheduledEventContribution(
+                    event=event,
+                    source="sandbox_schedule",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    hints={"asset": asset_label, "possession": "location"},
+                )
+                for event in asset.scheduled_events
+            )
+    player_assets = _player_asset_holder(location)
+    if player_assets is not None:
+        for asset_label, asset in sorted(player_assets.assets.items()):
+            contributions.extend(
+                ScheduledEventContribution(
+                    event=event,
+                    source="sandbox_schedule",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    hints={"asset": asset_label, "possession": "carried"},
+                )
+                for event in asset.scheduled_events
+            )
+    contributions.extend(
+        ScheduledEventContribution(
+            event=event,
+            source="sandbox_schedule",
+            source_label=event.label or event.target,
+            source_kind="provider",
+        )
+        for event in _provider_scheduled_events(location, ctx=ctx)
+    )
+    return contributions
 
 
 def _scheduled_presence(location: SandboxLocation) -> list[ScheduledPresence]:
@@ -416,6 +508,7 @@ def _project_sandbox_interaction(
     sponsor_label: str,
     sponsor_kind: str,
     tags: set[str],
+    contribution_kind: str = "interaction",
     **hints: Any,
 ) -> Action | None:
     tag = _interaction_tag(interaction.label)
@@ -444,7 +537,7 @@ def _project_sandbox_interaction(
         ui_hints=_sandbox_contribution_hints(
             location,
             source=source,
-            contribution="interaction",
+            contribution=contribution_kind,
             source_label=sponsor_label,
             source_kind=sponsor_kind,
             interaction=interaction.label,
@@ -1856,36 +1949,26 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
     world_time = current_world_time(caller)
     location_label = caller.get_label()
     actors_present = _actors_present(caller)
-    for index, event in enumerate(_scheduled_events(caller, ctx)):
+    for index, contribution in enumerate(_scheduled_event_contributions(caller, ctx)):
+        event = contribution.event
         if not event.matches(
             world_time,
             location=location_label,
             actors_present=actors_present,
         ):
             continue
-        target = _resolve_traversable_ref(caller, event.target)
-        if target is None:
-            continue
-        if event.once and _target_visited(target):
-            continue
-        Action(
-            registry=graph,
-            label=f"sandbox_event_{caller.get_label()}_{index}",
-            predecessor_id=caller.uid,
-            successor_id=target.uid,
-            trigger_phase=Action.trigger_phase_from_activation(event.activation),
-            return_phase=ResolutionPhase.PLANNING if event.return_to_location else None,
-            text=event.action_text(),
-            tags={"dynamic", "sandbox", "event"},
-            ui_hints=_sandbox_contribution_hints(
-                caller,
-                source="sandbox_schedule",
-                contribution="event",
-                source_label=event.label or event.target,
-                source_kind="schedule",
-                event=event.label,
-                target=target.get_label(),
-            ),
+        event_label = event.label or f"event_{index}"
+        _project_sandbox_interaction(
+            caller,
+            graph=graph,
+            interaction=event.as_interaction(event_label),
+            source=contribution.source,
+            sponsor_label=contribution.source_label,
+            sponsor_kind=contribution.source_kind,
+            tags={"event"},
+            contribution_kind="event",
+            event=event_label,
+            **contribution.hints,
         )
     return None
 
