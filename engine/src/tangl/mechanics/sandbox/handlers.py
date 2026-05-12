@@ -379,6 +379,10 @@ def _mob_by_label(location: SandboxLocation, label: str) -> SandboxMob | None:
     return None
 
 
+def _mob_present_at_location(location: SandboxLocation, mob: SandboxMob) -> bool:
+    return mob.present_at(location.get_label(), current_world_time(location))
+
+
 def _mob_affordance_tag(label: str) -> str | None:
     normalized = label.strip().replace(" ", "_")
     if not normalized:
@@ -774,6 +778,8 @@ def _mob_can_receive_asset(
     player_assets = _player_asset_holder(location)
     if mob is None or player_assets is None:
         return False
+    if not _mob_present_at_location(location, mob):
+        return False
     asset = player_assets.get_asset(asset_label)
     return bool(asset and mob.can_receive_asset(asset, player_assets))
 
@@ -787,6 +793,8 @@ def _mob_can_give_asset(
     player_assets = _player_asset_holder(location)
     if mob is None or player_assets is None:
         return False
+    if not _mob_present_at_location(location, mob):
+        return False
     asset = mob.get_asset(asset_label)
     return bool(asset and mob.can_give_asset(asset, player_assets))
 
@@ -799,6 +807,10 @@ def _give_asset_to_mob(
     mob = _mob_by_label(location, mob_label)
     if mob is None:
         raise KeyError(mob_label)
+    if not _mob_present_at_location(location, mob):
+        raise ValueError(
+            f"Mob {mob_label!r} is not present at {location.get_label()!r}"
+        )
     player_assets = _player_asset_holder(location)
     if player_assets is None:
         raise ValueError("sandbox location has no player asset holder")
@@ -813,6 +825,10 @@ def _take_asset_from_mob(
     mob = _mob_by_label(location, mob_label)
     if mob is None:
         raise KeyError(mob_label)
+    if not _mob_present_at_location(location, mob):
+        raise ValueError(
+            f"Mob {mob_label!r} is not present at {location.get_label()!r}"
+        )
     player_assets = _player_asset_holder(location)
     if player_assets is None:
         raise ValueError("sandbox location has no player asset holder")
@@ -1394,7 +1410,7 @@ def _project_mob_asset_actions(
                 )
             ],
             journal_text="Done.",
-            tags={"dynamic", "sandbox", "mob", "asset", "give"},
+            tags={"dynamic", "sandbox", "mob", "give"},
             ui_hints=_sandbox_contribution_hints(
                 location,
                 source="sandbox_mob",
@@ -1431,7 +1447,7 @@ def _project_mob_asset_actions(
                 )
             ],
             journal_text=_asset_take_text(asset),
-            tags={"dynamic", "sandbox", "mob", "asset", "take"},
+            tags={"dynamic", "sandbox", "mob", "take"},
             ui_hints=_sandbox_contribution_hints(
                 location,
                 source="sandbox_mob",

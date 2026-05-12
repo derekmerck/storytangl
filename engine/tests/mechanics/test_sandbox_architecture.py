@@ -48,6 +48,8 @@ ARCHITECTURE_SLICE = {
                         "text": "Listen to the road",
                         "target": "current",
                         "journal": "The road hums underfoot.",
+                        "availability": "True",
+                        "effects": "locals['listened'] = True",
                     }
                 }
             },
@@ -159,6 +161,12 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert compiled.assets["lamp"].readable is True
     assert isinstance(compiled.mobs["guide"], SandboxMob)
     assert isinstance(road.interactions[0], SandboxInteraction)
+    assert [predicate.expr for predicate in road.interactions[0].availability] == [
+        "True"
+    ]
+    assert [effect.expr for effect in road.interactions[0].effects] == [
+        "locals['listened'] = True"
+    ]
     assert isinstance(compiled.mobs["guide"].interactions[0], SandboxInteraction)
     assert isinstance(compiled.mobs["guide"], Actor)
 

@@ -437,6 +437,12 @@ def test_present_mob_projects_asset_transfer_actions() -> None:
     }
 
     assert transfer_texts == {"Give keys to pirate", "Take coin from pirate"}
+    mob_transfer_actions = [
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "mob")
+        if action.ui_hints.get("asset") in {"keys", "coin"}
+    ]
+    assert all("asset" not in action.tags for action in mob_transfer_actions)
 
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     take_coin = next(
@@ -487,6 +493,50 @@ def test_absent_mob_does_not_project_asset_transfer_actions() -> None:
         for action in _dynamic_sandbox_actions_with_tag(road, "mob")
         if action.ui_hints.get("asset") == "coin"
     ] == []
+
+
+def test_stale_mob_transfer_actions_are_unavailable_after_mob_moves() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0})
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        schedule=Schedule(
+            entries=[
+                ScheduleEntry(label="road_watch", location="road", period=1),
+                ScheduleEntry(label="building_watch", location="building", period=2),
+            ]
+        ),
+    )
+    SandboxItemType(label="coin", name="coin")
+    coin = Token[SandboxItemType](token_from="coin", label="coin")
+    pirate.add_asset(coin)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(pirate)
+    graph.add(coin)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+    take_coin = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "take")
+        if action.ui_hints.get("mob") == "pirate"
+    )
+
+    assert take_coin.available(ctx=ctx)
+
+    scope.locals["world_turn"] = 1
+
+    assert not take_coin.available(ctx=ctx)
 
 
 def test_sandbox_location_links_project_normal_actions() -> None:

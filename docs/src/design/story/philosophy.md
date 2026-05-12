@@ -189,6 +189,9 @@ any point in the traversal.
 
 ## Superposition of Possible Stories
 
+Forward-looking: this is conceptual design for a future constraint authority
+over the fact ledger, not a fully implemented subsystem today.
+
 StoryTangl can also be understood as maintaining a **superposition of possible
 stories**.  A linear narrative fixes beginning, middle, and end before the
 reader begins.  A traditional branching story pre-considers many deterministic

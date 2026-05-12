@@ -155,7 +155,13 @@ class SandboxExitSpec(BaseModel):
 def _normalize_runtime_ops(value: Any, op_kind: type[RuntimeOpT]) -> list[RuntimeOpT]:
     if value is None:
         return []
-    out: list[Any] = []
+    if isinstance(value, op_kind):
+        return [value]
+    if isinstance(value, str):
+        return [op_kind(expr=value)]
+    if isinstance(value, dict):
+        return [op_kind.model_validate(value)]
+    out: list[RuntimeOpT] = []
     for item in value:
         if isinstance(item, op_kind):
             out.append(item)
