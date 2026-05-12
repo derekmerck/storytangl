@@ -220,7 +220,7 @@ describe('StoryFlow', () => {
           fragments: [
             {
               uid: 'mystery',
-              fragment_type: 'roll',
+              fragment_type: 'future_widget',
               content: { value: 6 },
             },
           ],
@@ -232,7 +232,7 @@ describe('StoryFlow', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('roll')
+    expect(wrapper.text()).toContain('future_widget')
   })
 
   it('keeps referenced choice state visible for decision legibility', async () => {

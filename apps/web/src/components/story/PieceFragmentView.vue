@@ -34,6 +34,20 @@ const displayState = computed(() => {
   return state ? readableValue(state) : undefined
 })
 
+const lifecycleState = computed(() => {
+  if (props.fragment.realized === false) {
+    return 'offer'
+  }
+  return undefined
+})
+
+const availabilityState = computed(() => {
+  if (props.fragment.available === false) {
+    return stringValue(props.fragment.unavailable_reason) ?? 'unavailable'
+  }
+  return undefined
+})
+
 const pieceKind = computed(() => {
   const kind = stringValue(props.fragment.kind)
   return kind ? readableValue(kind) : undefined
@@ -50,6 +64,20 @@ const pieceKind = computed(() => {
     <span v-if="pieceKind" class="piece-meta">{{ pieceKind }}</span>
     <span v-if="displayState" class="piece-state" data-testid="piece-state">
       {{ displayState }}
+    </span>
+    <span
+      v-if="lifecycleState"
+      class="piece-state piece-state--offer"
+      data-testid="piece-realized-state"
+    >
+      {{ lifecycleState }}
+    </span>
+    <span
+      v-if="availabilityState"
+      class="piece-state piece-state--locked"
+      data-testid="piece-availability"
+    >
+      {{ availabilityState }}
     </span>
   </div>
 </template>
@@ -89,5 +117,14 @@ const pieceKind = computed(() => {
 
 .piece-state {
   background: rgba(var(--v-theme-primary), 0.12);
+}
+
+.piece-state--offer {
+  background: rgba(var(--v-theme-secondary), 0.14);
+}
+
+.piece-state--locked {
+  background: rgba(var(--v-theme-error), 0.12);
+  color: rgb(var(--v-theme-error));
 }
 </style>

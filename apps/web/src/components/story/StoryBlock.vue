@@ -5,6 +5,7 @@ import ContentFragmentView from './ContentFragmentView.vue'
 import GroupFragmentView from './GroupFragmentView.vue'
 import KvFragmentView from './KvFragmentView.vue'
 import MediaFragmentView from './MediaFragmentView.vue'
+import RollFragmentView from './RollFragmentView.vue'
 import StoryAction from './StoryAction.vue'
 import PieceFragmentView from './PieceFragmentView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
@@ -15,6 +16,7 @@ import {
   isGroupFragment,
   isMediaFragment,
   isPieceFragment,
+  isRollFragment,
 } from './fragmentUtils'
 
 const props = defineProps<{
@@ -74,6 +76,8 @@ const handleAction = (uid: string, payload?: unknown) => {
         <KvFragmentView v-else-if="fragment.fragment_type === 'kv'" :fragment="fragment" />
 
         <PieceFragmentView v-else-if="isPieceFragment(fragment)" :fragment="fragment" />
+
+        <RollFragmentView v-else-if="isRollFragment(fragment)" :fragment="fragment" />
 
         <UnknownFragmentFallback v-else :fragment="fragment" />
       </div>

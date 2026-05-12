@@ -25,9 +25,10 @@ promotes them.
 | Ordered kv rows | Engine `KvFragment.content` is still `OrderedTupleDict`; web fixtures use tuple-like arrays. | Record-shaped `KvRow` with optional semantic fields. | Treat record-shaped `KvRow` as a migration target, not current Tier S. |
 | Choice HTTP id | Web posts `choice_id` containing `ChoiceFragment.edge_id`; docs increasingly say `edge_id`. | `edge_id` in contract language. | Keep transport compatibility for now; prefer `edge_id` in new docs and fixtures where possible. |
 | Command feedback | Current fixture uses unknown `interpretation` fallback fields `outcome` and `command_text`. | Typed `interpretation` with `result` and `text`. | Do not make typed interpretation a Tier-S conformance requirement yet. |
-| `place` payloads | Not current in engine or web. | `accepts.kind="place"` with source and target zone refs. | Proposal fixture only until the engine emits a worked turn and a CLI commit path exists. |
-| Piece lifecycle | Current fixtures render `piece`; `realized` is pass-through metadata. | `PieceFragment.realized: bool` distinguishes offers from realized inventory/world objects. | Proposal fixture only; renderers may surface `offer` as an advisory tag. |
-| Roll outcomes | Current web fallback can show unknown fragments; no typed engine fragment. | `fragment_type="roll"` for auditable random/stat outcomes. | Proposal fixture only; reference port renders a text fallback summary. |
+| `place` payloads | Not current in engine; web/Tk/reference clients can inspect proposal fixtures. | `accepts.kind="place"` with source and target zone refs. | Proposal fixture only until the engine emits a worked turn and a CLI commit path exists. |
+| Piece lifecycle | Current fixtures render `piece`; web/Tk/reference clients surface `realized=false` as an offer hint. | `PieceFragment.realized: bool` distinguishes offers from realized inventory/world objects. | Proposal fixture only; renderers may surface `offer` as an advisory tag. |
+| Roll outcomes | No typed engine fragment; web/Tk/reference clients can inspect/render proposal `roll` fragments. | `fragment_type="roll"` for auditable random/stat outcomes. | Proposal fixture only; reference port renders a text fallback summary. |
+| Presentation profiles | No typed engine model; older web world theming exists as ad hoc `ui_config`. | `WorldInfo`/presentation catalog plus envelope `metadata.presentation_context` refs. | Advisory design target; do not treat as gameplay state or imperative UI commands. |
 
 `piece` replaced the older UI `token` term because it avoids the engine singleton conflict
 while staying general enough for cards, counters, documents, dice, actors, and
@@ -60,9 +61,10 @@ small-object-specific for the portable contract.
 | `cost_previews` | Not current. | Not rendered. | Tier P1 plural preview list. | Defer until typed accepts settle. |
 | `predicate_ref` | Not current. | Not rendered. | Tier P2. | Defer. |
 | `piece` / `zone` typed surface | Not current in engine. | Web has `piece`/`zone` pressure widgets. | Tier P2 typed target. | Current pressure fixture; typed engine support remains target. |
-| `piece.realized` | Not current in engine. | Metadata passes through; no dedicated styling contract. | Tier P2 lifecycle field. | Proposal fixture only. |
-| `accepts.kind="place"` | Not current. | Not rendered as a structured picker. | Tier P1/P3 pressure surface for equipment/placement. | Proposal fixture only. |
-| `roll` | Not current. | Unknown fallback only. | Tier P2 structured outcome fragment. | Proposal fixture only. |
+| `piece.realized` | Not current in engine. | Rendered as generic offer/availability tags. | Tier P2 lifecycle field. | Proposal fixture only. |
+| `accepts.kind="place"` | Not current. | Rendered as source-piece selection into a referenced target zone. | Tier P1/P3 pressure surface for equipment/placement. | Proposal fixture only. |
+| `roll` | Not current. | Rendered as a structured outcome row. | Tier P2 structured outcome fragment. | Proposal fixture only. |
+| `metadata.presentation_context` | Not current. | Not rendered. | Advisory profile refs and semantic tokens. | Document only until a world catalog shape exists. |
 
 ## First Fixture Suite
 

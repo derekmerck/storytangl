@@ -387,6 +387,65 @@ describe('StoryAction', () => {
     ])
   })
 
+  it('emits place accepts payloads from visible source-zone pieces', async () => {
+    const placeChoice: ChoiceStoryFragment = {
+      uid: 'action_place',
+      fragment_type: 'choice',
+      edge_id: 'edge_place',
+      text: 'Mount a weapon',
+      accepts: {
+        kind: 'place',
+        source_zone_ref: 'zone-loose',
+        target_zone_ref: 'zone-front',
+        constraints: { target_kind: ['weapon'] },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-loose': {
+        uid: 'zone-loose',
+        fragment_type: 'group',
+        group_type: 'zone',
+        zone_role: 'inventory',
+        member_ids: ['flame-fragment'],
+        hints: { label_text: 'parts on hand' },
+      },
+      'zone-front': {
+        uid: 'zone-front',
+        fragment_type: 'group',
+        group_type: 'zone',
+        zone_role: 'slot',
+        member_ids: [],
+        hints: { label_text: 'front mount' },
+      },
+      'flame-fragment': {
+        uid: 'flame-fragment',
+        fragment_type: 'piece',
+        piece_id: 'flamethrower-1',
+        content: 'Flamethrower',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: placeChoice, fragments })
+
+    expect(wrapper.find('[data-testid="choice-place-target"]').text()).toBe(
+      'parts on hand to front mount',
+    )
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('.choice-piece-option').trigger('click')
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_place',
+      {
+        piece_id: 'flamethrower-1',
+        source_zone_ref: 'zone-loose',
+        target_zone_ref: 'zone-front',
+      },
+    ])
+  })
+
   it('clears stale piece payload when a same-uid choice points at a new zone', async () => {
     const pieceChoice: ChoiceStoryFragment = {
       uid: 'action_pieces',

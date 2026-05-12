@@ -62,6 +62,8 @@ class InputControlPlan:
     maximum: int | None = None
     step: int | None = None
     unit: str | None = None
+    source_zone_ref: str | None = None
+    target_zone_ref: str | None = None
     options: tuple[PieceOption, ...] = ()
 
 
@@ -181,6 +183,15 @@ def collect_submission(plan: WidgetPlan, value: JsonValue = None) -> Submission:
         piece_ids = _selected_piece_ids(value)
         _validate_piece_selection(input_plan, piece_ids)
         payload = {"piece_ids": piece_ids}
+    elif input_plan.kind == "place":
+        piece_ids = _selected_piece_ids(value)
+        _validate_piece_selection(input_plan, piece_ids)
+        piece_id = piece_ids[0]
+        payload = {
+            "piece_id": piece_id,
+            "source_zone_ref": input_plan.source_zone_ref,
+            "target_zone_ref": input_plan.target_zone_ref,
+        }
     else:
         payload = {}
 
@@ -249,7 +260,7 @@ class TkReferenceApp:
             self._entry_choice(frame, plan)
         elif plan.input.kind == "quantity":
             self._quantity_choice(frame, plan)
-        elif plan.input.kind == "pieces":
+        elif plan.input.kind in {"pieces", "place"}:
             self._piece_choice(frame, plan)
         else:
             self._button(frame, plan, 0, 0)
@@ -406,6 +417,27 @@ def _choice_input_plan(
             maximum=_optional_int(accepts.get("max")),
             options=pieces_by_zone.get(zone_ref or "", ()),
         )
+    if kind == "place":
+        constraints = accepts.get("constraints")
+        source_zone_ref = _optional_text(accepts.get("source_zone_ref"))
+        target_zone_ref = _optional_text(accepts.get("target_zone_ref"))
+        if isinstance(constraints, dict):
+            source_zone_ref = source_zone_ref or _optional_text(
+                constraints.get("source_zone_ref")
+            )
+            target_zone_ref = target_zone_ref or _optional_text(
+                constraints.get("target_zone_ref")
+            )
+        return InputControlPlan(
+            kind=kind,
+            widget="place_selector",
+            payload_key="piece_id",
+            minimum=1,
+            maximum=1,
+            source_zone_ref=source_zone_ref,
+            target_zone_ref=target_zone_ref,
+            options=pieces_by_zone.get(source_zone_ref or "", ()),
+        )
     return InputControlPlan(kind=kind, widget="button")
 
 
@@ -468,6 +500,8 @@ def _sample_submission(plan: WidgetPlan) -> Submission | None:
         return collect_submission(plan, plan.input.minimum or 1)
     if plan.input.kind == "pieces" and plan.input.options:
         return collect_submission(plan, [plan.input.options[0].value])
+    if plan.input.kind == "place" and plan.input.options:
+        return collect_submission(plan, plan.input.options[0].value)
     return None
 
 
@@ -495,6 +529,8 @@ def _input_plan_json(plan: InputControlPlan | None) -> JsonObject | None:
         "maximum": plan.maximum,
         "step": plan.step,
         "unit": plan.unit,
+        "source_zone_ref": plan.source_zone_ref,
+        "target_zone_ref": plan.target_zone_ref,
         "options": [
             {
                 "value": option.value,

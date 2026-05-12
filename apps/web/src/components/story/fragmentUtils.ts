@@ -8,6 +8,7 @@ import type {
   RuntimeEnvelope,
   StoryFragment,
   PieceStoryFragment,
+  RollStoryFragment,
 } from '@/types'
 
 export type UnknownRecord = Record<string, unknown>
@@ -43,6 +44,9 @@ export const isMediaFragment = (fragment: StoryFragment): fragment is MediaStory
 
 export const isPieceFragment = (fragment: StoryFragment): fragment is PieceStoryFragment =>
   fragment.fragment_type === 'piece'
+
+export const isRollFragment = (fragment: StoryFragment): fragment is RollStoryFragment =>
+  fragment.fragment_type === 'roll'
 
 export const isControlFragment = (fragment: StoryFragment): fragment is ControlStoryFragment =>
   fragment.fragment_type === 'update' || fragment.fragment_type === 'delete'

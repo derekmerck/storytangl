@@ -12,6 +12,7 @@ import pytest
 
 ROOT = Path(__file__).parents[3]
 FIXTURE_DIR = ROOT / "engine" / "contrib" / "conformance" / "fixtures"
+PROPOSAL_DIR = ROOT / "engine" / "contrib" / "conformance" / "proposals"
 TK_PATH = ROOT / "engine" / "contrib" / "conformance" / "tk_reference_port.py"
 
 
@@ -33,8 +34,17 @@ def _plans(name: str) -> tuple[object, ...]:
     return plans
 
 
+def _proposal_plans(name: str) -> tuple[object, ...]:
+    _, plans = PORT.load_fixture_plan(PROPOSAL_DIR / name)
+    return plans
+
+
 def _choices(name: str) -> dict[str, object]:
     return {plan.text: plan for plan in _plans(name) if plan.choice is not None}
+
+
+def _proposal_choices(name: str) -> dict[str, object]:
+    return {plan.text: plan for plan in _proposal_plans(name) if plan.choice is not None}
 
 
 def test_tk_reference_port_stays_json_only_and_uses_generic_model() -> None:
@@ -98,6 +108,25 @@ def test_tk_piece_selector_uses_visible_pieces_from_referenced_zone() -> None:
         "edge_id": "00000000-0000-4000-8000-000000001507",
         "choice_uid": "00000000-0000-4000-8000-000000000507",
         "payload": {"piece_ids": ["lamp"]},
+    }
+
+
+def test_tk_place_selector_uses_visible_pieces_from_source_zone() -> None:
+    choice = _proposal_choices("place_accepts.json")["Mount a weapon."]
+
+    assert choice.widget == "place_selector"
+    assert [option.label for option in choice.input.options] == ["Vulcan Gun"]
+
+    submission = PORT.collect_submission(choice, "vulcan-1")
+
+    assert submission.as_transport() == {
+        "edge_id": "00000000-0000-4000-8000-000000013106",
+        "choice_uid": "00000000-0000-4000-8000-000000013006",
+        "payload": {
+            "piece_id": "vulcan-1",
+            "source_zone_ref": "00000000-0000-4000-8000-000000013003",
+            "target_zone_ref": "00000000-0000-4000-8000-000000013005",
+        },
     }
 
 

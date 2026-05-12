@@ -540,14 +540,14 @@ bundle = {
     "name":    "Crossroads // Neon Cut",
     "version": "0.1.0",
 
-    # CSS / theme tokens; flat key→value
+    # Presentation tokens; flat key→value
     "tokens": {
-        "--paper":        "#0a0510",
-        "--ink":          "#e9f3ff",
-        "--accent":       "#ff2e93",
-        "--font-serif":   "'Space Grotesk', sans-serif",
-        "--font-mono":    "'JetBrains Mono', monospace",
-        "--motion-scale": 0.6,
+        "surface":        "#0a0510",
+        "text":           "#e9f3ff",
+        "accent":         "#ff2e93",
+        "voice":          "{actor.voice}",
+        "trim":           "{allegiance.trim}",
+        "motion_scale":   0.6,
     },
 
     # Shell selection; advisory — client falls back to default if absent
@@ -574,10 +574,51 @@ bundle = {
    table) so other ports still work.
 3. `shell` is advisory; a port that lacks the named shell falls back to its
    default.
-4. Tokens are flat key→value; nothing nested. Variables prefixed with `--`
-   are CSS; `motion-*` are honored by all ports including non-web.
+4. Tokens are flat key→value and advisory. Web ports may map them to CSS
+   variables; CLI/Tk ports may map only a small subset; plain clients may
+   ignore them.
 
-### 4.3 Profiles — port conformance subsetting (Tier P2)
+### 4.3 Presentation context and token cascade — Tier P2
+
+Presentation profiles are a catalog-level mechanism, not a fragment type and
+not imperative UI commands. A world may expose durable profile definitions on
+`WorldInfo` or a world presentation endpoint. Runtime envelopes should carry
+only lightweight references to the currently active context:
+
+```python
+metadata = {
+    "presentation_context": {
+        "profile_refs": ["world:base", "city:bluegate", "scene:harbor_night"],
+        "mode": "dark",
+        "tokens": {
+            "voice": "{actor.captain_x.voice}",
+            "trim": "{actor.captain_x.trim}",
+        },
+    }
+}
+```
+
+The resolution model is deliberately smaller than CSS, Sass, or Jinja:
+
+1. The backend/world projection chooses the ordered `profile_refs`.
+2. The client loads the referenced flat token maps when it knows how.
+3. Later maps override earlier maps by key; local `tokens` apply last.
+4. A token value may be a simple alias such as `{allegiance.trim}`. Clients
+   resolve aliases recursively over the assembled map with a small depth limit
+   and cycle diagnostics.
+5. Concrete swatches may provide `base`, `light`, and `dark` variants. The
+   client chooses the variant that fits its current shell mode.
+6. Unknown profiles, tokens, aliases, or variants fall back to client defaults.
+
+This gives the useful part of CSS specificity without importing a selector
+language into the portable contract. The backend decides whether the active
+context includes a world, city, faction, actor, scene, or fragment override; the
+client only layers the maps it was handed. The same semantic token can style a
+button, dialog speaker, paperdoll trim, map marker, zone border, or CLI speaker
+prefix. Tokens may reinforce narrative state, but they must never be the only
+carrier of gameplay-relevant information.
+
+### 4.4 Profiles — port conformance subsetting (Tier P2)
 
 Bundles MAY declare which **profiles** they exercise:
 

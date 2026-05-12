@@ -40,7 +40,7 @@ const hasPayloadInput = computed(() => {
   const kind = props.choice.accepts.kind
   if (
     typeof kind === 'string' &&
-    ['text', 'quantity', 'pieces', 'raw_command'].includes(kind)
+    ['text', 'quantity', 'pieces', 'place', 'raw_command'].includes(kind)
   ) {
     return true
   }

@@ -72,7 +72,7 @@ const acceptsKind = computed(() => {
 const hasExplicitKind = computed(() => typeof accepts.value.kind === 'string')
 
 const rendersInput = computed(() =>
-  ['text', 'quantity', 'pieces', 'raw_command'].includes(acceptsKind.value),
+  ['text', 'quantity', 'pieces', 'place', 'raw_command'].includes(acceptsKind.value),
 )
 const inputLabel = computed(() => props.choice.text)
 const commandGrammar = computed<CommandGrammar>(() => {
@@ -129,13 +129,30 @@ const payloadKey = computed(() => {
 const targetZoneRef = computed(() => {
   const constraints = accepts.value.constraints
   if (!isRecord(constraints)) {
-    return undefined
+    return stringValue(accepts.value.target_zone_ref)
   }
-  return stringValue(constraints.target_zone_ref)
+  return stringValue(accepts.value.target_zone_ref) ?? stringValue(constraints.target_zone_ref)
+})
+
+const sourceZoneRef = computed(() => {
+  const constraints = accepts.value.constraints
+  if (!isRecord(constraints)) {
+    return stringValue(accepts.value.source_zone_ref)
+  }
+  return stringValue(accepts.value.source_zone_ref) ?? stringValue(constraints.source_zone_ref)
 })
 
 const targetZone = computed<GroupStoryFragment | undefined>(() => {
   const ref = targetZoneRef.value
+  if (!ref) {
+    return undefined
+  }
+  const fragment = props.fragments[ref]
+  return fragment && isGroupFragment(fragment) ? fragment : undefined
+})
+
+const sourceZone = computed<GroupStoryFragment | undefined>(() => {
+  const ref = sourceZoneRef.value
   if (!ref) {
     return undefined
   }
@@ -167,6 +184,12 @@ const candidatePieces = computed<PieceStoryFragment[]>(() =>
     .filter((fragment): fragment is PieceStoryFragment => Boolean(fragment)) ?? [],
 )
 
+const sourcePieces = computed<PieceStoryFragment[]>(() =>
+  sourceZone.value?.member_ids
+    .map(pieceByMemberId)
+    .filter((fragment): fragment is PieceStoryFragment => Boolean(fragment)) ?? [],
+)
+
 const pieceLabel = (piece: PieceStoryFragment): string => {
   const hints = piece.hints ?? piece.presentation_hints
   const content = fragmentText(piece.content)
@@ -179,8 +202,22 @@ const pieceLabel = (piece: PieceStoryFragment): string => {
   )
 }
 
+const zoneLabel = (zone: GroupStoryFragment | undefined, fallback: string): string => {
+  if (!zone) {
+    return fallback
+  }
+  const hints = zone.hints ?? zone.presentation_hints
+  return (
+    stringValue(hints?.label_text) ??
+    stringValue(zone.label) ??
+    stringValue(zone.zone_role) ??
+    zone.uid
+  )
+}
+
 const piecePayloadId = (piece: PieceStoryFragment): string => piece.piece_id ?? piece.uid
 const candidatePiecePayloadIds = computed(() => candidatePieces.value.map(piecePayloadId))
+const sourcePiecePayloadIds = computed(() => sourcePieces.value.map(piecePayloadId))
 
 const validateText = (value: string): string | undefined => {
   if (required.value && value.trim() === '') {
@@ -276,6 +313,28 @@ const piecePayload = (): PayloadState => {
   return { valid: true, payload: { piece_ids: [...selectedPieceIds.value] } }
 }
 
+const placePayload = (): PayloadState => {
+  const sourceRef = sourceZoneRef.value
+  const targetRef = targetZoneRef.value
+  if (!sourceRef || !targetRef || !sourceZone.value || !targetZone.value) {
+    return { valid: false, message: 'Missing source or target' }
+  }
+  if (sourcePieces.value.length === 0) {
+    return { valid: false, message: 'No valid sources' }
+  }
+  if (selectedPieceIds.value.length !== 1) {
+    return { valid: false, message: 'Select 1' }
+  }
+  return {
+    valid: true,
+    payload: {
+      piece_id: selectedPieceIds.value[0],
+      source_zone_ref: sourceRef,
+      target_zone_ref: targetRef,
+    },
+  }
+}
+
 const payloadState = computed<PayloadState>(() => {
   if (acceptsKind.value === 'text' || acceptsKind.value === 'raw_command') {
     return textPayload()
@@ -285,6 +344,9 @@ const payloadState = computed<PayloadState>(() => {
   }
   if (acceptsKind.value === 'pieces') {
     return piecePayload()
+  }
+  if (acceptsKind.value === 'place') {
+    return placePayload()
   }
   return { valid: true, payload: props.choice.payload }
 })
@@ -327,7 +389,7 @@ watch(
 )
 
 watch(
-  [acceptsKind, targetZoneRef, candidatePiecePayloadIds],
+  [acceptsKind, sourceZoneRef, targetZoneRef, candidatePiecePayloadIds, sourcePiecePayloadIds],
   () => {
     inputValue.value = ''
     selectedPieceIds.value = []
@@ -398,6 +460,35 @@ watch(
       <div v-else class="choice-input-message">No valid targets</div>
     </div>
 
+    <div v-else-if="acceptsKind === 'place'" class="choice-place-input">
+      <div class="choice-place-target" data-testid="choice-place-target">
+        {{ zoneLabel(sourceZone, 'source') }} to {{ zoneLabel(targetZone, 'target') }}
+      </div>
+      <div
+        v-if="sourcePieces.length > 0"
+        class="choice-piece-list"
+        role="listbox"
+        :aria-label="inputLabel"
+      >
+        <div
+          v-for="piece in sourcePieces"
+          :key="piece.uid"
+          class="choice-piece-option"
+          :class="{ 'choice-piece-option--selected': selectedPieceIds.includes(piecePayloadId(piece)) }"
+          role="option"
+          :aria-selected="selectedPieceIds.includes(piecePayloadId(piece))"
+          :aria-disabled="disabled ? 'true' : undefined"
+          :data-piece-id="piecePayloadId(piece)"
+          :tabindex="disabled ? undefined : 0"
+          @click="togglePiece(piece)"
+          @keydown="handlePieceKeydown($event, piece)"
+        >
+          {{ pieceLabel(piece) }}
+        </div>
+      </div>
+      <div v-else class="choice-input-message">No valid sources</div>
+    </div>
+
     <div
       v-if="payloadState.message"
       class="choice-input-message"
@@ -434,6 +525,19 @@ watch(
 
 .choice-piece-input {
   min-width: 0;
+}
+
+.choice-place-input {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.choice-place-target {
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  padding: 0 4px;
 }
 
 .choice-piece-list {
