@@ -396,7 +396,8 @@ pattern:
   that lower to ordinary actions, optional call/return edges, and self-loop
   effect/journal actions;
 - assets and fixtures sponsor take/drop/read/open/close/unlock/container
-  actions through typed facets and the asset transaction manager.
+  actions through typed facets and the asset transaction manager, and can also
+  sponsor explicit `SandboxInteraction` declarations.
 
 The likely promotion path is a general StoryTangl helper for sponsored
 traversal or concept-owned affordances once at least mobs, locations, assets,
@@ -439,11 +440,10 @@ than by creating a dialogue or encounter subsystem.
    "relationship trust high enough" should decide whether an ordinary action is
    offered or activatable.
 
-4. **Extend to assets and fixtures only after the shape holds.** Carried or
-   present assets and reachable fixtures should be able to sponsor the same
-   interaction declarations. This is where instruments, books, doors, altars,
-   and other object-bound storylets become first-class without new traversal
-   machinery.
+4. **Extend to assets and fixtures.** Carried or present assets and reachable
+   fixtures can sponsor the same interaction declarations. This is where
+   instruments, books, doors, altars, and other object-bound storylets become
+   first-class without new traversal machinery.
 
 5. **Delay lazy materialization.** The first implementation should target
    existing traversable nodes. Later, an interaction can name a template that is
@@ -463,6 +463,7 @@ Acceptance tests for the next slice should prove the architectural shape:
 - an absent scheduled mob does not offer that interaction;
 - a once-only interaction is suppressed after its target has been visited;
 - a location-owned interaction is offered only at that location;
+- present/carried assets and reachable fixtures offer sponsored interactions;
 - the projected actions are ordinary `Action` edges with journal fragments, not
   a parallel interaction ledger.
 

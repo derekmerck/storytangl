@@ -67,6 +67,7 @@ class SandboxAssetSurface(Protocol):
     turn_off_text: str | None
     take_text: str | None
     drop_text: str | None
+    interactions: list[SandboxInteraction]
 
     def get_label(self) -> str | None:
         """Return the graph/token label."""
@@ -1045,6 +1046,13 @@ def _project_location_asset_actions(
 ) -> None:
     for asset_label, asset in sorted(location.assets.items()):
         asset_name = _asset_name(asset)
+        _project_asset_interactions(
+            location,
+            graph=graph,
+            asset=asset,
+            asset_label=asset_label,
+            possession="location",
+        )
         if _asset_portable(asset):
             Action(
                 registry=graph,
@@ -1162,6 +1170,13 @@ def _project_carried_asset_actions(
             )
         if projection_state.suppress_asset_affordances:
             continue
+        _project_asset_interactions(
+            location,
+            graph=graph,
+            asset=asset,
+            asset_label=asset_label,
+            possession="carried",
+        )
         read_text = _asset_read_text(asset)
         if read_text:
             Action(
@@ -1200,6 +1215,47 @@ def _project_carried_asset_actions(
                 verb="drop",
                 asset=asset_label,
             ),
+        )
+
+
+def _project_asset_interactions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    asset: SandboxAssetSurface,
+    asset_label: str,
+    possession: str,
+) -> None:
+    for interaction in asset.interactions:
+        _project_sandbox_interaction(
+            location,
+            graph=graph,
+            interaction=interaction,
+            source="sandbox_asset",
+            sponsor_label=asset_label,
+            sponsor_kind="asset",
+            tags={"asset"},
+            asset=asset_label,
+            possession=possession,
+        )
+
+
+def _project_fixture_interactions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    fixture: SandboxFixture,
+) -> None:
+    for interaction in fixture.interactions:
+        _project_sandbox_interaction(
+            location,
+            graph=graph,
+            interaction=interaction,
+            source="sandbox_fixture",
+            sponsor_label=fixture.label,
+            sponsor_kind="fixture",
+            tags={"fixture"},
+            fixture=fixture.label,
         )
 
 
@@ -1588,6 +1644,7 @@ def project_sandbox_fixture_actions(*, caller, ctx, **_kw):
         return None
 
     for fixture in caller.fixtures:
+        _project_fixture_interactions(caller, graph=graph, fixture=fixture)
         if fixture.openable is None:
             continue
         if fixture.open:

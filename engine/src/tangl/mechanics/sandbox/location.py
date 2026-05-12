@@ -59,6 +59,7 @@ class SandboxFixture(HasAssets):
     openable: OpenableFacet | None = None
     lockable: LockableFacet | None = None
     container: ContainerFacet | None = None
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
 
     @property
     def locked(self) -> bool:

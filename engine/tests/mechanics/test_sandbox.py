@@ -57,6 +57,7 @@ class SandboxItemType(AssetType):
     turn_off_text: str | None = None
     take_text: str | None = None
     drop_text: str | None = None
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
 
 
 @pytest.fixture(autouse=True)
@@ -403,6 +404,109 @@ def test_location_interaction_can_be_trivial_self_loop_action() -> None:
         "You crouch behind the broken wall.",
         "Cover is good.",
     ]
+
+
+def test_assets_project_sponsored_interactions_when_present_or_carried() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    road = SandboxLocation(label="road", location_name="Road")
+    flute_scene = Block(label="flute_scene", content="The notes carry.")
+    book_scene = Block(label="book_scene", content="The margins answer.")
+    SandboxItemType(
+        label="flute",
+        name="flute",
+        interactions=[
+            SandboxInteraction(
+                label="play",
+                text="Play the flute",
+                target="flute_scene",
+                return_to_location=True,
+            )
+        ],
+    )
+    SandboxItemType(
+        label="book",
+        name="book",
+        interactions=[
+            SandboxInteraction(
+                label="study",
+                text="Study the book",
+                target="book_scene",
+            )
+        ],
+    )
+    flute = Token[SandboxItemType](token_from="flute", label="flute")
+    book = Token[SandboxItemType](token_from="book", label="book")
+    scope.player_assets.add_asset(flute)
+    road.add_asset(book)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(flute_scene)
+    graph.add(book_scene)
+    graph.add(flute)
+    graph.add(book)
+    scope.add_child(road)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    interactions = [
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "interaction")
+        if action.ui_hints.get("source") == "sandbox_asset"
+    ]
+    assert {action.text for action in interactions} == {
+        "Play the flute",
+        "Study the book",
+    }
+    assert {
+        action.ui_hints["asset"]: action.ui_hints["possession"]
+        for action in interactions
+    } == {"flute": "carried", "book": "location"}
+    play = next(action for action in interactions if action.text == "Play the flute")
+    assert play.successor is flute_scene
+    assert play.return_phase is not None
+
+
+def test_fixture_projects_sponsored_interaction() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    road = SandboxLocation(
+        label="road",
+        location_name="Road",
+        locals={"blessed": False},
+        fixtures=[
+            SandboxFixture(
+                label="altar",
+                name="altar",
+                interactions=[
+                    SandboxInteraction(
+                        label="pray",
+                        text="Pray at the altar",
+                        target="current",
+                        journal_text="The stone warms under your hands.",
+                        effects=[Effect(expr="blessed = True")],
+                    )
+                ],
+            )
+        ],
+    )
+    graph.add(road)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    interaction = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "interaction")
+        if action.ui_hints.get("source") == "sandbox_fixture"
+    )
+    assert interaction.text == "Pray at the altar"
+    assert interaction.successor is road
+    assert interaction.ui_hints["fixture"] == "altar"
+    assert interaction.journal_text == "The stone warms under your hands."
+
+    Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(interaction.uid)
+
+    assert road.locals["blessed"] is True
 
 
 def test_present_mob_projects_asset_transfer_actions() -> None:

@@ -49,7 +49,7 @@ ARCHITECTURE_SLICE = {
                         "target": "current",
                         "journal": "The road hums underfoot.",
                         "availability": "True",
-                        "effects": "locals['listened'] = True",
+                        "effects": "listened = True",
                     }
                 }
             },
@@ -67,6 +67,28 @@ ARCHITECTURE_SLICE = {
             "traits": ["portable", "readable"],
             "initial": {"location": "road"},
             "descriptions": {"examine": "The lamp is readable, somehow."},
+            "contributes": {
+                "interactions": {
+                    "rub": {
+                        "text": "Rub the lamp",
+                        "target": "current",
+                    }
+                }
+            },
+        }
+    },
+    "fixtures": {
+        "altar": {
+            "name": "Altar",
+            "initial": {"locations": ["road"]},
+            "contributes": {
+                "interactions": {
+                    "pray": {
+                        "text": "Pray at the altar",
+                        "target": "current",
+                    }
+                }
+            },
         }
     },
     "mobs": {
@@ -164,9 +186,9 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert [predicate.expr for predicate in road.interactions[0].availability] == [
         "True"
     ]
-    assert [effect.expr for effect in road.interactions[0].effects] == [
-        "locals['listened'] = True"
-    ]
+    assert [effect.expr for effect in road.interactions[0].effects] == ["listened = True"]
+    assert len(compiled.assets["lamp"].interactions) == 1
+    assert compiled.fixtures["altar"].interactions[0].label == "pray"
     assert isinstance(compiled.mobs["guide"].interactions[0], SandboxInteraction)
     assert isinstance(compiled.mobs["guide"], Actor)
 

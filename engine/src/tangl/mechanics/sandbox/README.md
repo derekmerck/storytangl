@@ -48,9 +48,11 @@ Current first-pass surface:
   target. Direction aliases such as `n`, `s`, `e`, `w`, `u`, and `d` are
   normalized into canonical UI hints while preserving the raw authored key.
 - `project_sandbox_asset_actions`: planning handler that projects present assets
-  as take/read choices and player-held assets as drop choices.
+  as take/read choices, player-held assets as drop choices, and present/carried
+  asset interactions as ordinary choices.
 - `project_sandbox_fixture_actions`: planning handler that projects openable
-  local fixtures as open/close choices.
+  local fixtures as open/close choices and fixture interactions as ordinary
+  choices.
 - `project_sandbox_mob_actions`: planning handler that projects present mob
   affordances and interactions as ordinary choices.
 - `project_sandbox_location_interactions`: planning handler that projects active
@@ -124,9 +126,9 @@ Sponsored interactions are the first shared local-choice surface. A
 `SandboxInteraction` lowers to a normal `Action` edge with target, activation,
 optional call/return, availability, effects, selected-action journal text, and
 provenance hints. Present mobs and active locations can sponsor these
-interactions now; carried assets and reachable fixtures are the next likely
-reuse point. This is a sandbox instance of a broader StoryTangl pattern: a
-concept that is in scope can sponsor a choice without owning a separate runtime.
+interactions, as can present/carried assets and reachable fixtures. This is a
+sandbox instance of a broader StoryTangl pattern: a concept that is in scope can
+sponsor a choice without owning a separate runtime.
 
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,

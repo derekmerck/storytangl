@@ -50,6 +50,7 @@ class SandboxCompiledAssetType(AssetType):
     turn_off_text: str | None = None
     take_text: str | None = None
     drop_text: str | None = None
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
 
 
 class SandboxSourceSpec(BaseModel):
@@ -212,10 +213,14 @@ class SandboxInteractionSpec(BaseModel):
         )
 
 
-class SandboxLocationContributionsSpec(BaseModel):
-    """Authored contribution tables for one compact location."""
+class SandboxContributionsSpec(BaseModel):
+    """Authored interaction contribution tables for one compact concept."""
 
     interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
+
+
+class SandboxLocationContributionsSpec(SandboxContributionsSpec):
+    """Authored contribution tables for one compact location."""
 
 
 class SandboxLocationSpec(BaseModel):
@@ -228,8 +233,8 @@ class SandboxLocationSpec(BaseModel):
     traits: list[str] = Field(default_factory=list)
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     exits: dict[str, str | SandboxExitSpec] = Field(default_factory=dict)
-    contributes: SandboxLocationContributionsSpec = Field(
-        default_factory=SandboxLocationContributionsSpec
+    contributes: SandboxContributionsSpec = Field(
+        default_factory=SandboxContributionsSpec
     )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
@@ -263,6 +268,9 @@ class SandboxAssetSpec(BaseModel):
     initial: SandboxInitialAssetSpec
     capacity: SandboxContainerSpec | None = None
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
+    contributes: SandboxContributionsSpec = Field(
+        default_factory=SandboxContributionsSpec
+    )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
     )
@@ -287,6 +295,9 @@ class SandboxFixtureSpec(BaseModel):
     key: str = "key"
     capacity: SandboxContainerSpec | None = None
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
+    contributes: SandboxContributionsSpec = Field(
+        default_factory=SandboxContributionsSpec
+    )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
     )
@@ -609,6 +620,11 @@ class SandboxSliceCompiler:
             ),
             "take_text": spec.descriptions.take,
             "drop_text": spec.descriptions.drop,
+            "interactions": [
+                interaction_spec.as_interaction(interaction_label)
+                for interaction_label, interaction_spec
+                in spec.contributes.interactions.items()
+            ],
         }
 
     def _compile_container(
@@ -676,6 +692,11 @@ class SandboxSliceCompiler:
                     capacity=fixture_spec.capacity,
                     descriptions=fixture_spec.descriptions,
                 ),
+                interactions=[
+                    interaction_spec.as_interaction(interaction_label)
+                    for interaction_label, interaction_spec
+                    in fixture_spec.contributes.interactions.items()
+                ],
             )
             for location_label in fixture_spec.initial.locations:
                 self._require_location(
