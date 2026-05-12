@@ -178,16 +178,24 @@ const pieceByMemberId = (memberId: string): PieceStoryFragment | undefined => {
   return piecesByPieceId.value.get(memberId)
 }
 
+const isSelectablePiece = (piece: PieceStoryFragment): boolean => piece.available !== false
+
 const candidatePieces = computed<PieceStoryFragment[]>(() =>
   targetZone.value?.member_ids
     .map(pieceByMemberId)
-    .filter((fragment): fragment is PieceStoryFragment => Boolean(fragment)) ?? [],
+    .filter(
+      (fragment): fragment is PieceStoryFragment =>
+        fragment !== undefined && isSelectablePiece(fragment),
+    ) ?? [],
 )
 
 const sourcePieces = computed<PieceStoryFragment[]>(() =>
   sourceZone.value?.member_ids
     .map(pieceByMemberId)
-    .filter((fragment): fragment is PieceStoryFragment => Boolean(fragment)) ?? [],
+    .filter(
+      (fragment): fragment is PieceStoryFragment =>
+        fragment !== undefined && isSelectablePiece(fragment),
+    ) ?? [],
 )
 
 const pieceLabel = (piece: PieceStoryFragment): string => {
@@ -310,6 +318,10 @@ const piecePayload = (): PayloadState => {
   if (selectedPieceIds.value.length > max) {
     return { valid: false, message: `Select at most ${max}` }
   }
+  const validIds = new Set(candidatePiecePayloadIds.value)
+  if (selectedPieceIds.value.some((pieceId) => !validIds.has(pieceId))) {
+    return { valid: false, message: 'Select a valid target' }
+  }
   return { valid: true, payload: { piece_ids: [...selectedPieceIds.value] } }
 }
 
@@ -325,10 +337,15 @@ const placePayload = (): PayloadState => {
   if (selectedPieceIds.value.length !== 1) {
     return { valid: false, message: 'Select 1' }
   }
+  const validIds = new Set(sourcePiecePayloadIds.value)
+  const selectedPieceId = selectedPieceIds.value[0]
+  if (!selectedPieceId || !validIds.has(selectedPieceId)) {
+    return { valid: false, message: 'Select a valid source' }
+  }
   return {
     valid: true,
     payload: {
-      piece_id: selectedPieceIds.value[0],
+      piece_id: selectedPieceId,
       source_zone_ref: sourceRef,
       target_zone_ref: targetRef,
     },
@@ -457,7 +474,6 @@ watch(
           {{ pieceLabel(piece) }}
         </div>
       </div>
-      <div v-else class="choice-input-message">No valid targets</div>
     </div>
 
     <div v-else-if="acceptsKind === 'place'" class="choice-place-input">
@@ -486,7 +502,6 @@ watch(
           {{ pieceLabel(piece) }}
         </div>
       </div>
-      <div v-else class="choice-input-message">No valid sources</div>
     </div>
 
     <div

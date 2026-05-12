@@ -406,9 +406,9 @@ def _choice_input_plan(
         )
     if kind == "pieces":
         constraints = accepts.get("constraints")
-        zone_ref = None
+        zone_ref = _optional_text(accepts.get("target_zone_ref"))
         if isinstance(constraints, dict):
-            zone_ref = _optional_text(constraints.get("target_zone_ref"))
+            zone_ref = zone_ref or _optional_text(constraints.get("target_zone_ref"))
         return InputControlPlan(
             kind=kind,
             widget="piece_selector",

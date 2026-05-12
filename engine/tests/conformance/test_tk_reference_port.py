@@ -111,6 +111,46 @@ def test_tk_piece_selector_uses_visible_pieces_from_referenced_zone() -> None:
     }
 
 
+def test_tk_piece_selector_accepts_top_level_target_zone_ref() -> None:
+    document = PORT.render_fixture_document(
+        {
+            "cursor_id": "fixture",
+            "step": 1,
+            "fragments": [
+                {
+                    "uid": "scene",
+                    "fragment_type": "group",
+                    "group_type": "scene",
+                    "member_ids": ["zone", "choice"],
+                },
+                {
+                    "uid": "zone",
+                    "fragment_type": "group",
+                    "group_type": "zone",
+                    "member_ids": ["lamp-fragment"],
+                    "hints": {"label_text": "Here"},
+                },
+                {
+                    "uid": "lamp-fragment",
+                    "fragment_type": "piece",
+                    "piece_id": "lamp",
+                    "content": "brass lamp",
+                    "zone_ref": "zone",
+                },
+                {
+                    "uid": "choice",
+                    "fragment_type": "choice",
+                    "text": "Take something.",
+                    "accepts": {"kind": "pieces", "target_zone_ref": "zone"},
+                },
+            ],
+        }
+    )
+    choice = next(plan for plan in PORT.build_widget_plan(document) if plan.choice is not None)
+
+    assert [option.value for option in choice.input.options] == ["lamp"]
+
+
 def test_tk_place_selector_uses_visible_pieces_from_source_zone() -> None:
     choice = _proposal_choices("place_accepts.json")["Mount a weapon."]
 

@@ -447,15 +447,20 @@ def _accepts_prompt(
         minimum = accepts.get("min")
         maximum = accepts.get("max")
         constraints = _object(accepts.get("constraints"))
-        zone_ref = _text(constraints, "target_zone_ref") if constraints is not None else None
+        zone_ref = _text(accepts, "target_zone_ref") or _text(constraints, "target_zone_ref")
         zone = registry.get(zone_ref) if zone_ref else None
         zone_label = _fragment_label(zone, zone_ref or "zone") if zone is not None else "zone"
         count = _selection_count(minimum, maximum, "piece")
         return f" <select {count} from {zone_label}>"
 
     if kind == "place":
-        source_ref = _text(accepts, "source_zone_ref")
-        target_ref = _text(accepts, "target_zone_ref")
+        constraints = _object(accepts.get("constraints"))
+        source_ref = _text(accepts, "source_zone_ref") or _text(
+            constraints, "source_zone_ref"
+        )
+        target_ref = _text(accepts, "target_zone_ref") or _text(
+            constraints, "target_zone_ref"
+        )
         source = registry.get(source_ref) if source_ref else None
         target = registry.get(target_ref) if target_ref else None
         source_label = (
@@ -571,7 +576,9 @@ def _render_section_value(value: JsonObject, ref_id: str | None) -> list[RenderI
         items = [_item("projected_value", " | ".join(columns), 1, ref_id)] if columns else []
         for row in rows:
             if isinstance(row, list):
-                items.append(_item("projected_value", " | ".join(str(cell) for cell in row), 1))
+                items.append(
+                    _item("projected_value", " | ".join(str(cell) for cell in row), 1, ref_id)
+                )
         return items
 
     if value_type == "badges":

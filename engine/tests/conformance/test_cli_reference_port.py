@@ -103,7 +103,9 @@ def test_cli_reference_renders_command_hints_as_advisory_prompt() -> None:
 
 
 def test_cli_reference_renders_projected_state_value_types() -> None:
-    output = _render("projected_state_all_values.json")
+    payload = PORT.load_fixture(FIXTURE_DIR / "projected_state_all_values.json")
+    document = PORT.render_fixture_document(payload)
+    output = "\n".join(PORT.format_document(document))
 
     assert "Wounds:\n  Sound" in output
     assert "Purse:\n  silver: 63" in output
@@ -111,6 +113,11 @@ def test_cli_reference_renders_projected_state_value_types() -> None:
     assert "name | role | mood" in output
     assert "Bram | soldier | surly" in output
     assert "Conditions:\n  rain-soaked, hungry, hunted" in output
+    assert all(
+        item.ref_id == "party"
+        for item in document.items
+        if item.role == "projected_value" and item.text in {"Bram | soldier | surly", "Elen | scout | watchful"}
+    )
 
 
 def test_cli_reference_applies_control_update_and_delete_before_rendering() -> None:

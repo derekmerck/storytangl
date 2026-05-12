@@ -364,7 +364,7 @@ describe('StoryAction', () => {
         uid: 'zone-room',
         fragment_type: 'group',
         group_type: 'zone',
-        member_ids: ['lamp-fragment'],
+        member_ids: ['lamp-fragment', 'sold-out-fragment'],
       },
       'lamp-fragment': {
         uid: 'lamp-fragment',
@@ -372,9 +372,20 @@ describe('StoryAction', () => {
         piece_id: 'lamp',
         content: 'brass lamp',
       },
+      'sold-out-fragment': {
+        uid: 'sold-out-fragment',
+        fragment_type: 'piece',
+        piece_id: 'sold-out',
+        content: 'sold out offer',
+        available: false,
+        unavailable_reason: 'Out of stock',
+      },
     }
 
     const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    expect(wrapper.findAll('.choice-piece-option')).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('sold out offer')
 
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')).toBeUndefined()
