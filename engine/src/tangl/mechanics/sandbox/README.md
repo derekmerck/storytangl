@@ -72,6 +72,10 @@ Current first-pass surface:
   description.
 - `advance_sandbox_time_on_wait`: update handler that advances sandbox-local
   time when a wait choice is selected.
+- `tangl.mechanics.sandbox.story_info.SandboxStoryInfoProjector`: optional
+  adapter for the existing service story-info seam. It projects disclosed
+  sandbox state into ordinary `ProjectedState` sections for clients that want
+  status rails, inventory panels, map modals, or ebook-style summaries.
 
 The wait action intentionally mirrors the `tangl.mechanics.games` self-loop
 pattern: planning creates a dynamic `Action`, the action targets the current
@@ -176,6 +180,13 @@ Generated sandbox actions carry provenance in `ui_hints`: the projection
 local metadata rather than a general VM receipt model, but it keeps dynamic
 choices explainable and leaves a clear promotion path if non-sandbox systems
 need the same debug surface.
+
+Projected state is a disclosed-status surface, not world truth. The optional
+service projector emits only generic `kv_list` and `item_list` sections such as
+current location, world time, player inventory, visible local assets, visible
+fixtures, visible mobs, and visible exits. Darkness and other visibility rules
+filter that surface the same way they filter local affordances. Hidden mobs,
+undisclosed schedules, secret exits, and puzzle truth stay backend-only.
 
 The older `scratch/mechanics/sandbox` code remains prior art. Mine it for
 calendar, schedule, mobile-actor, and event ideas, but do not promote it

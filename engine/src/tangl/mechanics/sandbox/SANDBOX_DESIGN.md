@@ -555,6 +555,41 @@ forced events, and selectable events. In v38 those become:
 - forced scheduled events as ordinary triggered actions
 - selectable scheduled events as ordinary generated choices
 
+### Projected State As Disclosure
+
+Sandbox projected state is an optional client convenience, not an authority
+surface. The backend owns world truth, action availability, hidden schedules,
+and mutation. A client receives only the facts the current reader/player is
+allowed to know.
+
+`SandboxStoryInfoProjector` lives in the sandbox package and attaches through
+the existing service `StoryInfoProjector` seam. Service remains generic; sandbox
+worlds opt in by installing the projector on the world. The projector emits
+ordinary `ProjectedState` sections using the existing `kv_list` and `item_list`
+value types. It does not add sandbox widgets or require a SugarCube-like
+interface. A web client may render those sections as a room header, inventory
+panel, time chip, map modal, or roster; a CLI may print them as status lines; an
+ebook compiler may ignore them or fold them into generated prose.
+
+Current disclosed sections are intentionally conservative:
+
+- current sandbox location;
+- derived world time, with arbitrary period labels such as morning, afternoon,
+  evening, and night;
+- player inventory;
+- visible local assets;
+- visible fixtures and their open/locked state;
+- present visible mobs;
+- visible authored exits.
+
+Visibility rules filter projected state the same way they filter journal and
+local affordances. Darkness may leave current location, time, and inventory
+visible while suppressing local assets, fixtures, mobs, and exits. This keeps
+projected state aligned with narrative disclosure rather than raw simulation
+truth. It must not expose hidden mobs, raw future schedules, secret exits,
+undisclosed puzzle dependencies, or anything the backend would not otherwise
+let the player perceive.
+
 ### Parser As Client Adapter
 
 Parser IF looks like a different interaction model because the menu is hidden.

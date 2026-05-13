@@ -284,6 +284,11 @@ def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
     return [scope for scope in location.ancestors if isinstance(scope, SandboxScope)]
 
 
+def sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
+    """Return sandbox scope ancestors that donate state to ``location``."""
+    return _sandbox_scopes(location)
+
+
 def _sandbox_scope_label(location: SandboxLocation) -> str:
     for scope in _sandbox_scopes(location):
         return scope.get_label()
@@ -466,6 +471,11 @@ def _present_mobs(location: SandboxLocation) -> list[SandboxMob]:
     ]
 
 
+def sandbox_present_mobs(location: SandboxLocation) -> list[SandboxMob]:
+    """Return mobs currently present at ``location`` according to world time."""
+    return _present_mobs(location)
+
+
 def _mob_by_label(location: SandboxLocation, label: str) -> SandboxMob | None:
     for mob in _sandbox_mobs(location):
         if mob.get_label() == label:
@@ -624,6 +634,11 @@ def _player_asset_holder(location: SandboxLocation) -> HasAssets | None:
     return None
 
 
+def sandbox_player_assets(location: SandboxLocation) -> HasAssets | None:
+    """Return the player-ready asset holder visible from ``location``."""
+    return _player_asset_holder(location)
+
+
 def _asset_inventory(holder: HasAssets | None) -> set[str]:
     if holder is None:
         return set()
@@ -674,6 +689,14 @@ def _projection_state(location: SandboxLocation, ctx: VmPhaseCtx) -> SandboxProj
     if state.journal_text is None and state.suppress_location_description:
         state.journal_text = location.dark_text
     return state
+
+
+def sandbox_projection_state(
+    location: SandboxLocation,
+    ctx: VmPhaseCtx,
+) -> SandboxProjectionState:
+    """Return the disclosed projection state for ``location`` in ``ctx``."""
+    return _projection_state(location, ctx)
 
 
 def _target_visited(target: TraversableNode) -> bool:

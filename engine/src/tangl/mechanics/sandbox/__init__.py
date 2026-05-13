@@ -48,6 +48,10 @@ from .handlers import (
     project_sandbox_scheduled_events,
     project_sandbox_unlocks,
     project_sandbox_wait,
+    sandbox_player_assets,
+    sandbox_present_mobs,
+    sandbox_projection_state,
+    sandbox_scopes,
 )
 from .interaction import SandboxInteraction
 from .mob import SandboxMob, SandboxMobAffordance
@@ -123,4 +127,8 @@ __all__ = [
     "project_sandbox_scheduled_events",
     "project_sandbox_unlocks",
     "project_sandbox_wait",
+    "sandbox_player_assets",
+    "sandbox_present_mobs",
+    "sandbox_projection_state",
+    "sandbox_scopes",
 ]
