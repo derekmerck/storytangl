@@ -35,7 +35,16 @@ SANDBOX_ROOT = SOURCE_ROOT / "mechanics" / "sandbox"
 
 ARCHITECTURE_SLICE = {
     "id": "sandbox_architecture_slice",
-    "scope": {"id": "arch_scope"},
+    "scope": {
+        "id": "arch_scope",
+        "scheduled_events": {
+            "dawn": {
+                "target": "road",
+                "text": "Notice the dawn",
+                "period": 1,
+            }
+        },
+    },
     "locations": {
         "road": {
             "name": "Road",
@@ -49,7 +58,14 @@ ARCHITECTURE_SLICE = {
                         "target": "current",
                         "journal": "The road hums underfoot.",
                         "availability": "True",
-                        "effects": "locals['listened'] = True",
+                        "effects": "listened = True",
+                    }
+                },
+                "scheduled_events": {
+                    "wagon": {
+                        "target": "cave",
+                        "text": "Hear the wagon pass",
+                        "period": 1,
                     }
                 }
             },
@@ -67,6 +83,42 @@ ARCHITECTURE_SLICE = {
             "traits": ["portable", "readable"],
             "initial": {"location": "road"},
             "descriptions": {"examine": "The lamp is readable, somehow."},
+            "contributes": {
+                "interactions": {
+                    "rub": {
+                        "text": "Rub the lamp",
+                        "target": "current",
+                    }
+                },
+                "scheduled_events": {
+                    "flicker": {
+                        "target": "current",
+                        "text": "Watch the lamp flicker",
+                        "period": 1,
+                    }
+                }
+            },
+        }
+    },
+    "fixtures": {
+        "altar": {
+            "name": "Altar",
+            "initial": {"locations": ["road"]},
+            "contributes": {
+                "interactions": {
+                    "pray": {
+                        "text": "Pray at the altar",
+                        "target": "current",
+                    }
+                },
+                "scheduled_events": {
+                    "chime": {
+                        "target": "current",
+                        "text": "Hear the altar chime",
+                        "period": 1,
+                    }
+                }
+            },
         }
     },
     "mobs": {
@@ -86,6 +138,13 @@ ARCHITECTURE_SLICE = {
                         "text": "Ask the guide about the cave",
                         "target": "road",
                         "return_to_location": True,
+                    }
+                },
+                "scheduled_events": {
+                    "warning": {
+                        "target": "road",
+                        "text": "Hear the guide's warning",
+                        "period": 1,
                     }
                 }
             },
@@ -164,10 +223,15 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert [predicate.expr for predicate in road.interactions[0].availability] == [
         "True"
     ]
-    assert [effect.expr for effect in road.interactions[0].effects] == [
-        "locals['listened'] = True"
-    ]
+    assert [effect.expr for effect in road.interactions[0].effects] == ["listened = True"]
+    assert compiled.scope.scheduled_events[0].label == "dawn"
+    assert road.scheduled_events[0].label == "wagon"
+    assert len(compiled.assets["lamp"].interactions) == 1
+    assert compiled.assets["lamp"].scheduled_events[0].label == "flicker"
+    assert compiled.fixtures["altar"].interactions[0].label == "pray"
+    assert compiled.fixtures["altar"].scheduled_events[0].label == "chime"
     assert isinstance(compiled.mobs["guide"].interactions[0], SandboxInteraction)
+    assert compiled.mobs["guide"].scheduled_events[0].label == "warning"
     assert isinstance(compiled.mobs["guide"], Actor)
 
     road_ctx = PhaseCtx(graph=compiled.graph, cursor_id=road.uid)

@@ -57,6 +57,8 @@ class SandboxItemType(AssetType):
     turn_off_text: str | None = None
     take_text: str | None = None
     drop_text: str | None = None
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
+    scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
 
 
 @pytest.fixture(autouse=True)
@@ -405,6 +407,109 @@ def test_location_interaction_can_be_trivial_self_loop_action() -> None:
     ]
 
 
+def test_assets_project_sponsored_interactions_when_present_or_carried() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    road = SandboxLocation(label="road", location_name="Road")
+    flute_scene = Block(label="flute_scene", content="The notes carry.")
+    book_scene = Block(label="book_scene", content="The margins answer.")
+    SandboxItemType(
+        label="flute",
+        name="flute",
+        interactions=[
+            SandboxInteraction(
+                label="play",
+                text="Play the flute",
+                target="flute_scene",
+                return_to_location=True,
+            )
+        ],
+    )
+    SandboxItemType(
+        label="book",
+        name="book",
+        interactions=[
+            SandboxInteraction(
+                label="study",
+                text="Study the book",
+                target="book_scene",
+            )
+        ],
+    )
+    flute = Token[SandboxItemType](token_from="flute", label="flute")
+    book = Token[SandboxItemType](token_from="book", label="book")
+    scope.player_assets.add_asset(flute)
+    road.add_asset(book)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(flute_scene)
+    graph.add(book_scene)
+    graph.add(flute)
+    graph.add(book)
+    scope.add_child(road)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    interactions = [
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "interaction")
+        if action.ui_hints.get("source") == "sandbox_asset"
+    ]
+    assert {action.text for action in interactions} == {
+        "Play the flute",
+        "Study the book",
+    }
+    assert {
+        action.ui_hints["asset"]: action.ui_hints["possession"]
+        for action in interactions
+    } == {"flute": "carried", "book": "location"}
+    play = next(action for action in interactions if action.text == "Play the flute")
+    assert play.successor is flute_scene
+    assert play.return_phase is not None
+
+
+def test_fixture_projects_sponsored_interaction() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    road = SandboxLocation(
+        label="road",
+        location_name="Road",
+        locals={"blessed": False},
+        fixtures=[
+            SandboxFixture(
+                label="altar",
+                name="altar",
+                interactions=[
+                    SandboxInteraction(
+                        label="pray",
+                        text="Pray at the altar",
+                        target="current",
+                        journal_text="The stone warms under your hands.",
+                        effects=[Effect(expr="blessed = True")],
+                    )
+                ],
+            )
+        ],
+    )
+    graph.add(road)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    interaction = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "interaction")
+        if action.ui_hints.get("source") == "sandbox_fixture"
+    )
+    assert interaction.text == "Pray at the altar"
+    assert interaction.successor is road
+    assert interaction.ui_hints["fixture"] == "altar"
+    assert interaction.journal_text == "The stone warms under your hands."
+
+    Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(interaction.uid)
+
+    assert road.locals["blessed"] is True
+
+
 def test_present_mob_projects_asset_transfer_actions() -> None:
     graph = Graph(label="tiny_cave")
     scope = SandboxScope(label="tiny_cave_scope")
@@ -748,6 +853,158 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
     choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
 
     assert any(choice.text == "Talk to traveler" and choice.available for choice in choices)
+
+
+def test_scheduled_event_uses_interaction_journal_effects_and_availability() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.locals.update({"world_turn": 2, "can_ring": False, "bell_rung": False})
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="bell",
+            location="road",
+            period=3,
+            target="current",
+            text="Ring the bell",
+            journal_text="The bell rings once.",
+            availability=[Predicate(expr="can_ring")],
+            effects=[Effect(expr="bell_rung = True")],
+        )
+    ]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    assert event.text == "Ring the bell"
+    assert event.ui_hints["contribution"] == "event"
+    assert event.journal_text == "The bell rings once."
+    assert not event.available(ctx=ctx)
+
+    road.locals["can_ring"] = True
+    ctx._ns_cache.clear()
+    assert event.available(ctx=ctx)
+
+    Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert road.locals["bell_rung"] is True
+
+
+def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0})
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    parley = Block(label="parley", content="The pirate lowers his blade.")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        schedule=Schedule(
+            entries=[
+                ScheduleEntry(label="road_watch", location="road", period=1),
+                ScheduleEntry(label="building_watch", location="building", period=2),
+            ]
+        ),
+        scheduled_events=[
+            ScheduledEvent(
+                label="parley",
+                period=1,
+                target="parley",
+                text="Parley with the pirate",
+            )
+        ],
+    )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(parley)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+
+    road_events = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert [event.text for event in road_events] == ["Parley with the pirate"]
+    assert road_events[0].ui_hints["source_kind"] == "mob"
+    assert road_events[0].ui_hints["mob"] == "pirate"
+    assert _dynamic_sandbox_actions_with_tag(building, "event") == []
+
+
+def test_hidden_mob_does_not_project_scheduled_events() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 0},
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(label="dark_cave", location_name="Dark Cave")
+    parley = Block(label="parley", content="The pirate lowers his blade.")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="dark_cave",
+        scheduled_events=[
+            ScheduledEvent(
+                label="parley",
+                period=1,
+                target="parley",
+                text="Parley with the pirate",
+            )
+        ],
+    )
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(parley)
+    graph.add(pirate)
+    scope.add_child(cave)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(cave, "event") == []
+
+
+def test_suppressed_carried_asset_affordances_do_not_project_scheduled_events() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 0},
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(label="dark_cave", location_name="Dark Cave")
+    whisper = Block(label="whisper", content="The amulet hums.")
+    SandboxItemType(
+        label="amulet",
+        name="amulet",
+        scheduled_events=[
+            ScheduledEvent(
+                label="whisper",
+                period=1,
+                target="whisper",
+                text="Listen to the amulet",
+            )
+        ],
+    )
+    amulet = Token[SandboxItemType](token_from="amulet", label="amulet")
+    scope.player_assets.add_asset(amulet)
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(whisper)
+    graph.add(amulet)
+    scope.add_child(cave)
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(cave, "event") == []
 
 
 def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -19,15 +19,12 @@ from .facets import (
     OpenableFacet,
     SwitchableFacet,
 )
-from .interaction import SandboxInteraction
+from .interaction import SandboxInteraction, normalize_runtime_ops
 from .location import SandboxExit, SandboxFixture, SandboxLocation
 from .mob import SandboxMob, SandboxMobAffordance
-from .schedule import Schedule
+from .schedule import Schedule, ScheduledEvent
 from .scope import SandboxScope
 from .visibility import SandboxVisibilityRule
-
-RuntimeOpT = TypeVar("RuntimeOpT", Predicate, Effect)
-
 
 class SandboxCompiledAssetType(AssetType):
     """Asset type used by the compact sandbox slice compiler."""
@@ -50,6 +47,8 @@ class SandboxCompiledAssetType(AssetType):
     turn_off_text: str | None = None
     take_text: str | None = None
     drop_text: str | None = None
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
+    scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
 
 
 class SandboxSourceSpec(BaseModel):
@@ -98,6 +97,7 @@ class SandboxScopeSpec(BaseModel):
     materialization: SandboxMaterializationSpec = Field(
         default_factory=SandboxMaterializationSpec
     )
+    scheduled_events: dict[str, ScheduledEvent] = Field(default_factory=dict)
 
 
 class SandboxRuntimeIdentitySpec(BaseModel):
@@ -152,28 +152,6 @@ class SandboxExitSpec(BaseModel):
         )
 
 
-def _normalize_runtime_ops(value: Any, op_kind: type[RuntimeOpT]) -> list[RuntimeOpT]:
-    if value is None:
-        return []
-    if isinstance(value, op_kind):
-        return [value]
-    if isinstance(value, str):
-        return [op_kind(expr=value)]
-    if isinstance(value, dict):
-        return [op_kind.model_validate(value)]
-    out: list[RuntimeOpT] = []
-    for item in value:
-        if isinstance(item, op_kind):
-            out.append(item)
-        elif isinstance(item, str):
-            out.append(op_kind(expr=item))
-        elif isinstance(item, dict):
-            out.append(op_kind.model_validate(item))
-        else:
-            raise TypeError(f"Expected {op_kind.__name__} expression, got {type(item)!r}")
-    return out
-
-
 class SandboxInteractionSpec(BaseModel):
     """Authored compact interaction sponsored by a scoped concept."""
 
@@ -190,12 +168,12 @@ class SandboxInteractionSpec(BaseModel):
     @field_validator("availability", mode="before")
     @classmethod
     def _normalize_availability(cls, value: Any) -> list[Predicate]:
-        return _normalize_runtime_ops(value, Predicate)
+        return normalize_runtime_ops(value, Predicate)
 
     @field_validator("effects", mode="before")
     @classmethod
     def _normalize_effects(cls, value: Any) -> list[Effect]:
-        return _normalize_runtime_ops(value, Effect)
+        return normalize_runtime_ops(value, Effect)
 
     def as_interaction(self, label: str) -> SandboxInteraction:
         """Return the runtime sponsored interaction."""
@@ -212,10 +190,15 @@ class SandboxInteractionSpec(BaseModel):
         )
 
 
-class SandboxLocationContributionsSpec(BaseModel):
-    """Authored contribution tables for one compact location."""
+class SandboxContributionsSpec(BaseModel):
+    """Authored interaction contribution tables for one compact concept."""
 
     interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
+    scheduled_events: dict[str, ScheduledEvent] = Field(default_factory=dict)
+
+
+class SandboxLocationContributionsSpec(SandboxContributionsSpec):
+    """Authored contribution tables for one compact location."""
 
 
 class SandboxLocationSpec(BaseModel):
@@ -228,8 +211,8 @@ class SandboxLocationSpec(BaseModel):
     traits: list[str] = Field(default_factory=list)
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     exits: dict[str, str | SandboxExitSpec] = Field(default_factory=dict)
-    contributes: SandboxLocationContributionsSpec = Field(
-        default_factory=SandboxLocationContributionsSpec
+    contributes: SandboxContributionsSpec = Field(
+        default_factory=SandboxContributionsSpec
     )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
@@ -263,6 +246,9 @@ class SandboxAssetSpec(BaseModel):
     initial: SandboxInitialAssetSpec
     capacity: SandboxContainerSpec | None = None
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
+    contributes: SandboxContributionsSpec = Field(
+        default_factory=SandboxContributionsSpec
+    )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
     )
@@ -287,6 +273,9 @@ class SandboxFixtureSpec(BaseModel):
     key: str = "key"
     capacity: SandboxContainerSpec | None = None
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
+    contributes: SandboxContributionsSpec = Field(
+        default_factory=SandboxContributionsSpec
+    )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
     )
@@ -322,6 +311,7 @@ class SandboxMobContributionsSpec(BaseModel):
 
     affordances: dict[str, SandboxMobActionSpec] = Field(default_factory=dict)
     interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
+    scheduled_events: dict[str, ScheduledEvent] = Field(default_factory=dict)
 
 
 class SandboxMobSpec(BaseModel):
@@ -442,7 +432,19 @@ class SandboxSliceCompiler:
             visibility_rules=[
                 SandboxVisibilityRule(journal_text=spec.scope.visibility.darkness_text)
             ],
+            scheduled_events=self._compile_scheduled_events(
+                spec.scope.scheduled_events
+            ),
         )
+
+    def _compile_scheduled_events(
+        self,
+        events: dict[str, ScheduledEvent],
+    ) -> list[ScheduledEvent]:
+        return [
+            event if event.label else event.model_copy(update={"label": label})
+            for label, event in events.items()
+        ]
 
     def _compile_locations(
         self,
@@ -467,6 +469,9 @@ class SandboxSliceCompiler:
                     for interaction_label, interaction_spec
                     in location_spec.contributes.interactions.items()
                 ],
+                scheduled_events=self._compile_scheduled_events(
+                    location_spec.contributes.scheduled_events
+                ),
             )
             links: dict[str, str | SandboxExit] = {}
             for direction, exit_spec in location_spec.exits.items():
@@ -609,6 +614,14 @@ class SandboxSliceCompiler:
             ),
             "take_text": spec.descriptions.take,
             "drop_text": spec.descriptions.drop,
+            "interactions": [
+                interaction_spec.as_interaction(interaction_label)
+                for interaction_label, interaction_spec
+                in spec.contributes.interactions.items()
+            ],
+            "scheduled_events": self._compile_scheduled_events(
+                spec.contributes.scheduled_events
+            ),
         }
 
     def _compile_container(
@@ -676,6 +689,14 @@ class SandboxSliceCompiler:
                     capacity=fixture_spec.capacity,
                     descriptions=fixture_spec.descriptions,
                 ),
+                interactions=[
+                    interaction_spec.as_interaction(interaction_label)
+                    for interaction_label, interaction_spec
+                    in fixture_spec.contributes.interactions.items()
+                ],
+                scheduled_events=self._compile_scheduled_events(
+                    fixture_spec.contributes.scheduled_events
+                ),
             )
             for location_label in fixture_spec.initial.locations:
                 self._require_location(
@@ -734,6 +755,9 @@ class SandboxSliceCompiler:
                     for interaction_label, interaction_spec
                     in mob_spec.contributes.interactions.items()
                 ],
+                scheduled_events=self._compile_scheduled_events(
+                    mob_spec.contributes.scheduled_events
+                ),
             )
             graph.add(mob)
             scope.add_child(mob)

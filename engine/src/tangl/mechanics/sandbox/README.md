@@ -42,15 +42,19 @@ Current first-pass surface:
   for rules such as darkness that change what a location can truthfully reveal.
 - `WorldTime`: deterministic derived time from `world_turn`.
 - `ScheduleEntry` / `Schedule` / `ScheduledEvent` / `ScheduledPresence`: small
-  schedule matching primitives.
+  schedule matching primitives. `ScheduledEvent` is a time/presence gate over
+  the same sponsored interaction surface used by locations, mobs, assets, and
+  fixtures.
 - `project_sandbox_location_links`: planning handler that projects movement
   links into normal dynamic actions, unless a manual action already covers that
   target. Direction aliases such as `n`, `s`, `e`, `w`, `u`, and `d` are
   normalized into canonical UI hints while preserving the raw authored key.
 - `project_sandbox_asset_actions`: planning handler that projects present assets
-  as take/read choices and player-held assets as drop choices.
+  as take/read choices, player-held assets as drop choices, and present/carried
+  asset interactions as ordinary choices.
 - `project_sandbox_fixture_actions`: planning handler that projects openable
-  local fixtures as open/close choices.
+  local fixtures as open/close choices and fixture interactions as ordinary
+  choices.
 - `project_sandbox_mob_actions`: planning handler that projects present mob
   affordances and interactions as ordinary choices.
 - `project_sandbox_location_interactions`: planning handler that projects active
@@ -58,7 +62,8 @@ Current first-pass surface:
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects matching
-  scheduled events and concept-provider events as normal dynamic actions.
+  scope, location, mob, asset, fixture, and concept-provider scheduled events
+  through the normal sponsored interaction path.
 - `project_sandbox_unlocks`: planning handler that projects locked local objects
   as self-loop unlock choices with normal edge availability, effects, and
   selected-action journal text.
@@ -79,12 +84,13 @@ is gated by the local fixture's open state. A link such as
 `down: {kind: message, journal: "You don't fit!"}` projects a self-loop with
 selected-action journal text.
 
-Scheduled sandbox events use the same VM edges. An `activation` value maps to
-the same `Action` trigger phase used by authored story actions. A
-`return_to_location` event is just an `Action` with `return_phase=PLANNING`, so
-the return step reprojects the current location before journaling choices; a
-`once` event is suppressed after its target has been marked visited by the
-generic VM `mark_visited` handler.
+Scheduled sandbox events use the same VM edges and interaction payloads. The
+schedule fields decide whether the affordance is primed at the current
+`WorldTime`, location, and actor-presence set. After that, `target`,
+`activation`, `return_to_location`, `availability`, `effects`, and
+`journal_text` follow the same `SandboxInteraction` path as any other sponsored
+choice. A `once` event is suppressed after its target has been marked visited by
+the generic VM `mark_visited` handler.
 
 Asset projection is deliberately modest. Locations are `HasAssets` holders, and
 the nearest `SandboxScope.player_assets` holder stands in for ready-at-hand
@@ -124,9 +130,9 @@ Sponsored interactions are the first shared local-choice surface. A
 `SandboxInteraction` lowers to a normal `Action` edge with target, activation,
 optional call/return, availability, effects, selected-action journal text, and
 provenance hints. Present mobs and active locations can sponsor these
-interactions now; carried assets and reachable fixtures are the next likely
-reuse point. This is a sandbox instance of a broader StoryTangl pattern: a
-concept that is in scope can sponsor a choice without owning a separate runtime.
+interactions, as can present/carried assets and reachable fixtures. This is a
+sandbox instance of a broader StoryTangl pattern: a concept that is in scope can
+sponsor a choice without owning a separate runtime.
 
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,
