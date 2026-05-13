@@ -73,6 +73,49 @@ soft truth can be re-solved around later choices. Sandbox geography is one
 useful projection for that future solver because it makes nearby opportunities,
 recent paths, blocked routes, and offscreen actors explicit.
 
+### Humane Sandbox Design
+
+Sandbox is a spatial, temporal, and social overlay on ordinary StoryTangl
+choices. Its purpose is not to make the player exhaustively search a complete
+map for the one active event. Its purpose is to let the story render current
+opportunity as place, presence, time, inventory, weather, rules, and local
+constraint.
+
+The common failure mode is a "hunt for the event" simulator: the player clicks
+through mostly empty rooms, times, or menus until a hidden predicate finally
+fires. That can feel like agency, but it is often only friction. A StoryTangl
+sandbox should instead shape the explorable field around the current narrative
+frontier. It may prune irrelevant routes, close or elide locations where
+nothing meaningful can happen, move actors toward useful intersections,
+surface hints, or materialize interesting content on demand. Empty traversal is
+valid only when emptiness is doing work: tension, misdirection, loneliness,
+search pressure, atmosphere, or strategic uncertainty.
+
+There is a complementary game-design exception. Random hunting can be
+excellent when it is explicit, legible, and strategic: scarce turns, known or
+learnable encounter tables, resource pressure, risk/reward loadouts,
+probabilistic drops, speedrun routing, or optimization puzzles. In that case
+the search is not accidental UI burden; it is the game. The design rule is:
+exploration friction is valuable only when it is modeled, legible, and
+strategically or narratively meaningful.
+
+Repeated sandbox traversal should therefore be collapsible into
+macro-affordances when the uncertainty is mechanical but the moment-by-moment
+ritual is no longer interesting. "Search this room until you find something
+useful," "farm this location until sunset," or "run triage for the next hour"
+can consume the same resources, apply the same risks, and emit a summarized
+journal/accounting result. This preserves the authoritative ledger while
+respecting the reader's time.
+
+Ritual and outcome authority are separate concerns. The backend should own the
+truth of resolution: costs, risks, rolls, state changes, and journal facts. A
+client may still stage ceremony around that truth: dice animation, card draw,
+travel montage, progress clock, or farming digest. Ritual is useful when it
+supports comprehension, suspense, agency, texture, or delight. It becomes
+hostile when it is artificial friction whose removal is treated as a premium
+benefit. StoryTangl should make ethical summarization easy and should not
+normalize paywalling relief from intentionally induced tedium.
+
 ---
 
 ## Relationship To Existing Architecture

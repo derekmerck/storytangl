@@ -188,6 +188,26 @@ fixtures, visible mobs, and visible exits. Darkness and other visibility rules
 filter that surface the same way they filter local affordances. Hidden mobs,
 undisclosed schedules, secret exits, and puzzle truth stay backend-only.
 
+Humane sandbox design matters. Sandboxes are useful because they let a story
+project ordinary choices into spatial, temporal, and social terms: where to go,
+who is present, what is ready at hand, and what opportunities are currently
+discoverable. They become tedious when that projection degrades into "hunt for
+the event" clicking. Empty travel, stochastic search, or repeated ritual should
+exist only when it is doing narrative or game work: tension, uncertainty,
+resource pressure, rule discovery, optimization, or atmosphere. Otherwise the
+world should prune dead space, bias or move interesting affordances toward the
+reader, close irrelevant routes, or summarize repeated traversal as a
+macro-affordance with the same authoritative costs and risks.
+
+Ritual is allowed to be meaningful. Dice rolls, travel montages, repeated
+searches, farming loops, and other ceremonies can help a player feel suspense
+or effort even when the backend already owns the authoritative outcome. But the
+ritual should be skippable or summarizable once repetition stops serving
+meaning, and StoryTangl mechanics should never normalize monetizing relief from
+intentionally induced tedium. Premium content, tools, hosting, cosmetics, or
+patronage are one thing; paywalling the removal of artificial friction is a
+hostile design pattern.
+
 The older `scratch/mechanics/sandbox` code remains prior art. Mine it for
 calendar, schedule, mobile-actor, and event ideas, but do not promote it
 directly without rederiving it against v38 contracts.
