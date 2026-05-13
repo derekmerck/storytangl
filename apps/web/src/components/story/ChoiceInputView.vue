@@ -309,9 +309,9 @@ const quantityPayload = (): PayloadState => {
 }
 
 const piecePayload = (): PayloadState => {
-  const min = minValue.value ?? 1
+  const min = minValue.value ?? (required.value ? 1 : 0)
   const max = maxValue.value ?? 1
-  if (candidatePieces.value.length === 0) {
+  if (candidatePieces.value.length === 0 && min > 0) {
     return { valid: false, message: 'No valid targets' }
   }
   if (selectedPieceIds.value.length < min) {
@@ -319,6 +319,9 @@ const piecePayload = (): PayloadState => {
   }
   if (selectedPieceIds.value.length > max) {
     return { valid: false, message: `Select at most ${max}` }
+  }
+  if (selectedPieceIds.value.length === 0) {
+    return { valid: true, payload: props.choice.payload }
   }
   const validIds = new Set(candidatePiecePayloadIds.value)
   if (selectedPieceIds.value.some((pieceId) => !validIds.has(pieceId))) {
@@ -330,6 +333,9 @@ const piecePayload = (): PayloadState => {
 const placePayload = (): PayloadState => {
   const sourceRef = sourceZoneRef.value
   const targetRef = targetZoneRef.value
+  if (!required.value && selectedPieceIds.value.length === 0) {
+    return { valid: true, payload: props.choice.payload }
+  }
   if (!sourceRef || !targetRef || !sourceZone.value || !targetZone.value) {
     return { valid: false, message: 'Missing source or target' }
   }
@@ -469,6 +475,7 @@ watch(
         v-if="candidatePieces.length > 0"
         class="choice-piece-list"
         role="listbox"
+        :aria-multiselectable="maxValue !== undefined && maxValue > 1 ? 'true' : undefined"
         :aria-label="inputLabel"
       >
         <div

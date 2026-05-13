@@ -398,6 +398,73 @@ describe('StoryAction', () => {
     ])
   })
 
+  it('allows optional piece accepts with no selection', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces_optional',
+      fragment_type: 'choice',
+      edge_id: 'edge_pieces_optional',
+      text: 'Maybe take something',
+      accepts: {
+        kind: 'pieces',
+        required: false,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: [],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge_pieces_optional', undefined])
+  })
+
+  it('marks multi-piece accepts as multi-select listboxes', () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces_multi',
+      fragment_type: 'choice',
+      edge_id: 'edge_pieces_multi',
+      text: 'Take some things',
+      accepts: {
+        kind: 'pieces',
+        min: 0,
+        max: 2,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['lamp-fragment', 'coin-fragment'],
+      },
+      'lamp-fragment': {
+        uid: 'lamp-fragment',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
+        content: 'brass lamp',
+      },
+      'coin-fragment': {
+        uid: 'coin-fragment',
+        fragment_type: 'piece',
+        piece_id: 'coin',
+        content: 'silver coin',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    expect(wrapper.find('.choice-piece-list').attributes('aria-multiselectable')).toBe('true')
+  })
+
   it('emits place accepts payloads from visible source-zone pieces', async () => {
     const placeChoice: ChoiceStoryFragment = {
       uid: 'action_place',
@@ -455,6 +522,41 @@ describe('StoryAction', () => {
         target_zone_ref: 'zone-front',
       },
     ])
+  })
+
+  it('allows optional place accepts with no selection', async () => {
+    const placeChoice: ChoiceStoryFragment = {
+      uid: 'action_place_optional',
+      fragment_type: 'choice',
+      edge_id: 'edge_place_optional',
+      text: 'Maybe mount a weapon',
+      accepts: {
+        kind: 'place',
+        required: false,
+        source_zone_ref: 'zone-loose',
+        target_zone_ref: 'zone-front',
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-loose': {
+        uid: 'zone-loose',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: [],
+      },
+      'zone-front': {
+        uid: 'zone-front',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: [],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: placeChoice, fragments })
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge_place_optional', undefined])
   })
 
   it('clears stale piece payload when a same-uid choice points at a new zone', async () => {
