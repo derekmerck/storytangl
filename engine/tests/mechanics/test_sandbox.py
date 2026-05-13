@@ -934,6 +934,79 @@ def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
     assert _dynamic_sandbox_actions_with_tag(building, "event") == []
 
 
+def test_hidden_mob_does_not_project_scheduled_events() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 0},
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(label="dark_cave", location_name="Dark Cave")
+    parley = Block(label="parley", content="The pirate lowers his blade.")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="dark_cave",
+        scheduled_events=[
+            ScheduledEvent(
+                label="parley",
+                period=1,
+                target="parley",
+                text="Parley with the pirate",
+            )
+        ],
+    )
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(parley)
+    graph.add(pirate)
+    scope.add_child(cave)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(cave, "event") == []
+
+
+def test_suppressed_carried_asset_affordances_do_not_project_scheduled_events() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 0},
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(label="dark_cave", location_name="Dark Cave")
+    whisper = Block(label="whisper", content="The amulet hums.")
+    SandboxItemType(
+        label="amulet",
+        name="amulet",
+        scheduled_events=[
+            ScheduledEvent(
+                label="whisper",
+                period=1,
+                target="whisper",
+                text="Listen to the amulet",
+            )
+        ],
+    )
+    amulet = Token[SandboxItemType](token_from="amulet", label="amulet")
+    scope.player_assets.add_asset(amulet)
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(whisper)
+    graph.add(amulet)
+    scope.add_child(cave)
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(cave, "event") == []
+
+
 def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
     graph, _road, _building, cave_entrance = _sandbox_graph()
     cave_entrance.fixtures = [

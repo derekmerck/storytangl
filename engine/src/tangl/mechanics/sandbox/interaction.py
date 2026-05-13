@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +12,7 @@ from tangl.core.runtime_op import Effect, Predicate
 RuntimeOpT = TypeVar("RuntimeOpT", Predicate, Effect)
 
 
-def normalize_runtime_ops(value: Any, op_kind: type[RuntimeOpT]) -> list[RuntimeOpT]:
+def normalize_runtime_ops(value: object, op_kind: type[RuntimeOpT]) -> list[RuntimeOpT]:
     """Normalize compact predicate/effect authoring values."""
     if value is None:
         return []
@@ -21,6 +22,8 @@ def normalize_runtime_ops(value: Any, op_kind: type[RuntimeOpT]) -> list[Runtime
         return [op_kind(expr=value)]
     if isinstance(value, dict):
         return [op_kind.model_validate(value)]
+    if not isinstance(value, Iterable):
+        raise TypeError(f"Expected {op_kind.__name__} expression, got {type(value)!r}")
     out: list[RuntimeOpT] = []
     for item in value:
         if isinstance(item, op_kind):

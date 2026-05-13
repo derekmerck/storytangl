@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Iterable
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -99,12 +99,12 @@ class ScheduledEvent(ScheduleEntry):
 
     @field_validator("availability", mode="before")
     @classmethod
-    def _normalize_availability(cls, value: Any) -> list[Predicate]:
+    def _normalize_availability(cls, value: object) -> list[Predicate]:
         return normalize_runtime_ops(value, Predicate)
 
     @field_validator("effects", mode="before")
     @classmethod
-    def _normalize_effects(cls, value: Any) -> list[Effect]:
+    def _normalize_effects(cls, value: object) -> list[Effect]:
         return normalize_runtime_ops(value, Effect)
 
     def action_text(self) -> str:

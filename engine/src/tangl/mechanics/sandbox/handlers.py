@@ -378,18 +378,19 @@ def _scheduled_event_contributions(
                 )
                 for event in fixture.scheduled_events
             )
-    for mob in _present_mobs(location):
-        mob_label = mob.get_label()
-        contributions.extend(
-            ScheduledEventContribution(
-                event=event,
-                source="sandbox_schedule",
-                source_label=mob_label,
-                source_kind="mob",
-                hints={"mob": mob_label},
+    if not projection_state.suppress_location_description:
+        for mob in _present_mobs(location):
+            mob_label = mob.get_label()
+            contributions.extend(
+                ScheduledEventContribution(
+                    event=event,
+                    source="sandbox_schedule",
+                    source_label=mob_label,
+                    source_kind="mob",
+                    hints={"mob": mob_label},
+                )
+                for event in mob.scheduled_events
             )
-            for event in mob.scheduled_events
-        )
     if not projection_state.suppress_asset_affordances:
         for asset_label, asset in sorted(location.assets.items()):
             contributions.extend(
@@ -403,7 +404,7 @@ def _scheduled_event_contributions(
                 for event in asset.scheduled_events
             )
     player_assets = _player_asset_holder(location)
-    if player_assets is not None:
+    if player_assets is not None and not projection_state.suppress_asset_affordances:
         for asset_label, asset in sorted(player_assets.assets.items()):
             contributions.extend(
                 ScheduledEventContribution(
