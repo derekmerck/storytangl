@@ -536,4 +536,59 @@ describe('StoryAction', () => {
       { piece_ids: ['coin'] },
     ])
   })
+
+  it('preserves piece selection across same-zone fragment refreshes', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
+      fragment_type: 'choice',
+      edge_id: 'edge_pieces',
+      text: 'Take something',
+      accepts: {
+        kind: 'pieces',
+        min: 1,
+        max: 1,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['lamp-fragment'],
+      },
+      'lamp-fragment': {
+        uid: 'lamp-fragment',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
+        content: 'brass lamp',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    await wrapper.find('.choice-piece-option').trigger('click')
+    await wrapper.setProps({
+      fragments: {
+        ...fragments,
+        'lamp-fragment': {
+          uid: 'lamp-fragment',
+          fragment_type: 'piece',
+          piece_id: 'lamp',
+          content: 'polished brass lamp',
+        },
+      },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.choice-piece-option').classes()).toContain(
+      'choice-piece-option--selected',
+    )
+
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_pieces',
+      { piece_ids: ['lamp'] },
+    ])
+  })
 })

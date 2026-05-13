@@ -226,6 +226,8 @@ const zoneLabel = (zone: GroupStoryFragment | undefined, fallback: string): stri
 const piecePayloadId = (piece: PieceStoryFragment): string => piece.piece_id ?? piece.uid
 const candidatePiecePayloadIds = computed(() => candidatePieces.value.map(piecePayloadId))
 const sourcePiecePayloadIds = computed(() => sourcePieces.value.map(piecePayloadId))
+const sameStringList = (left: string[], right: string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index])
 
 const validateText = (value: string): string | undefined => {
   if (required.value && value.trim() === '') {
@@ -406,10 +408,21 @@ watch(
 )
 
 watch(
-  [acceptsKind, sourceZoneRef, targetZoneRef, candidatePiecePayloadIds, sourcePiecePayloadIds],
+  [acceptsKind, sourceZoneRef, targetZoneRef],
   () => {
     inputValue.value = ''
     selectedPieceIds.value = []
+  },
+)
+
+watch(
+  [candidatePiecePayloadIds, sourcePiecePayloadIds],
+  ([candidateIds, sourceIds]) => {
+    const validIds = new Set([...candidateIds, ...sourceIds])
+    const nextSelected = selectedPieceIds.value.filter((pieceId) => validIds.has(pieceId))
+    if (!sameStringList(selectedPieceIds.value, nextSelected)) {
+      selectedPieceIds.value = nextSelected
+    }
   },
 )
 </script>
