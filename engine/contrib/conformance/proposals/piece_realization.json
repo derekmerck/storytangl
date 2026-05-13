@@ -1,0 +1,99 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000010002",
+  "step": 102,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000012001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000012002",
+        "00000000-0000-4000-8000-000000012003",
+        "00000000-0000-4000-8000-000000012006"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000012002",
+      "fragment_type": "content",
+      "content": "Murph points from the installed launcher to the catalog placards."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000012003",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "catalog",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000012004",
+        "00000000-0000-4000-8000-000000012005"
+      ],
+      "hints": {
+        "label_text": "Murph's wares"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000012004",
+      "fragment_type": "piece",
+      "piece_id": "flamethrower",
+      "kind": "weapon",
+      "realized": false,
+      "available": true,
+      "zone_ref": "00000000-0000-4000-8000-000000012003",
+      "properties": {
+        "name": "Flamethrower",
+        "weight": 3,
+        "ammo": 4
+      },
+      "cost": [
+        {
+          "ledger_key": "wallet",
+          "delta": -400,
+          "unit": "cr"
+        }
+      ],
+      "hints": {
+        "label_text": "Flamethrower"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000012005",
+      "fragment_type": "piece",
+      "piece_id": "rl-1",
+      "kind": "weapon",
+      "realized": true,
+      "display_state": "mounted",
+      "zone_ref": "00000000-0000-4000-8000-000000012003",
+      "properties": {
+        "name": "Rocket Launcher",
+        "weight": 3,
+        "ammo": 4
+      },
+      "hints": {
+        "label_text": "Rocket Launcher"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000012006",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000012106",
+      "text": "Buy from Murph's.",
+      "available": true,
+      "accepts": {
+        "kind": "pieces",
+        "min": 0,
+        "max": 2,
+        "constraints": {
+          "target_zone_ref": "00000000-0000-4000-8000-000000012003",
+          "target_kind": ["weapon"]
+        }
+      },
+      "ui_hints": {
+        "hotkey": "1"
+      }
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_piece_realization",
+    "proposal": true,
+    "vocab_version": "1.1"
+  }
+}

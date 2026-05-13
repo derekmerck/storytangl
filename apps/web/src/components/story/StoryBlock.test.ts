@@ -156,20 +156,20 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('63')
   })
 
-  it('renders zone groups with token labels and state', () => {
+  it('renders zone groups with piece labels and state', () => {
     const fragments: Record<string, StoryFragment> = {
       zone: {
         uid: 'zone',
         fragment_type: 'group',
         group_type: 'zone',
         zone_role: 'player_hand',
-        member_ids: ['token'],
+        member_ids: ['piece'],
         hints: { label_text: 'Traveler hand' },
       },
-      token: {
-        uid: 'token',
-        fragment_type: 'token',
-        token_id: 'rust-map-card',
+      piece: {
+        uid: 'piece',
+        fragment_type: 'piece',
+        piece_id: 'rust-map-card',
         content: 'Rust map card',
         display_state: 'face_up',
       },
@@ -178,7 +178,7 @@ describe('StoryBlock', () => {
     const wrapper = mountBlock(fragments, ['zone'])
 
     expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Traveler hand')
     expect(wrapper.text()).toContain('Rust map card')
     expect(wrapper.text()).toContain('face up')
@@ -229,23 +229,71 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('three ticks')
   })
 
-  it('renders standalone token fragments', () => {
+  it('renders standalone piece fragments', () => {
     const fragments: Record<string, StoryFragment> = {
-      token: {
-        uid: 'token',
-        fragment_type: 'token',
-        token_id: 'lantern-token',
+      piece: {
+        uid: 'piece',
+        fragment_type: 'piece',
+        piece_id: 'lantern-piece',
         kind: 'tool',
         label: 'Brass lantern',
         display_state: 'ready',
       },
     }
 
-    const wrapper = mountBlock(fragments, ['token'])
+    const wrapper = mountBlock(fragments, ['piece'])
 
-    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Brass lantern')
     expect(wrapper.text()).toContain('ready')
+  })
+
+  it('renders unrealized pieces as offers with unavailable reasons', () => {
+    const fragments: Record<string, StoryFragment> = {
+      piece: {
+        uid: 'piece',
+        fragment_type: 'piece',
+        piece_id: 'flamethrower',
+        kind: 'weapon',
+        realized: false,
+        available: false,
+        unavailable_reason: 'Out of stock',
+        label: 'Flamethrower',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['piece'])
+
+    expect(wrapper.find('[data-testid="piece-realized-state"]').text()).toBe('offer')
+    expect(wrapper.find('[data-testid="piece-availability"]').text()).toBe('Out of stock')
+  })
+
+  it('renders roll fragments as structured outcomes', () => {
+    const fragments: Record<string, StoryFragment> = {
+      roll: {
+        uid: 'roll',
+        fragment_type: 'roll',
+        label: 'Driving check',
+        kind: 'dice',
+        inputs: {
+          dice: '2d6',
+          rolled: [4, 5],
+          modifier: 0,
+          total: 9,
+          target: 12,
+        },
+        outcome: 'fail',
+        narrative: 'The wheel jerks under you.',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['roll'])
+
+    expect(wrapper.find('[data-testid="roll-fragment"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Driving check')
+    expect(wrapper.text()).toContain('2d6: 4 + 5 = 9 vs 12')
+    expect(wrapper.text()).toContain('fail')
+    expect(wrapper.text()).toContain('The wheel jerks under you.')
   })
 
   it('renders choices and emits selected edge ids', async () => {
@@ -275,7 +323,7 @@ describe('StoryBlock', () => {
     const fragments: Record<string, StoryFragment> = {
       weird: {
         uid: 'weird',
-        fragment_type: 'dice_roll',
+        fragment_type: 'future_widget',
         content: { value: 6 },
       },
     }
@@ -283,6 +331,6 @@ describe('StoryBlock', () => {
     const wrapper = mountBlock(fragments, ['weird'])
 
     expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('dice_roll')
+    expect(wrapper.text()).toContain('future_widget')
   })
 })

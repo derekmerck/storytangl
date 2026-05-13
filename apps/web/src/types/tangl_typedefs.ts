@@ -305,14 +305,20 @@ export interface GroupStoryFragment extends BaseStoryFragment {
   hints?: PresentationHints | null
   presentation_hints?: PresentationHints | null
   zone_role?: string | null
+  constraints?: Record<string, unknown> | null
 }
 
-export interface TokenStoryFragment extends BaseStoryFragment {
-  fragment_type: 'token'
-  token_id?: FragmentId | null
+export interface PieceStoryFragment extends BaseStoryFragment {
+  fragment_type: 'piece'
+  piece_id?: FragmentId | null
   kind?: string | null
+  realized?: boolean | null
+  available?: boolean | null
+  unavailable_reason?: string | null
   display_state?: string | null
   zone_ref?: FragmentId | null
+  properties?: Record<string, unknown> | null
+  cost?: Array<Record<string, unknown>> | null
   hints?: PresentationHints | null
   presentation_hints?: PresentationHints | null
 }
@@ -351,16 +357,28 @@ export interface UserEventStoryFragment extends BaseStoryFragment {
   content?: unknown
 }
 
+export interface RollStoryFragment extends BaseStoryFragment {
+  fragment_type: 'roll'
+  label?: string | null
+  kind?: string | null
+  inputs?: Record<string, unknown> | null
+  outcome?: string | null
+  narrative?: string | null
+  against?: Record<string, unknown> | null
+  ritual_hints?: Record<string, unknown> | null
+}
+
 export type StoryFragment =
   | ContentStoryFragment
   | AttributedStoryFragment
   | MediaStoryFragment
   | GroupStoryFragment
-  | TokenStoryFragment
+  | PieceStoryFragment
   | KvStoryFragment
   | ChoiceStoryFragment
   | ControlStoryFragment
   | UserEventStoryFragment
+  | RollStoryFragment
   | BaseStoryFragment
 
 export interface RuntimeEnvelope {
@@ -376,4 +394,5 @@ export interface StorySceneModel {
   key: string
   uid: FragmentId
   memberIds: FragmentId[]
+  metadata?: Record<string, unknown>
 }

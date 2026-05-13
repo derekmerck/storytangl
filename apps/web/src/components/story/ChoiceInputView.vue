@@ -5,9 +5,9 @@ import type {
   ChoiceStoryFragment,
   GroupStoryFragment,
   StoryFragment,
-  TokenStoryFragment,
+  PieceStoryFragment,
 } from '@/types'
-import { fragmentText, isGroupFragment, isRecord, isTokenFragment } from './fragmentUtils'
+import { fragmentText, isGroupFragment, isRecord, isPieceFragment } from './fragmentUtils'
 
 type PayloadState = {
   valid: boolean
@@ -30,9 +30,15 @@ type PreparedValidator = Validator & {
   regex?: RegExp
 }
 
+type CommandGrammar = {
+  examples?: unknown
+  placeholder?: unknown
+}
+
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments: Record<string, StoryFragment>
+  metadata?: Record<string, unknown>
   disabled?: boolean
 }>()
 
@@ -42,7 +48,7 @@ const emit = defineEmits<{
 }>()
 
 const inputValue = ref('')
-const selectedTokenIds = ref<string[]>([])
+const selectedPieceIds = ref<string[]>([])
 
 const stringValue = (value: unknown): string | undefined =>
   typeof value === 'string' && value ? value : undefined
@@ -65,9 +71,33 @@ const acceptsKind = computed(() => {
 })
 const hasExplicitKind = computed(() => typeof accepts.value.kind === 'string')
 
-const rendersInput = computed(() => ['text', 'quantity', 'tokens'].includes(acceptsKind.value))
+const rendersInput = computed(() =>
+  ['text', 'quantity', 'pieces', 'place', 'raw_command'].includes(acceptsKind.value),
+)
 const inputLabel = computed(() => props.choice.text)
-const placeholder = computed(() => stringValue(accepts.value.placeholder) ?? '')
+const commandGrammar = computed<CommandGrammar>(() => {
+  const grammar = props.metadata?.grammar
+  return isRecord(grammar) ? grammar : {}
+})
+const commandExamples = computed(() =>
+  Array.isArray(commandGrammar.value.examples)
+    ? commandGrammar.value.examples.filter(
+        (example): example is string => typeof example === 'string' && example.length > 0,
+      )
+    : [],
+)
+const commandPlaceholder = computed(() => {
+  if (acceptsKind.value !== 'raw_command') {
+    return undefined
+  }
+  return (
+    stringValue(commandGrammar.value.placeholder) ??
+    (commandExamples.value.length > 0 ? `e.g. ${commandExamples.value[0]}` : 'Type a command')
+  )
+})
+const placeholder = computed(() =>
+  stringValue(accepts.value.placeholder) ?? commandPlaceholder.value ?? '',
+)
 const minValue = computed(() => numericValue(accepts.value.min))
 const maxValue = computed(() => numericValue(accepts.value.max))
 const stepValue = computed(() => numericValue(accepts.value.step) ?? 1)
@@ -99,9 +129,17 @@ const payloadKey = computed(() => {
 const targetZoneRef = computed(() => {
   const constraints = accepts.value.constraints
   if (!isRecord(constraints)) {
-    return undefined
+    return stringValue(accepts.value.target_zone_ref)
   }
-  return stringValue(constraints.target_zone_ref)
+  return stringValue(accepts.value.target_zone_ref) ?? stringValue(constraints.target_zone_ref)
+})
+
+const sourceZoneRef = computed(() => {
+  const constraints = accepts.value.constraints
+  if (!isRecord(constraints)) {
+    return stringValue(accepts.value.source_zone_ref)
+  }
+  return stringValue(accepts.value.source_zone_ref) ?? stringValue(constraints.source_zone_ref)
 })
 
 const targetZone = computed<GroupStoryFragment | undefined>(() => {
@@ -113,44 +151,83 @@ const targetZone = computed<GroupStoryFragment | undefined>(() => {
   return fragment && isGroupFragment(fragment) ? fragment : undefined
 })
 
-const tokensByTokenId = computed(() => {
-  const tokens = new Map<string, TokenStoryFragment>()
-  for (const fragment of Object.values(props.fragments)) {
-    if (isTokenFragment(fragment) && fragment.token_id) {
-      tokens.set(fragment.token_id, fragment)
-    }
+const sourceZone = computed<GroupStoryFragment | undefined>(() => {
+  const ref = sourceZoneRef.value
+  if (!ref) {
+    return undefined
   }
-  return tokens
+  const fragment = props.fragments[ref]
+  return fragment && isGroupFragment(fragment) ? fragment : undefined
 })
 
-const tokenByMemberId = (memberId: string): TokenStoryFragment | undefined => {
+const piecesByPieceId = computed(() => {
+  const pieces = new Map<string, PieceStoryFragment>()
+  for (const fragment of Object.values(props.fragments)) {
+    if (isPieceFragment(fragment) && fragment.piece_id) {
+      pieces.set(fragment.piece_id, fragment)
+    }
+  }
+  return pieces
+})
+
+const pieceByMemberId = (memberId: string): PieceStoryFragment | undefined => {
   const fragment = props.fragments[memberId]
-  if (fragment && isTokenFragment(fragment)) {
+  if (fragment && isPieceFragment(fragment)) {
     return fragment
   }
-  return tokensByTokenId.value.get(memberId)
+  return piecesByPieceId.value.get(memberId)
 }
 
-const candidateTokens = computed<TokenStoryFragment[]>(() =>
+const isSelectablePiece = (piece: PieceStoryFragment): boolean => piece.available !== false
+
+const candidatePieces = computed<PieceStoryFragment[]>(() =>
   targetZone.value?.member_ids
-    .map(tokenByMemberId)
-    .filter((fragment): fragment is TokenStoryFragment => Boolean(fragment)) ?? [],
+    .map(pieceByMemberId)
+    .filter(
+      (fragment): fragment is PieceStoryFragment =>
+        fragment !== undefined && isSelectablePiece(fragment),
+    ) ?? [],
 )
 
-const tokenLabel = (token: TokenStoryFragment): string => {
-  const hints = token.hints ?? token.presentation_hints
-  const content = fragmentText(token.content)
+const sourcePieces = computed<PieceStoryFragment[]>(() =>
+  sourceZone.value?.member_ids
+    .map(pieceByMemberId)
+    .filter(
+      (fragment): fragment is PieceStoryFragment =>
+        fragment !== undefined && isSelectablePiece(fragment),
+    ) ?? [],
+)
+
+const pieceLabel = (piece: PieceStoryFragment): string => {
+  const hints = piece.hints ?? piece.presentation_hints
+  const content = fragmentText(piece.content)
   return (
     stringValue(hints?.label_text) ??
-    stringValue(token.label) ??
+    stringValue(piece.label) ??
     (content ? content : undefined) ??
-    stringValue(token.token_id) ??
-    token.uid
+    stringValue(piece.piece_id) ??
+    piece.uid
   )
 }
 
-const tokenPayloadId = (token: TokenStoryFragment): string => token.token_id ?? token.uid
-const candidateTokenPayloadIds = computed(() => candidateTokens.value.map(tokenPayloadId))
+const zoneLabel = (zone: GroupStoryFragment | undefined, fallback: string): string => {
+  if (!zone) {
+    return fallback
+  }
+  const hints = zone.hints ?? zone.presentation_hints
+  return (
+    stringValue(hints?.label_text) ??
+    stringValue(zone.label) ??
+    stringValue(zone.zone_role) ??
+    zone.uid
+  )
+}
+
+const piecePayloadId = (piece: PieceStoryFragment): string => piece.piece_id ?? piece.uid
+const candidatePiecePayloadIds = computed(() => candidatePieces.value.map(piecePayloadId))
+const sourcePiecePayloadIds = computed(() => sourcePieces.value.map(piecePayloadId))
+const sameStringList = (left: string[], right: string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index])
 
 const validateText = (value: string): string | undefined => {
   if (required.value && value.trim() === '') {
@@ -231,62 +308,102 @@ const quantityPayload = (): PayloadState => {
   return { valid: true, payload: wrapPayload(quantity) }
 }
 
-const tokenPayload = (): PayloadState => {
-  const min = minValue.value ?? 1
+const piecePayload = (): PayloadState => {
+  const min = minValue.value ?? (required.value ? 1 : 0)
   const max = maxValue.value ?? 1
-  if (candidateTokens.value.length === 0) {
+  if (candidatePieces.value.length === 0 && min > 0) {
     return { valid: false, message: 'No valid targets' }
   }
-  if (selectedTokenIds.value.length < min) {
+  if (selectedPieceIds.value.length < min) {
     return { valid: false, message: min === max ? `Select ${min}` : `Select ${min}-${max}` }
   }
-  if (selectedTokenIds.value.length > max) {
+  if (selectedPieceIds.value.length > max) {
     return { valid: false, message: `Select at most ${max}` }
   }
-  return { valid: true, payload: { token_ids: [...selectedTokenIds.value] } }
+  if (selectedPieceIds.value.length === 0) {
+    return { valid: true, payload: props.choice.payload }
+  }
+  const validIds = new Set(candidatePiecePayloadIds.value)
+  if (selectedPieceIds.value.some((pieceId) => !validIds.has(pieceId))) {
+    return { valid: false, message: 'Select a valid target' }
+  }
+  return { valid: true, payload: { piece_ids: [...selectedPieceIds.value] } }
+}
+
+const placePayload = (): PayloadState => {
+  const sourceRef = sourceZoneRef.value
+  const targetRef = targetZoneRef.value
+  if (!required.value && selectedPieceIds.value.length === 0) {
+    return { valid: true, payload: props.choice.payload }
+  }
+  if (!sourceRef || !targetRef || !sourceZone.value || !targetZone.value) {
+    return { valid: false, message: 'Missing source or target' }
+  }
+  if (sourcePieces.value.length === 0) {
+    return { valid: false, message: 'No valid sources' }
+  }
+  if (selectedPieceIds.value.length !== 1) {
+    return { valid: false, message: 'Select 1' }
+  }
+  const validIds = new Set(sourcePiecePayloadIds.value)
+  const selectedPieceId = selectedPieceIds.value[0]
+  if (!selectedPieceId || !validIds.has(selectedPieceId)) {
+    return { valid: false, message: 'Select a valid source' }
+  }
+  return {
+    valid: true,
+    payload: {
+      piece_id: selectedPieceId,
+      source_zone_ref: sourceRef,
+      target_zone_ref: targetRef,
+    },
+  }
 }
 
 const payloadState = computed<PayloadState>(() => {
-  if (acceptsKind.value === 'text') {
+  if (acceptsKind.value === 'text' || acceptsKind.value === 'raw_command') {
     return textPayload()
   }
   if (acceptsKind.value === 'quantity') {
     return quantityPayload()
   }
-  if (acceptsKind.value === 'tokens') {
-    return tokenPayload()
+  if (acceptsKind.value === 'pieces') {
+    return piecePayload()
+  }
+  if (acceptsKind.value === 'place') {
+    return placePayload()
   }
   return { valid: true, payload: props.choice.payload }
 })
 
-const toggleToken = (token: TokenStoryFragment) => {
+const togglePiece = (piece: PieceStoryFragment) => {
   if (props.disabled) {
     return
   }
-  const id = tokenPayloadId(token)
-  if (selectedTokenIds.value.includes(id)) {
-    selectedTokenIds.value = selectedTokenIds.value.filter((selected) => selected !== id)
+  const id = piecePayloadId(piece)
+  if (selectedPieceIds.value.includes(id)) {
+    selectedPieceIds.value = selectedPieceIds.value.filter((selected) => selected !== id)
     return
   }
 
   const max = maxValue.value ?? 1
   if (max <= 1) {
-    selectedTokenIds.value = [id]
+    selectedPieceIds.value = [id]
     return
   }
-  if (selectedTokenIds.value.length >= max) {
+  if (selectedPieceIds.value.length >= max) {
     return
   }
-  selectedTokenIds.value = [...selectedTokenIds.value, id]
+  selectedPieceIds.value = [...selectedPieceIds.value, id]
 }
 
-const handleTokenKeydown = (event: KeyboardEvent, token: TokenStoryFragment) => {
+const handlePieceKeydown = (event: KeyboardEvent, piece: PieceStoryFragment) => {
   if (props.disabled) {
     return
   }
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    toggleToken(token)
+    togglePiece(piece)
   }
 }
 
@@ -297,10 +414,21 @@ watch(
 )
 
 watch(
-  [acceptsKind, targetZoneRef, candidateTokenPayloadIds],
+  [acceptsKind, sourceZoneRef, targetZoneRef],
   () => {
     inputValue.value = ''
-    selectedTokenIds.value = []
+    selectedPieceIds.value = []
+  },
+)
+
+watch(
+  [candidatePiecePayloadIds, sourcePiecePayloadIds],
+  ([candidateIds, sourceIds]) => {
+    const validIds = new Set([...candidateIds, ...sourceIds])
+    const nextSelected = selectedPieceIds.value.filter((pieceId) => validIds.has(pieceId))
+    if (!sameStringList(selectedPieceIds.value, nextSelected)) {
+      selectedPieceIds.value = nextSelected
+    }
   },
 )
 </script>
@@ -308,9 +436,10 @@ watch(
 <template>
   <div v-if="rendersInput" class="choice-input-view" data-testid="choice-input-view">
     <v-text-field
-      v-if="acceptsKind === 'text'"
+      v-if="acceptsKind === 'text' || acceptsKind === 'raw_command'"
       v-model="inputValue"
       class="choice-input"
+      :class="{ 'choice-input--command': acceptsKind === 'raw_command' }"
       density="compact"
       hide-details
       variant="outlined"
@@ -341,30 +470,58 @@ watch(
       </template>
     </v-text-field>
 
-    <div v-else-if="acceptsKind === 'tokens'" class="choice-token-input">
+    <div v-else-if="acceptsKind === 'pieces'" class="choice-piece-input">
       <div
-        v-if="candidateTokens.length > 0"
-        class="choice-token-list"
+        v-if="candidatePieces.length > 0"
+        class="choice-piece-list"
+        role="listbox"
+        :aria-multiselectable="maxValue !== undefined && maxValue > 1 ? 'true' : undefined"
+        :aria-label="inputLabel"
+      >
+        <div
+          v-for="piece in candidatePieces"
+          :key="piece.uid"
+          class="choice-piece-option"
+          :class="{ 'choice-piece-option--selected': selectedPieceIds.includes(piecePayloadId(piece)) }"
+          role="option"
+          :aria-selected="selectedPieceIds.includes(piecePayloadId(piece))"
+          :aria-disabled="disabled ? 'true' : undefined"
+          :data-piece-id="piecePayloadId(piece)"
+          :tabindex="disabled ? undefined : 0"
+          @click="togglePiece(piece)"
+          @keydown="handlePieceKeydown($event, piece)"
+        >
+          {{ pieceLabel(piece) }}
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="acceptsKind === 'place'" class="choice-place-input">
+      <div class="choice-place-target" data-testid="choice-place-target">
+        {{ zoneLabel(sourceZone, 'source') }} to {{ zoneLabel(targetZone, 'target') }}
+      </div>
+      <div
+        v-if="sourcePieces.length > 0"
+        class="choice-piece-list"
         role="listbox"
         :aria-label="inputLabel"
       >
         <div
-          v-for="token in candidateTokens"
-          :key="token.uid"
-          class="choice-token-option"
-          :class="{ 'choice-token-option--selected': selectedTokenIds.includes(tokenPayloadId(token)) }"
+          v-for="piece in sourcePieces"
+          :key="piece.uid"
+          class="choice-piece-option"
+          :class="{ 'choice-piece-option--selected': selectedPieceIds.includes(piecePayloadId(piece)) }"
           role="option"
-          :aria-selected="selectedTokenIds.includes(tokenPayloadId(token))"
+          :aria-selected="selectedPieceIds.includes(piecePayloadId(piece))"
           :aria-disabled="disabled ? 'true' : undefined"
-          :data-token-id="tokenPayloadId(token)"
+          :data-piece-id="piecePayloadId(piece)"
           :tabindex="disabled ? undefined : 0"
-          @click="toggleToken(token)"
-          @keydown="handleTokenKeydown($event, token)"
+          @click="togglePiece(piece)"
+          @keydown="handlePieceKeydown($event, piece)"
         >
-          {{ tokenLabel(token) }}
+          {{ pieceLabel(piece) }}
         </div>
       </div>
-      <div v-else class="choice-input-message">No valid targets</div>
     </div>
 
     <div
@@ -388,6 +545,10 @@ watch(
   max-width: 280px;
 }
 
+.choice-input--command {
+  max-width: min(100%, 520px);
+}
+
 .choice-input--quantity {
   max-width: 180px;
 }
@@ -397,17 +558,30 @@ watch(
   font-size: 0.78rem;
 }
 
-.choice-token-input {
+.choice-piece-input {
   min-width: 0;
 }
 
-.choice-token-list {
+.choice-place-input {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.choice-place-target {
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  padding: 0 4px;
+}
+
+.choice-piece-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.choice-token-option {
+.choice-piece-option {
   background: rgba(var(--v-theme-surface), 0.86);
   border: 1px solid rgba(var(--v-theme-primary), 0.34);
   border-radius: 6px;
@@ -418,12 +592,12 @@ watch(
   padding: 6px 9px;
 }
 
-.choice-token-option[aria-disabled='true'] {
+.choice-piece-option[aria-disabled='true'] {
   cursor: default;
   opacity: 0.6;
 }
 
-.choice-token-option--selected {
+.choice-piece-option--selected {
   background: rgba(var(--v-theme-primary), 0.16);
   border-color: rgb(var(--v-theme-primary));
 }

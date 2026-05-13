@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 
 import type { GroupStoryFragment, StoryFragment } from '@/types'
-import { isTokenFragment } from './fragmentUtils'
-import TokenFragmentView from './TokenFragmentView.vue'
+import { isPieceFragment } from './fragmentUtils'
+import PieceFragmentView from './PieceFragmentView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
 
 const props = defineProps<{
@@ -52,7 +52,7 @@ const members = computed(() =>
 
     <div v-if="members.length > 0" class="zone-members" role="list">
       <component
-        :is="isTokenFragment(member) ? TokenFragmentView : UnknownFragmentFallback"
+        :is="isPieceFragment(member) ? PieceFragmentView : UnknownFragmentFallback"
         v-for="member in members"
         :key="member.uid"
         :fragment="member"

@@ -54,7 +54,7 @@ Known mechanics already fit this model:
 
 - rock-paper-scissors and trivial test games
 - Blackjack/21/22 sketches
-- Nim and token games
+- Nim and piece games
 - Bag RPS typed-resource commitments
 - credentials/Papers-Please-like inspection loops
 - Calvin Cards contested card checks
@@ -74,7 +74,7 @@ These ideas were adopted into the current vocabulary:
 - keep unavailable choices visible with blocker diagnostics
 - preserve action history as an audit trail
 - support graceful degradation from rich widgets to text choices
-- treat resource and token pools as first-class interaction surfaces
+- treat resource and piece pools as first-class interaction surfaces
 
 ## Deferred Ideas
 
@@ -92,7 +92,7 @@ These remain useful but are intentionally deferred:
 
 Future fixtures should exercise one interaction family at a time:
 
-- visible zone plus selectable token
+- visible zone plus selectable piece
 - hidden card or document with reveal state
 - unavailable affordance with structured blockers
 - quantity or resource-spend payload

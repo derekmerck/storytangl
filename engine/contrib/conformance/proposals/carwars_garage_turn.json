@@ -1,0 +1,259 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000010005",
+  "step": 105,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000015001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000015002",
+        "00000000-0000-4000-8000-000000015003",
+        "00000000-0000-4000-8000-000000015005",
+        "00000000-0000-4000-8000-000000015007",
+        "00000000-0000-4000-8000-000000015010",
+        "00000000-0000-4000-8000-000000015011",
+        "00000000-0000-4000-8000-000000015012",
+        "00000000-0000-4000-8000-000000015013"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015002",
+      "fragment_type": "content",
+      "content_format": "md",
+      "content": "Murph's Auto, end of the strip. Your **Beast** sits on the lift."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015003",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "slot",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000015004"
+      ],
+      "constraints": {
+        "accepts_kind": ["weapon"],
+        "capacity": [
+          {
+            "kind": "count",
+            "max": 1,
+            "unit": "weapon"
+          },
+          {
+            "kind": "weight",
+            "max": 3,
+            "unit": "stone",
+            "sum_property": "weight",
+            "ledger_key": "vehicle.front.weight"
+          }
+        ]
+      },
+      "hints": {
+        "label_text": "front mount"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015004",
+      "fragment_type": "piece",
+      "piece_id": "rl-1",
+      "kind": "weapon",
+      "realized": true,
+      "display_state": "mounted",
+      "zone_ref": "00000000-0000-4000-8000-000000015003",
+      "properties": {
+        "name": "Rocket Launcher",
+        "weight": 3,
+        "ammo": 4
+      },
+      "hints": {
+        "label_text": "Rocket Launcher"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015005",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "slot",
+      "member_ids": [],
+      "constraints": {
+        "accepts_kind": ["weapon"],
+        "capacity": [
+          {
+            "kind": "count",
+            "max": 1,
+            "unit": "weapon"
+          },
+          {
+            "kind": "weight",
+            "max": 4,
+            "unit": "stone",
+            "sum_property": "weight",
+            "ledger_key": "vehicle.turret.weight"
+          }
+        ]
+      },
+      "hints": {
+        "label_text": "turret"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015006",
+      "fragment_type": "piece",
+      "piece_id": "spare-armor-1",
+      "kind": "armor",
+      "realized": true,
+      "zone_ref": "00000000-0000-4000-8000-000000015007",
+      "properties": {
+        "name": "Spare Armor",
+        "weight": 2
+      },
+      "hints": {
+        "label_text": "Spare Armor"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015007",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "inventory",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000015006"
+      ],
+      "hints": {
+        "label_text": "parts on hand"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015008",
+      "fragment_type": "piece",
+      "piece_id": "flamethrower",
+      "kind": "weapon",
+      "realized": false,
+      "available": true,
+      "zone_ref": "00000000-0000-4000-8000-000000015010",
+      "properties": {
+        "name": "Flamethrower",
+        "weight": 3,
+        "ammo": 4
+      },
+      "cost": [
+        {
+          "ledger_key": "wallet",
+          "delta": -400,
+          "unit": "cr"
+        }
+      ],
+      "hints": {
+        "label_text": "Flamethrower"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015009",
+      "fragment_type": "piece",
+      "piece_id": "rl-mk2",
+      "kind": "weapon",
+      "realized": false,
+      "available": false,
+      "unavailable_reason": "Out of stock until next session.",
+      "zone_ref": "00000000-0000-4000-8000-000000015010",
+      "properties": {
+        "name": "Rocket Launcher Mk II",
+        "weight": 3,
+        "ammo": 6
+      },
+      "cost": [
+        {
+          "ledger_key": "wallet",
+          "delta": -650,
+          "unit": "cr"
+        }
+      ],
+      "hints": {
+        "label_text": "Rocket Launcher Mk II"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015010",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "catalog",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000015008",
+        "00000000-0000-4000-8000-000000015009"
+      ],
+      "hints": {
+        "label_text": "Murph's wares"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015011",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000015111",
+      "text": "Mount a weapon.",
+      "available": true,
+      "accepts": {
+        "kind": "place",
+        "source_zone_ref": "00000000-0000-4000-8000-000000015007",
+        "target_zone_ref": "00000000-0000-4000-8000-000000015005",
+        "constraints": {
+          "target_kind": ["weapon"]
+        }
+      },
+      "ui_hints": {
+        "hotkey": "1",
+        "drag": {
+          "enabled": true,
+          "grab_zone_ref": "00000000-0000-4000-8000-000000015007",
+          "drop_zone_refs": [
+            "00000000-0000-4000-8000-000000015005"
+          ],
+          "preview": "capacity"
+        }
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015012",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000015112",
+      "text": "Buy from Murph's.",
+      "available": true,
+      "accepts": {
+        "kind": "pieces",
+        "min": 0,
+        "max": 2,
+        "constraints": {
+          "target_zone_ref": "00000000-0000-4000-8000-000000015010",
+          "target_kind": ["weapon", "armor"]
+        }
+      },
+      "ui_hints": {
+        "hotkey": "2"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000015013",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000015113",
+      "text": "Hit the road.",
+      "available": true,
+      "accepts": {
+        "kind": "pick"
+      },
+      "ui_hints": {
+        "hotkey": "3",
+        "stat_check": {
+          "label": "Driving check",
+          "dice": "2d6",
+          "target": 12,
+          "modifier": 0,
+          "success_text": "1/36 chance"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_carwars_garage_turn",
+    "proposal": true,
+    "vocab_version": "1.1"
+  }
+}

@@ -5,5 +5,6 @@ export {
 export { crossroadsProjectedState } from './projectedState'
 export {
   buyQuantityRuntimeEnvelope,
+  commandHintRuntimeEnvelope,
   sandboxPayloadRuntimeEnvelope,
 } from './payloadInteractions'

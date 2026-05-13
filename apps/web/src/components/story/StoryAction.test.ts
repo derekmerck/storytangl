@@ -12,6 +12,7 @@ const vuetify = createVuetify({ components, directives })
 const mountWithVuetify = (props: {
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
+  metadata?: Record<string, unknown>
   disabled?: boolean
 }) =>
   mount(StoryAction, {
@@ -155,13 +156,13 @@ describe('StoryAction', () => {
     ])
   })
 
-  it('renders structured token accepts as token options', () => {
-    const tokenChoice: ChoiceStoryFragment = {
-      uid: 'action_tokens',
+  it('renders structured piece accepts as piece options', () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
       fragment_type: 'choice',
       text: 'Play a card',
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'zone-hand' },
@@ -176,16 +177,16 @@ describe('StoryAction', () => {
       },
       card: {
         uid: 'card',
-        fragment_type: 'token',
-        token_id: 'rust-map-card',
+        fragment_type: 'piece',
+        piece_id: 'rust-map-card',
         content: 'Rust map card',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
 
     expect(wrapper.find('[data-testid="choice-input-view"]').exists()).toBe(true)
-    expect(wrapper.find('.choice-token-option').exists()).toBe(true)
+    expect(wrapper.find('.choice-piece-option').exists()).toBe(true)
     expect(wrapper.text()).toContain('Rust map card')
   })
 
@@ -238,6 +239,67 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual(['action_text', { text: 'Hope' }])
   })
 
+  it('emits raw command payloads through the reserved interpretation edge', async () => {
+    const commandChoice: ChoiceStoryFragment = {
+      uid: 'action_command',
+      fragment_type: 'choice',
+      edge_id: 'interpret_command',
+      text: 'Try a command.',
+      accepts: { kind: 'raw_command' },
+    }
+
+    const wrapper = mountWithVuetify({
+      choice: commandChoice,
+      metadata: {
+        grammar: {
+          examples: ['take lamp', 'open door'],
+        },
+      },
+    })
+
+    const input = wrapper.find('input')
+    expect(input.attributes('placeholder')).toBe('e.g. take lamp')
+
+    await input.setValue('take lamp')
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'interpret_command',
+      { text: 'take lamp' },
+    ])
+  })
+
+  it('submits raw commands when grammar hints are missing or malformed', async () => {
+    const commandChoice: ChoiceStoryFragment = {
+      uid: 'action_command',
+      fragment_type: 'choice',
+      edge_id: 'interpret_command',
+      text: 'Try a command.',
+      accepts: { kind: 'raw_command' },
+    }
+
+    const wrapper = mountWithVuetify({
+      choice: commandChoice,
+      metadata: {
+        grammar: {
+          examples: [12, null],
+          verbs: 'take',
+        },
+      },
+    })
+
+    const input = wrapper.find('input')
+    expect(input.attributes('placeholder')).toBe('Type a command')
+
+    await input.setValue('xyzzy')
+    await input.trigger('keydown.enter')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'interpret_command',
+      { text: 'xyzzy' },
+    ])
+  })
+
   it('emits quantity accepts payloads after min/max validation passes', async () => {
     const quantityChoice: ChoiceStoryFragment = {
       uid: 'action_quantity',
@@ -284,14 +346,14 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual(['action_quantity', undefined])
   })
 
-  it('emits token accepts payloads from visible target-zone tokens', async () => {
-    const tokenChoice: ChoiceStoryFragment = {
-      uid: 'action_tokens',
+  it('emits piece accepts payloads from visible target-zone pieces', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
       fragment_type: 'choice',
-      edge_id: 'edge_tokens',
+      edge_id: 'edge_pieces',
       text: 'Take something',
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'zone-room' },
@@ -302,37 +364,209 @@ describe('StoryAction', () => {
         uid: 'zone-room',
         fragment_type: 'group',
         group_type: 'zone',
-        member_ids: ['lamp-fragment'],
+        member_ids: ['lamp-fragment', 'sold-out-fragment'],
       },
       'lamp-fragment': {
         uid: 'lamp-fragment',
-        fragment_type: 'token',
-        token_id: 'lamp',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
         content: 'brass lamp',
+      },
+      'sold-out-fragment': {
+        uid: 'sold-out-fragment',
+        fragment_type: 'piece',
+        piece_id: 'sold-out',
+        content: 'sold out offer',
+        available: false,
+        unavailable_reason: 'Out of stock',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    expect(wrapper.findAll('.choice-piece-option')).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('sold out offer')
 
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')).toBeUndefined()
 
-    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('.choice-piece-option').trigger('click')
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')![0]).toEqual([
-      'edge_tokens',
-      { token_ids: ['lamp'] },
+      'edge_pieces',
+      { piece_ids: ['lamp'] },
     ])
   })
 
-  it('clears stale token payload when a same-uid choice points at a new zone', async () => {
-    const tokenChoice: ChoiceStoryFragment = {
-      uid: 'action_tokens',
+  it('allows optional piece accepts with no selection', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces_optional',
       fragment_type: 'choice',
-      edge_id: 'edge_tokens',
+      edge_id: 'edge_pieces_optional',
+      text: 'Maybe take something',
+      accepts: {
+        kind: 'pieces',
+        required: false,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: [],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge_pieces_optional', undefined])
+  })
+
+  it('marks multi-piece accepts as multi-select listboxes', () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces_multi',
+      fragment_type: 'choice',
+      edge_id: 'edge_pieces_multi',
+      text: 'Take some things',
+      accepts: {
+        kind: 'pieces',
+        min: 0,
+        max: 2,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['lamp-fragment', 'coin-fragment'],
+      },
+      'lamp-fragment': {
+        uid: 'lamp-fragment',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
+        content: 'brass lamp',
+      },
+      'coin-fragment': {
+        uid: 'coin-fragment',
+        fragment_type: 'piece',
+        piece_id: 'coin',
+        content: 'silver coin',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    expect(wrapper.find('.choice-piece-list').attributes('aria-multiselectable')).toBe('true')
+  })
+
+  it('emits place accepts payloads from visible source-zone pieces', async () => {
+    const placeChoice: ChoiceStoryFragment = {
+      uid: 'action_place',
+      fragment_type: 'choice',
+      edge_id: 'edge_place',
+      text: 'Mount a weapon',
+      accepts: {
+        kind: 'place',
+        source_zone_ref: 'zone-loose',
+        target_zone_ref: 'zone-front',
+        constraints: { target_kind: ['weapon'] },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-loose': {
+        uid: 'zone-loose',
+        fragment_type: 'group',
+        group_type: 'zone',
+        zone_role: 'inventory',
+        member_ids: ['flame-fragment'],
+        hints: { label_text: 'parts on hand' },
+      },
+      'zone-front': {
+        uid: 'zone-front',
+        fragment_type: 'group',
+        group_type: 'zone',
+        zone_role: 'slot',
+        member_ids: [],
+        hints: { label_text: 'front mount' },
+      },
+      'flame-fragment': {
+        uid: 'flame-fragment',
+        fragment_type: 'piece',
+        piece_id: 'flamethrower-1',
+        content: 'Flamethrower',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: placeChoice, fragments })
+
+    expect(wrapper.find('[data-testid="choice-place-target"]').text()).toBe(
+      'parts on hand to front mount',
+    )
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('.choice-piece-option').trigger('click')
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_place',
+      {
+        piece_id: 'flamethrower-1',
+        source_zone_ref: 'zone-loose',
+        target_zone_ref: 'zone-front',
+      },
+    ])
+  })
+
+  it('allows optional place accepts with no selection', async () => {
+    const placeChoice: ChoiceStoryFragment = {
+      uid: 'action_place_optional',
+      fragment_type: 'choice',
+      edge_id: 'edge_place_optional',
+      text: 'Maybe mount a weapon',
+      accepts: {
+        kind: 'place',
+        required: false,
+        source_zone_ref: 'zone-loose',
+        target_zone_ref: 'zone-front',
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-loose': {
+        uid: 'zone-loose',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: [],
+      },
+      'zone-front': {
+        uid: 'zone-front',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: [],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: placeChoice, fragments })
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge_place_optional', undefined])
+  })
+
+  it('clears stale piece payload when a same-uid choice points at a new zone', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
+      fragment_type: 'choice',
+      edge_id: 'edge_pieces',
       text: 'Take something',
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'zone-room' },
@@ -347,26 +581,26 @@ describe('StoryAction', () => {
       },
       'lamp-fragment': {
         uid: 'lamp-fragment',
-        fragment_type: 'token',
-        token_id: 'lamp',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
         content: 'brass lamp',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
 
-    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('.choice-piece-option').trigger('click')
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')![0]).toEqual([
-      'edge_tokens',
-      { token_ids: ['lamp'] },
+      'edge_pieces',
+      { piece_ids: ['lamp'] },
     ])
 
     await wrapper.setProps({
       choice: {
-        ...tokenChoice,
+        ...pieceChoice,
         accepts: {
-          kind: 'tokens',
+          kind: 'pieces',
           min: 1,
           max: 1,
           constraints: { target_zone_ref: 'zone-bag' },
@@ -381,8 +615,8 @@ describe('StoryAction', () => {
         },
         'coin-fragment': {
           uid: 'coin-fragment',
-          fragment_type: 'token',
-          token_id: 'coin',
+          fragment_type: 'piece',
+          piece_id: 'coin',
           content: 'silver coin',
         },
       },
@@ -396,12 +630,67 @@ describe('StoryAction', () => {
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')!.length).toBe(1)
 
-    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('.choice-piece-option').trigger('click')
     await wrapper.find('button').trigger('click')
     const events = wrapper.emitted('doAction')!
     expect(events[events.length - 1]).toEqual([
-      'edge_tokens',
-      { token_ids: ['coin'] },
+      'edge_pieces',
+      { piece_ids: ['coin'] },
+    ])
+  })
+
+  it('preserves piece selection across same-zone fragment refreshes', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
+      fragment_type: 'choice',
+      edge_id: 'edge_pieces',
+      text: 'Take something',
+      accepts: {
+        kind: 'pieces',
+        min: 1,
+        max: 1,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['lamp-fragment'],
+      },
+      'lamp-fragment': {
+        uid: 'lamp-fragment',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
+        content: 'brass lamp',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
+
+    await wrapper.find('.choice-piece-option').trigger('click')
+    await wrapper.setProps({
+      fragments: {
+        ...fragments,
+        'lamp-fragment': {
+          uid: 'lamp-fragment',
+          fragment_type: 'piece',
+          piece_id: 'lamp',
+          content: 'polished brass lamp',
+        },
+      },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.choice-piece-option').classes()).toContain(
+      'choice-piece-option--selected',
+    )
+
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_pieces',
+      { piece_ids: ['lamp'] },
     ])
   })
 })

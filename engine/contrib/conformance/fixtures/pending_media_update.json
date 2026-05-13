@@ -1,0 +1,32 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000003",
+  "step": 49,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000301",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": ["00000000-0000-4000-8000-000000000302"]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000302",
+      "fragment_type": "media",
+      "content": "gen:vellum_map_close_up",
+      "content_format": "rit",
+      "media_role": "dialog_im",
+      "generation_status": "pending"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000303",
+      "fragment_type": "update",
+      "ref_type": "media",
+      "ref_id": "00000000-0000-4000-8000-000000000302",
+      "payload": {
+        "content": "/media/world/tangl_world/vellum_map_close_up.svg",
+        "content_format": "url",
+        "generation_status": "ready"
+      }
+    }
+  ],
+  "metadata": {"fixture": "pending_media_update"}
+}

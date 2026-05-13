@@ -7,6 +7,7 @@ import * as directives from 'vuetify/directives'
 
 import { HttpResponse, http, server } from '@tests/setup'
 import {
+  commandHintRuntimeEnvelope,
   crossroadsNextRuntimeEnvelope,
   crossroadsRuntimeEnvelope,
 } from '@tests/fixtures'
@@ -177,6 +178,39 @@ describe('StoryFlow', () => {
     expect(wrapper.text()).toContain('The stranger slides the folded vellum')
   })
 
+  it('submits command text through the reserved raw command choice', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json(commandHintRuntimeEnvelope),
+      ),
+      http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
+        const body = await request.json()
+        expect(body).toEqual({
+          choice_id: 'interpret_command',
+          payload: { text: 'take lamp' },
+        })
+        return HttpResponse.json(crossroadsNextRuntimeEnvelope)
+      }),
+    )
+
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    const input = wrapper.find('input')
+    expect(input.attributes('placeholder')).toBe('e.g. take lamp')
+
+    await input.setValue('take lamp')
+    const commandButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Try a command'))
+
+    expect(commandButton).toBeDefined()
+    await commandButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('The stranger slides the folded vellum')
+  })
+
   it('handles unknown fragment types with visible fallbacks', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
@@ -186,7 +220,7 @@ describe('StoryFlow', () => {
           fragments: [
             {
               uid: 'mystery',
-              fragment_type: 'dice_roll',
+              fragment_type: 'future_widget',
               content: { value: 6 },
             },
           ],
@@ -198,7 +232,7 @@ describe('StoryFlow', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('dice_roll')
+    expect(wrapper.text()).toContain('future_widget')
   })
 
   it('keeps referenced choice state visible for decision legibility', async () => {
@@ -207,7 +241,7 @@ describe('StoryFlow', () => {
 
     expect(wrapper.text()).toContain('Show a card from your hand')
     expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Traveler hand')
     expect(wrapper.text()).toContain('Rust map card')
   })

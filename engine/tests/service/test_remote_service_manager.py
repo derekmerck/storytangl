@@ -303,8 +303,8 @@ class TestRemoteResponseHydration:
             "step": 4,
             "fragments": [
                 {
-                    "fragment_type": "token",
-                    "token_id": "rust-map-card",
+                    "fragment_type": "custom_card",
+                    "card_id": "rust-map-card",
                     "content": "Rust map card",
                 },
                 {
@@ -326,10 +326,10 @@ class TestRemoteResponseHydration:
 
         assert len(envelope.fragments) == 3
         assert all(isinstance(fragment, BaseFragment) for fragment in envelope.fragments)
-        assert envelope.fragments[0].fragment_type == "token"
+        assert envelope.fragments[0].fragment_type == "custom_card"
         assert envelope.fragments[0].content == {
-            "fragment_type": "token",
-            "token_id": "rust-map-card",
+            "fragment_type": "custom_card",
+            "card_id": "rust-map-card",
             "content": "Rust map card",
         }
         assert envelope.fragments[1].fragment_type == "unknown"

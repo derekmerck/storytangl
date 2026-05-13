@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { TokenStoryFragment } from '@/types'
+import type { PieceStoryFragment } from '@/types'
 import { fragmentText } from './fragmentUtils'
 
 const props = defineProps<{
-  fragment: TokenStoryFragment
+  fragment: PieceStoryFragment
 }>()
 
 const stringValue = (value: unknown): string | undefined =>
@@ -18,13 +18,13 @@ const hintLabel = computed(() => {
   return stringValue(hints?.label_text)
 })
 
-const tokenLabel = computed(() => {
+const pieceLabel = computed(() => {
   const content = fragmentText(props.fragment.content)
   return (
     hintLabel.value ??
     stringValue(props.fragment.label) ??
     (content ? content : undefined) ??
-    stringValue(props.fragment.token_id) ??
+    stringValue(props.fragment.piece_id) ??
     props.fragment.uid
   )
 })
@@ -34,7 +34,21 @@ const displayState = computed(() => {
   return state ? readableValue(state) : undefined
 })
 
-const tokenKind = computed(() => {
+const lifecycleState = computed(() => {
+  if (props.fragment.realized === false) {
+    return 'offer'
+  }
+  return undefined
+})
+
+const availabilityState = computed(() => {
+  if (props.fragment.available === false) {
+    return stringValue(props.fragment.unavailable_reason) ?? 'unavailable'
+  }
+  return undefined
+})
+
+const pieceKind = computed(() => {
   const kind = stringValue(props.fragment.kind)
   return kind ? readableValue(kind) : undefined
 })
@@ -42,20 +56,34 @@ const tokenKind = computed(() => {
 
 <template>
   <div
-    class="token-fragment"
-    data-testid="token-fragment"
-    :data-token-id="fragment.token_id ?? fragment.uid"
+    class="piece-fragment"
+    data-testid="piece-fragment"
+    :data-piece-id="fragment.piece_id ?? fragment.uid"
   >
-    <span class="token-label">{{ tokenLabel }}</span>
-    <span v-if="tokenKind" class="token-meta">{{ tokenKind }}</span>
-    <span v-if="displayState" class="token-state" data-testid="token-state">
+    <span class="piece-label">{{ pieceLabel }}</span>
+    <span v-if="pieceKind" class="piece-meta">{{ pieceKind }}</span>
+    <span v-if="displayState" class="piece-state" data-testid="piece-state">
       {{ displayState }}
+    </span>
+    <span
+      v-if="lifecycleState"
+      class="piece-state piece-state--offer"
+      data-testid="piece-realized-state"
+    >
+      {{ lifecycleState }}
+    </span>
+    <span
+      v-if="availabilityState"
+      class="piece-state piece-state--locked"
+      data-testid="piece-availability"
+    >
+      {{ availabilityState }}
     </span>
   </div>
 </template>
 
 <style scoped>
-.token-fragment {
+.piece-fragment {
   align-items: center;
   background: rgba(var(--v-theme-surface), 0.86);
   border: 1px solid rgba(var(--v-theme-primary), 0.34);
@@ -69,13 +97,13 @@ const tokenKind = computed(() => {
   padding: 6px 9px;
 }
 
-.token-label {
+.piece-label {
   font-weight: 700;
   overflow-wrap: anywhere;
 }
 
-.token-meta,
-.token-state {
+.piece-meta,
+.piece-state {
   border-radius: 4px;
   color: rgb(var(--v-theme-on-surface-variant));
   font-size: 0.75rem;
@@ -83,11 +111,20 @@ const tokenKind = computed(() => {
   padding: 2px 5px;
 }
 
-.token-meta {
+.piece-meta {
   background: rgba(var(--v-theme-surface-variant), 0.62);
 }
 
-.token-state {
+.piece-state {
   background: rgba(var(--v-theme-primary), 0.12);
+}
+
+.piece-state--offer {
+  background: rgba(var(--v-theme-secondary), 0.14);
+}
+
+.piece-state--locked {
+  background: rgba(var(--v-theme-error), 0.12);
+  color: rgb(var(--v-theme-error));
 }
 </style>
