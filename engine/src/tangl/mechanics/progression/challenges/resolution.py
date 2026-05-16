@@ -72,6 +72,23 @@ def _remap_wallet(
     return remapped
 
 
+def _sum_modifier(effects: Iterable[SituationalEffect], attr: str) -> float:
+    """Sum a magnitude modifier across applicable effects, clamped to [-1, 1]."""
+    total = sum(getattr(effect, attr, 0.0) for effect in effects)
+    return max(-1.0, min(1.0, total))
+
+
+def _scale_wallet(wallet_map: Mapping[str, int], modifier: float) -> dict[str, int]:
+    """Apply a proportional ``1 + modifier`` factor to wallet amounts (floor 0)."""
+    if not modifier:
+        return dict(wallet_map)
+    factor = 1.0 + modifier
+    return {
+        currency: max(0, round(amount * factor))
+        for currency, amount in wallet_map.items()
+    }
+
+
 def resolve_challenge(
     challenge: StatChallenge,
     entity: HasStats,
@@ -117,7 +134,10 @@ def resolve_challenge(
         if effect.reward_currency_remap
     ]
 
-    effective_cost = _remap_wallet(challenge.cost, cost_remaps)
+    effective_cost = _scale_wallet(
+        _remap_wallet(challenge.cost, cost_remaps),
+        _sum_modifier(tag_effects, "cost_modifier"),
+    )
 
     if effective_cost and wallet is None:
         raise ValueError("Challenge cost requires a wallet-like target")
@@ -156,7 +176,10 @@ def resolve_challenge(
         roll=roll,
     )
 
-    payout = _remap_wallet(challenge.payout.reward_for(outcome), reward_remaps)
+    payout = _scale_wallet(
+        _remap_wallet(challenge.payout.reward_for(outcome), reward_remaps),
+        _sum_modifier(tag_effects, "reward_modifier"),
+    )
     if wallet is not None and payout:
         wallet.earn(payout)
 
@@ -188,6 +211,7 @@ def resolve_challenge(
             challenge,
             result,
             apply=apply_growth,
+            gain_scale=1.0 + _sum_modifier(tag_effects, "growth_modifier"),
         )
         result.growth_receipt = growth_receipt
 

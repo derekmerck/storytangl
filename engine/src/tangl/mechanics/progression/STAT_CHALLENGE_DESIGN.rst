@@ -7,8 +7,12 @@ Status
 Partially landed. The current package now has a supported one-shot challenge
 surface, structured `ChallengeResult` output, donor-based situational effect
 gathering, baseline growth handlers, broad stat-gate support, and an
-`Adventure2` preset. Story-facing traversal wrappers and richer authored worlds
-remain follow-up work.
+`Adventure2` preset. Situational effects now carry full three-axis magnitude
+modifiers -- `cost_modifier`, `difficulty_modifier`, and `reward_modifier` --
+plus a distinct `growth_modifier` for training gain (cost/reward are
+proportional wallet adjustments clamped to a `1 + sum` factor over [-1, 1];
+growth scales `GrowthHandler.grow(gain_scale=...)`). Story-facing traversal
+wrappers and richer authored worlds remain follow-up work.
 
 
 Purpose

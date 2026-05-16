@@ -35,6 +35,7 @@ class GrowthHandler(ABC):
         result,
         *,
         apply: bool = True,
+        gain_scale: float = 1.0,
     ) -> GrowthReceipt:
         target_stat = result.domain
         if target_stat is None or target_stat not in entity.stats:
@@ -51,6 +52,9 @@ class GrowthHandler(ABC):
             outcome_weight=outcome_weight,
             headroom_factor=headroom_factor,
         )
+        # Situational growth_modifier (e.g. mood biasing this week's training)
+        # scales the gain; floored at 0 so a malus never reverses a skill.
+        primary_delta *= max(0.0, gain_scale)
 
         deltas: dict[str, float] = {}
         if primary_delta > 0:
