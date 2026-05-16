@@ -1,0 +1,19 @@
+label: coronate_the_regent
+
+metadata:
+  title: "Coronate the Regent"
+  start_at: prologue.start
+
+# Placeholder spine. The real week-loop, scheduled events, and coronation
+# payoff are built in a later phase; this keeps the bundle loadable now.
+scenes:
+  prologue:
+    blocks:
+      start:
+        label: start
+        content: |
+          The regency council adjourns. You have a handful of weeks before the
+          coronation, and a great deal still to prepare.
+        actions:
+          - text: "Begin"
+            successor: start

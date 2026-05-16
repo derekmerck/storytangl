@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Mapping
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..definition.stat_system import StatSystemDefinition
 
@@ -23,7 +23,9 @@ class HasWallet(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    wallet: Dict[str, int]
+    # Mutated in place by spend()/earn(); persist non-default values through
+    # unstructure() even without reassignment.
+    wallet: Dict[str, int] = Field(json_schema_extra={"include": True})
 
     # ------------------------------------------------------------------ #
     # Constructors
