@@ -33,9 +33,13 @@ class Stat(BaseModel):
     # Default handler; callers/worlds can subclass Stat and override this.
     handler: ClassVar[type[StatHandler]] = ProbitStatHandler
 
-    def __init__(self, value: ValueLike = 10.0, **data):
-        fv = self.normalize_value(value)
-        super().__init__(fv=fv, **data)
+    def __init__(self, value: ValueLike | None = None, **data):
+        # Serialized constructor form is ``{"fv": <float>}``; accept it
+        # directly so Stat round-trips through unstructure()/structure().
+        if "fv" in data:
+            super().__init__(**data)
+            return
+        super().__init__(fv=self.normalize_value(10.0 if value is None else value), **data)
 
     @classmethod
     def normalize_value(

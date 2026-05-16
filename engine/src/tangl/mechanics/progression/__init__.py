@@ -43,6 +43,7 @@ from .challenges import (
     StatRequirement,
     resolve_challenge,
 )
+from .story_blocks import HasStatChallenge, HasTraining
 
 __all__ = [
     "Quality",
@@ -90,4 +91,6 @@ __all__ = [
     "LinearGrowthHandler",
     "SteppedGrowthHandler",
     "DiminishingGrowthHandler",
+    "HasStatChallenge",
+    "HasTraining",
 ]
