@@ -29,6 +29,8 @@ from .compiler import (
     SandboxStableMaterializationSpec,
 )
 from .facets import (
+    ChargeConsumption,
+    ChargeFacet,
     ContainerFacet,
     LightSourceFacet,
     LockableFacet,
@@ -36,6 +38,7 @@ from .facets import (
     SwitchableFacet,
 )
 from .handlers import (
+    advance_sandbox_time_on_action,
     advance_sandbox_time_on_wait,
     compose_sandbox_visibility_journal,
     compose_sandbox_mob_journal,
@@ -63,7 +66,17 @@ from .location import (
 )
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
 from .scope import SandboxInventory, SandboxScope
-from .time import WorldTime, advance_world_turn, current_world_time, get_world_turn
+from .time import (
+    SandboxClockPolicy,
+    SandboxTickEvent,
+    SandboxTickResult,
+    SandboxTimeCost,
+    TimePolicy,
+    WorldTime,
+    advance_world_turn,
+    current_world_time,
+    get_world_turn,
+)
 from .visibility import SandboxProjectionState, SandboxVisibilityRule
 
 __all__ = [
@@ -71,6 +84,7 @@ __all__ = [
     "SandboxContainerSpec",
     "SandboxCompiledAssetType",
     "SandboxCompiledSlice",
+    "SandboxClockPolicy",
     "SandboxContributionsSpec",
     "SandboxDescriptionSpec",
     "SandboxExitSpec",
@@ -86,6 +100,8 @@ __all__ = [
     "SandboxLocationContributionsSpec",
     "SandboxLocation",
     "SandboxLocationSpec",
+    "ChargeConsumption",
+    "ChargeFacet",
     "ContainerFacet",
     "LightSourceFacet",
     "LockableFacet",
@@ -104,6 +120,9 @@ __all__ = [
     "SandboxSliceSpec",
     "SandboxSourceSpec",
     "SandboxStableMaterializationSpec",
+    "SandboxTickEvent",
+    "SandboxTickResult",
+    "SandboxTimeCost",
     "SandboxVisibilityRule",
     "Schedule",
     "ScheduleEntry",
@@ -111,6 +130,8 @@ __all__ = [
     "ScheduledPresence",
     "SwitchableFacet",
     "WorldTime",
+    "TimePolicy",
+    "advance_sandbox_time_on_action",
     "advance_sandbox_time_on_wait",
     "advance_world_turn",
     "compose_sandbox_mob_journal",

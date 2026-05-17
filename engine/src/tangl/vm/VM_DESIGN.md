@@ -119,6 +119,32 @@ JOURNAL — the player's next choice is recorded at the start of the *next*
 `resolve_choice` call, not at the end of the current pipeline. This keeps the pipeline
 atomic and simplifies replay: every step is a complete VALIDATE→POSTREQS sequence.
 
+**Phases are recursively refinable symbols.** A phase is atomic at the contract
+boundary but may be decomposed at the implementation boundary. At the VM level,
+`UPDATE` is one causal symbol in the pipeline. Internally it may be refined into
+selected-edge effects, node effects, and a domain-local update chain. That chain may
+itself refine into smaller steps such as charge depletion, mob movement, schedule
+advancement, or queue service completion. The same grammar-like rule applies to
+`JOURNAL`: callers see `JOURNAL(ctx) -> fragments`, while the implementation may
+gather content candidates, enrich them, and only produce concrete fragments during
+the final composition step.
+
+A refinement preserves the parent phase's entry and exit contracts, not every
+intermediate representation. Private substeps may pass raw candidates, annotations,
+tick events, receipts, or other domain-local shapes, but those shapes must not leak
+across the parent boundary unless they are intentionally promoted into public
+vocabulary. This is the boundary rule that makes recursive phase refinement useful
+instead of turning the phase bus into a stack of incompatible private runtimes.
+
+Domain packages may therefore subdivide a VM phase with their own behavior chain,
+provided the outer VM contract remains intact. For example, a sandbox package may
+invoke `do_sandbox_tick` from an `on_update` handler after normal selected-edge and
+node effects have run. That sandbox tick is not a new VM phase; it is a domain-local
+refinement of UPDATE. If a mechanic truly must interleave earlier or later, it can
+still register an ordinary `on_update` or `on_finalize` handler with explicit
+priority, but that is an advanced phase-ordering decision and should be documented
+at the call site.
+
 
 ### Traversal Contracts (`traversable.py`)
 
@@ -283,6 +309,17 @@ the VM dispatch surface.
 handlers must pass). JOURNAL uses merge (all handler contributions combined). UPDATE and
 PLANNING use gather (all results collected). These are not arbitrary choices — they
 follow from what each phase does.
+
+**Domain subphases use the same dispatch hygiene.** When a mechanics or story package
+adds a local behavior chain inside a VM phase, use recognizable phase-bus vocabulary:
+an `on_<domain_event>` registration surface, a `do_<domain_event>` invocation surface,
+boring handler signatures such as `(*, caller, ctx, **kw)`, explicit `Priority`, and a
+documented return shape. Name the chain after the domain event, not the first current
+consumer: `sandbox_tick` is healthier than `charge_update_loop` because charges, mobs,
+schedules, hazards, and queues can all be tick consumers. Avoid private context types,
+private ledgers, private fragment hierarchies, and hidden output channels. If a
+domain-local refinement gains a second non-domain consumer, promote the generic piece
+intentionally rather than letting one package own a framework concept by accident.
 
 **`AggregationMode` will drive a hook factory.** Each `do_*` function currently
 hardcodes its own fold call. The intent is to replace this copy-paste with a table of

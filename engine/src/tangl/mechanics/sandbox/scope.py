@@ -12,6 +12,7 @@ from tangl.vm import TraversableNode
 
 from .mob import SandboxMob
 from .schedule import ScheduledEvent, ScheduledPresence
+from .time import SandboxClockPolicy
 from .visibility import SandboxVisibilityRule
 
 
@@ -27,6 +28,7 @@ class SandboxScope(TraversableNode):
     mobs: list[SandboxMob] = Field(default_factory=list)
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     player_assets: SandboxInventory = Field(default_factory=SandboxInventory)
+    clock_policy: SandboxClockPolicy = Field(default_factory=SandboxClockPolicy)
     wait_enabled: bool | None = True
     wait_text: str | None = "Wait"
     wait_turn_delta: int | None = 1

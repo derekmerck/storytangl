@@ -7,7 +7,15 @@ from pydantic import Field
 
 from tangl.core import Graph, Selector, Token
 from tangl.core.runtime_op import Effect, Predicate
+from tangl.mechanics.games import (
+    HasGame,
+    IncrementalGame,
+    IncrementalGameHandler,
+    TaskSpec,
+)
 from tangl.mechanics.sandbox import (
+    ChargeConsumption,
+    ChargeFacet,
     ContainerFacet,
     LightSourceFacet,
     LockableFacet,
@@ -30,6 +38,7 @@ from tangl.mechanics.sandbox import (
     current_world_time,
     normalize_sandbox_direction,
 )
+from tangl.mechanics.sandbox import incremental as sandbox_incremental
 from tangl.story import Action, Block, StoryGraph
 from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
@@ -59,6 +68,25 @@ class SandboxItemType(AssetType):
     drop_text: str | None = None
     interactions: list[SandboxInteraction] = Field(default_factory=list)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
+
+
+class SandboxColonyGame(IncrementalGame):
+    """Tiny resource-allocation shell for sandbox tick integration tests."""
+
+    starting_resources: dict[str, int] = {"food": 1}
+    starting_workers: int = 1
+    task_specs: dict[str, TaskSpec] = {
+        "forage": TaskSpec(produces={"food": 2}),
+    }
+    upkeep: dict[str, int] = {"food": 1}
+    unlocked_tasks: list[str] = ["forage"]
+
+
+class SandboxColonyBlock(HasGame, Block):
+    """Sandbox-hosted incremental game block."""
+
+    _game_class = SandboxColonyGame
+    _game_handler_class = IncrementalGameHandler
 
 
 @pytest.fixture(autouse=True)
@@ -136,6 +164,17 @@ def test_world_turn_helpers_use_mutable_locals() -> None:
     assert current_world_time(location).turn == 1
     assert advance_world_turn(location, 2) == 3
     assert location.locals["world_turn"] == 3
+
+
+def test_charge_consumption_supports_when_used_trigger() -> None:
+    charge = ChargeFacet(
+        current=2,
+        maximum=2,
+        consumption_trigger=ChargeConsumption.WHEN_USED,
+    )
+
+    assert charge.can_consume(is_on=True) is False
+    assert charge.can_consume(is_on=False, was_used=True) is True
 
 
 def test_schedule_matches_time_location_and_presence() -> None:
@@ -786,7 +825,10 @@ def test_sandbox_location_projects_wait_choice() -> None:
     assert len(waits) == 1
     assert waits[0].text == "Wait"
     assert waits[0].successor is road
-    assert waits[0].payload == {"sandbox_action": "wait", "turn_delta": 1}
+    assert waits[0].payload["sandbox_action"] == "wait"
+    assert waits[0].payload["turn_delta"] == 1
+    assert waits[0].payload["sandbox_time_cost"].duration == 1
+    assert waits[0].payload["sandbox_time_cost"].kind == "wait"
 
 
 def test_wait_choice_advances_world_turn_through_ledger() -> None:
@@ -801,6 +843,64 @@ def test_wait_choice_advances_world_turn_through_ledger() -> None:
 
     assert ledger.cursor is road
     assert road.locals["world_turn"] == 1
+
+
+def test_sandbox_can_host_incremental_allocation_and_tick_cycles() -> None:
+    graph = Graph(label="colony_sandbox")
+    scope = SandboxScope(label="colony_scope", locals={"world_turn": 0})
+    hub = SandboxLocation(label="colony_hub", location_name="Colony")
+    colony = SandboxColonyBlock(label="colony_shell", content="The colony waits.")
+    graph.add(scope)
+    graph.add(hub)
+    graph.add(colony)
+    scope.add_child(hub)
+    scope.add_child(colony)
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    assert sandbox_incremental.reconcile_incremental_games_on_sandbox_tick is not None
+    do_provision(hub, ctx=ctx)
+    actions = _dynamic_sandbox_actions_with_tag(hub, "incremental")
+
+    assert {action.text for action in actions} == {
+        "Assign 1 worker to forage",
+        "End cycle",
+    }
+
+    assign = next(action for action in actions if action.text == "Assign 1 worker to forage")
+    assert assign.payload["sandbox_time_cost"].duration == 0
+
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+    ledger.resolve_choice(assign.uid, choice_payload=assign.payload)
+
+    assert scope.locals["world_turn"] == 0
+    assert colony.game.worker_pool == 0
+    assert colony.game.task_assignments["forage"] == 1
+    assert any(
+        isinstance(fragment, ContentFragment)
+        and fragment.content == "You assign a worker to forage."
+        for fragment in ledger.get_journal()
+    )
+
+    do_provision(hub, ctx=PhaseCtx(graph=graph, cursor_id=hub.uid))
+    cycle = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(hub, "incremental")
+        if action.text == "End cycle"
+    )
+    assert cycle.payload["sandbox_time_cost"].duration == 1
+
+    ledger.resolve_choice(cycle.uid, choice_payload=cycle.payload)
+
+    assert scope.locals["world_turn"] == 1
+    assert colony.game.cycle == 1
+    assert colony.game.resources["food"] == 2
+    journal_text = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert "Cycle 1 resolves." in journal_text
+    assert "Resources: food=2." in journal_text
 
 
 def test_scheduled_event_projects_only_at_matching_location_and_time() -> None:
@@ -1616,7 +1716,10 @@ def test_scope_donates_wait_to_child_locations() -> None:
     wait = _dynamic_sandbox_actions_with_tag(road, "wait")[0]
 
     assert wait.text == "Pass time"
-    assert wait.payload == {"sandbox_action": "wait", "turn_delta": 2}
+    assert wait.payload["sandbox_action"] == "wait"
+    assert wait.payload["turn_delta"] == 2
+    assert wait.payload["sandbox_time_cost"].duration == 2
+    assert wait.payload["sandbox_time_cost"].kind == "wait"
 
     do_provision(peer, ctx=PhaseCtx(graph=graph, cursor_id=peer.uid))
     assert _dynamic_sandbox_actions_with_tag(peer, "wait") == []

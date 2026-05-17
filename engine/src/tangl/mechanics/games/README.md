@@ -19,6 +19,13 @@ Concrete games can optionally refine the shared VM presentation hooks too:
 - `build_round_notes`
 - `get_journal_fragments`
 
+Some game families expose narrower public operations for non-modal hosts. For
+example, `IncrementalGameHandler.resolve_cycle_tick()` resolves one
+production/upkeep cycle without requiring sandbox to know anything about
+workers, resources, or task names. The sandbox package can adapt that operation
+to its tick seam, while the incremental game remains manually runnable through
+ordinary `HasGame` blocks.
+
 The Game component class itself is only responsible for managing and dumping state when required, such as for assigning namespace variables to evaluate win conditions at higher levels.
 
 Games progress over "rounds", to distinguish them from story "turns".  One turn of the base story structure (i.e., one block) may comprise multiple games with multiple rounds.

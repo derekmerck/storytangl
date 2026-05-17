@@ -13,6 +13,7 @@ from tangl.story import StoryGraph
 from tangl.story.concepts.asset import AssetType
 
 from .facets import (
+    ChargeFacet,
     ContainerFacet,
     LightSourceFacet,
     LockableFacet,
@@ -42,7 +43,10 @@ class SandboxCompiledAssetType(AssetType):
         json_schema_extra={"instance_var": True},
     )
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
-    charge: int | None = Field(default=None, json_schema_extra={"instance_var": True})
+    charge: ChargeFacet | None = Field(
+        default=None,
+        json_schema_extra={"instance_var": True},
+    )
     turn_on_text: str | None = None
     turn_off_text: str | None = None
     take_text: str | None = None
@@ -604,7 +608,7 @@ class SandboxSliceCompiler:
                 descriptions=spec.descriptions,
             ),
             "lit": bool(state.get("lit", False)),
-            "charge": state.get("charge"),
+            "charge": self._compile_charge(spec=spec, traits=traits, state=state),
             "read_text": spec.descriptions.examine,
             "turn_on_text": (
                 spec.descriptions.turn_on or f"Your {spec.name} is now on."
@@ -623,6 +627,38 @@ class SandboxSliceCompiler:
                 spec.contributes.scheduled_events
             ),
         }
+
+    def _compile_charge(
+        self,
+        *,
+        spec: SandboxAssetSpec,
+        traits: set[str],
+        state: dict[str, Any],
+    ) -> ChargeFacet | None:
+        charge_spec = (spec.model_extra or {}).get("charge")
+        if "requires_charge" not in traits and "charge" not in state and not charge_spec:
+            return None
+        if "requires_charge" in traits and "charge" not in state and not charge_spec:
+            raise ValueError(
+                f"Asset {spec.name!r} declares requires_charge but has no charge data "
+                f"for ChargeFacet; traits={sorted(traits)!r}, state={state!r}"
+            )
+        if isinstance(charge_spec, dict):
+            current = int(state.get("charge", charge_spec.get("current", 0)))
+            maximum = int(charge_spec.get("maximum", charge_spec.get("max", current)))
+            return ChargeFacet(
+                current=current,
+                maximum=maximum,
+                consume_per_tick=int(charge_spec.get("consume_per_tick", 1)),
+                charge_name=str(charge_spec.get("charge_name", "charges")),
+                exhausted_text=charge_spec.get("exhausted_text"),
+                warnings={
+                    int(threshold): str(text)
+                    for threshold, text in dict(charge_spec.get("warnings", {})).items()
+                },
+            )
+        current = int(state.get("charge", 0))
+        return ChargeFacet(current=current, maximum=current)
 
     def _compile_container(
         self,

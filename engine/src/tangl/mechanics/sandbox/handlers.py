@@ -12,10 +12,18 @@ from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.fragments import ContentFragment
 from tangl.story import Action
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
-from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
+from tangl.vm import (
+    ResolutionPhase,
+    TraversableNode,
+    VmPhaseCtx,
+    on_journal,
+    on_provision,
+    on_update,
+)
 from tangl.vm.dispatch import on_compose_journal, on_gather_ns
 
-from .facets import ContainerFacet, LightSourceFacet, SwitchableFacet
+from .dispatch import do_sandbox_tick, on_sandbox_tick
+from .facets import ChargeFacet, ContainerFacet, LightSourceFacet, SwitchableFacet
 from .interaction import SandboxInteraction
 from .location import (
     SandboxExit,
@@ -26,7 +34,14 @@ from .location import (
 from .mob import SandboxMob
 from .schedule import ScheduledEvent, ScheduledPresence
 from .scope import SandboxScope
-from .time import advance_world_turn, current_world_time
+from .time import (
+    SandboxClockPolicy,
+    SandboxTickEvent,
+    SandboxTickResult,
+    SandboxTimeCost,
+    advance_world_turn,
+    current_world_time,
+)
 from .visibility import SandboxProjectionState, SandboxVisibilityRule
 
 
@@ -63,6 +78,7 @@ class SandboxAssetSurface(Protocol):
     switchable: SwitchableFacet | None
     light_source: LightSourceFacet | None
     container: ContainerFacet | None
+    charge: ChargeFacet | None
     lit: bool
     turn_on_text: str | None
     turn_off_text: str | None
@@ -344,6 +360,38 @@ def _nearest_wait_turn_delta(location: SandboxLocation) -> int:
     return 1
 
 
+def _clock_policy(location: SandboxLocation) -> SandboxClockPolicy:
+    for scope in _sandbox_scopes(location):
+        return scope.clock_policy
+    return SandboxClockPolicy()
+
+
+def _sandbox_action_payload(
+    kind: str,
+    *,
+    duration: int | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "sandbox_time_cost": SandboxTimeCost(kind=kind, duration=duration),
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def _coerce_time_cost(value: Any) -> SandboxTimeCost | None:
+    if value is None:
+        return None
+    if isinstance(value, SandboxTimeCost):
+        return value
+    if isinstance(value, dict):
+        return SandboxTimeCost.model_validate(value)
+    raise TypeError(
+        f"sandbox_time_cost must be SandboxTimeCost or dict, got {type(value)!r}"
+    )
+
+
 def _scheduled_event_contributions(
     location: SandboxLocation,
     ctx: VmPhaseCtx,
@@ -566,6 +614,70 @@ def _time_owner(location: SandboxLocation) -> Any:
     return location
 
 
+def _record_tick_result(location: SandboxLocation, result: SandboxTickResult) -> None:
+    location.locals["_sandbox_tick_result"] = result
+
+
+def _sandbox_time_advance(
+    location: SandboxLocation,
+    *,
+    ctx: VmPhaseCtx,
+    cost: SandboxTimeCost | None,
+) -> SandboxTickResult:
+    duration = _clock_policy(location).action_duration(cost)
+    result = SandboxTickResult(requested=duration)
+    if duration == 0:
+        _record_tick_result(location, result)
+        return result
+
+    time_owner = _time_owner(location)
+    for _ in range(duration):
+        clock_tick = advance_world_turn(time_owner, 1)
+        result.elapsed += 1
+        result.events.extend(do_sandbox_tick(location, ctx=ctx, clock_tick=clock_tick))
+    _record_tick_result(location, result)
+    return result
+
+
+def _charged_assets(location: SandboxLocation) -> list[Token]:
+    graph = location.graph
+    if graph is None:
+        return []
+    assets: list[Token] = []
+    seen: set[object] = set()
+    for item in graph.find_all():
+        if not isinstance(item, Token):
+            continue
+        charge = getattr(item, "charge", None)
+        if not isinstance(charge, ChargeFacet):
+            continue
+        if item.uid in seen:
+            continue
+        seen.add(item.uid)
+        assets.append(item)
+    return assets
+
+
+def _asset_observable(location: SandboxLocation, asset: Token, ctx: VmPhaseCtx) -> bool:
+    player_assets = _player_asset_holder(location)
+    if player_assets is not None and asset in player_assets.assets.values():
+        return True
+    if (
+        asset in location.assets.values()
+        and not _projection_state(location, ctx).suppress_asset_affordances
+    ):
+        return True
+    return any(asset in mob.assets.values() for mob in _present_mobs(location))
+
+
+def _charge_event_text(asset: Token, charge: ChargeFacet) -> str:
+    if charge.exhausted_text:
+        return charge.exhausted_text
+    if getattr(asset, "light_source", None) is not None:
+        return f"The {_asset_name(asset)} flickers and goes out."
+    return f"The {_asset_name(asset)} runs out of {charge.charge_name}."
+
+
 def _visibility_rules(location: SandboxLocation) -> list[SandboxVisibilityRule]:
     rules: list[SandboxVisibilityRule] = []
     for scope in reversed(_sandbox_scopes(location)):
@@ -744,6 +856,20 @@ def _selected_payload(ctx: VmPhaseCtx) -> Any:
     return ctx.selected_payload
 
 
+def _selected_sandbox_time_cost(ctx: VmPhaseCtx) -> SandboxTimeCost | None:
+    payload = _selected_payload(ctx)
+    if isinstance(payload, dict) and "sandbox_time_cost" in payload:
+        return _coerce_time_cost(payload["sandbox_time_cost"])
+    selected_edge = ctx.selected_edge
+    if not isinstance(selected_edge, Action):
+        return None
+    if "sandbox" not in (selected_edge.tags or set()):
+        return None
+    ui_hints = selected_edge.ui_hints or {}
+    kind = str(ui_hints.get("contribution") or "local_action")
+    return SandboxTimeCost(kind=kind)
+
+
 def _sandbox_inventory(location: SandboxLocation) -> set[str]:
     return _asset_inventory(_player_asset_holder(location))
 
@@ -869,6 +995,9 @@ def _set_asset_lit(location: SandboxLocation, asset_label: str, lit: bool) -> To
     if asset.switchable is None:
         raise ValueError(f"Asset {asset_label!r} is not switchable")
     if lit:
+        charge = getattr(asset, "charge", None)
+        if isinstance(charge, ChargeFacet) and charge.current <= 0:
+            raise ValueError(f"Asset {asset_label!r} has no charge")
         asset.switchable.switch_on(asset)
     else:
         asset.switchable.switch_off(asset)
@@ -1107,6 +1236,7 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
                 predecessor_id=caller.uid,
                 successor_id=caller.uid,
                 text=_message_exit_text(raw_direction, exit_spec),
+                payload=_sandbox_action_payload("movement"),
                 journal_text=exit_spec.journal_text or "",
                 tags={"dynamic", "sandbox", "movement"},
                 ui_hints=_sandbox_contribution_hints(
@@ -1139,6 +1269,7 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
             predecessor_id=caller.uid,
             successor_id=target.uid,
             text=_movement_text(raw_direction, target, exit_spec),
+            payload=_sandbox_action_payload("movement"),
             availability=availability,
             tags={"dynamic", "sandbox", "movement"},
             ui_hints=_sandbox_contribution_hints(
@@ -1938,10 +2069,11 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
         predecessor_id=caller.uid,
         successor_id=caller.uid,
         text=wait_text,
-        payload={
-            "sandbox_action": "wait",
-            "turn_delta": turn_delta,
-        },
+        payload=_sandbox_action_payload(
+            "wait",
+            duration=turn_delta,
+            extra={"sandbox_action": "wait", "turn_delta": turn_delta},
+        ),
         tags={"dynamic", "sandbox", "wait"},
         ui_hints=_sandbox_contribution_hints(
             caller,
@@ -2000,26 +2132,75 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
 @on_update(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
+    priority=Priority.LATE,
 )
-def advance_sandbox_time_on_wait(*, caller, ctx, **_kw):
-    """Advance sandbox world time when the selected action is wait."""
+def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
+    """Advance sandbox-local time for selected sandbox actions."""
     if not isinstance(caller, SandboxLocation):
         return None
 
-    payload = _selected_payload(ctx)
-    if not isinstance(payload, dict):
+    cost = _selected_sandbox_time_cost(ctx)
+    if cost is None:
         return None
-    if payload.get("sandbox_action") != "wait":
-        return None
-
-    try:
-        turn_delta = int(payload.get("turn_delta", 1))
-    except (TypeError, ValueError):
-        turn_delta = 1
-    if turn_delta < 0:
-        return None
-    advance_world_turn(_time_owner(caller), turn_delta)
+    _sandbox_time_advance(caller, ctx=ctx, cost=cost)
     return None
+
+
+advance_sandbox_time_on_wait = advance_sandbox_time_on_action
+
+
+@on_sandbox_tick(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def reconcile_charged_sandbox_assets(*, caller, ctx, clock_tick, **_kw):
+    """Tick observer that consumes charges for charged assets."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    ns = dict(ctx.get_ns(caller))
+    events: list[SandboxTickEvent] = []
+    for asset in _charged_assets(caller):
+        charge = asset.charge
+        if (
+            charge.last_reconciled_tick is not None
+            and charge.last_reconciled_tick >= clock_tick
+        ):
+            continue
+        charge.last_reconciled_tick = clock_tick
+        charge_ns = {**ns, "asset": asset, "charge": charge}
+        if not charge.can_consume(
+            is_on=bool(getattr(asset, "lit", False)),
+            was_used=False,
+            ns=charge_ns,
+        ):
+            continue
+        before, after = charge.consume()
+        observable = _asset_observable(caller, asset, ctx)
+        for threshold, text in sorted(charge.warnings.items(), reverse=True):
+            if after == 0:
+                continue
+            if before > threshold >= after and observable:
+                events.append(
+                    SandboxTickEvent(
+                        kind="charge_warning",
+                        source_label=_asset_key(asset),
+                        text=text,
+                        clock_tick=clock_tick,
+                    )
+                )
+        if after == 0 and before > 0:
+            if getattr(asset, "switchable", None) is not None:
+                asset.switchable.switch_off(asset)
+            if observable:
+                events.append(
+                    SandboxTickEvent(
+                        kind="charge_exhausted",
+                        source_label=_asset_key(asset),
+                        text=_charge_event_text(asset, charge),
+                        clock_tick=clock_tick,
+                    )
+                )
+    return events or None
 
 
 @on_compose_journal(
@@ -2079,3 +2260,26 @@ def compose_sandbox_mob_journal(*, caller, ctx, fragments, **_kw):
     if not additions:
         return None
     return [*fragments, *additions]
+
+
+@on_journal(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+    priority=Priority.LAST,
+)
+def render_sandbox_tick_journal(*, caller, ctx, **_kw):
+    """Render observable sandbox tick events to the journal."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    result = caller.locals.get("_sandbox_tick_result")
+    if not isinstance(result, SandboxTickResult):
+        return None
+    fragments = [
+        ContentFragment(content=event.text, source_id=caller.uid)
+        for event in result.events
+        if event.observable and event.text
+    ]
+    return fragments or None
+
+
+compose_sandbox_tick_journal = render_sandbox_tick_journal

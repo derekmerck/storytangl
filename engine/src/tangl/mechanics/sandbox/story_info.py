@@ -23,6 +23,7 @@ from .handlers import (
     sandbox_present_mobs,
     sandbox_projection_state,
 )
+from .facets import ChargeFacet
 from .location import SandboxExit, SandboxFixture, SandboxLocation, normalize_sandbox_direction
 from .time import current_world_time
 
@@ -195,12 +196,16 @@ def _asset_name(asset: Token, *, fallback: str) -> str:
 
 
 def _asset_detail(asset: Token) -> str | None:
+    detail: list[str] = []
     if bool(getattr(asset, "lit", False)):
-        return "lit"
+        detail.append("lit")
+    charge = getattr(asset, "charge", None)
+    if isinstance(charge, ChargeFacet):
+        detail.append(f"{charge.current} {charge.charge_name}")
     container = getattr(asset, "container", None)
     if container is not None:
-        return "open" if container.is_open else "closed"
-    return None
+        detail.append("open" if container.is_open else "closed")
+    return ", ".join(detail) or None
 
 
 def _asset_tags(asset: Token) -> list[str]:
@@ -209,6 +214,8 @@ def _asset_tags(asset: Token) -> list[str]:
     tags.update(str(trait) for trait in traits)
     if bool(getattr(asset, "lit", False)):
         tags.add("lit")
+    if isinstance(getattr(asset, "charge", None), ChargeFacet):
+        tags.add("charged")
     if getattr(asset, "container", None) is not None:
         tags.add("container")
     return sorted(tags)

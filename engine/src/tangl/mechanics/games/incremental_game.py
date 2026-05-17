@@ -221,6 +221,10 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         game.round_detail = detail
         return result
 
+    def resolve_cycle_tick(self, game: IncrementalGame) -> RoundResult:
+        """Resolve one production/upkeep cycle as a tick-compatible operation."""
+        return self.receive_move(game, IncrementalMove(kind="end_cycle"))
+
     def evaluate(self, game: IncrementalGame) -> GameResult:
         if game.victory_resources and self._meets_requirements(game.resources, game.victory_resources):
             return GameResult.WIN

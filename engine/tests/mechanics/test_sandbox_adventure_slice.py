@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 import pytest
@@ -326,6 +327,29 @@ def test_adventure_slice_compiler_rejects_unknown_exit_target() -> None:
         SandboxSliceCompiler().compile(data)
 
 
+def test_adventure_slice_compiler_rejects_missing_charge_data() -> None:
+    data: dict[str, Any] = {
+        "id": "bad_charge",
+        "scope": {"id": "cave"},
+        "locations": {
+            "building": {"name": "Building"},
+        },
+        "assets": {
+            "lamp": {
+                "name": "lamp",
+                "traits": ["portable", "requires_charge"],
+                "initial": {"location": "building"},
+            },
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="declares requires_charge but has no charge data",
+    ):
+        SandboxSliceCompiler().compile(data)
+
+
 def test_adventure_slice_compiler_rejects_unknown_mob_schedule_location() -> None:
     data: dict[str, Any] = {
         "id": "bad_mob_schedule",
@@ -624,6 +648,48 @@ def test_adventure_slice_compiler_runs_core_walkthrough() -> None:
     _choose(ledger, contribution="mob", mob="wounded_pirate", action="help")
 
     assert assets["brass_lamp"].lit is True
+    assert assets["brass_lamp"].charge.current < assets["brass_lamp"].charge.maximum
     assert fixtures["grate"].locked is False
     assert fixtures["grate"].open is True
     assert mobs["wounded_pirate"].state["helped"] is True
+
+
+def test_adventure_lamp_charge_exhausts_during_sandbox_tick() -> None:
+    data = deepcopy(ADVENTURE_SANDBOX_SLICE)
+    data["assets"]["brass_lamp"]["initial"]["state"]["charge"] = 1
+    data["assets"]["brass_lamp"]["charge"] = {
+        "charge_name": "oil",
+        "exhausted_text": "The lamp flickers and the light abruptly goes out.",
+    }
+    compiled = SandboxSliceCompiler().compile(data)
+    ledger = Ledger.from_graph(compiled.graph, entry_id=compiled.locations["road"].uid)
+
+    _choose(ledger, contribution="movement", direction="east")
+    _choose(ledger, contribution="take", asset="brass_lamp")
+    _choose(ledger, contribution="light", asset="brass_lamp", verb="turn_on")
+
+    lamp = compiled.assets["brass_lamp"]
+    assert lamp.charge.current == 0
+    assert lamp.lit is False
+    assert any(
+        fragment.content == "The lamp flickers and the light abruptly goes out."
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    )
+
+
+def test_charged_assets_keep_ticking_when_left_offscreen() -> None:
+    data = deepcopy(ADVENTURE_SANDBOX_SLICE)
+    data["assets"]["brass_lamp"]["initial"]["state"]["charge"] = 3
+    compiled = SandboxSliceCompiler().compile(data)
+    ledger = Ledger.from_graph(compiled.graph, entry_id=compiled.locations["road"].uid)
+
+    _choose(ledger, contribution="movement", direction="east")
+    _choose(ledger, contribution="take", asset="brass_lamp")
+    _choose(ledger, contribution="light", asset="brass_lamp", verb="turn_on")
+    _choose(ledger, contribution="drop", asset="brass_lamp")
+    _choose(ledger, contribution="movement", direction="west")
+
+    lamp = compiled.assets["brass_lamp"]
+    assert lamp.charge.current == 0
+    assert lamp.lit is False

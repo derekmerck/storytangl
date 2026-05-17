@@ -31,6 +31,9 @@ Current first-pass surface:
 - `OpenableFacet` / `LockableFacet` / `SwitchableFacet` / `LightSourceFacet` /
   `ContainerFacet`: runtime capability surfaces lowered from compact authoring
   traits.
+- `ChargeFacet`: a first tick-compatible observer facet housed here while the
+  sandbox simulation seam is being proven. It is a useful template for
+  consumption mechanics, but not part of sandbox's core identity.
 - `SandboxMob`: a graph-backed actor-like concept with stable location and
   mutable state that can project affordances when present.
 - `SandboxInteraction`: a sponsored local choice that lowers to an ordinary
@@ -40,7 +43,10 @@ Current first-pass surface:
   trait-bearing sandbox facts into a runtime `StoryGraph` for pressure tests.
 - `SandboxVisibilityRule` / `SandboxProjectionState`: a small projection filter
   for rules such as darkness that change what a location can truthfully reveal.
-- `WorldTime`: deterministic derived time from `world_turn`.
+- `WorldTime` / `SandboxClockPolicy` / `SandboxTimeCost`: normalized clock and
+  action-duration vocabulary. Authoring layers may speak in minutes, periods,
+  turns, oil, or watts, but runtime sandbox ticking consumes normalized integer
+  counters.
 - `ScheduleEntry` / `Schedule` / `ScheduledEvent` / `ScheduledPresence`: small
   schedule matching primitives. `ScheduledEvent` is a time/presence gate over
   the same sponsored interaction surface used by locations, mobs, assets, and
@@ -70,8 +76,12 @@ Current first-pass surface:
 - `compose_sandbox_visibility_journal`: compose handler that can substitute a
   darkness-style journal fragment when projection rules suppress the location
   description.
-- `advance_sandbox_time_on_wait`: update handler that advances sandbox-local
-  time when a wait choice is selected.
+- `advance_sandbox_time_on_action`: update handler that advances sandbox-local
+  time for selected sandbox actions and invokes the domain-local sandbox tick
+  chain.
+- `tangl.mechanics.sandbox.incremental`: optional adapter that lets hosted
+  `IncrementalGame` blocks project allocation choices into a sandbox location
+  and resolve production/upkeep as a sandbox tick observer.
 - `tangl.mechanics.sandbox.story_info.SandboxStoryInfoProjector`: optional
   adapter for the existing service story-info seam. It projects disclosed
   sandbox state into ordinary `ProjectedState` sections for clients that want
@@ -81,6 +91,35 @@ The wait action intentionally mirrors the `tangl.mechanics.games` self-loop
 pattern: planning creates a dynamic `Action`, the action targets the current
 node, selected payload is read during UPDATE, and normal ledger/journal behavior
 does the rest.
+
+Sandbox time is a normalized runtime counter. A scope-level
+`SandboxClockPolicy` defines default durations by action kind; generated actions
+may carry `SandboxTimeCost` to override or explicitly set zero duration. The
+compiler owns conversion from world units such as "15 minutes" or "one period"
+into normalized action duration. Journal and story-info projection own the
+reverse conversion back into reader-facing clock labels. Runtime code should not
+solve dimensional analysis.
+
+Sandbox ticking is a domain-local refinement of VM UPDATE, not a new VM phase.
+Selected-edge and node UPDATE effects run first; then
+`advance_sandbox_time_on_action` advances the sandbox clock and calls the
+sandbox tick chain once per normalized tick. Current tick consumers include
+charged assets. Future consumers such as hazards, deadlines, mobile actors, or
+queueing simulation events should attach to the same chain rather than adding a
+parallel update loop.
+
+The tick chain is an observation seam, not a list of sandbox-owned mechanics.
+Sandbox owns the scoped clock, action-duration interpretation, and invitation to
+observe time advancing. A hosted mechanic owns its own meaning: charges own
+resource counters and consumption predicates; an incremental game owns
+allocation, upkeep, and production; a queueing simulator owns arrivals,
+service, and utilization. Each can be run manually outside a sandbox or
+registered as a sandbox tick consumer when hosted in a world with scoped time.
+
+Current tick observers bridge into JOURNAL with small local stashes. That should
+be treated as scaffolding: effect-phase content wants a phase-local receipt or
+context slot, not persistent `locals`, so transient render material does not
+become serialized story state.
 
 Structured sandbox exits are still ordinary actions. A link such as
 `down: {through: grate, to: below_grate}` projects movement whose availability
@@ -119,6 +158,27 @@ substitutes a dark journal fragment and suppresses local asset/fixture
 affordances. Carried light-source assets still project a turn-on/turn-off
 self-loop action, so a lamp can restore normal room detail and object choices
 without treating darkness as a movement gate.
+
+Charged assets are normalized counters. A `requires_charge` compact trait lowers
+to a `ChargeFacet` with current/max charge, consumption trigger, optional
+predicate, warnings, and exhaustion text. Lit charged assets keep consuming
+charge during sandbox ticks even when left offscreen. Exhaustion mutates the
+asset state globally, while journal text is emitted only when the event is
+observable from the current location.
+
+This charge support is intentionally parasitic on sandbox time. Flashlight
+batteries, lamp oil, oxygen tanks, ammunition drip, cooldowns, fatigue, and
+similar counters are better understood as consumption mechanics that can observe
+ticks than as sandbox primitives. If the same counter logic becomes useful in
+non-sandbox contexts, promote the generic counter/consumption vocabulary out of
+`mechanics.sandbox` and leave only the sandbox tick adapter here.
+
+The incremental-game adapter follows the same rule. `IncrementalGameHandler`
+owns allocation, production, upkeep, and cycle resolution. The sandbox adapter
+only discovers hosted incremental blocks under the active `SandboxScope`,
+projects their available moves as ordinary self-loop sandbox actions, and calls
+the handler's cycle operation when sandbox time ticks. The same game can still
+run manually in a modal `HasGame` block without sandbox.
 
 Mob projection is schedule/presence plus simple asset holding. `SandboxScope.mobs`
 holds stable `SandboxMob` nodes, each with a fallback sandbox location label,

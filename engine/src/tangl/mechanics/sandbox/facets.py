@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from enum import StrEnum
 from typing import Protocol
 
 from pydantic import BaseModel, Field
 
 from tangl.core import Token
+from tangl.core.runtime_op import Predicate
 from tangl.story.concepts.asset import HasAssets
 
 
@@ -104,6 +106,57 @@ class LightSourceFacet(BaseModel):
         if self.requires_switch or switchable is not None:
             return is_on
         return True
+
+
+class ChargeConsumption(StrEnum):
+    """Normalized charge consumption trigger for tick-compatible assets."""
+
+    ALWAYS = "always"
+    WHEN_ON = "when_on"
+    WHEN_USED = "when_used"
+    NEVER = "never"
+
+
+class ChargeFacet(BaseModel):
+    """Normalized resource counter that can observe sandbox ticks."""
+
+    current: int
+    maximum: int
+    consume_per_tick: int = 1
+    charge_name: str = "charges"
+    consumption_trigger: ChargeConsumption = ChargeConsumption.WHEN_ON
+    consume_when: Predicate | None = None
+    exhausted_text: str | None = None
+    warnings: dict[int, str] = Field(default_factory=dict)
+    last_reconciled_tick: int | None = None
+
+    def can_consume(
+        self,
+        *,
+        is_on: bool,
+        was_used: bool = False,
+        ns: dict | None = None,
+    ) -> bool:
+        """Return whether this charged asset should burn charge now."""
+        if self.current <= 0:
+            return False
+        if self.consume_when is not None and not self.consume_when(ns or {}):
+            return False
+        if self.consumption_trigger == ChargeConsumption.NEVER:
+            return False
+        if self.consumption_trigger == ChargeConsumption.ALWAYS:
+            return True
+        if self.consumption_trigger == ChargeConsumption.WHEN_ON:
+            return is_on
+        if self.consumption_trigger == ChargeConsumption.WHEN_USED:
+            return was_used
+        return False
+
+    def consume(self) -> tuple[int, int]:
+        """Consume normalized charge and return ``(before, after)``."""
+        before = self.current
+        self.current = max(0, self.current - self.consume_per_tick)
+        return before, self.current
 
 
 class ContainerFacet(HasAssets):
