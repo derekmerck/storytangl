@@ -62,6 +62,10 @@ class SandboxItemType(AssetType):
         json_schema_extra={"instance_var": True},
     )
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
+    charge: ChargeFacet | None = Field(
+        default=None,
+        json_schema_extra={"instance_var": True},
+    )
     turn_on_text: str | None = None
     turn_off_text: str | None = None
     take_text: str | None = None
@@ -175,6 +179,30 @@ def test_charge_consumption_supports_when_used_trigger() -> None:
 
     assert charge.can_consume(is_on=True) is False
     assert charge.can_consume(is_on=False, was_used=True) is True
+
+
+def test_depleted_charged_asset_does_not_project_turn_on_choice() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    cave = SandboxLocation(label="cave", location_name="Cave")
+    SandboxItemType(
+        label="lamp",
+        name="lamp",
+        switchable=SwitchableFacet(),
+        light_source=LightSourceFacet(),
+        charge=ChargeFacet(current=0, maximum=3),
+    )
+    lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
+    scope.player_assets.add_asset(lamp)
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(lamp)
+    scope.add_child(cave)
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+
+    asset_actions = _dynamic_sandbox_actions_with_tag(cave, "asset")
+    assert "Turn on lamp" not in {action.text for action in asset_actions}
 
 
 def test_schedule_matches_time_location_and_presence() -> None:

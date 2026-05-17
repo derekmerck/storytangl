@@ -133,6 +133,11 @@ def _asset_is_switchable(asset: SandboxAssetSurface) -> bool:
     return asset.switchable is not None
 
 
+def _asset_can_switch_on(asset: SandboxAssetSurface) -> bool:
+    charge = asset.charge
+    return not isinstance(charge, ChargeFacet) or charge.current > 0
+
+
 def _asset_is_container(asset: SandboxAssetSurface) -> bool:
     return asset.container is not None
 
@@ -631,10 +636,18 @@ def _sandbox_time_advance(
         return result
 
     time_owner = _time_owner(location)
+    charged_assets = _charged_assets(location)
     for _ in range(duration):
         clock_tick = advance_world_turn(time_owner, 1)
         result.elapsed += 1
-        result.events.extend(do_sandbox_tick(location, ctx=ctx, clock_tick=clock_tick))
+        result.events.extend(
+            do_sandbox_tick(
+                location,
+                ctx=ctx,
+                clock_tick=clock_tick,
+                charged_assets=charged_assets,
+            )
+        )
     _record_tick_result(location, result)
     return result
 
@@ -1354,6 +1367,8 @@ def _project_carried_asset_actions(
         asset_name = _asset_name(asset)
         if _asset_is_switchable(asset):
             lit = _asset_lit(asset)
+            if not lit and not _asset_can_switch_on(asset):
+                continue
             Action(
                 registry=graph,
                 label=f"sandbox_light_{location.get_label()}_{asset_label}",
@@ -2153,13 +2168,22 @@ advance_sandbox_time_on_wait = advance_sandbox_time_on_action
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
 )
-def reconcile_charged_sandbox_assets(*, caller, ctx, clock_tick, **_kw):
+def reconcile_charged_sandbox_assets(
+    *,
+    caller,
+    ctx,
+    clock_tick,
+    charged_assets: list[Token] | None = None,
+    **_kw,
+):
     """Tick observer that consumes charges for charged assets."""
     if not isinstance(caller, SandboxLocation):
         return None
     ns = dict(ctx.get_ns(caller))
     events: list[SandboxTickEvent] = []
-    for asset in _charged_assets(caller):
+    if charged_assets is None:
+        charged_assets = _charged_assets(caller)
+    for asset in charged_assets:
         charge = asset.charge
         if (
             charge.last_reconciled_tick is not None

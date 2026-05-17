@@ -9,6 +9,7 @@ import pytest
 
 from tangl.core import Selector
 from tangl.mechanics.sandbox import (
+    ChargeConsumption,
     SandboxCompiledAssetType,
     SandboxCompiledSlice,
     SandboxLocation,
@@ -348,6 +349,23 @@ def test_adventure_slice_compiler_rejects_missing_charge_data() -> None:
         match="declares requires_charge but has no charge data",
     ):
         SandboxSliceCompiler().compile(data)
+
+
+def test_adventure_slice_compiler_preserves_charge_policy() -> None:
+    data = deepcopy(ADVENTURE_SANDBOX_SLICE)
+    data["assets"]["brass_lamp"]["charge"] = {
+        "consumption_trigger": "always",
+        "consume_when": "allow_charge",
+        "charge_name": "oxygen",
+    }
+
+    compiled = SandboxSliceCompiler().compile(data)
+    charge = compiled.assets["brass_lamp"].charge
+
+    assert charge.consumption_trigger == ChargeConsumption.ALWAYS
+    assert charge.charge_name == "oxygen"
+    assert charge.can_consume(is_on=False, ns={"allow_charge": True}) is True
+    assert charge.can_consume(is_on=True, ns={"allow_charge": False}) is False
 
 
 def test_adventure_slice_compiler_rejects_unknown_mob_schedule_location() -> None:

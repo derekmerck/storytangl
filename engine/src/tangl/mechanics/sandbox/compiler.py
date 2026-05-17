@@ -13,6 +13,7 @@ from tangl.story import StoryGraph
 from tangl.story.concepts.asset import AssetType
 
 from .facets import (
+    ChargeConsumption,
     ChargeFacet,
     ContainerFacet,
     LightSourceFacet,
@@ -646,11 +647,20 @@ class SandboxSliceCompiler:
         if isinstance(charge_spec, dict):
             current = int(state.get("charge", charge_spec.get("current", 0)))
             maximum = int(charge_spec.get("maximum", charge_spec.get("max", current)))
+            consume_when = charge_spec.get("consume_when")
+            if isinstance(consume_when, str):
+                consume_when = Predicate(expr=consume_when)
+            elif isinstance(consume_when, dict):
+                consume_when = Predicate.model_validate(consume_when)
             return ChargeFacet(
                 current=current,
                 maximum=maximum,
                 consume_per_tick=int(charge_spec.get("consume_per_tick", 1)),
                 charge_name=str(charge_spec.get("charge_name", "charges")),
+                consumption_trigger=ChargeConsumption(
+                    charge_spec.get("consumption_trigger", ChargeConsumption.WHEN_ON)
+                ),
+                consume_when=consume_when,
                 exhausted_text=charge_spec.get("exhausted_text"),
                 warnings={
                     int(threshold): str(text)
