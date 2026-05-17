@@ -26,7 +26,13 @@ def _script() -> dict:
                     "start": {
                         "label": "start",
                         "content": "Start",
-                        "actions": [{"text": "Go", "successor": "hub"}],
+                        "actions": [
+                            {
+                                "text": "Go",
+                                "successor": "hub",
+                                "effects": ["went = True"],
+                            }
+                        ],
                     },
                     "hub": {
                         "label": "hub",
@@ -78,9 +84,12 @@ class TestEdgeConditionsWiring:
         graph = _graph()
         start = _node(graph, "start")
         go = next(iter(start.edges_out(Selector(has_kind=Action))))
-        # Sanity: the wiring path is exercised; effects list exists and is
-        # the typed edge field (empty here, but no longer silently dropped).
-        assert hasattr(go, "effects")
+        # The authored effect must actually reach the edge -- not merely that
+        # the field exists (the silent-drop bug left it an empty default).
+        assert go.effects, "authored effect was dropped during wiring"
+        exprs = [getattr(e, "expr", None) or getattr(e, "core_effect", None)
+                 for e in go.effects]
+        assert any("went = True" in str(x) for x in exprs)
 
     def test_conditioned_continue_gates_selection(self) -> None:
         graph = _graph()

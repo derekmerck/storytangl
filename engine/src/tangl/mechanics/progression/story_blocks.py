@@ -36,10 +36,16 @@ from .outcomes import Outcome
 
 
 class HasStatChallenge:
-    """Block facet that resolves an authored stat challenge on visit."""
+    """Block facet that resolves an authored stat challenge on visit.
+
+    ``_roll`` pins the resolution sample for beats the author intends as a
+    scripted certainty (Probit is asymptotic, so "extreme difficulty" alone
+    leaves a ~0.04% RNG tail). ``None`` keeps the check stochastic.
+    """
 
     _challenge: ClassVar[StatChallenge] = StatChallenge()
     _growth_handler: ClassVar[GrowthHandler | None] = None
+    _roll: ClassVar[float | None] = None
 
 
 class HasTraining:
@@ -106,6 +112,7 @@ def resolve_stat_challenge(
         effect_donors=effect_donors,
         tag_donors=tag_donors,
         growth_handler=cursor._growth_handler,
+        roll=cursor._roll,
     )
 
     passed = result.outcome >= Outcome.SUCCESS
@@ -188,6 +195,7 @@ def apply_training(
     result = resolve_challenge(
         challenge,
         actor,
+        wallet=actor if isinstance(actor, HasWallet) else None,
         context_tags=set(cursor._training_tags),
         effect_donors=effect_donors,
         tag_donors=tag_donors,
@@ -198,6 +206,8 @@ def apply_training(
     cursor.locals["trained_gain"] = (
         receipt.applied_deltas.get(skill, 0.0) if receipt else 0.0
     )
+    # Training mutates stats; let same-cycle conditioned edges/journal see it.
+    _refresh_ns_cache(ctx)
     return None
 
 

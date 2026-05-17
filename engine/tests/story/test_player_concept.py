@@ -66,7 +66,7 @@ def _load_regent_cls():
     )
     if str(pkg_root) not in sys.path:
         sys.path.insert(0, str(pkg_root))
-    from coronate_the_regent.domain import Regent  # noqa: WPS433
+    from coronate_the_regent.domain import Regent
 
     return Regent
 

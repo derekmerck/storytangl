@@ -23,7 +23,7 @@ def _domain():
     root = Path(__file__).resolve().parents[3] / "worlds" / "coronate_the_regent"
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    import coronate_the_regent.domain as d  # noqa: WPS433
+    import coronate_the_regent.domain as d
 
     return d
 

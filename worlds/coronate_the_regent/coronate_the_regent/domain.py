@@ -161,20 +161,22 @@ class TrainCharm(HasTraining, Block):
 
 
 class PrinceAudience(HasStatChallenge, Block):
-    # Difficulty 0.0: a base Regent's competency (~10) yields p_success ~1.0,
-    # so the check passes deterministically. The demo's branching turns on the
-    # *choice* to attend the prince, not on a stat coin-flip.
+    # A scripted certainty: a competent base Regent passes. Difficulty 0.0
+    # makes p~1.0 and the pinned roll removes the residual Probit tail, so
+    # the branch turns purely on the *choice* to attend the prince.
     _challenge = StatChallenge(
         name="The prince's visit", domain="charm", difficulty=0.0
     )
+    _roll = 0.0  # p~1 + roll 0 -> always (major) success
 
 
 class DragonFight(HasStatChallenge, Block):
-    # Lethal by design: base combat fails this deterministically, so survival
-    # depends on the dragonslayer sword (an inter-phase payoff), not the roll.
+    # Lethal by design: base combat fails deterministically, so survival
+    # depends on the dragonslayer sword's forced_outcome, not the dice.
     _challenge = StatChallenge(
         name="The dragon", domain="combat", difficulty=20.0, tags={"#dragon"}
     )
+    _roll = 0.99  # p~0 + high roll -> always fail (sword override aside)
 
 
 class GrantBlock(Block):

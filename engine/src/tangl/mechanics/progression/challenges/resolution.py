@@ -79,14 +79,21 @@ def _sum_modifier(effects: Iterable[SituationalEffect], attr: str) -> float:
 
 
 def _scale_wallet(wallet_map: Mapping[str, int], modifier: float) -> dict[str, int]:
-    """Apply a proportional ``1 + modifier`` factor to wallet amounts (floor 0)."""
+    """Apply a proportional ``1 + modifier`` factor to wallet amounts.
+
+    Zero-valued entries are dropped so a fully-discounted (factor 0) cost is
+    genuinely empty -- otherwise ``resolve_challenge`` would still treat
+    ``{"coin": 0}`` as requiring a wallet.
+    """
     if not modifier:
         return dict(wallet_map)
     factor = 1.0 + modifier
-    return {
-        currency: max(0, round(amount * factor))
-        for currency, amount in wallet_map.items()
-    }
+    scaled: dict[str, int] = {}
+    for currency, amount in wallet_map.items():
+        value = max(0, round(amount * factor))
+        if value:
+            scaled[currency] = value
+    return scaled
 
 
 def resolve_challenge(

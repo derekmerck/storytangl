@@ -849,7 +849,10 @@ class StoryMaterializer:
                 successor_ref=successor_ref,
                 activation=activation,
                 predicate=self._coerce_str(spec.get("predicate")),
-                availability=_as_exprs(spec.get("conditions")),
+                availability=[
+                    *_as_exprs(spec.get("availability")),
+                    *_as_exprs(spec.get("conditions")),
+                ],
                 effects=_as_exprs(spec.get("effects")),
                 payload=spec.get("payload"),
                 accepts=spec.get("accepts") or spec.get("payload_schema"),

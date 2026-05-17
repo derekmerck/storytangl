@@ -996,8 +996,15 @@ class StoryCompiler:
         # Authored ``conditions`` are availability predicates: map them onto
         # the entity's ``availability`` field (mirrors the effects path).
         # Without this they would land as an ignored extra attribute and
-        # silently gate nothing.
-        if isinstance(payload.get("conditions"), list):
+        # silently gate nothing. Only do this for availability-capable kinds
+        # that don't define their own ``conditions`` field, so a custom kind's
+        # authored ``conditions`` data is not silently stripped.
+        kind_fields = getattr(kind, "model_fields", {})
+        if (
+            "availability" in kind_fields
+            and "conditions" not in kind_fields
+            and isinstance(payload.get("conditions"), list)
+        ):
             normalized_conditions: list[dict[str, Any]] = []
             for condition in payload["conditions"]:
                 if isinstance(condition, str):
