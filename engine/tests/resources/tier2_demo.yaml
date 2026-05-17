@@ -73,7 +73,7 @@ scenes:
             successor: shrine.entrance
             conditions:
               - "companion_trust >= 2"
-              - "'companion' in {concept.label for concept in ctx.cursor.get_concepts()}"
+              - "'companion' in roles"
             effects:
               - "Item.acquire('map', graph=graph)"
               - "has_map = True"
@@ -94,7 +94,7 @@ scenes:
           - text: "Ask Aria to translate the runes"
             successor: lore
             conditions:
-              - "'companion' in {concept.label for concept in ctx.cursor.get_concepts()}"
+              - "'companion' in roles"
           - text: "Take the crystal"
             successor: crystal_obtained
             conditions:
