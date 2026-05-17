@@ -128,6 +128,7 @@ scenes:
             successor: buy_sword
             conditions:
               - "player.wallet.get('coin', 0) >= 3"
+              - "not player.has('dragonslayer_sword')"
           - text: "Move on"
             successor: w4_gate
       buy_sword:

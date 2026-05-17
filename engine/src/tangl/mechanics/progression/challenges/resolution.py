@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from math import ceil
 
 from ..definition.stat_system import StatSystemDefinition
 from ..effects import (
@@ -78,19 +79,32 @@ def _sum_modifier(effects: Iterable[SituationalEffect], attr: str) -> float:
     return max(-1.0, min(1.0, total))
 
 
-def _scale_wallet(wallet_map: Mapping[str, int], modifier: float) -> dict[str, int]:
+def _scale_wallet(
+    wallet_map: Mapping[str, int],
+    modifier: float,
+    *,
+    debit_safe: bool = False,
+) -> dict[str, int]:
     """Apply a proportional ``1 + modifier`` factor to wallet amounts.
 
     Zero-valued entries are dropped so a fully-discounted (factor 0) cost is
     genuinely empty -- otherwise ``resolve_challenge`` would still treat
     ``{"coin": 0}`` as requiring a wallet.
+
+    With ``debit_safe`` (used for costs), a *partial* discount rounds up so a
+    positive cost never silently becomes free -- only a full ``-1.0`` discount
+    (factor 0) clears it. Payouts keep nearest-integer rounding.
     """
     if not modifier:
         return dict(wallet_map)
     factor = 1.0 + modifier
     scaled: dict[str, int] = {}
     for currency, amount in wallet_map.items():
-        value = max(0, round(amount * factor))
+        raw = amount * factor
+        if debit_safe and amount > 0 and factor > 0:
+            value = max(1, ceil(raw))
+        else:
+            value = max(0, round(raw))
         if value:
             scaled[currency] = value
     return scaled
@@ -144,6 +158,7 @@ def resolve_challenge(
     effective_cost = _scale_wallet(
         _remap_wallet(challenge.cost, cost_remaps),
         _sum_modifier(tag_effects, "cost_modifier"),
+        debit_safe=True,
     )
 
     if effective_cost and wallet is None:

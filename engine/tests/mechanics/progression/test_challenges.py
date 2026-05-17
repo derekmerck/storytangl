@@ -193,6 +193,32 @@ def test_cost_modifier_makes_challenge_cheaper_or_dearer():
     assert dear.wallet["stamina"] == 4
 
 
+def test_partial_discount_never_zeros_a_positive_cost():
+    actor = _adventure_actor(stamina=10)
+    # 1-unit cost with a 50% discount: round(0.5)==0 would make it free;
+    # debit-safe rounding keeps it a real (1-unit) cost.
+    challenge = StatChallenge(name="Toll", domain="strength", difficulty="poor",
+                              cost={"stamina": 1})
+    result = resolve_challenge(
+        challenge, actor, wallet=actor, roll=0.1,
+        effects=[SituationalEffect(name="haggle", cost_modifier=-0.5)],
+    )
+    assert result.cost_paid == {"stamina": 1}
+    assert actor.wallet["stamina"] == 9
+
+
+def test_full_discount_frees_the_cost():
+    actor = _adventure_actor(stamina=10)
+    challenge = StatChallenge(name="Comped", domain="strength", difficulty="poor",
+                              cost={"stamina": 4})
+    result = resolve_challenge(
+        challenge, actor, wallet=actor, roll=0.1,
+        effects=[SituationalEffect(name="on the house", cost_modifier=-1.0)],
+    )
+    assert result.cost_paid == {}
+    assert actor.wallet["stamina"] == 10  # nothing spent
+
+
 def test_reward_modifier_scales_payout():
     up = _adventure_actor()
     down = _adventure_actor()
