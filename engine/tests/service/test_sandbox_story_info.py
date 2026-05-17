@@ -8,6 +8,7 @@ from pydantic import Field
 from tangl.core import Graph, Token
 from tangl.mechanics.sandbox import (
     ChargeFacet,
+    ContainerFacet,
     LightSourceFacet,
     LockableFacet,
     OpenableFacet,
@@ -30,6 +31,10 @@ class SandboxInfoItemType(AssetType):
     portable: bool = True
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
     charge: ChargeFacet | None = Field(
+        default=None,
+        json_schema_extra={"instance_var": True},
+    )
+    container: ContainerFacet | None = Field(
         default=None,
         json_schema_extra={"instance_var": True},
     )

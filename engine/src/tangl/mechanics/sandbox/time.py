@@ -10,6 +10,9 @@ from pydantic import Field
 from tangl.core.bases import BaseModelPlus
 
 
+DEFAULT_LOCAL_ACTION_DURATION = 1
+
+
 class HasMutableLocals(Protocol):
     """Object exposing mutable local state."""
 
@@ -104,7 +107,10 @@ class SandboxClockPolicy(BaseModelPlus):
 
     def default_duration(self, kind: str) -> int:
         """Return the normalized default duration for an action kind."""
-        return self.default_durations.get(kind, self.default_durations["local_action"])
+        return self.default_durations.get(
+            kind,
+            self.default_durations.get("local_action", DEFAULT_LOCAL_ACTION_DURATION),
+        )
 
     def action_duration(self, cost: SandboxTimeCost | None) -> int:
         """Resolve a time-cost request to non-negative normalized ticks."""

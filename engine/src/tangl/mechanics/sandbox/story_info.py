@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Protocol, cast
 
 from tangl.core import Selector, Token
 from tangl.service.response import (
@@ -23,12 +24,26 @@ from .handlers import (
     sandbox_present_mobs,
     sandbox_projection_state,
 )
-from .facets import ChargeFacet
+from .facets import ChargeFacet, ContainerFacet
 from .location import SandboxExit, SandboxFixture, SandboxLocation, normalize_sandbox_direction
 from .time import current_world_time
 
 
 DEFAULT_PERIOD_LABELS = ("morning", "afternoon", "evening", "night")
+
+
+class ProjectedAssetSurface(Protocol):
+    """Minimal asset-token surface disclosed through story-info projection."""
+
+    name: str
+    traits: set[str]
+    lit: bool
+    charge: ChargeFacet | None
+    container: ContainerFacet | None
+
+    def get_label(self) -> str | None:
+        """Return the graph/token label."""
+        ...
 
 
 class SandboxStoryInfoProjector:
@@ -176,17 +191,26 @@ def _asset_items(holder: HasAssets | None) -> list[ProjectedItem]:
     if holder is None:
         return []
     return [
-        ProjectedItem(
-            label=_asset_name(asset, fallback=asset_label),
-            detail=_asset_detail(asset),
-            tags=_asset_tags(asset),
-        )
+        _asset_item(asset_label, asset)
         for asset_label, asset in sorted(holder.assets.items())
     ]
 
 
-def _asset_name(asset: Token, *, fallback: str) -> str:
-    name = getattr(asset, "name", "")
+def _asset_item(asset_label: str, asset: Token) -> ProjectedItem:
+    surface = _asset_surface(asset)
+    return ProjectedItem(
+        label=_asset_name(surface, fallback=asset_label),
+        detail=_asset_detail(surface),
+        tags=_asset_tags(surface),
+    )
+
+
+def _asset_surface(asset: Token) -> ProjectedAssetSurface:
+    return cast(ProjectedAssetSurface, asset)
+
+
+def _asset_name(asset: ProjectedAssetSurface, *, fallback: str) -> str:
+    name = asset.name
     if name:
         return str(name)
     label = asset.get_label()
@@ -195,28 +219,27 @@ def _asset_name(asset: Token, *, fallback: str) -> str:
     return fallback.replace("_", " ")
 
 
-def _asset_detail(asset: Token) -> str | None:
+def _asset_detail(asset: ProjectedAssetSurface) -> str | None:
     detail: list[str] = []
-    if bool(getattr(asset, "lit", False)):
+    if asset.lit:
         detail.append("lit")
-    charge = getattr(asset, "charge", None)
+    charge = asset.charge
     if isinstance(charge, ChargeFacet):
         detail.append(f"{charge.current} {charge.charge_name}")
-    container = getattr(asset, "container", None)
+    container = asset.container
     if container is not None:
         detail.append("open" if container.is_open else "closed")
     return ", ".join(detail) or None
 
 
-def _asset_tags(asset: Token) -> list[str]:
+def _asset_tags(asset: ProjectedAssetSurface) -> list[str]:
     tags = {"asset"}
-    traits = getattr(asset, "traits", set()) or set()
-    tags.update(str(trait) for trait in traits)
-    if bool(getattr(asset, "lit", False)):
+    tags.update(str(trait) for trait in asset.traits)
+    if asset.lit:
         tags.add("lit")
-    if isinstance(getattr(asset, "charge", None), ChargeFacet):
+    if isinstance(asset.charge, ChargeFacet):
         tags.add("charged")
-    if getattr(asset, "container", None) is not None:
+    if asset.container is not None:
         tags.add("container")
     return sorted(tags)
 

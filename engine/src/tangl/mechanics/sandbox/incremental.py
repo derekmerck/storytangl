@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tangl.core import Priority, Selector
+from tangl.core import Graph, Priority, Selector
 from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.games import (
     GamePhase,
@@ -13,7 +13,7 @@ from tangl.mechanics.games import (
     IncrementalGameHandler,
     IncrementalMove,
 )
-from tangl.story import Action
+from tangl.story import Action, StoryGraph
 from tangl.vm import VmPhaseCtx, on_journal, on_provision, on_update
 
 from .dispatch import on_sandbox_tick
@@ -22,9 +22,16 @@ from .location import SandboxLocation
 from .time import SandboxTickEvent, SandboxTimeCost
 
 
+ALLOCATION_MOVE_KINDS = {"assign", "build", "promote", "unassign"}
+
+
 def _has_tags(value, *tags: str) -> bool:
     actual = value.tags or set()
     return set(tags).issubset(actual)
+
+
+def _graph_frozen_shape(graph: Graph) -> bool:
+    return isinstance(graph, StoryGraph) and graph.frozen_shape
 
 
 def _hosted_incremental_games(location: SandboxLocation) -> list[HasGame]:
@@ -111,7 +118,7 @@ def project_sandbox_incremental_game_moves(*, caller, ctx, **_kw):
     if not isinstance(caller, SandboxLocation):
         return None
     graph = caller.graph
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_incremental_actions(caller, ctx=ctx)
@@ -162,6 +169,8 @@ def process_sandbox_incremental_game_move(*, caller, ctx, **_kw):
         raise TypeError("sandbox incremental move payload must be an IncrementalMove")
     if move.kind == "end_cycle":
         return None
+    if move.kind not in ALLOCATION_MOVE_KINDS:
+        raise ValueError(f"Unsupported sandbox incremental move kind: {move.kind!r}")
 
     host = _host_from_payload(caller, payload)
     _ensure_incremental_ready(host)
@@ -232,6 +241,6 @@ def render_sandbox_incremental_journal(*, caller, ctx, **_kw):
 __all__ = [
     "process_sandbox_incremental_game_move",
     "project_sandbox_incremental_game_moves",
-    "render_sandbox_incremental_journal",
     "reconcile_incremental_games_on_sandbox_tick",
+    "render_sandbox_incremental_journal",
 ]

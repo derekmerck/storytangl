@@ -11,6 +11,7 @@ from tangl.mechanics.games import (
     HasGame,
     IncrementalGame,
     IncrementalGameHandler,
+    IncrementalMove,
     TaskSpec,
 )
 from tangl.mechanics.sandbox import (
@@ -20,6 +21,7 @@ from tangl.mechanics.sandbox import (
     LightSourceFacet,
     LockableFacet,
     OpenableFacet,
+    SandboxClockPolicy,
     SandboxExit,
     SandboxFixture,
     SandboxInteraction,
@@ -179,6 +181,17 @@ def test_charge_consumption_supports_when_used_trigger() -> None:
 
     assert charge.can_consume(is_on=True) is False
     assert charge.can_consume(is_on=False, was_used=True) is True
+
+
+def test_charge_consumption_rate_must_be_positive() -> None:
+    with pytest.raises(ValueError):
+        ChargeFacet(current=2, maximum=2, consume_per_tick=0)
+
+
+def test_clock_policy_default_duration_has_constant_fallback() -> None:
+    policy = SandboxClockPolicy(default_durations={"movement": 2})
+
+    assert policy.default_duration("custom_action") == 1
 
 
 def test_depleted_charged_asset_does_not_project_turn_on_choice() -> None:
@@ -929,6 +942,29 @@ def test_sandbox_can_host_incremental_allocation_and_tick_cycles() -> None:
     ]
     assert "Cycle 1 resolves." in journal_text
     assert "Resources: food=2." in journal_text
+
+
+def test_sandbox_incremental_update_rejects_unsupported_move_kind() -> None:
+    graph = Graph(label="colony_sandbox")
+    scope = SandboxScope(label="colony_scope", locals={"world_turn": 0})
+    hub = SandboxLocation(label="colony_hub", location_name="Colony")
+    colony = SandboxColonyBlock(label="colony_shell", content="The colony waits.")
+    graph.add(scope)
+    graph.add(hub)
+    graph.add(colony)
+    scope.add_child(hub)
+    scope.add_child(colony)
+    ctx = PhaseCtx(
+        graph=graph,
+        cursor_id=hub.uid,
+        incoming_payload={
+            "sandbox_incremental_game": colony.uid,
+            "move": IncrementalMove(kind="resolve_cycle"),
+        },
+    )
+
+    with pytest.raises(ValueError, match="Unsupported sandbox incremental move kind"):
+        sandbox_incremental.process_sandbox_incremental_game_move(caller=hub, ctx=ctx)
 
 
 def test_scheduled_event_projects_only_at_matching_location_and_time() -> None:

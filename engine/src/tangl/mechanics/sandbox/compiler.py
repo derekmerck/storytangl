@@ -667,6 +667,11 @@ class SandboxSliceCompiler:
                     for threshold, text in dict(charge_spec.get("warnings", {})).items()
                 },
             )
+        if charge_spec is not None:
+            raise ValueError(
+                f"Asset {spec.name!r} charge config must be a mapping; "
+                f"got {type(charge_spec)!r}"
+            )
         current = int(state.get("charge", 0))
         return ChargeFacet(current=current, maximum=current)
 

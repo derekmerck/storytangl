@@ -39,7 +39,6 @@ from .facets import (
 )
 from .handlers import (
     advance_sandbox_time_on_action,
-    advance_sandbox_time_on_wait,
     compose_sandbox_visibility_journal,
     compose_sandbox_mob_journal,
     contribute_sandbox_inventory_helpers,
@@ -132,7 +131,6 @@ __all__ = [
     "WorldTime",
     "TimePolicy",
     "advance_sandbox_time_on_action",
-    "advance_sandbox_time_on_wait",
     "advance_world_turn",
     "compose_sandbox_mob_journal",
     "compose_sandbox_visibility_journal",

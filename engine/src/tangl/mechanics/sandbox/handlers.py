@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from tangl.core import Graph, Selector, Token
 from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.fragments import ContentFragment
-from tangl.story import Action
+from tangl.story import Action, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import (
     ResolutionPhase,
@@ -105,6 +105,14 @@ class ScheduledEventContribution:
 
 def _has_tags(value: TaggedEntity, *tags: str) -> bool:
     return set(tags).issubset(value.tags or set())
+
+
+def _graph_frozen_shape(graph: Graph) -> bool:
+    return isinstance(graph, StoryGraph) and graph.frozen_shape
+
+
+def _token_has_field(token: Token, field_name: str) -> bool:
+    return field_name in type(token).model_fields
 
 
 def _asset_key(asset: SandboxAssetSurface) -> str:
@@ -214,7 +222,7 @@ def _resolve_ref(
     *,
     kind: type[TraversableNode],
 ) -> TraversableNode | None:
-    graph = getattr(location, "graph", None)
+    graph = location.graph
     if graph is None:
         return None
 
@@ -659,9 +667,10 @@ def _charged_assets(location: SandboxLocation) -> list[Token]:
     assets: list[Token] = []
     seen: set[object] = set()
     for item in graph.find_all():
-        if not isinstance(item, Token):
+        if not isinstance(item, Token) or not _token_has_field(item, "charge"):
             continue
-        charge = getattr(item, "charge", None)
+        asset = cast(SandboxAssetSurface, item)
+        charge = asset.charge
         if not isinstance(charge, ChargeFacet):
             continue
         if item.uid in seen:
@@ -686,9 +695,10 @@ def _asset_observable(location: SandboxLocation, asset: Token, ctx: VmPhaseCtx) 
 def _charge_event_text(asset: Token, charge: ChargeFacet) -> str:
     if charge.exhausted_text:
         return charge.exhausted_text
-    if getattr(asset, "light_source", None) is not None:
-        return f"The {_asset_name(asset)} flickers and goes out."
-    return f"The {_asset_name(asset)} runs out of {charge.charge_name}."
+    surface = cast(SandboxAssetSurface, asset)
+    if surface.light_source is not None:
+        return f"The {_asset_name(surface)} flickers and goes out."
+    return f"The {_asset_name(surface)} runs out of {charge.charge_name}."
 
 
 def _visibility_rules(location: SandboxLocation) -> list[SandboxVisibilityRule]:
@@ -1008,10 +1018,11 @@ def _set_asset_lit(location: SandboxLocation, asset_label: str, lit: bool) -> To
     if asset.switchable is None:
         raise ValueError(f"Asset {asset_label!r} is not switchable")
     if lit:
-        charge = getattr(asset, "charge", None)
+        surface = cast(SandboxAssetSurface, asset)
+        charge = surface.charge
         if isinstance(charge, ChargeFacet) and charge.current <= 0:
             raise ValueError(f"Asset {asset_label!r} has no charge")
-        asset.switchable.switch_on(asset)
+        surface.switchable.switch_on(surface)
     else:
         asset.switchable.switch_off(asset)
     return asset
@@ -1233,8 +1244,8 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="movement", ctx=ctx)
@@ -1790,8 +1801,8 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="asset", ctx=ctx)
@@ -1827,8 +1838,8 @@ def project_sandbox_unlocks(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="unlock", ctx=ctx)
@@ -1898,8 +1909,8 @@ def project_sandbox_fixture_actions(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="fixture", ctx=ctx)
@@ -1965,8 +1976,8 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="mob", ctx=ctx)
@@ -2042,8 +2053,8 @@ def project_sandbox_location_interactions(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="location", ctx=ctx)
@@ -2070,8 +2081,8 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision or not _nearest_wait_enabled(caller):
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="wait", ctx=ctx)
@@ -2111,8 +2122,8 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
         return None
     if not caller.auto_provision:
         return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="event", ctx=ctx)
@@ -2161,9 +2172,6 @@ def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
     return None
 
 
-advance_sandbox_time_on_wait = advance_sandbox_time_on_action
-
-
 @on_sandbox_tick(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -2184,7 +2192,8 @@ def reconcile_charged_sandbox_assets(
     if charged_assets is None:
         charged_assets = _charged_assets(caller)
     for asset in charged_assets:
-        charge = asset.charge
+        surface = cast(SandboxAssetSurface, asset)
+        charge = surface.charge
         if (
             charge.last_reconciled_tick is not None
             and charge.last_reconciled_tick >= clock_tick
@@ -2193,7 +2202,7 @@ def reconcile_charged_sandbox_assets(
         charge.last_reconciled_tick = clock_tick
         charge_ns = {**ns, "asset": asset, "charge": charge}
         if not charge.can_consume(
-            is_on=bool(getattr(asset, "lit", False)),
+            is_on=surface.lit,
             was_used=False,
             ns=charge_ns,
         ):
@@ -2213,8 +2222,8 @@ def reconcile_charged_sandbox_assets(
                     )
                 )
         if after == 0 and before > 0:
-            if getattr(asset, "switchable", None) is not None:
-                asset.switchable.switch_off(asset)
+            if surface.switchable is not None:
+                surface.switchable.switch_off(surface)
             if observable:
                 events.append(
                     SandboxTickEvent(

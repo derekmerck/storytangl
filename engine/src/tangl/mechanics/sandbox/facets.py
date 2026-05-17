@@ -122,7 +122,7 @@ class ChargeFacet(BaseModel):
 
     current: int
     maximum: int
-    consume_per_tick: int = 1
+    consume_per_tick: int = Field(default=1, ge=1)
     charge_name: str = "charges"
     consumption_trigger: ChargeConsumption = ChargeConsumption.WHEN_ON
     consume_when: Predicate | None = None
@@ -154,6 +154,8 @@ class ChargeFacet(BaseModel):
 
     def consume(self) -> tuple[int, int]:
         """Consume normalized charge and return ``(before, after)``."""
+        if self.consume_per_tick <= 0:
+            raise ValueError("consume_per_tick must be positive")
         before = self.current
         self.current = max(0, self.current - self.consume_per_tick)
         return before, self.current

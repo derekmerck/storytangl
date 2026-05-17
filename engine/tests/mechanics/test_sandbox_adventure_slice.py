@@ -368,6 +368,14 @@ def test_adventure_slice_compiler_preserves_charge_policy() -> None:
     assert charge.can_consume(is_on=True, ns={"allow_charge": False}) is False
 
 
+def test_adventure_slice_compiler_rejects_invalid_charge_config_shape() -> None:
+    data = deepcopy(ADVENTURE_SANDBOX_SLICE)
+    data["assets"]["brass_lamp"]["charge"] = "oil"
+
+    with pytest.raises(ValueError, match="charge config must be a mapping"):
+        SandboxSliceCompiler().compile(data)
+
+
 def test_adventure_slice_compiler_rejects_unknown_mob_schedule_location() -> None:
     data: dict[str, Any] = {
         "id": "bad_mob_schedule",
