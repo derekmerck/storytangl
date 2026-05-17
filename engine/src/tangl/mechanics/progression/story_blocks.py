@@ -182,3 +182,24 @@ def apply_training(
         receipt.applied_deltas.get(skill, 0.0) if receipt else 0.0
     )
     return None
+
+
+@on_journal(wants_caller_kind=HasTraining, wants_exact_kind=False)
+def journal_training(
+    cursor: HasTraining | None = None,
+    *,
+    caller: HasTraining | None = None,
+    ctx: Any,
+    **_kw: Any,
+):
+    """Emit a compact training fragment (state -> narrative)."""
+    from tangl.journal.fragments import ContentFragment
+
+    cursor = cursor if isinstance(cursor, HasTraining) else caller
+    if not isinstance(cursor, HasTraining):
+        return []
+    skill = cursor.locals.get("trained_skill")
+    if not skill:
+        return []
+    gain = cursor.locals.get("trained_gain", 0.0)
+    return [ContentFragment(content=f"You train {skill}. ({skill} +{gain:.1f})")]
