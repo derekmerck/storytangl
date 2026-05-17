@@ -6,6 +6,8 @@ from typing import FrozenSet, Iterable, Optional, Set
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..outcomes import Outcome
+
 
 class _FrozenStrMap(dict[str, str]):
     def _blocked(self, *_args, **_kwargs) -> None:
@@ -59,6 +61,24 @@ class SituationalEffect(BaseModel):
         Additive adjustment to difficulty (delta = competency - difficulty).
     - `competency_modifier`:
         Additive adjustment to competency.
+    - `cost_modifier` / `reward_modifier`:
+        Proportional adjustment to the challenge's currency cost and to its
+        outcome payout. Positive means *more* of that axis (dearer cost,
+        bigger reward); the per-scenario sum is clamped to [-1, 1] so the
+        applied factor is `1 + sum` (a -1 cost is free, a +1 reward doubles).
+        These scale wallet amounts and are independent of `*_currency_remap`,
+        which only relabels currencies.
+    - `growth_modifier`:
+        Proportional adjustment to *training* stat gain only. Deliberately
+        distinct from `reward_modifier`: payout is wallet currency, growth is
+        skill experience. Mood biasing this week's learning is a
+        `growth_modifier` scoped to skill-category tags, never a payout.
+    - `forced_outcome`:
+        Hard override of the resolved outcome (fumble/fail/pass/critical),
+        bypassing the roll entirely -- the authored lever for "the
+        dragonslayer sword guarantees the kill" or "you simply cannot study
+        without the outfit". When several apply, the most severe (minimum)
+        wins, so a prohibition dominates a blessing.
     - `domain_override`:
         Optional remap for the tested challenge domain.
     - `cost_currency_remap` / `reward_currency_remap`:
@@ -74,6 +94,10 @@ class SituationalEffect(BaseModel):
 
     difficulty_modifier: float = 0.0
     competency_modifier: float = 0.0
+    cost_modifier: float = 0.0
+    reward_modifier: float = 0.0
+    growth_modifier: float = 0.0
+    forced_outcome: Optional[Outcome] = None
     domain_override: str | None = None
     cost_currency_remap: Mapping[str, str] = Field(
         default_factory=dict,

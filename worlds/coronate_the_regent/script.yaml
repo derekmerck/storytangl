@@ -1,0 +1,210 @@
+label: coronate_the_regent
+
+metadata:
+  title: "Coronate the Regent"
+  start_at: court.start
+
+# A compact four-week preparation loop. Each week offers limited training,
+# then a scheduled event tests accumulated state. Early choices (impress the
+# prince, provoke the dragon, buy the sword) pay off at the coronation.
+#
+# Branching uses `conditions:` -- expression predicates evaluated against the
+# scoped namespace (the protagonist is published as `player`).
+scenes:
+  court:
+    title: "The Regency"
+
+    templates:
+      regent:
+        kind: "coronate_the_regent.domain.Regent"
+        label: regent
+        full_name: "Regent Elodie"
+
+    blocks:
+      start:
+        label: start
+        content: |
+          The regency council adjourns. Four weeks remain before the
+          coronation, and a great deal still to prepare.
+        actions:
+          - text: "Begin the first week"
+            successor: w1_hub
+
+      # --- Week 1 -------------------------------------------------------
+      w1_hub:
+        label: w1_hub
+        content: "Week 1. Choose your study."
+        actions:
+          - text: "Train at arms"
+            successor: w1_combat
+          - text: "Study courtly graces"
+            successor: w1_charm
+      w1_combat:
+        label: w1_combat
+        kind: "coronate_the_regent.domain.TrainCombat"
+        continues:
+          - successor: w2_hub
+            trigger: last
+      w1_charm:
+        label: w1_charm
+        kind: "coronate_the_regent.domain.TrainCharm"
+        continues:
+          - successor: w2_hub
+            trigger: last
+
+      # --- Week 2: the prince ------------------------------------------
+      w2_hub:
+        label: w2_hub
+        content: "Week 2. A royal visitor is expected."
+        actions:
+          - text: "Receive the visiting prince"
+            successor: prince
+          - text: "Train at arms instead"
+            successor: w2_combat
+          - text: "Study courtly graces instead"
+            successor: w2_charm
+      w2_combat:
+        label: w2_combat
+        kind: "coronate_the_regent.domain.TrainCombat"
+        continues:
+          - successor: w3_hub
+            trigger: last
+      w2_charm:
+        label: w2_charm
+        kind: "coronate_the_regent.domain.TrainCharm"
+        continues:
+          - successor: w3_hub
+            trigger: last
+      prince:
+        label: prince
+        kind: "coronate_the_regent.domain.PrinceAudience"
+        content: "The prince watches you across the receiving hall."
+        continues:
+          - successor: prince_ok
+            trigger: last
+            conditions:
+              - "challenge_passed"
+          - successor: w3_hub
+            trigger: last
+            conditions:
+              - "not challenge_passed"
+      prince_ok:
+        label: prince_ok
+        kind: "coronate_the_regent.domain.GrantImpressedPrince"
+        content: "The prince leaves visibly charmed."
+        continues:
+          - successor: w3_hub
+            trigger: last
+
+      # --- Week 3: the dragon and the merchant -------------------------
+      w3_hub:
+        label: w3_hub
+        content: "Week 3. A dragon has been sighted near the border."
+        actions:
+          - text: "Send a sharp warning to the dragon"
+            successor: provoke
+          - text: "Leave the dragon undisturbed"
+            successor: merchant
+          - text: "Train at arms"
+            successor: w3_combat
+      w3_combat:
+        label: w3_combat
+        kind: "coronate_the_regent.domain.TrainCombat"
+        continues:
+          - successor: merchant
+            trigger: last
+      provoke:
+        label: provoke
+        kind: "coronate_the_regent.domain.GrantIrritatedDragon"
+        content: "Your envoy returns; the dragon is now decidedly irritated."
+        continues:
+          - successor: merchant
+            trigger: last
+      merchant:
+        label: merchant
+        content: "A travelling merchant offers a dragonslayer sword for 3 coin."
+        actions:
+          - text: "Buy the dragonslayer sword (3 coin)"
+            successor: buy_sword
+            conditions:
+              - "player.wallet.get('coin', 0) >= 3"
+              - "not player.has('dragonslayer_sword')"
+          - text: "Move on"
+            successor: w4_gate
+      buy_sword:
+        label: buy_sword
+        kind: "coronate_the_regent.domain.BuySword"
+        content: "The sword is yours."
+        continues:
+          - successor: w4_gate
+            trigger: last
+
+      # --- Week 4: reckoning and coronation ----------------------------
+      # Compelled: an irritated dragon forces the fight; otherwise the
+      # coronation proceeds. Expressed as mutually exclusive continues.
+      w4_gate:
+        label: w4_gate
+        content: "Week 4. The coronation is at hand."
+        continues:
+          - successor: dragon
+            trigger: last
+            conditions:
+              - "player.has('irritated_dragon')"
+          - successor: coronation
+            trigger: last
+            conditions:
+              - "not player.has('irritated_dragon')"
+      dragon:
+        label: dragon
+        kind: "coronate_the_regent.domain.DragonFight"
+        content: "The dragon descends on the capital. There is no avoiding it now."
+        continues:
+          - successor: slain
+            trigger: last
+            conditions:
+              - "challenge_passed"
+          - successor: ending_dead
+            trigger: last
+            conditions:
+              - "not challenge_passed"
+      slain:
+        label: slain
+        content: "The dragon falls. The city is saved."
+        continues:
+          - successor: ending_slain_married
+            trigger: last
+            conditions:
+              - "player.has('impressed_prince')"
+          - successor: ending_slain_solo
+            trigger: last
+            conditions:
+              - "not player.has('impressed_prince')"
+      coronation:
+        label: coronation
+        content: "You are crowned beneath a quiet, peaceful sky."
+        continues:
+          - successor: ending_marry
+            trigger: last
+            conditions:
+              - "player.has('impressed_prince')"
+          - successor: ending_solo
+            trigger: last
+            conditions:
+              - "not player.has('impressed_prince')"
+
+      # --- Endings ------------------------------------------------------
+      ending_marry:
+        label: ending_marry
+        content: "Crowned and betrothed to the prince, you reign in alliance."
+      ending_solo:
+        label: ending_solo
+        content: "Crowned alone, you reign on your own terms."
+      ending_slain_married:
+        label: ending_slain_married
+        content: "Dragonslayer and betrothed, your legend is doubly secured."
+      ending_slain_solo:
+        label: ending_slain_solo
+        content: "The dragonslayer queen reigns, feared and unwed."
+      ending_dead:
+        label: ending_dead
+        content: "The dragon's fire ends the regency before the crown is set."

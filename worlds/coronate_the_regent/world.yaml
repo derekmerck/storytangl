@@ -1,0 +1,10 @@
+label: coronate_the_regent
+scripts: script.yaml
+domain_module: coronate_the_regent.domain
+metadata:
+  title: "Coronate the Regent"
+  description: >-
+    A deadline-driven training, crisis, and coronation demo. Inspired by the
+    design pattern of stat-training succession games: constrained repeated
+    choices, predictable deadline pressure, and delayed consequences from
+    earlier decisions. Not a port -- named for the mechanic, not any IP.

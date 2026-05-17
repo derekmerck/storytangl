@@ -252,6 +252,11 @@ class Unstructurable(BaseModelPlus):
     - `value_hash()` is recomputed from current constructor-form data on each call.
     - Fields marked with ``json_schema_extra={"exclude": True}`` are omitted from
       :meth:`unstructure` output.
+    - Fields marked with ``json_schema_extra={"include": True}`` are persisted
+      whenever their value diverges from the field default, even if the field
+      was only mutated in place and never reassigned (so ``exclude_unset``
+      cannot drop them). Still-default/empty values remain elided, so this does
+      not chum snapshots with nulls or defaults.
     - Set ``guard_unstructure = True`` for classes that should refuse constructor-form
       export because they carry non-serializable behavior.
 
@@ -303,6 +308,15 @@ class Unstructurable(BaseModelPlus):
             exclude_unset=True,
             exclude_defaults=True,
         )
+        include_fields = set(self._match_fields(include=True)) - exclude_fields
+        if include_fields:
+            # Persist non-default values of opted-in fields even when they were
+            # only mutated in place (exclude_unset would otherwise drop them);
+            # exclude_defaults still elides untouched defaults so snapshots are
+            # not chummed with empty/null state.
+            data.update(
+                self.model_dump(include=include_fields, exclude_defaults=True)
+            )
         if 'uid' not in data and hasattr(self, 'uid'):
             data['uid'] = getattr(self, 'uid')
         data['kind'] = self.__class__

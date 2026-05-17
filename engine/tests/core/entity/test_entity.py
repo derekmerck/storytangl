@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from pydantic import Field
 
 from tangl.core.bases import HasIdentity, Unstructurable
 from tangl.core.ctx import using_ctx
@@ -24,6 +25,18 @@ class EntityWithAttrib(Entity):
     """Entity subclass used in composition and serialization tests."""
 
     foo: int = 0
+
+
+class EntityWithMutableState(Entity):
+    """Entity with a marked vs. unmarked mutable collection field.
+
+    ``marked`` opts into snapshot persistence via
+    ``json_schema_extra={"include": True}``; ``unmarked`` does not, and exists
+    to document the boundary the marker is for.
+    """
+
+    marked: set[str] = Field(default_factory=set, json_schema_extra={"include": True})
+    unmarked: set[str] = Field(default_factory=set)
 
 
 class TestEntityComposition:
@@ -147,6 +160,46 @@ class TestEntitySerialization:
         entity = Entity(label="v1")
         evolved = entity.evolve(label="v2")
         assert evolved.label == "v2"
+
+
+class TestIncludeMarkerRoundTrip:
+    """`json_schema_extra={"include": True}` snapshot-fidelity contract.
+
+    Regression for the ``exclude_unset`` footgun: a field that starts at its
+    default and is then mutated *in place* (never reassigned) must still
+    survive ``unstructure()``/``structure()`` when marked ``include=True``.
+    """
+
+    def test_in_place_mutated_marked_field_round_trips(self) -> None:
+        entity = EntityWithMutableState()
+        entity.marked.add("acquired")  # in place; field never reassigned
+
+        data = entity.unstructure()
+        assert data["marked"] == {"acquired"}
+
+        restored = Entity.structure(data)
+        assert restored.marked == {"acquired"}
+
+    def test_default_marked_field_is_still_elided(self) -> None:
+        # No chumming: an untouched marked field stays out of the snapshot.
+        data = EntityWithMutableState().unstructure()
+        assert "marked" not in data
+
+    def test_unmarked_in_place_mutation_is_dropped(self) -> None:
+        # Documents the boundary: without the marker, in-place mutation is
+        # lost (this is exactly the footgun the marker exists to close).
+        entity = EntityWithMutableState()
+        entity.unmarked.add("ghost")
+
+        restored = Entity.structure(entity.unstructure())
+        assert restored.unmarked == set()
+
+    def test_marker_does_not_resurrect_excluded_fields(self) -> None:
+        entity = EntityWithMutableState()
+        entity.marked.add("kept")
+        restored = Entity.structure(entity.unstructure())
+        assert restored.marked == {"kept"}
+        assert restored.unmarked == set()
 
 
 class TestEntityDispatchHooks:

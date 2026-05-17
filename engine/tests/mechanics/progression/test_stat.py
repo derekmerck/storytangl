@@ -19,6 +19,18 @@ def test_stat_construct_from_fv_int_quality_str():
     assert s_str.quality is Quality.MID
 
 
+def test_stat_round_trips_through_serialized_fv_form():
+    """Regression: ``Stat(**stat.model_dump())`` must reconstruct, not collide.
+
+    The serialized constructor form is ``{"fv": <float>}``; ``__init__`` must
+    accept it directly rather than re-deriving fv from the ``value`` default.
+    """
+    original = Stat(13.5)
+    restored = Stat(**original.model_dump())
+    assert restored.fv == original.fv
+    assert restored == original
+
+
 def test_stat_equality_by_tier():
     a = Stat(10.0)
     b = Stat("mid")

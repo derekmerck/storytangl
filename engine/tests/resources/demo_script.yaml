@@ -28,7 +28,7 @@ scenes:
           - text: "Ask the Guide for advice"
             successor: guide_advice
             conditions:
-              - "'guide' in [c.label for c in ctx.cursor.get_concepts()]"
+              - "'guide' in roles"
 
           - text: "Take the left path"
             successor: garden.entrance

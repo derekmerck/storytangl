@@ -47,6 +47,27 @@ def gather_story_graph_locals(*, caller, ctx, **_kw):
 
 
 @on_gather_ns(priority=Priority.EARLY)
+def gather_player_fixture(*, caller, ctx, **_kw):
+    """Publish the optional Player protagonist as a high-scope ns fixture.
+
+    A ``Player`` node is not an ancestor of story blocks, so its
+    ``@contribute_ns`` payload would not otherwise reach a block's scoped
+    namespace. Locate it once and merge its contribution so authored
+    predicates can read ``player`` / ``flags`` / ``mood`` anywhere.
+    """
+    graph = getattr(caller, "graph", None)
+    if graph is None:
+        return None
+    from tangl.core import Selector
+    from tangl.story.concepts import Player
+
+    player = graph.find_one(Selector(has_kind=Player))
+    if player is None:
+        return None
+    return dict(player.get_ns())
+
+
+@on_gather_ns(priority=Priority.EARLY)
 def gather_story_world_locals(*, caller, ctx, **_kw):
     """Inject world locals into the assembled runtime namespace.
 

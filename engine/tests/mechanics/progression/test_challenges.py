@@ -169,6 +169,211 @@ def test_challenge_result_exposes_projection_labels():
     assert result.payout_label in {"ok", "good", "very good"}
 
 
+def test_cost_modifier_makes_challenge_cheaper_or_dearer():
+    base = _adventure_actor(stamina=10)
+    cheap = _adventure_actor(stamina=10)
+    dear = _adventure_actor(stamina=10)
+    challenge = StatChallenge(name="Bribe", domain="strength", difficulty="poor",
+                              cost={"stamina": 4})
+
+    base_r = resolve_challenge(challenge, base, wallet=base, roll=0.1)
+    cheap_r = resolve_challenge(
+        challenge, cheap, wallet=cheap, roll=0.1,
+        effects=[SituationalEffect(name="discount", cost_modifier=-0.5)],
+    )
+    dear_r = resolve_challenge(
+        challenge, dear, wallet=dear, roll=0.1,
+        effects=[SituationalEffect(name="gouged", cost_modifier=0.5)],
+    )
+
+    assert base_r.cost_paid == {"stamina": 4}
+    assert cheap_r.cost_paid == {"stamina": 2}   # 4 * 0.5
+    assert dear_r.cost_paid == {"stamina": 6}    # 4 * 1.5
+    assert cheap.wallet["stamina"] == 8
+    assert dear.wallet["stamina"] == 4
+
+
+def test_partial_discount_never_zeros_a_positive_cost():
+    actor = _adventure_actor(stamina=10)
+    # 1-unit cost with a 50% discount: round(0.5)==0 would make it free;
+    # debit-safe rounding keeps it a real (1-unit) cost.
+    challenge = StatChallenge(name="Toll", domain="strength", difficulty="poor",
+                              cost={"stamina": 1})
+    result = resolve_challenge(
+        challenge, actor, wallet=actor, roll=0.1,
+        effects=[SituationalEffect(name="haggle", cost_modifier=-0.5)],
+    )
+    assert result.cost_paid == {"stamina": 1}
+    assert actor.wallet["stamina"] == 9
+
+
+def test_full_discount_frees_the_cost():
+    actor = _adventure_actor(stamina=10)
+    challenge = StatChallenge(name="Comped", domain="strength", difficulty="poor",
+                              cost={"stamina": 4})
+    result = resolve_challenge(
+        challenge, actor, wallet=actor, roll=0.1,
+        effects=[SituationalEffect(name="on the house", cost_modifier=-1.0)],
+    )
+    assert result.cost_paid == {}
+    assert actor.wallet["stamina"] == 10  # nothing spent
+
+
+def test_reward_modifier_scales_payout():
+    up = _adventure_actor()
+    down = _adventure_actor()
+    challenge = StatChallenge(
+        name="Errand", domain="strength", difficulty="poor",
+        payout=ChallengePayout(by_outcome={Outcome.SUCCESS: {"mana": 4}}),
+    )
+
+    up_r = resolve_challenge(
+        challenge, up, wallet=up, roll=0.1,
+        effects=[SituationalEffect(name="patron", reward_modifier=0.5)],
+    )
+    down_r = resolve_challenge(
+        challenge, down, wallet=down, roll=0.1,
+        effects=[SituationalEffect(name="skimmed", reward_modifier=-0.5)],
+    )
+
+    assert up_r.payout_granted == {"mana": 6}    # 4 * 1.5
+    assert down_r.payout_granted == {"mana": 2}  # 4 * 0.5
+
+
+def test_modifier_sum_is_clamped_to_unit_factor_range():
+    actor = _adventure_actor(stamina=10)
+    challenge = StatChallenge(name="Toll", domain="strength", difficulty="poor",
+                              cost={"stamina": 4})
+
+    result = resolve_challenge(
+        challenge, actor, wallet=actor, roll=0.1,
+        effects=[
+            SituationalEffect(name="a", cost_modifier=0.8),
+            SituationalEffect(name="b", cost_modifier=0.8),
+        ],
+    )
+    # sum 1.6 clamps to 1.0 -> factor 2.0, not 2.6
+    assert result.cost_paid == {"stamina": 8}
+
+
+def test_growth_modifier_scales_training_gain_only():
+    from tangl.mechanics.progression.growth import LinearGrowthHandler
+
+    plain = _adventure_actor()
+    boosted = _adventure_actor()
+    challenge = StatChallenge(
+        name="Drill", domain="strength", difficulty="poor",
+        payout=ChallengePayout(by_outcome={Outcome.SUCCESS: {"mana": 4}}),
+    )
+
+    plain_r = resolve_challenge(
+        challenge, plain, wallet=plain, roll=0.1,
+        growth_handler=LinearGrowthHandler(),
+    )
+    boosted_r = resolve_challenge(
+        challenge, boosted, wallet=boosted, roll=0.1,
+        growth_handler=LinearGrowthHandler(),
+        effects=[SituationalEffect(name="in the mood", growth_modifier=1.0)],
+    )
+
+    plain_gain = plain_r.growth_receipt.applied_deltas["strength"]
+    boosted_gain = boosted_r.growth_receipt.applied_deltas["strength"]
+    assert boosted_gain == pytest.approx(plain_gain * 2.0)
+    # growth_modifier must not touch the wallet payout (reward != growth)
+    assert plain_r.payout_granted == boosted_r.payout_granted
+
+
+def test_reward_and_growth_modifiers_are_independent_axes():
+    from tangl.mechanics.progression.growth import LinearGrowthHandler
+
+    reward_only = _adventure_actor()
+    growth_only = _adventure_actor()
+    challenge = StatChallenge(
+        name="Spar", domain="strength", difficulty="poor",
+        payout=ChallengePayout(by_outcome={Outcome.SUCCESS: {"mana": 4}}),
+    )
+
+    r = resolve_challenge(
+        challenge, reward_only, wallet=reward_only, roll=0.1,
+        growth_handler=LinearGrowthHandler(),
+        effects=[SituationalEffect(name="bonus pay", reward_modifier=0.5)],
+    )
+    g = resolve_challenge(
+        challenge, growth_only, wallet=growth_only, roll=0.1,
+        growth_handler=LinearGrowthHandler(),
+        effects=[SituationalEffect(name="good teacher", growth_modifier=0.5)],
+    )
+
+    # reward_modifier moved payout, left growth at baseline.
+    assert r.payout_granted == {"mana": 6}
+    # growth_modifier moved growth, left payout at baseline.
+    assert g.payout_granted == {"mana": 4}
+    assert (
+        g.growth_receipt.applied_deltas["strength"]
+        > r.growth_receipt.applied_deltas["strength"]
+    )
+
+
+def test_forced_outcome_overrides_the_roll():
+    actor = _adventure_actor()
+    # An easy challenge that would otherwise pass at roll=0.1...
+    challenge = StatChallenge(domain="strength", difficulty="poor", tags={"#x"})
+    natural = resolve_challenge(challenge, actor, roll=0.1)
+    assert natural.outcome >= Outcome.SUCCESS
+
+    forced = resolve_challenge(
+        challenge,
+        actor,
+        roll=0.1,
+        effects=[
+            SituationalEffect(
+                name="cursed", applies_to_tags={"#x"},
+                forced_outcome=Outcome.DISASTER,
+            )
+        ],
+    )
+    assert forced.outcome is Outcome.DISASTER
+
+
+def test_forced_outcome_most_severe_wins():
+    actor = _adventure_actor()
+    challenge = StatChallenge(domain="strength", difficulty="poor", tags={"#x"})
+    result = resolve_challenge(
+        challenge,
+        actor,
+        roll=0.1,
+        effects=[
+            SituationalEffect(
+                name="blessing", applies_to_tags={"#x"},
+                forced_outcome=Outcome.MAJOR_SUCCESS,
+            ),
+            SituationalEffect(
+                name="prohibition", applies_to_tags={"#x"},
+                forced_outcome=Outcome.FAILURE,
+            ),
+        ],
+    )
+    # A prohibition dominates a blessing.
+    assert result.outcome is Outcome.FAILURE
+
+
+def test_forced_outcome_only_applies_when_tag_eligible():
+    actor = _adventure_actor()
+    challenge = StatChallenge(domain="strength", difficulty="poor", tags={"#x"})
+    result = resolve_challenge(
+        challenge,
+        actor,
+        roll=0.1,
+        effects=[
+            SituationalEffect(
+                name="irrelevant curse", applies_to_tags={"#combat"},
+                forced_outcome=Outcome.DISASTER,
+            )
+        ],
+    )
+    assert result.outcome >= Outcome.SUCCESS  # curse did not apply
+
+
 def test_projection_helpers_remain_monotone():
     projected = [project_quality(value) for value in [4.0, 7.0, 10.0, 13.0, 16.0]]
     assert projected == sorted(projected)

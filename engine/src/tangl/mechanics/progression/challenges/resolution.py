@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from math import ceil
 
 from ..definition.stat_system import StatSystemDefinition
 from ..effects import (
@@ -72,6 +73,43 @@ def _remap_wallet(
     return remapped
 
 
+def _sum_modifier(effects: Iterable[SituationalEffect], attr: str) -> float:
+    """Sum a magnitude modifier across applicable effects, clamped to [-1, 1]."""
+    total = sum(getattr(effect, attr, 0.0) for effect in effects)
+    return max(-1.0, min(1.0, total))
+
+
+def _scale_wallet(
+    wallet_map: Mapping[str, int],
+    modifier: float,
+    *,
+    debit_safe: bool = False,
+) -> dict[str, int]:
+    """Apply a proportional ``1 + modifier`` factor to wallet amounts.
+
+    Zero-valued entries are dropped so a fully-discounted (factor 0) cost is
+    genuinely empty -- otherwise ``resolve_challenge`` would still treat
+    ``{"coin": 0}`` as requiring a wallet.
+
+    With ``debit_safe`` (used for costs), a *partial* discount rounds up so a
+    positive cost never silently becomes free -- only a full ``-1.0`` discount
+    (factor 0) clears it. Payouts keep nearest-integer rounding.
+    """
+    if not modifier:
+        return dict(wallet_map)
+    factor = 1.0 + modifier
+    scaled: dict[str, int] = {}
+    for currency, amount in wallet_map.items():
+        raw = amount * factor
+        if debit_safe and amount > 0 and factor > 0:
+            value = max(1, ceil(raw))
+        else:
+            value = max(0, round(raw))
+        if value:
+            scaled[currency] = value
+    return scaled
+
+
 def resolve_challenge(
     challenge: StatChallenge,
     entity: HasStats,
@@ -117,7 +155,11 @@ def resolve_challenge(
         if effect.reward_currency_remap
     ]
 
-    effective_cost = _remap_wallet(challenge.cost, cost_remaps)
+    effective_cost = _scale_wallet(
+        _remap_wallet(challenge.cost, cost_remaps),
+        _sum_modifier(tag_effects, "cost_modifier"),
+        debit_safe=True,
+    )
 
     if effective_cost and wallet is None:
         raise ValueError("Challenge cost requires a wallet-like target")
@@ -156,7 +198,22 @@ def resolve_challenge(
         roll=roll,
     )
 
-    payout = _remap_wallet(challenge.payout.reward_for(outcome), reward_remaps)
+    # A situational ``forced_outcome`` is a hard authored override of the
+    # roll. Cost is still paid (the attempt happened); payout and growth
+    # follow the forced outcome. Most-severe wins so a prohibition beats a
+    # blessing.
+    forced = [
+        effect.forced_outcome
+        for effect in tag_effects
+        if effect.forced_outcome is not None
+    ]
+    if forced:
+        outcome = min(forced)
+
+    payout = _scale_wallet(
+        _remap_wallet(challenge.payout.reward_for(outcome), reward_remaps),
+        _sum_modifier(tag_effects, "reward_modifier"),
+    )
     if wallet is not None and payout:
         wallet.earn(payout)
 
@@ -188,6 +245,7 @@ def resolve_challenge(
             challenge,
             result,
             apply=apply_growth,
+            gain_scale=1.0 + _sum_modifier(tag_effects, "growth_modifier"),
         )
         result.growth_receipt = growth_receipt
 

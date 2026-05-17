@@ -23,7 +23,11 @@ Story may import vm/core. It must not import service.
 The story package is organized around four things:
 
 - Narrative vocabulary: `Block`, `Scene`, `MenuBlock`, `Action`, `Actor`,
-  `Location`, `Role`, `Setting`.
+  `Location`, `Player`, `Role`, `Setting`. `Player` is an optional
+  non-structural protagonist fixture: a provider `Node` that publishes itself
+  into the scoped namespace (`player`) for authored predicate access. It is
+  never auto-injected; a world opts in by composing a subclass (a generic
+  world-level player-declaration API is intentionally deferred).
 - Compilation: `StoryCompiler` turns authored data into a validated template
   registry plus compile metadata.
 - Runtime authority: `World` is the singleton story authority and the public

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, Mapping, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..definition.stat_system import StatSystemDefinition
 from ..handlers import get_handler_cls
@@ -35,7 +35,9 @@ class HasStats(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     stat_system: StatSystemDefinition
-    stats: Dict[str, Stat]
+    # Stats are mutated in place by growth/challenges; persist non-default
+    # values through unstructure() even without reassignment.
+    stats: Dict[str, Stat] = Field(json_schema_extra={"include": True})
 
     # ------------------------------------------------------------------ #
     # Constructors
