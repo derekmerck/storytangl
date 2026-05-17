@@ -69,17 +69,9 @@ class Player(Node):
 
     @contribute_ns
     def provide_player_symbols(self) -> dict[str, Any]:
-        """Publish the protagonist into local namespace contribution.
-
-        Each storyline flag and inventory item is also surfaced as a bare
-        truthy key so authored edge ``predicate:`` selectors (which are a
-        single namespace-key lookup, not an expression) can branch on them.
-        """
-        payload: dict[str, Any] = {
+        """Publish the protagonist into local namespace contribution."""
+        return {
             "player": self,
             "flags": self.flags,
             "mood": self.mood,
         }
-        for token in (*self.flags, *self.inv, *self.achievements):
-            payload[str(token)] = True
-        return payload

@@ -993,6 +993,24 @@ class StoryCompiler:
                     normalized_effects.append(dict(effect))
             payload["effects"] = normalized_effects
 
+        # Authored ``conditions`` are availability predicates: map them onto
+        # the entity's ``availability`` field (mirrors the effects path).
+        # Without this they would land as an ignored extra attribute and
+        # silently gate nothing.
+        if isinstance(payload.get("conditions"), list):
+            normalized_conditions: list[dict[str, Any]] = []
+            for condition in payload["conditions"]:
+                if isinstance(condition, str):
+                    normalized_conditions.append({"expr": condition})
+                elif isinstance(condition, dict):
+                    normalized_conditions.append(dict(condition))
+            existing = payload.get("availability")
+            if isinstance(existing, list):
+                payload["availability"] = [*existing, *normalized_conditions]
+            else:
+                payload["availability"] = normalized_conditions
+            payload.pop("conditions", None)
+
         if kind is Action:
             if payload.get("successor_ref") is None:
                 mapped_ref = (

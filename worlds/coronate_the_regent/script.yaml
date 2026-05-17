@@ -8,8 +8,8 @@ metadata:
 # then a scheduled event tests accumulated state. Early choices (impress the
 # prince, provoke the dragon, buy the sword) pay off at the coronation.
 #
-# Branching uses `conditions:` (expression predicates over the scoped
-# namespace) rather than `predicate:` (which is a single ns-key lookup).
+# Branching uses `conditions:` -- expression predicates evaluated against the
+# scoped namespace (the protagonist is published as `player`).
 scenes:
   court:
     title: "The Regency"
@@ -82,10 +82,12 @@ scenes:
         continues:
           - successor: prince_ok
             trigger: last
-            predicate: challenge_passed
+            conditions:
+              - "challenge_passed"
           - successor: w3_hub
             trigger: last
-            predicate: challenge_failed
+            conditions:
+              - "not challenge_passed"
       prince_ok:
         label: prince_ok
         kind: "coronate_the_regent.domain.GrantImpressedPrince"
@@ -145,9 +147,12 @@ scenes:
         continues:
           - successor: dragon
             trigger: last
-            predicate: irritated_dragon
+            conditions:
+              - "player.has('irritated_dragon')"
           - successor: coronation
             trigger: last
+            conditions:
+              - "not player.has('irritated_dragon')"
       dragon:
         label: dragon
         kind: "coronate_the_regent.domain.DragonFight"
@@ -155,28 +160,36 @@ scenes:
         continues:
           - successor: slain
             trigger: last
-            predicate: dragon_survived
+            conditions:
+              - "challenge_passed or player.has('dragonslayer_sword')"
           - successor: ending_dead
             trigger: last
-            predicate: dragon_lost
+            conditions:
+              - "not challenge_passed and not player.has('dragonslayer_sword')"
       slain:
         label: slain
         content: "The dragon falls. The city is saved."
         continues:
           - successor: ending_slain_married
             trigger: last
-            predicate: impressed_prince
+            conditions:
+              - "player.has('impressed_prince')"
           - successor: ending_slain_solo
             trigger: last
+            conditions:
+              - "not player.has('impressed_prince')"
       coronation:
         label: coronation
         content: "You are crowned beneath a quiet, peaceful sky."
         continues:
           - successor: ending_marry
             trigger: last
-            predicate: impressed_prince
+            conditions:
+              - "player.has('impressed_prince')"
           - successor: ending_solo
             trigger: last
+            conditions:
+              - "not player.has('impressed_prince')"
 
       # --- Endings ------------------------------------------------------
       ending_marry:

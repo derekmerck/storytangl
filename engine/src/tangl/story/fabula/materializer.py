@@ -825,6 +825,21 @@ class StoryMaterializer:
             activation = self._coerce_str(spec.get("trigger") or spec.get("activation"))
             trigger_phase = Action.trigger_phase_from_activation(activation)
 
+            # Authored ``conditions``/``effects`` on actions, continues, and
+            # redirects must reach the edge as availability predicates and
+            # effects; without this they are silently dropped and the edge
+            # gates/mutates nothing.
+            def _as_exprs(value: Any) -> list[dict[str, Any]]:
+                if not isinstance(value, list):
+                    return []
+                out: list[dict[str, Any]] = []
+                for item in value:
+                    if isinstance(item, str):
+                        out.append({"expr": item})
+                    elif isinstance(item, dict):
+                        out.append(dict(item))
+                return out
+
             action = Action(
                 registry=state.graph,
                 label=spec.get("label") or f"action_{node.label}_{index}",
@@ -834,6 +849,8 @@ class StoryMaterializer:
                 successor_ref=successor_ref,
                 activation=activation,
                 predicate=self._coerce_str(spec.get("predicate")),
+                availability=_as_exprs(spec.get("conditions")),
+                effects=_as_exprs(spec.get("effects")),
                 payload=spec.get("payload"),
                 accepts=spec.get("accepts") or spec.get("payload_schema"),
                 ui_hints=(

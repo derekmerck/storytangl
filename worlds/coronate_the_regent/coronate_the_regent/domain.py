@@ -91,7 +91,7 @@ from tangl.mechanics.progression import (  # noqa: E402
 )
 from tangl.mechanics.progression.challenges import StatChallenge  # noqa: E402
 from tangl.story import Block  # noqa: E402
-from tangl.vm import on_gather_ns, on_update  # noqa: E402
+from tangl.vm import on_update  # noqa: E402
 
 
 def _regent(graph) -> Regent | None:
@@ -151,22 +151,6 @@ class GrantIrritatedDragon(GrantBlock):
 class BuySword(GrantBlock):
     _grant_inv = ("dragonslayer_sword",)
     _grant_cost = {"coin": 3}
-
-
-@on_gather_ns(wants_caller_kind=DragonFight, wants_exact_kind=False)
-def dragon_outcome_keys(cursor=None, *, caller=None, ctx, **_kw):
-    """Collapse "passed the check OR holds the sword" into single ns keys.
-
-    Edge ``predicate:`` is a single namespace-key lookup, not an expression,
-    so the compound survival rule is precomputed here.
-    """
-    block = cursor if isinstance(cursor, DragonFight) else caller
-    if not isinstance(block, DragonFight):
-        return {}
-    regent = _regent(getattr(block, "graph", None))
-    has_sword = regent is not None and regent.has("dragonslayer_sword")
-    survived = bool(block.locals.get("challenge_passed")) or has_sword
-    return {"dragon_survived": survived, "dragon_lost": not survived}
 
 
 @on_update(wants_caller_kind=GrantBlock, wants_exact_kind=False)
