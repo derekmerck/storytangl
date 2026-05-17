@@ -14,7 +14,7 @@ from typing import ClassVar, Dict
 
 from pydantic import Field
 
-from tangl.mechanics.progression import SituationalEffect
+from tangl.mechanics.progression import Outcome, SituationalEffect
 
 from tangl.mechanics.progression.definition.canonical_slots import CanonicalSlot
 from tangl.mechanics.progression.definition.stat_def import StatDef
@@ -100,13 +100,13 @@ class Regent(Player, HasStats, HasWallet):
             ),
         ],
     }
-    # The dragonslayer sword genuinely eases the dragon check via the
-    # situational layer (a difficulty malus, clamped like any modifier) --
-    # it biases the odds; the authored guard still owns the hard branch.
+    # The dragonslayer sword guarantees the kill: a forced_outcome override
+    # on the #dragon-tagged check, so survival is decided by the mechanics
+    # (no authored guard crutch on the branch).
     SWORD_EFFECT: ClassVar[SituationalEffect] = SituationalEffect(
         name="dragonslayer sword",
         applies_to_tags=frozenset({"#dragon"}),
-        difficulty_modifier=-2.5,
+        forced_outcome=Outcome.MAJOR_SUCCESS,
     )
 
     def get_situational_effects(self) -> list[SituationalEffect]:

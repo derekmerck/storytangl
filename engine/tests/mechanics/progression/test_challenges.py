@@ -288,6 +288,66 @@ def test_reward_and_growth_modifiers_are_independent_axes():
     )
 
 
+def test_forced_outcome_overrides_the_roll():
+    actor = _adventure_actor()
+    # An easy challenge that would otherwise pass at roll=0.1...
+    challenge = StatChallenge(domain="strength", difficulty="poor", tags={"#x"})
+    natural = resolve_challenge(challenge, actor, roll=0.1)
+    assert natural.outcome >= Outcome.SUCCESS
+
+    forced = resolve_challenge(
+        challenge,
+        actor,
+        roll=0.1,
+        effects=[
+            SituationalEffect(
+                name="cursed", applies_to_tags={"#x"},
+                forced_outcome=Outcome.DISASTER,
+            )
+        ],
+    )
+    assert forced.outcome is Outcome.DISASTER
+
+
+def test_forced_outcome_most_severe_wins():
+    actor = _adventure_actor()
+    challenge = StatChallenge(domain="strength", difficulty="poor", tags={"#x"})
+    result = resolve_challenge(
+        challenge,
+        actor,
+        roll=0.1,
+        effects=[
+            SituationalEffect(
+                name="blessing", applies_to_tags={"#x"},
+                forced_outcome=Outcome.MAJOR_SUCCESS,
+            ),
+            SituationalEffect(
+                name="prohibition", applies_to_tags={"#x"},
+                forced_outcome=Outcome.FAILURE,
+            ),
+        ],
+    )
+    # A prohibition dominates a blessing.
+    assert result.outcome is Outcome.FAILURE
+
+
+def test_forced_outcome_only_applies_when_tag_eligible():
+    actor = _adventure_actor()
+    challenge = StatChallenge(domain="strength", difficulty="poor", tags={"#x"})
+    result = resolve_challenge(
+        challenge,
+        actor,
+        roll=0.1,
+        effects=[
+            SituationalEffect(
+                name="irrelevant curse", applies_to_tags={"#combat"},
+                forced_outcome=Outcome.DISASTER,
+            )
+        ],
+    )
+    assert result.outcome >= Outcome.SUCCESS  # curse did not apply
+
+
 def test_projection_helpers_remain_monotone():
     projected = [project_quality(value) for value in [4.0, 7.0, 10.0, 13.0, 16.0]]
     assert projected == sorted(projected)

@@ -11,8 +11,11 @@ gathering, baseline growth handlers, broad stat-gate support, and an
 modifiers -- `cost_modifier`, `difficulty_modifier`, and `reward_modifier` --
 plus a distinct `growth_modifier` for training gain (cost/reward are
 proportional wallet adjustments clamped to a `1 + sum` factor over [-1, 1];
-growth scales `GrowthHandler.grow(gain_scale=...)`). Story-facing traversal
-wrappers and richer authored worlds remain follow-up work.
+growth scales `GrowthHandler.grow(gain_scale=...)`). A situational
+`forced_outcome` provides a hard authored override of the rolled outcome
+(fumble/fail/pass/critical); when several apply the most severe wins, so a
+prohibition dominates a blessing. Story-facing traversal wrappers and richer
+authored worlds remain follow-up work.
 
 
 Purpose

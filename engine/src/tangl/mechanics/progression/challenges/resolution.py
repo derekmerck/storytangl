@@ -176,6 +176,18 @@ def resolve_challenge(
         roll=roll,
     )
 
+    # A situational ``forced_outcome`` is a hard authored override of the
+    # roll. Cost is still paid (the attempt happened); payout and growth
+    # follow the forced outcome. Most-severe wins so a prohibition beats a
+    # blessing.
+    forced = [
+        effect.forced_outcome
+        for effect in tag_effects
+        if effect.forced_outcome is not None
+    ]
+    if forced:
+        outcome = min(forced)
+
     payout = _scale_wallet(
         _remap_wallet(challenge.payout.reward_for(outcome), reward_remaps),
         _sum_modifier(tag_effects, "reward_modifier"),

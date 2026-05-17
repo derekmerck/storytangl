@@ -161,11 +161,11 @@ scenes:
           - successor: slain
             trigger: last
             conditions:
-              - "challenge_passed or player.has('dragonslayer_sword')"
+              - "challenge_passed"
           - successor: ending_dead
             trigger: last
             conditions:
-              - "not challenge_passed and not player.has('dragonslayer_sword')"
+              - "not challenge_passed"
       slain:
         label: slain
         content: "The dragon falls. The city is saved."

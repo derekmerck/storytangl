@@ -6,6 +6,8 @@ from typing import FrozenSet, Iterable, Optional, Set
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..outcomes import Outcome
+
 
 class _FrozenStrMap(dict[str, str]):
     def _blocked(self, *_args, **_kwargs) -> None:
@@ -71,6 +73,12 @@ class SituationalEffect(BaseModel):
         distinct from `reward_modifier`: payout is wallet currency, growth is
         skill experience. Mood biasing this week's learning is a
         `growth_modifier` scoped to skill-category tags, never a payout.
+    - `forced_outcome`:
+        Hard override of the resolved outcome (fumble/fail/pass/critical),
+        bypassing the roll entirely -- the authored lever for "the
+        dragonslayer sword guarantees the kill" or "you simply cannot study
+        without the outfit". When several apply, the most severe (minimum)
+        wins, so a prohibition dominates a blessing.
     - `domain_override`:
         Optional remap for the tested challenge domain.
     - `cost_currency_remap` / `reward_currency_remap`:
@@ -89,6 +97,7 @@ class SituationalEffect(BaseModel):
     cost_modifier: float = 0.0
     reward_modifier: float = 0.0
     growth_modifier: float = 0.0
+    forced_outcome: Optional[Outcome] = None
     domain_override: str | None = None
     cost_currency_remap: Mapping[str, str] = Field(
         default_factory=dict,

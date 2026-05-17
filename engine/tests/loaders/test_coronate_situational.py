@@ -3,9 +3,9 @@
 Closes the Phase-2 gap (cost/difficulty/reward/growth modifiers had unit
 coverage but no world consumer). The Regent is an EffectDonor: mood biases
 *training growth* via a growth_modifier scoped to the skill-category tag, and
-the dragonslayer sword eases the dragon check via a difficulty_modifier.
-These are mechanical biases (clamped, probabilistic), proven deterministically
-at the resolve_challenge level rather than through flaky traversal.
+the dragonslayer sword forces the dragon check to a pass via forced_outcome.
+Proven deterministically at the resolve_challenge level rather than through
+flaky traversal.
 """
 
 from __future__ import annotations
@@ -57,30 +57,32 @@ class TestMoodBiasesTrainingGrowth:
         assert studious == pytest.approx(plain)
 
 
-class TestSwordEasesDragonCheck:
+class TestSwordForcesDragonOutcome:
     def _dragon(self, with_sword: bool):
         d = _domain()
         regent = d.Regent()
         if with_sword:
             regent.inv.add("dragonslayer_sword")
-        challenge = d.DragonFight._challenge
+        # roll=0.99 would fail the difficulty-20 check on its own; the sword
+        # must override that deterministically.
         return resolve_challenge(
-            challenge,
+            d.DragonFight._challenge,
             regent,
             effect_donors=(regent,),
             tag_donors=(regent,),
-            roll=0.5,
+            roll=0.99,
         )
 
-    def test_sword_lowers_effective_difficulty_and_raises_odds(self) -> None:
-        without = self._dragon(with_sword=False)
-        withit = self._dragon(with_sword=True)
-        # The sword is a clamped difficulty malus on the #dragon-tagged check.
-        assert withit.effective_difficulty < without.effective_difficulty
-        assert withit.success_likelihood > without.success_likelihood
+    def test_without_sword_the_hard_check_fails(self) -> None:
+        from tangl.mechanics.progression import Outcome
 
-    def test_sword_effect_is_active_in_the_result(self) -> None:
+        assert self._dragon(with_sword=False).outcome < Outcome.SUCCESS
+
+    def test_sword_forces_a_pass_regardless_of_roll(self) -> None:
+        from tangl.mechanics.progression import Outcome
+
         result = self._dragon(with_sword=True)
+        assert result.outcome == Outcome.MAJOR_SUCCESS
         assert any(
             e.name == "dragonslayer sword" for e in result.active_effects
         )
