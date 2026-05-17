@@ -239,6 +239,15 @@ export interface ProjectedState {
   sections: ProjectedSection[]
 }
 
+export interface InfoAffordance {
+  kind: string
+  label?: string | null
+  shortcuts?: string[]
+  query?: Record<string, unknown> | null
+  format?: string | null
+  availability?: string | null
+}
+
 export type JournalEntry = JournalStoryUpdate[]
 export type StoryStatus = ProjectedState
 export type WorldSceneList = JournalKVItem[]
@@ -306,6 +315,7 @@ export interface GroupStoryFragment extends BaseStoryFragment {
   presentation_hints?: PresentationHints | null
   zone_role?: string | null
   constraints?: Record<string, unknown> | null
+  layout_hints?: Record<string, unknown> | null
 }
 
 export interface PieceStoryFragment extends BaseStoryFragment {

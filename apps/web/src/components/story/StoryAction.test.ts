@@ -133,6 +133,29 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')).toBeUndefined()
   })
 
+  it('renders sandbox choice provenance and time hints as advisory badges', () => {
+    const hintedChoice: ChoiceStoryFragment = {
+      uid: 'wait_evening',
+      fragment_type: 'choice',
+      text: 'Wait until evening',
+      ui_hints: {
+        source_kind: 'schedule',
+        contribution: 'time_advance',
+        direction: 'wait',
+        time_delta: { periods: 2, arrives_at: 'evening' },
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: hintedChoice })
+
+    expect(wrapper.find('[data-testid="choice-hints"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('schedule')
+    expect(wrapper.text()).toContain('time advance')
+    expect(wrapper.text()).toContain('wait')
+    expect(wrapper.text()).toContain('+2 periods')
+    expect(wrapper.text()).toContain('arrives evening')
+  })
+
   it('emits freeform payloads using accepts payload_type', async () => {
     const freeformChoice: ChoiceStoryFragment = {
       uid: 'action_freeform',

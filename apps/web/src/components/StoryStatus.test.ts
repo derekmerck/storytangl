@@ -6,6 +6,7 @@ import * as directives from 'vuetify/directives'
 
 import StoryStatus from './StoryStatus.vue'
 import { HttpResponse, http, server } from '@tests/setup'
+import { sandboxInfoAffordances, sandboxProjectedState } from '@tests/fixtures'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
@@ -18,8 +19,9 @@ describe('StoryStatus', () => {
     vi.resetModules()
   })
 
-  const mountStatus = () =>
+  const mountStatus = (props?: InstanceType<typeof StoryStatus>['$props']) =>
     mount(StoryStatus, {
+      props,
       global: {
         plugins: [vuetify],
       },
@@ -56,6 +58,102 @@ describe('StoryStatus', () => {
 
     expect(wrapper.text()).toContain('Conditions')
     expect(wrapper.text()).toContain('rain-soaked, hungry, hunted')
+  })
+
+  it('renders sandbox status conventions as generic projected sections', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState)),
+    )
+
+    const wrapper = mountStatus()
+    await flushPromises()
+
+    expect(wrapper.find('[data-section-kind="world_time"]').exists()).toBe(true)
+    expect(wrapper.find('[data-section-kind="location"]').exists()).toBe(true)
+    expect(wrapper.find('[data-section-kind="agenda"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('evening')
+    expect(wrapper.text()).toContain('brass lamp')
+    expect(wrapper.text()).toContain('fixture')
+    expect(wrapper.text()).toContain('Guard changes watch')
+  })
+
+  it('renders optional info affordances without requiring bespoke client support', async () => {
+    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="info-affordance-bar"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Status')
+    expect(wrapper.text()).toContain('Map')
+    expect(wrapper.text()).toContain('Inventory')
+    expect(wrapper.text()).toContain('Party')
+    expect(wrapper.text()).toContain('m')
+    expect(wrapper.text()).toContain('i')
+  })
+
+  it('loads the selected info affordance through story-info query params', async () => {
+    const seenSearches: string[] = []
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
+        seenSearches.push(new URL(request.url).search)
+        return HttpResponse.json(sandboxProjectedState)
+      }),
+    )
+
+    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    await flushPromises()
+
+    const mapButton = wrapper.find('[data-info-kind="map"]')
+    expect(mapButton.exists()).toBe(true)
+    await mapButton.trigger('click')
+    await flushPromises()
+
+    expect(seenSearches[0]).toBe('')
+    expect(seenSearches.some((search) => search.includes('type=map'))).toBe(true)
+    expect(seenSearches.some((search) => search.includes('format=tiles'))).toBe(true)
+  })
+
+  it('uses the affordance kind as a fallback story-info type', async () => {
+    const seenSearches: string[] = []
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
+        seenSearches.push(new URL(request.url).search)
+        return HttpResponse.json(sandboxProjectedState)
+      }),
+    )
+
+    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    await flushPromises()
+
+    await wrapper.find('[data-info-kind="inventory"]').trigger('click')
+    await flushPromises()
+
+    expect(seenSearches.some((search) => search.includes('type=inventory'))).toBe(true)
+  })
+
+  it('refreshes the projected status when the story update key changes', async () => {
+    const statusHandler = vi.fn(() =>
+      HttpResponse.json({
+        sections: [
+          {
+            section_id: 'turn',
+            title: 'Turn',
+            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
+          },
+        ],
+      }),
+    )
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
+
+    const wrapper = mountStatus({ refreshKey: 0 })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({ refreshKey: 1 })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('2')
   })
 
   it('handles empty status payload', async () => {

@@ -3,6 +3,7 @@ export {
   crossroadsRuntimeEnvelope,
 } from './runtimeEnvelope'
 export { crossroadsProjectedState } from './projectedState'
+export { sandboxInfoAffordances, sandboxProjectedState } from './sandboxProjectedState'
 export {
   buyQuantityRuntimeEnvelope,
   commandHintRuntimeEnvelope,

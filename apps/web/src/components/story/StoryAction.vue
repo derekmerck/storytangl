@@ -33,6 +33,34 @@ const iconName = computed(() => {
   }
   return icon.startsWith('mdi-') ? icon : `mdi-${icon}`
 })
+const readableValue = (value: string): string => value.replace(/_/g, ' ')
+const choiceHintBadges = computed(() => {
+  const hints = props.choice.ui_hints ?? {}
+  const badges: string[] = []
+  for (const key of ['source_kind', 'contribution', 'direction']) {
+    const value = hints[key]
+    if (typeof value === 'string' && value) {
+      badges.push(readableValue(value))
+    }
+  }
+  return badges
+})
+const timeDeltaLabel = computed(() => {
+  const delta = props.choice.ui_hints?.time_delta
+  if (!isRecord(delta)) {
+    return undefined
+  }
+  const parts: string[] = []
+  const periods = delta.periods
+  if (typeof periods === 'number' && Number.isFinite(periods) && periods !== 0) {
+    parts.push(`${periods > 0 ? '+' : ''}${periods} periods`)
+  }
+  const arrivesAt = delta.arrives_at
+  if (typeof arrivesAt === 'string' && arrivesAt) {
+    parts.push(`arrives ${readableValue(arrivesAt)}`)
+  }
+  return parts.length ? parts.join(' · ') : undefined
+})
 const hasPayloadInput = computed(() => {
   if (!props.choice.accepts) {
     return false
@@ -115,6 +143,28 @@ const handleClick = () => {
       <div v-if="!available && choice.unavailable_reason" class="choice-reason">
         {{ choice.unavailable_reason }}
       </div>
+
+      <div
+        v-if="choiceHintBadges.length || timeDeltaLabel"
+        class="choice-hints"
+        data-testid="choice-hints"
+      >
+        <span
+          v-for="badge in choiceHintBadges"
+          :key="badge"
+          class="choice-hint"
+          data-testid="choice-hint"
+        >
+          {{ badge }}
+        </span>
+        <span
+          v-if="timeDeltaLabel"
+          class="choice-hint choice-hint--time"
+          data-testid="choice-time-delta"
+        >
+          {{ timeDeltaLabel }}
+        </span>
+      </div>
     </div>
   </v-col>
 </template>
@@ -151,5 +201,25 @@ const handleClick = () => {
   color: rgb(var(--v-theme-on-surface-variant));
   font-size: 0.78rem;
   padding: 0 8px 4px;
+}
+
+.choice-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px 2px;
+}
+
+.choice-hint {
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
+  border-radius: 4px;
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.72rem;
+  line-height: 1.1;
+  padding: 3px 5px;
+}
+
+.choice-hint--time {
+  color: rgb(var(--v-theme-primary));
 }
 </style>
