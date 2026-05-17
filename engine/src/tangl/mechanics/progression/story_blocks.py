@@ -28,6 +28,7 @@ from tangl.vm import (
 )
 
 from .challenges import StatChallenge, resolve_challenge
+from .effects.donors import EffectDonor, TagDonor
 from .entity.has_stats import HasStats
 from .entity.has_wallet import HasWallet
 from .growth import GrowthHandler, LinearGrowthHandler
@@ -60,6 +61,16 @@ def _actor(cursor: Any, ctx: Any) -> HasStats | None:
     return actor if isinstance(actor, HasStats) else None
 
 
+def _donors(actor: Any) -> tuple[tuple, tuple]:
+    """Treat the protagonist as its own situational-effect/tag donor.
+
+    Mood-biased growth, equipment difficulty effects, etc. ride this seam.
+    """
+    effect_donors = (actor,) if isinstance(actor, EffectDonor) else ()
+    tag_donors = (actor,) if isinstance(actor, TagDonor) else ()
+    return effect_donors, tag_donors
+
+
 def _refresh_ns_cache(ctx: Any) -> None:
     """Drop cached namespaces so POSTREQS/continues see fresh challenge flags."""
     cache = getattr(ctx, "_ns_cache", None)
@@ -86,11 +97,14 @@ def resolve_stat_challenge(
     if actor is None:
         return None
 
+    effect_donors, tag_donors = _donors(actor)
     result = resolve_challenge(
         cursor._challenge,
         actor,
         wallet=actor if isinstance(actor, HasWallet) else None,
         context_tags=getattr(cursor, "tags", None),
+        effect_donors=effect_donors,
+        tag_donors=tag_donors,
         growth_handler=cursor._growth_handler,
     )
 
@@ -170,10 +184,13 @@ def apply_training(
         tags=set(cursor._training_tags),
     )
     handler = cursor._growth_handler or LinearGrowthHandler()
+    effect_donors, tag_donors = _donors(actor)
     result = resolve_challenge(
         challenge,
         actor,
         context_tags=set(cursor._training_tags),
+        effect_donors=effect_donors,
+        tag_donors=tag_donors,
         growth_handler=handler,
     )
     receipt = result.growth_receipt

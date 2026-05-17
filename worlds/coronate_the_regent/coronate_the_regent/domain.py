@@ -14,6 +14,8 @@ from typing import ClassVar, Dict
 
 from pydantic import Field
 
+from tangl.mechanics.progression import SituationalEffect
+
 from tangl.mechanics.progression.definition.canonical_slots import CanonicalSlot
 from tangl.mechanics.progression.definition.stat_def import StatDef
 from tangl.mechanics.progression.definition.stat_system import StatSystemDefinition
@@ -75,6 +77,51 @@ class Regent(Player, HasStats, HasWallet):
         json_schema_extra={"include": True},
     )
 
+    # Mood biases *which* training pays off this week: a growth_modifier
+    # scoped to the skill-category tag a TrainBlock stamps on its challenge.
+    MOOD_EFFECTS: ClassVar[dict[str, list[SituationalEffect]]] = {
+        "martial": [
+            SituationalEffect(
+                name="martial mood",
+                applies_to_tags=frozenset({"#martial"}),
+                growth_modifier=1.0,
+            ),
+            SituationalEffect(
+                name="martial mood (courtly slump)",
+                applies_to_tags=frozenset({"#courtly"}),
+                growth_modifier=-0.5,
+            ),
+        ],
+        "studious": [
+            SituationalEffect(
+                name="studious mood",
+                applies_to_tags=frozenset({"#courtly"}),
+                growth_modifier=1.0,
+            ),
+        ],
+    }
+    # The dragonslayer sword genuinely eases the dragon check via the
+    # situational layer (a difficulty malus, clamped like any modifier) --
+    # it biases the odds; the authored guard still owns the hard branch.
+    SWORD_EFFECT: ClassVar[SituationalEffect] = SituationalEffect(
+        name="dragonslayer sword",
+        applies_to_tags=frozenset({"#dragon"}),
+        difficulty_modifier=-2.5,
+    )
+
+    def get_situational_effects(self) -> list[SituationalEffect]:
+        effects: list[SituationalEffect] = []
+        if self.mood:
+            effects.extend(self.MOOD_EFFECTS.get(self.mood, ()))
+        if self.has("dragonslayer_sword"):
+            effects.append(self.SWORD_EFFECT)
+        return effects
+
+    def get_context_tags(self) -> set[str]:
+        # Challenges carry their own category/scenario tags; the protagonist
+        # contributes none of its own today.
+        return set()
+
 
 Regent.model_rebuild()
 
@@ -102,12 +149,14 @@ def _regent(graph) -> Regent | None:
 class TrainCombat(HasTraining, Block):
     _training_skill = "combat"
     _training_difficulty = "ok"
+    _training_tags = frozenset({"training", "#martial"})
     _growth_handler = LinearGrowthHandler()
 
 
 class TrainCharm(HasTraining, Block):
     _training_skill = "charm"
     _training_difficulty = "ok"
+    _training_tags = frozenset({"training", "#courtly"})
     _growth_handler = LinearGrowthHandler()
 
 
@@ -124,7 +173,7 @@ class DragonFight(HasStatChallenge, Block):
     # Lethal by design: base combat fails this deterministically, so survival
     # depends on the dragonslayer sword (an inter-phase payoff), not the roll.
     _challenge = StatChallenge(
-        name="The dragon", domain="combat", difficulty=20.0
+        name="The dragon", domain="combat", difficulty=20.0, tags={"#dragon"}
     )
 
 
