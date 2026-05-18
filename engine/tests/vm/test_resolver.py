@@ -119,6 +119,7 @@ class _ResolverCtx:
         self.incoming_payload = None
         self.selected_edge = None
         self.selected_payload = None
+        self.injected_journal_fragments = []
         self._authorities = list(authorities or [])
         self._rng = rng or Random(0)
         self._location_entity_groups = list(location_entity_groups or [])

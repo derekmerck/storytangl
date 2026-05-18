@@ -167,6 +167,7 @@ class PhaseCtx:
     local_authorities: list[BehaviorRegistry] = field(default_factory=list)
     incoming_edge: Any | None = None
     incoming_payload: Any = None
+    injected_journal_fragments: list[Record] = field(default_factory=list)
 
     _ns_cache: dict[UUID, ChainMap[str, Any]] = field(default_factory=dict)
     _ns_inflight: set[UUID] = field(default_factory=set)
@@ -224,6 +225,7 @@ class PhaseCtx:
             "local_authorities": list(self.local_authorities),
             "incoming_edge": self.incoming_edge,
             "incoming_payload": self.incoming_payload,
+            "injected_journal_fragments": self.injected_journal_fragments,
         }
         kwargs.update(field_overrides)
         return PhaseCtx(**kwargs)

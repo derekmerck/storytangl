@@ -921,6 +921,7 @@ def test_sandbox_can_host_incremental_allocation_and_tick_cycles() -> None:
         and fragment.content == "You assign a worker to forage."
         for fragment in ledger.get_journal()
     )
+    assert "_sandbox_incremental_fragments" not in hub.locals
 
     do_provision(hub, ctx=PhaseCtx(graph=graph, cursor_id=hub.uid))
     cycle = next(
@@ -942,6 +943,7 @@ def test_sandbox_can_host_incremental_allocation_and_tick_cycles() -> None:
     ]
     assert "Cycle 1 resolves." in journal_text
     assert "Resources: food=2." in journal_text
+    assert "_sandbox_tick_result" not in hub.locals
 
 
 def test_sandbox_incremental_update_rejects_unsupported_move_kind() -> None:

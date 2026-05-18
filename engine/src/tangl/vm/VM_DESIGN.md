@@ -136,6 +136,13 @@ across the parent boundary unless they are intentionally promoted into public
 vocabulary. This is the boundary rule that makes recursive phase refinement useful
 instead of turning the phase bus into a stack of incompatible private runtimes.
 
+`PhaseCtx.injected_journal_fragments` is the promoted side channel for one common
+cross-phase case: UPDATE-time work that needs to emit concrete journal fragments
+during the same `follow_edge` pass. UPDATE handlers may append fragments there;
+`do_journal` drains the list before normal journal rendering and composition.
+Handlers must not put such ephemeral render material in persistent entity
+`locals`.
+
 Domain packages may therefore subdivide a VM phase with their own behavior chain,
 provided the outer VM contract remains intact. For example, a sandbox package may
 invoke `do_sandbox_tick` from an `on_update` handler after normal selected-edge and

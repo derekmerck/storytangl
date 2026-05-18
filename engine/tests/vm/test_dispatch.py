@@ -236,6 +236,23 @@ class TestDoJournal:
 
         assert result is fragment
 
+    def test_injected_journal_fragments_are_drained_before_render_results(self) -> None:
+        injected = ContentFragment(content="from update")
+        rendered = ContentFragment(content="from journal")
+        on_journal(lambda *, caller, ctx, **kw: rendered)
+        g = Graph()
+        node = _node(g, label="n")
+        ctx = PhaseCtx(
+            graph=g,
+            cursor_id=node.uid,
+            injected_journal_fragments=[injected],
+        )
+
+        result = do_journal(node, ctx=ctx)
+
+        assert result == [injected, rendered]
+        assert ctx.injected_journal_fragments == []
+
     def test_compose_handler_receives_merged_fragments_and_can_replace_output(self, null_ctx) -> None:
         first = Record(label="first")
         second = Record(label="second")

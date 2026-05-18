@@ -14,7 +14,7 @@ from tangl.mechanics.games import (
     IncrementalMove,
 )
 from tangl.story import Action, StoryGraph
-from tangl.vm import VmPhaseCtx, on_journal, on_provision, on_update
+from tangl.vm import VmPhaseCtx, on_provision, on_update
 
 from .dispatch import on_sandbox_tick
 from .handlers import sandbox_scopes
@@ -101,12 +101,11 @@ def _latest_fragments(host: HasGame) -> list[ContentFragment]:
 
 
 def _store_incremental_fragments(
-    location: SandboxLocation,
+    ctx: VmPhaseCtx,
     host: HasGame,
 ) -> None:
     fragments = _latest_fragments(host)
-    if fragments:
-        location.locals["_sandbox_incremental_fragments"] = fragments
+    ctx.injected_journal_fragments.extend(fragments)
 
 
 @on_provision(
@@ -182,7 +181,7 @@ def process_sandbox_incremental_game_move(*, caller, ctx, **_kw):
         host.locals["last_round"] = None
         host.locals["round_result"] = None
     host.locals["game_result"] = host.game.result
-    _store_incremental_fragments(caller, host)
+    _store_incremental_fragments(ctx, host)
     return None
 
 
@@ -222,25 +221,8 @@ def reconcile_incremental_games_on_sandbox_tick(*, caller, ctx, clock_tick, **_k
     return events or None
 
 
-@on_journal(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
-    priority=Priority.LATE,
-)
-def render_sandbox_incremental_journal(*, caller, ctx, **_kw):
-    """Append allocation-action journal fragments for hosted incremental games."""
-    if not isinstance(caller, SandboxLocation):
-        return None
-    additions = caller.locals.get("_sandbox_incremental_fragments")
-    if not isinstance(additions, list):
-        return None
-    caller.locals["_sandbox_incremental_fragments"] = []
-    return additions or None
-
-
 __all__ = [
     "process_sandbox_incremental_game_move",
     "project_sandbox_incremental_game_moves",
     "reconcile_incremental_games_on_sandbox_tick",
-    "render_sandbox_incremental_journal",
 ]

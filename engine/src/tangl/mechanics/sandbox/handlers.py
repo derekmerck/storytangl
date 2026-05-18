@@ -627,8 +627,16 @@ def _time_owner(location: SandboxLocation) -> Any:
     return location
 
 
-def _record_tick_result(location: SandboxLocation, result: SandboxTickResult) -> None:
-    location.locals["_sandbox_tick_result"] = result
+def _inject_tick_fragments(
+    ctx: VmPhaseCtx,
+    location: SandboxLocation,
+    result: SandboxTickResult,
+) -> None:
+    ctx.injected_journal_fragments.extend(
+        ContentFragment(content=event.text, source_id=location.uid)
+        for event in result.events
+        if event.observable and event.text
+    )
 
 
 def _sandbox_time_advance(
@@ -640,7 +648,6 @@ def _sandbox_time_advance(
     duration = _clock_policy(location).action_duration(cost)
     result = SandboxTickResult(requested=duration)
     if duration == 0:
-        _record_tick_result(location, result)
         return result
 
     time_owner = _time_owner(location)
@@ -656,7 +663,7 @@ def _sandbox_time_advance(
                 charged_assets=charged_assets,
             )
         )
-    _record_tick_result(location, result)
+    _inject_tick_fragments(ctx, location, result)
     return result
 
 
@@ -2293,26 +2300,3 @@ def compose_sandbox_mob_journal(*, caller, ctx, fragments, **_kw):
     if not additions:
         return None
     return [*fragments, *additions]
-
-
-@on_journal(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
-    priority=Priority.LAST,
-)
-def render_sandbox_tick_journal(*, caller, ctx, **_kw):
-    """Render observable sandbox tick events to the journal."""
-    if not isinstance(caller, SandboxLocation):
-        return None
-    result = caller.locals.get("_sandbox_tick_result")
-    if not isinstance(result, SandboxTickResult):
-        return None
-    fragments = [
-        ContentFragment(content=event.text, source_id=caller.uid)
-        for event in result.events
-        if event.observable and event.text
-    ]
-    return fragments or None
-
-
-compose_sandbox_tick_journal = render_sandbox_tick_journal
