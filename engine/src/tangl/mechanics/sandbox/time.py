@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any, Protocol
 
+from pydantic import Field
+
 from tangl.core.bases import BaseModelPlus
+
+
+DEFAULT_LOCAL_ACTION_DURATION = 1
 
 
 class HasMutableLocals(Protocol):
@@ -67,6 +73,76 @@ class WorldTime(BaseModelPlus):
             season=((month - 1) // months_per_season) + 1,
             year=(month_index // months_per_year) + 1,
         )
+
+
+class TimePolicy(StrEnum):
+    """How a sandbox action's normalized duration is reconciled."""
+
+    DEFAULT = "default"
+    ATOMIC = "atomic"
+    INTERRUPTIBLE = "interruptible"
+
+
+class SandboxTimeCost(BaseModelPlus):
+    """Normalized action-duration request stored on generated sandbox actions."""
+
+    duration: int | None = None
+    kind: str = "local_action"
+    policy: TimePolicy = TimePolicy.DEFAULT
+
+
+class SandboxClockPolicy(BaseModelPlus):
+    """Scope-local normalized clock policy for sandbox actions."""
+
+    tick_label: str = "turn"
+    integration_quantum: int = 1
+    default_durations: dict[str, int] = Field(
+        default_factory=lambda: {
+            "movement": 1,
+            "local_action": 1,
+            "wait": 1,
+            "info": 0,
+        }
+    )
+
+    def default_duration(self, kind: str) -> int:
+        """Return the normalized default duration for an action kind."""
+        return self.default_durations.get(
+            kind,
+            self.default_durations.get("local_action", DEFAULT_LOCAL_ACTION_DURATION),
+        )
+
+    def action_duration(self, cost: SandboxTimeCost | None) -> int:
+        """Resolve a time-cost request to non-negative normalized ticks."""
+        if cost is None:
+            duration = self.default_duration("local_action")
+        elif cost.duration is None:
+            duration = self.default_duration(cost.kind)
+        else:
+            duration = cost.duration
+        if duration < 0:
+            raise ValueError("action duration must be non-negative")
+        return duration
+
+
+class SandboxTickEvent(BaseModelPlus):
+    """One event produced while reconciling a sandbox tick."""
+
+    kind: str
+    source_label: str = ""
+    text: str | None = None
+    observable: bool = True
+    clock_tick: int | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class SandboxTickResult(BaseModelPlus):
+    """Summary of one sandbox time advance."""
+
+    requested: int = 0
+    elapsed: int = 0
+    interrupted: bool = False
+    events: list[SandboxTickEvent] = Field(default_factory=list)
 
 
 def get_world_turn(source: HasWorldTurnScope) -> int:

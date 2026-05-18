@@ -73,6 +73,49 @@ soft truth can be re-solved around later choices. Sandbox geography is one
 useful projection for that future solver because it makes nearby opportunities,
 recent paths, blocked routes, and offscreen actors explicit.
 
+### Humane Sandbox Design
+
+Sandbox is a spatial, temporal, and social overlay on ordinary StoryTangl
+choices. Its purpose is not to make the player exhaustively search a complete
+map for the one active event. Its purpose is to let the story render current
+opportunity as place, presence, time, inventory, weather, rules, and local
+constraint.
+
+The common failure mode is a "hunt for the event" simulator: the player clicks
+through mostly empty rooms, times, or menus until a hidden predicate finally
+fires. That can feel like agency, but it is often only friction. A StoryTangl
+sandbox should instead shape the explorable field around the current narrative
+frontier. It may prune irrelevant routes, close or elide locations where
+nothing meaningful can happen, move actors toward useful intersections,
+surface hints, or materialize interesting content on demand. Empty traversal is
+valid only when emptiness is doing work: tension, misdirection, loneliness,
+search pressure, atmosphere, or strategic uncertainty.
+
+There is a complementary game-design exception. Random hunting can be
+excellent when it is explicit, legible, and strategic: scarce turns, known or
+learnable encounter tables, resource pressure, risk/reward loadouts,
+probabilistic drops, speedrun routing, or optimization puzzles. In that case
+the search is not accidental UI burden; it is the game. The design rule is:
+exploration friction is valuable only when it is modeled, legible, and
+strategically or narratively meaningful.
+
+Repeated sandbox traversal should therefore be collapsible into
+macro-affordances when the uncertainty is mechanical but the moment-by-moment
+ritual is no longer interesting. "Search this room until you find something
+useful," "farm this location until sunset," or "run triage for the next hour"
+can consume the same resources, apply the same risks, and emit a summarized
+journal/accounting result. This preserves the authoritative ledger while
+respecting the reader's time.
+
+Ritual and outcome authority are separate concerns. The backend should own the
+truth of resolution: costs, risks, rolls, state changes, and journal facts. A
+client may still stage ceremony around that truth: dice animation, card draw,
+travel montage, progress clock, or farming digest. Ritual is useful when it
+supports comprehension, suspense, agency, texture, or delight. It becomes
+hostile when it is artificial friction whose removal is treated as a premium
+benefit. StoryTangl should make ethical summarization easy and should not
+normalize paywalling relief from intentionally induced tedium.
+
 ---
 
 ## Relationship To Existing Architecture
@@ -549,11 +592,196 @@ forced events, and selectable events. In v38 those become:
 
 - `world_turn` in locals
 - derived `WorldTime`
-- explicit `advance_world_turn(...)`
+- `SandboxClockPolicy` for scope-local normalized clock policy
+- `SandboxTimeCost` on generated actions for action-duration requests
+- explicit `advance_world_turn(...)` for the dumb clock increment
+- sandbox tick as a domain-local UPDATE refinement
 - schedule matching against time, location, and optional presence
 - scheduled events as time-gated sponsored interactions
 - forced scheduled events as ordinary triggered actions
 - selectable scheduled events as ordinary generated choices
+
+The runtime clock is normalized. Authors and importers may describe travel as
+"15 minutes", a dating-sim activity as "one evening", or a lamp as "six hours of
+oil", but the sandbox runtime should receive only integer counters:
+`clock_tick`, action duration, integration quantum, current charge, maximum
+charge, and normalized consumption rate. The compiler or world authority lowers
+world units into that grid. Journal and story-info projection render normalized
+counters back into story terms.
+
+This is an intentional boundary:
+
+```text
+author units -> compiler/world authority -> normalized runtime counters
+normalized runtime counters -> journal/story-info -> reader units
+```
+
+Runtime should not solve dimensional analysis. Unit fidelity can be a mechanic
+for worlds that want it, but it should be expressed by choosing a finer
+normalized grid or richer compiler policy, not by teaching the VM or sandbox
+runtime about watts, minutes, oil volume, or battery chemistry. A tick handler
+may observe world-unit metadata, but it should only commit normalized runtime
+state.
+
+The current update order is:
+
+```text
+selected edge UPDATE effects
+node UPDATE effects
+sandbox time advance and tick reconciliation
+JOURNAL
+FINALIZE / POSTREQS
+```
+
+`advance_world_turn(...)` remains dumb. The higher-level sandbox time advance
+resolves the selected action's `SandboxTimeCost`, advances the nearest sandbox
+scope clock, and runs `do_sandbox_tick` once per normalized tick. The first tick
+consumer is charged-asset depletion. Future consumers such as hazards,
+deadlines, mobile actors, service completions, or queueing metrics should attach
+to the same tick chain so simulation remains a domain-local refinement of
+UPDATE rather than a parallel runtime.
+
+The first implementation treats ordinary sandbox actions as atomic and loops
+per normalized tick for clarity. Interruptible waits/searches and event-driven
+queueing can be layered later. Worlds that need mid-action interruption must
+choose a clock grid fine enough for those interruptions; otherwise elapsed time
+can be reconciled at the action boundary.
+
+#### Tick-Compatible Mechanics Are Hosted Observers
+
+The sandbox tick chain is deliberately smaller than a simulation framework.
+Sandbox owns:
+
+- scoped time state;
+- action-duration normalization;
+- when selected actions advance time;
+- the invitation for scoped systems to observe each normalized tick;
+- receipt-like tick events that can later be projected into journal fragments or
+  story-info.
+
+It does not own the semantics of every system that happens to care about time.
+`ChargeFacet` is the first implementation because a lamp makes the Adventure
+slice concrete, but it is a parasite on the sandbox clock, not part of the
+sandbox definition. The charge mechanic owns counters, consumption triggers,
+warning thresholds, and exhaustion effects. Sandbox merely tells it that time
+advanced.
+
+The same separation should apply to other mechanics:
+
+- an incremental/resource-allocation game owns workers, tasks, upkeep, builds,
+  production, and cycle resolution;
+- a mob scheduler owns presence, movement, pathing policy, and local
+  projections;
+- a queueing simulator owns arrivals, service stations, resource seize/release,
+  service completions, and metrics;
+- a hazard/deadline system owns expiry conditions and consequences.
+
+Each of those systems should be runnable without sandbox by calling its own
+handler directly. When hosted inside a sandbox, a thin adapter may register it
+with `on_sandbox_tick` so it observes the same normalized clock as lamps,
+schedules, and other scoped world systems.
+
+The first non-charge example is the optional incremental-game adapter. An
+`IncrementalGameHandler` now exposes cycle resolution as a public operation, so
+authors can still run the resource loop manually. When a `HasGame` block hosting
+an `IncrementalGame` is placed under a `SandboxScope`, the adapter can project
+available allocation moves into the active location as ordinary self-loop
+sandbox actions. Allocation moves are zero-duration by default; `end_cycle`
+requests one normalized tick. The sandbox tick observer then calls the
+incremental handler to resolve upkeep, production, victory/loss state, and
+journalable cycle notes. Sandbox does not know what "food", "workers",
+"forage", or "upkeep" mean.
+
+This gives the desired dependency direction:
+
+```text
+sandbox tick -> invite observers
+charge observer -> consume charge
+incremental observer -> resolve production/upkeep
+mob observer -> reconcile presence/pathing
+queue observer -> reconcile arrivals/completions
+```
+
+If a hosted observer becomes useful across multiple non-sandbox domains, promote
+that observer's generic vocabulary to its own mechanics package and keep only
+the sandbox adapter here. The sandbox package should remain the dynamic-hub and
+scoped-time host, not the permanent home for every tick-compatible subsystem.
+
+#### Future RFC: Effect-Phase Content Injection
+
+The current tick implementation uses a small pragmatic bridge: update-time
+observers return `SandboxTickEvent`s, the sandbox time-advance helper gathers
+them into a result, and journal handlers render the observable events later in
+the same VM pass. Some first-pass adapters temporarily stash those renderable
+events on the active location's `locals`.
+
+That is acceptable as scaffolding, but it is not the right long-term contract.
+`locals` is persistent story state. Phase-local render material is ephemeral and
+may contain objects that should not serialize, replay as state, or become
+visible to predicates as durable world truth.
+
+A cleaner general pattern would give UPDATE a receipt-like content side channel:
+
+```text
+UPDATE
+  -> selected-edge effects
+  -> node/domain effects
+  -> observers append content candidates to ctx or update receipts
+JOURNAL
+  -> gather content candidates
+  -> enrich/order/filter candidates
+  -> compose normal journal fragments
+```
+
+Possible implementations:
+
+- add an explicit `injected_fragments` or `content_candidates` slot to the
+  runtime context for one `follow_edge` pass;
+- let update handlers return structured receipts that the frame carries into
+  JOURNAL;
+- define a small sandbox-local context wrapper while the pattern is being
+  proven, then promote the generic part once another mechanic needs it.
+
+This would match the existing journal-phase shape, where intermediate gathered
+content can live on the context until composition emits the phase result. It
+would also give charge warnings, incremental cycle notes, mob movement notices,
+queue arrivals, hazards, and selected effect narration one shared path into the
+journal without making each observer invent a persistent stash key.
+
+### Projected State As Disclosure
+
+Sandbox projected state is an optional client convenience, not an authority
+surface. The backend owns world truth, action availability, hidden schedules,
+and mutation. A client receives only the facts the current reader/player is
+allowed to know.
+
+`SandboxStoryInfoProjector` lives in the sandbox package and attaches through
+the existing service `StoryInfoProjector` seam. Service remains generic; sandbox
+worlds opt in by installing the projector on the world. The projector emits
+ordinary `ProjectedState` sections using the existing `kv_list` and `item_list`
+value types. It does not add sandbox widgets or require a SugarCube-like
+interface. A web client may render those sections as a room header, inventory
+panel, time chip, map modal, or roster; a CLI may print them as status lines; an
+ebook compiler may ignore them or fold them into generated prose.
+
+Current disclosed sections are intentionally conservative:
+
+- current sandbox location;
+- derived world time, with arbitrary period labels such as morning, afternoon,
+  evening, and night;
+- player inventory;
+- visible local assets;
+- visible fixtures and their open/locked state;
+- present visible mobs;
+- visible authored exits.
+
+Visibility rules filter projected state the same way they filter journal and
+local affordances. Darkness may leave current location, time, and inventory
+visible while suppressing local assets, fixtures, mobs, and exits. This keeps
+projected state aligned with narrative disclosure rather than raw simulation
+truth. It must not expose hidden mobs, raw future schedules, secret exits,
+undisclosed puzzle dependencies, or anything the backend would not otherwise
+let the player perceive.
 
 ### Parser As Client Adapter
 
@@ -696,6 +924,13 @@ west -> cobble_crawl
 The point is not that the schema is final. The point is to keep an executable
 pressure fixture while negotiating which schema choices are authoring sugar,
 which are generic sandbox traits, and which require world-specific authorities.
+
+One small Adventure-flavored follow-up worth preserving is magic-word
+teleportation, such as `XYZZY`. It is charming, but architecturally it should be
+just another sponsored interaction or parser-facing choice: a scoped/world
+authority recognizes the word, projects the teleport affordance when appropriate,
+and resolves it through ordinary traversal/effects rather than giving parser
+input special semantic power.
 
 `SandboxSliceCompiler` is the current mechanics-level compiler boundary for
 that pressure fixture. It mirrors the broader compiler split in miniature:
