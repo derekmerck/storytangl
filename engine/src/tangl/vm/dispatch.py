@@ -220,12 +220,23 @@ def do_update(caller, *, ctx, **kwargs) -> None:
 
 
 def do_journal(caller, *, ctx, **kwargs):
+    injected = list(ctx.injected_journal_fragments)
+    ctx.injected_journal_fragments.clear()
     receipts = _run_task("render_journal", caller=caller, ctx=ctx, **kwargs)
     results = CallReceipt.gather_results(*receipts)
-    if not results:
+    if not results and not injected:
         return None
 
     merged: list[Record] = []
+    for value in injected:
+        normalized = _assert_fragment_result(value, task="render_journal")
+        if normalized is None:
+            continue
+        if isinstance(normalized, Record):
+            merged.append(normalized)
+            continue
+        merged.extend(normalized)
+
     for value in results:
         normalized = _assert_fragment_result(value, task="render_journal")
         if normalized is None:

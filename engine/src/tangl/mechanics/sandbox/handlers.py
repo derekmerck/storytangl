@@ -627,8 +627,22 @@ def _time_owner(location: SandboxLocation) -> Any:
     return location
 
 
-def _record_tick_result(location: SandboxLocation, result: SandboxTickResult) -> None:
-    location.locals["_sandbox_tick_result"] = result
+def _inject_tick_fragments(
+    ctx: VmPhaseCtx,
+    location: SandboxLocation,
+    result: SandboxTickResult,
+) -> None:
+    for event in result.events:
+        if not event.observable or not event.text:
+            continue
+        source_id = event.source_id or location.uid
+        ctx.injected_journal_fragments.append(
+            ContentFragment(
+                content=event.text,
+                source_id=source_id,
+                origin_id=source_id,
+            )
+        )
 
 
 def _sandbox_time_advance(
@@ -640,7 +654,6 @@ def _sandbox_time_advance(
     duration = _clock_policy(location).action_duration(cost)
     result = SandboxTickResult(requested=duration)
     if duration == 0:
-        _record_tick_result(location, result)
         return result
 
     time_owner = _time_owner(location)
@@ -656,7 +669,7 @@ def _sandbox_time_advance(
                 charged_assets=charged_assets,
             )
         )
-    _record_tick_result(location, result)
+    _inject_tick_fragments(ctx, location, result)
     return result
 
 
@@ -2217,6 +2230,7 @@ def reconcile_charged_sandbox_assets(
                     SandboxTickEvent(
                         kind="charge_warning",
                         source_label=_asset_key(asset),
+                        source_id=asset.uid,
                         text=text,
                         clock_tick=clock_tick,
                     )
@@ -2229,6 +2243,7 @@ def reconcile_charged_sandbox_assets(
                     SandboxTickEvent(
                         kind="charge_exhausted",
                         source_label=_asset_key(asset),
+                        source_id=asset.uid,
                         text=_charge_event_text(asset, charge),
                         clock_tick=clock_tick,
                     )
@@ -2293,26 +2308,3 @@ def compose_sandbox_mob_journal(*, caller, ctx, fragments, **_kw):
     if not additions:
         return None
     return [*fragments, *additions]
-
-
-@on_journal(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
-    priority=Priority.LAST,
-)
-def render_sandbox_tick_journal(*, caller, ctx, **_kw):
-    """Render observable sandbox tick events to the journal."""
-    if not isinstance(caller, SandboxLocation):
-        return None
-    result = caller.locals.get("_sandbox_tick_result")
-    if not isinstance(result, SandboxTickResult):
-        return None
-    fragments = [
-        ContentFragment(content=event.text, source_id=caller.uid)
-        for event in result.events
-        if event.observable and event.text
-    ]
-    return fragments or None
-
-
-compose_sandbox_tick_journal = render_sandbox_tick_journal

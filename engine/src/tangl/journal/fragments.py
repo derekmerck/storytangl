@@ -38,7 +38,14 @@ class PresentationHints(BaseModel, extra="allow"):
 
 
 class ContentFragment(BaseFragment):
-    """Canonical content-bearing journal fragment."""
+    """Canonical content-bearing journal fragment.
+
+    ``source_id`` identifies the entity or edge that donated the content.
+    ``origin_id`` records the producer/provenance trail inherited from
+    :class:`BaseFragment`. Handlers that merely transport or defer fragments
+    should preserve both. Compositors that synthesize replacement prose may use
+    the composing cursor or source of the new composite instead.
+    """
 
     fragment_type: str | Enum = "content"
     content: Any = None

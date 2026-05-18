@@ -707,46 +707,41 @@ that observer's generic vocabulary to its own mechanics package and keep only
 the sandbox adapter here. The sandbox package should remain the dynamic-hub and
 scoped-time host, not the permanent home for every tick-compatible subsystem.
 
-#### Future RFC: Effect-Phase Content Injection
+#### Effect-Phase Content Injection
 
-The current tick implementation uses a small pragmatic bridge: update-time
-observers return `SandboxTickEvent`s, the sandbox time-advance helper gathers
-them into a result, and journal handlers render the observable events later in
-the same VM pass. Some first-pass adapters temporarily stash those renderable
-events on the active location's `locals`.
+Tick observers may produce journalable facts during UPDATE, before the JOURNAL
+phase has gathered normal node content. These facts must not be stored in
+location or scope `locals`: `locals` is persistent story state, while
+effect-phase journal material is ephemeral and belongs only to the current
+`follow_edge` pass.
 
-That is acceptable as scaffolding, but it is not the right long-term contract.
-`locals` is persistent story state. Phase-local render material is ephemeral and
-may contain objects that should not serialize, replay as state, or become
-visible to predicates as durable world truth.
-
-A cleaner general pattern would give UPDATE a receipt-like content side channel:
+The VM provides `PhaseCtx.injected_journal_fragments` as a receipt-like content
+side channel:
 
 ```text
 UPDATE
   -> selected-edge effects
   -> node/domain effects
-  -> observers append content candidates to ctx or update receipts
+  -> observers append concrete journal fragments to ctx.injected_journal_fragments
 JOURNAL
-  -> gather content candidates
+  -> drain injected fragments
+  -> gather normal node content
   -> enrich/order/filter candidates
   -> compose normal journal fragments
 ```
 
-Possible implementations:
+Sandbox charge warnings, charge exhaustion notes, and incremental-cycle notes
+use this path. Future mob movement notices, queue arrivals, hazards, and
+selected effect narration should use the same context field instead of
+inventing persistent stash keys.
 
-- add an explicit `injected_fragments` or `content_candidates` slot to the
-  runtime context for one `follow_edge` pass;
-- let update handlers return structured receipts that the frame carries into
-  JOURNAL;
-- define a small sandbox-local context wrapper while the pattern is being
-  proven, then promote the generic part once another mechanic needs it.
-
-This would match the existing journal-phase shape, where intermediate gathered
-content can live on the context until composition emits the phase result. It
-would also give charge warnings, incremental cycle notes, mob movement notices,
-queue arrivals, hazards, and selected effect narration one shared path into the
-journal without making each observer invent a persistent stash key.
+Injected fragments preserve the concept that donated the content. A lamp charge
+warning uses the lamp token as `source_id` and `origin_id`, and an
+incremental-cycle note uses the hosted game node as `source_id` and
+`origin_id`; they are not re-labeled as the active location merely because the
+location is the current cursor. Compositors may replace or synthesize fragments
+under a new source when they intentionally compose new prose, such as replacing
+suppressed location description with a darkness fragment.
 
 ### Projected State As Disclosure
 

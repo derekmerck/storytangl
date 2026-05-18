@@ -93,6 +93,7 @@ def null_ctx() -> SimpleNamespace:
     return SimpleNamespace(
         get_authorities=lambda: [],
         get_inline_behaviors=lambda: [],
+        injected_journal_fragments=[],
     )
 
 

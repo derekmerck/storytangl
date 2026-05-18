@@ -702,6 +702,7 @@ def test_adventure_lamp_charge_exhausts_during_sandbox_tick() -> None:
         for fragment in ledger.get_journal()
         if isinstance(fragment, ContentFragment)
     )
+    assert "_sandbox_tick_result" not in compiled.locations["building"].locals
 
 
 def test_charged_assets_keep_ticking_when_left_offscreen() -> None:

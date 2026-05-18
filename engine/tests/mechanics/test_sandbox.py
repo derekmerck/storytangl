@@ -919,8 +919,11 @@ def test_sandbox_can_host_incremental_allocation_and_tick_cycles() -> None:
     assert any(
         isinstance(fragment, ContentFragment)
         and fragment.content == "You assign a worker to forage."
+        and fragment.source_id == colony.uid
+        and fragment.origin_id == colony.uid
         for fragment in ledger.get_journal()
     )
+    assert "_sandbox_incremental_fragments" not in hub.locals
 
     do_provision(hub, ctx=PhaseCtx(graph=graph, cursor_id=hub.uid))
     cycle = next(
@@ -942,6 +945,7 @@ def test_sandbox_can_host_incremental_allocation_and_tick_cycles() -> None:
     ]
     assert "Cycle 1 resolves." in journal_text
     assert "Resources: food=2." in journal_text
+    assert "_sandbox_tick_result" not in hub.locals
 
 
 def test_sandbox_incremental_update_rejects_unsupported_move_kind() -> None:
@@ -1701,6 +1705,52 @@ def test_darkness_rule_substitutes_journal_and_suppresses_local_asset_actions() 
     ]
     assert content == ["It is now pitch dark."]
     assert _dynamic_sandbox_actions_with_tag(cave, "asset") == []
+
+
+def test_tick_fragments_do_not_replace_suppressed_location_description() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(
+        label="dark_cave",
+        location_name="Dark Cave",
+        content="A glittering nugget rests here.",
+    )
+    SandboxItemType(
+        label="lamp",
+        name="lamp",
+        switchable=SwitchableFacet(),
+        light_source=LightSourceFacet(),
+        charge=ChargeFacet(current=1, maximum=1),
+    )
+    lamp = Token[SandboxItemType](token_from="lamp", label="lamp", lit=True)
+    scope.player_assets.add_asset(lamp)
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(lamp)
+    scope.add_child(cave)
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+    wait = _dynamic_sandbox_actions_with_tag(cave, "wait")[0]
+    ledger = Ledger(graph=graph, cursor_id=cave.uid)
+    ledger.resolve_choice(wait.uid, choice_payload=wait.payload)
+
+    fragments = [
+        fragment
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert [fragment.content for fragment in fragments] == [
+        "The lamp flickers and goes out.",
+        "It is now pitch dark.",
+    ]
+    assert fragments[0].source_id == lamp.uid
+    assert fragments[0].origin_id == lamp.uid
+    assert fragments[1].source_id == cave.uid
 
 
 def test_carried_lamp_restores_dark_location_detail_and_asset_affordances() -> None:

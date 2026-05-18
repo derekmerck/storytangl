@@ -27,6 +27,7 @@ class VmPhaseCtx(DispatchCtx, Protocol):
     incoming_edge: Any | None
     selected_edge: Any | None
     selected_payload: Any
+    injected_journal_fragments: list[Any]
 
     @property
     def cursor(self) -> Any | None: ...

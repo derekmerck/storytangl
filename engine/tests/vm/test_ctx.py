@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tangl.core import Graph
 from tangl.core.ctx import CoreCtx
+from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
@@ -65,3 +66,16 @@ def test_phase_ctx_isolates_result_pipe_for_subdispatch() -> None:
         assert nested.results == ["inner"]
 
     assert ctx.results == ["outer"]
+
+
+def test_phase_ctx_derive_shares_injected_journal_fragments() -> None:
+    graph = Graph()
+    node = TraversableNode(label="n")
+    graph.add(node)
+    ctx = PhaseCtx(graph=graph, cursor_id=node.uid)
+    fragment = ContentFragment(content="fragment")
+
+    derived = ctx.derive()
+    derived.injected_journal_fragments.append(fragment)
+
+    assert ctx.injected_journal_fragments == [fragment]

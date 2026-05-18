@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any, Protocol
+from uuid import UUID
 
 from pydantic import Field
 
@@ -130,6 +131,7 @@ class SandboxTickEvent(BaseModelPlus):
 
     kind: str
     source_label: str = ""
+    source_id: UUID | None = None
     text: str | None = None
     observable: bool = True
     clock_tick: int | None = None
