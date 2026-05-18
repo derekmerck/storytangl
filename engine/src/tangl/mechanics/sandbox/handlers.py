@@ -632,11 +632,17 @@ def _inject_tick_fragments(
     location: SandboxLocation,
     result: SandboxTickResult,
 ) -> None:
-    ctx.injected_journal_fragments.extend(
-        ContentFragment(content=event.text, source_id=location.uid)
-        for event in result.events
-        if event.observable and event.text
-    )
+    for event in result.events:
+        if not event.observable or not event.text:
+            continue
+        source_id = event.source_id or location.uid
+        ctx.injected_journal_fragments.append(
+            ContentFragment(
+                content=event.text,
+                source_id=source_id,
+                origin_id=source_id,
+            )
+        )
 
 
 def _sandbox_time_advance(
@@ -2224,6 +2230,7 @@ def reconcile_charged_sandbox_assets(
                     SandboxTickEvent(
                         kind="charge_warning",
                         source_label=_asset_key(asset),
+                        source_id=asset.uid,
                         text=text,
                         clock_tick=clock_tick,
                     )
@@ -2236,6 +2243,7 @@ def reconcile_charged_sandbox_assets(
                     SandboxTickEvent(
                         kind="charge_exhausted",
                         source_label=_asset_key(asset),
+                        source_id=asset.uid,
                         text=_charge_event_text(asset, charge),
                         clock_tick=clock_tick,
                     )

@@ -735,6 +735,14 @@ use this path. Future mob movement notices, queue arrivals, hazards, and
 selected effect narration should use the same context field instead of
 inventing persistent stash keys.
 
+Injected fragments preserve the concept that donated the content. A lamp charge
+warning uses the lamp token as `source_id` and `origin_id`, and an
+incremental-cycle note uses the hosted game node as `source_id` and
+`origin_id`; they are not re-labeled as the active location merely because the
+location is the current cursor. Compositors may replace or synthesize fragments
+under a new source when they intentionally compose new prose, such as replacing
+suppressed location description with a darkness fragment.
+
 ### Projected State As Disclosure
 
 Sandbox projected state is an optional client convenience, not an authority

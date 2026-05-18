@@ -105,7 +105,15 @@ def _store_incremental_fragments(
     host: HasGame,
 ) -> None:
     fragments = _latest_fragments(host)
-    ctx.injected_journal_fragments.extend(fragments)
+    ctx.injected_journal_fragments.extend(
+        fragment.model_copy(
+            update={
+                "source_id": fragment.source_id or host.uid,
+                "origin_id": fragment.origin_id or host.uid,
+            }
+        )
+        for fragment in fragments
+    )
 
 
 @on_provision(
@@ -214,6 +222,7 @@ def reconcile_incremental_games_on_sandbox_tick(*, caller, ctx, clock_tick, **_k
                 SandboxTickEvent(
                     kind="incremental_cycle",
                     source_label=host.get_label(),
+                    source_id=host.uid,
                     text=fragment.content,
                     clock_tick=clock_tick,
                 )
