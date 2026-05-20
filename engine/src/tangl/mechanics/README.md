@@ -13,7 +13,9 @@ The top-level package organization stays broad and family-oriented:
 - `assembly`
 - `demographics`
 - `presence`
-- later: `sandbox`, `credentials`, other world- or plugin-provided families
+- `sandbox`
+- `simulation`
+- later: `credentials`, other world- or plugin-provided families
 
 Within each family, the preferred design lens is:
 
@@ -68,6 +70,10 @@ are using it systematically.
   ordinary `MenuBlock`, `Fanout`, `Action`, target availability, journal, ledger,
   and replay machinery rather than a separate traversal subsystem. See
   `sandbox/SANDBOX_DESIGN.md`.
+- **Simulation**: small operational-simulation kernels that attach through
+  ordinary mechanics and VM seams. The first proof is a deterministic queueing
+  model that uses a mutable core `Registry` as a future-event list, `HasGame`
+  for re-entrant actions, and normal journal fragments for observation.
 - **Credentials**: expected to compose game kernels, asset collections, render, and
   writeback rather than porting the legacy package wholesale.
 
