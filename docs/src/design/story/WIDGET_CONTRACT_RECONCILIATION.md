@@ -1,159 +1,298 @@
 # Widget Contract Reconciliation
 
-**Status:** working reconciliation pass for
-`STORYTANGL_WIDGET_VOCAB.md` v1.1 against this branch.
+**Status:** living document · updated alongside each spec / engine / UI release
+**Companion to:** `STORYTANGL_WIDGET_VOCAB.md` v1.3
+**Companion to:** `bundles/<name>/EXTENSIONS.md` (Tier P3 genre layers)
 
-The unified vocabulary is the preferred design target. This note keeps fixture
-work honest by separating four things that otherwise get blurred:
+This document tracks **implementation status** across the three layers
+named in spec §0.7:
 
-- what the engine currently models or decodes
-- what the web client currently renders
-- what the unified vocabulary wants to call the surface
-- what should enter the first conformance fixture suite
+| Layer | Document | Role |
+|---|---|---|
+| **L1 — UI Vocabulary** | `STORYTANGL_WIDGET_VOCAB.md` + `bundles/<name>/EXTENSIONS.md` | Target-truth. What data shapes the player-facing client needs. The spec evolves here; everything else chases. |
+| **L2 — API Transport** | `API_SPEC.md` (forthcoming; derived from this doc) | REST endpoints (and other wire transport) routing L1 needs to L3 capabilities. Optional layer — CLI ports skip it. |
+| **L3 — Engine Capabilities** | `ENGINE_CAPABILITIES.md` (forthcoming; derived from this doc) | Python callables that produce the data L1 wants. The current engine's actual surface. |
 
-Conformance fixtures should be generated from the "fixture status" column, not
-from the vocabulary tier labels alone. Proposal fixtures live separately under
-`engine/contrib/conformance/proposals/` and are not gating until this document
-promotes them.
+**The spec is target-truth.** This document is the honest reality
+check. The two are intentionally allowed to disagree during a
+settling phase — that's how the inversion (UI-led design, backend
+chases) works.
 
-## Naming Decisions
+---
 
-| Surface | Current branch | v1.1 target | Decision |
-| --- | --- | --- | --- |
-| UI piece / selectable item | Web fixtures and conformance fixtures use `piece`, `piece_id`, `piece_ids`. Engine typed decode support is still pending. | `piece`, `piece_id`, `piece_ids`. | `piece` is now the only UI target terminology. Do not add new `token` UI fixtures or payloads. |
-| Engine singleton token | `tangl.core.token.Token` names a local instance of a reference singleton. | Unchanged. | This is the reason to avoid `token` for UI pieces. |
-| Ordered kv rows | Engine `KvFragment.content` is still `OrderedTupleDict`; web fixtures use tuple-like arrays. | Record-shaped `KvRow` with optional semantic fields. | Treat record-shaped `KvRow` as a migration target, not current Tier S. |
-| Choice HTTP id | Web posts `choice_id` containing `ChoiceFragment.edge_id`; docs increasingly say `edge_id`. | `edge_id` in contract language. | Keep transport compatibility for now; prefer `edge_id` in new docs and fixtures where possible. |
-| Command feedback | Current fixture uses unknown `interpretation` fallback fields `outcome` and `command_text`. | Typed `interpretation` with `result` and `text`. | Do not make typed interpretation a Tier-S conformance requirement yet. |
-| `place` payloads | Not current in engine; web/Tk/reference clients can inspect proposal fixtures. | `accepts.kind="place"` with source and target zone refs. | Proposal fixture only until the engine emits a worked turn and a CLI commit path exists. |
-| Piece lifecycle | Current fixtures render `piece`; web/Tk/reference clients surface `realized=false` as an offer hint. | `PieceFragment.realized: bool` distinguishes offers from realized inventory/world objects. | Proposal fixture only; renderers may surface `offer` as an advisory tag. |
-| Roll outcomes | No typed engine fragment; web/Tk/reference clients can inspect/render proposal `roll` fragments. | `fragment_type="roll"` for auditable random/stat outcomes. | Proposal fixture only; reference port renders a text fallback summary. |
-| Presentation profiles | No typed engine model; older web world theming exists as ad hoc `ui_config`. | `WorldInfo`/presentation catalog plus envelope `metadata.presentation_context` refs. | Advisory design target; do not treat as gameplay state or imperative UI commands. |
+## How to read this doc
 
-`piece` replaced the older UI `token` term because it avoids the engine singleton conflict
-while staying general enough for cards, counters, documents, dice, actors, and
-board cells. `chip` is a viable renderer word, but it is too visual and too
-small-object-specific for the portable contract.
+Each surface in the spec gets a row in one of the §-numbered tables
+below. The four status columns per row:
 
-## Contract Reality Map
+| Column | What it tracks |
+|---|---|
+| **Spec tier (L1)** | `Tier S` / `Tier P1` / `Tier P2` / `Tier P3` per the vocab spec. The contract commitment. |
+| **Reference clients** | What `apps/web/` and the reference CLI/Tk ports ship today. Values: `done`, `partial`, `not_started`, `n/a`. |
+| **Engine backend (L3)** | What `engine/` ships today. Values: same as L2, plus `untyped` (works but with `dict[str, Any]` rather than typed Pydantic). |
+| **Plan** | One-line forward direction. Empty when the row is settled across columns. |
 
-| Surface | Engine status | Web status | v1.1 target | Fixture status |
-| --- | --- | --- | --- | --- |
-| `RuntimeEnvelope` | Current in `tangl.service.response`; includes `metadata`. | Current; `StoryFlow` consumes direct fragments. | Tier S. | Include. |
-| `ProjectedState` union | Current: `scalar`, `kv_list`, `item_list`, `table`, `badges`. | Current renderer exists; layout polish remains. | Tier S. | Include all value types. |
-| `content` | Current `ContentFragment`. | Rendered. | Tier S. | Include. |
-| `attributed` / `dialog` | Current `AttributedFragment` plus `DialogFragment`/group variants. | Rendered through dialog groups. | Tier S. | Include dialog with avatar/media binding. |
-| `media` | Current `MediaFragment`, including `content_format="rit"`. | Rendered; pending RIT placeholder exists. | Tier S. | Include pending and update-to-ready media. |
-| `group(scene)` | Current `GroupFragment`. | Scene shell is the primary flow unit. | Tier S. | Include. |
-| `group(dialog)` | Current via `group_type="dialog"` and `fragment_type="dialog"`. | Rendered. | Tier S. | Include. |
-| `group(overlay)` | Engine accepts arbitrary `group_type`, but no specific semantics. | No dedicated overlay treatment. | Vocab target. | Defer. |
-| `group(status_sidecar)` | Engine accepts arbitrary `group_type`, but no specific semantics. | No dedicated in-stream sidecar rail. | Vocab target. | Defer or mark visual-only until emitted. |
-| `kv` fragment | Current, but with `OrderedTupleDict` rather than record `KvRow`. | Rendered from tuple-like arrays. | Record `KvRow`. | Include current shape; add migration fixture later. |
-| `choice` available/locked | Current `ChoiceFragment`. | Rendered, disabled semantics covered. | Tier S. | Include. |
-| `accepts.kind="text"` | Current as dict payload metadata. | Rendered by `ChoiceInputView`. | Tier S/P1 typed target. | Include. |
-| `accepts.kind="quantity"` | Current as dict payload metadata. | Rendered by `ChoiceInputView`. | Tier S/P1 typed target. | Include. |
-| `accepts.kind="pieces"` | Current web/conformance pressure fixture; engine type is untyped dict and no dedicated piece fragment decoder exists. | Rendered with `group_type="zone"` and `fragment_type="piece"`. | `piece_ids`. | Include as the targetable-state pressure surface. |
-| `accepts.kind="raw_command"` | Current as reserved choice shape; backend resolution remains authoritative. | Rendered by `ChoiceInputView`; `metadata.grammar` is scene-local and advisory. | Tier P1/Tier S candidate. | Include web fixture; backend interpretation fixture can mature later. |
-| `control(update/delete)` | Current `ControlFragment`. | Applied to registry. | Tier S. | Include. |
-| `user_event` | Current `UserEventFragment`. | Rendered as status alert. | Tier S. | Include. |
-| `interpretation` | Not a typed engine fragment. Unknown fragments fallback in web. | Fallback-only. | Tier P1. | Defer typed assertions; fallback fixture is ok. |
-| `compose` | Not current. | Not rendered. | Tier P1. | Defer. |
-| `cost_previews` | Not current. | Not rendered. | Tier P1 plural preview list. | Defer until typed accepts settle. |
-| `predicate_ref` | Not current. | Not rendered. | Tier P2. | Defer. |
-| `piece` / `zone` typed surface | Not current in engine. | Web has `piece`/`zone` pressure widgets. | Tier P2 typed target. | Current pressure fixture; typed engine support remains target. |
-| `piece.realized` | Not current in engine. | Rendered as generic offer/availability tags. | Tier P2 lifecycle field. | Proposal fixture only. |
-| `accepts.kind="place"` | Not current. | Rendered as source-piece selection into a referenced target zone. | Tier P1/P3 pressure surface for equipment/placement. | Proposal fixture only. |
-| `roll` | Not current. | Rendered as a structured outcome row. | Tier P2 structured outcome fragment. | Proposal fixture only. |
-| `metadata.presentation_context` | Not current. | Not rendered. | Advisory profile refs and semantic tokens. | Document only until a world catalog shape exists. |
+A row is **settled** when all three implementation columns match the
+spec's tier commitment. A row with mismatched columns is in
+**negotiation** — that's fine; the doc just makes the gap visible.
 
-## First Fixture Suite
+**Sequence of work, per the inversion strategy.** UI vocabulary
+leads (commit the target shape in the spec), the reference UI
+catches up next (against fixtures, even with dummy data), then the
+engine + API expose capabilities that match. The CLI port skips L2
+entirely and consumes L3 directly via an in-process shim.
 
-The first conformance pass added JSON fixtures under
-`engine/contrib/conformance/fixtures/` for repo-current surfaces only:
+---
 
-- `crossroads_inn.json`: content, kv, available and locked choices, user event.
-- `dialog_with_avatar.json`: attributed dialog and avatar/dialog media binding.
-- `pending_media_update.json`: unresolved RIT media plus `update` to a ready
-  URL/data payload.
-- `projected_state_all_values.json`: one `ProjectedState` with scalar,
-  `kv_list`, `item_list`, `table`, and `badges`.
-- `quantity_payload.json`: `accepts.kind="quantity"` with min/max/unit.
-- `sandbox_payload.json`: text, quantity, current `pieces`/zone pressure
-  surface, and decision-legibility references.
-- `command_hints.json`: reserved `interpret_command`,
-  `accepts.kind="raw_command"`, and advisory `metadata.grammar`.
-- `control_delete.json`: delete removes a visible registry entry without
-  rendering the control fragment.
+## §A — Tier S surfaces (core contract)
 
-Do not include `compose`, typed `interpretation`, `cost_previews`,
-`predicate_ref`, `place`, `roll`, or `piece.realized` semantics in the gating
-suite yet. Those belong in proposal or migration fixtures until the engine
-emits them and the CLI reference port can commit the interaction.
+These are the surfaces v1.3 marks Tier S — committed as stable target
+contract. Most are already shipping in the reference UI and engine;
+the negotiation is mostly about typed-shape graduations.
 
-## Proposal Fixture Suite
+| Surface | Spec tier | Reference UI | Engine backend | Plan |
+|---|---|---|---|---|
+| `ContentFragment` shape | S | done | done | — |
+| `AttributedFragment` shape | S | done | done | — |
+| `MediaFragment` shape | S | done | done | — |
+| `GroupFragment` shape (`scene`, `dialog`, `overlay`, `status_sidecar`) | S | done | done | — |
+| `KvFragment` shape | S | partial (TS-typed) | untyped (engine emits `OrderedTupleDict`) | Tier P1 KvRow migration (see §B) |
+| `ChoiceFragment` shape (frame only) | S | done | done | — |
+| `ControlFragment` (`update` / `delete`) | S | done | done | — |
+| `UserEventFragment` | S | done | done | — |
+| `ProjectedState.sections` with five `value_type`s | S | done | done | — |
+| `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
+| Bundle customization / presentation profiles | S target | partial (docs + older world `ui_config`) | not_started | keep advisory; requires world-info catalog before conformance |
+| §5.1 Decision Legibility Contract | S | partial (no automated check) | n/a (contract; not a capability) | webapp conformance harness (see §E) |
+| §5.2 Time Parity Rule (visual ritual skip, media advance) | S | partial (skip available, not enforced) | n/a | webapp conformance harness |
+| §5.3 Input Parity Rule (drag fallback, hotkey numbers) | S | partial (positional hotkeys done; drag-fallback in carwars) | n/a | webapp conformance harness |
+| §0.2 CLI Floor Rule | S | n/a | n/a (gating rule on PRs) | wire into CI for Tier S graduations |
 
-Non-gating proposal fixtures live under
-`engine/contrib/conformance/proposals/`. They are JSON load and reference-port
-inspection targets, not conformance requirements.
+---
 
-- `record_kvrow.json`: record-shaped scene-bound `kv` rows with `max`, `unit`,
-  `hint`, and `emphasis`.
-- `piece_realization.json`: `piece.realized=true/false` as the replacement for
-  older offer-specific widget ideas.
-- `place_accepts.json`: `accepts.kind="place"` with source and target zones.
-- `roll_fragment.json`: `fragment_type="roll"` with dice inputs and explicit
-  outcome.
-- `carwars_garage_turn.json`: compact garage pressure turn combining slot
-  zones, catalog offers, `place`, `pieces`, and advisory drag/stat hints.
+## §B — Tier P1 surfaces (target for next engine epoch)
 
-These fixtures intentionally use `piece` and `piece_ids` only. There are no
-legacy clients outside this repository, so any remaining UI `token` vocabulary
-should be fixed in place when found rather than supported through adapters.
+These are committed target contract but require additive engine
+work. Each row should land as a single PR-shaped change with a
+backwards-compat shim.
 
-## Multi-Envelope Sequence Suite
+| Surface | Spec tier | Reference UI | Engine backend | Plan |
+|---|---|---|---|---|
+| Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` used; untyped accepts dict) | untyped (`dict[str, Any]`) | engine PR: typed `Accepts` discriminated union in `tangl/journal/intent.py` |
+| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done (kinds used; untyped) | untyped | same engine PR as above |
+| Typed `PlaceAccepts` (no `edge_ref`) | P1 | partial | untyped | same engine PR |
+| Typed `ComposeAccepts` | P1 | not_started | untyped | webapp PR for `compose` rendering; engine PR for typed shape |
+| Typed `UIHints` | P1 | partial (ad-hoc keys) | untyped | engine PR |
+| Typed `Blocker` (replaces dict blockers) | P1 | partial | untyped | engine PR |
+| Typed `InterpretationFragment` | P1 | partial (custom shape mid-cycle) | untyped | engine PR; webapp aligns on `result`/`text` field names |
+| `cost_previews: list[CostPreview]` (plural) | P1 | partial | not_started | engine PR; webapp follows |
+| `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
+| `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | partial (emits in some bundles, untyped) | engine PR: typed `InfoAffordance` model |
+| `InfoAffordance.query: dict | None` (opaque descriptor) | P1 | done | partial | engine PR: declare the field; bundles populate as needed |
+| `metadata.info_state: InfoState` typed | P1 | partial (nested type + fixture; refresh still unconditional) | not_started | engine PR: emit nested `info_state`; webapp can later use it for cache hints |
+| `/story/info` accepts `kind` + `query` params | P1 | done client-side | partial (basic endpoint exists; no query routing) | API + engine PR (see §D) |
+| HTTP body field `edge_id` (rename of `choice_id`) | P1 | uses `choice_id` | uses `choice_id` | engine + webapp PR with one-version deprecation shim |
+| §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
+| §1.6 Info channels graduation to Tier S | P1 | done | partial | gated on CLI reference port implementing the `?`/slash fallback |
 
-Sequence fixtures live under `engine/contrib/conformance/sequences/`. They
-exercise the fragment registry over time rather than a single turn snapshot.
+**Block on Tier P1 graduation to Tier S:** the CLI reference port
+(`engine/contrib/conformance/cli_reference_port.py`) must implement
+each surface before its row can promote. Until then they stay P1.
 
-- `garage_buy_mount.json`: starts with a pending media placeholder, a catalog
-  offer, an empty inventory zone, an empty slot zone, and an unknown fallback
-  fragment; then updates media to a ready URL, deletes the stale offer, adds a
-  realized piece, moves that piece into the slot, and deletes the fallback.
+---
 
-The sequence harness asserts the same invariants a thin client needs: update
-fragments preserve UID identity, delete fragments remove stale registry entries,
-piece movement updates both zone membership and piece state, and every open
-choice references state renderable in the current scene shell.
+## §C — Tier P2 surfaces (interactive surface vocabulary)
 
-## Webapp Remediation Backlog
+These are committed target contract but larger, and several depend
+on the §7.4 predicate-registration protocol (an explicit open
+question in the spec).
 
-These are the concrete migrations implied by the unified vocabulary:
+| Surface | Spec tier | Reference UI | Engine backend | Plan |
+|---|---|---|---|---|
+| `PieceFragment` (core shape) | P2 | partial (basic web widget + carwars wireframes) | partial (untyped equivalent) | engine PR: typed `PieceFragment` with required `hints.label_text` |
+| `PieceFragment.realized` + `cost` (offers) | P2 | done in carwars catalog fixtures | not_started | engine PR for typed lifecycle; bundle MVP needed for shop semantics |
+| `PieceFragment.owner` | P2 (proposal fixture) | not_started | not_started | wait for multi-cursor MVP |
+| `PieceFragment.position` | P2 (proposal fixture) | not_started | not_started | wait for grid/hex bundle MVP (Patchwork, Carcassonne) |
+| `PieceFragment.available` + `unavailable_reason` | P2 | done | not_started | engine PR with `PieceFragment` graduation |
+| `group_type="zone"` with `ZoneConstraints` | P2 | partial (basic web widget + carwars wireframes) | not_started | engine PR: typed `GroupFragment.constraints`; bundle MVP for capacity |
+| `ZoneLayoutHints` (orientation, fan, grid, hex, graph, floorplan) | P2 | partial (orientation/grid/fan) | not_started | engine PR; render-port catches up as needed |
+| `GraphLayout.edges` (first-class adjacencies with UIDs) | P2 (proposal fixture) | not_started | not_started | wait for network/route bundle MVP (Ticket-to-Ride-shaped) |
+| `PlaceAccepts.edge_ref` | P2 (proposal fixture) | not_started | not_started | wait for same MVP as above |
+| `RollFragment` (typed) | P2 | partial (basic rendering in carwars) | not_started | engine PR; CLI reference port renders outcome word + narrative |
+| `RitualHints` (skip_label, auto_skip_after_seen, allow_replay, duration_ms) | P2 | partial | not_started | engine PR with `RollFragment` graduation |
+| `predicate_ref` registration protocol | §7.4 OPEN | n/a | n/a | **highest-leverage open question**; awaiting MVP author |
+| `visibility="hidden" \| "owner_only" \| "public"` | P2 | partial | not_started | engine PR — single-cursor today, audience-list extension when multi-cursor lands |
+| `visibility: list[ParticipantId]` (audience lists) | P2 (proposal fixture) | not_started | not_started | wait for team-game MVP |
 
-1. Add typed engine fragments or decode support for the `piece`/zone surface.
-   UI fixtures and payloads already use `piece`/`piece_ids`; backend model
-   support should follow that vocabulary directly.
-2. Replace tuple-like kv payloads with record-shaped `KvRow` in engine
-   `KvFragment`, projected state, fixtures, and web rendering.
-3. Add a typed `InterpretationFragment` with `result` and `text`, while keeping
-   unknown-fragment fallback for older payloads.
-4. Decide whether `/story/do` keeps `choice_id` as the transport field or
-   migrates to `edge_id`; document any compatibility adapter explicitly.
-5. Add typed `place` accepts and a CLI commit path before web/Tk placement
-   widgets.
-6. Add typed `RollFragment` support once at least one engine-side stat/random
-   outcome emits it.
-7. Implement `overlay` and `status_sidecar` only when the engine emits worked
-   examples.
-8. Add more sequence fixtures as soon as a feature depends on cross-envelope
-   registry behavior rather than single-turn rendering.
-9. Build or update the CLI reference port before graduating any P1/P2 widget
-   into Tier S.
+---
 
-## Wireframe Guidance
+## §D — API transport (Layer 2)
 
-Use this reconciliation table before commissioning new wireframes. A Tier-S-only
-wireframe should include only the fixture-current surfaces above, and should
-annotate every rendered widget with a back-reference to
-`STORYTANGL_WIDGET_VOCAB.md`. A separate proposal wireframe may use
-`carwars_garage_turn.json`, but it should be labeled P1/P2/P3 exploration and
-not compared against current web conformance.
+The API surface is intentionally underspecified at the contract
+level — the spec commits to the data shapes (L1), and the API
+chooses how to route them. This table is what the engine team
+implements.
+
+| Endpoint | Method | Spec target | Current engine | Plan |
+|---|---|---|---|---|
+| `/story/do` | POST | accepts `ChoiceRequest{edge_id, payload}`; returns `RuntimeEnvelope` | accepts `{choice_id, payload}`; untyped response | rename body field; type response; ship deprecation shim |
+| `/story/update` | GET | returns `RuntimeEnvelope` typed | partial | type response |
+| `/story/info` | GET | accepts `kind?` and `query?` params (JSON-encoded descriptor); returns `ProjectedState` | basic endpoint exists | add `query` param routing; document descriptor semantics |
+| `/system/info` | GET | public; rate-limited | done | — |
+| `/auth/whoami` | GET | returns current `Principal` | not_started | see auth thread |
+| `/auth/keys` (CRUD) | various | API key lifecycle | not_started | see auth thread |
+| `/auth/revoke` | POST | revoke a key | not_started | see auth thread |
+
+**CLI port and L2.** The CLI port does not call any of these
+endpoints. It consumes `engine/`'s Python surface directly via an
+in-process shim — typically a thin wrapper around
+`ServiceManager.do_action()` / `get_envelope()` / `get_projected_state()`.
+The L2 column is therefore not blocking for CLI conformance.
+
+---
+
+## §E — Conformance harness
+
+These tests verify spec contracts against the reference
+implementations. They serve as the gating mechanism for tier
+graduations and as the regression suite for cross-port parity.
+
+| Harness | What it checks | Status | Plan |
+|---|---|---|---|
+| `engine/contrib/conformance/cli_reference_port.py` | Tier S CLI rendering for every fragment / value_type | partial (Tier S widgets only) | extend coverage as Tier P1 → S graduations happen |
+| `engine/contrib/conformance/legibility.py` | §5.1 — referenced UIDs are rendered | not_started | first conformance harness to write |
+| `engine/contrib/conformance/parity.py` | §5.2 time parity, §5.3 input parity | not_started | second harness |
+| `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
+| `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S fixtures only) | add P1 proposal fixtures: `place_on_edge.json`, `multi_cursor_visibility.json`, `roll_outcomes.json` |
+| webapp Vitest conformance suite | webapp DOM matches expected for each fixture | not_started | written from fixtures; webapp regression mechanism |
+
+---
+
+## §F — Recent reconciliation events
+
+A short log of what changed across recent spec / UI / engine releases.
+Each entry names which layer moved and what the consequence is for the
+others.
+
+### 2026-05 — spec v1.3 (L1 update only)
+
+- Reverted `accepts.kind="select"` rename → `pieces`. **Impact:** L2/L3
+  may continue using `pieces`; no migration needed.
+- Demoted §1.5 cursors and §1.6 info channels to Tier P1. **Impact:**
+  none on L2/L3 directly; clarifies that current single-cursor behavior
+  is settled, multi-cursor is target.
+- Replaced `GET /story/info/{kind}` with query-descriptor model.
+  **Impact:** L2 evolves the `/story/info` endpoint; no L1 break since
+  the v1.2 URL form was never shipped.
+- Added §0.7 three-layer architecture. **Impact:** this document
+  exists.
+- EXTENSIONS.md swept `tokens → pieces`. **Impact:** carwars Tier P3
+  conventions now consistent with main spec.
+
+### 2026-05 — webapp v1.3 reference UI update
+
+- Reference webapp uses `accepts.kind="pieces"` throughout (15+ call
+  sites).
+- Reference webapp implements `InfoAffordance.query` as an opaque JSON
+  descriptor on `/story/info?kind=...&query=...`.
+- Reference webapp accepts nested `metadata.info_state`, but still refreshes
+  `/story/info` on every story update until backend dirty-kind support lands.
+- Reference webapp ships `place` accepts kind without `edge_ref`
+  (proposal fixture not yet exercised).
+
+### 2026-05 — engine current (L3 baseline)
+
+- Engine emits `dict[str, Any]` for accepts, ui_hints, blockers
+  (untyped baseline).
+- Engine HTTP body uses `choice_id` (pre-rename).
+- Engine `KvFragment.content` is `OrderedTupleDict` (pre-KvRow
+  migration).
+- Engine has no `/story/info/{kind}` (consistent with v1.3 spec).
+
+---
+
+## §G — How to use this doc
+
+- **Spec authors.** When you commit a vocabulary change, update the
+  appropriate row's "Spec tier" column and add a one-paragraph entry
+  to §F. The implementation columns lag deliberately.
+- **Reference UI authors.** When the webapp implements a surface,
+  update the "Reference UI" column to `done` or `partial`. If you're
+  implementing against a fixture (not against a live engine), use
+  `partial` and note the fixture in the Plan column.
+- **Engine authors.** When the engine ships a typed shape or endpoint,
+  update the "Engine backend" column. If you're shipping the engine
+  capability but not the API endpoint, that's still progress — the
+  capabilities table in `ENGINE_CAPABILITIES.md` (forthcoming) tracks
+  Python surface separately.
+- **CLI port authors.** Watch §A and §B; you don't care about §D.
+  Your conformance is against `cli_reference_port.py` and the §E
+  harness.
+
+A row becomes a candidate for the §F log when any column moves.
+A surface becomes a candidate for Tier S graduation when all three
+implementation columns read `done` and the CLI reference port
+renders it.
+
+---
+
+## §H — Forward-looking sequence
+
+This is the **inversion plan** the project committed to: UI leads,
+API + engine chase. Each step's deliverable is a single PR-shaped
+change to the named layer.
+
+**Phase 1 — Stabilize spec (current).**
+
+- ✅ Spec v1.3 with the six v1.2.1 patches.
+- ✅ EXTENSIONS.md swept to `pieces`.
+- ✅ This reconciliation doc as the three-layer spine.
+
+**Phase 2 — Reference UI catches up.** Wireframes and webapp align
+to v1.3.
+
+- Wireframes resync: v1.3 bundle is archived under
+  `docs/src/design/story/wireframes/v1_3/`; keep future wireframes labeled
+  by tier and avoid treating P2/P3 sketches as reference-client status.
+- Webapp PR sequence:
+  1. Typed Accepts model in TS, generated from a planned Pydantic
+     source. Fall back to dict for untyped engine output.
+  2. KvRow flat shape in TS, with bar / fraction / delta / styled
+     subtypes via intersection narrowing.
+  3. `compose` accepts rendering as nested ChoiceInputView.
+  4. `InterpretationFragment` renderer with the spec's `result` /
+     `text` field names.
+  5. `metadata.info_state` behavior pass: use nested `dirty_kinds` /
+     `available_kinds` as cache hints once the backend emits them.
+  6. Keep `info_affordances` opaque; clients pass `query` descriptors through
+     rather than parsing bundle-specific fields.
+
+**Phase 3 — Engine + API catch up.** Backend declares capabilities,
+API maps them.
+
+- Engine PR sequence:
+  1. Typed `Accepts` / `UIHints` / `Blocker` discriminated unions in
+     `tangl/journal/intent.py`. Coercion shim accepts old free-form
+     dicts; emit `DeprecationWarning`.
+  2. Unified `KvRow` shape: `KvFragment.content` → `list[KvRow]`,
+     `ProjectedKVItem` → `KvRow`. Migrate `OrderedTupleDict`.
+  3. Typed `InterpretationFragment` with `result` / `text` fields.
+  4. Typed `metadata.grammar` and `metadata.info_affordances`.
+  5. HTTP API: rename `choice_id` → `edge_id` with deprecation; type
+     responses on `/story/do` / `/story/update`; add `query` param
+     routing on `/story/info`.
+  6. Conformance harness: write `legibility.py`, `parity.py`, extend
+     `cli_reference_port.py` for new Tier P1 surfaces.
+
+**Phase 4 — Tier P1 → S graduation.** Surfaces in §B promote one
+at a time, gated on the CLI reference port and the conformance
+harness having coverage for each.
+
+**Phase 5 — Tier P2 surfaces gate on bundle MVPs.** Each Tier P2
+surface (multi-cursor, pieces with position, edge_ref, predicate
+registration) waits for a real bundle author who needs it. We do
+not pre-build these.
+
+---
+
+*End of v0.1.*

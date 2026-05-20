@@ -1,24 +1,64 @@
-import type { InfoAffordance, ProjectedState } from '@/types'
+import type { InfoAffordance, InfoState, ProjectedState } from '@/types'
 
 export const sandboxInfoAffordances: InfoAffordance[] = [
+  {
+    kind: 'world_time',
+    label: 'Watch',
+    shortcuts: ['t', 'time'],
+    query: { kinds: ['world_time'] },
+  },
+  {
+    kind: 'presence',
+    label: 'Here',
+    shortcuts: ['h', 'look'],
+    query: { kinds: ['location', 'presence'] },
+  },
+  {
+    kind: 'inventory',
+    label: 'Carrying',
+    shortcuts: ['i', 'inv'],
+    query: { kinds: ['inventory'] },
+  },
   {
     kind: 'map',
     label: 'Map',
     shortcuts: ['m', 'map'],
-    query: { type: 'map', format: 'tiles' },
+    query: { type: 'map', format: 'graph' },
   },
   {
-    kind: 'inventory',
-    label: 'Inventory',
-    shortcuts: ['i'],
+    kind: 'agenda',
+    label: 'Schedule',
+    shortcuts: ['a'],
+    query: { kinds: ['agenda'] },
   },
   {
-    kind: 'party',
-    label: 'Party',
-    shortcuts: ['p'],
-    query: { kinds: ['party', 'followers'] },
+    kind: 'objectives',
+    label: 'Objectives',
+    shortcuts: ['o'],
+    query: { kinds: ['objectives'] },
+  },
+  {
+    kind: 'help',
+    label: 'Help',
+    shortcuts: ['?'],
+    query: null,
   },
 ]
+
+export const sandboxInfoState: InfoState = {
+  version: 17,
+  dirty_kinds: ['location', 'inventory', 'agenda'],
+  available_kinds: [
+    'status',
+    'inventory',
+    'map',
+    'world_time',
+    'agenda',
+    'presence',
+    'objectives',
+    'help',
+  ],
+}
 
 export const sandboxProjectedState: ProjectedState = {
   sections: [

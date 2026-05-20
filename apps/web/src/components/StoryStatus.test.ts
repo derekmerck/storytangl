@@ -6,7 +6,7 @@ import * as directives from 'vuetify/directives'
 
 import StoryStatus from './StoryStatus.vue'
 import { HttpResponse, http, server } from '@tests/setup'
-import { sandboxInfoAffordances, sandboxProjectedState } from '@tests/fixtures'
+import { sandboxInfoAffordances, sandboxInfoState, sandboxProjectedState } from '@tests/fixtures'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
@@ -84,17 +84,29 @@ describe('StoryStatus', () => {
     expect(wrapper.find('[data-testid="info-affordance-bar"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Status')
     expect(wrapper.text()).toContain('Map')
-    expect(wrapper.text()).toContain('Inventory')
-    expect(wrapper.text()).toContain('Party')
+    expect(wrapper.text()).toContain('Carrying')
+    expect(wrapper.text()).toContain('Help')
     expect(wrapper.text()).toContain('m')
     expect(wrapper.text()).toContain('i')
   })
 
-  it('loads the selected info affordance through story-info query params', async () => {
-    const seenSearches: string[] = []
+  it('treats info_state available kinds as advisory affordance visibility', async () => {
+    const wrapper = mountStatus({
+      infoAffordances: sandboxInfoAffordances,
+      infoState: { ...sandboxInfoState, available_kinds: ['map', 'help'] },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-info-kind="map"]').exists()).toBe(true)
+    expect(wrapper.find('[data-info-kind="help"]').exists()).toBe(true)
+    expect(wrapper.find('[data-info-kind="inventory"]').exists()).toBe(false)
+  })
+
+  it('loads the selected info affordance through an opaque story-info query descriptor', async () => {
+    const seenParams: URLSearchParams[] = []
     server.use(
       http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
-        seenSearches.push(new URL(request.url).search)
+        seenParams.push(new URL(request.url).searchParams)
         return HttpResponse.json(sandboxProjectedState)
       }),
     )
@@ -107,16 +119,19 @@ describe('StoryStatus', () => {
     await mapButton.trigger('click')
     await flushPromises()
 
-    expect(seenSearches[0]).toBe('')
-    expect(seenSearches.some((search) => search.includes('type=map'))).toBe(true)
-    expect(seenSearches.some((search) => search.includes('format=tiles'))).toBe(true)
+    expect(seenParams.at(0)?.toString()).toBe('')
+    const mapParams = seenParams.find((params) => params.get('kind') === 'map')
+    expect(mapParams).toBeDefined()
+    expect(mapParams?.get('type')).toBeNull()
+    expect(mapParams?.get('format')).toBeNull()
+    expect(JSON.parse(mapParams?.get('query') ?? '{}')).toEqual({ type: 'map', format: 'graph' })
   })
 
-  it('uses the affordance kind as a fallback story-info type', async () => {
-    const seenSearches: string[] = []
+  it('sends null-query affordances by kind only', async () => {
+    const seenParams: URLSearchParams[] = []
     server.use(
       http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
-        seenSearches.push(new URL(request.url).search)
+        seenParams.push(new URL(request.url).searchParams)
         return HttpResponse.json(sandboxProjectedState)
       }),
     )
@@ -124,10 +139,12 @@ describe('StoryStatus', () => {
     const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
     await flushPromises()
 
-    await wrapper.find('[data-info-kind="inventory"]').trigger('click')
+    await wrapper.find('[data-info-kind="help"]').trigger('click')
     await flushPromises()
 
-    expect(seenSearches.some((search) => search.includes('type=inventory'))).toBe(true)
+    const helpParams = seenParams.find((params) => params.get('kind') === 'help')
+    expect(helpParams).toBeDefined()
+    expect(helpParams?.has('query')).toBe(false)
   })
 
   it('refreshes the projected status when the story update key changes', async () => {

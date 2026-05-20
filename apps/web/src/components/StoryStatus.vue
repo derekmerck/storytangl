@@ -7,6 +7,7 @@ import type {
   ItemListValue,
   KvListValue,
   InfoAffordance,
+  InfoState,
   PrimitiveValue,
   ProjectedSection,
   StoryStatus as StoryStatusPayload,
@@ -30,6 +31,7 @@ const { $http } = useGlobal()
 const props = defineProps<{
   refreshKey?: string | number
   infoAffordances?: InfoAffordance[]
+  infoState?: InfoState | null
 }>()
 
 const statusSections = ref<StatusSection[]>([])
@@ -100,45 +102,32 @@ const normalizeStatusPayload = (payload: StoryStatusPayload | null | undefined):
   return payload.sections.map(normalizeSection)
 }
 
-type QueryParamValue = string | number | boolean | Array<string | number | boolean>
-type QueryParams = Record<string, QueryParamValue>
-
-const isQueryParamValue = (value: unknown): value is QueryParamValue => {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return true
-  }
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (item) => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean',
-    )
-  )
-}
+type QueryParams = Record<string, string>
 
 const affordanceLabel = (affordance: InfoAffordance): string =>
   affordance.label ?? affordance.kind.replace(/_/g, ' ')
 
+const visibleAffordances = computed(() => {
+  const affordances = props.infoAffordances ?? []
+  const availableKinds = props.infoState?.available_kinds
+  if (!availableKinds?.length) {
+    return affordances
+  }
+  const available = new Set(availableKinds)
+  return affordances.filter((affordance) => available.has(affordance.kind))
+})
+
 const activeAffordance = computed(() =>
-  props.infoAffordances?.find((affordance) => affordance.kind === activeAffordanceKind.value),
+  visibleAffordances.value.find((affordance) => affordance.kind === activeAffordanceKind.value),
 )
 
 const infoQueryParams = (affordance: InfoAffordance | undefined): QueryParams | undefined => {
   if (!affordance) {
     return undefined
   }
-  const params: QueryParams = {}
+  const params: QueryParams = { kind: affordance.kind }
   if (affordance.query) {
-    for (const [key, value] of Object.entries(affordance.query)) {
-      if (key && isQueryParamValue(value)) {
-        params[key] = value
-      }
-    }
-  }
-  if (!('type' in params) && !('kind' in params) && !('kinds' in params)) {
-    params.type = affordance.kind
-  }
-  if (affordance.format && !('format' in params)) {
-    params.format = affordance.format
+    params.query = JSON.stringify(affordance.query)
   }
   return params
 }
@@ -161,7 +150,7 @@ const loadStatus = async (affordance: InfoAffordance | undefined = activeAfforda
 }
 
 const hasSections = computed(() => statusSections.value.length > 0)
-const hasAffordances = computed(() => Boolean(props.infoAffordances?.length))
+const hasAffordances = computed(() => visibleAffordances.value.length > 0)
 
 const sectionClass = (section: StatusSection): Record<string, boolean> => {
   const kind = section.kind ?? section.sectionId
@@ -182,11 +171,11 @@ watch(
 )
 
 watch(
-  () => props.infoAffordances,
+  visibleAffordances,
   (affordances) => {
     if (
       activeAffordanceKind.value &&
-      !affordances?.some((affordance) => affordance.kind === activeAffordanceKind.value)
+      !affordances.some((affordance) => affordance.kind === activeAffordanceKind.value)
     ) {
       activeAffordanceKind.value = null
       void loadStatus(undefined)
@@ -219,7 +208,7 @@ const selectAffordance = (affordance: InfoAffordance | undefined) => {
         Status
       </v-btn>
       <v-btn
-        v-for="affordance in infoAffordances"
+        v-for="affordance in visibleAffordances"
         :key="affordance.kind"
         class="info-affordance"
         size="x-small"

@@ -7,7 +7,7 @@ import { setActivePinia, createPinia } from 'pinia'
 
 import App from '@/App.vue'
 import { HttpResponse, http, server } from '@tests/setup'
-import { crossroadsRuntimeEnvelope, sandboxInfoAffordances } from '@tests/fixtures'
+import { crossroadsRuntimeEnvelope, sandboxInfoAffordances, sandboxInfoState } from '@tests/fixtures'
 
 const vuetify = createVuetify({ components, directives })
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
@@ -81,6 +81,7 @@ describe('App.vue', () => {
           metadata: {
             ...crossroadsRuntimeEnvelope.metadata,
             info_affordances: sandboxInfoAffordances,
+            info_state: sandboxInfoState,
           },
         }),
       ),
@@ -91,7 +92,7 @@ describe('App.vue', () => {
 
     const drawer = wrapper.find('.v-navigation-drawer')
     expect(drawer.text()).toContain('Map')
-    expect(drawer.text()).toContain('Inventory')
-    expect(drawer.text()).toContain('Party')
+    expect(drawer.text()).toContain('Carrying')
+    expect(drawer.text()).toContain('Help')
   })
 })

@@ -244,8 +244,12 @@ export interface InfoAffordance {
   label?: string | null
   shortcuts?: string[]
   query?: Record<string, unknown> | null
-  format?: string | null
-  availability?: string | null
+}
+
+export interface InfoState {
+  version?: number | null
+  dirty_kinds?: string[]
+  available_kinds?: string[]
 }
 
 export type JournalEntry = JournalStoryUpdate[]
