@@ -13,7 +13,7 @@ from tangl.core.bases import BaseModelPlus, HasOrder
 class SimulationEvent(HasOrder, Entity):
     """Exact future event ordered by normalized turn and insertion sequence."""
 
-    at_turn: int
+    at_turn: int = Field(ge=0)
     kind: str
     target: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)

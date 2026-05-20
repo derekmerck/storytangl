@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import Field
 
 from tangl.core import Graph
@@ -79,12 +80,8 @@ def test_advance_world_turn_to_advances_and_rejects_backwards() -> None:
     assert source.locals["world_turn"] == 5
     assert advance_world_turn_to(source, 5) == 0
 
-    try:
+    with pytest.raises(ValueError, match="target_turn"):
         advance_world_turn_to(source, 4)
-    except ValueError as exc:
-        assert "target_turn" in str(exc)
-    else:
-        raise AssertionError("backward clock jumps should fail")
 
 
 def test_event_calendar_peeks_and_pops_by_turn_then_sequence() -> None:
@@ -118,6 +115,37 @@ def test_queueing_run_processes_events_in_order_and_completes_patients() -> None
         "imaging": 0.8,
         "disposition": 0.32,
     }
+
+
+def test_queueing_empty_run_can_complete() -> None:
+    game = QueueSimulation(
+        station_specs={"triage": QueueStationSpec()},
+        entry_station="triage",
+    )
+    handler = QueueSimulationHandler()
+    handler.setup(game)
+
+    assert [move.kind for move in handler.get_available_moves(game)] == ["run_until_complete"]
+
+    handler.receive_move(game, QueueMove("run_until_complete"))
+
+    assert game.metrics is not None
+    assert game.metrics.completed_count == 0
+    assert game.metrics.completed_turn == 0
+
+
+def test_queueing_rejects_non_terminating_topology() -> None:
+    game = QueueSimulation(
+        patient_arrivals={"P1": 0},
+        station_specs={
+            "triage": QueueStationSpec(next_station="imaging"),
+            "imaging": QueueStationSpec(next_station="triage"),
+        },
+        entry_station="triage",
+    )
+
+    with pytest.raises(ValueError, match="cycle"):
+        QueueSimulationHandler().setup(game)
 
 
 def test_queueing_capacity_and_fifo_order_are_respected() -> None:

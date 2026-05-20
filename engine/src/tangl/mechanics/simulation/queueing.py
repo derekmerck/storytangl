@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from statistics import mean
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import Field
 
@@ -27,8 +27,8 @@ class QueueMove:
 class QueueStationSpec(BaseModelPlus):
     """Static service-station configuration."""
 
-    capacity: int = 1
-    service_turns: int = 1
+    capacity: int = Field(default=1, ge=1)
+    service_turns: int = Field(default=1, ge=1)
     next_station: str | None = None
 
 
@@ -36,7 +36,7 @@ class QueuePatient(BaseModelPlus):
     """One job moving through the queueing network."""
 
     label: str
-    arrival_turn: int
+    arrival_turn: int = Field(ge=0)
     current_station: str | None = None
     completed: bool = False
     completion_turn: int | None = None
@@ -60,8 +60,8 @@ class QueueStationState(BaseModelPlus):
     """Mutable service-station state."""
 
     label: str
-    capacity: int = 1
-    service_turns: int = 1
+    capacity: int = Field(default=1, ge=1)
+    service_turns: int = Field(default=1, ge=1)
     next_station: str | None = None
     queue: list[str] = Field(default_factory=list)
     in_service: list[str] = Field(default_factory=list)
@@ -101,7 +101,8 @@ class QueueSimulation(Game[QueueMove]):
     patient_arrivals: dict[str, int] = Field(default_factory=dict)
     station_specs: dict[str, QueueStationSpec] = Field(default_factory=dict)
     entry_station: str = "triage"
-    projection_mode: str = "log"
+    projection_mode: Literal["log", "narrative"] = "log"
+    max_run_events: int = Field(default=10_000, ge=1)
 
     locals: dict[str, Any] = Field(
         default_factory=dict,
@@ -156,6 +157,7 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
     game_cls: ClassVar[type[Game]] = QueueSimulation
 
     def on_setup(self, game: QueueSimulation) -> None:
+        self._validate_config(game)
         game.locals["world_turn"] = 0
         game.calendar = EventCalendar()
         game.patients = {
@@ -192,7 +194,7 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
         if game.metrics is not None:
             return []
         if game.calendar.is_empty():
-            return []
+            return [QueueMove("run_until_complete")]
         return [QueueMove("run_next"), QueueMove("run_until_complete")]
 
     def get_move_label(self, game: QueueSimulation, move: QueueMove) -> str:
@@ -212,8 +214,15 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
             latest = self.run_next_event(game)
         elif player_move.kind == "run_until_complete":
             latest = []
+            processed = 0
             while not game.calendar.is_empty():
+                if processed >= game.max_run_events:
+                    raise RuntimeError(
+                        "run_until_complete exceeded max_run_events; "
+                        "check queue topology for non-terminating routes"
+                    )
                 latest.extend(self.run_next_event(game))
+                processed += 1
         else:
             raise ValueError(f"Unsupported queueing move: {player_move.kind!r}")
 
@@ -224,6 +233,28 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
 
         game.latest_trace = latest
         return RoundResult.WIN if game.metrics is not None else RoundResult.CONTINUE
+
+    def _validate_config(self, game: QueueSimulation) -> None:
+        if game.entry_station not in game.station_specs:
+            raise ValueError(
+                f"entry_station must reference a known station: {game.entry_station!r}"
+            )
+        for label, arrival_turn in game.patient_arrivals.items():
+            if arrival_turn < 0:
+                raise ValueError(f"patient {label!r} arrival_turn must be non-negative")
+        for label, spec in game.station_specs.items():
+            if spec.next_station is not None and spec.next_station not in game.station_specs:
+                raise ValueError(
+                    f"station {label!r} next_station is unknown: {spec.next_station!r}"
+                )
+
+        seen: set[str] = set()
+        current: str | None = game.entry_station
+        while current is not None:
+            if current in seen:
+                raise ValueError(f"station topology contains a cycle at {current!r}")
+            seen.add(current)
+            current = game.station_specs[current].next_station
 
     def evaluate(self, game: QueueSimulation) -> GameResult:
         if game.metrics is not None:
@@ -310,7 +341,9 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
         event: SimulationEvent,
         latest: list[QueueTraceEvent],
     ) -> None:
-        patient = game.patients[event.target or ""]
+        if event.target is None:
+            raise ValueError("arrival event requires a target patient")
+        patient = game.patients[event.target]
         self._enqueue(game, patient, game.entry_station, latest, arrival=True)
         self._try_start_service(game, game.entry_station, latest)
 
@@ -320,8 +353,11 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
         event: SimulationEvent,
         latest: list[QueueTraceEvent],
     ) -> None:
-        patient = game.patients[str(event.payload["patient"])]
-        station_label = str(event.payload["station"])
+        patient_label = event.payload["patient"]
+        station_label = event.payload["station"]
+        if not isinstance(patient_label, str) or not isinstance(station_label, str):
+            raise TypeError("service_complete event payload requires patient and station labels")
+        patient = game.patients[patient_label]
         station = game.stations[station_label]
         station.in_service.remove(patient.label)
         station.completed_count += 1

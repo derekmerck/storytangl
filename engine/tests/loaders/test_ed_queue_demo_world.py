@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tangl.core import Selector
+from tangl.journal.fragments import ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.service.world_registry import WorldRegistry
@@ -60,8 +61,9 @@ class TestEdQueueDemoWorld:
 
         assert ledger.cursor.label == "summary"
         content = " ".join(
-            getattr(fragment, "content", "")
+            fragment.content
             for fragment in ledger.get_journal()
+            if isinstance(fragment, ContentFragment)
         )
         assert "mean_los=14.0" in content
         assert "bottleneck=imaging" in content
