@@ -1,0 +1,36 @@
+label: ed_queue_demo
+
+metadata:
+  title: "ED Queue Demo"
+  description: "A deterministic queueing simulation proof."
+  start_at: ed_queue.entrance
+
+scenes:
+  ed_queue:
+    title: "ED Queue Demo"
+    blocks:
+      entrance:
+        content: |
+          The department is quiet enough to study: four arrivals, three
+          stations, one obvious bottleneck waiting to reveal itself.
+        actions:
+          - text: "Open the event list"
+            successor: simulation
+
+      simulation:
+        kind: "ed_queue_demo.domain.EdQueueBlock"
+        content: |
+          The board is ready. Triage, imaging, and disposition will run from
+          the same deterministic future-event list.
+        continues:
+          - successor: summary
+            trigger: last
+            predicate: game_won
+
+      summary:
+        content: |
+          The trace is complete. The journal has already shown the run; the
+          ledger can now be mined for the queueing metrics.
+        actions:
+          - text: "Run it again"
+            successor: entrance

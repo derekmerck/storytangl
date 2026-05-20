@@ -174,3 +174,21 @@ def advance_world_turn(source: HasMutableLocals, delta: int = 1) -> int:
     next_turn = int(locals_.get("world_turn", 0)) + delta
     locals_["world_turn"] = next_turn
     return next_turn
+
+
+def advance_world_turn_to(source: HasMutableLocals, target_turn: int) -> int:
+    """Advance ``source.locals['world_turn']`` to ``target_turn``.
+
+    Returns the elapsed normalized turns. Backward jumps are rejected; callers
+    that need rollback or replay should express that through VM history rather
+    than mutating the clock in reverse.
+    """
+    locals_ = source.locals
+    if not isinstance(locals_, dict):
+        raise TypeError("source must expose a mutable locals dict")
+    current_turn = int(locals_.get("world_turn", 0))
+    if target_turn < current_turn:
+        raise ValueError("target_turn must not be earlier than current world_turn")
+    elapsed = target_turn - current_turn
+    advance_world_turn(source, elapsed)
+    return elapsed

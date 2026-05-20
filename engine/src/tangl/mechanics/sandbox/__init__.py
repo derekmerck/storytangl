@@ -73,6 +73,7 @@ from .time import (
     TimePolicy,
     WorldTime,
     advance_world_turn,
+    advance_world_turn_to,
     current_world_time,
     get_world_turn,
 )
@@ -132,6 +133,7 @@ __all__ = [
     "TimePolicy",
     "advance_sandbox_time_on_action",
     "advance_world_turn",
+    "advance_world_turn_to",
     "compose_sandbox_mob_journal",
     "compose_sandbox_visibility_journal",
     "contribute_sandbox_inventory_helpers",

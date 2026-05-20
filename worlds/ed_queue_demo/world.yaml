@@ -1,0 +1,6 @@
+label: ed_queue_demo
+scripts: script.yaml
+domain_module: ed_queue_demo.domain
+metadata:
+  title: "ED Queue Demo"
+  description: "A deterministic queueing simulation proof."
