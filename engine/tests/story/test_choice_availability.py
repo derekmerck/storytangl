@@ -130,8 +130,8 @@ class TestAvailableChoices:
             predecessor_id=start.uid,
             successor_id=end.uid,
             text="Pick",
-            accepts={"type": "string", "enum": ["a", "b"]},
-            ui_hints={"widget": "radio"},
+            accepts={"kind": "text", "validators": [{"kind": "enum", "values": ["a", "b"]}]},
+            ui_hints={"source_kind": "radio"},
         )
         graph.add(action)
         ctx = _simple_ctx()
@@ -139,8 +139,11 @@ class TestAvailableChoices:
         fragments = render_block_choices(caller=start, ctx=ctx)
 
         assert fragments
-        assert fragments[0].accepts == {"type": "string", "enum": ["a", "b"]}
-        assert fragments[0].ui_hints == {"widget": "radio"}
+        assert fragments[0].accepts is not None
+        assert fragments[0].accepts.kind == "text"
+        assert fragments[0].accepts.validators[0].values == ["a", "b"]
+        assert fragments[0].ui_hints is not None
+        assert fragments[0].ui_hints.source_kind == "radio"
 
 
 # ---------------------------------------------------------------------------

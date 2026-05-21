@@ -7,10 +7,11 @@ from uuid import UUID
 import pydantic
 from pydantic import Field, model_validator, ConfigDict, field_validator
 
-from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
 from tangl.core import Entity
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.media_ir.media_script_model import MediaItemScript
+from tangl.journal.intent import Accepts
+from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
 from .actor_script_models import RoleScript
 from .location_script_models import SettingScript
 from .asset_script_models import AssetsScript
@@ -156,11 +157,10 @@ class ActionScript(BaseScriptItem):
         None,
         description="Optional payload carried by the action edge when selected.",
     )
-    accepts: dict[str, Any] | None = Field(
+    accepts: Accepts | None = Field(
         None,
         description=(
-            "Optional payload acceptance schema for client-side input generation "
-            "(for example enum/range/pattern constraints)."
+            "Optional typed payload acceptance contract for client-side input generation."
         ),
     )
     ui_hints: dict[str, Any] | None = Field(

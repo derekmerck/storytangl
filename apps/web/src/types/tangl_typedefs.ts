@@ -188,9 +188,15 @@ export interface JournalKVItem {
 
 export type PrimitiveValue = string | number | boolean
 
-export interface ProjectedKVItem {
+export interface KvRow {
   key: string
   value: PrimitiveValue
+  max?: PrimitiveValue | null
+  delta?: number | null
+  unit?: string | null
+  hint?: 'bar' | 'fraction' | 'delta' | 'tag' | string | null
+  emphasis?: 'ok' | 'warn' | 'danger' | 'subtle' | string | null
+  hints?: PresentationHints | null
 }
 
 export interface ScalarValue {
@@ -200,7 +206,7 @@ export interface ScalarValue {
 
 export interface KvListValue {
   value_type: 'kv_list'
-  items: ProjectedKVItem[]
+  items: KvRow[]
 }
 
 export interface ProjectedItem {
@@ -339,8 +345,137 @@ export interface PieceStoryFragment extends BaseStoryFragment {
 
 export interface KvStoryFragment extends BaseStoryFragment {
   fragment_type: 'kv'
-  content: Array<[string, PrimitiveValue | unknown]>
+  content: KvRow[]
   hints?: PresentationHints | null
+}
+
+export interface CostPreview {
+  ledger_key: string
+  delta: number
+  unit?: string | null
+}
+
+export interface PieceConstraints {
+  same_property?: string[] | null
+  different_property?: string[] | null
+  target_zone_ref?: FragmentId | null
+  source_zone_ref?: FragmentId | null
+  target_kind?: string[] | null
+  predicate_ref?: string | null
+}
+
+export interface LengthValidator {
+  kind: 'length'
+  min?: number | null
+  max?: number | null
+}
+
+export interface RegexValidator {
+  kind: 'regex'
+  pattern: string
+  flags?: string | null
+  message?: string | null
+}
+
+export interface EnumValidator {
+  kind: 'enum'
+  values: string[]
+  case_sensitive?: boolean
+}
+
+export interface BackendValidator {
+  kind: 'backend'
+}
+
+export type AcceptsValidator = LengthValidator | RegexValidator | EnumValidator | BackendValidator
+
+export interface PickAccepts {
+  kind: 'pick'
+  cost_previews?: CostPreview[]
+}
+
+export interface TextAccepts {
+  kind: 'text'
+  required?: boolean
+  placeholder?: string | null
+  validators?: AcceptsValidator[]
+}
+
+export interface QuantityAccepts {
+  kind: 'quantity'
+  required?: boolean
+  min?: number | null
+  max?: number | null
+  step?: number
+  unit?: string | null
+  ledger_ref?: string | null
+  cost_previews?: CostPreview[]
+}
+
+export interface PiecesAccepts {
+  kind: 'pieces'
+  min?: number
+  max?: number
+  constraints?: PieceConstraints | null
+}
+
+export interface PlaceAccepts {
+  kind: 'place'
+  source_zone_ref?: FragmentId | null
+  target_zone_ref?: FragmentId | null
+  edge_ref?: FragmentId | null
+  predicate_ref?: string | null
+  source_constraints?: PieceConstraints | null
+  required?: boolean
+}
+
+export interface RawCommandAccepts {
+  kind: 'raw_command'
+}
+
+export interface LegacyPayloadAccepts {
+  input: string
+  payload_type?: string | null
+  min?: number | null
+  max?: number | null
+  step?: number | null
+  unit?: string | null
+  placeholder?: string | null
+  required?: boolean
+  validators?: AcceptsValidator[]
+}
+
+export interface ComposePart {
+  role: string
+  accepts: PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts | PlaceAccepts | RawCommandAccepts
+}
+
+export interface ComposeAccepts {
+  kind: 'compose'
+  parts: ComposePart[]
+}
+
+export type ChoiceAccepts =
+  | PickAccepts
+  | TextAccepts
+  | QuantityAccepts
+  | PiecesAccepts
+  | PlaceAccepts
+  | ComposeAccepts
+  | RawCommandAccepts
+  | LegacyPayloadAccepts
+
+export interface ChoiceUIHints {
+  hotkey?: string | null
+  icon?: string | null
+  emphasis?: 'primary' | 'subtle' | 'warning' | 'danger' | string | null
+  widget?: string | null
+  source_kind?: string | null
+  contribution?: string | null
+  direction?: string | null
+  time_delta?: unknown
+  cost_previews?: CostPreview[]
+  [key: string]: unknown
 }
 
 export interface ChoiceStoryFragment extends BaseStoryFragment {
@@ -351,8 +486,8 @@ export interface ChoiceStoryFragment extends BaseStoryFragment {
   active?: boolean | null
   unavailable_reason?: string | null
   blockers?: Array<Record<string, unknown>> | null
-  accepts?: Record<string, unknown> | null
-  ui_hints?: Record<string, unknown> | null
+  accepts?: ChoiceAccepts | null
+  ui_hints?: ChoiceUIHints | null
   payload?: unknown
 }
 

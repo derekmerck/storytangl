@@ -56,7 +56,7 @@ the negotiation is mostly about typed-shape graduations.
 | `AttributedFragment` shape | S | done | done | — |
 | `MediaFragment` shape | S | done | done | — |
 | `GroupFragment` shape (`scene`, `dialog`, `overlay`, `status_sidecar`) | S | done | done | — |
-| `KvFragment` shape | S | partial (TS-typed) | untyped (engine emits `OrderedTupleDict`) | Tier P1 KvRow migration (see §B) |
+| `KvFragment` shape | S | done (`KvRow[]`) | done (`list[KvRow]`) | tuple-row fixtures migrated in typed accepts / KvRow PR |
 | `ChoiceFragment` shape (frame only) | S | done | done | — |
 | `ControlFragment` (`update` / `delete`) | S | done | done | — |
 | `UserEventFragment` | S | done | done | — |
@@ -73,16 +73,16 @@ the negotiation is mostly about typed-shape graduations.
 ## §B — Tier P1 surfaces (target for next engine epoch)
 
 These are committed target contract but require additive engine
-work. Each row should land as a single PR-shaped change with a
-backwards-compat shim.
+work. Each row should land as a single PR-shaped change unless the
+surface is small enough to settle with its immediate neighbors.
 
 | Surface | Spec tier | Reference UI | Engine backend | Plan |
 |---|---|---|---|---|
-| Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` used; untyped accepts dict) | untyped (`dict[str, Any]`) | engine PR: typed `Accepts` discriminated union in `tangl/journal/intent.py` |
-| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done (kinds used; untyped) | untyped | same engine PR as above |
-| Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial | untyped | same engine PR; `edge_ref` remains unexercised by current web fixtures |
-| Typed `ComposeAccepts` | P1 | not_started | untyped | webapp PR for `compose` rendering; engine PR for typed shape |
-| Typed `UIHints` | P1 | partial (ad-hoc keys) | untyped | engine PR |
+| Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` + typed TS shape) | done (`Accepts` union) | expand conformance cases only as new widgets land |
+| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done | done (`Accepts` union) | keep legacy web `payload_type` path as local UI compatibility until fixtures stop using it |
+| Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial (`edge_ref` not rendered) | done (`Accepts` union) | add `edge_ref` fixture when route/network MVP lands |
+| Typed `ComposeAccepts` | P1 | not_started | done (`Accepts` union) | webapp PR for `compose` rendering |
+| Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
 | Typed `Blocker` (replaces dict blockers) | P1 | partial | untyped | engine PR |
 | Typed `InterpretationFragment` | P1 | partial (custom shape mid-cycle) | untyped | engine PR; webapp aligns on `result`/`text` field names |
 | `cost_previews: list[CostPreview]` (plural) | P1 | partial | not_started | engine PR; webapp follows |
@@ -202,11 +202,12 @@ others.
 
 ### 2026-05 — engine current (L3 baseline)
 
-- Engine emits `dict[str, Any]` for accepts, ui_hints, blockers
-  (untyped baseline).
+- Engine emits typed `Accepts` and `UIHints` models from
+  `tangl.journal.intent`; blockers remain dictionary-shaped pending the
+  next intent pass.
 - Engine HTTP body uses `choice_id` (pre-rename).
-- Engine `KvFragment.content` is `OrderedTupleDict` (pre-KvRow
-  migration).
+- Engine `KvFragment.content`, projected `kv_list` values, web fixtures,
+  and conformance fixtures use the unified `KvRow` record shape.
 - Engine has no `/story/info/{kind}` (consistent with v1.3 spec).
 
 ---
@@ -255,30 +256,22 @@ to v1.3.
   `docs/src/design/story/wireframes/v1_3/`; keep future wireframes labeled
   by tier and avoid treating P2/P3 sketches as reference-client status.
 - Webapp PR sequence:
-  1. Typed Accepts model in TS, generated from a planned Pydantic
-     source. Fall back to dict for untyped engine output.
-  2. KvRow flat shape in TS, with bar / fraction / delta / styled
-     subtypes via intersection narrowing.
-  3. `compose` accepts rendering as nested ChoiceInputView.
-  4. `InterpretationFragment` renderer with the spec's `result` /
+  1. `compose` accepts rendering as nested ChoiceInputView.
+  2. `InterpretationFragment` renderer with the spec's `result` /
      `text` field names.
-  5. `metadata.info_state` behavior pass: use nested `dirty_kinds` /
+  3. `metadata.info_state` behavior pass: use nested `dirty_kinds` /
      `available_kinds` as cache hints once the backend emits them.
-  6. Keep `info_affordances` opaque; clients pass `query` descriptors through
+  4. Keep `info_affordances` opaque; clients pass `query` descriptors through
      rather than parsing bundle-specific fields.
 
 **Phase 3 — Engine + API catch up.** Backend declares capabilities,
 API maps them.
 
 - Engine PR sequence:
-  1. Typed `Accepts` / `UIHints` / `Blocker` discriminated unions in
-     `tangl/journal/intent.py`. Coercion shim accepts old free-form
-     dicts; emit `DeprecationWarning`.
-  2. Unified `KvRow` shape: `KvFragment.content` → `list[KvRow]`,
-     `ProjectedKVItem` → `KvRow`. Migrate `OrderedTupleDict`.
-  3. Typed `InterpretationFragment` with `result` / `text` fields.
-  4. Typed `metadata.grammar` and `metadata.info_affordances`.
-  5. HTTP API: rename `choice_id` → `edge_id` with deprecation; type
+  1. Typed `Blocker` model in `tangl/journal/intent.py`.
+  2. Typed `InterpretationFragment` with `result` / `text` fields.
+  3. Typed `metadata.grammar` and `metadata.info_affordances`.
+  4. HTTP API: rename `choice_id` → `edge_id` with deprecation; type
      responses on `/story/do` / `/story/update`; add `query` param
      routing on `/story/info`.
   6. Conformance harness: write `legibility.py`, `parity.py`, extend

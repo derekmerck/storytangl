@@ -56,7 +56,9 @@ const stringValue = (value: unknown): string | undefined =>
 const numericValue = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
-const accepts = computed(() => props.choice.accepts ?? {})
+const accepts = computed<Record<string, unknown>>(() =>
+  props.choice.accepts ? (props.choice.accepts as unknown as Record<string, unknown>) : {},
+)
 
 const acceptsKind = computed(() => {
   const kind = accepts.value.kind

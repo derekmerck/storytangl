@@ -163,7 +163,10 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
     elif fragment_type == "kv":
         rows = fragment.get("content")
         assert isinstance(rows, list)
-        assert all(isinstance(row, list) and len(row) >= 2 for row in rows)
+        assert all(
+            isinstance(row, dict) and isinstance(row.get("key"), str) and "value" in row
+            for row in rows
+        )
     elif fragment_type == "choice":
         assert isinstance(fragment.get("text"), str)
         accepts = fragment.get("accepts")

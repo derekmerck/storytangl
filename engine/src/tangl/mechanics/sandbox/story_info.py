@@ -10,7 +10,7 @@ from tangl.service.response import (
     ItemListValue,
     KvListValue,
     ProjectedItem,
-    ProjectedKVItem,
+    KvRow,
     ProjectedSection,
     ProjectedState,
 )
@@ -88,10 +88,10 @@ class SandboxStoryInfoProjector:
         projection_active: bool,
     ) -> ProjectedSection:
         items = [
-            ProjectedKVItem(key="Location", value=location.location_name or location.get_label())
+            KvRow(key="Location", value=location.location_name or location.get_label())
         ]
         if projection_active:
-            items.append(ProjectedKVItem(key="Visibility", value="limited"))
+            items.append(KvRow(key="Visibility", value="limited"))
         return ProjectedSection(
             section_id="sandbox_location",
             title="Location",
@@ -102,12 +102,12 @@ class SandboxStoryInfoProjector:
     def _time_section(self, location: SandboxLocation) -> ProjectedSection:
         world_time = current_world_time(location)
         items = [
-            ProjectedKVItem(key="Turn", value=world_time.turn),
-            ProjectedKVItem(
+            KvRow(key="Turn", value=world_time.turn),
+            KvRow(
                 key="Period",
                 value=_period_label(world_time.period, self.period_labels),
             ),
-            ProjectedKVItem(key="Day", value=world_time.day),
+            KvRow(key="Day", value=world_time.day),
         ]
         return ProjectedSection(
             section_id="sandbox_time",

@@ -144,8 +144,8 @@ describe('StoryBlock', () => {
         uid: 'kv',
         fragment_type: 'kv',
         content: [
-          ['time', 'late'],
-          ['coin', 63],
+          { key: 'time', value: 'late' },
+          { key: 'coin', value: 63 },
         ],
       },
     }

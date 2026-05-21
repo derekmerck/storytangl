@@ -62,17 +62,18 @@ const timeDeltaLabel = computed(() => {
   return parts.length ? parts.join(' · ') : undefined
 })
 const hasPayloadInput = computed(() => {
-  if (!props.choice.accepts) {
+  const accepts = props.choice.accepts
+  if (!accepts) {
     return false
   }
-  const kind = props.choice.accepts.kind
+  const kind = 'kind' in accepts ? accepts.kind : undefined
   if (
     typeof kind === 'string' &&
     ['text', 'quantity', 'pieces', 'place', 'raw_command'].includes(kind)
   ) {
     return true
   }
-  return typeof props.choice.accepts.input === 'string'
+  return isRecord(accepts) && typeof accepts.input === 'string'
 })
 const canCommit = computed(() => available.value && !busy.value && payloadValid.value)
 

@@ -1,4 +1,4 @@
-import type { MediaStoryFragment, StoryFragment } from '@/types'
+import type { KvRow, MediaStoryFragment, StoryFragment } from '@/types'
 
 export const contentClass = (fragment: StoryFragment): string[] => {
   const hints = fragment.hints ?? fragment.presentation_hints
@@ -10,13 +10,17 @@ export const contentClass = (fragment: StoryFragment): string[] => {
     : []
 }
 
-export const kvItems = (fragment: StoryFragment): Array<[string, unknown]> => {
+export const kvItems = (fragment: StoryFragment): KvRow[] => {
   if (fragment.fragment_type !== 'kv' || !Array.isArray(fragment.content)) {
     return []
   }
   return fragment.content.filter(
-    (item): item is [string, unknown] =>
-      Array.isArray(item) && typeof item[0] === 'string' && item.length >= 2,
+    (item): item is KvRow =>
+      item !== null &&
+      typeof item === 'object' &&
+      'key' in item &&
+      typeof item.key === 'string' &&
+      'value' in item,
   )
 }
 

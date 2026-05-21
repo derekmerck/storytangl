@@ -21,8 +21,8 @@ export const buyQuantityRuntimeEnvelope: RuntimeEnvelope = {
       uid: 'f-buy-kv',
       fragment_type: 'kv',
       content: [
-        ['wallet', '7 coin'],
-        ['rations', 0],
+        { key: 'wallet', value: '7 coin' },
+        { key: 'rations', value: 0 },
       ],
     },
     {

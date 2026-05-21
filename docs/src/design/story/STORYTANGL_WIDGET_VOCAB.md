@@ -6,7 +6,7 @@
 **Source of truth (for engine model alignment):**
 - `tangl.journal.fragments` (fragment types, presentation hints)
 - `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
-- `tangl.journal.intent` (proposed; typed `Accepts`/`UIHints`/`Blocker` — see §6)
+- `tangl.journal.intent` (typed `Accepts`/`UIHints`, plus next-pass `Blocker` — see §6)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual
@@ -184,7 +184,7 @@ This document is **Layer 1** of a three-layer separation:
 
 Per-surface, the three layers MAY be at different states. A typed
 `PiecesAccepts` may be Tier P1 in this spec, partial in the API, and
-`dict[str, Any]`-shaped in the engine — all simultaneously, all
+freshly typed in the engine — all simultaneously, all
 during a settling phase. **`WIDGET_CONTRACT_RECONCILIATION.md` tracks
 per-surface status across the three layers.** When a row in the
 reconciliation tracker reads "implemented" across all three columns,
@@ -654,9 +654,8 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     activation_payload: Any = Field(None, alias="payload")
 ```
 
-The current engine emits `accepts`, `ui_hints`, and `blockers` as
-`dict[str, Any]`. Tier P1 (§6) introduces typed shapes; the migration
-shim on `ChoiceFragment` accepts both forms during deprecation.
+The current engine emits typed `accepts` and `ui_hints`; `blockers`
+remain dictionary-shaped until the next intent pass.
 
 | | |
 |---|---|
@@ -976,20 +975,20 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
 
 ---
 
-## 6 · Tier P1 — typed contract proposals (next engine epoch)
+## 6 · Tier P1 — typed contract surfaces
 
-Everything below is **additive** and **backwards-compatible** via
-coercion shims. No fragment shapes change; only their interior dicts
-gain types.
+Everything below types fragment interiors without changing the outer
+fragment envelope shape. `Accepts` and `UIHints` are implemented in the
+engine; `Blocker` remains the next dictionary-shaped sub-surface to
+promote.
 
 ### 6.1 Typed `Accepts`
 
-The engine's `ChoiceFragment.accepts` is currently `dict[str, Any]`.
-This proposal lands a Pydantic discriminated union in
+The engine's `ChoiceFragment.accepts` is a Pydantic discriminated union in
 `tangl/journal/intent.py`:
 
 ```python
-# tangl/journal/intent.py — proposed Tier P1
+# tangl/journal/intent.py — Tier P1
 from typing import Annotated, Literal, TypeAlias
 from pydantic import BaseModel, ConfigDict, Field
 

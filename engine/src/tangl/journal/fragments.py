@@ -15,10 +15,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from tangl.core import BaseFragment, Registry, Selector
+from tangl.journal.intent import Accepts, KvRow, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, StyleClass, StyleDict, StyleId, UnstructuredData
-from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 
 
 class PresentationHints(BaseModel, extra="allow"):
@@ -73,7 +73,7 @@ class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
     """Ordered key-value fragment for info-like surfaces."""
 
     fragment_type: Literal["kv"] = "kv"
-    content: OrderedTupleDict = Field(...)
+    content: list[KvRow] = Field(default_factory=list)
 
 
 class ChoiceFragment(BaseFragment, extra="allow"):
@@ -86,8 +86,8 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     active: bool | None = None
     unavailable_reason: str | None = None
     blockers: list[dict[str, Any]] | None = None
-    accepts: dict[str, Any] | None = None
-    ui_hints: dict[str, Any] | None = None
+    accepts: Accepts | None = None
+    ui_hints: UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
 
     @model_validator(mode="before")
@@ -230,8 +230,10 @@ __all__ = [
     "DialogFragment",
     "GroupFragment",
     "KvFragment",
+    "KvRow",
     "MediaFragment",
     "PresentationHints",
     "StagingHints",
+    "UIHints",
     "UserEventFragment",
 ]

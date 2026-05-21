@@ -59,9 +59,9 @@
       "uid": "00000000-0000-4000-8000-000000000107",
       "fragment_type": "kv",
       "content": [
-        ["time", "late evening"],
-        ["coin", "63 s"],
-        ["weather", "rain"]
+        {"key": "time", "value": "late evening"},
+        {"key": "coin", "value": "63 s"},
+        {"key": "weather", "value": "rain"}
       ],
       "hints": {"style_tags": ["status-inline"]}
     },

@@ -8,7 +8,7 @@ from tangl.service.response import (
     ItemListValue,
     KvListValue,
     ProjectedItem,
-    ProjectedKVItem,
+    KvRow,
     ProjectedSection,
     ProjectedState,
     ScalarValue,
@@ -25,8 +25,8 @@ def _fixture() -> ProjectedState:
                 kind="stats",
                 value=KvListValue(
                     items=[
-                        ProjectedKVItem(key="Health", value=9),
-                        ProjectedKVItem(key="Gold", value=14),
+                        KvRow(key="Health", value=9),
+                        KvRow(key="Gold", value=14),
                     ]
                 ),
             ),

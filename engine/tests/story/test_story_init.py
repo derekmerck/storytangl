@@ -341,15 +341,12 @@ def test_action_payload_is_materialized_from_script() -> None:
         "weight": 1,
     }
     script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["accepts"] = {
-        "type": "object",
-        "properties": {
-            "move": {"type": "string", "enum": ["rock", "paper", "scissors"]},
-        },
-        "required": ["move"],
+        "kind": "text",
+        "validators": [{"kind": "enum", "values": ["rock", "paper", "scissors"]}],
     }
     script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["ui_hints"] = {
-        "widget": "radio",
-        "framework": "wx",
+        "source_kind": "radio",
+        "contribution": "wx",
     }
 
     world = World.from_script_data(script_data=script)
@@ -359,20 +356,22 @@ def test_action_payload_is_materialized_from_script() -> None:
     action = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
     assert action.payload == {"move": "rock", "weight": 1}
     assert action.accepts is not None
-    assert action.accepts["type"] == "object"
-    assert action.accepts["properties"]["move"]["enum"] == ["rock", "paper", "scissors"]
-    assert action.ui_hints == {"widget": "radio", "framework": "wx"}
+    assert action.accepts.kind == "text"
+    assert action.accepts.validators[0].values == ["rock", "paper", "scissors"]
+    assert action.ui_hints is not None
+    assert action.ui_hints.source_kind == "radio"
+    assert action.ui_hints.contribution == "wx"
 
 
 def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
     script = _base_script()
     script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["payload_schema"] = {
-        "type": "string",
-        "enum": ["red", "blue"],
+        "kind": "text",
+        "validators": [{"kind": "enum", "values": ["red", "blue"]}],
     }
     script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["presentation_hints"] = {
         "style_tags": ["choice", "inline"],
-        "widget": "chips",
+        "source_kind": "chips",
     }
 
     world = World.from_script_data(script_data=script)
@@ -380,8 +379,12 @@ def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
     start = result.graph.get(result.graph.initial_cursor_id)
     assert isinstance(start, Block)
     action = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
-    assert action.accepts == {"type": "string", "enum": ["red", "blue"]}
-    assert action.ui_hints == {"style_tags": ["choice", "inline"], "widget": "chips"}
+    assert action.accepts is not None
+    assert action.accepts.kind == "text"
+    assert action.accepts.validators[0].values == ["red", "blue"]
+    assert action.ui_hints is not None
+    assert action.ui_hints.source_kind == "chips"
+    assert action.ui_hints.style_tags == ["choice", "inline"]
 
 
 def test_loader_compiler_runtime_path(tmp_path: Path) -> None:

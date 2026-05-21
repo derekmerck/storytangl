@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from tangl.journal.intent import Accepts, UIHints
 from tangl.vm import ResolutionPhase, TraversableEdge
 
 
@@ -21,8 +22,8 @@ class Action(TraversableEdge):
     successor_ref: str | None = None
     activation: str | None = None
     payload: Any = None
-    accepts: dict[str, Any] | None = None
-    ui_hints: dict[str, Any] | None = None
+    accepts: Accepts | None = None
+    ui_hints: UIHints | None = None
     journal_text: str | None = None
 
     @classmethod

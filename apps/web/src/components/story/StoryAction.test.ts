@@ -429,7 +429,7 @@ describe('StoryAction', () => {
       text: 'Maybe take something',
       accepts: {
         kind: 'pieces',
-        required: false,
+        min: 0,
         constraints: { target_zone_ref: 'zone-room' },
       },
     }
@@ -498,7 +498,7 @@ describe('StoryAction', () => {
         kind: 'place',
         source_zone_ref: 'zone-loose',
         target_zone_ref: 'zone-front',
-        constraints: { target_kind: ['weapon'] },
+        source_constraints: { target_kind: ['weapon'] },
       },
     }
     const fragments: Record<string, StoryFragment> = {

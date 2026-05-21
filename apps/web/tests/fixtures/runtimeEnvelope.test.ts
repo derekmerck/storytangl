@@ -91,7 +91,8 @@ describe('runtime envelope fixtures', () => {
         if (!isOpenChoice(fragment)) {
           continue
         }
-        const refs = collectReferenceIds(fragment.accepts?.constraints)
+        const accepts: Record<string, unknown> = isRecord(fragment.accepts) ? fragment.accepts : {}
+        const refs = collectReferenceIds([accepts.constraints, accepts.source_constraints])
         if (refs.length > 0) {
           const entry = { choice: fragment, refs }
           referencedChoices.push(entry)
@@ -115,8 +116,12 @@ describe('runtime envelope fixtures', () => {
     const kinds = new Set(
       [...sandboxPayloadRuntimeEnvelope.fragments, ...commandHintRuntimeEnvelope.fragments]
         .filter((fragment): fragment is ChoiceStoryFragment => fragment.fragment_type === 'choice')
-        .map((choice) => choice.accepts?.kind)
-        .filter((kind): kind is string => typeof kind === 'string'),
+        .map((choice) =>
+          isRecord(choice.accepts) && typeof choice.accepts.kind === 'string'
+            ? choice.accepts.kind
+            : undefined,
+        )
+        .filter((kind): kind is NonNullable<typeof kind> => typeof kind === 'string'),
     )
 
     expect(kinds.has('text')).toBe(true)

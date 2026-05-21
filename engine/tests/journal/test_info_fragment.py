@@ -1,20 +1,16 @@
-import pytest
-
 from tangl.journal.content import KvFragment as InfoFragment
-from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 
 #### TestKvFragment
 
 def test_info_fragment_creation():
-    # Test KV fragment with different value types
-    otd = OrderedTupleDict()
-    otd['score'] = 100, 'foo'
     fragment = InfoFragment(
         fragment_type="kv",
-        content=otd
+        content=[{"key": "score", "value": 100, "unit": "foo"}],
     )
     assert fragment.fragment_type == "kv"
-    assert fragment.content['score'] == (100, 'foo')
+    assert fragment.content[0].key == "score"
+    assert fragment.content[0].value == 100
+    assert fragment.content[0].unit == "foo"
 
 
 # def test_kv_fragment_with_complex_value():

@@ -19,6 +19,7 @@ from pydantic import (
 
 from tangl.core import BaseFragment
 from tangl.info import __url__
+from tangl.journal.intent import KvRow, PrimitiveValue
 from tangl.journal.fragments import KvFragment, MediaFragment, PresentationHints
 from tangl.service.user.user import User
 
@@ -176,9 +177,6 @@ class WorldSceneList(KvFragment):
     ...
 
 
-PrimitiveValue: TypeAlias = str | int | float | bool
-
-
 class ScalarValue(BaseModel):
     """Single scalar projected-state payload."""
 
@@ -186,18 +184,11 @@ class ScalarValue(BaseModel):
     value: PrimitiveValue
 
 
-class ProjectedKVItem(BaseModel):
-    """One projected key-value pair."""
-
-    key: str
-    value: PrimitiveValue
-
-
 class KvListValue(BaseModel):
     """Ordered key-value payload."""
 
     value_type: Literal["kv_list"] = "kv_list"
-    items: list[ProjectedKVItem]
+    items: list[KvRow]
 
 
 class ProjectedItem(BaseModel):
@@ -319,12 +310,12 @@ __all__ = [
     "InfoModel",
     "ItemListValue",
     "KvListValue",
+    "KvRow",
     "MediaNative",
     "NativeResponse",
     "PreflightReport",
     "PrimitiveValue",
     "ProjectedItem",
-    "ProjectedKVItem",
     "ProjectedSection",
     "ProjectedState",
     "RuntimeEnvelope",
