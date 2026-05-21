@@ -102,6 +102,16 @@ describe('StoryStatus', () => {
     expect(wrapper.find('[data-info-kind="inventory"]').exists()).toBe(false)
   })
 
+  it('hides all optional affordances when info_state marks none available', async () => {
+    const wrapper = mountStatus({
+      infoAffordances: sandboxInfoAffordances,
+      infoState: { ...sandboxInfoState, available_kinds: [] },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="info-affordance-bar"]').exists()).toBe(false)
+  })
+
   it('loads the selected info affordance through an opaque story-info query descriptor', async () => {
     const seenParams: URLSearchParams[] = []
     server.use(

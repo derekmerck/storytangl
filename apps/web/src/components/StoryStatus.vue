@@ -110,7 +110,7 @@ const affordanceLabel = (affordance: InfoAffordance): string =>
 const visibleAffordances = computed(() => {
   const affordances = props.infoAffordances ?? []
   const availableKinds = props.infoState?.available_kinds
-  if (!availableKinds?.length) {
+  if (availableKinds === undefined) {
     return affordances
   }
   const available = new Set(availableKinds)
@@ -258,8 +258,8 @@ const selectAffordance = (affordance: InfoAffordance | undefined) => {
 
         <v-list density="compact">
           <v-list-item
-            v-for="item in section.items"
-            :key="`${section.sectionId}-${item.key}`"
+            v-for="(item, itemIndex) in section.items"
+            :key="`${section.sectionId}-${item.key}-${itemIndex}`"
             class="story-status-item"
           >
             <v-list-item-title class="text-body-2 font-weight-medium">
@@ -271,7 +271,11 @@ const selectAffordance = (affordance: InfoAffordance | undefined) => {
             </v-list-item-subtitle>
 
             <div v-if="item.tags?.length" class="story-status-tags">
-              <span v-for="tag in item.tags" :key="tag" class="story-status-tag">
+              <span
+                v-for="(tag, tagIndex) in item.tags"
+                :key="`${tag}-${tagIndex}`"
+                class="story-status-tag"
+              >
                 {{ tag }}
               </span>
             </div>
