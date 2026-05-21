@@ -80,7 +80,7 @@ backwards-compat shim.
 |---|---|---|---|---|
 | Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` used; untyped accepts dict) | untyped (`dict[str, Any]`) | engine PR: typed `Accepts` discriminated union in `tangl/journal/intent.py` |
 | Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done (kinds used; untyped) | untyped | same engine PR as above |
-| Typed `PlaceAccepts` (no `edge_ref`) | P1 | partial | untyped | same engine PR |
+| Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial | untyped | same engine PR; `edge_ref` remains unexercised by current web fixtures |
 | Typed `ComposeAccepts` | P1 | not_started | untyped | webapp PR for `compose` rendering; engine PR for typed shape |
 | Typed `UIHints` | P1 | partial (ad-hoc keys) | untyped | engine PR |
 | Typed `Blocker` (replaces dict blockers) | P1 | partial | untyped | engine PR |
@@ -88,7 +88,7 @@ backwards-compat shim.
 | `cost_previews: list[CostPreview]` (plural) | P1 | partial | not_started | engine PR; webapp follows |
 | `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
 | `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | partial (emits in some bundles, untyped) | engine PR: typed `InfoAffordance` model |
-| `InfoAffordance.query: dict | None` (opaque descriptor) | P1 | done | partial | engine PR: declare the field; bundles populate as needed |
+| `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | partial | engine PR: declare the field; bundles populate as needed |
 | `metadata.info_state: InfoState` typed | P1 | partial (nested type + fixture; refresh still unconditional) | not_started | engine PR: emit nested `info_state`; webapp can later use it for cache hints |
 | `/story/info` accepts `kind` + `query` params | P1 | done client-side | partial (basic endpoint exists; no query routing) | API + engine PR (see §D) |
 | HTTP body field `edge_id` (rename of `choice_id`) | P1 | uses `choice_id` | uses `choice_id` | engine + webapp PR with one-version deprecation shim |
@@ -117,7 +117,7 @@ question in the spec).
 | `group_type="zone"` with `ZoneConstraints` | P2 | partial (basic web widget + carwars wireframes) | not_started | engine PR: typed `GroupFragment.constraints`; bundle MVP for capacity |
 | `ZoneLayoutHints` (orientation, fan, grid, hex, graph, floorplan) | P2 | partial (orientation/grid/fan) | not_started | engine PR; render-port catches up as needed |
 | `GraphLayout.edges` (first-class adjacencies with UIDs) | P2 (proposal fixture) | not_started | not_started | wait for network/route bundle MVP (Ticket-to-Ride-shaped) |
-| `PlaceAccepts.edge_ref` | P2 (proposal fixture) | not_started | not_started | wait for same MVP as above |
+| `PlaceAccepts.edge_ref` fixture coverage | P2 pressure fixture | not_started | not_started | P1 typed field exists in the target; graph-route fixture remains gated on a route/network MVP |
 | `RollFragment` (typed) | P2 | partial (basic rendering in carwars) | not_started | engine PR; CLI reference port renders outcome word + narrative |
 | `RitualHints` (skip_label, auto_skip_after_seen, allow_replay, duration_ms) | P2 | partial | not_started | engine PR with `RollFragment` graduation |
 | `predicate_ref` registration protocol | §7.4 OPEN | n/a | n/a | **highest-leverage open question**; awaiting MVP author |

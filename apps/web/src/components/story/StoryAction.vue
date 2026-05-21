@@ -36,11 +36,11 @@ const iconName = computed(() => {
 const readableValue = (value: string): string => value.replace(/_/g, ' ')
 const choiceHintBadges = computed(() => {
   const hints = props.choice.ui_hints ?? {}
-  const badges: string[] = []
+  const badges: Array<{ key: string; label: string }> = []
   for (const key of ['source_kind', 'contribution', 'direction']) {
     const value = hints[key]
     if (typeof value === 'string' && value) {
-      badges.push(readableValue(value))
+      badges.push({ key, label: readableValue(value) })
     }
   }
   return badges
@@ -151,11 +151,11 @@ const handleClick = () => {
       >
         <span
           v-for="badge in choiceHintBadges"
-          :key="badge"
+          :key="badge.key"
           class="choice-hint"
           data-testid="choice-hint"
         >
-          {{ badge }}
+          {{ badge.label }}
         </span>
         <span
           v-if="timeDeltaLabel"

@@ -348,9 +348,9 @@ sections:${tript.projected_state?.sections?.length || 0}`}
             <h4>Where to read more <span className="frag-tag">docs</span></h4>
             <div className="spec-body" style={{fontSize:12, lineHeight:1.5}}>
               <ul style={{paddingLeft:18, margin:0}}>
-                <li><code>docs/STORYTANGL_WIDGET_VOCAB.md</code> · v1.1 main spec.</li>
-                <li><code>docs/EXTENSIONS.md</code> · carwars Tier P3 extensions.</li>
-                <li><code>docs/SANDBOX_NAV_HANDOFF.md</code> · sandbox info-channel handoff.</li>
+                <li><code>docs/src/design/story/STORYTANGL_WIDGET_VOCAB.md</code> · v1.3 target vocabulary.</li>
+                <li><code>docs/src/design/story/WIDGET_CONTRACT_RECONCILIATION.md</code> · current vs target status.</li>
+                <li><code>docs/src/design/story/bundles/carwars/EXTENSIONS.md</code> · CarWars Tier P3 pressure layer.</li>
               </ul>
             </div>
           </div>

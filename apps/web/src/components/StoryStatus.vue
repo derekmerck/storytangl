@@ -38,6 +38,7 @@ const statusSections = ref<StatusSection[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const activeAffordanceKind = ref<string | null>(null)
+const statusRequestId = ref(0)
 
 const formatPrimitive = (value: PrimitiveValue): string => {
   if (typeof value === 'boolean') {
@@ -133,19 +134,28 @@ const infoQueryParams = (affordance: InfoAffordance | undefined): QueryParams | 
 }
 
 const loadStatus = async (affordance: InfoAffordance | undefined = activeAffordance.value) => {
+  const requestId = ++statusRequestId.value
   try {
     loading.value = true
     error.value = null
     const response = await $http.value.get<StoryStatusPayload>('/story/info', {
       params: infoQueryParams(affordance),
     })
+    if (requestId !== statusRequestId.value) {
+      return
+    }
     statusSections.value = normalizeStatusPayload(response.data)
   } catch (err) {
+    if (requestId !== statusRequestId.value) {
+      return
+    }
     console.error('Failed to fetch status:', err)
     error.value = 'Unable to load story status. Please try again later.'
     statusSections.value = []
   } finally {
-    loading.value = false
+    if (requestId === statusRequestId.value) {
+      loading.value = false
+    }
   }
 }
 

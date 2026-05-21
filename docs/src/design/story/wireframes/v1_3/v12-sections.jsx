@@ -240,8 +240,15 @@ function cliRenderSandbox(fx) {
   }
   out.push("");
   // §5.3 floor: info channels reachable through slash commands
-  out.push("(info: /t time · /h here · /i inv");
-  out.push("       /m map · /a agenda · ?)");
+  const infoCommands = (env.metadata?.info_affordances || [])
+    .map((affordance) => {
+      const shortcut = affordance.shortcuts?.[0];
+      if (!shortcut) return null;
+      const label = affordance.label || affordance.kind.replace(/_/g, " ");
+      return `/${shortcut} ${label}`;
+    })
+    .filter(Boolean);
+  out.push(`(info: ${infoCommands.join(" · ") || "?"})`);
   out.push("> ");
   return out.join("\n");
 }
@@ -329,7 +336,7 @@ function V12Changes() {
       </div>
       <div className="ch">
         <span className="to">+ metadata.info_state, info_affordances</span>
-        <div className="muted">§1.6. Typed sub-keys (was 3 ad-hoc flat keys). <code>GET /story/info/&#123;kind&#125;</code> for on-demand projections.</div>
+        <div className="muted">§1.6. Typed sub-keys (was 3 ad-hoc flat keys). <code>GET /story/info?kind=...</code> plus opaque query descriptors for on-demand projections.</div>
       </div>
       <div className="ch">
         <span className="to">+ §0.7 three-layer architecture</span>
@@ -340,7 +347,7 @@ function V12Changes() {
         <div className="muted">Cursors / channels and info channels are committed target contract, but not yet engine-shipped (no CLI reference port). Framing stays; only the tier badge moves.</div>
       </div>
       <div className="ch">
-        <span className="from">GET /story/info/&#123;kind&#125;</span><span className="arrow">→</span><span className="to">InfoAffordance.query: dict | None</span>
+        <span className="from">GET /story/info?kind=...</span><span className="arrow">→</span><span className="to">InfoAffordance.query: dict | None</span>
         <div className="muted">Opaque query descriptor; backend interprets. Hand-it-back semantics. Transport routing is a backend concern, not vocabulary.</div>
       </div>
       <div className="ch">
@@ -1132,9 +1139,7 @@ function SandboxMap({ zone, env, byUid }) {
         return (
           <div key={n.uid}
             className={"map-node " + (n.properties.state || "")}
-            style={{left: `${(p.x/W)*100}%`, top: `${(p.y/H)*100}%`}}
-            role="button"
-            tabIndex={0}>
+            style={{left: `${(p.x/W)*100}%`, top: `${(p.y/H)*100}%`}}>
             {n.properties.name}
             {n.properties.state === "here" && <span className="muted" style={{display:"block", fontSize:8, color:"var(--paper-2)"}}>(you)</span>}
           </div>

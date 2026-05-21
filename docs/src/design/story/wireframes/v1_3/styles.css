@@ -446,8 +446,6 @@ html, body {
   background: var(--paper);
   text-align: left;
 }
-.device-body { }
-
 /* DOSSIER SHELL */
 .dossier {
   display: grid;

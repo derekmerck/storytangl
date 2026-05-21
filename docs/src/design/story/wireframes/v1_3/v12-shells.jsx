@@ -114,7 +114,7 @@ function DossierShell({ envelope, projected, onPick, onCommand }) {
       </div>
       <div className="dos-rail">
         {(projected?.sections || []).map((s) => <RailSection key={s.section_id} section={s} />)}
-        {(!projected || projected.sections.length === 0) && (
+        {(!projected?.sections || projected.sections.length === 0) && (
           <div className="muted" style={{fontFamily:"var(--mono)", fontSize:11, fontStyle:"italic"}}>
             (no projected sections)
           </div>

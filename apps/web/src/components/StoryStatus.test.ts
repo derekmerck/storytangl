@@ -86,8 +86,9 @@ describe('StoryStatus', () => {
     expect(wrapper.text()).toContain('Map')
     expect(wrapper.text()).toContain('Carrying')
     expect(wrapper.text()).toContain('Help')
-    expect(wrapper.text()).toContain('m')
-    expect(wrapper.text()).toContain('i')
+    const shortcuts = wrapper.findAll('.info-affordance-shortcut').map((node) => node.text())
+    expect(shortcuts).toContain('m')
+    expect(shortcuts).toContain('i')
   })
 
   it('treats info_state available kinds as advisory affordance visibility', async () => {
@@ -135,6 +136,56 @@ describe('StoryStatus', () => {
     expect(mapParams?.get('type')).toBeNull()
     expect(mapParams?.get('format')).toBeNull()
     expect(JSON.parse(mapParams?.get('query') ?? '{}')).toEqual({ type: 'map', format: 'graph' })
+  })
+
+  it('ignores stale story-info responses when affordance requests overlap', async () => {
+    type StoryInfoResponse = { sections: Array<Record<string, unknown>> }
+    const pending = new Map<string, unknown>()
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
+        const kind = new URL(request.url).searchParams.get('kind') ?? 'status'
+        return new Promise((resolve) => {
+          pending.set(kind, (payload: StoryInfoResponse) => resolve(HttpResponse.json(payload)))
+        })
+      }),
+    )
+
+    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    await flushPromises()
+
+    await wrapper.find('[data-info-kind="map"]').trigger('click')
+    await flushPromises()
+
+    const resolveMap = pending.get('map')
+    if (typeof resolveMap === 'function') {
+      resolveMap({
+        sections: [
+          {
+            section_id: 'map-result',
+            title: 'Map Result',
+            value: { value_type: 'scalar', value: 'new map' },
+          },
+        ],
+      } satisfies StoryInfoResponse)
+    }
+    await flushPromises()
+
+    const resolveStatus = pending.get('status')
+    if (typeof resolveStatus === 'function') {
+      resolveStatus({
+        sections: [
+          {
+            section_id: 'status-result',
+            title: 'Status Result',
+            value: { value_type: 'scalar', value: 'stale status' },
+          },
+        ],
+      } satisfies StoryInfoResponse)
+    }
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('new map')
+    expect(wrapper.text()).not.toContain('stale status')
   })
 
   it('sends null-query affordances by kind only', async () => {

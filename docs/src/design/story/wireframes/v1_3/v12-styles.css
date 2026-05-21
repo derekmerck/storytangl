@@ -768,7 +768,8 @@
 }
 .spec-card .spec-body ol li code,
 .spec-card .spec-body ul li code {
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 .spec-card h4 { flex-wrap: wrap; align-items: baseline; }
 

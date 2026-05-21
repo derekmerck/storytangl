@@ -1,8 +1,8 @@
-// v12-fixtures.js — consolidated fixtures for the v1.2 wireframe demo.
+// v12-fixtures.js — consolidated fixtures for the v1.3 wireframe demo.
 //
 // Every fixture is a single { envelope, projected_state } pair shaped against
-// STORYTANGL_WIDGET_VOCAB v1.1, with the v1.2 conventions for sandbox + carwars
-// extensions layered on top. The shells/widgets in this doc consume these
+// STORYTANGL_WIDGET_VOCAB v1.3, with sandbox info-channel and CarWars extension
+// pressure examples layered on top. The shells/widgets in this doc consume these
 // directly — no synthetic adapter layer.
 //
 // Fixtures included:

@@ -1112,7 +1112,7 @@ keeps payloads short and matches existing webapp behavior.
 | `text` | `{ "text": str }` | |
 | `quantity` | `{ "quantity": int }` | |
 | `pieces` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max`. (Renamed from `tokens` in v1.2; the `select` rename was reverted in v1.2.1.) |
-| `place` | `{ "piece_id": str, "target_zone_ref": str | null, "edge_ref": str | null }` | Move a single piece into a single target. Exactly one of `target_zone_ref` or `edge_ref` is present. |
+| `place` | `{ "piece_id": str, "target_zone_ref": str \| null, "edge_ref": str \| null }` | Move a single piece into a single target. Exactly one of `target_zone_ref` or `edge_ref` is present. |
 | `compose` | `{ "parts": { role: subpayload, ... } }` | Each subpayload follows its part's `accepts.kind`. |
 | `raw_command` | `{ "text": str }` | Reserved for `interpret_command`-shaped choices. |
 
