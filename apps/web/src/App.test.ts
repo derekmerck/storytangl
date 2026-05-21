@@ -6,6 +6,8 @@ import * as directives from 'vuetify/directives'
 import { setActivePinia, createPinia } from 'pinia'
 
 import App from '@/App.vue'
+import { HttpResponse, http, server } from '@tests/setup'
+import { crossroadsRuntimeEnvelope, sandboxInfoAffordances, sandboxInfoState } from '@tests/fixtures'
 
 const vuetify = createVuetify({ components, directives })
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
@@ -69,5 +71,28 @@ describe('App.vue', () => {
     expect(drawer.text()).toContain('Wounds')
     expect(drawer.text()).toContain('Purse')
     expect(drawer.text()).toContain('Sound')
+  })
+
+  it('surfaces advertised story-info affordances from the latest envelope', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({
+          ...crossroadsRuntimeEnvelope,
+          metadata: {
+            ...crossroadsRuntimeEnvelope.metadata,
+            info_affordances: sandboxInfoAffordances,
+            info_state: sandboxInfoState,
+          },
+        }),
+      ),
+    )
+
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const drawer = wrapper.find('.v-navigation-drawer')
+    expect(drawer.text()).toContain('Map')
+    expect(drawer.text()).toContain('Carrying')
+    expect(drawer.text()).toContain('Help')
   })
 })

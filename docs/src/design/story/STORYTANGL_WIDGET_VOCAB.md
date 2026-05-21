@@ -1,37 +1,43 @@
-# StoryTangl Widget Vocabulary Target
+# StoryTangl Widget Vocabulary
 
-**Version:** v1.1 (draft) · supersedes v1.0 + carwars-extensions v0.1
-**Status of this document:** proposed unified vocabulary target. Repo-current
-conformance status is tracked in
-`docs/src/design/story/WIDGET_CONTRACT_RECONCILIATION.md`; do not treat every
-Tier S label below as CI-enforced until that table marks the surface current.
+**Version:** v1.3 · supersedes v1.2 + v1.2.1-review
+**Layer:** UI Vocabulary (Layer 1 of 3). **Implementation status** across reference clients, API transport, and engine backend is tracked in `WIDGET_CONTRACT_RECONCILIATION.md`. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
-**Source of truth:**
+**Source of truth (for engine model alignment):**
 - `tangl.journal.fragments` (fragment types, presentation hints)
 - `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
-- `tangl.journal.intent` (proposed; typed `Accepts`/`UIHints`/`Blocker` — see §5)
+- `tangl.journal.intent` (proposed; typed `Accepts`/`UIHints`/`Blocker` — see §6)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual
-treatments are author-swappable via bundle customization (§4); the vocabulary
-itself is not.
+treatments are author-swappable via bundle customization (§4); the
+vocabulary itself is not.
 
-> The Vue components in `apps/web/src/components/story/` are **one** reference
-> rendering. A CLI port, a tkinter port, and a Godot port are equally valid —
-> they each realize the same widget contract in their own medium.
+> The Vue components in `apps/web/src/components/story/` are **one**
+> reference rendering. A CLI port, a tkinter port, and a Godot port are
+> equally valid — they each realize the same widget contract in their own
+> medium.
 
-Repository note: this document intentionally uses the settled vocabulary target
-(`piece`, record-shaped `KvRow`, `interpretation.result/text`). The webapp and
-conformance fixtures have retired the older UI `token` term; tuple-style kv
-rows and fallback-only interpretation rendering remain current implementation
-gaps. See the reconciliation document before generating conformance fixtures or
-filing implementation drift.
-
-**v1.1 reconciliation summary.** The current repo has proposal fixtures for
-record-shaped `KvRow`, `piece.realized`, `place` accepts, `roll`, and a compact
-CarWars garage turn. Those fixtures are review scaffolding, not Tier-S gating
-requirements. `piece`/`piece_ids` is the only UI target vocabulary; the engine's
-`tangl.core.token.Token` keeps its existing name.
+**v1.3 changes summary (against v1.2).**
+- **Reverted** the `accepts.kind="select"` rename. Repo convention `pieces`
+  is preserved (15+ call sites; mirrors `piece_ids` payload and
+  `PieceFragment`). `select` is reserved for a hypothetical future generic
+  selection accepts; it is not minted on a piece-specific operation.
+- **Demoted** §1.5 "Cursors and journal channels" and §1.6 "Info channels"
+  to Tier P1 (committed target contract, not yet engine-shipped, no CLI
+  reference port yet). The framings stay; only the tier tag changes.
+- **Replaced** `GET /story/info/{kind}` with the query-descriptor model
+  matching the existing repo convention: `InfoAffordance.query: dict |
+  None` carries an opaque descriptor the backend interprets. Transport
+  routing is a backend concern, not a vocabulary concern.
+- **Added** §0.7 "Three-layer architecture" naming the
+  UI/API/Engine separation. Implementation status moves to
+  `WIDGET_CONTRACT_RECONCILIATION.md`; the spec is target-truth.
+- **Clarified** that several Tier P2 fixtures (`edge_ref`, `owner`,
+  `position`, audience-list `visibility`) are **proposal fixtures**
+  awaiting bundle MVP authors — not gating fixtures for current
+  conformance.
+- `PiecesAccepts` is the model class (was `SelectAccepts` in v1.2 draft).
 
 ---
 
@@ -39,68 +45,154 @@ requirements. `piece`/`piece_ids` is the only UI target vocabulary; the engine's
 
 ### 0.1 Tier tags
 
-Every section in this document carries one of four tier tags. These are not
-aspirations; they are operational. A reader should always know what's in the
-engine right now, what's a near-term proposal, and what's a longer-horizon
-direction.
+Every section in this document carries one of four tier tags. These are
+not aspirations; they are operational. A reader should always know what's
+in the engine right now, what's a near-term proposal, and what's a
+longer-horizon direction.
 
 | Tag | Meaning |
 |---|---|
-| **Tier S** (Stable target) | Intended portable baseline. Clients MAY rely on the subset marked current in `WIDGET_CONTRACT_RECONCILIATION.md`; unreconciled entries remain target language. |
+| **Tier S** (Stable) | Stable target contract. Clients MAY rely on the subset marked current in `WIDGET_CONTRACT_RECONCILIATION.md`; proposal-only surfaces remain Tier P until implemented and covered by the CLI floor. |
 | **Tier P1** (Proposed, next engine epoch) | Concrete proposal with typed Pydantic models below. Additive. Backwards-compatible coercion path planned. |
-| **Tier P2** (Proposed, larger) | Architectural direction with sketch-level types. Pending settlement of §6 ontology. |
-| **Tier P3** (Genre extensions) | Domain-specific layers (carwars, hana-smuta, etc.). Defer until P1+P2 stabilize. |
+| **Tier P2** (Proposed, larger) | Architectural direction with sketch-level types. Pending settlement of §7 ontology. |
+| **Tier P3** (Genre extensions) | Domain-specific layers (carwars, hana-smuta, etc.). Defer until P1+P2 stabilize. Live in `bundles/<name>/EXTENSIONS.md`. |
 
-Each section's tier is given in its header. Subsections inherit unless overridden.
+Each section's tier is given in its header. Subsections inherit unless
+overridden.
 
 ### 0.2 The CLI Floor Rule
 
-> A new widget, accepts kind, hint, fragment type, or `value_type` does not
-> enter Tier S until a worked CLI rendering exists in
-> `engine/contrib/conformance/cli_reference_port.py` and produces output for
-> every state described in its spec entry.
+> A new widget, accepts kind, hint, fragment type, or `value_type` does
+> not enter Tier S until a worked CLI rendering exists in
+> `engine/contrib/conformance/cli_reference_port.py` and produces output
+> for every state described in its spec entry.
 
 This is the single rule that prevents the contract from drifting toward
 web-shaped affordances. Drag-drop, animation, hover preview — those are
-*reference renderings on top of* a contract that a CLI could fully execute.
-A widget whose semantics requires more than a CLI can do is not in the
-vocabulary; it is a renderer flourish.
+*reference renderings on top of* a contract that a CLI could fully
+execute. A widget whose semantics requires more than a CLI can do is not
+in the vocabulary; it is a renderer flourish.
 
-The Python `cli_reference_port.py` is the gating artifact. If a Tier P1/P2
-proposal lands without a CLI rendering, it stays Tier P; it does not graduate.
+The Python `cli_reference_port.py` is the gating artifact. If a Tier
+P1/P2 proposal lands without a CLI rendering, it stays Tier P; it does
+not graduate.
+
+**The CLI Floor Rule is the *capability parity* axis of the contract.**
+Three sibling parity rules — *information parity* (§5.1 Decision
+Legibility), *time parity* (§5.2 Time Parity), and *input parity* (§5.3
+Input Parity) — extend the same discipline to other dimensions of the
+player's experience. Together they form a four-legged stool: every
+richer port may exceed the CLI port, but never trap the player below
+CLI-floor accessibility on any axis.
 
 ### 0.3 Backend authority
 
-> The backend is authoritative for all state changes. The client MAY preview,
-> validate, and decorate, but the client never decides anything that affects
-> state without backend confirmation.
+> The backend is authoritative for all state changes. The client MAY
+> preview, validate, and decorate, but the client never decides anything
+> that affects state without backend confirmation.
 
-This rule has implications throughout the document. Grammar hints are
-advisory; client-side validators are advisory; capacity ledgers compute on
-the backend; predicates evaluate on the backend. The client's job is to
-render and route events.
+§0.3 has three consequences:
+
+1. **The client cannot mutate state without backend confirmation.**
+   Grammar hints are advisory; client-side validators are advisory;
+   capacity bars compute on the backend; predicates evaluate on the
+   backend.
+2. **The client cannot perceive state the backend has not sent.** Hidden
+   information stays hidden because it never crosses the wire, not
+   because the client agrees to look the other way. The client cannot
+   implement game logic — including but not limited to: rule resolution,
+   win/loss determination, predicate evaluation, hidden-information
+   tracking, RNG, scoring, and pacing.
+3. **The client cannot assume a coherent backend world model.** State
+   may be authored on demand, retroactively committed, or refused. Each
+   envelope is self-consistent at render time; the contract makes no
+   guarantee that two envelopes describing "the same" world surface are
+   explanations of a stable underlying truth. The client renders
+   fragments; the backend is the story.
 
 ### 0.4 Records over tuples
 
-All ordered key/value structures in this document are arrays of records, not
-arrays of tuples. This applies to `KvRow` (§2.5), `compose.parts` payloads
-(§6.1), and any future ordered-pair surface. Records are extensible, narrow
-cleanly in TypeScript and Pydantic, and survive schema evolution. Tuples are
-not used at any wire boundary.
+All ordered key/value structures in this document are arrays of records,
+not arrays of tuples. This applies to `KvRow` (§2.5), `compose.parts`
+payloads (§6.1.1), and any future ordered-pair surface. Records are
+extensible, narrow cleanly in TypeScript and Pydantic, and survive
+schema evolution. Tuples are not used at any wire boundary.
 
 ### 0.5 Naming changes from prior drafts
 
-Five renames were ratified in moving from v0.x to v1.0. They are noted here
-once and applied throughout. Implementations migrating from v0.x should follow
-the repo-current schedule in `WIDGET_CONTRACT_RECONCILIATION.md`.
+Renames ratified in moving from v0.x through v1.3. Applied throughout;
+implementations migrating from prior versions update on the schedule in
+`WIDGET_CONTRACT_RECONCILIATION.md`.
 
-| v0.x | v1.0 | Reason |
+| Prior | v1.2 | Reason |
 |---|---|---|
-| `token` (retired UI term) | `piece` | Collides with `tangl.core.token.Token` (singleton wrapper). |
+| `token` (UI piece) | `piece` | Collides with `tangl.core.token.Token` (singleton wrapper). |
 | `ledger` (UI section type) | *removed* | Subsumed by annotated `kv_list` rows (§2.5). The engine's `tangl.vm.runtime.ledger.Ledger` keeps the name. |
 | `choice_id` (HTTP body) | `edge_id` | Reconciles with `ChoiceFragment.edge_id`. |
-| `interpretation.outcome` / `command_text` | `interpretation.result` / `text` | Spec-final names; webapp drift is recent enough to fix cheaply. |
-| `token_ids` (retired commit payload) | `piece_ids` | Follows `piece` rename. |
+| `interpretation.outcome` / `command_text` | `interpretation.result` / `text` | Spec-final names. |
+| `token_ids` / `offer_ids` (commit payload) | `piece_ids` | Follows `piece` rename; offers and pieces share one namespace. |
+| `cost_preview` (singular field) | `cost_previews: list[CostPreview]` | Multi-axis costs are common (money + time + reputation). Length-1 lists handle singular. |
+| `token_offer` fragment type | *removed* | Subsumed by `PieceFragment.realized: bool` (§7.1). |
+| `dice_roll` content_format | *removed* | Subsumed by `RollFragment` (§7.3); generalizes to card draws, random tables, etc. |
+| `accepts.kind="tokens"` | `accepts.kind="pieces"` | The kind name "tokens" collided with the deprecated `Token` fragment type. The rename to `pieces` mirrors the payload field `piece_ids` and the `PieceFragment` it operates on. (A v1.2 draft proposed `select`; rejected in v1.2.1 review because the payload is specifically `piece_ids`, not a generic selection. `select` stays reserved for a hypothetical future generic selection accepts.) |
+
+### 0.6 Narrative authoring stance
+
+StoryTangl's contract is shaped to interactive fiction rather than
+digital tabletop simulation. The runtime is free to author state lazily,
+generatively, or in response to player input — there is no
+client-readable world model, no determinism guarantee, and no
+requirement that previously-rendered fragments correspond to a still-
+existing backend object beyond what later envelopes assert.
+
+Games built on StoryTangl are **interactive narrative opportunities**,
+not simulated worlds with computable invariants. Bundles that want
+simulation-like behavior (deterministic rules, queryable state, fair
+RNG) implement those guarantees on the backend; the contract does not
+provide them.
+
+Practically, this means:
+
+- A piece's identity might be authored at the moment it's revealed, not
+  when the zone is first rendered. A memory game's facedown cards have
+  no identity until the player flips them.
+- A predicate need not be referentially transparent. The same predicate
+  may return different answers on different turns; the contract is that
+  the backend has decided, not that any client can reproduce the
+  decision.
+- An offer (`PieceFragment.realized=False`) need not promise a stable
+  catalog. The runtime may synthesize offers on demand and let unsold
+  ones evaporate when the player leaves the shop.
+- A "world" is whatever the transcript has committed to so far, plus
+  whatever the backend is willing to commit to next. The contract makes
+  no commitment beyond what the current envelope renders.
+
+This stance is what makes the contract small enough to be portable
+across CLI / web / Godot / Ren'Py without losing expressiveness. The
+constraints in §0.2 and §5 are downstream consequences of this design
+choice.
+
+### 0.7 Three-layer architecture
+
+This document is **Layer 1** of a three-layer separation:
+
+| Layer | Document | What it specifies |
+|---|---|---|
+| **L1 — UI Vocabulary** | this doc (`STORYTANGL_WIDGET_VOCAB.md`) + `bundles/<name>/EXTENSIONS.md` | What data shapes the player-facing client needs, and at what levels of expressiveness. Target-truth. |
+| **L2 — API Transport** | `API_SPEC.md` (forthcoming) | REST endpoints (and other transport mechanisms) that route L1 data needs to L3 capabilities. Optional. Clients sharing an address space with the engine (CLI, embedded ports) skip this layer entirely. |
+| **L3 — Engine Capabilities** | `ENGINE_CAPABILITIES.md` (forthcoming) | Python callables that produce the data L1 wants. Ground truth of what's implementable in the current engine. |
+
+Per-surface, the three layers MAY be at different states. A typed
+`PiecesAccepts` may be Tier P1 in this spec, partial in the API, and
+`dict[str, Any]`-shaped in the engine — all simultaneously, all
+during a settling phase. **`WIDGET_CONTRACT_RECONCILIATION.md` tracks
+per-surface status across the three layers.** When a row in the
+reconciliation tracker reads "implemented" across all three columns,
+the surface is settled.
+
+The negotiation direction is **UI-out**: the spec proposes target
+contract; the API and engine chase. CLI ports skip L2 and call L3
+directly (in-process or via whatever shim a port chooses).
 
 ---
 
@@ -119,35 +211,37 @@ class RuntimeEnvelope(InfoModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 ```
 
-Each runtime turn produces one envelope. Fields:
+Each runtime turn produces one envelope **for one cursor** (§1.5). Fields:
 
-- **`cursor_id`** — current cursor position. Stable across `interpretation`
-  fragments (which do not advance the cursor); changes when state advances.
-- **`step`** — monotonic counter incremented per state-changing turn.
-  Unchanged by `interpretation` fragments.
+- **`cursor_id`** — identifies the journal channel. Stable within a
+  session. Changes when state advances; unchanged across `interpretation`
+  fragments.
+- **`step`** — monotonic counter, per-channel, incremented per state-
+  changing turn. Unchanged by `interpretation` fragments.
 - **`fragments`** — ordered stream; see §2 for fragment types.
 - **`last_redirect` / `redirect_trace`** — runtime introspection for the
-  ledger's most recent and historical redirects. Author/debug surface only;
-  reader clients ignore.
-- **`metadata`** — open dict for cross-cutting hints. The `metadata.grammar`
-  sub-key is reserved (§5.5).
+  ledger's most recent and historical redirects. Author/debug surface
+  only; reader clients ignore.
+- **`metadata`** — open dict for cross-cutting hints. Reserved sub-keys:
+  `metadata.grammar` (§6.6), `metadata.info_affordances` and
+  `metadata.info_state` (§1.6).
 
 ### 1.2 Fragment registry and UID stability
 
-Every fragment carries a stable `uid`. Clients maintain a registry keyed by
-`uid` across envelopes within a session. The registry is the source of truth
-for the rendered scene; envelopes are diffs into it.
+Every fragment carries a stable `uid`. Clients maintain a registry keyed
+by `uid` across envelopes within a session. The registry is the source
+of truth for the rendered scene; envelopes are diffs into it.
 
 Two registry-mutating fragment types exist (§2.7):
 
-- **`update`** control fragments mutate the registry entry at `ref_id` by
-  merging `payload` into the existing fragment. The same UID is re-rendered
-  in place; **no layout shift**.
+- **`update`** control fragments mutate the registry entry at `ref_id`
+  by merging `payload` into the existing fragment. The same UID is re-
+  rendered in place; **no layout shift**.
 - **`delete`** control fragments remove the registry entry at `ref_id`.
 
-**Clients MUST NOT drop fragments they do not understand.** They MUST render
-a textual fallback (see §3 parity table) so UIDs remain resolvable by future
-control fragments.
+**Clients MUST NOT drop fragments they do not understand.** They MUST
+render a textual fallback (see §9 parity table) so UIDs remain
+resolvable by future control fragments.
 
 ### 1.3 ProjectedState
 
@@ -165,10 +259,11 @@ class ProjectedSection(BaseModel):
 ```
 
 `ProjectedState` is a **sidecar** to `RuntimeEnvelope`. Sections are
-re-projected every state-changing turn (i.e. when `step` advances). Shells
-MAY animate deltas. The `kind` field is a free string for semantic tagging
-(`wallet`, `score`, `inventory`, etc.); ports MAY use it to choose between
-visual treatments.
+re-projected every state-changing turn (i.e. when `step` advances).
+Shells MAY animate deltas. The `kind` field is a free string for
+semantic tagging (`wallet`, `score`, `inventory`, `world_time`, etc.);
+ports MAY use it to choose between visual treatments. See §1.6 for the
+v1.2 conventional `kind` values.
 
 ### 1.4 Flow vs rail
 
@@ -178,20 +273,178 @@ A useful organizing distinction for shell designers:
   scene-bound, accumulates as a transcript, and is the locus of player
   interaction.
 - **Rail content** comes from `ProjectedState.sections`. It is durable
-  across turns, refreshes in place, and represents the world's persistent
-  state visible to the player (purse, stats, inventory).
+  across turns, refreshes in place, and represents the world's
+  persistent state visible to the player (purse, stats, inventory).
 
-Some widgets exist in both worlds — `kv` (§2.5) is the canonical example,
-appearing as a scene-bound *fragment* and as a durable *section value*. The
-shape is identical (§2.5); only the routing differs.
+Some widgets exist in both worlds — `kv` (§2.5) is the canonical
+example, appearing as a scene-bound *fragment* and as a durable
+*section value*. The shape is identical (§2.5); only the routing
+differs.
+
+### 1.5 Cursors and journal channels — Tier P1
+
+> Each cursor has its own journal channel. Envelopes are per-channel.
+> The backend coordinates shared world state across channels; the
+> contract makes no commitment about turn ordering or simultaneous input
+> — those are bundle concerns.
+
+**Status (L1):** committed target contract. **Status (L3):**
+single-cursor today; multi-cursor channel routing is a proposed extension
+awaiting an MVP author. The vocabulary commits to the framing; current
+engine and reference UI behave as if there is one cursor.
+
+A **cursor** identifies one participant's traversal through a story.
+For solo play, there's one cursor and one channel. For multi-
+participant play — Discord-style shared reading, head-to-head gamebooks,
+asynchronous group play — there are N cursors, each with its own
+channel, each receiving its own envelope stream.
+
+**The contract is cursor-local.** `RuntimeEnvelope.cursor_id` identifies
+the channel an envelope belongs to. `step` is monotonic per channel.
+Fragment registries are per channel. Two channels may render the same
+underlying world state differently (per-participant visibility) and at
+different paces (asynchronous turn-taking).
+
+**Shared world coordination is bundle territory.** When two cursors
+interact with shared state — one player buys an item from a shop the
+other player also frequents — the bundle decides:
+
+- How the runtime serializes commits across channels.
+- Whether turn order is round-robin, speed-first, GM-paced, or
+  freeform.
+- How `update` control fragments propagate to other channels' registries.
+
+The contract makes none of these decisions cheap. It just guarantees
+that each channel sees a self-consistent envelope stream.
+
+**`visibility` and the cursor.** `visibility="owner_only"` is
+interpreted *against the channel's owner*. A fragment with
+`visibility="owner_only"` and `owner=A` is rendered in cursor A's
+channel and never crosses into cursor B's. `visibility="hidden"` means
+the fragment never reaches *any* channel — it lives backend-side only.
+
+**`visibility` accepts a list of participant IDs.** When a fragment is
+visible to a defined audience (team-mates, allies, the GM), the field
+takes a list instead of a singleton:
+
+```python
+class BaseFragment:
+    # ...
+    visibility: VisibilityLevel | list[ParticipantId] = "public"
+```
+
+Where `VisibilityLevel` is `Literal["public", "owner_only", "hidden"]`
+and `ParticipantId` is the cursor's owning account. A list value means
+"rendered in any channel whose owner appears in this list." Teams,
+asymmetric cooperative roles, and "show this to the GM only" surfaces
+all use this form. Routing is a Service-layer concern.
+
+**Single-cursor is the floor case.** Most of this contract is written
+as if there's one cursor. The CLI port assumes one cursor. The
+`crossroads_inn.json` fixture assumes one cursor. Multi-cursor is the
+parallelizable extension; nothing in §§2–4 changes for it.
+
+**What is *not* in scope.** Couch multiplayer (two participants sharing
+one rendering surface and one input device) is out of scope by design;
+ports that want to host it run two independent client instances
+side-by-side, each with its own cursor, and the contract doesn't try to
+help. Mechanics that require simultaneous concealed input across
+channels (closed drafting, sealed-bid auctions) require cross-channel
+coordination that the contract treats as a bundle concern; they are
+expressible only via backend orchestration the spec does not make
+cheap.
+
+### 1.6 Info channels — Tier P1
+
+> An info channel is an advisory side-projection of world state the
+> player MAY query. Info channels are **discovery hints, not mandatory
+> client UI**.
+
+**Status (L1):** target contract for v1.2+. **Status (L2):** reference
+webapp implements `info_affordances` with `query` descriptors against
+`/story/info`. **Status (L3):** engine emits `metadata.info_affordances`
+in some bundles but the typed `info_state` shape is not yet ratified at
+the engine response model layer.
+
+A bundle MAY expose **info channels** — typed sub-surfaces of world
+state the player can pull on demand: a map, an inventory, a watch
+showing world time, a character sheet, a help screen, a list of active
+objectives.
+
+The runtime advertises these channels through two optional metadata
+keys on `RuntimeEnvelope`:
+
+```python
+class InfoAffordance(BaseModel):
+    kind: str               # stable info-channel identifier
+    label: str              # short, player-facing
+    shortcuts: list[str]    # CLI/keyboard aliases
+    query: dict[str, Any] | None = None
+    # Opaque query descriptor the backend interprets.
+    # Hand-it-back semantic: clients pass it to the info endpoint without
+    # inspecting its contents. Bundles decide what query keys mean.
+    # Examples: { "type": "map", "format": "tiles" },
+    #           { "kinds": ["party", "followers"] },
+    #           None  (no descriptor; default info kind is the channel itself)
+
+class InfoState(BaseModel):
+    version: int                          # monotonic per cursor
+    dirty_kinds: list[str] = []           # changed since prior turn
+    available_kinds: list[str] = []       # what's queryable this turn
+
+# RuntimeEnvelope.metadata reserved sub-keys:
+#   metadata.info_affordances: list[InfoAffordance]
+#   metadata.info_state: InfoState
+```
+
+**Advisory, not authoritative.** A port that has room for an info-pill
+bar renders the affordances as buttons. A port without that affordance
+(CLI, narrow mobile, accessibility-mode) surfaces them through some
+other path — a `?` menu, slash commands, keyboard shortcuts, a hidden
+drawer. Per §5.3 Input Parity, every info channel MUST be reachable by
+some CLI-floor mode; how *prettily* is port-specific.
+
+**Rich rendering is a render-profile concern, not a contract entry.**
+An info channel of `kind="map"` might be rendered on the web as an
+animated tile grid, on the CLI as `[map: 12 known locations, 3
+unexplored]`, on Godot as a 3D minimap. The *data* is canonical; the
+*rendering* is the port's call. The contract does not grow
+`format: "tiles" | "graph" | "ascii"` fields on sections. Bundles
+choose visual treatments via `hints.style_tags`, bundle widget
+variants (§4.2), or port-specific profiles (§4.3).
+
+**Every info channel has a `ProjectedState` fallback.** Any `kind`
+exposed as an info affordance MUST also be expressible as one of the
+five canonical `value_type`s (`scalar`, `kv_list`, `item_list`,
+`table`, `badges`) — either directly in `ProjectedState.sections` or
+via an info-channel query (§6.7). The fallback exists so a port
+that doesn't implement the rich rendering still has *something* to
+show. The fallback is the contract surface; the rich rendering is
+ornament.
+
+**Conventional `kind` values** (non-normative; bundles MAY add more):
+`world_time`, `location`, `inventory`, `agenda`, `objectives`,
+`roster`, `wallet`, `help`, `presence`. Ports MAY honor these for
+visual treatment selection — a `kind="world_time"` section might
+render with a clock icon by default; `kind="map"` might earn a fold-
+out treatment. None of this is contract; it's recommended convention.
+
+**Cache invalidation.** `info_state.version` is monotonic per cursor.
+`info_state.dirty_kinds` tells the client which channels' cached
+projections went stale since the prior turn. A client that does not
+cache info channels can ignore `info_state` entirely.
+
+**Single-cursor default.** All info channels are scoped to the cursor
+they're advertised in. Per §1.5, multi-cursor bundles project
+per-cursor channels; there is no global info-channel surface.
 
 ---
 
 ## 2 · Fragment widgets — Tier S
 
-Every fragment widget section has the same structure: a Pydantic shape, a
-behavior table (required/optional/states/a11y/fallback), and concrete port
-sketches.
+Every fragment widget section has the same structure: a Pydantic shape,
+a behavior table (required/optional/states/a11y/fallback), and concrete
+port sketches.
 
 ### 2.1 `content` — Prose block
 
@@ -210,7 +463,7 @@ class ContentFragment(BaseFragment):
 | **Optional** | `content` (any; usually str), `content_format` (`md`/`plain`/`html`), `hints.style_tags[]`, `hints.style_dict`, `hints.icon`, `source_id` |
 | **Container rule** | Flows into the active `scene` group. Interrupts any preceding caption region. |
 | **States** | **empty** → skip. **loading** → stream chunks in as they arrive. **error** → render raw string with visible marker. **stale** (after `update` arrives) → re-render in place with same UID; no layout shift. |
-| **A11y** | Plain text selectable; if `hints.style_tags` contains `establishing` or `chapter`, treat as `<h*>` landmark. Honor `prefers-reduced-motion`. |
+| **A11y** | Plain text selectable; if `hints.style_tags` contains `establishing` or `chapter`, treat as `<h*>` landmark. Honor `prefers-reduced-motion`. Time Parity (§5.2): typewriter / staggered-reveal effects MUST be skippable to canonical-instant rendering with a single user action. |
 | **Fallback** | Unknown `content_format` → plain text. Unknown hint tag → ignore. |
 
 **Port sketches.** Web: `<p>` or `<article>` honoring `style_tags` via classes. CLI: hard-wrap to terminal width; blank line above/below. tkinter: `Text` widget segment with tag set. Ren'Py / Godot: `RichTextLabel` / narrator say.
@@ -225,10 +478,10 @@ class AttributedFragment(ContentFragment):
     media: str
 ```
 
-Note the `alias="type"` on `fragment_type` — the wire shape may use either
-`fragment_type: "attributed"` or `type: "attributed"`. Clients MUST accept
-both. (This is a legacy-compat surface; future fragment types should not
-introduce aliases.)
+Note the `alias="type"` on `fragment_type` — the wire shape may use
+either `fragment_type: "attributed"` or `type: "attributed"`. Clients
+MUST accept both. (This is a legacy-compat surface; future fragment
+types should not introduce aliases.)
 
 | | |
 |---|---|
@@ -259,10 +512,10 @@ class MediaFragment(ContentFragment):
 | **Optional** | `media_role` ∈ `cover_im` / `narrative_im` / `avatar_im` / `dialog_im` / `sfx` / `bgm` / `video`; `scope` ∈ `world` / `scene` / `turn`; `staging_hints` (shape, size, position, transition, duration, timing) |
 | **Container rule** | Routed by `media_role`, not by order. `cover_im` is persistent chrome; `narrative_im` belongs to the active content region; `avatar_im` / `dialog_im` bind to the nearest preceding `attributed`; `bgm` is timelined against `staging_hints.media_timing`. |
 | **States** | **empty** → hide. **loading** → placeholder box with role label; ARIA busy. **pending** (`content_format="rit"` unresolved) → placeholder marked `data-pending`; swapped in place by later `update` to `url` or `data` — same widget, same DOM node, no reflow. **error** → placeholder + error text; preserve layout. |
-| **A11y** | Images need `content` labeled via `hints` or sibling text. Audio/video must expose native controls or keyboard toggle. `prefers-reduced-motion` disables `media_transition`. |
+| **A11y** | Images need `content` labeled via `hints` or sibling text. Audio/video must expose native controls or keyboard toggle. `prefers-reduced-motion` disables `media_transition`. Time Parity (§5.2): the player MUST always be able to advance past time-bound media (audio/video) with a single action; the player MAY independently choose to let media continue playing. |
 | **Fallback** | Unknown `media_role` → render inline. `content_format="rit"` unresolved → pending placeholder. |
 
-**Port sketches.** Web: `<img>` / `<video>` / `<audio>` / placeholder; role maps to CSS class. CLI: `[img: <url>]` / `[♪ <url>]` single-line markers. tkinter: `Label(image=…)` or placeholder `Frame`; audio/video out-of-band. Ren'Py: `scene <bg>` / `show <sprite>` / `play music` / `play sound`. Godot: `TextureRect` / `VideoStreamPlayer` / `AudioStreamPlayer`.
+**Port sketches.** Web: `<img>` / `<video>` / `<audio>` / placeholder; role maps to CSS class. CLI: `[img: <url>]` / `[♪ <url>]` single-line tokens. tkinter: `Label(image=…)` or placeholder `Frame`; audio/video out-of-band. Ren'Py: `scene <bg>` / `show <sprite>` / `play music` / `play sound`. Godot: `TextureRect` / `VideoStreamPlayer` / `AudioStreamPlayer`.
 
 ### 2.4 `group` — Container
 
@@ -271,32 +524,37 @@ class GroupFragment(BaseFragment, extra="allow"):
     fragment_type: Literal["group"] = "group"
     group_type: str | Enum | None = None
     member_ids: list[UUID] = Field(default_factory=list)
+    layout_hints: ZoneLayoutHints | None = None       # visual layout (Tier P2; §7.2)
+    constraints: ZoneConstraints | None = None        # semantic constraints (Tier P2; §7.2)
 ```
 
 Note: `DialogFragment(GroupFragment)` exists as a distinct fragment type
 (`fragment_type: "dialog"`) with the same structural role. Clients MAY
-treat `DialogFragment` and `GroupFragment(group_type="dialog")` identically.
+treat `DialogFragment` and `GroupFragment(group_type="dialog")`
+identically.
 
 | | |
 |---|---|
 | **Required** | `uid`, `member_ids[]` |
-| **Optional** | `group_type` |
-| **Canonical `group_type`** | `scene` (turn boundary); `dialog` (consecutive `attributed` lines); `turn` (implicit cursor advancement); `overlay` (modal over active scene; one level of nesting); `status_sidecar` (in-stream kv/item_list rail). Tier P2 adds `zone` (§6.2). |
+| **Optional** | `group_type`, `layout_hints` (Tier P2; visual), `constraints` (Tier P2; semantic) |
+| **Canonical `group_type`** | `scene` (turn boundary); `dialog` (consecutive `attributed` lines); `turn` (implicit cursor advancement); `overlay` (modal over active scene; one level of nesting); `status_sidecar` (in-stream kv/item_list rail). Tier P2 adds `zone` (§7.2). |
+| **Recommended `zone_role` tags** (Tier P2, non-normative) | `field` (open play area), `hand` (private to owner), `pile` (stack, top-only), `discard`, `slot` (a zone with `constraints.capacity` set), `catalog` (a zone whose members are unrealized pieces, §7.1), `connection` (an edge-shaped placement target, §7.2). These are visual-treatment tags only; their semantics derive from `constraints` and member contents, not from the tag itself. |
 | **Container rule** | `scene` defines turn boundaries. `dialog` groups consecutive `attributed`. `turn` is implicit cursor advancement. `overlay` is modal over current scene. `status_sidecar` is an in-stream rail. |
-| **States** | **loading** → render members as they arrive, in order. **partial** → ok; finalize on next `update`. **empty** → hide entire group. |
+| **States** | **loading** → render members as they arrive, in order. **partial** → ok; finalize on next `update`. **empty** → hide entire group, except: empty zones referenced by an open choice's `accepts.constraints.target_zone_ref` MUST render as a placeholder per §5.1. |
 | **A11y** | `overlay` traps focus and exposes `role="dialog" aria-modal="true"`. `dialog` is the `aria-live` host. |
 | **Fallback** | Unknown `group_type` → render members flat, no wrapper. |
 
 `group_type` is currently typed as `str | Enum | None` — it accepts any
-value. The canonical list above is recommended; ports MUST handle unknown
-types via the fallback rule.
+value. The canonical list above is recommended; ports MUST handle
+unknown types via the fallback rule.
 
 ### 2.5 `kv` — Key/value rows (unified shape)
 
-The `kv` surface appears in two places — as a scene-bound fragment, and as a
-projected section's `value_type`. **Both use the same `KvRow` shape.** This
-unification supersedes the older `OrderedTupleDict` form for `KvFragment` and
-the simpler `{key, value}` form for `ProjectedKVItem`.
+The `kv` surface appears in two places — as a scene-bound fragment, and
+as a projected section's `value_type`. **Both use the same `KvRow`
+shape.** This unification supersedes the older `OrderedTupleDict` form
+for `KvFragment` and the simpler `{key, value}` form for
+`ProjectedKVItem`.
 
 ```python
 # tangl/journal/intent.py (Tier P1; ratifies the unified shape)
@@ -318,9 +576,10 @@ class KvRow(BaseModel, extra="allow"):
 
 `KvRow` carries two categories of metadata:
 
-- **Semantic fields** (`max`, `delta`, `unit`, `hint`, `emphasis`) inform
-  rendering across *all* ports. CLI honors them by choice of glyph/format;
-  web by choice of widget; Godot by choice of scene variant.
+- **Semantic fields** (`max`, `delta`, `unit`, `hint`, `emphasis`)
+  inform rendering across *all* ports. CLI honors them by choice of
+  glyph/format; web by choice of widget; Godot by choice of scene
+  variant.
 - **Presentational hints** (`presentation_hints`, the engine's existing
   `PresentationHints` model) are port-specific styling (`style_dict`,
   `style_tags`, `style_name`, `icon`). Ports that don't recognize them
@@ -328,9 +587,9 @@ class KvRow(BaseModel, extra="allow"):
 
 #### 2.5.1 Type narrowing via field population
 
-The flat optional-field shape supports type narrowing without proliferating
-`value_type`s. A port that wants to render specific subshapes does so by
-narrowing on populated fields:
+The flat optional-field shape supports type narrowing without
+proliferating `value_type`s. A port that wants to render specific
+subshapes does so by narrowing on populated fields:
 
 ```python
 # Pydantic — required-field overrides for typed authoring/consumption
@@ -354,9 +613,9 @@ const isBarRow = (row: KvRow): row is BarRow =>
   row.max !== undefined && row.hint === 'bar';
 ```
 
-The wire schema is unchanged — exactly one shape, with optional fields. The
-narrowing happens at read time in the consumer's type system. This is also
-why the project does not add `value_type: "ledger"` or
+The wire schema is unchanged — exactly one shape, with optional fields.
+The narrowing happens at read time in the consumer's type system. This
+is also why the project does not add `value_type: "ledger"` or
 `value_type: "capacity_ledger"` to `SectionValue`: those subtypes are
 populated `kv_list`s, not new value types.
 
@@ -389,23 +648,23 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
-    blockers: list[dict[str, Any]] | None = None    # Tier P1 typed target, see §6.3
-    accepts: dict[str, Any] | None = None           # Tier P1 typed target, see §6.1
-    ui_hints: dict[str, Any] | None = None          # Tier P1 typed target, see §6.2
+    blockers: list["Blocker"] | None = None         # Tier P1 type, see §6.3
+    accepts: "Accepts | None" = None                # Tier P1 type, see §6.1
+    ui_hints: "UIHints | None" = None               # Tier P1 type, see §6.2
     activation_payload: Any = Field(None, alias="payload")
 ```
 
 The current engine emits `accepts`, `ui_hints`, and `blockers` as
-plain dict/list values. Tier P1 (§6) introduces typed shapes; that migration
-should accept both forms during deprecation.
+`dict[str, Any]`. Tier P1 (§6) introduces typed shapes; the migration
+shim on `ChoiceFragment` accepts both forms during deprecation.
 
 | | |
 |---|---|
 | **Required** | `uid`, `text` |
 | **Optional** | `edge_id` (omitted for `interpret_command` reserved choices); `available` (default `true`); `unavailable_reason`; `blockers[]`; `accepts`; `ui_hints`; `activation_payload` |
-| **Container rule** | Always emitted within the active `scene` group. Order is presented order; `ui_hints.hotkey` is advisory. |
-| **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, compose, raw_command}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
-| **A11y** | Group is `role="group" aria-label="choices"`. Hotkeys from `ui_hints.hotkey`; ↑/↓ cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target ≥ 44×44 on touch. Locked choices remain focusable for screen reader stability. |
+| **Container rule** | Always emitted within the active `scene` group. Order is presented order; positional hotkey numbering follows order. |
+| **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, place, compose, raw_command}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
+| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices (e.g., `>` for `interpret_command`). Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. ↑/↓ cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target ≥ 44×44 on touch. Locked choices remain focusable for screen reader stability. |
 | **Fallback** | Unknown `accepts.kind` → plain button posting empty payload, with warning. Unknown `ui_hints.widget` → default widget for `accepts.kind`. |
 
 **Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1) Pay the forty silver.` … `> ` prompt; `(locked: reason)` suffix for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: `menu:` block; `if`-gated for locked; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
@@ -423,8 +682,8 @@ class ControlFragment(BaseFragment, extra="allow"):
 ```
 
 Note the wire aliases: `ref_type` and `ref_id` are the JSON field names;
-`reference_type` and `reference_id` are the Python attributes. Clients see
-the aliased forms.
+`reference_type` and `reference_id` are the Python attributes. Clients
+see the aliased forms.
 
 | | |
 |---|---|
@@ -459,7 +718,7 @@ class UserEventFragment(BaseFragment, extra="allow"):
 
 ### 2.9 `interpretation` — Backend command-resolution feedback (Tier P1)
 
-This fragment is Tier P1 — its full type definition lives in §5.4. It is
+This fragment is Tier P1 — its full type definition lives in §6.4. It is
 listed here for proximity to the other fragment widgets. Clients SHOULD
 render it in scroll order alongside `content` fragments. It does not
 advance the cursor.
@@ -478,9 +737,9 @@ SectionValue = Annotated[
 ```
 
 Five canonical value types. Each has a stable shape, port-independent
-semantics, and a sensible CLI rendering. **No additional `value_type`s are
-proposed.** Subtypes that look like new value types are populated `kv_list`s
-(see §2.5.1).
+semantics, and a sensible CLI rendering. **No additional `value_type`s
+are proposed.** Subtypes that look like new value types are populated
+`kv_list`s (see §2.5.1).
 
 ### 3.2 Shapes and renderings
 
@@ -495,8 +754,8 @@ proposed.** Subtypes that look like new value types are populated `kv_list`s
 `kv_list` is the workhorse: it absorbs ledger-like data, capacity bars,
 deltas, and styled rows via the field-population mechanics in §2.5.1.
 `table` covers tabular data where row-major presentation matters
-(armor-by-location, leaderboard); a row width validator on the engine side
-ensures `len(row) == len(columns)`.
+(armor-by-location, leaderboard); a row width validator on the engine
+side ensures `len(row) == len(columns)`.
 
 ### 3.3 Section hints
 
@@ -509,12 +768,15 @@ class ProjectedSection(BaseModel):
     hints: PresentationHints | None = None
 ```
 
-`kind` is a free string used by ports to choose between visual treatments
-(`wallet` → coin icon, `score` → leaderboard skin, etc.). It does not
-discriminate the value union.
+`kind` is a free string used by ports to choose between visual
+treatments (`wallet` → coin icon, `score` → leaderboard skin, etc.). It
+does not discriminate the value union. The v1.2 conventional `kind`
+values (`world_time`, `location`, `inventory`, etc.) are documented in
+§1.6.
 
-`hints` is the existing `PresentationHints` model (style_name, style_tags,
-style_dict, icon). Same surface as on every other fragment that carries hints.
+`hints` is the existing `PresentationHints` model (style_name,
+style_tags, style_dict, icon). Same surface as on every other fragment
+that carries hints.
 
 ---
 
@@ -529,25 +791,31 @@ vocabulary and MUST NOT be redefined.
 - The canonical `group_type`s listed in §2.4.
 - The set of canonical `value_type`s in §3.1.
 - The accessibility contract throughout §2.
+- The four conformance contracts in §5 (CLI Floor + Information / Time /
+  Input Parity).
 - Fallback behavior: never silently drop fragments.
-- The CLI floor rule (§0.2).
+
+The §1.5 cursor-channel routing model and §1.6 info-channel rules are
+Tier P1 in v1.3 — committed target contract, not yet engine-shipped.
+When they graduate to Tier S (engine + CLI reference port implemented),
+they join the list above.
 
 ### 4.2 What a bundle MAY override
 
 ```python
 bundle = {
-    "id":      "crossroads_cyberpunk",      # unique
+    "id":      "crossroads_cyberpunk",
     "name":    "Crossroads // Neon Cut",
     "version": "0.1.0",
 
-    # Presentation tokens; flat key→value
+    # CSS / theme tokens; flat key→value
     "tokens": {
-        "surface":        "#0a0510",
-        "text":           "#e9f3ff",
-        "accent":         "#ff2e93",
-        "voice":          "{actor.voice}",
-        "trim":           "{allegiance.trim}",
-        "motion_scale":   0.6,
+        "--paper":        "#0a0510",
+        "--ink":          "#e9f3ff",
+        "--accent":       "#ff2e93",
+        "--font-serif":   "'Space Grotesk', sans-serif",
+        "--font-mono":    "'JetBrains Mono', monospace",
+        "--motion-scale": 0.6,
     },
 
     # Shell selection; advisory — client falls back to default if absent
@@ -561,64 +829,23 @@ bundle = {
 
     # Custom fragment types the story invents — must include text fallback
     "handlers": {
-        "roll": "renderRoll",              # function reference
+        "dice_roll": "renderDiceRoll",
     },
 }
 ```
 
 **Rules.**
 
-1. Variants receive the **same props contract** as the default widget. They
-   may not change required/optional field names.
-2. A custom fragment handler MUST provide a text fallback (per §6 parity
+1. Variants receive the **same props contract** as the default widget.
+   They may not change required/optional field names.
+2. A custom fragment handler MUST provide a text fallback (per §9 parity
    table) so other ports still work.
-3. `shell` is advisory; a port that lacks the named shell falls back to its
-   default.
-4. Tokens are flat key→value and advisory. Web ports may map them to CSS
-   variables; CLI/Tk ports may map only a small subset; plain clients may
-   ignore them.
+3. `shell` is advisory; a port that lacks the named shell falls back to
+   its default.
+4. Tokens are flat key→value; nothing nested. Variables prefixed with
+   `--` are CSS; `motion-*` are honored by all ports including non-web.
 
-### 4.3 Presentation context and token cascade — Tier P2
-
-Presentation profiles are a catalog-level mechanism, not a fragment type and
-not imperative UI commands. A world may expose durable profile definitions on
-`WorldInfo` or a world presentation endpoint. Runtime envelopes should carry
-only lightweight references to the currently active context:
-
-```python
-metadata = {
-    "presentation_context": {
-        "profile_refs": ["world:base", "city:bluegate", "scene:harbor_night"],
-        "mode": "dark",
-        "tokens": {
-            "voice": "{actor.captain_x.voice}",
-            "trim": "{actor.captain_x.trim}",
-        },
-    }
-}
-```
-
-The resolution model is deliberately smaller than CSS, Sass, or Jinja:
-
-1. The backend/world projection chooses the ordered `profile_refs`.
-2. The client loads the referenced flat token maps when it knows how.
-3. Later maps override earlier maps by key; local `tokens` apply last.
-4. A token value may be a simple alias such as `{allegiance.trim}`. Clients
-   resolve aliases recursively over the assembled map with a small depth limit
-   and cycle diagnostics.
-5. Concrete swatches may provide `base`, `light`, and `dark` variants. The
-   client chooses the variant that fits its current shell mode.
-6. Unknown profiles, tokens, aliases, or variants fall back to client defaults.
-
-This gives the useful part of CSS specificity without importing a selector
-language into the portable contract. The backend decides whether the active
-context includes a world, city, faction, actor, scene, or fragment override; the
-client only layers the maps it was handed. The same semantic token can style a
-button, dialog speaker, paperdoll trim, map marker, zone border, or CLI speaker
-prefix. Tokens may reinforce narrative state, but they must never be the only
-carrier of gameplay-relevant information.
-
-### 4.4 Profiles — port conformance subsetting (Tier P2)
+### 4.3 Profiles — port conformance subsetting (Tier P2)
 
 Bundles MAY declare which **profiles** they exercise:
 
@@ -626,56 +853,134 @@ Bundles MAY declare which **profiles** they exercise:
 bundle["profiles"] = ["card", "location", "actor"]
 ```
 
-A port that implements a strict subset of profiles is still a conforming
-StoryTangl client for any bundle whose `profiles` are a subset of the
-port's supported profiles. The minimum conforming card-game client
-implements `card`, `hand`, `field`, `pile`, `score_pile`, `discard`,
-`accepts.kind ∈ {pick, pieces}`, plus the §3 value types it uses. This is
-the path by which (e.g.) a hana-smuta tkinter board ships without
-implementing the full §6 vocabulary.
+A port that implements a strict subset of profiles is still a
+conforming StoryTangl client for any bundle whose `profiles` are a
+subset of the port's supported profiles. The minimum conforming
+card-game client implements `card`, `hand`, `field`, `pile`,
+`score_pile`, `discard`, `accepts.kind ∈ {pick, pieces}`, plus the §3
+value types it uses. This is the path by which (e.g.) a hana-smuta
+tkinter board ships without implementing the full §7 vocabulary.
 
-Profiles are non-normative: a port that does not know a profile falls back
-to generic widget rendering. See §6.5 for the profile registry.
+Profiles are non-normative: a port that does not know a profile falls
+back to generic widget rendering. See §7.5 for the profile registry.
 
 ---
 
-## 5 · Decision Legibility Contract — Tier S (proposed conformance hook)
+## 5 · Conformance contracts
 
-> **When a fragment's state is referenced by an open `choice`'s `accepts`
-> constraints, `blockers[]`, or `unavailable_reason`, the client MUST render
-> enough of that fragment's state for a player to evaluate the choice
-> without out-of-band knowledge.**
+Four parity rules govern all ports. CLI Floor (§0.2) handles capability
+parity; the three rules below handle information, time, and input
+parity. Together they form the four-legged stool: every richer port may
+exceed the CLI port, but never trap the player below CLI-floor
+accessibility on any axis.
 
-> `visibility="hidden"` fragments are never referenced by open choices in
-> the referencing player's session. `visibility="owner_only"` fragments are
-> referenced only in their owner's session.
+### 5.1 Decision Legibility Contract
 
-This rule strengthens §2's generic rendering rule. Existing widgets (prose,
-media, choice) do not gate legal choices on rendered state, so "render
-however you like" suffices. Interactive surfaces (§6) do, and must
-therefore meet a stricter floor: **if the player can choose it, the player
-can see it.**
+> **When a fragment's state is referenced by an open `choice`'s
+> `accepts` constraints, `blockers[]`, or `unavailable_reason`, the
+> client MUST render enough of that fragment's state for a player to
+> evaluate the choice without out-of-band knowledge.**
+
+> `visibility="hidden"` fragments are never referenced by open choices
+> in any cursor's channel. `visibility="owner_only"` fragments are
+> referenced only in their owner's channel. `visibility=[...]`
+> (audience list) fragments are referenced only in channels whose
+> owner appears in the list.
+
+This rule strengthens §2's generic rendering rule. Existing widgets
+(prose, media, choice) do not gate legal choices on rendered state, so
+"render however you like" suffices. Interactive surfaces (§7) do, and
+must therefore meet a stricter floor: **if the player can choose it,
+the player can see it.**
 
 **Operational tests.**
 
-- An open `choice.accepts.constraints.target_zone_ref = Z` means zone `Z`
-  MUST be rendered with all non-hidden member pieces visible.
-- A `blockers[]` entry with `refs` citing `piece_id = P` means piece `P`
-  MUST be rendered.
+- An open `choice.accepts.constraints.target_zone_ref = Z` means zone
+  `Z` MUST be rendered with all visible-to-this-cursor member pieces
+  visible.
+- A `blockers[]` entry with `refs` citing `piece_id = P` means piece
+  `P` MUST be rendered in this cursor's channel.
 - An `unavailable_reason` mentioning a state property MUST resolve from
   rendered state alone (no out-of-band knowledge required).
 
-This rule is **conformance-checkable**: a test sweeps every open turn for
-referenced UIDs and verifies each is on screen. The test lives in
-`engine/contrib/conformance/legibility.py` (Tier P1) and runs against every
-fixture as part of CI.
+This rule is **conformance-checkable**: a test sweeps every open turn
+for referenced UIDs and verifies each is on screen. The test lives in
+`engine/contrib/conformance/legibility.py` (Tier P1) and runs against
+every fixture as part of CI.
+
+### 5.2 Time Parity Rule
+
+> **Player time spent on any fragment is bounded by the player's
+> choice, never by the author's pacing.**
+
+*Visual ritual* (typewriter prose, animations, transitions,
+structured-outcome reveal) MUST be skippable with a single user action
+to a state observably equivalent to the CLI port's rendering of the
+same envelope. Authors choose default pacing; players choose actual
+pacing.
+
+*Time-bound media* (audio, video) has its own playback contract. The
+player MUST always be able to advance past it with a single user
+action; the player MAY independently choose to let media continue
+playing in the background. The player is never trapped waiting for
+media to finish.
+
+A port that adds presentation time over CLI-floor latency without
+honoring this rule is non-conforming. Bundles MAY tune skip affordances
+via advisory `RitualHints` (§7.3 — `skip_label`, `auto_skip_after_seen`,
+`allow_replay`) but cannot suppress skip itself. **Author intent for
+dramatic pacing belongs in prose structure** (fragment boundaries that
+require advancement), **not in time-elapse**.
+
+**Operational tests.**
+
+- Time-to-canonical-outcome on the web port (with skip invoked) MUST
+  equal CLI-port time-to-canonical-outcome for the same envelope.
+- For a `media` fragment with `media_role ∈ {bgm, video, sfx}`, an
+  "advance" affordance MUST be reachable while the media is still
+  playing.
+- For any `RollFragment`, the player MUST reach the next turn's choices
+  within one user action regardless of `ritual_hints.duration_ms`.
+
+### 5.3 Input Parity Rule
+
+> **Every interaction the contract supports MUST be reachable via the
+> CLI port's input modes (numbered selection, raw text entry).**
+
+Richer port-specific input modalities — drag-and-drop, gestures, voice,
+hotkey accelerators, gamepad — are presentation enhancements that MAY
+be added on top, but MUST NOT be the only way to perform any
+interaction.
+
+A port that requires drag-and-drop with no click-pick fallback, or
+hotkey-only paths with no visible-button fallback, or info-pill-only
+paths with no slash-command or `?` menu fallback, is non-conforming.
+
+**Worked examples.**
+
+- A `place` accepts choice rendered as drag-drop on the web port (per
+  `ui_hints.drag`, §6.2.1) MUST also offer the two-step click-pick path
+  (pick piece, pick target zone). The CLI port renders only the click-
+  pick path.
+- A `raw_command` accepts choice with a typeahead grammar overlay MUST
+  also accept plain text submission with no overlay. The CLI port
+  renders only plain text.
+- A choice list's positional hotkey numbering (§2.6) is the keyboard
+  realization of the same choice list visible as buttons. Ports MAY add
+  hotkeys; ports MUST keep the visible buttons reachable by tap/click.
+- An info-affordance bar (§1.6) is one way to expose info channels.
+  Ports without room for it (CLI, narrow viewports, accessibility mode)
+  MUST expose the same info channels through some CLI-floor mode —
+  typically slash commands derived from `info_affordances[].shortcuts`,
+  or a single `?` menu.
 
 ---
 
 ## 6 · Tier P1 — typed contract proposals (next engine epoch)
 
-Everything below is **additive** and **backwards-compatible** via coercion
-shims. No fragment shapes change; only their interior dicts gain types.
+Everything below is **additive** and **backwards-compatible** via
+coercion shims. No fragment shapes change; only their interior dicts
+gain types.
 
 ### 6.1 Typed `Accepts`
 
@@ -691,15 +996,16 @@ from pydantic import BaseModel, ConfigDict, Field
 class CostPreview(BaseModel):
     """Advisory cost display. Never gates a commit; backend re-validates."""
     ledger_key: str           # which projected section to debit
-    delta: int
+    delta: int | float
     unit: str | None = None
 
 class PieceConstraints(BaseModel):
-    """Constraints on a kind='pieces' selection."""
+    """Constraints on a kind='pieces' or kind='place' selection."""
     same_property: list[str] | None = None
     different_property: list[str] | None = None
     target_zone_ref: str | None = None    # uid of group with group_type=zone
-    predicate_ref: str | None = None      # opaque, story-registered (Tier P2)
+    target_kind: list[str] | None = None  # filter by piece.kind, e.g. ["weapon"]
+    predicate_ref: str | None = None      # opaque, story-registered (§7.4)
 
 class LengthValidator(BaseModel):
     kind: Literal["length"] = "length"
@@ -747,10 +1053,26 @@ class QuantityAccepts(BaseModel):
     cost_previews: list[CostPreview] = Field(default_factory=list)
 
 class PiecesAccepts(BaseModel):
+    """Select N pieces from a constrained source.
+    Renamed from 'tokens' (kind name) in v1.2 — the prior name collided
+    with the deprecated Token fragment type. A v1.2 draft proposed
+    `select` but was reverted in v1.2.1: payload is specifically piece_ids,
+    so the kind name should track that. `select` stays reserved for any
+    future generic selection accepts. Wire payload field is piece_ids."""
     kind: Literal["pieces"] = "pieces"
     min: int = 1
     max: int = 1
     constraints: PieceConstraints | None = None
+
+class PlaceAccepts(BaseModel):
+    """Move a piece from a source zone into a target zone, slot, or edge."""
+    kind: Literal["place"] = "place"
+    source_zone_ref: str | None = None       # where the piece comes from
+    target_zone_ref: str | None = None       # specific target zone/slot
+    edge_ref: str | None = None              # for network/route building (§7.2)
+    predicate_ref: str | None = None         # for one-of-N matching targets
+    source_constraints: PieceConstraints | None = None
+    required: bool = True
 
 class ComposePart(BaseModel):
     role: str                            # stable string the backend keys on
@@ -764,13 +1086,14 @@ class RawCommandAccepts(BaseModel):
     kind: Literal["raw_command"] = "raw_command"
 
 NonComposeAccepts: TypeAlias = Annotated[
-    PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts | RawCommandAccepts,
+    PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts
+    | PlaceAccepts | RawCommandAccepts,
     Field(discriminator="kind"),
 ]
 
 Accepts: TypeAlias = Annotated[
     PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts
-    | ComposeAccepts | RawCommandAccepts,
+    | PlaceAccepts | ComposeAccepts | RawCommandAccepts,
     Field(discriminator="kind"),
 ]
 ComposePart.model_rebuild()
@@ -778,17 +1101,18 @@ ComposePart.model_rebuild()
 
 #### 6.1.1 Commit payload shapes
 
-The wire payload is shape-keyed by the choice's `accepts.kind`, **not** by an
-explicit discriminator on the payload itself. The backend has the open-choice
-list and resolves the expected shape via `edge_id`. This keeps payloads short
-and matches existing webapp behavior.
+The wire payload is shape-keyed by the choice's `accepts.kind`, **not**
+by an explicit discriminator on the payload itself. The backend has the
+open-choice list and resolves the expected shape via `edge_id`. This
+keeps payloads short and matches existing webapp behavior.
 
 | `accepts.kind` | Wire payload | Notes |
 |---|---|---|
 | `pick` | `{}` (empty object) | The `edge_id` is the answer. |
 | `text` | `{ "text": str }` | |
 | `quantity` | `{ "quantity": int }` | |
-| `pieces` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max` |
+| `pieces` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max`. (Renamed from `tokens` in v1.2; the `select` rename was reverted in v1.2.1.) |
+| `place` | `{ "piece_id": str, "target_zone_ref": str \| null, "edge_ref": str \| null }` | Move a single piece into a single target. Exactly one of `target_zone_ref` or `edge_ref` is present. |
 | `compose` | `{ "parts": { role: subpayload, ... } }` | Each subpayload follows its part's `accepts.kind`. |
 | `raw_command` | `{ "text": str }` | Reserved for `interpret_command`-shaped choices. |
 
@@ -806,28 +1130,70 @@ Concrete `compose` example — "give 2 coins to guard":
 }
 ```
 
+Concrete `place` example — "mount the flamethrower on the front":
+
+```json
+{
+  "edge_id": "e-mount",
+  "payload": {
+    "piece_id": "pc-flamethrower",
+    "target_zone_ref": "z-front-mount"
+  }
+}
+```
+
+Concrete `place` (edge variant) — "lay track on the Toledo-Chicago connection":
+
+```json
+{
+  "edge_id": "e-lay-track",
+  "payload": {
+    "piece_id": "pc-train-blue",
+    "edge_ref": "edge-toledo-chicago"
+  }
+}
+```
+
 #### 6.1.2 Validator authority
 
-- Non-`backend` validators (length, regex, enum) are advisory. The client
-  SHOULD evaluate them inline before allowing commit.
-- The backend re-evaluates ALL validators on commit and is authoritative.
-- A backend-side validation failure surfaces as an `interpretation` fragment
-  with `result="validation_failed"` (§6.4). Step does not advance.
+- Non-`backend` validators (length, regex, enum) are advisory. The
+  client SHOULD evaluate them inline before allowing commit.
+- The backend re-evaluates ALL validators on commit and is
+  authoritative.
+- A backend-side validation failure surfaces as an `interpretation`
+  fragment with `result="validation_failed"` (§6.4). Step does not
+  advance.
 
 ### 6.2 Typed `UIHints`
 
 ```python
 class UIHints(BaseModel, extra="allow"):
-    hotkey: str | None = None             # "1"-"9", "a"-"z"
+    hotkey: str | None = None             # "1"-"9", "a"-"z", or symbolic
     icon: str | None = None
     emphasis: Literal["primary", "subtle", "warning", "danger"] | None = None
     widget: str | None = None             # variant override id from bundle.widgets
     cost_previews: list[CostPreview] = Field(default_factory=list)
 ```
 
-`UIHints` is deliberately open (`extra="allow"`) — it's a hint surface, not
-a contract surface. Authors may add hints freely; ports ignore unknowns.
-The named fields are documented hints with defined semantics.
+`UIHints` is deliberately open (`extra="allow"`) — it's a hint surface,
+not a contract surface. Authors may add hints freely; ports ignore
+unknowns. The named fields are documented hints with defined semantics.
+
+#### 6.2.1 Genre-specific UIHints sub-shapes (Tier P3)
+
+Genre layers MAY define additional typed sub-shapes on `UIHints` for
+their domain. These live in `bundles/<genre>/EXTENSIONS.md`, not in the
+main spec. Examples:
+
+- `ui_hints.drag` — drag-and-drop affordance for `place`-accepting
+  choices. Floor rule per §5.3 (Input Parity): every drag interaction
+  MUST have a click-pick fallback.
+- `ui_hints.stat_check` — pre-roll difficulty preview for
+  `RollFragment`-triggering choices.
+- `ui_hints.cost_breakdown` — itemized cost display.
+
+A port that does not know a genre-specific hint ignores it. The
+behavior without the hint MUST still be reachable.
 
 ### 6.3 Typed `Blocker`
 
@@ -838,10 +1204,11 @@ class Blocker(BaseModel, extra="allow"):
     refs: list[str] = Field(default_factory=list)  # uids referenced by message
 ```
 
-Each blocker entry combines an author-stable identifier (for predicates and
-testing), a player-facing message (which MAY reference rendered state per
-§5), and a list of UIDs the message references. The Decision Legibility
-Contract (§5) requires every UID in `refs` to be rendered.
+Each blocker entry combines an author-stable identifier (for predicates
+and testing), a player-facing message (which MAY reference rendered
+state per §5.1), and a list of UIDs the message references. The
+Decision Legibility Contract requires every UID in `refs` to be
+rendered.
 
 ### 6.4 `InterpretationFragment`
 
@@ -874,10 +1241,10 @@ class InterpretationFragment(BaseFragment):
 | **A11y** | `role="status" aria-live="polite"`. |
 | **Fallback** | A port that doesn't model `interpretation` MAY render `message` as a `content` fragment. |
 
-**Why a dedicated fragment.** Replay/audit parity wants the failure to be
-structured. Ports that render the parser-failure transcript (IF-style)
-benefit from a stable shape. The cost is one fragment type that other ports
-can fall back to prose for.
+**Why a dedicated fragment.** Replay/audit parity wants the failure to
+be structured. Ports that render the parser-failure transcript (IF-
+style) benefit from a stable shape. The cost is one fragment type that
+other ports can fall back to prose for.
 
 ### 6.5 Reserved `interpret_command` edge
 
@@ -897,13 +1264,13 @@ list:
 }
 ```
 
-The client's command bar wraps this choice. Submission posts a `raw_command`
-payload (`{ text: "..." }`). The backend either:
+The client's command bar wraps this choice. Submission posts a
+`raw_command` payload (`{ text: "..." }`). The backend either:
 
 - Resolves the text to a real edge, applies it, and returns a normal
   envelope (cursor advances), OR
-- Returns an `InterpretationFragment` describing the failure mode (cursor
-  unchanged, choices intact).
+- Returns an `InterpretationFragment` describing the failure mode
+  (cursor unchanged, choices intact).
 
 A port that does not implement a command bar simply ignores the
 `interpret_command` choice (which renders as a button labeled "Try a
@@ -911,9 +1278,9 @@ command" with a text input — fine fallback).
 
 ### 6.6 `metadata.grammar`
 
-Per the architecture commitment in `apps/web/notes/ARCHITECTURE.md`, the
-grammar hint lives at `RuntimeEnvelope.metadata.grammar`. This is a typed
-sub-key validated on serialization, **not** a top-level field on
+Per the architecture commitment in `apps/web/notes/ARCHITECTURE.md`,
+the grammar hint lives at `RuntimeEnvelope.metadata.grammar`. This is a
+typed sub-key validated on serialization, **not** a top-level field on
 `RuntimeEnvelope`.
 
 ```python
@@ -937,15 +1304,17 @@ class GrammarHint(BaseModel):
 
 **Synthesis.** The grammar hint is a **denormalized projection of the
 visible action surface** for the current turn. It MUST NOT contain any
-verb, noun, or alias that does not already correspond to a visible `choice`
-or `piece`. It is a UX affordance, never a security boundary.
+verb, noun, or alias that does not already correspond to a visible
+`choice` or `piece` in this cursor's channel. It is a UX affordance,
+never a security boundary.
 
-The Story layer is the natural synthesizer (it knows what is narratively
-visible). The Service layer is responsible for serializing it into
-`metadata.grammar` on egress.
+The Story layer is the natural synthesizer (it knows what is
+narratively visible). The Service layer is responsible for serializing
+it into `metadata.grammar` on egress.
 
 **Absence.** When `metadata.grammar` is absent, the command bar simply
-submits raw text. No preview, no highlighting. Identical to a CLI port.
+submits raw text. No preview, no highlighting. Identical to a CLI
+port.
 
 ### 6.7 HTTP API
 
@@ -962,86 +1331,266 @@ def do_story_action(req: ChoiceRequest, ...) -> RuntimeEnvelope: ...
 def get_story_update(...) -> RuntimeEnvelope: ...
 
 @router.get("/story/info", response_model=ProjectedState)
-def get_story_info(...) -> ProjectedState: ...
+def get_story_info(
+    kind: str | None = None,
+    query: str | None = None,   # JSON-encoded InfoAffordance.query descriptor
+    ...,
+) -> ProjectedState: ...
 ```
 
-Three changes from the current `openapi.json`:
+Four changes from the current `openapi.json`:
 
 1. **`choice_id` → `edge_id`.** Deprecation: accept both names for one
    minor version, emit a header warning when `choice_id` is used. Then
    strict.
 2. **Typed responses on `/story/do` and `/story/update`** —
-   `response_model=RuntimeEnvelope` lets the OpenAPI doc express the full
-   contract, which lets `apps/web` regenerate `api.d.ts` cleanly (§7.5).
+   `response_model=RuntimeEnvelope` lets the OpenAPI doc express the
+   full contract, which lets `apps/web` regenerate `api.d.ts` cleanly.
 3. **Payload validation by edge.** The backend looks up the choice by
    `edge_id`, retrieves its declared `Accepts.kind`, and validates the
-   posted payload against the matching `*Payload` shape (§6.1.1). Failures
-   are surfaced as `InterpretationFragment` with `result="validation_failed"`.
+   posted payload against the matching `*Payload` shape (§6.1.1).
+   Failures are surfaced as `InterpretationFragment` with
+   `result="validation_failed"`.
+4. **`/story/info` accepts an opaque query descriptor.** The
+   `InfoAffordance.query` payload (§1.6) is JSON-encoded and passed as
+   the `query` parameter; `kind` filters the response to a single info
+   channel. Both parameters are optional. The backend interprets the
+   descriptor however it wants; clients pass it back without inspecting
+   contents. **The contract surface is the `InfoAffordance.query` shape
+   in §1.6, not the URL routing here** — the transport may evolve (POST
+   body, separate endpoint per kind, etc.) without breaking L1
+   vocabulary clients, as long as the query descriptor is honored. The
+   v1.2 draft proposal of `GET /story/info/{kind}` was rejected in
+   v1.2.1 review because the URL-path approach baked `kind` into the
+   transport and didn't accommodate richer query payloads.
 
 ---
 
 ## 7 · Tier P2 — interactive surface vocabulary (proposed, larger)
 
-This section depends on typed engine support for the settled `piece` surface
-and the predicate registration protocol (§7.4). It is sketch-level until those
-land. Implementations MAY consume this as a roadmap; it is not yet contract.
+This section uses the settled §0.5 ontology rename (`token` → `piece`) and
+still depends on the predicate registration protocol (§7.4).
+Implementations MAY consume this as a roadmap; it is partial contract.
 
-### 7.1 `PieceFragment` — Identified surface element with state
+### 7.1 `PieceFragment` — Identified surface element with state and lifecycle
 
 ```python
 class PieceFragment(BaseFragment):
     fragment_type: Literal["piece"] = "piece"
     piece_id: str
-    kind: str                             # free string: "card", "tile", "die", ...
+    kind: str                             # free string: "card", "tile", "die", "weapon", ...
     properties: dict[str, Any] = Field(default_factory=dict)
-    visibility: Literal["public", "owner_only", "hidden"] = "public"
+    visibility: VisibilityLevel | list[ParticipantId] = "public"   # see §1.5
     display_state: str | None = None      # "face_up", "face_down", "selected", ...
     zone_ref: str | None = None
     presentation_hints: PresentationHints | None = Field(None, alias="hints")
+
+    # Multi-cursor / ownership
+    owner: ParticipantId | None = None    # cursor whose channel "owns" this piece
+
+    # Lifecycle and economics
+    realized: bool = True                                  # False = offer (not yet minted)
+    cost: list[CostPreview] = Field(default_factory=list)  # for offers; multi-axis ok
+    available: bool = True                                 # render disabled when False
+    unavailable_reason: str | None = None                  # accompanies available=False
+
+    # Geometry (interpretation depends on parent zone's layout_hints)
+    position: dict[str, Any] | None = None
+    # for layout_hints.grid → {row, col}
+    # for layout_hints.graph hex → {q, r}
+    # for free-form spatial → {x, y}
+    # absent → piece occupies the zone without a positional binding
 ```
 
-A piece is an addressable, state-bearing element of a game surface (card,
-tile, die, counter, generator, location, actor). Zone-to-zone moves are
-`update` control fragments mutating `zone_ref`. Display-state changes are
-`update` control fragments mutating `display_state`. Same UID throughout —
-no reflow.
+A piece is an addressable, state-bearing element of a game surface
+(card, tile, die, counter, weapon, generator, location, actor).
 
-`hints.label_text` is **required** as a text fallback for CLI rendering.
+**Lifecycle.** A piece is either **realized** (`realized=True`, has a
+backend-issued UID, exists in world state) or an **offer**
+(`realized=False`, has a bundle-stable id, will be minted on commit).
+Both share `piece_id` and `PieceFragment` shape — there is no separate
+`token_offer` fragment type. Catalogs are zones whose members are
+unrealized pieces. Shop transactions, salvage piles, quest rewards,
+and crafting outputs all use this lifecycle.
 
-### 7.2 `zone` — New `group_type`
+**Ownership and visibility.** `owner` identifies the cursor whose
+channel the piece is primarily associated with — typically the
+player holding the card, occupying the slot, or controlling the
+worker. `visibility="owner_only"` is interpreted against `owner`.
+`visibility=[...]` lists the cursors that may see the piece. See §1.5.
 
-Adds `zone` to the canonical `group_type` list in §2.4.
+**Position.** `PieceFragment.position` carries the piece's spatial
+binding inside its parent zone, when the parent zone's `layout_hints`
+provides a geometry. For a grid zone, `position` is `{row, col}`. For
+a hex zone, `{q, r}` (axial coords). For a free-form spatial zone
+(e.g., a free-placement map), `{x, y}`. The CLI port renders piece
+position as `[piece at (2, 3)]` regardless of geometry; richer ports
+use the parent zone's layout to place the piece graphically. If
+`position` is absent, the piece occupies the zone without a positional
+binding (a card in a hand, a coin in a wallet).
+
+**Movement.** Zone-to-zone moves are `update` control fragments
+mutating `zone_ref`. Position changes within a zone are `update`
+fragments mutating `position`. Display-state changes are `update`
+fragments mutating `display_state`. Same UID throughout — no reflow.
+Realization (offer → realized piece) is also an `update` control
+fragment mutating `realized`.
+
+**Availability.** `available=False` renders the piece as disabled with
+`unavailable_reason`. Use cases: a card grayed because it's not
+playable this turn; a shop item temporarily out of stock; a slot-
+occupant pending some condition.
+
+**`hints.label_text` is required** as a text fallback for CLI rendering.
+
+### 7.2 `zone` — Group container with semantic constraints and geometry
+
+Adds `zone` to the canonical `group_type` list in §2.4. Zones carry
+two distinct kinds of metadata:
 
 ```python
+class Edge(BaseModel):
+    """An adjacency relation between two zones, addressable as a placement target."""
+    uid: str                              # stable id for place choices' edge_ref
+    a: str                                # zone uid
+    b: str                                # zone uid
+    label: str | None = None              # player-facing
+    properties: dict[str, Any] = Field(default_factory=dict)
+
 class ZoneLayoutHints(BaseModel):
+    """Visual layout — port-specific; does not affect what's allowed."""
     orientation: Literal["row", "grid", "fan", "stack"] | None = None
     reveal: Literal["all", "top", "count"] | None = None
     counter: bool = False                 # render as bare number (Nim, wallet)
     # geometry — exactly one of:
-    graph: dict | None = None             # {nodes, adjacency} — overworld
-    grid: dict | None = None              # {rows, cols} — civ-style
+    graph: GraphLayout | None = None      # {nodes, edges} — for point-to-point or networks
+    grid: GridLayout | None = None        # {rows, cols} — civ-style
     floorplan: dict | None = None         # {rooms, doors} — building
+    hex: HexLayout | None = None          # {orientation: "pointy"|"flat", radius}
+
+class GraphLayout(BaseModel):
+    nodes: list[str]                      # zone uids
+    edges: list[Edge]                     # addressable adjacencies (see G3)
+
+class GridLayout(BaseModel):
+    rows: int
+    cols: int
+
+class HexLayout(BaseModel):
+    orientation: Literal["pointy", "flat"]
+    radius: int | None = None
+
+class ZoneCapacity(BaseModel):
+    kind: Literal["count", "weight", "power", "composite"]
+    max: int | float | None = None
+    unit: str | None = None
+    sum_property: str | None = None       # for kind="weight"|"power": sum this piece property
+    ledger_key: str | None = None         # advisory mirror in projected ledger
+
+class ZoneConstraints(BaseModel):
+    """Semantic constraints — informs what's allowed, affects all ports."""
+    accepts_kind: list[str] = Field(default_factory=list)       # piece.kind whitelist
+    accepts_tags: list[str] = Field(default_factory=list)       # piece.properties.tags ∩
+    capacity: list[ZoneCapacity] = Field(default_factory=list)  # multiple = composite
+    predicate_ref: str | None = None                            # backend-evaluated catch-all
 ```
 
-A zone's member pieces (those with `zone_ref` matching the zone's `uid`)
-render inside it. Empty zones MUST still render a placeholder if
-referenceable by an open choice (§5).
+`GroupFragment` (when `group_type=zone`) has both fields available:
 
-### 7.3 `RoundReportFragment` — Structured move-outcome
+- **`layout_hints`** — *visual* layout (orientation, fan, grid, hex,
+  graph, floorplan). A renderer that ignores layout hints still
+  renders the zone correctly.
+- **`constraints`** — *semantic* membership rules. A renderer MAY use
+  these for live preview (slot tile turns red on capacity overflow),
+  but the backend always re-evaluates and is authoritative.
+
+**The split matters because they have different cross-port behavior.**
+A port that ignores `layout_hints` still renders correctly (just less
+prettily). A port that ignores `constraints` may show stale capacity
+bars or mispredicted blockers, but commits will still be correctly
+evaluated by the backend.
+
+**Edges are first-class.** `GraphLayout.edges` carry UIDs and may be
+addressable as placement targets via `PlaceAccepts.edge_ref`
+(§6.1.1). This lets a bundle author model network/route-building
+games — Ticket to Ride trains on routes, Power Grid wires between
+cities — where pieces are placed *on connections*, not in zones.
+Bundles that prefer it MAY model edges as `zone_role="connection"`
+sub-zones with capacity 1 instead; both patterns are conforming.
+
+**Capacity is projected, not computed client-side.** The backend
+projects current capacity into a `kv_list` row using `KvRow.value` /
+`KvRow.max` (e.g., `weight: 4/12`). The client paints the bar from
+the projected state. Drag-preview UIs read the projection plus the
+dragged piece's `properties.<sum_property>` to compute a live
+overlay. There is no `capacity_contributions` mapping on the wire —
+the projection is the contract, not the formula.
+
+**Empty zones referenced by an open choice.** A zone with
+`member_ids: []` that is the target of an open choice's
+`accepts.constraints.target_zone_ref` or
+`PlaceAccepts.target_zone_ref` MUST still render as a placeholder
+with its `hints.label_text` and constraint summary, per §5.1
+Decision Legibility. CLI port renders `[ front_mount: empty (weapon,
+cap 1) ]`.
+
+### 7.3 `RollFragment` — Structured-outcome ritual
+
+Generalizes "backend-resolved structured outcome rendered as a
+ritual." Subsumes dice rolls, card draws, random-table results, coin
+flips, combat resolutions, and procedural reveals.
 
 ```python
-class RoundReportFragment(BaseFragment):
-    fragment_type: Literal["round_report"] = "round_report"
-    result: Literal["WIN", "LOSE", "DRAW", "CONTINUE"]
-    player_move: Any
-    opponent_move: Any | None = None      # null for solitaire
-    score_delta: dict[str, int] = Field(default_factory=dict)
-    notes: dict = Field(default_factory=dict)  # game-specific
-    prose_fallback: str                   # required for CLI port
+class RitualHints(BaseModel, extra="allow"):
+    """Advisory polish for skip/replay UX. Cannot suppress skip itself."""
+    skip_label: str | None = None        # "Skip the roll" — defaults to a generic
+    auto_skip_after_seen: bool = False   # client may auto-skip on replay
+    allow_replay: bool = True            # may the player re-watch from the transcript
+    duration_ms: int | None = None       # advisory; informs progress UI
+
+class RollFragment(BaseFragment):
+    fragment_type: Literal["roll"] = "roll"
+    label: str                            # "Driving check", "Draw fate"
+    kind: Literal["dice", "card", "table", "flip", "custom"] = "dice"
+    inputs: dict[str, Any] = Field(default_factory=dict)   # discriminated by kind
+    outcome: str                          # "success" | "fail" | "crit" | bundle-defined
+    narrative: str | None = None          # prose; required for CLI fallback
+    against: dict[str, str] | None = None # {piece_id, property} when applicable
+    ritual_hints: RitualHints | None = None
 ```
 
-Replay/audit parity wants this stable. Ports without round-report
-rendering fall back to emitting `prose_fallback` as a `content` fragment.
+| | |
+|---|---|
+| **Required** | `uid`, `label`, `outcome`. `narrative` is required when no other content fragment in the same envelope explains the result. |
+| **Optional** | `inputs` (kind-specific), `against`, `ritual_hints` |
+| **Container rule** | Flows into the active scene. Order is presented order; pre-roll choice precedes the roll. |
+| **States** | **resolved** (the outcome is canonical the moment the fragment lands). The visual *ritual* is a presentation enhancement bound by §5.2 Time Parity. |
+| **A11y** | The outcome word is announced verbatim. Any visual ritual respects `prefers-reduced-motion` and the §5.2 skip rule. |
+| **Fallback** | A port that does not specially-render `roll` MUST render `label`, `inputs` summary, `outcome` word, and `narrative` as a `content` fragment. |
+
+**`inputs` shape by kind.**
+
+| `kind` | Typical `inputs` |
+|---|---|
+| `dice` | `{ "dice": "2d6", "rolled": [4, 5], "target": 12, "modifier": 0, "total": 9 }` |
+| `card` | `{ "drawn": ["king_of_cups"] }` |
+| `table` | `{ "table_id": "minor_loot", "row": 17, "label": "rusted dagger" }` |
+| `flip` | `{ "result": "heads" }` |
+| `custom` | bundle-defined |
+
+**The fork lives on the backend.** A roll's success/fail outcome
+selects which edges appear in the *next* envelope's open-choice list.
+The client never decides which branch fires — the backend rolls,
+narrates, and routes to the corresponding edge. This is what makes
+`RollFragment.outcome` canonical and unambiguously skippable: the
+player has nothing to decide about the roll itself.
+
+**Per §0.6 narrative authoring stance:** a roll outcome need not be
+the answer to a referentially-transparent question. The backend may
+generate the outcome at the moment of the roll, may have planned it
+in advance, or may decide it in service of narrative pacing. The
+contract is that the *rendered outcome is canonical*; nothing
+upstream commits the backend to a stable underlying model.
 
 ### 7.4 `predicate_ref` registration protocol
 
@@ -1053,33 +1602,48 @@ Open question pending an MVP author. The shape proposed:
   `predicate_ref` as opaque (`requires: <predicate_ref>`).
 - The backend always evaluates predicates; the client never does.
 
-Without this, BGG-mechanism coverage for variable powers, area control, and
-pattern building stays theoretical.
+Per §0.6, predicates need not be referentially transparent — they are
+backend callables, not world-model queries. The same `predicate_ref`
+may return different answers on different turns; the contract is that
+the backend has decided, not that any client can reproduce the
+decision.
+
+Without this protocol resolved, BGG-mechanism coverage for variable
+powers, area control, pattern building, and adjacency-based tile
+placement stays theoretical. §7.4 is the single highest-leverage open
+item in v1.2.
 
 ### 7.5 Profile registry
 
-Profiles are non-normative descriptors of how a specific `piece.kind` is
-used. Each profile specifies canonical `properties` keys, recommended
-`zone_role`s and `layout_hints`, the `accepts.kind` its moves use, and a
-worked CLI fallback.
+Profiles are non-normative descriptors of how a specific `piece.kind`
+is used. Each profile specifies canonical `properties` keys,
+recommended `zone_role`s and `layout_hints`, the `accepts.kind` its
+moves use, and a worked CLI fallback.
 
 Currently sketched: `card`, `tile`, `counter`, `die`, `packet`,
-`generator`, `location`, `actor`. Full definitions deferred until Tier P2
-typing lands.
+`generator`, `location`, `actor`. Full definitions deferred until Tier
+P2 typing lands.
 
 ---
 
 ## 8 · Tier P3 — genre extensions (deferred)
 
-Genre layers add domain-specific widgets on top of Tier P2:
+Genre layers add domain-specific authoring affordances on top of Tier
+P2. Each genre lives in its own extensions document.
 
-- **Carwars-gamebook** (in design): `slot` zone_role, `place` accepts.kind,
-  `piece.realized=false` offers, `RollFragment`, `ui_hints.stat_check`.
-- **Hana-smuta board** (sketched in v0.x): card profile + `hand` / `field` /
-  `pile` / `score_pile` zones, plus matching `accepts(pieces, same_property)`.
+- **Carwars-gamebook** — `bundles/carwars/EXTENSIONS.md`. Slot-zone
+  conventions, `ui_hints.stat_check`, `ui_hints.drag` for vehicle
+  outfitting, RNG combat fixtures, the "Garage turn" worked example.
+- **Hana-smuta board** — `bundles/hana_smuta/EXTENSIONS.md` (sketched).
+  Card profile + `hand` / `field` / `pile` / `score_pile` zones, plus
+  matching `accepts(pieces, same_property)`.
 
-These remain in design conversations. They do not enter Tier P2 until
-their underlying primitives have stabilized and a CLI rendering exists.
+Genre extensions MAY introduce typed sub-shapes on the open dicts of
+existing fragments and hints (e.g., `ui_hints.stat_check`,
+`ui_hints.drag`). They MUST NOT introduce new top-level fragment types
+or modify Tier S/P1/P2 contract surfaces. Anything that needs a new
+top-level type is a candidate for promotion to Tier P2 or P3, and goes
+through the CLI Floor Rule.
 
 ---
 
@@ -1100,6 +1664,7 @@ their underlying primitives have stabilized and a CLI rendering exists.
 | choice (pick, available) | button | `1) …` | `Button` | `menu:` / `Button` |
 | choice (locked) | disabled + reason | `(locked) reason` | disabled + reason | `if` gated |
 | choice (text/quantity/pieces) | inline form | `> ` prompt | `Entry` / `Spinbox` | `renpy.input` / `LineEdit` |
+| choice (place) | two-step click-pick (drag-drop optional, §5.3) | numbered two-step pick | listbox + button | scene click target |
 | choice (compose) | grouped form | sequenced prompts | nested `Frames` | menu of menus |
 | choice (raw_command) | command bar | `> ` prompt (default) | `Entry` | `renpy.input` |
 | control (update/delete) | re-render target | re-print with marker | re-render cell | re-run statement |
@@ -1110,8 +1675,9 @@ their underlying primitives have stabilized and a CLI rendering exists.
 | projected item_list | roster | `- label (detail)` | `Listbox` + detail | `ItemList` |
 | projected table | `<table>` | aligned columns | `ttk.Treeview` | grid / `Tree` |
 | projected badges | chips | `[tag1][tag2]` | small labels | chips |
+| info_affordances bar | pill bar | slash commands / `?` menu | menu bar | menu screen |
 
-**Tier P2 widgets (piece, zone, round_report)** are not in this table until
+**Tier P2 widgets (piece, zone, roll)** are not in this table until
 their CLI renderings ship in `cli_reference_port.py`.
 
 ---
@@ -1124,20 +1690,32 @@ their CLI renderings ship in `cli_reference_port.py`.
 engine/contrib/conformance/
   fixtures/
     crossroads_inn.json           # canonical narrative turn
-    projected_state_all_values.json # all current ProjectedState value types
     sandbox_payload.json          # text/quantity/pieces accepts variants
-    quantity_payload.json         # quantity accepts with min/max/unit
+    buy_quantity.json             # quantity with ledger_ref + cost_previews
     command_hints.json            # raw_command + grammar + interpretation
     dialog_with_avatar.json       # attributed group + avatar_im binding
-    pending_media_update.json     # rit format with later update swap
-    control_delete.json           # delete control fragment
+    pending_media.json            # rit format with later update swap
+    place_into_slot.json          # place accepts; zone constraints; capacity
+    place_on_edge.json            # PROPOSAL FIXTURE — place accepts with edge_ref
+    roll_outcomes.json            # RollFragment with success/fail/crit
+    info_channels.json            # metadata.info_affordances + info_state + query
+    multi_cursor_visibility.json  # PROPOSAL FIXTURE — owner_only and audience-list
   cli_reference_port.py           # Python CLI port (Tier S floor)
-  legibility.py                   # §5 contract checker
+  legibility.py                   # §5.1 contract checker
+  parity.py                       # §5.2 / §5.3 contract checkers
   test_conformance.py             # pytest harness
 ```
 
-Fixtures are JSON. Each port runs its own conformance test that loads the
-fixtures and asserts observable output:
+**Proposal fixtures vs. gating fixtures.** Fixtures tagged "PROPOSAL
+FIXTURE" exercise contract surfaces that are committed in this spec
+but not yet engine-shipped (and not yet enforced in the CLI reference
+port). They serve as forward-compatibility evidence — the wire shapes
+are valid against the spec — but conformance tests skip them until
+the corresponding engine-rollout status is "implemented." See
+`WIDGET_CONTRACT_RECONCILIATION.md` for current rollout status.
+
+Fixtures are JSON. Each port runs its own conformance test that loads
+the fixtures and asserts observable output:
 
 - **Web port**: feed envelopes through the renderer, assert DOM matches
   expected.
@@ -1145,23 +1723,44 @@ fixtures and asserts observable output:
   stdout matches expected.
 - **Future ports**: same fixtures, port-appropriate assertions.
 
-### 10.2 Legibility check (Tier P1)
+### 10.2 Conformance checks (Tier P1)
 
-`legibility.py` walks each fixture and verifies:
+`legibility.py` walks each fixture and verifies §5.1:
 
-- Every UID referenced by an open choice's `accepts.constraints.target_zone_ref`
-  is present in the rendered output.
-- Every UID in any `blocker.refs` is present in the rendered output.
-- No fragment with `visibility="hidden"` appears in a non-owner session.
+- Every UID referenced by an open choice's
+  `accepts.constraints.target_zone_ref`,
+  `PlaceAccepts.target_zone_ref`, or `PlaceAccepts.edge_ref` is
+  present in rendered output.
+- Every UID in any `blocker.refs` is present in rendered output.
+- No fragment with `visibility="hidden"` appears in any channel.
+- A fragment with `visibility="owner_only"` appears only in its
+  owner's channel.
+- A fragment with `visibility=[participant_ids]` appears only in
+  channels whose owner is in the list.
 
-Failure prints the offending fixture, choice UID, and missing reference UID.
+`parity.py` verifies §5.2 and §5.3 against port harnesses:
+
+- Time-to-canonical-outcome on the web port (with skip invoked) ≤
+  CLI-port time-to-canonical-outcome + tolerance.
+- Every `media` fragment's "advance past" affordance is reachable
+  during playback.
+- Every interaction the CLI port reaches via numbered selection is
+  reachable on the web port via tap/click of a visible button.
+- Every drag-and-drop interaction on the web port has a click-pick
+  fallback observable in the same fixture.
+- Every `metadata.info_affordances` entry is reachable through some
+  CLI-floor mode (`info_affordances[].shortcuts` keystrokes or a
+  documented slash/menu command).
+
+Failure prints the offending fixture, choice/fragment UID, and rule
+violation.
 
 ### 10.3 CLI floor as gate
 
-Per §0.2: `cli_reference_port.py` MUST produce defined output for every
-state of every Tier S widget. Tier P1 proposals MUST add CLI rendering
-before graduating to Tier S. PRs that change Tier S vocabulary without
-updating `cli_reference_port.py` fail CI.
+Per §0.2: `cli_reference_port.py` MUST produce defined output for
+every state of every Tier S widget. Tier P1 proposals MUST add CLI
+rendering before graduating to Tier S. PRs that change Tier S
+vocabulary without updating `cli_reference_port.py` fail CI.
 
 ---
 
@@ -1172,31 +1771,68 @@ updating `cli_reference_port.py` fail CI.
 | Envelope | One `RuntimeEnvelope` instance — the per-turn payload from `/story/do` or `/story/update`. |
 | Fragment | An entry in `RuntimeEnvelope.fragments`. Has stable `uid`. |
 | Section | An entry in `ProjectedState.sections`. Refreshed every state-changing turn. |
-| Piece (Tier P2) | Identified, state-bearing surface element (card, tile, die, etc.). UI concept; distinct from `tangl.core.token.Token`. |
-| Zone (Tier P2) | A `group_type="zone"` group containing pieces. |
+| Cursor | One participant's traversal through a story. Each cursor has its own journal channel; envelopes are per-cursor. |
+| Channel | The envelope stream for one cursor. Multi-cursor sessions have multiple channels coordinated by bundle logic. |
+| Participant / Owner | The account or identity behind a cursor. Used for `owner_only` visibility and `visibility=[participant_ids]` audience routing. |
+| Info channel | An advisory side-projection of world state queryable via the info endpoint (§6.7) with an opaque `query` descriptor (§1.6) and advertised in `metadata.info_affordances`. |
+| Piece (Tier P2) | Identified, state-bearing surface element (card, tile, die, etc.). UI concept; distinct from `tangl.core.token.Token`. May be realized (has backend UID) or unrealized (an offer). |
+| Offer (Tier P2) | A `PieceFragment` with `realized=False`. Becomes a real piece on commit. |
+| Zone (Tier P2) | A `group_type="zone"` group containing pieces. May carry `constraints` (semantic), `layout_hints` (visual), and `layout_hints.graph.edges` (addressable adjacencies). |
+| Edge (Tier P2) | An adjacency relation between zones, addressable as a placement target via `PlaceAccepts.edge_ref`. |
+| Slot (Tier P2) | Recommended visual-treatment tag for a zone with `constraints.capacity` set. Not a contract entry. |
+| Catalog (Tier P2) | Recommended visual-treatment tag for a zone whose members are unrealized pieces. Not a contract entry. |
+| Connection (Tier P2) | Recommended visual-treatment tag for a zone or edge that models a route between locations. Not a contract entry. |
 | Profile (Tier P2) | A non-normative descriptor of how a `piece.kind` is used. Drives port-conformance subsetting. |
-| Predicate (Tier P2) | An author-registered, backend-evaluated boolean function referenced by `predicate_ref`. |
+| Predicate (Tier P2) | An author-registered, backend-evaluated boolean function referenced by `predicate_ref`. Per §0.6, need not be referentially transparent. |
+| Ritual (Tier P2) | A presentation enhancement that elapses time to dramatize a backend-canonical outcome. Subject to §5.2 Time Parity. |
 | Tier S/P1/P2/P3 | This document's stratification of stable vs. proposed vocabulary. |
 
-## Appendix B — Implementation questions and decisions
+## Appendix B — Open questions (working list)
 
-1. **`payload_type` wrapper** in webapp `ChoiceInputView`: default decision is
-   kill or fold into a concrete `Accepts` variant; do not standardize a second
-   wrapper unless an author case appears.
-2. **`render_profile` query parameter** on `/story/do`: document concrete
-   profiles or remove it. The vocabulary does not define render profiles as a
-   parallel contract.
-3. **Legacy `JournalStoryUpdate[]` adapters** in
-   `apps/web/src/components/story/fragmentUtils.ts`: keep only as a sunset
-   compatibility path while fragment-stream rendering takes over.
-4. **Predicate registration protocol** (§7.4): blocked pending an author MVP;
-   keep dependencies in the blocked list rather than Tier S fixtures.
-5. **Conformance fixture format**: JSON is the committed cross-language format.
-   YAML is documentation-only unless commentability becomes load-bearing.
-6. **Group fragment `dialog` vs DialogFragment**: ports MAY treat them
-   identically. Promote extra fields to `DialogFragment` if needed; otherwise
-   plan retirement of the duplicate legacy shape.
+1. **`payload_type` wrapper** in webapp `ChoiceInputView`. Kill,
+   formalize, or fold into a specific `Accepts` variant? Default-kill
+   unless an author case appears.
+2. **`render_profile` query parameter** on `/story/do` (currently
+   defaults to `"raw"`). What other profiles exist? Document or
+   remove.
+3. **Sunset clock for legacy `JournalStoryUpdate[]`** in
+   `apps/web/src/components/story/fragmentUtils.ts`. Are any backends
+   still emitting that shape? If not, the adapters can go.
+4. **Predicate registration protocol** (§7.4). Highest-leverage open
+   item. Awaiting an MVP author.
+5. **Conformance fixture format** — JSON confirmed for cross-language
+   portability.
+6. **Group fragment `dialog` vs DialogFragment** — current engine has
+   both. Spec says ports MAY treat them identically. If there's a use
+   case for DialogFragment carrying additional fields, it should be
+   promoted. Else, plan retirement of the legacy shape.
+7. **`PieceFragment.available` / `unavailable_reason` for realized
+   pieces.** These fields make sense for offers (catalog rows). They
+   also plausibly apply to realized pieces (a card grayed because not
+   playable this turn). v1.2 keeps them on base `PieceFragment` for
+   both cases.
+8. **`RitualHints` scope.** Currently on `RollFragment` only. If
+   authors want skip-tuning on `MediaFragment` transitions or other
+   timed presentations, lift `RitualHints` to a shared mixin.
+9. **Cross-channel turn coordination** (§1.5). The contract says
+   bundles own this; the spec does not propose a uniform primitive
+   for "wait for all cursors to commit" or "rotate active cursor."
+   Worth a sketch document at some point but explicitly out of scope
+   for v1.x.
+10. **Info-channel compound queries.** v1.3 resolves the v1.2 sub-
+    addressing question via `InfoAffordance.query: dict[str, Any] |
+    None` — bundles encode whatever compound parameters they need in
+    the descriptor (e.g., `query={"type":"map","region":"hall"}`).
+    Whether the engine team standardizes a sub-set of well-known query
+    keys (`region`, `filter`, `format`) is a future question.
+
+## Appendix C — Cross-references to genre extensions
+
+| Bundle | Document | Highlights |
+|---|---|---|
+| carwars (gamebook) | `bundles/carwars/EXTENSIONS.md` | Slot-zone conventions, `ui_hints.stat_check`, `ui_hints.drag`, Garage turn worked example, RNG combat patterns |
+| hana_smuta (sketch) | `bundles/hana_smuta/EXTENSIONS.md` (TBD) | Card profile, `hand`/`field`/`pile`/`score_pile` zones, `same_property` constraints |
 
 ---
 
-*End of v1.1 draft.*
+*End of v1.3.*

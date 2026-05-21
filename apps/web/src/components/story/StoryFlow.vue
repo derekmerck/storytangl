@@ -24,6 +24,10 @@ import {
 const { $http, $debug, $verbose } = useGlobal()
 const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
 
+const emit = defineEmits<{
+  storyUpdate: [envelope: RuntimeEnvelope]
+}>()
+
 const fragmentRegistry = ref<Record<string, StoryFragment>>({})
 const scenes = ref<StorySceneModel[]>([])
 const userEvents = ref<UserEventStoryFragment[]>([])
@@ -148,6 +152,7 @@ const handlePayload = async (payload: unknown, fallbackPrefix: string) => {
     return
   }
   await applyEnvelope(envelope)
+  emit('storyUpdate', envelope)
 }
 
 const fetchInitialBlocks = async () => {

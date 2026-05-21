@@ -95,6 +95,16 @@ describe('StoryFlow', () => {
     expect(wrapper.text()).toContain('Pay the forty silver')
   })
 
+  it('emits a story update after accepting an initial envelope', async () => {
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    expect(wrapper.emitted('storyUpdate')).toBeTruthy()
+    expect(wrapper.emitted('storyUpdate')![0]![0]).toMatchObject({
+      cursor_id: crossroadsRuntimeEnvelope.cursor_id,
+    })
+  })
+
   it('renders canonical media fragments and remaps media URLs', async () => {
     const wrapper = mountFlow()
     await flushPromises()
@@ -176,6 +186,7 @@ describe('StoryFlow', () => {
     const scenes = wrapper.findAllComponents(StoryBlock)
     expect(scenes.length).toBeGreaterThan(initialCount)
     expect(wrapper.text()).toContain('The stranger slides the folded vellum')
+    expect(wrapper.emitted('storyUpdate')!.length).toBeGreaterThanOrEqual(2)
   })
 
   it('submits command text through the reserved raw command choice', async () => {
