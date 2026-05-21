@@ -707,6 +707,47 @@ that observer's generic vocabulary to its own mechanics package and keep only
 the sandbox adapter here. The sandbox package should remain the dynamic-hub and
 scoped-time host, not the permanent home for every tick-compatible subsystem.
 
+##### Future Work: Timed Process / Counter Vocabulary
+
+`ChargeFacet` and queueing service completions are probably two projections of a
+smaller shared mechanic: a normalized counter or timed process with a progress
+policy and a completion event.
+
+They should not be unified by making triage service time pretend to be lamp oil.
+`ChargeFacet` is useful story vocabulary for batteries, lamp fuel, oxygen,
+ammunition drip, cooldowns, fatigue, and other resources that deplete or refill.
+Queue service time is better modeled as work in progress that schedules or
+emits a completion. The reusable layer underneath both is closer to:
+
+```text
+normalized counter + consumption/progress predicate + warning/completion policy
+```
+
+Examples:
+
+- lamp charge decreases while lit and emits exhaustion when it reaches zero;
+- queue service completes after a normalized duration and emits
+  `service_complete`;
+- a deadline expires at a normalized turn and emits a failure or warning;
+- a build, research, recovery, or cooldown timer progresses while its enabling
+  conditions hold and emits a completion affordance/event.
+
+The queueing proof currently uses the event-calendar path because DES wants
+next-event advancement: when service starts, it schedules completion at
+`now + service_turns`. The lamp proof currently uses the sandbox tick path
+because visible/offscreen depletion is easiest to reason about one normalized
+tick at a time. A future `TimedProcessFacet`, `CountdownFacet`, or similarly
+named mechanics-level type could expose both adapters:
+
+- sandbox tick adapter: observe each normalized tick and mutate the counter;
+- simulation calendar adapter: schedule the next completion directly;
+- journal/story-info adapter: project warnings, exhaustion, completion, and
+  remaining-time summaries.
+
+That promotion should happen only after one more non-lamp and non-queue use case
+proves the common shape. Until then, keep `ChargeFacet` domain-specific and keep
+queue service completion in the simulation package.
+
 #### Effect-Phase Content Injection
 
 Tick observers may produce journalable facts during UPDATE, before the JOURNAL

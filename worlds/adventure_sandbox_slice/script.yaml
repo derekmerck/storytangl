@@ -1,0 +1,111 @@
+label: adventure_sandbox_slice
+
+metadata:
+  title: "Adventure Sandbox Slice"
+  description: "A compact Adventure-like sandbox demo."
+  start_at: adventure.entrance
+
+scenes:
+  adventure:
+    title: "Adventure Sandbox Slice"
+    blocks:
+      entrance:
+        content: |
+          This is not a preservation port. It is a small semantic-compression
+          demo: locations, assets, a lockable grate, a lamp, darkness, and one
+          wounded pirate, all projected through ordinary StoryTangl choices.
+        actions:
+          - text: "Stand at the end of the road"
+            successor: road
+
+      road:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "End of Road"
+        light: true
+        content: |
+          You are standing at the end of a road before a small brick building.
+          Around you is a forest. A small stream flows out of the building and
+          down a gully.
+        links:
+          east: building
+          south: valley
+          down: valley
+          in: building
+
+      building:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "Inside Building"
+        light: true
+        content: |
+          You are inside a building, a well house for a large spring.
+        links:
+          west: road
+          out: road
+          in:
+            kind: message
+            journal: "The pipes are too small."
+
+      valley:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "In A Valley"
+        light: true
+        content: |
+          You are in a valley beside a stream tumbling along a rocky bed.
+        links:
+          north: road
+          up: road
+          south: slit_streambed
+          down: slit_streambed
+
+      slit_streambed:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "At Slit in Streambed"
+        light: true
+        content: |
+          At your feet all the water of the stream splashes into a 2-inch slit
+          in the rock. Downstream the streambed is bare rock.
+        links:
+          north: valley
+          up: valley
+          south: outside_grate
+          down:
+            kind: message
+            journal: "You don't fit through a two-inch slit!"
+
+      outside_grate:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "Outside Grate"
+        light: true
+        content: |
+          You are in a 20-foot depression floored with bare dirt. Set into the
+          dirt is a strong steel grate mounted in concrete.
+        links:
+          north: slit_streambed
+          down:
+            through: grate
+            target: below_grate
+
+      below_grate:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "Below the Grate"
+        content: |
+          You are in a small chamber beneath a 3x3 steel grate to the surface.
+          A low crawl over cobbles leads inward to the west.
+        dark_text: |
+          It is now pitch dark. If you proceed you will likely fall into a pit.
+        links:
+          up:
+            through: grate
+            target: outside_grate
+          west: cobble_crawl
+
+      cobble_crawl:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "In Cobble Crawl"
+        content: |
+          You are crawling over cobbles in a low passage. There is a dim light
+          at the east end of the passage.
+        dark_text: |
+          It is now pitch dark. If you proceed you will likely fall into a pit.
+        links:
+          east: below_grate
