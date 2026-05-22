@@ -429,6 +429,54 @@ PNG/JPG LFS rules.
 
 ---
 
+## Generality: one engine, many skins
+
+The credentials engine is **theme-neutral**. A world supplies only *data* -- the
+restriction map (rules), the permit/credential catalog, the indication
+vocabulary, and the candidate extras -- while the runtime (roster of extras +
+procedurally generated packets + inspect/decide + derived disposition) is
+identical across themes. This is the same reuse the other `mechanics.games`
+kernels already follow (Bag-RPS in `colony_loop`, etc.), and it is a concrete
+*second use case*, which is what justifies generalizing the vocabulary now.
+
+Build Phase A accordingly: **no border/travel nouns baked into the kernel.**
+`Indication`, `RestrictionLevel`, and the permit catalog are per-world data; only
+the abstract chain (Indication -> RestrictionLevel -> Presentation -> Outcome)
+and the generator live in the engine.
+
+### Worked second skin: Steam-Automata Chop Shop
+
+A notes-rich world concept (an underground robot fencing / modification ring)
+reskins the mechanic onto robot legality. Its data lives in a *sibling checkout*,
+not this repo:
+`/Users/derek/dev/storytangl/scratch/old/worlds/chopshop/resources/`
+(`automata_credential_types.yaml`, `automata_parts_list.yaml`,
+`automata_upgrades.yaml`, `scene_notes.yaml`).
+
+- `automata_credential_types.yaml` is `default_credential_types.yaml` reskinned:
+  anonymous "activation stamps" (`valid_period: 0`, no id) and id-bound
+  "inspection / waiver tags" (`valid_period: 100`), over indications
+  work / skilled / luxury (purpose) and passing / weapons / thinking
+  (contraband), with origins CoD / CMG / black-market mapping onto `Region`.
+- A unit's **components and upgrades determine its true indications**: a milspec
+  chassis grants combat (needs a weapon waiver), a simulacrum chassis grants
+  `passing` (needs a passing waiver), and illegal mods like `thinking` or
+  `cloaking` are contraband (deny / arrest). Same Indication -> ... -> Outcome
+  derivation, with candidate truth *computed from config* rather than authored
+  directly.
+
+### Direction: assess -> remediate (legalize) loop
+
+Chop shop also inverts the gatekeeper framing. The disposition is not terminal:
+it **feeds an outer shop loop** (buy / repair / legalize). The player can
+*remediate* a unit to change its legality -- part it out, or forge / procure the
+right stamps -- which is the degrade / generate machinery applied from the player
+side (inspect -> assess -> remediate -> re-assess). That is a composite loop
+(shell = shop economy, spike = legality assessment), noted as a future direction
+(not v1 scope) and a natural wing of the unified showcase world.
+
+---
+
 ## Scratch disposition: keep / adapt / drop
 
 - **Keep as canonical narrative:** `README.md` (the encounter spec) and
