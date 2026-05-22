@@ -317,11 +317,11 @@ def validate_successor_exists(*, caller, ctx, **kw):
 
 @on_prereqs
 def descend_into_container(*, caller, ctx, **kw):
-    """If the cursor is a container, redirect to its source member.
+    """If the cursor is a container, redirect to its active entry member.
 
     This is the only special traversal logic in the whole system.  Everything
     else is generic pipeline execution.  Container descent chains naturally:
-    if the source is also a container, its own PREREQS will fire
+    if the entry is also a container, its own PREREQS will fire
     ``descend_into_container`` again, descending further.
 
     Priority: EARLY-ish — should fire before triggered edge checks, because
@@ -330,8 +330,13 @@ def descend_into_container(*, caller, ctx, **kw):
     not entries).
     """
     if isinstance(caller, TraversableNode) and caller.is_container:
-        logger.debug("Container descent: %s → %s", caller.get_label(), caller.source.get_label())
-        return caller.enter()
+        edge = caller.enter(ctx=ctx)
+        logger.debug(
+            "Container descent: %s → %s",
+            caller.get_label(),
+            edge.successor.get_label(),
+        )
+        return edge
     return None
 
 

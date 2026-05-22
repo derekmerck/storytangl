@@ -1651,16 +1651,14 @@ class Resolver:
         if next(unsatisfied_deps, None) is not None:
             return False
 
-        # Containers must have a reachable sink from their source.
+        # Container frontier viability delegates to the active entry target.
+        # Whole-container route-to-sink analysis is a static-analysis concern,
+        # not a runtime availability gate.
         if isinstance(node, TraversableNode) and node.is_container:
-            source = node.source
-            sink = node.sink
-            if source is None or sink is None:
-                return False
-            ns = None
-            if _ctx is not None and hasattr(_ctx, "get_ns"):
-                ns = dict(_ctx.get_ns(source))
-            if not node.has_forward_progress(source, ns=ns):
+            try:
+                if not node.enterable(ctx=_ctx):
+                    return False
+            except (RuntimeError, TypeError, ValueError):
                 return False
 
         return True

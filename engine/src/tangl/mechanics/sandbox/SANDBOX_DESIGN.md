@@ -131,11 +131,37 @@ The current v38 architecture already has most of the sandbox substrate:
   which gives generated choices their own activation conditions and mutations.
 - `TraversableEdge.return_phase` supports jump-and-return interactions.
 - Target-node availability expresses entry gating.
+- VM container entry projection lets a sandbox hub, questline, or board-like
+  scope re-enter through a remembered or conditional child without creating a
+  sandbox cursor.
 - Namespace gathering exposes caller, ancestor, role, setting, graph, and world
   locals to predicates and render.
 
 The sandbox package should add reusable rules and schedule/time vocabulary, not
 a second VM.
+
+### Re-entrant Hubs And Board-like Scopes
+
+Sandbox hubs are ordinary traversable containers that happen to project
+location-centered affordances. When a hub needs to resume somewhere other than
+its default source, it should use the VM's `resolve_entry(ctx)` / `enter(ctx)`
+contract rather than a sandbox-specific traversal path. A town hub can resume a
+tavern questline, a castle escape, or a local board-game phase by changing the
+container's continuation target; the VM still follows one cursor through one
+ordinary descent edge at a time.
+
+Board-game and track interactions fit this same model. The board or track can
+be a constrained sandbox-like scope whose active entry is the current phase or
+space. Token positions, score, supplies, dice state, and turn counters remain
+scope-local state or assets, not VM cursors. `HasGame` may wrap that scope when
+the rules want a game facade, but the underlying traversal remains normal VM
+container entry projection.
+
+Dynamic sandbox affordances remain ephemeral. Each projector clears only the
+actions it previously generated for the active owner node, then rebuilds from
+current location, inventory, mobs, schedule, and scope state. This is the same
+refresh pattern used by game move projection: re-entering a hub means
+recomputing the visible frontier, not trusting stale generated edges.
 
 ### Architectural Legitimacy Guardrail
 

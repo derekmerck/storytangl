@@ -20,9 +20,12 @@ import tangl.vm.traversable as traversable_module
 from tangl.core import Graph
 from tangl.core.runtime_op import Predicate
 from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import (
     AnonymousEdge,
     AnyTraversableEdge,
+    ContainerEntryRule,
+    HasContainerEntryProjection,
     TraversableEffect,
     TraversableEdge,
     TraversableNode,
@@ -33,8 +36,18 @@ from tangl.vm.traversable import (
 )
 
 
+class ResumableNode(HasContainerEntryProjection, TraversableNode):
+    """Test container that opts into re-entrant entry projection."""
+
+
 def _node(graph: Graph, **kwargs) -> TraversableNode:
     node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _resumable_node(graph: Graph, **kwargs) -> ResumableNode:
+    node = ResumableNode(**kwargs)
     graph.add(node)
     return node
 
@@ -216,6 +229,99 @@ class TestTraversableNodeContainer:
         assert isinstance(edge, AnonymousEdge)
         assert edge.predecessor is container
         assert edge.successor is entry
+
+    def test_resumable_container_enters_resume_target(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        container.add_child(entry)
+        container.add_child(resumed)
+        container.source_id = entry.uid
+        container.resume_id = resumed.uid
+
+        edge = container.enter()
+        assert edge.successor is resumed
+
+    def test_resumable_container_without_resume_uses_source(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        container.add_child(entry)
+        container.source_id = entry.uid
+
+        assert container.enter().successor is entry
+
+    def test_entry_rule_selects_matching_target(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        strider_entry = _node(g, label="strider_entry")
+        container.add_child(entry)
+        container.add_child(strider_entry)
+        container.source_id = entry.uid
+        container.locals["befriended_strider"] = True
+        container.entry_rules = [
+            ContainerEntryRule(
+                target_id=strider_entry.uid,
+                availability=[Predicate(expr="befriended_strider")],
+            )
+        ]
+        ctx = PhaseCtx(graph=g, cursor_id=container.uid)
+
+        edge = container.enter(ctx=ctx)
+        assert edge.successor is strider_entry
+
+    def test_resume_overrides_matching_entry_rule(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        rule_entry = _node(g, label="rule_entry")
+        resumed = _node(g, label="resumed")
+        for member in (entry, rule_entry, resumed):
+            container.add_child(member)
+        container.source_id = entry.uid
+        container.resume_id = resumed.uid
+        container.locals["rule_matches"] = True
+        container.entry_rules = [
+            ContainerEntryRule(
+                target_id=rule_entry.uid,
+                availability=[Predicate(expr="rule_matches")],
+            )
+        ]
+        ctx = PhaseCtx(graph=g, cursor_id=container.uid)
+
+        assert container.enter(ctx=ctx).successor is resumed
+
+    def test_resume_target_outside_container_fails_loudly(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        elsewhere = _node(g, label="elsewhere")
+        container.add_child(entry)
+        container.source_id = entry.uid
+        container.resume_id = elsewhere.uid
+
+        with pytest.raises(ValueError, match="not a member"):
+            container.enter()
+
+    def test_unavailable_resume_target_makes_container_unenterable(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        resumed = _node(
+            g,
+            label="resumed",
+            availability=[Predicate(expr="resume_open")],
+        )
+        container.add_child(entry)
+        container.add_child(resumed)
+        container.source_id = entry.uid
+        container.resume_id = resumed.uid
+        resumed.locals["resume_open"] = False
+        ctx = PhaseCtx(graph=g, cursor_id=container.uid)
+
+        assert container.enterable(ctx=ctx) is False
 
     def test_sink_property(self) -> None:
         g = Graph()
@@ -670,6 +776,21 @@ class TestTraversalContractValidation:
 
         issues = validate_traversal_contracts(g)
         assert any("source_id is set but sink_id is missing" in issue for issue in issues)
+
+    def test_resume_target_not_member_reports_issue(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        source = _node(g, label="entry")
+        sink = _node(g, label="exit")
+        elsewhere = _node(g, label="elsewhere")
+        container.add_child(source)
+        container.add_child(sink)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = elsewhere.uid
+
+        issues = validate_traversal_contracts(g)
+        assert any("resume_id" in issue and "not a member" in issue for issue in issues)
 
     def test_sink_without_source_reports_issue(self) -> None:
         g = Graph()
