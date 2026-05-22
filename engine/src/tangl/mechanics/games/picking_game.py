@@ -47,7 +47,7 @@ class PickingGame(Game[PickingMove]):
         default_factory=dict,
         json_schema_extra={"reset_field": True},
     )
-    terminal_decision: str | None = Field(
+    committed_decision: str | None = Field(
         default=None,
         json_schema_extra={"reset_field": True},
     )
@@ -96,7 +96,7 @@ class PickingGame(Game[PickingMove]):
                 "picking_inspected_targets": list(self.inspected_targets),
                 "picking_revealed_findings": dict(self.revealed_findings),
                 "picking_num_findings": len(self.revealed_findings),
-                "picking_terminal_decision": self.terminal_decision,
+                "picking_committed_decision": self.committed_decision,
                 "picking_decision_options": self.get_decision_targets(),
             }
         )
@@ -174,7 +174,7 @@ class PickingGameHandler(GameHandler[PickingGameT]):
             game.inspected_targets.append(player_move.target)
             result = self.resolve_inspection(game, player_move.target, detail)
         elif player_move.kind == "decide":
-            game.terminal_decision = player_move.target
+            game.committed_decision = player_move.target
             result = self.resolve_decision(game, player_move.target, detail)
         else:
             raise ValueError(f"Unknown picking move kind: {player_move.kind}")
@@ -215,7 +215,7 @@ class PickingGameHandler(GameHandler[PickingGameT]):
         detail["round_result"] = round_result.value
         detail["inspected_targets"] = list(game.inspected_targets)
         detail["revealed_findings"] = dict(game.revealed_findings)
-        detail["terminal_decision"] = game.terminal_decision
+        detail["committed_decision"] = game.committed_decision
         return detail
 
     def get_journal_fragments(self, game: PickingGameT) -> list[ContentFragment] | None:

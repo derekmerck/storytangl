@@ -2,17 +2,21 @@ label: credential_gate
 
 metadata:
   title: "Credential Gate"
-  description: "Inspect a traveler, review the packet, and choose a disposition."
+  description: "Work a checkpoint shift: inspect each traveler's packet and rule on a disposition."
   start_at: gate.entrance
 
+# One re-entrant HasGame block walks the whole roster: each disposition keeps the
+# game READY and re-provisions moves for the next traveler, so no per-candidate
+# story edges are needed. The game only reports terminal once the final candidate
+# is ruled on, at which point the game_won / game_lost exits route to the summary.
 scenes:
   gate:
     title: "Credential Gate"
     blocks:
       entrance:
         content: |
-          The checkpoint shutters rattle in the wind while the next traveler
-          sets a thin packet on the counter.
+          The checkpoint shutters rattle in the wind. A line of travelers waits,
+          packets in hand, while the first sets a thin sheaf on the counter.
         actions:
           - text: "Open the gate ledger"
             successor: challenge
@@ -20,8 +24,8 @@ scenes:
       challenge:
         kind: "credential_gate.domain.CredentialGateBlock"
         content: |
-          The packet looks almost correct at first glance, which is exactly what
-          makes it worth a closer review.
+          Each packet looks almost correct at first glance, which is exactly what
+          makes the line worth a closer review. Work them one at a time.
         continues:
           - successor: victory
             trigger: last
@@ -32,14 +36,10 @@ scenes:
 
       victory:
         content: |
-          The ruling lands cleanly, and the gate line lurches forward around it.
-        actions:
-          - text: "Reset the desk"
-            successor: entrance
+          The last traveler clears the counter. Every call held up, and the line
+          moves on behind you without complaint.
 
       defeat:
         content: |
-          The desk feels suddenly smaller when the wrong call reaches it.
-        actions:
-          - text: "Try again"
-            successor: entrance
+          The shift ends short. At least one ruling was wrong, and the desk feels
+          smaller for it when the tally is read back.
