@@ -1,6 +1,7 @@
 # Credentials Loop Design
 
-**Status:** PROMOTED FAMILY NOTE  
+**Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phases A/B/C/D
+designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -218,3 +219,196 @@ If the credentials family is expanded next, the live design should aim for:
 That should preserve the best lessons from the old *Papers, Please*
 deconstruction without forcing the first implementation to solve everything at
 once.
+
+---
+
+## v1 Landed (2026-05-21): the candidate-roster shift
+
+The first live expansion is implemented in `credentials_game.py` and demoed by
+`worlds/credential_gate`. A single `CredentialsGame` hosts a **roster** of
+`CredentialCase`s walked by one re-entrant `HasGame` block: each disposition keeps
+the game `READY` and re-provisions moves for the next candidate, so there are no
+nested game blocks and no per-candidate story edges. The game reports terminal
+only once the final candidate is decided, at which point the existing
+`game_won` / `game_lost` POSTREQS exits route to a shift summary.
+
+What shipped:
+
+- **`CredentialCase`** -- the single source of truth for per-candidate authored
+  data (documents, hidden facts, packet facts, `correct_disposition`), with
+  reserved seams for Phase A (`region`/`purpose`/`contraband`) and Phase C
+  (`whitelist`/`blacklist`/`bribe_offer`).
+- **`CredentialCaseResult`** -- an auditable record per disposition (chosen vs.
+  expected, correct, findings).
+- **`shift_complete` + `evaluate()`** own shift terminality; `advance_case()`
+  resets only per-case working state; `pass_threshold` defaults to strict
+  all-correct.
+- **`expected_disposition(case)`** -- the single correctness chokepoint, today
+  returning the authored answer (bent by whitelist/blacklist context).
+
+Dispositions are authored per case, and the interaction is inspect -> packet ->
+disposition only. Everything below layers onto this spine.
+
+---
+
+## Implementation Seams (how later phases stay overlays)
+
+Five properties keep Phases A/B/C as extensions rather than entangled rewrites:
+
+1. **`CredentialCase` is pure data.** Every phase adds *fields*; the loop never
+   special-cases them.
+2. **`expected_disposition(case)` is the single correctness chokepoint.** Nothing
+   else decides right vs. wrong.
+3. **Move dispatch is by `move.kind`** in the picking kernel. New interactions are
+   new kinds, not new control flow.
+4. **Shift state is additive** (`case_results` today; `reputation`/`finding_status`
+   later), reset on setup, exported via `to_namespace`.
+5. **Consequences route through namespace + authored POSTREQS edges** in YAML, not
+   hardcoded branches.
+
+---
+
+## Phase A: derived disposition and generated packets
+
+The scratch package under `scratch/mechanics/credentials/` already designed this
+end to end. The work is **port-and-reconcile**, not new invention.
+
+### A.1 Derivation vocabulary (port)
+
+The conceptual core is a chain:
+
+```
+Indication --(restriction map)--> RestrictionLevel --> Presentation --> Outcome
+```
+
+- `credentials-2/enums.py` is the cleanest source: `Indication`,
+  `RestrictionLevel`, `RestrictionMap`, `RegionalRestrictionMaps` (with worked
+  LOCAL / FOREIGN_EAST / FOREIGN_WEST example maps), and a `Presentation` enum
+  whose members are grouped by `Outcome` via `presentations_for_outcome`.
+- Top-level `enums.py` is the complementary richer version: the **Flag `Outcome`
+  severity hierarchy** (CRIME > DENY > ACCEPT, with specific members such as
+  `FORGED_CREDENTIAL`, `MISSING_PERMIT`, `POSSIBLE_*`) plus the full `Move` set
+  and `Move.appropriate_for(outcome)`.
+- `tests/test_outcomes.py` locks the presentation -> outcome mapping; port it as
+  the spec for the canonical vocabulary (reconcile the two enum files into one).
+
+### A.2 derive_disposition
+
+Swap the body of `expected_disposition(case)` from `return case.correct_disposition`
+to a derivation against the shift's `restriction_map`, returning the
+**most-severe applicable Outcome** (the Flag hierarchy encodes that precedence).
+Keep authored `correct_disposition` as an explicit override so v1 cases and pinned
+encounters keep working unchanged.
+
+### A.3 Candidate factory: one pipeline, three entry points
+
+```
+disposition --sample--> failure mode(s) --construct--> packet (CredentialCase)
+   (Tier 3)               (Tier 2)                       (Tier 1)
+```
+
+Each tier supplies data from that point down; it is one funnel, not three paths.
+Tier 1 = explicit packet (v1 today). Tier 2 = declare a failure mode (or none)
+and build it against the current rules; disposition is then derived. Tier 3 =
+declare a disposition and sample an appropriate failure mode.
+
+The construction primitive is **start correct, then degrade**:
+
+```
+case = degrade(build_valid(intent, restriction_map), failure_modes)
+```
+
+`credentialed.py::generate_credentials()` is the worked blueprint: build a proper
+packet from the rules, then apply crime / invalidation / mediation mutators
+(`_forged_credential`, `_wrong_id_holder`, `_hidden_contraband`,
+`_bad_credential`, `_missing_credential`, `_possible_*`), with `outcome.specify()`
+sampling a specific failure within a category. Its doctrine -- *credentials are
+never tested against restrictions; they are created to pass or violate them* --
+is what makes generation tractable. Failure modes compose (multiple corruptions
+on one packet); a correct candidate is `degrade(..., [])`.
+
+### A.4 RosterSpec and pinned encounters
+
+`generate_roster(spec, restriction_map, rng)` returns `list[CredentialCase]` from
+a disposition distribution plus pinned cases. Port the shape from
+`credential_script_models.py` (`outcomes_distribution` /
+`expected_disposition_ratio` per region, `num_encounters`) and
+`credentials-2/cred_check_scene.py` (`sample_outcomes()`, pinned `extras`). This
+realizes "day 1 = 2 accept / 1 deny / 1 arrest, or pin known encounters." It is
+generation-side only; the runtime loop never learns whether a case was authored
+or sampled.
+
+### A.5 Packet-as-tokens (when structure is needed)
+
+When narrative-string findings are no longer enough, the structured packet model
+is `credentials-2/credential.py`: `CredentialType` as a YAML-loaded Singleton
+wrapped by `WrappedSingleton`, with `credential_status` as an overlay flag and
+computed `seal` (`seal.py::Seal.type_for`), issue, and expiry. It deliberately
+mirrors the **Wearable / Outfit-manager** pattern -- the credential packet is to
+the candidate what an outfit is to an actor. `default_credential_types.yaml` is
+the catalog (ticket, asylum, work permit, etc.). This becomes
+`CredentialCase.packet`; the degrade mutators set `credential_status` overlays
+rather than rebuilding tokens.
+
+---
+
+## Phase B: mediation moves
+
+Add a `"mediate"` move kind (`request_document` / `request_search` /
+`verify_id`). Override two methods in `CredentialsGameHandler`:
+`get_available_moves` (super + mediation targets) and `resolve_round` (handle
+`"mediate"`, else `super()`); the picking base is untouched. Add a per-case
+`finding_status` working dict (possible -> cleared / confirmed) reset by
+`advance_case`, which `derive_disposition` reads (e.g. a declined search becomes a
+deny). Port the move set and the discrepancy / mediation table from top-level
+`enums.py` and `notes.md`.
+
+**Optional enabling refactor:** before Phase B, change
+`PickingGameHandler.resolve_round` from `if inspect / elif decide / else raise`
+to dispatch through a `dict[str, resolver]` (or a `resolve_move_kind` hook with
+inspect/decide defaults). This turns "add a move kind" into a registration for
+*any* picking game, keeping B and C as true overlays.
+
+---
+
+## Phase C: context and haggling
+
+Whitelist / blacklist are already wired through `expected_disposition` and
+`_packet_finding`; Phase C only needs authored cases that set the flags plus
+journal flavor. Bribe / threat is another move kind (`accept_bribe` /
+`refuse_bribe`) plus additive shift tallies (`reputation`, `coin`) updated in
+resolution and exported to namespace; richer endings are then authored as extra
+POSTREQS edges keyed on `credential_*` predicates -- no engine change. The
+`ScreeningRound` narrative-override idea from the (dropped) `screening.py`
+(`on_invalid_seal`, `on_allow`, ...) is worth reviving as per-finding journal
+flavor.
+
+---
+
+## Phase D: media (deferred)
+
+The media layer is specced in `credential_forge/credforge.py`,
+`credential_forge/credforge_configs.yaml`, and `credentials-2/journal_models.py`
+(forge for ticket / id-card / permit images, seal images, holder portraits, and
+`JournalCredential` media items). Keep these as the eventual design, but defer
+until the interaction is proven, and use **SVG only** per the repository's
+PNG/JPG LFS rules.
+
+---
+
+## Scratch disposition: keep / adapt / drop
+
+- **Keep / port:** `credentials-2/enums.py` (derivation chain), top-level
+  `enums.py` (Flag severity + `Move` set), `credentials-2/credential.py` +
+  `seal.py` + `default_credential_types.yaml` (token packet model),
+  `credentialed.py::generate_credentials` (degrade-from-correct algorithm),
+  `credential_script_models.py` + `credentials-2/cred_check_scene.py` (roster
+  distribution + pinned extras), `tests/test_outcomes.py` +
+  `tests/test_credential_types.py` (specs).
+- **Keep as deferred:** `credential_forge/*`, `credentials-2/journal_models.py`
+  (media), `outcomes_graph.py` (optional derivation-graph validation tool).
+- **Drop (superseded by v38 Block/HasGame):** `screening.py` (old Challenge/Scene
+  scaffolding -- but salvage the narrative-override hook idea),
+  `papers_please_example.py`, and the empty stubs `credential_check.py`,
+  `candidate.py`, `credentials.py`, `credentials-2/cred_check_*.py`,
+  `id_card.py`, `enums_1.py`, `id_mint.py`, `utils.py`.
