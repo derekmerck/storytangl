@@ -207,12 +207,15 @@ object declarations as semantic facts like `portable`, `lockable`,
 Those traits are authoring compression: the compiler lowers them into typed
 runtime facets, and handlers project ordinary StoryTangl actions from the
 facets.
-The first executable slice lives in
-`engine/tests/mechanics/test_sandbox_adventure_slice.py` and now runs through
-`SandboxSliceCompiler`. This compiler is intentionally below the full loader
-stack: future codecs can decode source formats into the compact slice schema,
-and later world-bundle integration can decide how much of this should become a
-shared story/world compiler layer.
+The compact compiler pressure test lives in
+`engine/tests/mechanics/test_sandbox_adventure_slice.py` and runs through
+`SandboxSliceCompiler`. A playable world-bundle version lives in
+`worlds/adventure_sandbox_slice`; it declares the map as ordinary near-native
+world blocks and uses a small domain setup handler to attach the shared scope,
+assets, fixtures, and pirate. The compiler is intentionally below the full
+loader stack: future codecs can decode source formats into the compact slice
+schema, and later world-bundle integration can decide how much of this should
+become a shared story/world compiler layer.
 
 The compact schema can also declare materialization policy. The current sandbox
 slice compiler is allowed to be fully eager: declared locations, assets, and

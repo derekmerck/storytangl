@@ -19,6 +19,15 @@ See [logic_demo/README.md](logic_demo/README.md) for details.
 **Twine Logic Demo** - The same state-machine idea authored in Twee/Twine and
 decoded through the built-in Twine codec.
 
+### adventure_sandbox_slice/
+**Adventure Sandbox Slice** - A compact Colossal Cave-style sandbox mechanics
+demo with location links, inventory, a lamp, a lockable grate, darkness, and a
+present mob interaction.
+
+### ed_queue_demo/
+**ED Queue Demo** - A deterministic queueing/DES mechanics proof rendered
+through normal StoryTangl journal fragments.
+
 ## Creating a New World
 
 ### Quick Start

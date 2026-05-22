@@ -178,6 +178,35 @@ the graph. Unlike the legacy `TraversableSubgraph` which created hidden `__SOURC
 `__SINK` nodes, v38 designates existing members as source and sink. Edges into the
 container target the container itself; edges out of the container originate from the sink.
 
+**Container entry projection.** `source_id` is the default entry, not the only possible
+entry. A container may opt into re-entry policy by overriding `resolve_entry(ctx)`;
+the built-in `HasContainerEntryProjection` surface supports a remembered `resume_id`
+and ordered conditional entry rules. PREREQS descent calls `enter(ctx)`, which resolves
+the active child and returns an ordinary `AnonymousEdge` to that child. This is still
+one VM cursor: the bookmark is a continuation target, not a second cursor.
+
+**Delegated enterability.** An edge targeting a container first checks the edge's own
+availability, then the container boundary, then the resolved child's availability in a
+derived context for that child. If a remembered resume target exists but is currently
+unavailable, the container is unavailable; it does not silently fall back to an entry
+rule or `source_id`. Malformed targets such as missing nodes or nodes outside the
+container fail loudly at point of use.
+
+**Sink reachability is analysis, not runtime availability.** `has_forward_progress()`
+remains useful for static checks, tests, and authoring diagnostics, but live container
+entry does not prove that the sink is reachable. Sandboxes, board tracks, games, and
+re-entrant story hubs may intentionally loop, wait on schedules, or have no immediate
+terminal path. Runtime enterability only asks whether the active entry can be entered
+under ordinary VM rules; provisioning continues through the normal PLANNING path after
+the descent commits.
+
+**Provisionability preview is dependency-only and non-mutating.** During PLANNING,
+container frontier viability delegates to the resolved entry target and asks whether
+that target's open hard dependencies are already satisfied or have admissible offers
+under `ctx.derive(cursor_id=resolved_entry.uid)`. This preview does not bind providers,
+materialize templates, create dynamic edges, or prove full route solvability. Committed
+traversal still provisions normally after PREREQS descent reaches the resolved entry.
+
 **LCA-based movement.** Every cursor movement is `goto(target)` whose context
 implications are determined by the lowest common ancestor (LCA) of source and target in
 the hierarchy. The ancestor chain at any cursor position defines the complete resource
@@ -509,6 +538,12 @@ entity), `CREATE` (clone/mint a new one), `STUB` (debug/preview fallback, only w
 stubs are allowed), `TOKEN` (specifically a singleton token). Requirements can restrict
 which policies are acceptable.
 
+`Resolver.preview_requirement()` and `Resolver.preview_frontier_node()` expose the
+non-mutating side of the same contract. They gather and filter admissible offers, then
+report viability without invoking offer callbacks, binding dependency providers, or
+creating topology. Container entry projection uses this path to hide an entry whose
+active child has unsatisfied hard requirements that cannot currently be provisioned.
+
 **Selected-path runtime materialization.** When a CREATE or CLONE offer is
 accepted for a traversable requirement, resolver may need to build missing
 structural prefix segments before binding the final provider. The supported
@@ -609,10 +644,18 @@ UPDATE effects fire on arrival. FINALIZE effects fire on departure/commit. The
 `trigger_phase` field on `TraversableEffect` determines which handler fires it.
 
 **Container descent is a PREREQS handler.** When the cursor arrives at a container node
-(`is_container=True`), the system PREREQS handler calls `node.enter()` and returns the
-resulting `AnonymousEdge`. The frame's PREREQS aggregation is `first_result`, so this
-redirect is followed and the pipeline re-runs at the source node. Nested containers
-descend recursively through normal pipeline execution.
+(`is_container=True`), the system PREREQS handler calls `node.enter(ctx)` and returns
+the resulting `AnonymousEdge`. The frame's PREREQS aggregation is `first_result`, so
+this redirect is followed and the pipeline re-runs at the resolved entry node. Nested
+containers descend recursively through normal pipeline execution, each resolving its
+own active entry.
+
+**Dynamic frontier refresh.** Domain packages that project dynamic choices during
+PLANNING must treat those edges as ephemeral affordances. Before rebuilding, a provider
+clears only the previous dynamic edges it generated for that owner node, using tags or
+provenance narrow enough not to delete another provider's work. Re-entering a hub,
+game, or sandbox location therefore recomputes the local frontier from current state
+instead of relying on stale generated paths.
 
 
 ---

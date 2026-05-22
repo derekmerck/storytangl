@@ -34,23 +34,31 @@ from typing import Callable, Iterator
 import pytest
 
 from tangl.core import Graph
+from tangl.core.runtime_op import Predicate
 from tangl.journal.fragments import ContentFragment
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     on_journal,
+    on_provision,
     on_update,
     on_validate,
 )
+from tangl.vm.provision import Dependency, ProvisionPolicy, Requirement
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import Frame
 from tangl.vm.runtime.ledger import Ledger
 from tangl.vm.replay import StepRecord
 from tangl.vm.traversable import (
     AnonymousEdge,
+    HasContainerEntryProjection,
     TraversableEdge,
     TraversableNode,
 )
 import tangl.vm.system_handlers  # side-effect: register default handlers
+
+
+class ResumableNode(HasContainerEntryProjection, TraversableNode):
+    """Test node with re-entrant container entry projection."""
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +68,12 @@ import tangl.vm.system_handlers  # side-effect: register default handlers
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
     node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _resumable_node(graph: Graph, **kwargs) -> ResumableNode:
+    node = ResumableNode(**kwargs)
     graph.add(node)
     return node
 
@@ -203,6 +217,32 @@ class TestValidateGate:
         with pytest.raises(Exception):
             frame.follow_edge(edge)
 
+    def test_container_target_validation_previews_active_entry_dependencies(self) -> None:
+        g = Graph()
+        start = _node(g, label="start")
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        for member in (entry, resumed, sink):
+            container.add_child(member)
+        container.source_id = entry.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        Dependency(
+            registry=g,
+            predecessor_id=resumed.uid,
+            requirement=Requirement(
+                has_identifier="missing",
+                provision_policy=ProvisionPolicy.EXISTING,
+            ),
+        )
+        edge = _edge(g, predecessor_id=start.uid, successor_id=container.uid)
+
+        frame = Frame(graph=g, cursor=start)
+        with pytest.raises(ValueError, match="validation failed"):
+            frame.follow_edge(edge)
+
 
 # ---------------------------------------------------------------------------
 # PREREQS: redirect chains
@@ -263,6 +303,151 @@ class TestPrereqsRedirect:
         frame.resolve_choice(edge_to_container)
         # After descent the cursor should be inside the container
         assert frame.cursor in (container, source)
+
+    def test_container_descent_follows_resume_target(self) -> None:
+        g = Graph()
+        outer = _node(g, label="outer")
+        container = _resumable_node(g, label="container")
+        source = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        for member in (source, resumed, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        edge_to_container = _edge(g, predecessor_id=outer.uid, successor_id=container.uid)
+
+        frame = Frame(graph=g, cursor=outer)
+        frame.resolve_choice(edge_to_container)
+
+        assert frame.cursor is resumed
+
+    def test_container_edge_validation_uses_resolved_entry(self) -> None:
+        g = Graph()
+        outer = _node(g, label="outer")
+        container = _resumable_node(g, label="container")
+        source = _node(g, label="entry")
+        resumed = _node(
+            g,
+            label="resumed",
+            availability=[Predicate(expr="resume_open")],
+        )
+        sink = _node(g, label="exit")
+        for member in (source, resumed, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        resumed.locals["resume_open"] = False
+        edge_to_container = _edge(g, predecessor_id=outer.uid, successor_id=container.uid)
+
+        frame = Frame(graph=g, cursor=outer)
+        with pytest.raises(ValueError, match="Edge validation failed"):
+            frame.resolve_choice(edge_to_container)
+
+    def test_incoming_edge_availability_applies_before_container_entry(self) -> None:
+        g = Graph()
+        outer = _node(g, label="outer")
+        container = _resumable_node(g, label="container")
+        source = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        for member in (source, resumed, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        outer.locals["gate_open"] = False
+        edge_to_container = _edge(
+            g,
+            predecessor_id=outer.uid,
+            successor_id=container.uid,
+            availability=[Predicate(expr="gate_open")],
+        )
+
+        frame = Frame(graph=g, cursor=outer)
+        with pytest.raises(ValueError, match="Edge validation failed"):
+            frame.resolve_choice(edge_to_container)
+
+    def test_committed_container_entry_runs_planning_for_resolved_entry(self) -> None:
+        g = Graph()
+        outer = _node(g, label="outer")
+        container = _resumable_node(g, label="container")
+        source = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        for member in (source, resumed, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        edge_to_container = _edge(g, predecessor_id=outer.uid, successor_id=container.uid)
+        provisioned: list[TraversableNode] = []
+
+        @on_provision
+        def record_provision(caller, *, ctx, **kw):
+            _ = (ctx, kw)
+            if isinstance(caller, TraversableNode):
+                provisioned.append(caller)
+            return None
+
+        frame = Frame(graph=g, cursor=outer)
+        with _cleanup_behaviors(record_provision):
+            frame.resolve_choice(edge_to_container)
+
+        assert resumed in provisioned
+        assert frame.cursor is resumed
+
+    def test_nested_container_descent_resolves_each_active_entry(self) -> None:
+        g = Graph()
+        outer = _node(g, label="outer")
+        parent = _resumable_node(g, label="parent")
+        parent_source = _node(g, label="parent_entry")
+        child = _resumable_node(g, label="child")
+        child_source = _node(g, label="child_entry")
+        child_resume = _node(g, label="child_resume")
+        child_sink = _node(g, label="child_exit")
+        parent_sink = _node(g, label="parent_exit")
+        for member in (child_source, child_resume, child_sink):
+            child.add_child(member)
+        child.source_id = child_source.uid
+        child.sink_id = child_sink.uid
+        child.resume_id = child_resume.uid
+        for member in (parent_source, child, parent_sink):
+            parent.add_child(member)
+        parent.source_id = parent_source.uid
+        parent.sink_id = parent_sink.uid
+        parent.resume_id = child.uid
+        edge_to_parent = _edge(g, predecessor_id=outer.uid, successor_id=parent.uid)
+
+        frame = Frame(graph=g, cursor=outer)
+        frame.resolve_choice(edge_to_parent)
+
+        assert frame.cursor is child_resume
+
+    def test_board_like_container_resumes_current_phase(self) -> None:
+        g = Graph()
+        outer = _node(g, label="outer")
+        board = _resumable_node(g, label="board")
+        roll = _node(g, label="roll")
+        move = _node(g, label="move")
+        resolve = _node(g, label="resolve")
+        for member in (roll, move, resolve):
+            board.add_child(member)
+        board.source_id = roll.uid
+        board.sink_id = resolve.uid
+        board.locals["token_space"] = "space_3"
+        board.locals["score"] = 7
+        board.resume_id = move.uid
+        edge_to_board = _edge(g, predecessor_id=outer.uid, successor_id=board.uid)
+
+        frame = Frame(graph=g, cursor=outer)
+        frame.resolve_choice(edge_to_board)
+
+        assert frame.cursor is move
+        assert board.locals["token_space"] == "space_3"
+        assert board.locals["score"] == 7
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,8 @@
+label: adventure_sandbox_slice
+scripts: script.yaml
+domain_module: adventure_sandbox_slice.domain
+
+metadata:
+  title: "Adventure Sandbox Slice"
+  description: "A feel-preserving Colossal Cave-style sandbox mechanics demo."
+  start_at: adventure.entrance

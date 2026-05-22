@@ -131,11 +131,37 @@ The current v38 architecture already has most of the sandbox substrate:
   which gives generated choices their own activation conditions and mutations.
 - `TraversableEdge.return_phase` supports jump-and-return interactions.
 - Target-node availability expresses entry gating.
+- VM container entry projection lets a sandbox hub, questline, or board-like
+  scope re-enter through a remembered or conditional child without creating a
+  sandbox cursor.
 - Namespace gathering exposes caller, ancestor, role, setting, graph, and world
   locals to predicates and render.
 
 The sandbox package should add reusable rules and schedule/time vocabulary, not
 a second VM.
+
+### Re-entrant Hubs And Board-like Scopes
+
+Sandbox hubs are ordinary traversable containers that happen to project
+location-centered affordances. When a hub needs to resume somewhere other than
+its default source, it should use the VM's `resolve_entry(ctx)` / `enter(ctx)`
+contract rather than a sandbox-specific traversal path. A town hub can resume a
+tavern questline, a castle escape, or a local board-game phase by changing the
+container's continuation target; the VM still follows one cursor through one
+ordinary descent edge at a time.
+
+Board-game and track interactions fit this same model. The board or track can
+be a constrained sandbox-like scope whose active entry is the current phase or
+space. Token positions, score, supplies, dice state, and turn counters remain
+scope-local state or assets, not VM cursors. `HasGame` may wrap that scope when
+the rules want a game facade, but the underlying traversal remains normal VM
+container entry projection.
+
+Dynamic sandbox affordances remain ephemeral. Each projector clears only the
+actions it previously generated for the active owner node, then rebuilds from
+current location, inventory, mobs, schedule, and scope state. This is the same
+refresh pattern used by game move projection: re-entering a hub means
+recomputing the visible frontier, not trusting stale generated edges.
 
 ### Architectural Legitimacy Guardrail
 
@@ -706,6 +732,47 @@ If a hosted observer becomes useful across multiple non-sandbox domains, promote
 that observer's generic vocabulary to its own mechanics package and keep only
 the sandbox adapter here. The sandbox package should remain the dynamic-hub and
 scoped-time host, not the permanent home for every tick-compatible subsystem.
+
+##### Future Work: Timed Process / Counter Vocabulary
+
+`ChargeFacet` and queueing service completions are probably two projections of a
+smaller shared mechanic: a normalized counter or timed process with a progress
+policy and a completion event.
+
+They should not be unified by making triage service time pretend to be lamp oil.
+`ChargeFacet` is useful story vocabulary for batteries, lamp fuel, oxygen,
+ammunition drip, cooldowns, fatigue, and other resources that deplete or refill.
+Queue service time is better modeled as work in progress that schedules or
+emits a completion. The reusable layer underneath both is closer to:
+
+```text
+normalized counter + consumption/progress predicate + warning/completion policy
+```
+
+Examples:
+
+- lamp charge decreases while lit and emits exhaustion when it reaches zero;
+- queue service completes after a normalized duration and emits
+  `service_complete`;
+- a deadline expires at a normalized turn and emits a failure or warning;
+- a build, research, recovery, or cooldown timer progresses while its enabling
+  conditions hold and emits a completion affordance/event.
+
+The queueing proof currently uses the event-calendar path because DES wants
+next-event advancement: when service starts, it schedules completion at
+`now + service_turns`. The lamp proof currently uses the sandbox tick path
+because visible/offscreen depletion is easiest to reason about one normalized
+tick at a time. A future `TimedProcessFacet`, `CountdownFacet`, or similarly
+named mechanics-level type could expose both adapters:
+
+- sandbox tick adapter: observe each normalized tick and mutate the counter;
+- simulation calendar adapter: schedule the next completion directly;
+- journal/story-info adapter: project warnings, exhaustion, completion, and
+  remaining-time summaries.
+
+That promotion should happen only after one more non-lamp and non-queue use case
+proves the common shape. Until then, keep `ChargeFacet` domain-specific and keep
+queue service completion in the simulation package.
 
 #### Effect-Phase Content Injection
 

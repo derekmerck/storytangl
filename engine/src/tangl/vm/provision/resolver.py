@@ -1282,6 +1282,75 @@ class Resolver:
         blockers = self._diagnose_blockers(requirement=requirement, _ctx=_ctx)
         return ViabilityResult(viable=False, chain=[], scope_distance=0, blockers=blockers)
 
+    @staticmethod
+    def _dependency_blocker(
+        dependency: Dependency,
+        *,
+        preview: ViabilityResult,
+    ) -> Blocker:
+        return Blocker(
+            reason="dependency_unprovisionable",
+            context={
+                "dependency_id": str(dependency.uid),
+                "requirement": repr(dependency.requirement),
+                "blockers": [
+                    {
+                        "reason": blocker.reason,
+                        "context": dict(blocker.context),
+                    }
+                    for blocker in preview.blockers
+                ],
+            },
+        )
+
+    def preview_frontier_node(
+        self,
+        node: Node,
+        *,
+        allow_stubs: bool = False,
+        _ctx: VmPhaseCtx | None = None,
+    ) -> ViabilityResult:
+        """Return non-mutating provisionability for one frontier node."""
+        for dependency in node.edges_out(Selector(has_kind=Dependency)):
+            if dependency.satisfied:
+                continue
+            if not dependency.requirement.hard_requirement:
+                continue
+            preview = self.preview_requirement(
+                dependency.requirement,
+                allow_stubs=allow_stubs,
+                _ctx=_ctx,
+            )
+            if not preview.viable:
+                return ViabilityResult(
+                    viable=False,
+                    chain=list(preview.chain),
+                    scope_distance=preview.scope_distance,
+                    blockers=[self._dependency_blocker(dependency, preview=preview)],
+                )
+
+        if isinstance(node, TraversableNode) and node.is_container:
+            if not node.enterable(ctx=_ctx):
+                return ViabilityResult(
+                    viable=False,
+                    blockers=[
+                        Blocker(
+                            reason="entry_unavailable",
+                            context={"node_id": str(node.uid)},
+                        )
+                    ],
+                )
+            target = node.resolve_entry(ctx=_ctx)
+            target_ctx = _ctx.derive(cursor_id=target.uid) if _ctx is not None else None
+            target_resolver = Resolver.from_ctx(target_ctx) if target_ctx is not None else self
+            return target_resolver.preview_frontier_node(
+                target,
+                allow_stubs=allow_stubs,
+                _ctx=target_ctx,
+            )
+
+        return ViabilityResult(viable=True)
+
     def _preview_viable_offer(
         self,
         *,
@@ -1651,16 +1720,21 @@ class Resolver:
         if next(unsatisfied_deps, None) is not None:
             return False
 
-        # Containers must have a reachable sink from their source.
+        # Container frontier viability delegates to the active entry target.
+        # Whole-container route-to-sink analysis is a static-analysis concern,
+        # not a runtime availability gate.
         if isinstance(node, TraversableNode) and node.is_container:
-            source = node.source
-            sink = node.sink
-            if source is None or sink is None:
+            if not node.enterable(ctx=_ctx):
                 return False
-            ns = None
-            if _ctx is not None and hasattr(_ctx, "get_ns"):
-                ns = dict(_ctx.get_ns(source))
-            if not node.has_forward_progress(source, ns=ns):
+            target = node.resolve_entry(ctx=_ctx)
+            target_ctx = _ctx.derive(cursor_id=target.uid) if _ctx is not None else None
+            target_resolver = Resolver.from_ctx(target_ctx) if target_ctx is not None else self
+            preview = target_resolver.preview_frontier_node(
+                target,
+                allow_stubs=allow_stubs,
+                _ctx=target_ctx,
+            )
+            if not preview.viable:
                 return False
 
         return True
