@@ -271,7 +271,24 @@ Five properties keep Phases A/B/C as extensions rather than entangled rewrites:
 ## Phase A: derived disposition and generated packets
 
 The scratch package under `scratch/mechanics/credentials/` already designed this
-end to end. The work is **port-and-reconcile**, not new invention.
+end to end. The work is **port-and-reconcile**, not new invention. Its
+`README.md` is the canonical encounter spec (rules-per-indication, candidate
+truth vs. presentation, derived expected disposition, blacklist/whitelist, and
+the haggling twist where a candidate may bribe for a *denial*).
+
+### A.0 Why generate, not validate (the central lesson)
+
+The scratch work first tried to **algorithmically validate** an author-produced
+packet -- inspect the documents, compare against the rules, and *infer* the
+correct disposition. That path is a trap: it forces the engine to re-derive
+intent from artifacts, and every new failure type needs new validation logic.
+
+The decisive pivot was to **build the packet to match the intended disposition**
+instead. Generation is strictly easier than inference, it guarantees the only
+discrepancies present are the intended ones, and it is what makes the
+specification funnel (A.3) possible at all. Do not reintroduce a packet-validator
+to compute dispositions; dispositions are an *input* to generation, derived for
+scoring only via `expected_disposition`.
 
 ### A.1 Derivation vocabulary (port)
 
@@ -338,7 +355,23 @@ realizes "day 1 = 2 accept / 1 deny / 1 arrest, or pin known encounters." It is
 generation-side only; the runtime loop never learns whether a case was authored
 or sampled.
 
-### A.5 Packet-as-tokens (when structure is needed)
+### A.5 Rules are an authored story lever
+
+The `restriction_map` is not engine configuration -- it is a **story knob the
+author sets per day** ("no asylum from the east today"; "no weapons permits from
+the west"). Changing the rules changes *which failure modes can even exist*: a
+forbidden indication cannot be cleared by any permit, an allowed one cannot
+produce a missing-permit failure, and so on. So the available failure-mode space
+is **derived from the current rules**, and generation (A.3) samples only from
+that derived space.
+
+`outcomes_graph.py` exists for exactly this: it visualizes the
+`Indication -> RestrictionLevel -> Presentation -> Outcome` graph under a given
+rule set, so an author can *see* which dispositions and failure modes are
+reachable today before committing a day's rules. It is an authoring/validation
+aid for rule sets, not a runtime component.
+
+### A.6 Packet-as-tokens (when structure is needed)
 
 When narrative-string findings are no longer enough, the structured packet model
 is `credentials-2/credential.py`: `CredentialType` as a YAML-loaded Singleton
@@ -398,6 +431,9 @@ PNG/JPG LFS rules.
 
 ## Scratch disposition: keep / adapt / drop
 
+- **Keep as canonical narrative:** `README.md` (the encounter spec) and
+  `notes.md` (the discrepancy / mediation taxonomy). These are the design of
+  record for the mechanic, not just background.
 - **Keep / port:** `credentials-2/enums.py` (derivation chain), top-level
   `enums.py` (Flag severity + `Move` set), `credentials-2/credential.py` +
   `seal.py` + `default_credential_types.yaml` (token packet model),
@@ -406,7 +442,10 @@ PNG/JPG LFS rules.
   distribution + pinned extras), `tests/test_outcomes.py` +
   `tests/test_credential_types.py` (specs).
 - **Keep as deferred:** `credential_forge/*`, `credentials-2/journal_models.py`
-  (media), `outcomes_graph.py` (optional derivation-graph validation tool).
+  (media).
+- **Keep as an authoring aid:** `outcomes_graph.py` -- visualizes the reachable
+  failure-mode / disposition space under a given rule set (see A.5), for vetting
+  a day's authored rules. Not a runtime component.
 - **Drop (superseded by v38 Block/HasGame):** `screening.py` (old Challenge/Scene
   scaffolding -- but salvage the narrative-override hook idea),
   `papers_please_example.py`, and the empty stubs `credential_check.py`,
