@@ -1,7 +1,8 @@
 # Credentials Loop Design
 
-**Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phases A/B/C/D
-designed below as overlays  
+**Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A.1 LANDED
+(rules-derived dispositions, 2026-05-22); Phases A.2+/B/C/D designed below as
+overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -359,6 +360,18 @@ discrepancies present are the intended ones, and it is what makes the
 specification funnel (A.3) possible at all. Do not reintroduce a packet-validator
 to compute dispositions; dispositions are an *input* to generation, derived for
 scoring only via `expected_disposition`.
+
+**A.1 landed (2026-05-22).** `credentials_enums.py` holds the vocabulary
+(`Region`, `Indication`, `RestrictionLevel`, `CredentialStatus`) and the lean
+packet types (`CredentialToken`, `ContrabandItem`); `derive_disposition` reads a
+case only through its **discovery API** (`get_region` / `get_purpose` /
+`id_status` / `credential_for` / `get_contraband`) so the packet's internals stay
+opaque and swappable. `expected_disposition` derives unless an authored
+`correct_disposition` override is set; `credential_gate` now derives all three
+dispositions. Rules are stored as a flat `Restrictions` model (a rule list with
+`level_for` + a `from_map` authoring constructor) rather than an enum-keyed dict,
+because the VM hashes node state with `json.dumps` and enum dict-keys are not
+JSON-serializable. A.2+ below is still pending.
 
 ### A.1 Derivation vocabulary (port)
 

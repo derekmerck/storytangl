@@ -94,11 +94,26 @@ from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, Twen
 from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 from .kim_game import KimGame, KimGameHandler, KimMove
+from .credentials_enums import (
+    ContrabandItem,
+    CredentialStatus,
+    CredentialToken,
+    DEFAULT_RESTRICTIONS,
+    Indication,
+    Region,
+    RestrictionLevel,
+    RestrictionMap,
+    RestrictionRule,
+    Restrictions,
+)
 from .credentials_game import (
+    CredentialCase,
+    CredentialCaseResult,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
     CredentialsMove,
+    derive_disposition,
 )
 
 
@@ -152,6 +167,19 @@ __all__ = [
     "CredentialsGameHandler",
     "CredentialsMove",
     "CredentialDisposition",
+    "CredentialCase",
+    "CredentialCaseResult",
+    "derive_disposition",
+    "ContrabandItem",
+    "CredentialStatus",
+    "CredentialToken",
+    "Indication",
+    "Region",
+    "RestrictionLevel",
+    "RestrictionMap",
+    "RestrictionRule",
+    "Restrictions",
+    "DEFAULT_RESTRICTIONS",
     # Dispatch
     "HasGame",
     "generate_game_journal",

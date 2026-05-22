@@ -5,71 +5,124 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.mechanics.games import HasGame
+from tangl.mechanics.games.credentials_enums import (
+    CredentialStatus,
+    CredentialToken,
+    Indication,
+    Region,
+    Restrictions,
+    RestrictionLevel,
+)
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
-    CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
 )
 from tangl.story import Block
 
 
-def _gate_roster() -> list[CredentialCase]:
-    """A three-candidate shift spanning each disposition.
+# The day's rules for this checkpoint. Travel needs a valid id; work needs a
+# permit (which also needs id). The candidates' dispositions are *derived* from
+# these rules and each packet's structured truth -- not authored.
+GATE_RULES = {
+    Region.LOCAL: {
+        Indication.TRAVEL: RestrictionLevel.WITH_ID,
+        Indication.WORK: RestrictionLevel.WITH_PERMIT,
+        Indication.EMIGRATE: RestrictionLevel.WITH_PERMIT,
+        Indication.WEAPON: RestrictionLevel.WITH_PERMIT,
+        Indication.DRUGS: RestrictionLevel.FORBIDDEN,
+        Indication.SECRETS: RestrictionLevel.FORBIDDEN,
+    },
+}
 
-    One clean traveler (pass), one whose seal is wrong (deny), and one whose
-    packet is fabricated (arrest). The correct answers are authored per case;
-    Phase A will later derive them from a restriction map.
+
+def _gate_roster() -> list[CredentialCase]:
+    """Three candidates whose dispositions derive to pass / deny / arrest.
+
+    The narrative strings drive the inspect loop; the structured truth (region,
+    purpose, id_card, packet) is what ``derive_disposition`` reads against
+    ``GATE_RULES``.
     """
 
     return [
+        # Tomas: travelling with a valid id -> derives PASS.
         CredentialCase(
             candidate_name="Tomas Vey",
             presented_documents={
                 "passport": "A crisp passport, its seal sharp and current.",
-                "travel permit": "A permit stamped for this very week.",
             },
             hidden_facts={},
             packet_hidden_facts={},
-            correct_disposition=CredentialDisposition.PASS,
+            region=Region.LOCAL,
+            purpose=Indication.TRAVEL,
+            id_card=CredentialToken(
+                indication=Indication.TRAVEL, status=CredentialStatus.VALID
+            ),
         ),
+        # Edda: here to work, valid id, but the work permit's seal is missing
+        # (a mitigatable infraction) -> derives DENY.
         CredentialCase(
             candidate_name="Edda Marrow",
             presented_documents={
-                "passport": "A worn passport with a blurred seal.",
-                "travel permit": "A permit stamped for this week.",
+                "passport": "A worn passport with a current seal.",
+                "work permit": "A work permit -- but where is the issuing seal?",
                 "baggage": "A lacquered case with a stubborn clasp.",
             },
             hidden_facts={
-                "passport": "The seal impression is wrong for this border.",
+                "work permit": "The work permit was never sealed by the issuer.",
             },
             packet_hidden_facts={
-                "packet consistency": "The documents do not satisfy this checkpoint's rules.",
+                "packet consistency": "An unsealed permit does not satisfy the work rule.",
             },
-            correct_disposition=CredentialDisposition.DENY,
+            region=Region.LOCAL,
+            purpose=Indication.WORK,
+            id_card=CredentialToken(
+                indication=Indication.WORK, status=CredentialStatus.VALID
+            ),
+            packet=[
+                CredentialToken(
+                    indication=Indication.WORK,
+                    status=CredentialStatus.MISSING_SEAL,
+                    requires_id=True,
+                ),
+            ],
         ),
+        # Goran: here to work with a forged work permit -> derives ARREST.
         CredentialCase(
             candidate_name="Goran Siv",
             presented_documents={
                 "passport": "A passport whose photograph sits oddly on the page.",
-                "travel permit": "A permit from an issuing office that closed years ago.",
+                "work permit": "A work permit with an over-bright, wrong-toned seal.",
             },
             hidden_facts={
-                "passport": "The lamination has been lifted and re-set; the photo is swapped.",
-                "travel permit": "The issuing seal belongs to a defunct authority -- a forgery.",
+                "work permit": "The seal is a forgery -- the impression is fake.",
             },
             packet_hidden_facts={
-                "packet consistency": "Two forged documents in one packet: this is fabricated.",
+                "packet consistency": "A forged permit is fabrication, not a clerical slip.",
             },
-            correct_disposition=CredentialDisposition.ARREST,
+            region=Region.LOCAL,
+            purpose=Indication.WORK,
+            id_card=CredentialToken(
+                indication=Indication.WORK, status=CredentialStatus.VALID
+            ),
+            packet=[
+                CredentialToken(
+                    indication=Indication.WORK,
+                    status=CredentialStatus.FORGED,
+                    requires_id=True,
+                ),
+            ],
         ),
     ]
 
 
 class GateCredentialsGame(CredentialsGame):
-    """Authored checkpoint shift for the demo world."""
+    """Authored checkpoint shift for the demo world (dispositions derived)."""
 
     roster: list[CredentialCase] = Field(default_factory=_gate_roster)
+    restriction_map: Restrictions = Field(
+        default_factory=lambda: Restrictions.from_map(GATE_RULES)
+    )
 
 
 class CredentialGateBlock(HasGame, Block):

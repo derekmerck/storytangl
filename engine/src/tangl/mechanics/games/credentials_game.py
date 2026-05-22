@@ -20,6 +20,16 @@ from pydantic import Field
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
 
+from .credentials_enums import (
+    DEFAULT_RESTRICTIONS,
+    ContrabandItem,
+    CredentialStatus,
+    CredentialToken,
+    Indication,
+    Region,
+    Restrictions,
+    RestrictionLevel,
+)
 from .enums import GameResult, RoundResult
 from .game import Game
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
@@ -37,16 +47,23 @@ CredentialsMove = PickingMove
 
 
 class CredentialCase(BaseModelPlus):
-    """Authored data for one candidate -- the single source of truth per case.
+    """One candidate, with an opaque credential packet behind a discovery API.
 
-    Working state (what the player has inspected, revealed, or decided) lives on
-    :class:`CredentialsGame`; this model is only the static case definition. The
-    Phase A and Phase C fields are reserved seams: they carry no behavior in v1
-    but let later layers swap authored answers for derived ones without
-    reshaping the roster.
+    The narrative strings (``presented_documents`` / ``hidden_facts`` /
+    ``packet_hidden_facts``) drive the v1 inspect loop. The *structured truth*
+    (``region`` / ``purpose`` / ``id_card`` / ``packet`` / ``possessions``) is
+    what :func:`derive_disposition` reads -- but only through the discovery
+    methods below, never by reaching into the fields. That keeps the internal
+    representation swappable (flat tokens today; a Singleton catalog with media
+    later, see ``CREDENTIALS_LOOP_DESIGN.md`` A.6) behind one stable surface.
+
+    ``correct_disposition`` is an optional authored *override*: when set it wins,
+    otherwise the disposition is derived from the rules.
     """
 
     candidate_name: str = "Traveler"
+
+    # --- Narrative surface for the (v1) inspect loop -------------------------
     required_documents: list[str] = Field(
         default_factory=lambda: ["passport", "travel permit"]
     )
@@ -67,17 +84,44 @@ class CredentialCase(BaseModelPlus):
             "packet consistency": "The packet does not satisfy the checkpoint rules as presented.",
         }
     )
-    correct_disposition: CredentialDisposition = CredentialDisposition.DENY
 
-    # --- Phase A seams (candidate truth -> derive_disposition); unused in v1 --
-    region: str | None = None
-    purpose: str | None = None
-    contraband: str | None = None
+    # --- Structured truth (read only via the discovery API below) ------------
+    region: Region = Region.LOCAL
+    purpose: Indication = Indication.TRAVEL
+    id_card: CredentialToken | None = None
+    packet: list[CredentialToken] = Field(default_factory=list)
+    possessions: list[ContrabandItem] = Field(default_factory=list)
 
-    # --- Phase C seams (context overrides / haggling); unused in v1 ----------
+    # Authored override; None means "derive from the rules".
+    correct_disposition: CredentialDisposition | None = None
+
+    # --- Phase C seams (context overrides / haggling) -----------------------
     whitelist: bool = False
     blacklist: bool = False
     bribe_offer: int = 0
+
+    # ----- Discovery API ----------------------------------------------------
+    # The only surface the game loop and derive_disposition may use to ask the
+    # packet about its content, declared intent, and validity.
+
+    def get_region(self) -> Region:
+        return self.region
+
+    def get_purpose(self) -> Indication:
+        return self.purpose
+
+    def id_status(self) -> CredentialStatus | None:
+        """Status of the bearer id, or ``None`` if no id was presented."""
+
+        return self.id_card.status if self.id_card is not None else None
+
+    def credential_for(self, indication: Indication) -> CredentialToken | None:
+        """The presented credential satisfying ``indication``, if any."""
+
+        return next((c for c in self.packet if c.indication is indication), None)
+
+    def get_contraband(self) -> list[ContrabandItem]:
+        return list(self.possessions)
 
 
 class CredentialCaseResult(BaseModelPlus):
@@ -95,7 +139,7 @@ def _default_roster() -> list[CredentialCase]:
     """A two-candidate shift so a bare game is playable and demonstrable."""
 
     return [
-        CredentialCase(),  # blurred seal -> DENY
+        CredentialCase(correct_disposition=CredentialDisposition.DENY),
         CredentialCase(
             candidate_name="Tomas Vey",
             presented_documents={
@@ -107,6 +151,98 @@ def _default_roster() -> list[CredentialCase]:
             correct_disposition=CredentialDisposition.PASS,
         ),
     ]
+
+
+# --- Disposition derivation (reads cases only via the discovery API) --------
+
+_DISPOSITION_SEVERITY: dict[CredentialDisposition, int] = {
+    CredentialDisposition.PASS: 0,
+    CredentialDisposition.DENY: 1,
+    CredentialDisposition.ARREST: 2,
+}
+
+
+def _worse(a: CredentialDisposition, b: CredentialDisposition) -> CredentialDisposition:
+    return a if _DISPOSITION_SEVERITY[a] >= _DISPOSITION_SEVERITY[b] else b
+
+
+def _assess_credential(token: CredentialToken | None) -> CredentialDisposition:
+    if token is None:
+        return CredentialDisposition.DENY  # missing -> produce it (mitigatable)
+    if token.status.is_valid:
+        return CredentialDisposition.PASS
+    if token.status.is_crime:
+        return CredentialDisposition.ARREST  # forged
+    return CredentialDisposition.DENY  # missing seal / bad date / expired
+
+
+def _assess_id(case: CredentialCase) -> CredentialDisposition:
+    status = case.id_status()
+    if status is None:
+        return CredentialDisposition.DENY  # missing id -> produce it (mitigatable)
+    if status.is_valid:
+        return CredentialDisposition.PASS
+    if status.is_crime:
+        return CredentialDisposition.ARREST  # fake / wrong-holder id
+    return CredentialDisposition.DENY
+
+
+def _assess_requirement(
+    case: CredentialCase,
+    indication: Indication,
+    level: RestrictionLevel,
+) -> CredentialDisposition:
+    """Assess one indication against its required level (the two error surfaces)."""
+
+    worst = CredentialDisposition.PASS
+    if level.requires_permit:
+        permit = case.credential_for(indication)
+        worst = _worse(worst, _assess_credential(permit))
+        if permit is not None and not permit.holder_matches:
+            worst = _worse(worst, CredentialDisposition.ARREST)  # permit/id mismatch
+    if level.requires_id:
+        worst = _worse(worst, _assess_id(case))
+    return worst
+
+
+def _assess_contraband(
+    case: CredentialCase,
+    item: ContrabandItem,
+    level: RestrictionLevel,
+) -> CredentialDisposition:
+    if item.concealed:
+        return CredentialDisposition.ARREST  # concealment is a crime
+    if level is RestrictionLevel.FORBIDDEN:
+        return CredentialDisposition.DENY  # declared but forbidden -> relinquish
+    return _assess_requirement(case, item.indication, level)
+
+
+def derive_disposition(
+    case: CredentialCase,
+    restrictions: Restrictions,
+) -> CredentialDisposition:
+    """Derive the correct disposition from the rules and the candidate's packet.
+
+    Reads the candidate only through its discovery API, so the packet's internal
+    representation stays opaque. Returns the most-severe applicable outcome
+    (ARREST > DENY > PASS).
+    """
+
+    region = case.get_region()
+    worst = CredentialDisposition.PASS
+
+    purpose = case.get_purpose()
+    level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
+    if level is RestrictionLevel.FORBIDDEN:
+        worst = _worse(worst, CredentialDisposition.DENY)  # purpose not allowed
+    else:
+        worst = _worse(worst, _assess_requirement(case, purpose, level))
+
+    for item in case.get_contraband():
+        level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
+        worst = _worse(worst, _assess_contraband(case, item, level))
+
+    return worst
 
 
 class CredentialsGame(PickingGame):
@@ -123,6 +259,11 @@ class CredentialsGame(PickingGame):
     allow_arrest: bool = True
     # ``None`` means "every candidate must be correct" (the strict default).
     pass_threshold: int | None = None
+    # The day's rules. Cases derive their disposition against this unless they
+    # carry an authored ``correct_disposition`` override.
+    restriction_map: Restrictions = Field(
+        default_factory=lambda: DEFAULT_RESTRICTIONS.model_copy(deep=True)
+    )
 
     # --- Per-case working state (reset by advance_case) ----------------------
     case_index: int = Field(default=0, json_schema_extra={"reset_field": True})
@@ -229,9 +370,9 @@ class CredentialsGame(PickingGame):
     def expected_disposition(self, case: CredentialCase) -> CredentialDisposition:
         """Resolve the correct disposition for ``case``.
 
-        v1 returns the authored answer (bent by whitelist/blacklist context).
-        Phase A will replace the body with ``derive_disposition(case,
-        restriction_map)`` while keeping this call site stable.
+        Context overrides (whitelist/blacklist) win first; then an authored
+        ``correct_disposition`` override if present; otherwise the disposition is
+        derived from the day's rules via :func:`derive_disposition`.
         """
 
         if case.whitelist:
@@ -242,7 +383,9 @@ class CredentialsGame(PickingGame):
                 if self.allow_arrest
                 else CredentialDisposition.DENY
             )
-        return case.correct_disposition
+        if case.correct_disposition is not None:
+            return case.correct_disposition
+        return derive_disposition(case, self.restriction_map)
 
     # ----- roster advancement ----------------------------------------------
     def advance_case(self) -> None:
