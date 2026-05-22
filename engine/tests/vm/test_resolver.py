@@ -1406,6 +1406,23 @@ class TestResolverFrontierNode:
         resolver = Resolver(entity_groups=[])
         assert resolver.resolve_frontier_node(container, _ctx=ctx) is False
 
+    def test_malformed_container_entry_target_raises(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        source = _node(g, label="entry")
+        sink = _node(g, label="exit")
+        elsewhere = _node(g, label="elsewhere")
+        for member in (source, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = elsewhere.uid
+        ctx = PhaseCtx(graph=g, cursor_id=container.uid)
+
+        resolver = Resolver(entity_groups=[])
+        with pytest.raises(ValueError, match="not a member"):
+            resolver.resolve_frontier_node(container, _ctx=ctx)
+
     def test_node_with_empty_fanout_still_resolves_true(self) -> None:
         g = Graph()
         node = _node(g, label="hub")

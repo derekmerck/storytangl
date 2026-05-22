@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tangl.core import Priority, Selector, Token
+from tangl.core import Graph, Priority, Selector, Token
 from tangl.mechanics.sandbox import (
     ChargeFacet,
     ContainerFacet,
@@ -18,28 +18,34 @@ from tangl.mechanics.sandbox import (
     SandboxVisibilityRule,
     SwitchableFacet,
 )
-from tangl.vm import on_prereqs
+from tangl.vm import on_provision
+from tangl.vm.ctx import VmPhaseCtx
 
 
 class AdventureSandboxLocation(SandboxLocation):
     """A demo Adventure-like location using the generic sandbox handlers."""
 
 
-def _location(graph, label: str) -> AdventureSandboxLocation:
+def _location(graph: Graph, label: str) -> AdventureSandboxLocation:
     location = graph.find_one(Selector.from_identifier(label))
     if not isinstance(location, AdventureSandboxLocation):
         raise ValueError(f"Adventure sandbox location {label!r} is missing")
     return location
 
 
-def _asset_type(label: str, **values) -> SandboxCompiledAssetType:
+def _asset_type(label: str, **values: object) -> SandboxCompiledAssetType:
     existing = SandboxCompiledAssetType.get_instance(label)
     if existing is not None:
         return existing
     return SandboxCompiledAssetType(label=label, **values)
 
 
-def _add_asset(graph, label: str, location: AdventureSandboxLocation, **values) -> Token:
+def _add_asset(
+    graph: Graph,
+    label: str,
+    location: AdventureSandboxLocation,
+    **values: object,
+) -> Token[SandboxCompiledAssetType]:
     asset_type = _asset_type(label, **values)
     asset = Token[SandboxCompiledAssetType](token_from=label, label=label)
     graph.add(asset)
@@ -47,7 +53,7 @@ def _add_asset(graph, label: str, location: AdventureSandboxLocation, **values) 
     return asset
 
 
-def _ensure_adventure_sandbox(graph) -> None:
+def _ensure_adventure_sandbox(graph: Graph) -> None:
     if graph.find_one(Selector.from_identifier("cave")) is not None:
         return
 
@@ -171,16 +177,20 @@ def _ensure_adventure_sandbox(graph) -> None:
     scope.mobs.append(pirate)
 
 
-@on_prereqs(
+@on_provision(
     wants_caller_kind=AdventureSandboxLocation,
     wants_exact_kind=False,
     priority=Priority.FIRST,
 )
-def setup_adventure_sandbox(*, caller, ctx, **_kw):
+def setup_adventure_sandbox(
+    *,
+    caller: AdventureSandboxLocation,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> None:
     """Attach the demo's shared sandbox state before location planning."""
 
-    if not isinstance(caller, AdventureSandboxLocation):
-        return None
+    _ = ctx
     _ensure_adventure_sandbox(caller.graph)
     return None
 

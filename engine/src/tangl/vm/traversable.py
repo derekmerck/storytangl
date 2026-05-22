@@ -44,6 +44,7 @@ from tangl.core import Edge, Graph, HierarchicalNode, Node, Selector
 from tangl.core.bases import BaseModelPlus, HasState
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.type_hints import StringMap
+from .ctx import VmPhaseCtx
 from .resolution_phase import ResolutionPhase
 
 
@@ -259,7 +260,12 @@ class ContainerEntryRule(BaseModelPlus):
     label: str | None = None
     """Optional diagnostic label for authoring and tests."""
 
-    def available_for(self, container: object, *, ctx: Any = None) -> bool:
+    def available_for(
+        self,
+        container: TraversableNode,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> bool:
         """Return whether this rule matches the current container context."""
         if not self.availability:
             return True
@@ -288,7 +294,7 @@ class HasContainerEntryProjection(BaseModelPlus):
     entry_rules: list[ContainerEntryRule] = Field(default_factory=list)
     """Ordered conditional entry rules evaluated when no resume target exists."""
 
-    def resolve_entry(self, *, ctx: Any = None) -> TraversableNode:
+    def resolve_entry(self, *, ctx: VmPhaseCtx | None = None) -> TraversableNode:
         """Resolve the active entry target for this container."""
         if self.resume_id is not None:
             return self._resolve_entry_target(self.resume_id, field_name="resume_id")
@@ -588,7 +594,7 @@ class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
             )
         return target
 
-    def resolve_entry(self, *, ctx: Any = None) -> TraversableNode:
+    def resolve_entry(self, *, ctx: VmPhaseCtx | None = None) -> TraversableNode:
         """Resolve the active entry target for this container.
 
         Plain containers always enter through ``source_id``. Re-entrant
@@ -601,22 +607,40 @@ class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
             raise RuntimeError(f"{self!r} source_id is missing")
         return self._resolve_entry_target(self.source_id, field_name="source_id")
 
-    def enterable(self, *, ctx: Any = None) -> bool:
+    def enterable(
+        self,
+        *,
+        ctx: VmPhaseCtx | None = None,
+        ns: Mapping[str, Any] | None = None,
+    ) -> bool:
         """Return whether this container's active entry is currently available."""
         if not self.is_container:
-            return self.available(ctx=ctx)
+            return self.available(ns=ns, ctx=ctx)
 
-        ns = ctx.get_ns(self) if ctx is not None else None
-        rand = _resolve_rand(rand=None, ctx=ctx)
-        if not HasAvailability.available(self, ns=ns, ctx=ctx, rand=rand):
+        explicit_ns = ns
+        container_ns = explicit_ns
+        if container_ns is None and ctx is not None:
+            container_ns = ctx.get_ns(self)
+        container_rand = _resolve_rand(rand=None, ctx=ctx)
+        if not HasAvailability.available(
+            self,
+            ns=container_ns,
+            ctx=ctx,
+            rand=container_rand,
+        ):
             return False
 
         target = self.resolve_entry(ctx=ctx)
         target_ctx = ctx.derive(cursor_id=target.uid) if ctx is not None else None
-        target_ns = target_ctx.get_ns(target) if target_ctx is not None else None
-        return target.available(ns=target_ns, ctx=target_ctx, rand=rand)
+        target_ns = explicit_ns
+        if target_ns is None and target_ctx is not None:
+            target_ns = target_ctx.get_ns(target)
+        if target.is_container:
+            return target.enterable(ctx=target_ctx, ns=explicit_ns)
+        target_rand = _resolve_rand(rand=None, ctx=target_ctx)
+        return target.available(ns=target_ns, ctx=target_ctx, rand=target_rand)
 
-    def enter(self, *, ctx: Any = None) -> AnonymousEdge:
+    def enter(self, *, ctx: VmPhaseCtx | None = None) -> AnonymousEdge:
         """Produce the descent edge from this container to its active entry.
 
         Called by the system-level prereq handler when the cursor arrives at a
@@ -861,7 +885,7 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
             successor_ns = ctx.get_ns(successor)
 
         if isinstance(successor, TraversableNode) and successor.is_container:
-            return successor.enterable(ctx=ctx)
+            return successor.enterable(ctx=ctx, ns=ns)
 
         if not hasattr(successor, "available"):
             return True
@@ -965,13 +989,14 @@ class AnonymousEdge:
         if self.successor is None:
             return False
         rand = _resolve_rand(rand=None, ctx=ctx)
+        explicit_ns = ns
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(self.successor)
         if (
             isinstance(self.successor, TraversableNode)
             and self.successor.is_container
         ):
-            return self.successor.enterable(ctx=ctx)
+            return self.successor.enterable(ctx=ctx, ns=explicit_ns)
         if not hasattr(self.successor, "available"):
             return True
         return self.successor.available(ns=ns, ctx=ctx, rand=rand)

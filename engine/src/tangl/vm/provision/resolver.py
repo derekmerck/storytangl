@@ -1655,10 +1655,7 @@ class Resolver:
         # Whole-container route-to-sink analysis is a static-analysis concern,
         # not a runtime availability gate.
         if isinstance(node, TraversableNode) and node.is_container:
-            try:
-                if not node.enterable(ctx=_ctx):
-                    return False
-            except (RuntimeError, TypeError, ValueError):
+            if not node.enterable(ctx=_ctx):
                 return False
 
         return True

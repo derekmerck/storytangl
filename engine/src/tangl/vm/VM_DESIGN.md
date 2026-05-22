@@ -200,6 +200,13 @@ terminal path. Runtime enterability only asks whether the active entry can be en
 under ordinary VM rules; provisioning continues through the normal PLANNING path after
 the descent commits.
 
+**Provisionability preview is future work.** Current delegated enterability checks
+boundary availability and resolved-entry availability. It does not perform a
+non-mutating preview of the resolved entry's hard dependency satisfaction before the
+container is offered. A future resolver preview surface should be able to ask whether
+`ctx.derive(cursor_id=resolved_entry.uid)` has satisfied or provisionable hard
+requirements without committing bindings, dynamic edges, or graph mutations.
+
 **LCA-based movement.** Every cursor movement is `goto(target)` whose context
 implications are determined by the lowest common ancestor (LCA) of source and target in
 the hierarchy. The ancestor chain at any cursor position defines the complete resource

@@ -68,7 +68,8 @@ class TestAdventureSandboxWorld:
         enter = next(
             edge
             for edge in ledger.cursor.edges_out()
-            if edge.label == "action_entrance_0"
+            if isinstance(edge, Action)
+            and edge.text == "Stand at the end of the road"
         )
         ledger.resolve_choice(enter.uid)
 

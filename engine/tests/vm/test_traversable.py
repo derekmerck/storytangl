@@ -323,6 +323,50 @@ class TestTraversableNodeContainer:
 
         assert container.enterable(ctx=ctx) is False
 
+    def test_nested_unavailable_resume_makes_parent_unenterable(self) -> None:
+        g = Graph()
+        parent = _resumable_node(g, label="parent")
+        child = _resumable_node(g, label="child")
+        parent_entry = _node(g, label="parent_entry")
+        parent_exit = _node(g, label="parent_exit")
+        child_entry = _node(g, label="child_entry")
+        child_resume = _node(
+            g,
+            label="child_resume",
+            availability=[Predicate(expr="child_open")],
+        )
+        child_exit = _node(g, label="child_exit")
+        for member in (child_entry, child_resume, child_exit):
+            child.add_child(member)
+        child.source_id = child_entry.uid
+        child.sink_id = child_exit.uid
+        child.resume_id = child_resume.uid
+        child_resume.locals["child_open"] = False
+        for member in (parent_entry, child, parent_exit):
+            parent.add_child(member)
+        parent.source_id = parent_entry.uid
+        parent.sink_id = parent_exit.uid
+        parent.resume_id = child.uid
+        ctx = PhaseCtx(graph=g, cursor_id=parent.uid)
+
+        assert parent.enterable(ctx=ctx) is False
+
+    def test_container_successor_preserves_explicit_namespace(self) -> None:
+        g = Graph()
+        source = _node(g, label="source")
+        container = _resumable_node(g, label="container")
+        entry = _node(
+            g,
+            label="entry",
+            availability=[Predicate(expr="entry_open")],
+        )
+        container.add_child(entry)
+        container.source_id = entry.uid
+        edge = _edge(g, predecessor_id=source.uid, successor_id=container.uid)
+
+        assert edge.available(ns={"entry_open": True}) is True
+        assert edge.available(ns={"entry_open": False}) is False
+
     def test_sink_property(self) -> None:
         g = Graph()
         container = _node(g, label="scene")
