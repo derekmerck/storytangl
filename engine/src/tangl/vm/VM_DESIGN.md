@@ -200,12 +200,12 @@ terminal path. Runtime enterability only asks whether the active entry can be en
 under ordinary VM rules; provisioning continues through the normal PLANNING path after
 the descent commits.
 
-**Provisionability preview is future work.** Current delegated enterability checks
-boundary availability and resolved-entry availability. It does not perform a
-non-mutating preview of the resolved entry's hard dependency satisfaction before the
-container is offered. A future resolver preview surface should be able to ask whether
-`ctx.derive(cursor_id=resolved_entry.uid)` has satisfied or provisionable hard
-requirements without committing bindings, dynamic edges, or graph mutations.
+**Provisionability preview is dependency-only and non-mutating.** During PLANNING,
+container frontier viability delegates to the resolved entry target and asks whether
+that target's open hard dependencies are already satisfied or have admissible offers
+under `ctx.derive(cursor_id=resolved_entry.uid)`. This preview does not bind providers,
+materialize templates, create dynamic edges, or prove full route solvability. Committed
+traversal still provisions normally after PREREQS descent reaches the resolved entry.
 
 **LCA-based movement.** Every cursor movement is `goto(target)` whose context
 implications are determined by the lowest common ancestor (LCA) of source and target in
@@ -537,6 +537,12 @@ materialize the provider.
 entity), `CREATE` (clone/mint a new one), `STUB` (debug/preview fallback, only when
 stubs are allowed), `TOKEN` (specifically a singleton token). Requirements can restrict
 which policies are acceptable.
+
+`Resolver.preview_requirement()` and `Resolver.preview_frontier_node()` expose the
+non-mutating side of the same contract. They gather and filter admissible offers, then
+report viability without invoking offer callbacks, binding dependency providers, or
+creating topology. Container entry projection uses this path to hide an entry whose
+active child has unsatisfied hard requirements that cannot currently be provisioned.
 
 **Selected-path runtime materialization.** When a CREATE or CLONE offer is
 accepted for a traversable requirement, resolver may need to build missing

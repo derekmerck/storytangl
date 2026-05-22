@@ -1406,6 +1406,61 @@ class TestResolverFrontierNode:
         resolver = Resolver(entity_groups=[])
         assert resolver.resolve_frontier_node(container, _ctx=ctx) is False
 
+    def test_container_entry_dependency_preview_blocks_unprovisionable_entry(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        source = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        for member in (source, resumed, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        dep = _dependency(
+            g,
+            predecessor_id=resumed.uid,
+            requirement=Requirement(
+                has_identifier="missing",
+                provision_policy=ProvisionPolicy.EXISTING,
+            ),
+        )
+        ctx = PhaseCtx(graph=g, cursor_id=container.uid)
+
+        resolver = Resolver(entity_groups=[])
+
+        assert resolver.resolve_frontier_node(container, _ctx=ctx) is False
+        assert dep.satisfied is False
+        assert dep.provider is None
+
+    def test_container_entry_dependency_preview_does_not_bind_provider(self) -> None:
+        g = Graph()
+        container = _resumable_node(g, label="scene")
+        source = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        key = _node(g, label="key")
+        for member in (source, resumed, sink):
+            container.add_child(member)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        dep = _dependency(
+            g,
+            predecessor_id=resumed.uid,
+            requirement=Requirement(
+                has_identifier="key",
+                provision_policy=ProvisionPolicy.EXISTING,
+            ),
+        )
+        ctx = PhaseCtx(graph=g, cursor_id=container.uid)
+
+        resolver = Resolver(entity_groups=[[key]])
+
+        assert resolver.resolve_frontier_node(container, _ctx=ctx) is True
+        assert dep.satisfied is False
+        assert dep.provider is None
+
     def test_malformed_container_entry_target_raises(self) -> None:
         g = Graph()
         container = _resumable_node(g, label="scene")

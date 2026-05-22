@@ -82,6 +82,7 @@ from .dispatch import (
 )
 from .resolution_phase import ResolutionPhase
 from .traversal import get_visit_count, is_first_visit, steps_since_last_visit
+from .runtime.causality import CausalityMode
 from .traversable import HasEffects, TraversableNode, TraversableEdge, AnonymousEdge
 
 if TYPE_CHECKING:
@@ -304,7 +305,18 @@ def validate_successor_exists(*, caller, ctx, **kw):
     if successor is None:
         return False
     if hasattr(caller, "available"):
-        return bool(caller.available(ctx=ctx))
+        if not bool(caller.available(ctx=ctx)):
+            return False
+        if isinstance(successor, TraversableNode) and successor.is_container:
+            from .provision import Resolver
+
+            preview = Resolver.from_ctx(ctx).preview_frontier_node(
+                successor,
+                allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
+                _ctx=ctx,
+            )
+            return preview.viable
+        return True
     if hasattr(successor, "available"):
         ns = ctx.get_ns(successor) if ctx is not None and hasattr(ctx, "get_ns") else None
         return bool(successor.available(ns=ns))

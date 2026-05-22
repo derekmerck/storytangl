@@ -43,6 +43,7 @@ from tangl.vm.dispatch import (
     on_update,
     on_validate,
 )
+from tangl.vm.provision import Dependency, ProvisionPolicy, Requirement
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import Frame
 from tangl.vm.runtime.ledger import Ledger
@@ -214,6 +215,32 @@ class TestValidateGate:
         edge = AnonymousEdge(predecessor=a, successor=orphan)
         frame = Frame(graph=g, cursor=a)
         with pytest.raises(Exception):
+            frame.follow_edge(edge)
+
+    def test_container_target_validation_previews_active_entry_dependencies(self) -> None:
+        g = Graph()
+        start = _node(g, label="start")
+        container = _resumable_node(g, label="scene")
+        entry = _node(g, label="entry")
+        resumed = _node(g, label="resumed")
+        sink = _node(g, label="exit")
+        for member in (entry, resumed, sink):
+            container.add_child(member)
+        container.source_id = entry.uid
+        container.sink_id = sink.uid
+        container.resume_id = resumed.uid
+        Dependency(
+            registry=g,
+            predecessor_id=resumed.uid,
+            requirement=Requirement(
+                has_identifier="missing",
+                provision_policy=ProvisionPolicy.EXISTING,
+            ),
+        )
+        edge = _edge(g, predecessor_id=start.uid, successor_id=container.uid)
+
+        frame = Frame(graph=g, cursor=start)
+        with pytest.raises(ValueError, match="validation failed"):
             frame.follow_edge(edge)
 
 
