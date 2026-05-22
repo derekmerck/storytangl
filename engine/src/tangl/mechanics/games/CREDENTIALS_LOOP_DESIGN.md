@@ -268,6 +268,76 @@ Five properties keep Phases A/B/C as extensions rather than entangled rewrites:
 
 ---
 
+## The rule and failure-mode model
+
+The mechanic runs on a few axes. Stating them precisely here so Phases A/B/C
+implement the same model.
+
+### The restriction axis (and rule deltas)
+
+Each indication sits on one ordered axis, most to least restrictive:
+
+```
+forbidden  ->  allowed with permit (req id)  ->  allowed with id  ->  allowed (anonymous)
+```
+
+`req_id` is a *property of the level*: the two id-bound levels (permit, id)
+require checking the bearer id; the anonymous level does not. A day's authored
+rule change is a **delta along this axis** for some indication ("work moves from
+allowed-with-id to allowed-with-permit today"). Which failure modes are reachable
+follows from where each indication currently sits (see "Rules are an authored
+story lever", A.5).
+
+### Which rule applies (candidate -> bin)
+
+A candidate is mapped to a restriction bin by three factors:
+
+- **origin** (region),
+- **purpose** (the intent indication: travel / work / emigrate / ...),
+- **possessions** (contraband indications: weapon / drugs / secrets / ...).
+
+origin + purpose + each possession select the level(s) that candidate must
+satisfy.
+
+### Two error surfaces per permit
+
+A permitted indication needs a permit *and* verification of the permit against
+the bearer id -- so there are **two independent places to introduce an error**:
+the permit document itself (missing / bad / forged) and the id linkage (the
+permit's holder reference vs. the presented id). Generation and inspection both
+treat these as distinct surfaces.
+
+### Mitigatable infractions vs. crimes
+
+The disposition split turns on whether an error is *fixable in the moment*:
+
+| Error                            | Class       | Fix (mediation)           | Unfixed |
+| -------------------------------- | ----------- | ------------------------- | ------- |
+| Missing document                 | mitigatable | produce it                | deny    |
+| Missing seal                     | mitigatable | return to the signer      | deny    |
+| Openly declared contraband       | mitigatable | hand it over (relinquish) | deny    |
+| Forged seal                      | crime       | --                        | arrest  |
+| Fake id / fake papers (knowing)  | crime       | --                        | arrest  |
+| Concealed contraband             | crime       | (a search reveals it)     | arrest  |
+
+Mitigatable errors are the Phase B mediation moves: a successful fix clears the
+infraction (-> allow); refusal or inability escalates (-> deny). Crimes are not
+clearable; a search is a *detection* move (it exposes concealment), not a fix.
+
+### Origin bends severity (Phase C)
+
+Origin is not only a bin selector -- it modulates outcome severity *after* the
+base disposition is derived:
+
+- a **privileged** origin can have a crime overlooked (arrest -> deny / allow);
+- an **out-of-favor** origin can have a minor infraction charged up
+  (deny -> arrest).
+
+This is the nuanced form of whitelist / blacklist: not a binary pass/arrest, but
+a shift along the severity scale.
+
+---
+
 ## Phase A: derived disposition and generated packets
 
 The scratch package under `scratch/mechanics/credentials/` already designed this
