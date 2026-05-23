@@ -1,8 +1,8 @@
 # Credentials Loop Design
 
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A.1 LANDED
-(rules-derived dispositions, 2026-05-22); Phases A.2+/B/C/D designed below as
-overlays  
+(rules-derived dispositions, 2026-05-22); Phase A.2 LANDED (candidate factory,
+2026-05-22); Phases A.3/B/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -401,7 +401,16 @@ returning the **most-severe applicable disposition** (an explicit
 encounters keep working unchanged. (The two design subsections A.1 and A.2 were
 implemented together as the "A.1 derivation spine" increment.)
 
-### A.3 Candidate factory: one pipeline, three entry points (the A.2 increment)
+### A.3 Candidate factory: one pipeline, three entry points (the A.2 increment, LANDED)
+
+**Landed (2026-05-22)** in `credentials_factory.py`: `build_valid(region, purpose,
+rules, *, contraband)` produces a valid packet (derives PASS); `degrade(case,
+modes)` / `apply_failure` corrupt it per the `FailureMode` catalog;
+`make_case(...)` is the Tier 2 entry; `applicable_modes(case, class)` and
+`sample_failure_mode(case, class, rng)` expose the reachable modes for sampling.
+The round-trip invariant is tested: every mode derives to its class disposition,
+and composition takes the worst. Tier 3 sampling / day spec / lazy roster is A.4
+below (the A.3 increment), still pending.
 
 ```
 disposition --sample--> failure mode(s) --construct--> packet (CredentialCase)

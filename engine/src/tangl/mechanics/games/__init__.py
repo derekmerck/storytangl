@@ -99,6 +99,8 @@ from .credentials_enums import (
     CredentialStatus,
     CredentialToken,
     DEFAULT_RESTRICTIONS,
+    FailureClass,
+    FailureMode,
     Indication,
     Region,
     RestrictionLevel,
@@ -114,6 +116,14 @@ from .credentials_game import (
     CredentialsGameHandler,
     CredentialsMove,
     derive_disposition,
+)
+from .credentials_factory import (
+    applicable_modes,
+    apply_failure,
+    build_valid,
+    degrade,
+    make_case,
+    sample_failure_mode,
 )
 
 
@@ -180,6 +190,14 @@ __all__ = [
     "RestrictionRule",
     "Restrictions",
     "DEFAULT_RESTRICTIONS",
+    "FailureClass",
+    "FailureMode",
+    "build_valid",
+    "degrade",
+    "make_case",
+    "apply_failure",
+    "applicable_modes",
+    "sample_failure_mode",
     # Dispatch
     "HasGame",
     "generate_game_journal",

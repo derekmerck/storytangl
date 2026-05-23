@@ -101,6 +101,48 @@ class CredentialStatus(Enum):
         return self in (CredentialStatus.FORGED, CredentialStatus.WRONG_HOLDER)
 
 
+class FailureClass(Enum):
+    """How severe a packet failure is, and therefore the disposition it forces."""
+
+    MITIGATABLE = "mitigatable"  # fixable in the moment -> deny if unfixed
+    CRIME = "crime"              # -> arrest
+
+
+class FailureMode(Enum):
+    """A single way a packet can be degraded away from valid.
+
+    Used by the candidate factory's ``degrade`` (Phase A.2) and, later, sampled
+    by the roster generator (A.3). ``failure_class`` splits the modes that a
+    mediation could clear (-> deny) from outright crimes (-> arrest).
+    """
+
+    # mitigatable
+    MISSING_PERMIT = "missing_permit"
+    UNSEALED_PERMIT = "unsealed_permit"
+    MISSING_ID = "missing_id"
+    EXPIRED_ID = "expired_id"
+    UNPERMITTED_CONTRABAND = "unpermitted_contraband"
+    # crimes
+    FORGED_PERMIT = "forged_permit"
+    FAKE_ID = "fake_id"
+    WRONG_HOLDER_PERMIT = "wrong_holder_permit"
+    CONCEALED_CONTRABAND = "concealed_contraband"
+
+    @property
+    def failure_class(self) -> FailureClass:
+        return FailureClass.CRIME if self in _CRIME_MODES else FailureClass.MITIGATABLE
+
+
+_CRIME_MODES = frozenset(
+    {
+        FailureMode.FORGED_PERMIT,
+        FailureMode.FAKE_ID,
+        FailureMode.WRONG_HOLDER_PERMIT,
+        FailureMode.CONCEALED_CONTRABAND,
+    }
+)
+
+
 class CredentialToken(BaseModelPlus):
     """A single presented credential.
 
