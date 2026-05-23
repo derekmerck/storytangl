@@ -123,7 +123,15 @@ from .credentials_factory import (
     build_valid,
     degrade,
     make_case,
+    render_narrative,
     sample_failure_mode,
+)
+from .credentials_roster import (
+    ScenarioOffer,
+    ShiftSpec,
+    generate_roster,
+    make_offer,
+    materialize,
 )
 
 
@@ -195,9 +203,15 @@ __all__ = [
     "build_valid",
     "degrade",
     "make_case",
+    "render_narrative",
     "apply_failure",
     "applicable_modes",
     "sample_failure_mode",
+    "ScenarioOffer",
+    "ShiftSpec",
+    "generate_roster",
+    "make_offer",
+    "materialize",
     # Dispatch
     "HasGame",
     "generate_game_journal",

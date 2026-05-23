@@ -13,9 +13,12 @@ next candidate after every disposition until the game reports terminal.
 from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import Field
+
+if TYPE_CHECKING:
+    from .credentials_roster import ScenarioOffer
 
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
@@ -250,6 +253,10 @@ class CredentialsGame(PickingGame):
 
     # --- Shift configuration (authored; never reset between candidates) ------
     roster: list[CredentialCase] = Field(default_factory=_default_roster)
+    # Optional lazy roster: when set, candidates are sampled offers materialized
+    # on arrival (Phase A.3), and `offers` is the source of truth instead of
+    # `roster`. See credentials_roster.py.
+    offers: list["ScenarioOffer"] = Field(default_factory=list)
     checkpoint_rules: list[str] = Field(
         default_factory=lambda: [
             "Travelers need a valid passport.",
@@ -289,11 +296,29 @@ class CredentialsGame(PickingGame):
         default=False,
         json_schema_extra={"reset_field": True},
     )
+    # Lazy cache of materialized offers (cleared on setup; rebuilt on arrival).
+    materialized: list[CredentialCase] = Field(
+        default_factory=list,
+        json_schema_extra={"reset_field": True},
+    )
 
     # ----- active case access ----------------------------------------------
+    def _total_cases(self) -> int:
+        """Number of candidates this shift: sampled offers if any, else roster."""
+
+        return len(self.offers) if self.offers else len(self.roster)
+
     @property
     def active_case(self) -> CredentialCase:
-        return self.roster[self.case_index]
+        if not self.offers:
+            return self.roster[self.case_index]
+        # Lazy: materialize each offer's packet only when the candidate arrives.
+        from .credentials_roster import materialize
+
+        while len(self.materialized) <= self.case_index:
+            offer = self.offers[len(self.materialized)]
+            self.materialized.append(materialize(offer, self.restriction_map))
+        return self.materialized[self.case_index]
 
     @property
     def candidate_name(self) -> str:
@@ -343,7 +368,7 @@ class CredentialsGame(PickingGame):
     def required_correct(self) -> int:
         if self.pass_threshold is not None:
             return self.pass_threshold
-        return len(self.roster)
+        return self._total_cases()
 
     # ----- picking-kernel surface (reads the active case) -------------------
     def get_visible_items(self) -> list[str]:
@@ -397,7 +422,7 @@ class CredentialsGame(PickingGame):
         :meth:`CredentialsGameHandler.evaluate` owns shift terminality.
         """
 
-        if self.case_index + 1 < len(self.roster):
+        if self.case_index + 1 < self._total_cases():
             self.case_index += 1
         else:
             self.shift_complete = True
@@ -430,8 +455,8 @@ class CredentialsGame(PickingGame):
                 # Shift / roster progress
                 "credential_case_index": self.case_index,
                 "credential_case_number": self.case_index + 1,
-                "credential_roster_size": len(self.roster),
-                "credential_cases_remaining": len(self.roster) - len(self.case_results),
+                "credential_roster_size": self._total_cases(),
+                "credential_cases_remaining": self._total_cases() - len(self.case_results),
                 "credential_correct_count": self.correct_count,
                 "credential_shift_score": dict(self.score),
                 "credential_shift_complete": self.shift_complete,

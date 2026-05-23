@@ -154,6 +154,55 @@ def degrade(case: CredentialCase, modes: Iterable[FailureMode]) -> CredentialCas
     return case
 
 
+_STATUS_FINDINGS = {
+    CredentialStatus.MISSING_SEAL: "The issuing seal is missing.",
+    CredentialStatus.BAD_DATE: "The issue date is wrong.",
+    CredentialStatus.EXPIRED: "The credential has expired.",
+    CredentialStatus.FORGED: "The seal is a forgery.",
+    CredentialStatus.WRONG_HOLDER: "The holder does not match this document.",
+}
+
+
+def render_narrative(case: CredentialCase) -> CredentialCase:
+    """Populate the inspect-loop strings from the structured truth, in place.
+
+    Gives a generated case the ``presented_documents`` / ``hidden_facts`` /
+    ``packet_hidden_facts`` the v1 inspect loop needs. Document-level infractions
+    (bad/forged seal, holder mismatch) surface here; missing documents and
+    concealed contraband are detected by Phase B follow-up moves, not by plain
+    inspection, so they are not rendered as findings.
+    """
+
+    documents: dict[str, str] = {}
+    findings: dict[str, str] = {}
+
+    if case.id_card is not None:
+        documents["passport"] = "An identity document."
+        if not case.id_card.status.is_valid:
+            findings["passport"] = _STATUS_FINDINGS[case.id_card.status]
+
+    for token in case.packet:
+        label = f"{token.indication.value} permit"
+        documents[label] = f"A {token.indication.value} permit."
+        if not token.status.is_valid:
+            findings[label] = _STATUS_FINDINGS[token.status]
+        elif not token.holder_matches:
+            findings[label] = "The permit's holder does not match the bearer id."
+
+    for item in case.possessions:
+        if not item.concealed:
+            documents[f"declared {item.indication.value}"] = f"Openly declared {item.indication.value}."
+
+    case.presented_documents = documents
+    case.hidden_facts = findings
+    case.packet_hidden_facts = (
+        {"packet consistency": "The packet does not satisfy the checkpoint rules as presented."}
+        if findings
+        else {}
+    )
+    return case
+
+
 def make_case(
     region: Region,
     purpose: Indication,
@@ -163,12 +212,13 @@ def make_case(
     candidate_name: str = "Traveler",
     contraband: Sequence[Indication] = (),
 ) -> CredentialCase:
-    """Tier 2 entry: build a valid packet, then degrade it with ``failure_modes``."""
+    """Tier 2 entry: build a valid packet, degrade it, and render its narrative."""
 
     case = build_valid(
         region, purpose, restrictions, candidate_name=candidate_name, contraband=contraband
     )
-    return degrade(case, failure_modes)
+    degrade(case, failure_modes)
+    return render_narrative(case)
 
 
 def applicable_modes(

@@ -1,8 +1,8 @@
 # Credentials Loop Design
 
-**Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A.1 LANDED
-(rules-derived dispositions, 2026-05-22); Phase A.2 LANDED (candidate factory,
-2026-05-22); Phases A.3/B/C/D designed below as overlays  
+**Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
+(A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
+lazy offer roster, 2026-05-22); Phases B/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -455,7 +455,20 @@ A.1's structured truth is exactly the target this builds and mutates, and the
 **round-trip invariant** test pins it: `derive(degrade(build_valid(intent,
 rules), mode)) == expected_for(mode)`.
 
-### A.4 Day spec, lazy offers, and editable roster (the A.3 increment)
+### A.4 Day spec, lazy offers, and editable roster (the A.3 increment, LANDED)
+
+**Landed (2026-05-22)** in `credentials_roster.py` (compact form): `ShiftSpec`
+(rules + origin distribution + disposition-class distribution + encounters +
+purpose pool + pinned + seed); `generate_roster` samples origin + target then
+picks a *feasible, verified* failure mode (so the linchpin holds by
+construction); `ScenarioOffer` is the unmaterialized promise; `materialize(offer,
+rules)` builds the packet deterministically; `CredentialsGame.offers` +
+`active_case` materialize each candidate **on arrival** (cached in
+`materialized`, a reset field). `render_narrative` (in the factory) projects the
+inspect-loop strings from the structured truth so generated cases are playable.
+Pinned whitelisted encounters (the "John Smith" case) work. Multi-day shifts and
+live roster editing are deliberately left as repeated generation / ordinary list
+edits -- no extra machinery.
 
 This is the larger increment. It is authored at the **shift/day** level and
 materializes candidates lazily.
