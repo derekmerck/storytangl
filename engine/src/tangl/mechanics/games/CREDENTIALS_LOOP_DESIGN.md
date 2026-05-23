@@ -392,15 +392,16 @@ Indication --(restriction map)--> RestrictionLevel --> Presentation --> Outcome
 - `tests/test_outcomes.py` locks the presentation -> outcome mapping; port it as
   the spec for the canonical vocabulary (reconcile the two enum files into one).
 
-### A.2 derive_disposition
+### A.2 derive_disposition (landed with A.1)
 
-Swap the body of `expected_disposition(case)` from `return case.correct_disposition`
-to a derivation against the shift's `restriction_map`, returning the
-**most-severe applicable Outcome** (the Flag hierarchy encodes that precedence).
-Keep authored `correct_disposition` as an explicit override so v1 cases and pinned
-encounters keep working unchanged.
+`expected_disposition(case)` derives against the shift's `restriction_map`,
+returning the **most-severe applicable disposition** (an explicit
+`ARREST > DENY > PASS` severity order on `CredentialDisposition`). Authored
+`correct_disposition` stays an explicit override so v1 cases and pinned
+encounters keep working unchanged. (The two design subsections A.1 and A.2 were
+implemented together as the "A.1 derivation spine" increment.)
 
-### A.3 Candidate factory: one pipeline, three entry points
+### A.3 Candidate factory: one pipeline, three entry points (the A.2 increment)
 
 ```
 disposition --sample--> failure mode(s) --construct--> packet (CredentialCase)
@@ -427,16 +428,72 @@ never tested against restrictions; they are created to pass or violate them* --
 is what makes generation tractable. Failure modes compose (multiple corruptions
 on one packet); a correct candidate is `degrade(..., [])`.
 
-### A.4 RosterSpec and pinned encounters
+**Failure-mode catalog.** `degrade` is driven by an explicit `FailureMode` set,
+and the same catalog is what A.3's sampler draws from. Each mode carries:
 
-`generate_roster(spec, restriction_map, rng)` returns `list[CredentialCase]` from
-a disposition distribution plus pinned cases. Port the shape from
-`credential_script_models.py` (`outcomes_distribution` /
-`expected_disposition_ratio` per region, `num_encounters`) and
-`credentials-2/cred_check_scene.py` (`sample_outcomes()`, pinned `extras`). This
-realizes "day 1 = 2 accept / 1 deny / 1 arrest, or pin known encounters." It is
-generation-side only; the runtime loop never learns whether a case was authored
-or sampled.
+- a **class** -- *mitigatable* (-> deny if unfixed) vs *crime* (-> arrest), matching
+  `CredentialStatus.is_crime` and the concealed-contraband case from A.1;
+- the **mutation** it applies (which token/id status it sets, or contraband it
+  conceals); and
+- an **applicability** predicate: which modes a given indication can even exhibit
+  at its current restriction level (you can only "miss a permit" where a permit is
+  required; only "forge a seal" where a credential exists; only conceal contraband
+  where contraband is present). This is the A.5 "rules shape the failure space"
+  point made concrete -- the sampler asks the catalog which modes are reachable
+  for an (indication, level) before choosing one.
+
+A.1's structured truth is exactly the target this builds and mutates, and the
+**round-trip invariant** test pins it: `derive(degrade(build_valid(intent,
+rules), mode)) == expected_for(mode)`.
+
+### A.4 Day spec, lazy offers, and editable roster (the A.3 increment)
+
+This is the larger increment. It is authored at the **shift/day** level and
+materializes candidates lazily.
+
+**Day/shift spec (authored).** A `ShiftSpec` carries everything a day needs:
+
+- the day's **rules** (a `Restrictions`; rules change between days -- "foreign-west
+  is now allied: anonymous transit, no id; foreign-east is now work-permit-with-id
+  only");
+- an **origin distribution** set by the gate/location ("at the western gate: 50%
+  foreign-west, 30% local, 20% foreign-east");
+- a **disposition-class distribution** ("40% valid->allow, 30% mitigatable->deny,
+  30% illegal->arrest");
+- **encounters per day** and **number of days** ("5/day for 3 days");
+- **pinned offers** -- scripted encounters that must appear ("John Smith arrives
+  with an invalid political clearance, but he's whitelisted -> allow"). A pinned
+  offer can fix any subset (origin, packet specifics, context override) and the
+  rest is filled by sampling.
+
+**Two-stage sampling.** For each non-pinned slot: (1) sample an origin from the
+origin distribution and a disposition class from the class distribution; (2) ask
+the failure-mode catalog (A.3) for the modes of that class **reachable** for this
+origin under the day's rules, and sample one (or a composition). PASS = no mode;
+deny = a mitigatable mode {bad/missing seal, missing doc, declared-unpermitted
+contraband...}; arrest = a crime mode {forgery, fake id, concealment...}.
+
+**Roster = offers, materialized on arrival.** The roster holds **scenario offers**
+(origin + target class + chosen failure mode + any pins/overrides), *not* concrete
+packets. The actual `CredentialCase` (the credential tokens) is built on demand --
+via `build_valid` + `degrade` -- only when that candidate arrives in the story.
+Until then an offer is just a promise of a scenario, so the roster can be
+**pre-empted, edited, reordered, or inserted into** (drop in John Smith, retune a
+day) before materialization. This unifies the three tiers: every roster entry is
+an offer, fully-specified (Tier 1), failure-specified (Tier 2), or
+disposition-specified (Tier 3), and materialization resolves it down the funnel.
+
+The lazy hook fits the existing loop cleanly: materialize the next offer into the
+active case at `advance_case` / setup time. The runtime loop still never learns
+whether a case was authored or sampled. Port the distribution shape from
+`credential_script_models.py` (`expected_disposition_ratio` per region,
+`num_encounters`) and `credentials-2/cred_check_scene.py` (`sample_outcomes()`,
+pinned `extras`).
+
+**Tests** (the linchpin): every materialized offer derives to the disposition
+class it was generated for; the origin/class distributions are hit under a seed;
+pinned offers appear (and honor context overrides like John Smith's whitelist);
+editing/pre-empting the roster before arrival changes who shows up.
 
 ### A.5 Rules are an authored story lever
 
