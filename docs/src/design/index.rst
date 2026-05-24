@@ -24,7 +24,11 @@ See also
    story/STORYTANGL_WIDGET_VOCAB
    story/WIDGET_CONTRACT_RECONCILIATION
    story/WIDGET_WIREFRAMES
+   story/GENRE_AUDIT_NOTES
    story/bundles/carwars/EXTENSIONS
+   story/bundles/credentials/EXTENSIONS
+   story/bundles/elefant_hunt/EXTENSIONS
+   story/bundles/training/EXTENSIONS
    story/INTERACTION_VOCABULARY
    story/JOURNAL_COMPOSE_CONTRACT
    story/PRESENCE_PROSE_CONTRACT
