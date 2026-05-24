@@ -21,6 +21,7 @@ PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposal
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
+    "compose_payload.json",
     "control_delete.json",
     "crossroads_inn.json",
     "dialog_with_avatar.json",

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buyQuantityRuntimeEnvelope,
   commandHintRuntimeEnvelope,
+  composePayloadRuntimeEnvelope,
   crossroadsRuntimeEnvelope,
   sandboxPayloadRuntimeEnvelope,
 } from '.'
@@ -114,7 +115,11 @@ describe('runtime envelope fixtures', () => {
 
   it('covers text, quantity, piece, and raw command payload accepts', () => {
     const kinds = new Set(
-      [...sandboxPayloadRuntimeEnvelope.fragments, ...commandHintRuntimeEnvelope.fragments]
+      [
+        ...sandboxPayloadRuntimeEnvelope.fragments,
+        ...commandHintRuntimeEnvelope.fragments,
+        ...composePayloadRuntimeEnvelope.fragments,
+      ]
         .filter((fragment): fragment is ChoiceStoryFragment => fragment.fragment_type === 'choice')
         .map((choice) =>
           isRecord(choice.accepts) && typeof choice.accepts.kind === 'string'
@@ -127,6 +132,7 @@ describe('runtime envelope fixtures', () => {
     expect(kinds.has('text')).toBe(true)
     expect(kinds.has('quantity')).toBe(true)
     expect(kinds.has('pieces')).toBe(true)
+    expect(kinds.has('compose')).toBe(true)
     expect(kinds.has('raw_command')).toBe(true)
   })
 

@@ -83,6 +83,7 @@ def test_tk_plan_renders_projected_state_sections_and_values() -> None:
 
 def test_tk_choice_plan_uses_expected_controls_for_accepts_kinds() -> None:
     choices = _choices("sandbox_payload.json")
+    compose_choice = _choices("compose_payload.json")["Give coins."]
 
     assert choices["Look around."].widget == "button"
     assert choices["Take something."].widget == "piece_selector"
@@ -91,6 +92,8 @@ def test_tk_choice_plan_uses_expected_controls_for_accepts_kinds() -> None:
     assert choices["Offer coins."].input.minimum == 1
     assert choices["Offer coins."].input.maximum == 7
     assert choices["Offer coins."].input.unit == "coin"
+    assert compose_choice.widget == "compose_form"
+    assert [part.role for part in compose_choice.input.parts] == ["amount", "target"]
 
 
 def test_tk_piece_selector_uses_visible_pieces_from_referenced_zone() -> None:
@@ -173,6 +176,7 @@ def test_tk_place_selector_uses_visible_pieces_from_source_zone() -> None:
 def test_tk_submission_payload_shapes_match_accepts_kinds() -> None:
     sandbox_choices = _choices("sandbox_payload.json")
     command_choices = _choices("command_hints.json")
+    compose_choices = _choices("compose_payload.json")
 
     assert PORT.collect_submission(sandbox_choices["Look around."]).payload == {}
     assert PORT.collect_submission(sandbox_choices["Name your sword."], "Aster").payload == {
@@ -183,6 +187,15 @@ def test_tk_submission_payload_shapes_match_accepts_kinds() -> None:
     }
     assert PORT.collect_submission(command_choices["Try a command."], "take lamp").payload == {
         "text": "take lamp"
+    }
+    assert PORT.collect_submission(
+        compose_choices["Give coins."],
+        {"amount": 2, "target": ["guard"]},
+    ).payload == {
+        "parts": {
+            "amount": {"quantity": 2},
+            "target": {"piece_ids": ["guard"]},
+        }
     }
 
 

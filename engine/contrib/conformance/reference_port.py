@@ -471,6 +471,14 @@ def _accepts_prompt(
         )
         return f" <place from {source_label} to {target_label}>"
 
+    if kind == "compose":
+        roles = [
+            role
+            for part in _object_list(accepts.get("parts"))
+            if (role := _text(part, "role")) is not None
+        ]
+        return f" <compose: {', '.join(roles)}>" if roles else " <compose>"
+
     return f" <{kind}>"
 
 

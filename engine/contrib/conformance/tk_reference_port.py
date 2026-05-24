@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Mapping, Sequence, cast
+from typing import Callable, Mapping, Sequence, cast
 
 
 def _load_reference_port() -> ModuleType:
@@ -52,6 +52,14 @@ class PieceOption:
 
 
 @dataclass(frozen=True)
+class ComposeInputPart:
+    """One named input inside a composed payload."""
+
+    role: str
+    input: InputControlPlan
+
+
+@dataclass(frozen=True)
 class InputControlPlan:
     """Tk-friendly description of the input attached to a choice."""
 
@@ -65,6 +73,7 @@ class InputControlPlan:
     source_zone_ref: str | None = None
     target_zone_ref: str | None = None
     options: tuple[PieceOption, ...] = ()
+    parts: tuple[ComposeInputPart, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -165,35 +174,7 @@ def collect_submission(plan: WidgetPlan, value: JsonValue = None) -> Submission:
     if not plan.enabled:
         raise ValueError(f"Choice is locked: {plan.choice.label}")
 
-    input_plan = plan.input
-    if input_plan is None or input_plan.kind == "pick":
-        payload: JsonObject = {}
-    elif input_plan.kind in {"text", "raw_command"}:
-        if not isinstance(value, str):
-            raise ValueError(f"{input_plan.kind} choices require string input")
-        payload = {"text": value}
-    elif input_plan.kind == "quantity":
-        quantity = _int_value(value)
-        if input_plan.minimum is not None and quantity < input_plan.minimum:
-            raise ValueError(f"Quantity must be >= {input_plan.minimum}")
-        if input_plan.maximum is not None and quantity > input_plan.maximum:
-            raise ValueError(f"Quantity must be <= {input_plan.maximum}")
-        payload = {"quantity": quantity}
-    elif input_plan.kind == "pieces":
-        piece_ids = _selected_piece_ids(value)
-        _validate_piece_selection(input_plan, piece_ids)
-        payload = {"piece_ids": piece_ids}
-    elif input_plan.kind == "place":
-        piece_ids = _selected_piece_ids(value)
-        _validate_piece_selection(input_plan, piece_ids)
-        piece_id = piece_ids[0]
-        payload = {
-            "piece_id": piece_id,
-            "source_zone_ref": input_plan.source_zone_ref,
-            "target_zone_ref": input_plan.target_zone_ref,
-        }
-    else:
-        payload = {}
+    payload = _collect_input_payload(plan.input, value)
 
     return Submission(
         edge_id=plan.choice.edge_id,
@@ -262,6 +243,8 @@ class TkReferenceApp:
             self._quantity_choice(frame, plan)
         elif plan.input.kind in {"pieces", "place"}:
             self._piece_choice(frame, plan)
+        elif plan.input.kind == "compose":
+            self._compose_choice(frame, plan)
         else:
             self._button(frame, plan, 0, 0)
 
@@ -348,6 +331,51 @@ class TkReferenceApp:
             ),
         )
         button.grid(row=len(input_plan.options) + 1, column=1, sticky="w", padx=6)
+
+    def _compose_choice(self, parent: object, plan: WidgetPlan) -> None:
+        input_plan = cast(InputControlPlan, plan.input)
+        getters: dict[str, Callable[[], JsonValue]] = {}
+        self.ttk.Label(parent, text=plan.text).grid(row=0, column=0, sticky="w")
+        row = 1
+        for part in input_plan.parts:
+            self.ttk.Label(parent, text=part.role.replace("_", " ")).grid(
+                row=row,
+                column=0,
+                sticky="w",
+            )
+            if part.input.kind in {"text", "raw_command", "quantity"}:
+                variable = self.tk.StringVar(value=_initial_text_value(part.input))
+                field = self.ttk.Entry(parent, textvariable=variable, state=_tk_state(plan))
+                field.grid(row=row, column=1, sticky="ew", padx=6)
+                getters[part.role] = variable.get
+                row += 1
+                continue
+
+            variables: dict[str, object] = {}
+            for index, option in enumerate(part.input.options):
+                variable = self.tk.BooleanVar(value=False)
+                variables[option.value] = variable
+                check = self.ttk.Checkbutton(
+                    parent,
+                    text=option.label,
+                    variable=variable,
+                    state=_tk_state(plan),
+                )
+                check.grid(row=row + index, column=1, sticky="w", padx=6)
+            getters[part.role] = lambda variables=variables: [
+                value for value, variable in variables.items() if variable.get()
+            ]
+            row += max(1, len(part.input.options))
+        button = self.ttk.Button(
+            parent,
+            text="Submit",
+            state=_tk_state(plan),
+            command=lambda plan=plan, getters=getters: self._submit(
+                plan,
+                {role: getter() for role, getter in getters.items()},
+            ),
+        )
+        button.grid(row=row, column=1, sticky="w", padx=6)
 
     def _submit(self, plan: WidgetPlan, value: JsonValue = None) -> None:
         submission = collect_submission(plan, value)
@@ -438,6 +466,28 @@ def _choice_input_plan(
             target_zone_ref=target_zone_ref,
             options=pieces_by_zone.get(source_zone_ref or "", ()),
         )
+    if kind == "compose":
+        parts: list[ComposeInputPart] = []
+        for part in _object_list(accepts.get("parts")):
+            role = _optional_text(part.get("role"))
+            part_accepts = part.get("accepts")
+            if role is None or not isinstance(part_accepts, dict):
+                continue
+            part_accepts = cast(JsonObject, part_accepts)
+            child_choice = ChoiceControl(
+                uid=None,
+                edge_id=None,
+                label=role,
+                available=True,
+                hotkey="",
+                prompt="",
+                accepts_kind=_optional_text(part_accepts.get("kind")),
+                accepts=part_accepts,
+            )
+            child_input = _choice_input_plan(child_choice, pieces_by_zone)
+            if child_input is not None:
+                parts.append(ComposeInputPart(role=role, input=child_input))
+        return InputControlPlan(kind=kind, widget="compose_form", parts=tuple(parts))
     return InputControlPlan(kind=kind, widget="button")
 
 
@@ -491,6 +541,45 @@ def _selected_piece_ids(value: JsonValue) -> list[str]:
     raise ValueError("Piece choices require a piece id or list of piece ids")
 
 
+def _collect_input_payload(input_plan: InputControlPlan | None, value: JsonValue) -> JsonObject:
+    if input_plan is None or input_plan.kind == "pick":
+        return {}
+    if input_plan.kind in {"text", "raw_command"}:
+        if not isinstance(value, str):
+            raise ValueError(f"{input_plan.kind} choices require string input")
+        return {"text": value}
+    if input_plan.kind == "quantity":
+        quantity = _int_value(value)
+        if input_plan.minimum is not None and quantity < input_plan.minimum:
+            raise ValueError(f"Quantity must be >= {input_plan.minimum}")
+        if input_plan.maximum is not None and quantity > input_plan.maximum:
+            raise ValueError(f"Quantity must be <= {input_plan.maximum}")
+        return {"quantity": quantity}
+    if input_plan.kind == "pieces":
+        piece_ids = _selected_piece_ids(value)
+        _validate_piece_selection(input_plan, piece_ids)
+        return {"piece_ids": piece_ids}
+    if input_plan.kind == "place":
+        piece_ids = _selected_piece_ids(value)
+        _validate_piece_selection(input_plan, piece_ids)
+        piece_id = piece_ids[0]
+        return {
+            "piece_id": piece_id,
+            "source_zone_ref": input_plan.source_zone_ref,
+            "target_zone_ref": input_plan.target_zone_ref,
+        }
+    if input_plan.kind == "compose":
+        if not isinstance(value, dict):
+            raise ValueError("Compose choices require a role-to-value object")
+        return {
+            "parts": {
+                part.role: _collect_input_payload(part.input, value.get(part.role))
+                for part in input_plan.parts
+            }
+        }
+    return {}
+
+
 def _sample_submission(plan: WidgetPlan) -> Submission | None:
     if plan.input is None or plan.input.kind == "pick":
         return collect_submission(plan)
@@ -502,6 +591,26 @@ def _sample_submission(plan: WidgetPlan) -> Submission | None:
         return collect_submission(plan, [plan.input.options[0].value])
     if plan.input.kind == "place" and plan.input.options:
         return collect_submission(plan, plan.input.options[0].value)
+    if plan.input.kind == "compose":
+        values: JsonObject = {}
+        for part in plan.input.parts:
+            value = _sample_input_value(part.input)
+            if value is None:
+                return None
+            values[part.role] = value
+        return collect_submission(plan, values)
+    return None
+
+
+def _sample_input_value(input_plan: InputControlPlan) -> JsonValue:
+    if input_plan.kind in {"text", "raw_command"}:
+        return "sample"
+    if input_plan.kind == "quantity":
+        return input_plan.minimum or 1
+    if input_plan.kind in {"pieces", "place"} and input_plan.options:
+        if input_plan.kind == "place":
+            return input_plan.options[0].value
+        return [input_plan.options[0].value]
     return None
 
 
@@ -540,6 +649,13 @@ def _input_plan_json(plan: InputControlPlan | None) -> JsonObject | None:
             }
             for option in plan.options
         ],
+        "parts": [
+            {
+                "role": part.role,
+                "input": _input_plan_json(part.input),
+            }
+            for part in plan.parts
+        ],
     }
 
 
@@ -557,6 +673,18 @@ def _optional_int(value: object) -> int | None:
 
 def _optional_text(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _object_list(value: object) -> list[JsonObject]:
+    if not isinstance(value, list):
+        return []
+    return [cast(JsonObject, item) for item in value if isinstance(item, dict)]
+
+
+def _initial_text_value(plan: InputControlPlan) -> str:
+    if plan.kind == "quantity":
+        return str(plan.minimum or 0)
+    return ""
 
 
 def _item_text(data: JsonObject | None, key: str) -> str | None:

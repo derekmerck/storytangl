@@ -85,6 +85,7 @@ def test_cli_reference_renders_story_flow_choices_and_events() -> None:
 
 def test_cli_reference_renders_piece_zone_and_payload_prompts() -> None:
     output = _render("sandbox_payload.json")
+    compose_output = _render("compose_payload.json")
 
     assert "Here:" in output
     assert "- brass lamp [available]" in output
@@ -92,6 +93,7 @@ def test_cli_reference_renders_piece_zone_and_payload_prompts() -> None:
     assert "2) Take something. <select 1 piece from Here>" in output
     assert "3) Name your sword. <text: e.g. Hopebreaker>" in output
     assert "4) Offer coins. <quantity 1-7 coin>" in output
+    assert "1) Give coins. <compose: amount, target>" in compose_output
 
 
 def test_cli_reference_renders_command_hints_as_advisory_prompt() -> None:

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 import type {
+  ChoiceAccepts,
   ChoiceStoryFragment,
   GroupStoryFragment,
   StoryFragment,
@@ -9,10 +10,17 @@ import type {
 } from '@/types'
 import { fragmentText, isGroupFragment, isRecord, isPieceFragment } from './fragmentUtils'
 
+defineOptions({ name: 'ChoiceInputView' })
+
 type PayloadState = {
   valid: boolean
   payload?: unknown
   message?: string
+}
+
+type ComposePartInput = {
+  role: string
+  accepts: ChoiceAccepts
 }
 
 type Validator = {
@@ -49,6 +57,7 @@ const emit = defineEmits<{
 
 const inputValue = ref('')
 const selectedPieceIds = ref<string[]>([])
+const composePartStates = ref<Record<string, PayloadState>>({})
 
 const stringValue = (value: unknown): string | undefined =>
   typeof value === 'string' && value ? value : undefined
@@ -74,7 +83,7 @@ const acceptsKind = computed(() => {
 const hasExplicitKind = computed(() => typeof accepts.value.kind === 'string')
 
 const rendersInput = computed(() =>
-  ['text', 'quantity', 'pieces', 'place', 'raw_command'].includes(acceptsKind.value),
+  ['text', 'quantity', 'pieces', 'place', 'compose', 'raw_command'].includes(acceptsKind.value),
 )
 const inputLabel = computed(() => props.choice.text)
 const commandGrammar = computed<CommandGrammar>(() => {
@@ -143,6 +152,23 @@ const sourceZoneRef = computed(() => {
   }
   return stringValue(accepts.value.source_zone_ref) ?? stringValue(constraints.source_zone_ref)
 })
+
+const composeParts = computed<ComposePartInput[]>(() => {
+  const parts = accepts.value.parts
+  if (!Array.isArray(parts)) {
+    return []
+  }
+  return parts
+    .filter(
+      (part): part is Record<string, unknown> & { role: string; accepts: ChoiceAccepts } =>
+        isRecord(part) &&
+        typeof part.role === 'string' &&
+        part.role.length > 0 &&
+        isRecord(part.accepts),
+    )
+    .map((part) => ({ role: part.role, accepts: part.accepts as ChoiceAccepts }))
+})
+const composePartRoles = computed(() => composeParts.value.map((part) => part.role))
 
 const targetZone = computed<GroupStoryFragment | undefined>(() => {
   const ref = targetZoneRef.value
@@ -362,6 +388,23 @@ const placePayload = (): PayloadState => {
   }
 }
 
+const composePayload = (): PayloadState => {
+  const parts = composeParts.value
+  if (parts.length === 0) {
+    return { valid: false, message: 'Missing parts' }
+  }
+
+  const payloadParts: Record<string, unknown> = {}
+  for (const part of parts) {
+    const state = composePartStates.value[part.role]
+    if (!state?.valid) {
+      return { valid: false, message: state?.message ?? 'Complete all parts' }
+    }
+    payloadParts[part.role] = state.payload ?? {}
+  }
+  return { valid: true, payload: { parts: payloadParts } }
+}
+
 const payloadState = computed<PayloadState>(() => {
   if (acceptsKind.value === 'text' || acceptsKind.value === 'raw_command') {
     return textPayload()
@@ -375,8 +418,26 @@ const payloadState = computed<PayloadState>(() => {
   if (acceptsKind.value === 'place') {
     return placePayload()
   }
+  if (acceptsKind.value === 'compose') {
+    return composePayload()
+  }
   return { valid: true, payload: props.choice.payload }
 })
+
+const composePartLabel = (role: string): string => role.replace(/_/g, ' ')
+const composePartChoice = (part: ComposePartInput): ChoiceStoryFragment => ({
+  uid: `${props.choice.uid}:${part.role}`,
+  fragment_type: 'choice',
+  text: composePartLabel(part.role),
+  accepts: part.accepts,
+})
+
+const handleComposePartPayload = (role: string, payload: unknown, valid: boolean) => {
+  composePartStates.value = {
+    ...composePartStates.value,
+    [role]: { payload, valid },
+  }
+}
 
 const togglePiece = (piece: PieceStoryFragment) => {
   if (props.disabled) {
@@ -420,6 +481,20 @@ watch(
   () => {
     inputValue.value = ''
     selectedPieceIds.value = []
+    composePartStates.value = {}
+  },
+)
+
+watch(
+  composePartRoles,
+  (roles) => {
+    const roleSet = new Set(roles)
+    const nextStates = Object.fromEntries(
+      Object.entries(composePartStates.value).filter(([role]) => roleSet.has(role)),
+    )
+    if (Object.keys(nextStates).length !== Object.keys(composePartStates.value).length) {
+      composePartStates.value = nextStates
+    }
   },
 )
 
@@ -526,6 +601,26 @@ watch(
       </div>
     </div>
 
+    <div v-else-if="acceptsKind === 'compose'" class="choice-compose-input">
+      <div
+        v-for="part in composeParts"
+        :key="part.role"
+        class="choice-compose-part"
+      >
+        <div class="choice-compose-part-label">
+          {{ composePartLabel(part.role) }}
+        </div>
+        <ChoiceInputView
+          :choice="composePartChoice(part)"
+          :fragments="fragments"
+          :metadata="metadata"
+          :disabled="disabled"
+          @payload-change="(payload, valid) => handleComposePartPayload(part.role, payload, valid)"
+          @commit="emit('commit')"
+        />
+      </div>
+    </div>
+
     <div
       v-if="payloadState.message"
       class="choice-input-message"
@@ -568,6 +663,23 @@ watch(
   display: grid;
   gap: 8px;
   min-width: 0;
+}
+
+.choice-compose-input {
+  display: grid;
+  gap: 10px;
+}
+
+.choice-compose-part {
+  display: grid;
+  gap: 4px;
+}
+
+.choice-compose-part-label {
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .choice-place-target {

@@ -81,7 +81,7 @@ surface is small enough to settle with its immediate neighbors.
 | Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` + typed TS shape) | done (`Accepts` union) | expand conformance cases only as new widgets land |
 | Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done | done (`Accepts` union) | keep legacy web `payload_type` path as local UI compatibility until fixtures stop using it |
 | Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial (`edge_ref` not rendered) | done (`Accepts` union) | add `edge_ref` fixture when route/network MVP lands |
-| Typed `ComposeAccepts` | P1 | not_started | done (`Accepts` union) | webapp PR for `compose` rendering |
+| Typed `ComposeAccepts` | P1 | partial (web nested renderer + CLI/Tk inspection fixture) | done (`Accepts` union) | harden layout and add broader part combinations as worlds emit them |
 | Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
 | Typed `Blocker` (replaces dict blockers) | P1 | partial | untyped | engine PR |
 | Typed `InterpretationFragment` | P1 | partial (custom shape mid-cycle) | untyped | engine PR; webapp aligns on `result`/`text` field names |
@@ -256,7 +256,7 @@ to v1.3.
   `docs/src/design/story/wireframes/v1_3/`; keep future wireframes labeled
   by tier and avoid treating P2/P3 sketches as reference-client status.
 - Webapp PR sequence:
-  1. `compose` accepts rendering as nested ChoiceInputView.
+  1. ✅ `compose` accepts rendering as nested ChoiceInputView.
   2. `InterpretationFragment` renderer with the spec's `result` /
      `text` field names.
   3. `metadata.info_state` behavior pass: use nested `dirty_kinds` /

@@ -69,7 +69,7 @@ const hasPayloadInput = computed(() => {
   const kind = 'kind' in accepts ? accepts.kind : undefined
   if (
     typeof kind === 'string' &&
-    ['text', 'quantity', 'pieces', 'place', 'raw_command'].includes(kind)
+    ['text', 'quantity', 'pieces', 'place', 'compose', 'raw_command'].includes(kind)
   ) {
     return true
   }

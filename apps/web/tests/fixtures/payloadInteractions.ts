@@ -186,6 +186,66 @@ export const sandboxPayloadRuntimeEnvelope: RuntimeEnvelope = {
   metadata: { fixture: 'sandbox_payload' },
 }
 
+export const composePayloadRuntimeEnvelope: RuntimeEnvelope = {
+  cursor_id: 'cursor-compose-payload',
+  step: 27,
+  fragments: [
+    {
+      uid: 'f-compose-scene',
+      fragment_type: 'group',
+      group_type: 'scene',
+      member_ids: ['f-compose-prose', 'z-compose-people', 'f-choice-give'],
+    },
+    {
+      uid: 'f-compose-prose',
+      fragment_type: 'content',
+      content: 'The guard waits by the gate, palm open.',
+      content_format: 'md',
+    },
+    {
+      uid: 'z-compose-people',
+      fragment_type: 'group',
+      group_type: 'zone',
+      zone_role: 'field',
+      member_ids: ['piece-compose-guard'],
+      hints: { label_text: 'People nearby' },
+    },
+    {
+      uid: 'piece-compose-guard',
+      fragment_type: 'piece',
+      piece_id: 'guard',
+      kind: 'person',
+      content: 'gate guard',
+      zone_ref: 'z-compose-people',
+      hints: { label_text: 'gate guard' },
+    },
+    {
+      uid: 'f-choice-give',
+      fragment_type: 'choice',
+      edge_id: 'e-give',
+      text: 'Give coins.',
+      available: true,
+      accepts: {
+        kind: 'compose',
+        parts: [
+          { role: 'amount', accepts: { kind: 'quantity', min: 1, max: 7, unit: 'coin' } },
+          {
+            role: 'target',
+            accepts: {
+              kind: 'pieces',
+              min: 1,
+              max: 1,
+              constraints: { target_zone_ref: 'z-compose-people' },
+            },
+          },
+        ],
+      },
+      ui_hints: { hotkey: '5' },
+    },
+  ],
+  metadata: { fixture: 'compose_payload' },
+}
+
 export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
   cursor_id: 'cursor-command-hints',
   step: 31,
