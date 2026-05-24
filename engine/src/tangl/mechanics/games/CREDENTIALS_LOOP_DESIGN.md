@@ -278,7 +278,7 @@ implement the same model.
 
 Each indication sits on one ordered axis, most to least restrictive:
 
-```
+```text
 forbidden  ->  allowed with permit (req id)  ->  allowed with id  ->  allowed (anonymous)
 ```
 
@@ -377,7 +377,7 @@ JSON-serializable. A.2+ below is still pending.
 
 The conceptual core is a chain:
 
-```
+```text
 Indication --(restriction map)--> RestrictionLevel --> Presentation --> Outcome
 ```
 
@@ -412,7 +412,7 @@ The round-trip invariant is tested: every mode derives to its class disposition,
 and composition takes the worst. Tier 3 sampling / day spec / lazy roster is A.4
 below (the A.3 increment), still pending.
 
-```
+```text
 disposition --sample--> failure mode(s) --construct--> packet (CredentialCase)
    (Tier 3)               (Tier 2)                       (Tier 1)
 ```
@@ -424,7 +424,7 @@ declare a disposition and sample an appropriate failure mode.
 
 The construction primitive is **start correct, then degrade**:
 
-```
+```text
 case = degrade(build_valid(intent, restriction_map), failure_modes)
 ```
 

@@ -48,8 +48,9 @@ def build_valid(
 ) -> CredentialCase:
     """Assemble a fully valid packet for ``purpose`` (+ declared contraband).
 
-    The result derives to PASS under ``restrictions``. Declared contraband should
-    be permittable (a forbidden possession cannot be made valid).
+    The result derives to PASS under ``restrictions``. Declared contraband must be
+    permittable; requesting a FORBIDDEN possession raises, since no valid packet
+    can carry it (fail loud rather than return a non-valid case).
     """
 
     case = CredentialCase(
@@ -75,6 +76,11 @@ def build_valid(
 
     for c_ind in contraband:
         c_level = restrictions.level_for(region, c_ind, RestrictionLevel.FORBIDDEN)
+        if c_level is RestrictionLevel.FORBIDDEN:
+            raise ValueError(
+                f"Cannot build a valid case with forbidden contraband: "
+                f"{c_ind.value} in {region.value}."
+            )
         if c_level.requires_permit:
             case.packet.append(
                 CredentialToken(

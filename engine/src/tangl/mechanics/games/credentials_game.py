@@ -575,10 +575,19 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         round_result: RoundResult,
     ) -> dict[str, object] | None:
         detail = dict(super().build_round_notes(game, player_move, opponent_move, round_result) or {})
-        detail["discovered_findings"] = dict(game.revealed_findings)
-        detail["packet_findings"] = dict(game.packet_findings)
+        # A decision runs advance_case(), which resets the per-case working state,
+        # so read the just-decided case's findings/index from its recorded result
+        # rather than the (already reset) live game state.
+        if detail.get("action") == "decide" and game.case_results:
+            last = game.case_results[-1]
+            detail["discovered_findings"] = dict(last.discovered_findings)
+            detail["packet_findings"] = dict(last.packet_findings)
+            detail["case_index"] = len(game.case_results) - 1
+        else:
+            detail["discovered_findings"] = dict(game.revealed_findings)
+            detail["packet_findings"] = dict(game.packet_findings)
+            detail["case_index"] = game.case_index
         detail.setdefault("credential_stage", game.current_stage)
-        detail["case_index"] = game.case_index
         detail["correct_count"] = game.correct_count
         detail["shift_complete"] = game.shift_complete
         return detail
@@ -588,8 +597,9 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if last_round is None:
             return []
 
-        action = last_round.player_move.kind
-        target = last_round.player_move.target
+        move = self._normalize_move(last_round.player_move)
+        action = move.kind
+        target = move.target
         notes = last_round.notes or {}
 
         if action == "inspect":
@@ -620,7 +630,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             fragments.append(
                 ContentFragment(
                     content=(
-                        f"Shift complete: {game.correct_count} of {len(game.roster)} "
+                        f"Shift complete: {game.correct_count} of {game._total_cases()} "
                         "calls correct."
                     )
                 )

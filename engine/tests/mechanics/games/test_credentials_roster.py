@@ -24,13 +24,13 @@ from tangl.mechanics.games import (
 )
 
 D = CredentialDisposition
-I = Indication
+IND = Indication
 L = RestrictionLevel
 
 RULES = Restrictions.from_map(
     {
-        Region.LOCAL: {I.TRAVEL: L.WITH_ID, I.WORK: L.WITH_PERMIT, I.WEAPON: L.WITH_PERMIT},
-        Region.FOREIGN_WEST: {I.TRAVEL: L.WITH_PERMIT, I.WORK: L.FORBIDDEN, I.WEAPON: L.FORBIDDEN},
+        Region.LOCAL: {IND.TRAVEL: L.WITH_ID, IND.WORK: L.WITH_PERMIT, IND.WEAPON: L.WITH_PERMIT},
+        Region.FOREIGN_WEST: {IND.TRAVEL: L.WITH_PERMIT, IND.WORK: L.FORBIDDEN, IND.WEAPON: L.FORBIDDEN},
     }
 )
 
@@ -88,14 +88,14 @@ class TestMaterialize:
         assert first.model_dump() == second.model_dump()
 
     def test_materialized_case_is_inspectable(self) -> None:
-        offer = ScenarioOffer(region=Region.LOCAL, purpose=I.WORK, target_disposition=D.PASS)
+        offer = ScenarioOffer(region=Region.LOCAL, purpose=IND.WORK, target_disposition=D.PASS)
         case = materialize(offer, RULES)
         # A work candidate presents a passport and a work permit to inspect.
         assert "passport" in case.presented_documents
         assert any("permit" in label for label in case.presented_documents)
 
     def test_pinned_case_materializes_verbatim(self) -> None:
-        authored = CredentialCase(candidate_name="Pinned", purpose=I.TRAVEL)
+        authored = CredentialCase(candidate_name="Pinned", purpose=IND.TRAVEL)
         offer = ScenarioOffer(candidate_name="Pinned", pinned_case=authored)
         assert materialize(offer, RULES) is authored
 
@@ -107,7 +107,7 @@ class TestWhitelistedPin:
         offer = ScenarioOffer(
             candidate_name="John Smith",
             region=Region.LOCAL,
-            purpose=I.WORK,
+            purpose=IND.WORK,
             target_disposition=D.ARREST,
             failure_modes=[FailureMode.FORGED_PERMIT],
             whitelist=True,
@@ -126,7 +126,7 @@ class TestGameWalksOffers:
         spec = _spec(
             encounters=3,
             origin_distribution={Region.LOCAL: 1.0},
-            purpose_pool=[I.WORK],
+            purpose_pool=[IND.WORK],
             disposition_distribution={D.DENY: 1.0},
             seed=5,
         )
@@ -139,7 +139,7 @@ class TestGameWalksOffers:
         assert game._total_cases() == 3
 
         for _ in range(3):
-            game.active_case  # arrival materializes this candidate
+            _ = game.active_case  # arrival materializes this candidate
             inspect = handler.get_available_inspect_targets(game)[0]
             handler.receive_move(game, ("inspect", inspect))
             handler.receive_move(game, ("decide", "deny"))
@@ -147,3 +147,7 @@ class TestGameWalksOffers:
         assert game.shift_complete
         assert game.result.name == "WIN"
         assert game.correct_count == 3
+
+        # The shift summary counts the offers (3), not the default roster (2).
+        summary = " ".join(f.content for f in handler.get_journal_fragments(game))
+        assert "of 3" in summary
