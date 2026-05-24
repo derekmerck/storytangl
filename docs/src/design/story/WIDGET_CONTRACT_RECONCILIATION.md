@@ -1,7 +1,7 @@
 # Widget Contract Reconciliation
 
 **Status:** living document · updated alongside each spec / engine / UI release
-**Companion to:** `STORYTANGL_WIDGET_VOCAB.md` v1.3
+**Companion to:** `STORYTANGL_WIDGET_VOCAB.md` v1.5
 **Companion to:** `bundles/<name>/EXTENSIONS.md` (Tier P3 genre layers)
 
 This document tracks **implementation status** across the three layers
@@ -46,7 +46,7 @@ entirely and consumes L3 directly via an in-process shim.
 
 ## §A — Tier S surfaces (core contract)
 
-These are the surfaces v1.3 marks Tier S — committed as stable target
+These are the surfaces v1.5 marks Tier S — committed as stable target
 contract. Most are already shipping in the reference UI and engine;
 the negotiation is mostly about typed-shape graduations.
 
@@ -163,7 +163,8 @@ graduations and as the regression suite for cross-port parity.
 | `engine/contrib/conformance/legibility.py` | §5.1 — referenced UIDs are rendered | not_started | first conformance harness to write |
 | `engine/contrib/conformance/parity.py` | §5.2 time parity, §5.3 input parity | not_started | second harness |
 | `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
-| `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S fixtures only) | add P1 proposal fixtures: `place_on_edge.json`, `multi_cursor_visibility.json`, `roll_outcomes.json` |
+| `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S + current P1 fixtures) | keep promoting proposal fixtures as implementation lands |
+| `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment |
 | webapp Vitest conformance suite | webapp DOM matches expected for each fixture | not_started | written from fixtures; webapp regression mechanism |
 
 ---
@@ -173,6 +174,19 @@ graduations and as the regression suite for cross-port parity.
 A short log of what changed across recent spec / UI / engine releases.
 Each entry names which layer moved and what the consequence is for the
 others.
+
+### 2026-05 — spec v1.5 (L1 update only)
+
+- Adopted the v1.4 genre-audit additions: journal-as-narrative,
+  per-cursor projection of shared state, and the genre extension index.
+  **Impact:** no new top-level vocabulary surfaces; improves authoring
+  discipline and cross-demo traceability.
+- Reconciled v1.4 language with repo-current implementation status.
+  **Impact:** typed `Accepts` and `UIHints` are described as implemented;
+  `Blocker`, `InterpretationFragment`, typed info metadata, and Tier P2
+  widgets remain pending or partial.
+- Updated the fixture inventory to match the current repository,
+  including `compose_payload.json` and the existing proposal fixture set.
 
 ### 2026-05 — spec v1.3 (L1 update only)
 
@@ -208,7 +222,7 @@ others.
 - Engine HTTP body uses `choice_id` (pre-rename).
 - Engine `KvFragment.content`, projected `kv_list` values, web fixtures,
   and conformance fixtures use the unified `KvRow` record shape.
-- Engine has no `/story/info/{kind}` (consistent with v1.3 spec).
+- Engine has no `/story/info/{kind}` (consistent with v1.5 spec).
 
 ---
 
@@ -245,16 +259,19 @@ change to the named layer.
 
 **Phase 1 — Stabilize spec (current).**
 
-- ✅ Spec v1.3 with the six v1.2.1 patches.
+- ✅ Spec v1.5 with the v1.4 genre-audit additions reconciled to repo state.
 - ✅ EXTENSIONS.md swept to `pieces`.
 - ✅ This reconciliation doc as the three-layer spine.
 
 **Phase 2 — Reference UI catches up.** Wireframes and webapp align
-to v1.3.
+to v1.5.
 
 - Wireframes resync: v1.3 bundle is archived under
   `docs/src/design/story/wireframes/v1_3/`; keep future wireframes labeled
   by tier and avoid treating P2/P3 sketches as reference-client status.
+- Next wireframe input should be v1.5 plus vetted Tier P3 extension docs,
+  with v1.2/v1.3 wireframes treated as visual precedent rather than
+  contract truth.
 - Webapp PR sequence:
   1. ✅ `compose` accepts rendering as nested ChoiceInputView.
   2. `InterpretationFragment` renderer with the spec's `result` /
@@ -288,4 +305,4 @@ not pre-build these.
 
 ---
 
-*End of v0.1.*
+*End of v0.2.*

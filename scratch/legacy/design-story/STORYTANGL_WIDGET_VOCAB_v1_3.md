@@ -1,12 +1,12 @@
 # StoryTangl Widget Vocabulary
 
-**Version:** v1.5 · supersedes v1.4
-**Layer:** UI Vocabulary (Layer 1 of 3). **Implementation status** across reference clients (Layer 2: web/CLI/Tk), API transport, and engine backend (Layer 3) is tracked in `WIDGET_CONTRACT_RECONCILIATION.md`. **This document is target-truth.**
+**Version:** v1.3 · supersedes v1.2 + v1.2.1-review
+**Layer:** UI Vocabulary (Layer 1 of 3). **Implementation status** across reference clients, API transport, and engine backend is tracked in `WIDGET_CONTRACT_RECONCILIATION.md`. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
 **Source of truth (for engine model alignment):**
 - `tangl.journal.fragments` (fragment types, presentation hints)
 - `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
-- `tangl.journal.intent` (typed `Accepts`/`UIHints`; next-pass `Blocker` — see §6)
+- `tangl.journal.intent` (typed `Accepts`/`UIHints`, plus next-pass `Blocker` — see §6)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual
@@ -18,30 +18,26 @@ vocabulary itself is not.
 > equally valid — they each realize the same widget contract in their own
 > medium.
 
-**v1.5 changes summary (against v1.4).** v1.5 adopts the v1.4 genre-audit
-additions and reconciles them against the current repo implementation. No
-contract breaks; no new top-level vocabulary surfaces:
-
-- Keeps the new **§0.8 "Journal as narrative"** sidebar alongside §0.6
-  narrative authoring stance. Codifies the claim that v1.5-conforming envelope
-  streams produce legible narrative transcripts as a consequence of
-  traversal, without authored prose beyond per-location flavor. Elefant
-  Hunt is the worked proof-of-concept.
-- Keeps the §1.5 "**Per-cursor projection of shared state**"
-  paragraph naming the recipe: shared world, per-cursor visibility,
-  same `cursor_id` keyed projection. Resolves an ambiguity that
-  credentials, training, and elefant_hunt all hit.
-- Keeps the §0.9 **"Genre extensions index"** — short pointer table to all
-  `bundles/<name>/EXTENSIONS.md` documents, with one line about what
-  each genre stresses in the vocabulary. Helps readers find prior art.
-- Updates implementation-status wording for the repo-current typed
-  `Accepts` / `UIHints` work: those engine surfaces are implemented;
-  `Blocker`, `InterpretationFragment`, full info-channel typing, and
-  several Tier P2 surfaces remain pending.
-- Aligns the conformance fixture list with the current repository,
-  including `compose_payload.json` and the existing proposal fixtures.
-- Clarifies `place` payloads as carrying `source_zone_ref` when the
-  client selected from a visible source zone.
+**v1.3 changes summary (against v1.2).**
+- **Reverted** the `accepts.kind="select"` rename. Repo convention `pieces`
+  is preserved (15+ call sites; mirrors `piece_ids` payload and
+  `PieceFragment`). `select` is reserved for a hypothetical future generic
+  selection accepts; it is not minted on a piece-specific operation.
+- **Demoted** §1.5 "Cursors and journal channels" and §1.6 "Info channels"
+  to Tier P1 (committed target contract, not yet engine-shipped, no CLI
+  reference port yet). The framings stay; only the tier tag changes.
+- **Replaced** `GET /story/info/{kind}` with the query-descriptor model
+  matching the existing repo convention: `InfoAffordance.query: dict |
+  None` carries an opaque descriptor the backend interprets. Transport
+  routing is a backend concern, not a vocabulary concern.
+- **Added** §0.7 "Three-layer architecture" naming the
+  UI/API/Engine separation. Implementation status moves to
+  `WIDGET_CONTRACT_RECONCILIATION.md`; the spec is target-truth.
+- **Clarified** that several Tier P2 fixtures (`edge_ref`, `owner`,
+  `position`, audience-list `visibility`) are **proposal fixtures**
+  awaiting bundle MVP authors — not gating fixtures for current
+  conformance.
+- `PiecesAccepts` is the model class (was `SelectAccepts` in v1.2 draft).
 
 ---
 
@@ -124,11 +120,11 @@ schema evolution. Tuples are not used at any wire boundary.
 
 ### 0.5 Naming changes from prior drafts
 
-Renames ratified in moving from v0.x through v1.5. Applied throughout;
+Renames ratified in moving from v0.x through v1.3. Applied throughout;
 implementations migrating from prior versions update on the schedule in
 `WIDGET_CONTRACT_RECONCILIATION.md`.
 
-| Prior | Current | Reason |
+| Prior | v1.2 | Reason |
 |---|---|---|
 | `token` (UI piece) | `piece` | Collides with `tangl.core.token.Token` (singleton wrapper). |
 | `ledger` (UI section type) | *removed* | Subsumed by annotated `kv_list` rows (§2.5). The engine's `tangl.vm.runtime.ledger.Ledger` keeps the name. |
@@ -197,87 +193,6 @@ the surface is settled.
 The negotiation direction is **UI-out**: the spec proposes target
 contract; the API and engine chase. CLI ports skip L2 and call L3
 directly (in-process or via whatever shim a port chooses).
-
-### 0.8 Journal as narrative
-
-A v1.5-conforming envelope stream produces a legible narrative
-transcript as a consequence of traversal — without authored prose
-beyond per-location and per-event flavor. This is the StoryTangl
-thesis claim, made testable.
-
-A rendered CLI transcript of a complete play session — for any
-bundle whose envelope stream is contract-correct — should read as a
-coherent story. The arc structure (a Proppian arc, in the
-narratological sense: departure → trials → boons → return →
-recognition, or any equivalent ordering) emerges from the bundle's
-graph topology and the sequence of `content`, `attributed`, `roll`,
-and `control` fragments, not from a separate narration layer.
-
-The strongest demonstration is **bundle/elefant_hunt** (see
-Appendix C): a board game whose mechanics produce a recognizable
-naturalist's-journal arc from pure procedural mechanics. The
-bundle's per-location prose is thin; the structure does the work.
-
-**Implications for bundle authors.** The journal-as-story claim
-holds when:
-
-- Each location, encounter, and outcome emits a `content` fragment
-  with enough specificity to be re-readable in transcript form.
-  ("Camp. Consumed 3 supplies." is enough; an empty envelope is
-  not.)
-- `RollFragment.narrative` is populated when the outcome carries
-  story weight — losses, captures, revelations.
-- `attributed` fragments give recurring NPCs stable speaker names
-  so the transcript reads as a cast.
-- `update` and `delete` control fragments carry a `content`
-  fragment companion when the state change is narratively
-  significant ("Zartan is lost to the river.").
-
-**Implications for the contract.** The journal-as-narrative claim
-is a **bundle-authoring discipline**, not a contract enforcement
-rule. v1.5 does not gate conformance on it. But the conformance
-fixture suite SHOULD include at least one "render a complete
-session to transcript" test per genre, asserting the transcript is
-non-trivial and contains key narrative events. See §10.4.
-
-### 0.9 Genre extensions index
-
-Tier P3 genre conventions live in `bundles/<name>/EXTENSIONS.md`.
-The current set:
-
-| Bundle | What it stresses | EXTENSIONS doc |
-|---|---|---|
-| `carwars` | Vehicle outfitting; slot zones with capacity constraints; RNG stat checks; drag-and-drop with click-pick parity | `bundles/carwars/EXTENSIONS.md` |
-| `credentials` | Inspection / verification gameplay; severity-coded findings; mediation move sequencing; backend-authored discrepancies | `bundles/credentials/EXTENSIONS.md` |
-| `training` | Scheduled skill progression; mood as growth modulator; scheduled-event checks; per-tag situational effects | `bundles/training/EXTENSIONS.md` |
-| `elefant_hunt` | Graph-traversal sandbox; backend-private token pools; hunt resolution as composite roll; journal-as-story validation | `bundles/elefant_hunt/EXTENSIONS.md` |
-| `hana_smuta` (sketch) | Card play with `pieces` constraints; hand/field/pile/score zones | `bundles/hana_smuta/EXTENSIONS.md` (TBD) |
-
-Cross-paradigm patterns that emerged from drafting the above and were
-NOT lifted to a shared `_common/EXTENSIONS.md` because they're each
-already covered by main-spec conventions:
-
-- **Severity emphasis** — `ui_hints.emphasis` and `KvRow.emphasis`
-  carry author-stable severity. No genre needed to invent its own;
-  the main-spec vocabulary covers credentials findings, carwars
-  hazards, training mood states, elefant_hunt threat exits.
-- **Gate-check previews** — every genre that surfaces a "you're about
-  to roll against difficulty N" preview uses the same shape via
-  `ui_hints` with bundle-specific sub-keys (`stat_check` in carwars
-  and training, `validity_check` in credentials, `encounter_check`
-  in elefant_hunt). These are open hint surfaces by §6.2.1; a unified
-  `gate_check` was considered but each genre's preview text and
-  callout fields differ enough that forcing a single shape would
-  obscure intent. **Genres keep their own; the underlying pattern is
-  documented per-extension.**
-- **Owner-bound pieces with state** — carwars hunters, training
-  inventory unlocks, elefant_hunt mobs all use the same
-  `PieceFragment` shape with `owner` and `properties`. No
-  cross-genre extension needed.
-
-If a fourth cross-paradigm pattern emerges from future genre work,
-`bundles/_common/EXTENSIONS.md` becomes the right home for it. Today
-it is not.
 
 ---
 
@@ -348,7 +263,7 @@ re-projected every state-changing turn (i.e. when `step` advances).
 Shells MAY animate deltas. The `kind` field is a free string for
 semantic tagging (`wallet`, `score`, `inventory`, `world_time`, etc.);
 ports MAY use it to choose between visual treatments. See §1.6 for the
-current conventional `kind` values.
+v1.2 conventional `kind` values.
 
 ### 1.4 Flow vs rail
 
@@ -424,40 +339,6 @@ and `ParticipantId` is the cursor's owning account. A list value means
 asymmetric cooperative roles, and "show this to the GM only" surfaces
 all use this form. Routing is a Service-layer concern.
 
-**Per-cursor projection of shared world state.** Many multi-cursor
-games share a world surface — a board, a market catalog, an event
-queue — across cursors. The rendering recipe is:
-
-1. **The shared element exists once in backend world state.** A market
-   zone, a board zone, an animal pool — one canonical object on the
-   backend.
-2. **Each cursor receives its own projected envelope.** The same
-   shared element appears in each cursor's envelope as a fragment.
-   `PieceFragment.owner` and `visibility` (per-fragment) control
-   which cursor sees what about it.
-3. **Updates to shared state propagate as control fragments to
-   every relevant cursor's channel.** When cursor A captures an
-   animal, cursor B's channel receives a `delete` control fragment
-   removing that animal from the shared encounter zone and a
-   `content` fragment narrating ("Hunter Red bags a hippo at the
-   north watering hole.").
-
-This recipe lets a bundle implement Elefant Hunt's shared animal
-pool, a shared trick in trick-taking, a shared marketplace, or
-shared narrative arcs without needing a new fragment type. The
-`owner` field on pieces (Tier P2; §7.1) is the routing key for
-ownership-specific projection. `visibility="public"` means "render
-in every cursor's channel"; `owner_only` means "render only in the
-owner's channel"; the audience-list form (`visibility: list[ParticipantId]`,
-Tier P2 proposal fixture) handles team-scoped visibility.
-
-**The backend is the sole coordinator.** No cursor sees another
-cursor's intent before commit. No cursor's projection depends on
-inference about another cursor's state beyond what the backend has
-chosen to reveal. This is §0.3 backend authority applied to
-multi-cursor: the contract for cursor A makes no claim about
-cursor B's state that the backend hasn't explicitly projected.
-
 **Single-cursor is the floor case.** Most of this contract is written
 as if there's one cursor. The CLI port assumes one cursor. The
 `crossroads_inn.json` fixture assumes one cursor. Multi-cursor is the
@@ -479,7 +360,7 @@ cheap.
 > player MAY query. Info channels are **discovery hints, not mandatory
 > client UI**.
 
-**Status (L1):** committed Tier P1 target contract. **Status (L2):** reference
+**Status (L1):** target contract for v1.2+. **Status (L2):** reference
 webapp implements `info_affordances` with `query` descriptors against
 `/story/info`. **Status (L3):** engine emits `metadata.info_affordances`
 in some bundles but the typed `info_state` shape is not yet ratified at
@@ -888,7 +769,7 @@ class ProjectedSection(BaseModel):
 
 `kind` is a free string used by ports to choose between visual
 treatments (`wallet` → coin icon, `score` → leaderboard skin, etc.). It
-does not discriminate the value union. The v1.5 conventional `kind`
+does not discriminate the value union. The v1.2 conventional `kind`
 values (`world_time`, `location`, `inventory`, etc.) are documented in
 §1.6.
 
@@ -914,7 +795,7 @@ vocabulary and MUST NOT be redefined.
 - Fallback behavior: never silently drop fragments.
 
 The §1.5 cursor-channel routing model and §1.6 info-channel rules are
-Tier P1 in v1.5 — committed target contract, not yet fully engine-shipped.
+Tier P1 in v1.3 — committed target contract, not yet engine-shipped.
 When they graduate to Tier S (engine + CLI reference port implemented),
 they join the list above.
 
@@ -1098,8 +979,8 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
 
 Everything below types fragment interiors without changing the outer
 fragment envelope shape. `Accepts` and `UIHints` are implemented in the
-engine; `Blocker`, `InterpretationFragment`, and several metadata subkeys
-remain the next dictionary-shaped sub-surfaces to promote.
+engine; `Blocker` remains the next dictionary-shaped sub-surface to
+promote.
 
 ### 6.1 Typed `Accepts`
 
@@ -1122,7 +1003,6 @@ class PieceConstraints(BaseModel):
     same_property: list[str] | None = None
     different_property: list[str] | None = None
     target_zone_ref: str | None = None    # uid of group with group_type=zone
-    source_zone_ref: str | None = None    # uid of group supplying movable pieces
     target_kind: list[str] | None = None  # filter by piece.kind, e.g. ["weapon"]
     predicate_ref: str | None = None      # opaque, story-registered (§7.4)
 
@@ -1231,7 +1111,7 @@ keeps payloads short and matches existing webapp behavior.
 | `text` | `{ "text": str }` | |
 | `quantity` | `{ "quantity": int }` | |
 | `pieces` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max`. (Renamed from `tokens` in v1.2; the `select` rename was reverted in v1.2.1.) |
-| `place` | `{ "piece_id": str, "source_zone_ref": str | null, "target_zone_ref": str | null, "edge_ref": str | null }` | Move a single piece from an optional source into a single target. Exactly one of `target_zone_ref` or `edge_ref` is present. |
+| `place` | `{ "piece_id": str, "target_zone_ref": str \| null, "edge_ref": str \| null }` | Move a single piece into a single target. Exactly one of `target_zone_ref` or `edge_ref` is present. |
 | `compose` | `{ "parts": { role: subpayload, ... } }` | Each subpayload follows its part's `accepts.kind`. |
 | `raw_command` | `{ "text": str }` | Reserved for `interpret_command`-shaped choices. |
 
@@ -1256,7 +1136,6 @@ Concrete `place` example — "mount the flamethrower on the front":
   "edge_id": "e-mount",
   "payload": {
     "piece_id": "pc-flamethrower",
-    "source_zone_ref": "z-vehicle-loose",
     "target_zone_ref": "z-front-mount"
   }
 }
@@ -1269,7 +1148,6 @@ Concrete `place` (edge variant) — "lay track on the Toledo-Chicago connection"
   "edge_id": "e-lay-track",
   "payload": {
     "piece_id": "pc-train-blue",
-    "source_zone_ref": "z-train-yard",
     "edge_ref": "edge-toledo-chicago"
   }
 }
@@ -1440,7 +1318,7 @@ port.
 ### 6.7 HTTP API
 
 ```python
-# tangl/service/http/story.py — Tier P1 target
+# tangl/service/http/story.py — proposed Tier P1
 class ChoiceRequest(BaseModel):
     edge_id: UUID                        # was: choice_id (deprecated alias)
     payload: dict[str, Any] | None = None  # validated against Accepts at runtime
@@ -1732,7 +1610,7 @@ decision.
 Without this protocol resolved, BGG-mechanism coverage for variable
 powers, area control, pattern building, and adjacency-based tile
 placement stays theoretical. §7.4 is the single highest-leverage open
-item in v1.5.
+item in v1.2.
 
 ### 7.5 Profile registry
 
@@ -1755,15 +1633,6 @@ P2. Each genre lives in its own extensions document.
 - **Carwars-gamebook** — `bundles/carwars/EXTENSIONS.md`. Slot-zone
   conventions, `ui_hints.stat_check`, `ui_hints.drag` for vehicle
   outfitting, RNG combat fixtures, the "Garage turn" worked example.
-- **Credentials / inspection** — `bundles/credentials/EXTENSIONS.md`.
-  Severity-coded findings, mediation move catalog, packet zones,
-  disposition severity, backend-authored discrepancies.
-- **Training (succession-game)** — `bundles/training/EXTENSIONS.md`.
-  Mood as growth modulator, scheduled checks, inventory unlocks,
-  weekly study commits. Grounded in `worlds/coronate_the_regent`.
-- **Elefant Hunt / graph-traversal board game** —
-  `bundles/elefant_hunt/EXTENSIONS.md`. Graph sandbox, backend-private
-  token pool, composite hunt resolution, journal-as-story.
 - **Hana-smuta board** — `bundles/hana_smuta/EXTENSIONS.md` (sketched).
   Card profile + `hand` / `field` / `pile` / `score_pile` zones, plus
   matching `accepts(pieces, same_property)`.
@@ -1819,24 +1688,21 @@ their CLI renderings ship in `cli_reference_port.py`.
 ```
 engine/contrib/conformance/
   fixtures/
-    command_hints.json            # raw_command + grammar + interpretation
-    compose_payload.json          # compose accepts with quantity + pieces parts
-    control_delete.json           # delete control mutation
     crossroads_inn.json           # canonical narrative turn
-    dialog_with_avatar.json       # attributed group + avatar_im binding
-    pending_media_update.json     # rit format with later update swap
-    projected_state_all_values.json
-    quantity_payload.json         # quantity accepts
     sandbox_payload.json          # text/quantity/pieces accepts variants
-  proposals/
-    carwars_garage_turn.json      # proposal fixture for slot/catalog/place flow
-    piece_realization.json        # proposal fixture for realized/unrealized pieces
-    place_accepts.json            # proposal fixture for place accepts
-    record_kvrow.json             # proposal fixture for record-shaped KvRow
-    roll_fragment.json            # proposal fixture for RollFragment
+    buy_quantity.json             # quantity with ledger_ref + cost_previews
+    command_hints.json            # raw_command + grammar + interpretation
+    dialog_with_avatar.json       # attributed group + avatar_im binding
+    pending_media.json            # rit format with later update swap
+    place_into_slot.json          # place accepts; zone constraints; capacity
+    place_on_edge.json            # PROPOSAL FIXTURE — place accepts with edge_ref
+    roll_outcomes.json            # RollFragment with success/fail/crit
+    info_channels.json            # metadata.info_affordances + info_state + query
+    multi_cursor_visibility.json  # PROPOSAL FIXTURE — owner_only and audience-list
   cli_reference_port.py           # Python CLI port (Tier S floor)
-  reference_port.py               # UI-neutral reference view model
-  tk_reference_port.py            # Tk planning / inspection reference
+  legibility.py                   # §5.1 contract checker
+  parity.py                       # §5.2 / §5.3 contract checkers
+  test_conformance.py             # pytest harness
 ```
 
 **Proposal fixtures vs. gating fixtures.** Fixtures tagged "PROPOSAL
@@ -1895,39 +1761,6 @@ every state of every Tier S widget. Tier P1 proposals MUST add CLI
 rendering before graduating to Tier S. PRs that change Tier S
 vocabulary without updating `cli_reference_port.py` fail CI.
 
-### 10.4 Journal-as-story transcript test
-
-Per §0.8: each genre fixture suite SHOULD include at least one
-**transcript test** — a script that runs a complete play session
-through `cli_reference_port.py`, captures the rendered stdout, and
-asserts the resulting transcript is:
-
-1. Non-trivial (at least one fragment per location, encounter, or
-   choice-resolution event).
-2. Contains the key narrative events (locations visited, captures /
-   losses / commits, terminal outcome).
-3. Readable as prose by a human (smoke-tested manually; not a hard
-   assertion).
-
-The test is diagnostic, not gating: a transcript that reads poorly
-is a *bundle-authoring* finding (thin prose, missed control-fragment
-narrations, etc.), not a contract violation. The point is to keep
-the journal-as-story claim concretely measurable rather than
-aspirational.
-
-`engine/contrib/conformance/transcripts/` collects exemplar
-transcripts per genre:
-
-```
-engine/contrib/conformance/transcripts/
-  carwars_garage_to_combat.txt
-  credentials_day1_morning.txt
-  training_coronate_full_session.txt
-  elefant_hunt_one_expedition.txt
-```
-
-These serve as both regression baselines and authoring references.
-
 ---
 
 ## Appendix A — Glossary
@@ -1975,7 +1808,7 @@ These serve as both regression baselines and authoring references.
 7. **`PieceFragment.available` / `unavailable_reason` for realized
    pieces.** These fields make sense for offers (catalog rows). They
    also plausibly apply to realized pieces (a card grayed because not
-   playable this turn). v1.5 keeps them on base `PieceFragment` for
+   playable this turn). v1.2 keeps them on base `PieceFragment` for
    both cases.
 8. **`RitualHints` scope.** Currently on `RollFragment` only. If
    authors want skip-tuning on `MediaFragment` transitions or other
@@ -1985,7 +1818,7 @@ These serve as both regression baselines and authoring references.
    for "wait for all cursors to commit" or "rotate active cursor."
    Worth a sketch document at some point but explicitly out of scope
    for v1.x.
-10. **Info-channel compound queries.** v1.5 keeps the v1.3 sub-
+10. **Info-channel compound queries.** v1.3 resolves the v1.2 sub-
     addressing question via `InfoAffordance.query: dict[str, Any] |
     None` — bundles encode whatever compound parameters they need in
     the descriptor (e.g., `query={"type":"map","region":"hall"}`).
@@ -1997,11 +1830,8 @@ These serve as both regression baselines and authoring references.
 | Bundle | Document | Highlights |
 |---|---|---|
 | carwars (gamebook) | `bundles/carwars/EXTENSIONS.md` | Slot-zone conventions, `ui_hints.stat_check`, `ui_hints.drag`, Garage turn worked example, RNG combat patterns |
-| credentials (inspection) | `bundles/credentials/EXTENSIONS.md` | Severity-coded findings as `KvRow.emphasis`, mediation move catalog, packet zones, disposition severity via `ui_hints.emphasis`, backend-authored discrepancies per §0.6 |
-| training (succession-game) | `bundles/training/EXTENSIONS.md` | Mood as growth modulator (per-tag `SituationalEffect`s rendered as projected scalar + delta previews), `RollFragment` skill checks against player stats, weekly study commits, inventory unlocks via `realized` lifecycle |
-| elefant_hunt (board game / sandbox) | `bundles/elefant_hunt/EXTENSIONS.md` | Graph-traversal sandbox; backend-private `TokenPool` validating §0.3; composite hunt resolution via `RollFragment(kind="custom")`; journal-as-story validation per §0.8 |
 | hana_smuta (sketch) | `bundles/hana_smuta/EXTENSIONS.md` (TBD) | Card profile, `hand`/`field`/`pile`/`score_pile` zones, `same_property` constraints |
 
 ---
 
-*End of v1.5.*
+*End of v1.3.*
