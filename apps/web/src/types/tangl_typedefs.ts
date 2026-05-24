@@ -355,6 +355,13 @@ export interface CostPreview {
   unit?: string | null
 }
 
+export interface Blocker {
+  code?: string | null
+  message: string
+  refs?: FragmentId[]
+  [key: string]: unknown
+}
+
 export interface PieceConstraints {
   same_property?: string[] | null
   different_property?: string[] | null
@@ -485,7 +492,7 @@ export interface ChoiceStoryFragment extends BaseStoryFragment {
   available?: boolean
   active?: boolean | null
   unavailable_reason?: string | null
-  blockers?: Array<Record<string, unknown>> | null
+  blockers?: Blocker[] | null
   accepts?: ChoiceAccepts | null
   ui_hints?: ChoiceUIHints | null
   payload?: unknown
@@ -517,6 +524,16 @@ export interface RollStoryFragment extends BaseStoryFragment {
   ritual_hints?: Record<string, unknown> | null
 }
 
+export interface InterpretationStoryFragment extends BaseStoryFragment {
+  fragment_type: 'interpretation'
+  result?: string | null
+  text?: string | null
+  message?: string | null
+  candidates?: FragmentId[] | null
+  blocked_reason?: string | null
+  hint?: string | null
+}
+
 export type StoryFragment =
   | ContentStoryFragment
   | AttributedStoryFragment
@@ -528,6 +545,7 @@ export type StoryFragment =
   | ControlStoryFragment
   | UserEventStoryFragment
   | RollStoryFragment
+  | InterpretationStoryFragment
   | BaseStoryFragment
 
 export interface RuntimeEnvelope {

@@ -39,6 +39,8 @@ class ChoiceControl:
     accepts_kind: str | None = None
     locked_reason: str | None = None
     accepts: JsonObject | None = None
+    blockers: tuple[str, ...] = ()
+    cost_previews: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -385,6 +387,14 @@ def _render_choice(
     accepts_kind = _text(accepts, "kind") if accepts is not None else None
     prompt = _accepts_prompt(accepts, registry, envelope)
     locked_reason = None if available else _text(fragment, "locked_reason", "unavailable_reason")
+    blockers = tuple(
+        _blocker_text(blocker)
+        for blocker in _object_list(fragment.get("blockers"))
+    )
+    cost_previews = tuple(
+        _cost_preview_text(preview)
+        for preview in _choice_cost_previews(fragment, accepts)
+    )
 
     choice = ChoiceControl(
         uid=uid,
@@ -396,15 +406,52 @@ def _render_choice(
         accepts_kind=accepts_kind,
         locked_reason=locked_reason,
         accepts=accepts,
+        blockers=blockers,
+        cost_previews=cost_previews,
     )
     return _item("choice", _choice_text(choice), indent=indent, ref_id=uid, choice=choice)
 
 
 def _choice_text(choice: ChoiceControl) -> str:
+    costs = f" [cost: {'; '.join(choice.cost_previews)}]" if choice.cost_previews else ""
+    blockers = f" [blockers: {'; '.join(choice.blockers)}]" if choice.blockers else ""
     if not choice.available:
         suffix = f" [locked: {choice.locked_reason}]" if choice.locked_reason else " [locked]"
-        return f"x) {choice.label}{suffix}"
-    return f"{choice.hotkey}) {choice.label}{choice.prompt}"
+        return f"x) {choice.label}{suffix}{blockers}{costs}"
+    return f"{choice.hotkey}) {choice.label}{choice.prompt}{costs}"
+
+
+def _blocker_text(blocker: JsonObject) -> str:
+    message = _text(blocker, "message")
+    if message:
+        return message
+    code = _text(blocker, "code", "kind")
+    key = _text(blocker, "key")
+    need = blocker.get("need")
+    have = blocker.get("have")
+    parts = [part for part in (code, key) if part]
+    if need is not None or have is not None:
+        parts.append(f"have {have}, need {need}")
+    return ": ".join(parts) if parts else json.dumps(blocker, sort_keys=True)
+
+
+def _choice_cost_previews(fragment: JsonObject, accepts: JsonObject | None) -> list[JsonObject]:
+    previews: list[JsonObject] = []
+    hints = _object(fragment.get("ui_hints"))
+    if hints is not None:
+        previews.extend(_object_list(hints.get("cost_previews")))
+    if accepts is not None:
+        previews.extend(_object_list(accepts.get("cost_previews")))
+    return previews
+
+
+def _cost_preview_text(preview: JsonObject) -> str:
+    ledger_key = _text(preview, "ledger_key") or "cost"
+    delta = preview.get("delta")
+    unit = _text(preview, "unit")
+    sign = "+" if isinstance(delta, (int, float)) and delta > 0 else ""
+    unit_text = f" {unit}" if unit else ""
+    return f"{ledger_key} {sign}{delta}{unit_text}"
 
 
 def _choice_hotkey(fragment: JsonObject) -> str:
@@ -514,13 +561,23 @@ def _piece_data(fragment: JsonObject) -> JsonObject:
 
 
 def _render_interpretation(fragment: JsonObject) -> str:
-    outcome = _text(fragment, "outcome") or "interpretation"
-    content = _text(fragment, "content") or ""
-    command_text = _text(fragment, "command_text")
-    prefix = f"[interpretation:{outcome}]"
+    result = _text(fragment, "result", "outcome") or "interpretation"
+    command_text = _text(fragment, "text", "command_text")
+    message = _text(fragment, "message", "content") or ""
+    blocked_reason = _text(fragment, "blocked_reason")
+    hint = _text(fragment, "hint")
+    candidates = _string_list(fragment.get("candidates"))
+    prefix = f"[interpretation:{result}]"
     if command_text:
         prefix = f'{prefix} "{command_text}"'
-    return f"{prefix} {content}"
+    details = [
+        message,
+        f"blocked: {blocked_reason}" if blocked_reason else None,
+        f"hint: {hint}" if hint else None,
+        f"candidates: {', '.join(candidates)}" if candidates else None,
+    ]
+    suffix = " ".join(detail for detail in details if detail)
+    return f"{prefix} {suffix}".rstrip()
 
 
 def _render_roll(fragment: JsonObject) -> str:

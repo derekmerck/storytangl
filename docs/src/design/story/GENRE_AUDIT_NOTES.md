@@ -271,7 +271,7 @@ Ranked by leverage:
    cross-paradigm pattern emerges that genuinely warrants
    consolidation.
 6. **Engine PR sequencing follows
-   `WIDGET_CONTRACT_RECONCILIATION.md` §H** as planned.
+   `WIDGET_CONTRACT_RECONCILIATION.md` §I** as planned.
 
 ---
 

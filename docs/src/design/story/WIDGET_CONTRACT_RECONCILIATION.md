@@ -63,7 +63,7 @@ the negotiation is mostly about typed-shape graduations.
 | `ProjectedState.sections` with five `value_type`s | S | done | done | — |
 | `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
 | Bundle customization / presentation profiles | S target | partial (docs + older world `ui_config`) | not_started | keep advisory; requires world-info catalog before conformance |
-| §5.1 Decision Legibility Contract | S | partial (no automated check) | n/a (contract; not a capability) | webapp conformance harness (see §E) |
+| §5.1 Decision Legibility Contract | S | partial (no automated check) | n/a (contract; not a capability) | webapp conformance harness (see §F) |
 | §5.2 Time Parity Rule (visual ritual skip, media advance) | S | partial (skip available, not enforced) | n/a | webapp conformance harness |
 | §5.3 Input Parity Rule (drag fallback, hotkey numbers) | S | partial (positional hotkeys done; drag-fallback in carwars) | n/a | webapp conformance harness |
 | §0.2 CLI Floor Rule | S | n/a | n/a (gating rule on PRs) | wire into CI for Tier S graduations |
@@ -83,15 +83,15 @@ surface is small enough to settle with its immediate neighbors.
 | Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial (`edge_ref` not rendered) | done (`Accepts` union) | add `edge_ref` fixture when route/network MVP lands |
 | Typed `ComposeAccepts` | P1 | partial (web nested renderer + CLI/Tk inspection fixture) | done (`Accepts` union) | harden layout and add broader part combinations as worlds emit them |
 | Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
-| Typed `Blocker` (replaces dict blockers) | P1 | partial | untyped | engine PR |
-| Typed `InterpretationFragment` | P1 | partial (custom shape mid-cycle) | untyped | engine PR; webapp aligns on `result`/`text` field names |
-| `cost_previews: list[CostPreview]` (plural) | P1 | partial | not_started | engine PR; webapp follows |
+| Typed `Blocker` (replaces dict blockers) | P1 | done (typed + rendered) | untyped | engine PR |
+| Typed `InterpretationFragment` | P1 | done (renders `result` / `text` / `message`) | untyped | engine PR |
+| `cost_previews: list[CostPreview]` (plural) | P1 | done (choice display) | not_started | engine PR |
 | `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
 | `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | partial (emits in some bundles, untyped) | engine PR: typed `InfoAffordance` model |
 | `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | partial | engine PR: declare the field; bundles populate as needed |
-| `metadata.info_state: InfoState` typed | P1 | partial (nested type + fixture; refresh still unconditional) | not_started | engine PR: emit nested `info_state`; webapp can later use it for cache hints |
-| `/story/info` accepts `kind` + `query` params | P1 | done client-side | partial (basic endpoint exists; no query routing) | API + engine PR (see §D) |
-| HTTP body field `edge_id` (rename of `choice_id`) | P1 | uses `choice_id` | uses `choice_id` | engine + webapp PR with one-version deprecation shim |
+| `metadata.info_state: InfoState` typed | P1 | done (nested type + dirty-kind cache hints) | not_started | engine PR: emit nested `info_state` |
+| `/story/info` accepts `kind` + `query` params | P1 | done client-side | partial (basic endpoint exists; no query routing) | API + engine PR (see §E) |
+| HTTP body field `edge_id` (rename of `choice_id`) | P1 | bridge posts both fields | uses `choice_id` | engine PR; remove web `choice_id` after backend accepts `edge_id` |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
 | §1.6 Info channels graduation to Tier S | P1 | done | partial | gated on CLI reference port implementing the `?`/slash fallback |
 
@@ -126,7 +126,29 @@ question in the spec).
 
 ---
 
-## §D — API transport (Layer 2)
+## §D — Tier P3 genre extension surfaces
+
+These are advisory genre conventions layered on top of v1.5. They do
+not create new core fragment types, accepts kinds, or value types. A
+generic client remains conforming when it renders the underlying v1.5
+surfaces and ignores these enrichments.
+
+| Surface | Spec tier | Reference UI | Engine backend | Plan |
+|---|---|---|---|---|
+| `bundles/carwars/EXTENSIONS.md` | P3 | docs + v1.5 wireframe | n/a | keep drag optional; no garage-specific core widgets |
+| `bundles/credentials/EXTENSIONS.md` | P3 | docs + v1.5 wireframe | n/a | packet / finding / disposition treatments remain genre enrichments |
+| `bundles/training/EXTENSIONS.md` | P3 | docs + v1.5 wireframe | n/a | study previews, stat checks, and inventory unlocks remain genre enrichments |
+| `bundles/elefant_hunt/EXTENSIONS.md` | P3 | docs + v1.5 wireframe | n/a | journal-as-story transcript proof; no new surface beyond graph zones / rolls |
+| `ui_hints.stat_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional badge or CLI suffix; backend remains authoritative |
+| `ui_hints.validity_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional preview over mediation choices; fallback to ordinary choice text |
+| `ui_hints.encounter_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional risk badge / suffix; fallback to `ui_hints.emphasis` + prose |
+| `ui_hints.drag` | P3 | docs + v1.5 wireframe | n/a | optional enrichment; click-pick fallback remains required by §5.3 |
+| Genre transcript examples | P3 diagnostic | v1.5 wireframe samples | n/a | add executable transcripts when demo worlds stabilize; diagnostic, not gating |
+| `_common/EXTENSIONS.md` | deferred | n/a | n/a | do not create until a fourth cross-genre pattern is not already covered by core v1.5 |
+
+---
+
+## §E — API transport (Layer 2)
 
 The API surface is intentionally underspecified at the contract
 level — the spec commits to the data shapes (L1), and the API
@@ -151,7 +173,7 @@ The L2 column is therefore not blocking for CLI conformance.
 
 ---
 
-## §E — Conformance harness
+## §F — Conformance harness
 
 These tests verify spec contracts against the reference
 implementations. They serve as the gating mechanism for tier
@@ -159,17 +181,17 @@ graduations and as the regression suite for cross-port parity.
 
 | Harness | What it checks | Status | Plan |
 |---|---|---|---|
-| `engine/contrib/conformance/cli_reference_port.py` | Tier S CLI rendering for every fragment / value_type | partial (Tier S widgets only) | extend coverage as Tier P1 → S graduations happen |
+| `engine/contrib/conformance/cli_reference_port.py` | Tier S CLI rendering for every fragment / value_type | partial (Tier S + current P1 widgets) | extend coverage as Tier P1 → S graduations happen |
 | `engine/contrib/conformance/legibility.py` | §5.1 — referenced UIDs are rendered | not_started | first conformance harness to write |
 | `engine/contrib/conformance/parity.py` | §5.2 time parity, §5.3 input parity | not_started | second harness |
 | `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
 | `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S + current P1 fixtures) | keep promoting proposal fixtures as implementation lands |
-| `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment |
+| `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment, and one UUID-shaped v1.5 wireframe interpretation sample; CLI/Tk can inspect them without promotion |
 | webapp Vitest conformance suite | webapp DOM matches expected for each fixture | not_started | written from fixtures; webapp regression mechanism |
 
 ---
 
-## §F — Recent reconciliation events
+## §G — Recent reconciliation events
 
 A short log of what changed across recent spec / UI / engine releases.
 Each entry names which layer moved and what the consequence is for the
@@ -187,6 +209,20 @@ others.
   widgets remain pending or partial.
 - Updated the fixture inventory to match the current repository,
   including `compose_payload.json` and the existing proposal fixture set.
+- Imported and vetted Tier P3 extension docs for CarWars, credentials,
+  training, and elefant_hunt, plus `GENRE_AUDIT_NOTES.md`.
+  **Impact:** genre enrichments are advisory over core v1.5; no
+  `_common/EXTENSIONS.md` until a repeated cross-genre pattern is not
+  already covered by the core vocabulary.
+- Archived the v1.5 wireframe package under
+  `docs/src/design/story/wireframes/v1_5/`. **Impact:** visual coverage
+  now matches the reconciled v1.5 vocabulary and Tier P3 extension docs;
+  most wireframe fixtures remain design fixtures until their symbolic ids
+  are translated for engine conformance.
+- Translated one v1.5 wireframe interpretation sample into
+  `engine/contrib/conformance/proposals/` with UUID-shaped ids. **Impact:**
+  future ports have a concrete command-feedback fixture without promoting the
+  whole wireframe bundle to gating conformance.
 
 ### 2026-05 — spec v1.3 (L1 update only)
 
@@ -209,10 +245,33 @@ others.
   sites).
 - Reference webapp implements `InfoAffordance.query` as an opaque JSON
   descriptor on `/story/info?kind=...&query=...`.
-- Reference webapp accepts nested `metadata.info_state`, but still refreshes
-  `/story/info` on every story update until backend dirty-kind support lands.
+- Reference webapp accepts nested `metadata.info_state`. This row is
+  superseded by the v1.5 update, where `dirty_kinds` became an implemented
+  cache hint in the reference client.
 - Reference webapp ships `place` accepts kind without `edge_ref`
   (proposal fixture not yet exercised).
+
+### 2026-05 — webapp v1.5 reference UI reconciliation
+
+- Reference webapp renders `InterpretationFragment` with the spec's
+  `result`, `text`, `message`, `blocked_reason`, `hint`, and `candidates`
+  fields. **Impact:** command-resolution feedback no longer falls through
+  to the unknown-fragment fallback.
+- Reference webapp renders typed `blockers[]` and plural
+  `cost_previews[]` as choice decision details. **Impact:** locked choices
+  expose more of the decision-legibility contract in the current shell.
+- Reference webapp posts both `edge_id` and `choice_id` during the L2
+  transition. **Impact:** v1.5 clients can exercise the target field while
+  the current backend remains on `choice_id`.
+- Reference webapp treats `metadata.info_state.dirty_kinds` as cache hints for
+  `/story/info`. **Impact:** the sidebar keeps old refresh behavior when no
+  hint is provided, but skips clean side-channel refreshes when the backend
+  sends explicit dirty-kind metadata. The tests cover both default status and
+  selected affordance kinds.
+- Reference CLI/Tk ports render or inspect blockers, cost previews, typed
+  accepts prompts, and v1.5 interpretation fields. **Impact:** new client
+  ports can compare against portable JSON fixtures and proposal fixtures
+  instead of copying the Vue shell.
 
 ### 2026-05 — engine current (L3 baseline)
 
@@ -226,11 +285,11 @@ others.
 
 ---
 
-## §G — How to use this doc
+## §H — How to use this doc
 
 - **Spec authors.** When you commit a vocabulary change, update the
   appropriate row's "Spec tier" column and add a one-paragraph entry
-  to §F. The implementation columns lag deliberately.
+  to §G. The implementation columns lag deliberately.
 - **Reference UI authors.** When the webapp implements a surface,
   update the "Reference UI" column to `done` or `partial`. If you're
   implementing against a fixture (not against a live engine), use
@@ -240,18 +299,18 @@ others.
   capability but not the API endpoint, that's still progress — the
   capabilities table in `ENGINE_CAPABILITIES.md` (forthcoming) tracks
   Python surface separately.
-- **CLI port authors.** Watch §A and §B; you don't care about §D.
-  Your conformance is against `cli_reference_port.py` and the §E
+- **CLI port authors.** Watch §A and §B; you don't care about §E.
+  Your conformance is against `cli_reference_port.py` and the §F
   harness.
 
-A row becomes a candidate for the §F log when any column moves.
+A row becomes a candidate for the §G log when any column moves.
 A surface becomes a candidate for Tier S graduation when all three
 implementation columns read `done` and the CLI reference port
 renders it.
 
 ---
 
-## §H — Forward-looking sequence
+## §I — Forward-looking sequence
 
 This is the **inversion plan** the project committed to: UI leads,
 API + engine chase. Each step's deliverable is a single PR-shaped
@@ -261,22 +320,23 @@ change to the named layer.
 
 - ✅ Spec v1.5 with the v1.4 genre-audit additions reconciled to repo state.
 - ✅ EXTENSIONS.md swept to `pieces`.
+- ✅ Tier P3 extension docs imported and vetted for current demo genres.
 - ✅ This reconciliation doc as the three-layer spine.
 
 **Phase 2 — Reference UI catches up.** Wireframes and webapp align
 to v1.5.
 
-- Wireframes resync: v1.3 bundle is archived under
-  `docs/src/design/story/wireframes/v1_3/`; keep future wireframes labeled
-  by tier and avoid treating P2/P3 sketches as reference-client status.
-- Next wireframe input should be v1.5 plus vetted Tier P3 extension docs,
-  with v1.2/v1.3 wireframes treated as visual precedent rather than
-  contract truth.
+- ✅ Wireframes resync: v1.5 bundle is archived under
+  `docs/src/design/story/wireframes/v1_5/`, with v1.2/v1.3 treated as
+  visual precedent rather than contract truth.
+- ✅ The v1.5 wireframe annotates core vocabulary separately from Tier P3
+  enrichments (`stat_check`, `drag`, `validity_check`, `encounter_check`),
+  keeping contract conformance and genre flavor separable.
 - Webapp PR sequence:
   1. ✅ `compose` accepts rendering as nested ChoiceInputView.
-  2. `InterpretationFragment` renderer with the spec's `result` /
+  2. ✅ `InterpretationFragment` renderer with the spec's `result` /
      `text` field names.
-  3. `metadata.info_state` behavior pass: use nested `dirty_kinds` /
+  3. ✅ `metadata.info_state` behavior pass: use nested `dirty_kinds` /
      `available_kinds` as cache hints once the backend emits them.
   4. Keep `info_affordances` opaque; clients pass `query` descriptors through
      rather than parsing bundle-specific fields.
@@ -291,7 +351,7 @@ API maps them.
   4. HTTP API: rename `choice_id` → `edge_id` with deprecation; type
      responses on `/story/do` / `/story/update`; add `query` param
      routing on `/story/info`.
-  6. Conformance harness: write `legibility.py`, `parity.py`, extend
+  5. Conformance harness: write `legibility.py`, `parity.py`, extend
      `cli_reference_port.py` for new Tier P1 surfaces.
 
 **Phase 4 — Tier P1 → S graduation.** Surfaces in §B promote one

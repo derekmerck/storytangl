@@ -133,6 +133,38 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')).toBeUndefined()
   })
 
+  it('renders blockers and cost previews as decision details', () => {
+    const blockedChoice: ChoiceStoryFragment = {
+      uid: 'action_blocked',
+      fragment_type: 'choice',
+      text: 'Sneak away',
+      available: false,
+      unavailable_reason: 'Requires stealth',
+      blockers: [
+        {
+          code: 'skill_too_low',
+          message: 'Stealth 1, need 2.',
+          refs: ['pc-you'],
+        },
+      ],
+      ui_hints: {
+        cost_previews: [
+          { ledger_key: 'purse', delta: -40, unit: 'silver' },
+          { ledger_key: 'reputation', delta: 1 },
+        ],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: blockedChoice })
+
+    expect(wrapper.find('[data-testid="choice-blockers"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Stealth 1, need 2.')
+    expect(wrapper.text()).toContain('pc-you')
+    expect(wrapper.findAll('[data-testid="choice-cost-preview"]')).toHaveLength(2)
+    expect(wrapper.text()).toContain('purse -40 silver')
+    expect(wrapper.text()).toContain('reputation +1')
+  })
+
   it('renders sandbox choice provenance and time hints as advisory badges', () => {
     const hintedChoice: ChoiceStoryFragment = {
       uid: 'wait_evening',

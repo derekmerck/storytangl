@@ -122,6 +122,19 @@ const activeAffordance = computed(() =>
   visibleAffordances.value.find((affordance) => affordance.kind === activeAffordanceKind.value),
 )
 
+const activeInfoKind = computed(() => activeAffordanceKind.value ?? 'status')
+
+const shouldRefreshForInfoState = (): boolean => {
+  const infoState = props.infoState
+  if (!infoState?.dirty_kinds) {
+    return true
+  }
+  return (
+    infoState.dirty_kinds.includes('*') ||
+    infoState.dirty_kinds.includes(activeInfoKind.value)
+  )
+}
+
 const infoQueryParams = (affordance: InfoAffordance | undefined): QueryParams | undefined => {
   if (!affordance) {
     return undefined
@@ -176,7 +189,9 @@ onMounted(loadStatus)
 watch(
   () => props.refreshKey,
   () => {
-    void loadStatus()
+    if (shouldRefreshForInfoState()) {
+      void loadStatus()
+    }
   },
 )
 

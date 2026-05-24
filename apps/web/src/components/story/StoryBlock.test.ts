@@ -296,6 +296,29 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('The wheel jerks under you.')
   })
 
+  it('renders interpretation fragments as command feedback', () => {
+    const fragments: Record<string, StoryFragment> = {
+      interpretation: {
+        uid: 'interpretation',
+        fragment_type: 'interpretation',
+        result: 'blocked',
+        text: 'climb to attic',
+        message: 'The hatch is bolted from above.',
+        blocked_reason: 'Locked - no obvious key.',
+        hint: 'Find another way up.',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['interpretation'])
+
+    expect(wrapper.find('[data-testid="interpretation-fragment"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('blocked')
+    expect(wrapper.text()).toContain('climb to attic')
+    expect(wrapper.text()).toContain('The hatch is bolted from above.')
+    expect(wrapper.text()).toContain('Locked - no obvious key.')
+    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(false)
+  })
+
   it('renders choices and emits selected edge ids', async () => {
     const fragments: Record<string, StoryFragment> = {
       content: {

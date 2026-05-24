@@ -204,9 +204,25 @@ def test_tk_locked_choices_are_disabled_and_non_submitting() -> None:
 
     assert choice.enabled is False
     assert choice.widget == "button"
+    assert choice.choice is not None
+    assert choice.choice.blockers == ("Sleight of Hand 1, need 2.",)
 
     with pytest.raises(ValueError, match="locked"):
         PORT.collect_submission(choice)
+
+
+def test_tk_inspection_exposes_choice_decision_details() -> None:
+    inspection = PORT.inspect_fixture(FIXTURE_DIR / "crossroads_inn.json")
+    choices = {
+        widget["text"]: widget
+        for widget in inspection["widgets"]
+        if widget["role"] == "choice"
+    }
+
+    assert choices["Pay the forty silver."]["cost_previews"] == ["purse -40 silver"]
+    assert choices["Lift the map while he drinks."]["blockers"] == [
+        "Sleight of Hand 1, need 2."
+    ]
 
 
 def test_tk_inspection_harness_loads_every_fixture_without_tkinter() -> None:
@@ -220,6 +236,20 @@ def test_tk_inspection_harness_loads_every_fixture_without_tkinter() -> None:
         submission["payload"] == {"quantity": 1}
         for inspection in inspections
         for submission in inspection["sample_submissions"]
+    )
+
+
+def test_tk_inspection_harness_loads_every_proposal_without_tkinter() -> None:
+    inspections = [
+        PORT.inspect_fixture(path)
+        for path in sorted(PROPOSAL_DIR.glob("*.json"))
+    ]
+
+    assert all(inspection["widgets"] for inspection in inspections)
+    assert any(
+        widget["role"] == "interpretation"
+        for inspection in inspections
+        for widget in inspection["widgets"]
     )
 
 

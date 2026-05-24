@@ -623,6 +623,8 @@ def _widget_plan_json(plan: WidgetPlan) -> JsonObject:
         "enabled": plan.enabled,
         "accepts_kind": plan.choice.accepts_kind if plan.choice else None,
         "edge_id": plan.choice.edge_id if plan.choice else None,
+        "blockers": list(plan.choice.blockers) if plan.choice else [],
+        "cost_previews": list(plan.choice.cost_previews) if plan.choice else [],
         "input": _input_plan_json(plan.input) if plan.input else None,
     }
 

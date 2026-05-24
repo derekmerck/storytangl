@@ -168,6 +168,7 @@ describe('StoryFlow', () => {
       http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
         const body = await request.json()
         expect(body).toEqual({
+          edge_id: 'edge-1',
           choice_id: 'edge-1',
           payload: { offer_silver: 12 },
         })
@@ -197,6 +198,7 @@ describe('StoryFlow', () => {
       http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
         const body = await request.json()
         expect(body).toEqual({
+          edge_id: 'interpret_command',
           choice_id: 'interpret_command',
           payload: { text: 'take lamp' },
         })

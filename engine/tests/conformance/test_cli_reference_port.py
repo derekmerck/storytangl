@@ -78,8 +78,13 @@ def test_cli_reference_renders_story_flow_choices_and_events() -> None:
 
     assert "Rain drums on the thatch." in output
     assert "Stranger [low, confidential]: They say you're headed north." in output
-    assert "1) Pay the forty silver." in output
-    assert "x) Lift the map while he drinks. [locked: Requires Sleight of Hand >= 2]" in output
+    assert "1) Pay the forty silver. [cost: purse -40 silver]" in output
+    assert (
+        "x) Lift the map while he drinks. "
+        "[locked: Requires Sleight of Hand >= 2] "
+        "[blockers: Sleight of Hand 1, need 2.]"
+        in output
+    )
     assert '[event:achievement_progress] {"id": "met_10_strangers", "progress": "7/10"}' in output
 
 
@@ -99,8 +104,10 @@ def test_cli_reference_renders_piece_zone_and_payload_prompts() -> None:
 def test_cli_reference_renders_command_hints_as_advisory_prompt() -> None:
     output = _render("command_hints.json")
 
-    assert "[interpretation:impossible]" in output
+    assert "[interpretation:blocked]" in output
     assert "You can't eat the mailbox." in output
+    assert "blocked: The mailbox is fixed to the wall." in output
+    assert "hint: Try opening it instead." in output
     assert ">) Try a command. <command: e.g. take lamp>" in output
 
 
@@ -160,6 +167,7 @@ def test_cli_reference_can_inspect_proposal_fixtures_without_promoting_them() ->
     garage_output = _render_proposal("carwars_garage_turn.json")
     roll_output = _render_proposal("roll_fragment.json")
     kv_output = _render_proposal("record_kvrow.json")
+    interpretation_output = _render_proposal("wireframe_v15_interpretation_samples.json")
 
     assert "1) Mount a weapon. <place from parts on hand to turret>" in garage_output
     assert "2) Buy from Murph's. <select 0-2 pieces from Murph's wares>" in garage_output
@@ -167,3 +175,5 @@ def test_cli_reference_can_inspect_proposal_fixtures_without_promoting_them() ->
     assert "- Rocket Launcher Mk II [offer, locked: Out of stock until next session.]" in garage_output
     assert "[roll:dice] Driving check: 2d6 rolled 4 + 5 = 9 vs 12 outcome=fail." in roll_output
     assert "Fuel: 6" in kv_output
+    assert '[interpretation:ambiguous] "take key"' in interpretation_output
+    assert "candidates: 00000000-0000-4000-8000-000000017101" in interpretation_output

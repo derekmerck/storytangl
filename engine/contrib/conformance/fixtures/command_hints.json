@@ -51,9 +51,11 @@
     {
       "uid": "00000000-0000-4000-8000-000000000606",
       "fragment_type": "interpretation",
-      "content": "You can't eat the mailbox.",
-      "outcome": "impossible",
-      "command_text": "eat mailbox"
+      "result": "blocked",
+      "text": "eat mailbox",
+      "message": "You can't eat the mailbox.",
+      "blocked_reason": "The mailbox is fixed to the wall.",
+      "hint": "Try opening it instead."
     },
     {
       "uid": "00000000-0000-4000-8000-000000000607",

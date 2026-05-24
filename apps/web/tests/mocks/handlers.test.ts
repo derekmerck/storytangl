@@ -23,7 +23,7 @@ describe('MSW Handlers', () => {
 
   it('returns a runtime envelope on /story/do', async () => {
     const response = await axios.post('/story/do', {
-      choice_id: 'action_uid',
+      edge_id: 'action_uid',
       payload: null,
     })
     expect(response.data).toHaveProperty('fragments')
@@ -31,7 +31,7 @@ describe('MSW Handlers', () => {
     expect(response.data.fragments[0]).toHaveProperty('uid')
   })
 
-  it('rejects legacy /story/do payloads without choice_id', async () => {
+  it('rejects /story/do payloads without edge_id or choice_id', async () => {
     await expect(
       axios.post('/story/do', {
         uid: 'action_uid',

@@ -51,6 +51,6 @@
   "metadata": {
     "fixture": "proposal_record_kvrow",
     "proposal": true,
-    "vocab_version": "1.1"
+    "vocab_version": "1.5"
   }
 }

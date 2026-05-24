@@ -36,6 +36,7 @@ EXPECTED_PROPOSALS = {
     "place_accepts.json",
     "record_kvrow.json",
     "roll_fragment.json",
+    "wireframe_v15_interpretation_samples.json",
 }
 
 
@@ -181,7 +182,11 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
     elif fragment_type == "piece":
         assert isinstance(fragment.get("piece_id"), str)
     elif fragment_type == "interpretation":
-        assert isinstance(fragment.get("content"), str)
+        assert isinstance(fragment.get("message") or fragment.get("content"), str)
+        result = fragment.get("result")
+        text = fragment.get("text")
+        assert result is None or isinstance(result, str)
+        assert text is None or isinstance(text, str)
     else:
         pytest.fail(f"Fixture uses unexpected fragment type {fragment_type!r}")
 
