@@ -240,12 +240,12 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     movement = next(
         action
         for action in _sandbox_actions(road)
-        if action.ui_hints.get("contribution") == "movement"
+        if action.ui_hints.contribution == "movement"
     )
     interaction = next(
         action
         for action in _sandbox_actions(road)
-        if action.ui_hints.get("contribution") == "interaction"
+        if action.ui_hints.contribution == "interaction"
     )
     assert isinstance(movement, Action)
     assert movement.successor is cave
@@ -260,7 +260,7 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     mob_action = next(
         action
         for action in _sandbox_actions(cave)
-        if action.ui_hints.get("mob") == "guide"
+        if action.ui_hints.model_dump().get("mob") == "guide"
     )
     assert isinstance(mob_action, Action)
     assert mob_action.successor is cave

@@ -31,7 +31,7 @@ describe('MSW Handlers', () => {
     expect(response.data.fragments[0]).toHaveProperty('uid')
   })
 
-  it('rejects /story/do payloads without edge_id or choice_id', async () => {
+  it('rejects /story/do payloads without edge_id', async () => {
     await expect(
       axios.post('/story/do', {
         uid: 'action_uid',

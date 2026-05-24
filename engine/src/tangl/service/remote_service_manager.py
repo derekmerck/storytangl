@@ -425,7 +425,7 @@ class RemoteServiceManager(ServiceManager):
     def resolve_choice(
         self,
         *,
-        choice_id: UUID,
+        edge_id: UUID,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: UserAuthInfo | None = None,
@@ -438,7 +438,7 @@ class RemoteServiceManager(ServiceManager):
             "POST",
             "/story/do",
             auth_required=True,
-            json_body={"choice_id": str(choice_id), "payload": choice_payload},
+            json_body={"edge_id": str(edge_id), "payload": choice_payload},
         )
         return self._decode_runtime_envelope(payload)
 

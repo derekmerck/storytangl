@@ -33,15 +33,10 @@ from tangl.utils.hash_secret import key_for_secret
 class ChoiceRequest(BaseModel):
     """Request payload for resolving a player choice."""
 
-    choice_id: UUID | None = None
+    edge_id: UUID
     payload: Any = None
 
     model_config = ConfigDict(extra="forbid")
-
-    def resolve_choice_id(self) -> UUID:
-        if self.choice_id is not None:
-            return self.choice_id
-        raise ValueError("choice_id must be provided")
 
 
 router = APIRouter(tags=["Story"])
@@ -369,10 +364,6 @@ async def do_story_action(
     """Resolve a player choice and return the updated runtime envelope."""
 
     user_auth = resolve_user_auth(api_key, service_manager=service_manager)
-    try:
-        choice_id = request.resolve_choice_id()
-    except ValueError as exc:  # pragma: no cover - FastAPI handles validation
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         async with user_locks[user_auth.user_id]:
@@ -382,7 +373,7 @@ async def do_story_action(
                 auth_context=user_auth,
                 user_id=user_auth.user_id,
                 user_auth=user_auth,
-                choice_id=choice_id,
+                edge_id=request.edge_id,
                 choice_payload=request.payload,
             )
     except ValueError as exc:

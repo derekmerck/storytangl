@@ -73,7 +73,7 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     assert choices, "Expected an initial choice to be available"
 
     first_choice = choices[0].get("uid") or choices[0].get("source_id")
-    resolve_first = client.post("story/do", json={"choice_id": first_choice}, headers=headers)
+    resolve_first = client.post("story/do", json={"edge_id": first_choice}, headers=headers)
     assert resolve_first.status_code == 200
     first_step = resolve_first.json()["step"]
 
@@ -94,7 +94,7 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     assert choices_two, "Expected a continuation choice after the middle block"
 
     second_choice = choices_two[0].get("uid") or choices_two[0].get("source_id")
-    resolve_second = client.post("story/do", json={"choice_id": second_choice}, headers=headers)
+    resolve_second = client.post("story/do", json={"edge_id": second_choice}, headers=headers)
     assert resolve_second.status_code == 200
     second_step = resolve_second.json()["step"]
 
@@ -144,7 +144,7 @@ def test_linear_story_do_supports_html_render_profile(
     resolve = client.post(
         "story/do",
         params={"render_profile": "html"},
-        json={"choice_id": first_choice},
+        json={"edge_id": first_choice},
         headers=headers,
     )
     assert resolve.status_code == 200

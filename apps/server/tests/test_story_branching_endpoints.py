@@ -78,7 +78,7 @@ def test_branching_story_left_path_rest(branching_story_client: tuple[TestClient
     assert len(choices) == 3
 
     left_choice = _find_choice(choices, "left")
-    resolve_left = client.post("story/do", json={"choice_id": left_choice["uid"]}, headers=headers)
+    resolve_left = client.post("story/do", json={"edge_id": left_choice["uid"]}, headers=headers)
     assert resolve_left.status_code == 200
 
     update_two = client.get(
@@ -106,7 +106,7 @@ def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClien
 
     choices = extract_choices_from_fragments(fragments)
     right_choice = _find_choice(choices, "right")
-    resolve_right = client.post("story/do", json={"choice_id": right_choice["uid"]}, headers=headers)
+    resolve_right = client.post("story/do", json={"edge_id": right_choice["uid"]}, headers=headers)
     assert resolve_right.status_code == 200
 
     second_update = client.get(
@@ -125,7 +125,7 @@ def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClien
     assert _find_choice(choices_two, "back")
 
     enter_choice = _find_choice(choices_two, "enter")
-    resolve_enter = client.post("story/do", json={"choice_id": enter_choice["uid"]}, headers=headers)
+    resolve_enter = client.post("story/do", json={"edge_id": enter_choice["uid"]}, headers=headers)
     assert resolve_enter.status_code == 200
 
     third_update = client.get(
@@ -148,7 +148,7 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
     first_update = client.get("story/update", headers=headers).json()
     first_choices = extract_choices_from_fragments(first_update["fragments"])
     right_choice = _find_choice(first_choices, "right")
-    first_resolve = client.post("story/do", json={"choice_id": right_choice["uid"]}, headers=headers)
+    first_resolve = client.post("story/do", json={"edge_id": right_choice["uid"]}, headers=headers)
     assert first_resolve.status_code == 200
     first_step = first_resolve.json()["step"]
 
@@ -159,7 +159,7 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
     ).json()
     second_choices = extract_choices_from_fragments(second_update["fragments"])
     back_choice = _find_choice(second_choices, "back")
-    resolve_back = client.post("story/do", json={"choice_id": back_choice["uid"]}, headers=headers)
+    resolve_back = client.post("story/do", json={"edge_id": back_choice["uid"]}, headers=headers)
     assert resolve_back.status_code == 200
     back_step = resolve_back.json()["step"]
 

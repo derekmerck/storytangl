@@ -71,7 +71,7 @@ def test_story_choice_resolution_flow() -> None:
 
     resolved = manager.resolve_choice(
         user_id=user.uid,
-        choice_id=choice.uid,
+        edge_id=choice.uid,
     )
 
     assert resolved.cursor_id != old_cursor

@@ -276,7 +276,8 @@ def _sandbox_actions(location: SandboxLocation) -> list[Action]:
 def _choose(ledger: Ledger, **hints: str) -> Action:
     location = _provision_current(ledger)
     for action in _sandbox_actions(location):
-        if all(action.ui_hints.get(key) == value for key, value in hints.items()):
+        action_hints = action.ui_hints.model_dump()
+        if all(action_hints.get(key) == value for key, value in hints.items()):
             ledger.resolve_choice(action.uid, choice_payload=action.payload)
             return action
     raise AssertionError(
@@ -577,7 +578,7 @@ def test_adventure_slice_stable_mob_projects_only_when_present() -> None:
     assert [
         action
         for action in _sandbox_actions(road)
-        if action.ui_hints.get("mob") == "wounded_pirate"
+        if action.ui_hints.model_dump().get("mob") == "wounded_pirate"
     ] == []
 
     cobble.light = True
@@ -585,7 +586,7 @@ def test_adventure_slice_stable_mob_projects_only_when_present() -> None:
     mob_actions = [
         action
         for action in _sandbox_actions(cobble)
-        if action.ui_hints.get("mob") == "wounded_pirate"
+        if action.ui_hints.model_dump().get("mob") == "wounded_pirate"
     ]
 
     assert [action.text for action in mob_actions] == [
@@ -653,10 +654,10 @@ def test_adventure_slice_compiler_runs_core_walkthrough() -> None:
     down = next(
         choice
         for choice in down_choices
-        if choice.ui_hints.get("direction") == "down"
+        if choice.ui_hints.direction == "down"
     )
     assert down.available is False
-    assert down.ui_hints["through"] == "grate"
+    assert down.ui_hints.through == "grate"
 
     _choose(ledger, contribution="unlock", target="grate")
     _choose(ledger, contribution="open", target="grate")

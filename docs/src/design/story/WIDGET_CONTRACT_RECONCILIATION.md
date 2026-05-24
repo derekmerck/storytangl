@@ -91,7 +91,7 @@ surface is small enough to settle with its immediate neighbors.
 | `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | partial | engine PR: declare the field; bundles populate as needed |
 | `metadata.info_state: InfoState` typed | P1 | done (nested type + dirty-kind cache hints) | not_started | engine PR: emit nested `info_state` |
 | `/story/info` accepts `kind` + `query` params | P1 | done client-side | partial (basic endpoint exists; no query routing) | API + engine PR (see §E) |
-| HTTP body field `edge_id` (rename of `choice_id`) | P1 | bridge posts both fields | uses `choice_id` | engine PR; remove web `choice_id` after backend accepts `edge_id` |
+| HTTP body field `edge_id` | P1 | done | done | — |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
 | §1.6 Info channels graduation to Tier S | P1 | done | partial | gated on CLI reference port implementing the `?`/slash fallback |
 
@@ -157,7 +157,7 @@ implements.
 
 | Endpoint | Method | Spec target | Current engine | Plan |
 |---|---|---|---|---|
-| `/story/do` | POST | accepts `ChoiceRequest{edge_id, payload}`; returns `RuntimeEnvelope` | accepts `{choice_id, payload}`; untyped response | rename body field; type response; ship deprecation shim |
+| `/story/do` | POST | accepts `ChoiceRequest{edge_id, payload}`; returns `RuntimeEnvelope` | accepts `{edge_id, payload}` | type response |
 | `/story/update` | GET | returns `RuntimeEnvelope` typed | partial | type response |
 | `/story/info` | GET | accepts `kind?` and `query?` params (JSON-encoded descriptor); returns `ProjectedState` | basic endpoint exists | add `query` param routing; document descriptor semantics |
 | `/system/info` | GET | public; rate-limited | done | — |
@@ -260,9 +260,8 @@ others.
 - Reference webapp renders typed `blockers[]` and plural
   `cost_previews[]` as choice decision details. **Impact:** locked choices
   expose more of the decision-legibility contract in the current shell.
-- Reference webapp posts both `edge_id` and `choice_id` during the L2
-  transition. **Impact:** v1.5 clients can exercise the target field while
-  the current backend remains on `choice_id`.
+- Reference webapp posts `edge_id` to `/story/do`. **Impact:** client and
+  endpoint server now use the same choice-edge identifier name.
 - Reference webapp treats `metadata.info_state.dirty_kinds` as cache hints for
   `/story/info`. **Impact:** the sidebar keeps old refresh behavior when no
   hint is provided, but skips clean side-channel refreshes when the backend
@@ -278,7 +277,7 @@ others.
 - Engine emits typed `Accepts` and `UIHints` models from
   `tangl.journal.intent`; blockers remain dictionary-shaped pending the
   next intent pass.
-- Engine HTTP body uses `choice_id` (pre-rename).
+- Engine HTTP body uses `edge_id`.
 - Engine `KvFragment.content`, projected `kv_list` values, web fixtures,
   and conformance fixtures use the unified `KvRow` record shape.
 - Engine has no `/story/info/{kind}` (consistent with v1.5 spec).
@@ -348,9 +347,8 @@ API maps them.
   1. Typed `Blocker` model in `tangl/journal/intent.py`.
   2. Typed `InterpretationFragment` with `result` / `text` fields.
   3. Typed `metadata.grammar` and `metadata.info_affordances`.
-  4. HTTP API: rename `choice_id` → `edge_id` with deprecation; type
-     responses on `/story/do` / `/story/update`; add `query` param
-     routing on `/story/info`.
+  4. HTTP API: type responses on `/story/do` / `/story/update`; add `query`
+     param routing on `/story/info`.
   5. Conformance harness: write `legibility.py`, `parity.py`, extend
      `cli_reference_port.py` for new Tier P1 surfaces.
 

@@ -169,7 +169,6 @@ describe('StoryFlow', () => {
         const body = await request.json()
         expect(body).toEqual({
           edge_id: 'edge-1',
-          choice_id: 'edge-1',
           payload: { offer_silver: 12 },
         })
         return HttpResponse.json(crossroadsNextRuntimeEnvelope)
@@ -199,7 +198,6 @@ describe('StoryFlow', () => {
         const body = await request.json()
         expect(body).toEqual({
           edge_id: 'interpret_command',
-          choice_id: 'interpret_command',
           payload: { text: 'take lamp' },
         })
         return HttpResponse.json(crossroadsNextRuntimeEnvelope)

@@ -39,7 +39,8 @@ def _provision_sandbox_actions(ledger: Ledger) -> list[Action]:
 
 def _choose(ledger: Ledger, **hints: str) -> Action:
     for action in _provision_sandbox_actions(ledger):
-        if all(action.ui_hints.get(key) == value for key, value in hints.items()):
+        action_hints = action.ui_hints.model_dump()
+        if all(action_hints.get(key) == value for key, value in hints.items()):
             ledger.resolve_choice(action.uid, choice_payload=action.payload)
             return action
     raise AssertionError(f"No sandbox action at {ledger.cursor.label!r} matched {hints!r}")

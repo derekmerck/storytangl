@@ -377,8 +377,8 @@ def test_present_mob_projects_traversable_interaction_with_return() -> None:
     assert [action.text for action in interactions] == ["Talk to the pirate"]
     assert interactions[0].successor is pirate_chat
     assert interactions[0].return_phase is not None
-    assert interactions[0].ui_hints["source"] == "sandbox_mob"
-    assert interactions[0].ui_hints["source_label"] == "pirate"
+    assert interactions[0].ui_hints.source == "sandbox_mob"
+    assert interactions[0].ui_hints.source_label == "pirate"
 
 
 def test_scheduled_absent_mob_does_not_project_interaction() -> None:
@@ -533,14 +533,14 @@ def test_assets_project_sponsored_interactions_when_present_or_carried() -> None
     interactions = [
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "interaction")
-        if action.ui_hints.get("source") == "sandbox_asset"
+        if action.ui_hints.source == "sandbox_asset"
     ]
     assert {action.text for action in interactions} == {
         "Play the flute",
         "Study the book",
     }
     assert {
-        action.ui_hints["asset"]: action.ui_hints["possession"]
+        action.ui_hints.asset: action.ui_hints.possession
         for action in interactions
     } == {"flute": "carried", "book": "location"}
     play = next(action for action in interactions if action.text == "Play the flute")
@@ -578,11 +578,11 @@ def test_fixture_projects_sponsored_interaction() -> None:
     interaction = next(
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "interaction")
-        if action.ui_hints.get("source") == "sandbox_fixture"
+        if action.ui_hints.source == "sandbox_fixture"
     )
     assert interaction.text == "Pray at the altar"
     assert interaction.successor is road
-    assert interaction.ui_hints["fixture"] == "altar"
+    assert interaction.ui_hints.fixture == "altar"
     assert interaction.journal_text == "The stone warms under your hands."
 
     Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(interaction.uid)
@@ -617,15 +617,15 @@ def test_present_mob_projects_asset_transfer_actions() -> None:
     transfer_texts = {
         choice.text
         for choice in choices
-        if choice.ui_hints.get("source") == "sandbox_mob"
-        and choice.ui_hints.get("asset") in {"keys", "coin"}
+        if choice.ui_hints.source == "sandbox_mob"
+        and choice.ui_hints.asset in {"keys", "coin"}
     }
 
     assert transfer_texts == {"Give keys to pirate", "Take coin from pirate"}
     mob_transfer_actions = [
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "mob")
-        if action.ui_hints.get("asset") in {"keys", "coin"}
+        if action.ui_hints.asset in {"keys", "coin"}
     ]
     assert all("asset" not in action.tags for action in mob_transfer_actions)
 
@@ -633,7 +633,7 @@ def test_present_mob_projects_asset_transfer_actions() -> None:
     take_coin = next(
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "take")
-        if action.ui_hints.get("mob") == "pirate"
+        if action.ui_hints.mob == "pirate"
     )
     ledger.resolve_choice(take_coin.uid)
 
@@ -644,7 +644,7 @@ def test_present_mob_projects_asset_transfer_actions() -> None:
     give_keys = next(
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "give")
-        if action.ui_hints.get("asset") == "keys"
+        if action.ui_hints.asset == "keys"
     )
     ledger.resolve_choice(give_keys.uid)
 
@@ -676,7 +676,7 @@ def test_absent_mob_does_not_project_asset_transfer_actions() -> None:
     assert [
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "mob")
-        if action.ui_hints.get("asset") == "coin"
+        if action.ui_hints.asset == "coin"
     ] == []
 
 
@@ -714,7 +714,7 @@ def test_stale_mob_transfer_actions_are_unavailable_after_mob_moves() -> None:
     take_coin = next(
         action
         for action in _dynamic_sandbox_actions_with_tag(road, "take")
-        if action.ui_hints.get("mob") == "pirate"
+        if action.ui_hints.mob == "pirate"
     )
 
     assert take_coin.available(ctx=ctx)
@@ -736,11 +736,11 @@ def test_sandbox_location_links_project_normal_actions() -> None:
         "Go west to Cave Entrance",
     }
     assert all(action.successor is not None for action in actions)
-    assert all(action.ui_hints["source"] == "sandbox_link" for action in actions)
-    assert all(action.ui_hints["contribution"] == "movement" for action in actions)
-    assert all(action.ui_hints["source_kind"] == "location" for action in actions)
-    assert all(action.ui_hints["source_label"] == "road" for action in actions)
-    assert all(action.ui_hints["scope"] == "tiny_cave" for action in actions)
+    assert all(action.ui_hints.source == "sandbox_link" for action in actions)
+    assert all(action.ui_hints.contribution == "movement" for action in actions)
+    assert all(action.ui_hints.source_kind == "location" for action in actions)
+    assert all(action.ui_hints.source_label == "road" for action in actions)
+    assert all(action.ui_hints.scope == "tiny_cave" for action in actions)
 
 
 def test_sandbox_location_links_normalize_direction_aliases() -> None:
@@ -757,7 +757,7 @@ def test_sandbox_location_links_normalize_direction_aliases() -> None:
         "Go north to Building",
         "Go up to Cave Entrance",
     }
-    hints = {action.ui_hints["raw_direction"]: action.ui_hints["direction"] for action in actions}
+    hints = {action.ui_hints.raw_direction: action.ui_hints.direction for action in actions}
     assert hints == {"n": "north", "u": "up"}
 
 
@@ -1044,7 +1044,7 @@ def test_scheduled_event_uses_interaction_journal_effects_and_availability() -> 
 
     event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
     assert event.text == "Ring the bell"
-    assert event.ui_hints["contribution"] == "event"
+    assert event.ui_hints.contribution == "event"
     assert event.journal_text == "The bell rings once."
     assert not event.available(ctx=ctx)
 
@@ -1097,8 +1097,8 @@ def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
 
     road_events = _dynamic_sandbox_actions_with_tag(road, "event")
     assert [event.text for event in road_events] == ["Parley with the pirate"]
-    assert road_events[0].ui_hints["source_kind"] == "mob"
-    assert road_events[0].ui_hints["mob"] == "pirate"
+    assert road_events[0].ui_hints.source_kind == "mob"
+    assert road_events[0].ui_hints.mob == "pirate"
     assert _dynamic_sandbox_actions_with_tag(building, "event") == []
 
 
