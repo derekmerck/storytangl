@@ -94,11 +94,44 @@ from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, Twen
 from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 from .kim_game import KimGame, KimGameHandler, KimMove
+from .credentials_enums import (
+    ContrabandItem,
+    CredentialStatus,
+    CredentialToken,
+    DEFAULT_RESTRICTIONS,
+    FailureClass,
+    FailureMode,
+    Indication,
+    Region,
+    RestrictionLevel,
+    RestrictionMap,
+    RestrictionRule,
+    Restrictions,
+)
 from .credentials_game import (
+    CredentialCase,
+    CredentialCaseResult,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
     CredentialsMove,
+    derive_disposition,
+)
+from .credentials_factory import (
+    applicable_modes,
+    apply_failure,
+    build_valid,
+    degrade,
+    make_case,
+    render_narrative,
+    sample_failure_mode,
+)
+from .credentials_roster import (
+    ScenarioOffer,
+    ShiftSpec,
+    generate_roster,
+    make_offer,
+    materialize,
 )
 
 
@@ -152,6 +185,33 @@ __all__ = [
     "CredentialsGameHandler",
     "CredentialsMove",
     "CredentialDisposition",
+    "CredentialCase",
+    "CredentialCaseResult",
+    "derive_disposition",
+    "ContrabandItem",
+    "CredentialStatus",
+    "CredentialToken",
+    "Indication",
+    "Region",
+    "RestrictionLevel",
+    "RestrictionMap",
+    "RestrictionRule",
+    "Restrictions",
+    "DEFAULT_RESTRICTIONS",
+    "FailureClass",
+    "FailureMode",
+    "build_valid",
+    "degrade",
+    "make_case",
+    "render_narrative",
+    "apply_failure",
+    "applicable_modes",
+    "sample_failure_mode",
+    "ScenarioOffer",
+    "ShiftSpec",
+    "generate_roster",
+    "make_offer",
+    "materialize",
     # Dispatch
     "HasGame",
     "generate_game_journal",

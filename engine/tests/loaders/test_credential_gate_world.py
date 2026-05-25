@@ -47,17 +47,24 @@ class TestCredentialGateWorld:
         assert ledger.cursor.label == "entrance"
 
         ledger.resolve_choice(_actions(ledger)[0].uid)
-
         assert ledger.cursor.label == "challenge"
-        inspect = next(action for action in _actions(ledger) if action.label == "Inspect passport")
-        ledger.resolve_choice(inspect.uid, choice_payload=inspect.payload)
 
-        packet = next(action for action in _actions(ledger) if action.label == "Review packet consistency")
-        ledger.resolve_choice(packet.uid, choice_payload=packet.payload)
+        def choose(label: str) -> None:
+            action = next(a for a in _actions(ledger) if a.label == label)
+            ledger.resolve_choice(action.uid, choice_payload=action.payload)
 
-        deny = next(action for action in _actions(ledger) if action.label == "Choose deny")
-        ledger.resolve_choice(deny.uid, choice_payload=deny.payload)
+        # The authored roster: Tomas (pass), Edda (deny), Goran (arrest).
+        choose("Inspect passport")
+        choose("Choose pass")
+        assert ledger.cursor.label == "challenge"  # still mid-shift
+
+        choose("Inspect passport")
+        choose("Choose deny")
+        assert ledger.cursor.label == "challenge"
+
+        choose("Inspect passport")
+        choose("Choose arrest")
 
         assert ledger.cursor.label == "victory"
         content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
-        assert "choose to deny" in content.lower()
+        assert "shift complete" in content.lower()
