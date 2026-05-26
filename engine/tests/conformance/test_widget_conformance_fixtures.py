@@ -22,6 +22,7 @@ from tangl.service.response import ProjectedState, RuntimeEnvelope
 FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"
 PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposals"
 LEGIBILITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "legibility.py"
+PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "parity.py"
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
@@ -44,8 +45,8 @@ EXPECTED_PROPOSALS = {
 }
 
 
-def _load_legibility() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("legibility", LEGIBILITY_PATH)
+def _load_module(name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -54,7 +55,8 @@ def _load_legibility() -> ModuleType:
     return module
 
 
-LEGIBILITY = _load_legibility()
+LEGIBILITY = _load_module("legibility", LEGIBILITY_PATH)
+PARITY = _load_module("parity", PARITY_PATH)
 
 
 def _load_fixture(path: Path) -> dict[str, Any]:
@@ -212,6 +214,15 @@ def test_runtime_fixtures_pass_decision_legibility(path: Path) -> None:
     LEGIBILITY.assert_no_issues(result.issues)
 
 
+@pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
+def test_runtime_fixtures_pass_input_parity(path: Path) -> None:
+    payload = _load_fixture(path)
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    PARITY.assert_no_issues(result.issues)
+
+
 def test_decision_legibility_reports_hidden_choice_references() -> None:
     payload = {
         "cursor_id": "fixture",
@@ -287,6 +298,82 @@ def test_decision_legibility_accepts_visible_piece_domain_ids() -> None:
     result = LEGIBILITY.check_runtime_envelope(payload)
 
     assert result.issues == ()
+
+
+def test_input_parity_reports_unsubmittable_piece_choices() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "member_ids": [],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Take one.",
+                "available": True,
+                "accepts": {
+                    "kind": "pieces",
+                    "min": 1,
+                    "constraints": {"target_zone_ref": "zone"},
+                },
+            },
+        ],
+    }
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "target zone 'zone' is not renderable",
+    ]
+
+
+def test_input_parity_reports_invalid_compose_parts() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Give something.",
+                "available": True,
+                "accepts": {
+                    "kind": "compose",
+                    "parts": [
+                        {"role": "amount", "accepts": {"kind": "quantity", "min": 5, "max": 1}},
+                        {"role": "amount", "accepts": {"kind": "text"}},
+                        {"accepts": {"kind": "unknown"}},
+                    ],
+                },
+            },
+        ],
+    }
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "`min` exceeds `max`",
+        "duplicate role 'amount'",
+        "missing role",
+        "missing or unsupported accepts kind",
+    ]
 
 
 def test_command_hint_fixture_keeps_grammar_advisory() -> None:

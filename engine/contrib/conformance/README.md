@@ -31,6 +31,10 @@ their referenced state renderable after each envelope.
 JSON-only decision-legibility check: after applying update/delete controls, each
 available choice must be renderable in the current scene shell and any
 piece/zone/state references in its decision surfaces must also be renderable.
+`parity.py` is the sibling input-parity harness: available choices must expose
+enough `accepts` shape for a low-capability client to submit a portable payload
+for `pick`, `text`, `quantity`, `raw_command`, `pieces`, `place`, and recursive
+`compose` controls.
 
 `reference_port.py` is the smallest current proof of that portability. It
 renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without

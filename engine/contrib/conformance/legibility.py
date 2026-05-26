@@ -49,6 +49,7 @@ CHOICE_REFERENCE_SURFACES = (
     "ui_hints",
 )
 
+
 @dataclass(frozen=True)
 class LegibilityIssue:
     """A choice references state that is not renderable in the current shell."""

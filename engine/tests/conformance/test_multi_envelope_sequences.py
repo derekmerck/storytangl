@@ -16,6 +16,7 @@ ROOT = Path(__file__).parents[3]
 SEQUENCE_DIR = ROOT / "engine" / "contrib" / "conformance" / "sequences"
 REFERENCE_PATH = ROOT / "engine" / "contrib" / "conformance" / "reference_port.py"
 LEGIBILITY_PATH = ROOT / "engine" / "contrib" / "conformance" / "legibility.py"
+PARITY_PATH = ROOT / "engine" / "contrib" / "conformance" / "parity.py"
 EXPECTED_SEQUENCES = {"garage_buy_mount.json"}
 
 MEDIA_ID = "00000000-0000-4000-8000-000000021003"
@@ -38,6 +39,7 @@ def _load_module(name: str, path: Path) -> ModuleType:
 
 PORT = _load_module("reference_port", REFERENCE_PATH)
 LEGIBILITY = _load_module("legibility", LEGIBILITY_PATH)
+PARITY = _load_module("parity", PARITY_PATH)
 
 
 def _load_sequence(name: str) -> dict[str, Any]:
@@ -78,7 +80,10 @@ def test_reference_port_applies_registry_updates_across_envelopes() -> None:
     assert "gen:garage-card" not in _lines(steps[1])
     assert "Murph's wares:\n  (empty)" in _lines(steps[1])
     assert "parts on hand:\n  - Flamethrower" in _lines(steps[1])
-    assert "1) Mount the flamethrower. <place from parts on hand to front mount>" in _lines(steps[1])
+    assert (
+        "1) Mount the flamethrower. <place from parts on hand to front mount>"
+        in _lines(steps[1])
+    )
     assert "Buy from Murph's." not in _lines(steps[1])
     assert "[unsupported custom_probe] debug marker" in _lines(steps[1])
 
@@ -100,6 +105,12 @@ def test_sequence_open_choice_references_stay_renderable() -> None:
     sequence = _load_sequence("garage_buy_mount.json")
 
     LEGIBILITY.assert_no_issues(LEGIBILITY.check_sequence(sequence))
+
+
+def test_sequence_open_choices_keep_portable_input_shapes() -> None:
+    sequence = _load_sequence("garage_buy_mount.json")
+
+    PARITY.assert_no_issues(PARITY.check_sequence(sequence))
 
 
 def test_sequence_legibility_uses_current_registry_after_updates() -> None:
@@ -154,3 +165,69 @@ def test_sequence_legibility_uses_current_registry_after_updates() -> None:
     assert issues[0].step_index == 2
     assert issues[0].choice_uid == "choice"
     assert issues[0].ref_id == "zone"
+
+
+def test_sequence_input_parity_uses_current_registry_after_updates() -> None:
+    sequence = {
+        "sequence_id": "empty_source_after_update",
+        "envelopes": [
+            {
+                "cursor_id": "fixture",
+                "step": 1,
+                "fragments": [
+                    {
+                        "uid": "scene",
+                        "fragment_type": "group",
+                        "group_type": "scene",
+                        "member_ids": ["source", "target", "piece", "choice"],
+                    },
+                    {
+                        "uid": "source",
+                        "fragment_type": "group",
+                        "group_type": "zone",
+                        "member_ids": ["piece"],
+                    },
+                    {
+                        "uid": "target",
+                        "fragment_type": "group",
+                        "group_type": "zone",
+                        "member_ids": [],
+                    },
+                    {
+                        "uid": "piece",
+                        "fragment_type": "piece",
+                        "piece_id": "lamp",
+                    },
+                    {
+                        "uid": "choice",
+                        "fragment_type": "choice",
+                        "text": "Move it.",
+                        "accepts": {
+                            "kind": "place",
+                            "source_zone_ref": "source",
+                            "target_zone_ref": "target",
+                        },
+                    },
+                ],
+            },
+            {
+                "cursor_id": "fixture",
+                "step": 2,
+                "fragments": [
+                    {
+                        "uid": "source-update",
+                        "fragment_type": "update",
+                        "ref_id": "source",
+                        "payload": {"member_ids": []},
+                    }
+                ],
+            },
+        ],
+    }
+
+    issues = PARITY.check_sequence(sequence)
+
+    assert len(issues) == 1
+    assert issues[0].step_index == 2
+    assert issues[0].choice_uid == "choice"
+    assert issues[0].reason == "source zone 'source' has no selectable pieces"
