@@ -8,8 +8,7 @@ target in `STORYTANGL_WIDGET_VOCAB.md`. In particular:
 
 - `piece` / `zone` fixtures are current web pressure fixtures and decision-
   legibility examples while engine-side typed fragment support catches up.
-- `kv` fragments use the current web tuple-like row shape. Record-shaped
-  `KvRow` remains a migration target.
+- `kv` fragments use the unified record-shaped `KvRow` contract.
 - `interpretation` uses the v1.5 `result` / `text` / `message` shape while the
   reference renderers still accept the older fallback field names.
 
