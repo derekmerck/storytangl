@@ -549,20 +549,97 @@ rather than rebuilding tokens.
 
 ## Phase B: mediation moves
 
-Add a `"mediate"` move kind (`request_document` / `request_search` /
-`verify_id`). Override two methods in `CredentialsGameHandler`:
-`get_available_moves` (super + mediation targets) and `resolve_round` (handle
-`"mediate"`, else `super()`); the picking base is untouched. Add a per-case
-`finding_status` working dict (possible -> cleared / confirmed) reset by
-`advance_case`, which `derive_disposition` reads (e.g. a declined search becomes a
-deny). Port the move set and the discrepancy / mediation table from top-level
-`enums.py` and `notes.md`.
+Phase B adds follow-up moves that can clear or confirm findings before a
+disposition. The work splits into two increments because contraband mediation
+has enough independent design surface to warrant its own pass.
 
-**Optional enabling refactor:** before Phase B, change
-`PickingGameHandler.resolve_round` from `if inspect / elif decide / else raise`
-to dispatch through a `dict[str, resolver]` (or a `resolve_move_kind` hook with
-inspect/decide defaults). This turns "add a move kind" into a registration for
-*any* picking game, keeping B and C as true overlays.
+### B.1 — Core mediation (v1 increment)
+
+Adds three move kinds and a per-case ``finding_status: dict[str, str]``
+(values: ``"cleared"`` / ``"confirmed"``; reset by ``advance_case``).
+
+- **``request_document``** — per-target fanout, one Action per *presented*
+  document whose token has a mitigatable status. Applying clears that doc's
+  finding. Maps to ``accepts.kind="pieces"`` in the rendering contract
+  (`bundles/credentials/EXTENSIONS.md`).
+- **``verify_id``** — single Action, applicable when an id is presented. Clears
+  for VALID; confirms (records the crime in the audit trail) for WRONG_HOLDER.
+- **``request_search``** — single Action; reveals concealed contraband if any.
+
+``derive_disposition`` consults ``finding_status``: a cleared mitigatable doc
+finding contributes PASS instead of DENY; everything else as before.
+
+Enabled by a small base refactor: ``PickingGameHandler.resolve_round``
+dispatches through a kind-keyed registry (with inspect/decide as defaults), so
+the new kinds register cleanly without overriding ``resolve_round`` (and Phase C
+moves follow the same pattern).
+
+**v1 assumptions (deferred, see B.2):**
+- *Missing*-document requests are out of v1: ``request_document`` only targets
+  *presented-but-invalid* docs. Missing-doc requests need a different surface
+  (pick from "required-but-absent" indications).
+- All candidates comply truthfully with requests; no "declines mediation" path.
+
+### B.2 — Contraband mediation (deferred follow-up)
+
+Beyond ``request_search`` (which reveals concealment → existing ARREST), full
+contraband mediation needs a ``request_relinquish`` / ``request_declare``
+family with non-trivial interactions across possession state and permit
+validity. The matrix below is the spec to build against when B.2 lands.
+
+**Dimensions**
+- *Possession*: ``none`` / ``declared`` / ``concealed``
+- *Permit* for that contraband indication: ``none`` / ``valid`` /
+  ``mitigatable_invalid`` (missing seal, expired, ...) / ``forged`` /
+  ``wrong_holder`` (the last two are crimes intrinsic to the permit itself)
+- *Mediation moves*: ``request_declare`` (prompt to declare any concealed),
+  ``request_relinquish`` (yield declared contraband), ``request_search``
+  (already in B.1; force reveal of concealed)
+- *Candidate compliance*: comply (declare truthfully / yield) vs decline (lie /
+  refuse to yield) — the declines-mediation axis
+
+**Declared possession — relinquish path**
+
+| Permit | Yield (comply) | Decline yield | Notes |
+|---|---|---|---|
+| none | cleared → PASS | DENY | "fix what you brought" |
+| valid | (no mediation needed) | — | PASS by base derive |
+| mitigatable invalid | cleared → PASS | DENY | same as no permit |
+| forged | — (crime overrides) | — | ARREST |
+| wrong_holder | — (crime overrides) | — | ARREST |
+
+**Concealed possession — search path**
+
+| Permit | Search reveals | Notes |
+|---|---|---|
+| none | ARREST | smuggling |
+| valid | *[open: ARREST or DENY?]* | failure-to-declare with otherwise legitimate paperwork |
+| mitigatable invalid | ARREST | smuggling + invalid paper |
+| forged | ARREST | two crimes |
+| wrong_holder | ARREST | two crimes |
+| any | (no search done) | base derive sees no contraband; player may incorrectly PASS |
+
+**No possession — declare path** (after request_declare or by default)
+
+| Permit | Outcome | Notes |
+|---|---|---|
+| none | PASS | nothing to assess |
+| valid | PASS | permit unused |
+| mitigatable invalid | *[open: PASS or DENY?]* | does an unused invalid permit matter? |
+| forged | *[open: ARREST or moot?]* | is presenting a fake document a crime on its own? |
+| wrong_holder | *[open: ARREST or moot?]* | same question |
+
+**Open questions to resolve before B.2 implementation:**
+
+1. Concealed contraband with a *valid* permit — ARREST or DENY? (Failure-to-declare with otherwise legitimate paperwork.)
+2. Forged / wrong-holder permit with *no* actual contraband — is the forged document arrestable on its own, or moot?
+3. Mitigatable-invalid permit with no contraband — does the unused invalid paper deny, or pass?
+
+**B.2 ships:** the two new move kinds (``request_declare`` /
+``request_relinquish``), the declines-mediation axis (per-case
+``compliant: bool`` or per-failure-mode willingness), and the missing-doc
+request surface from B.1's deferred list. All three benefit from being
+designed together against this matrix.
 
 ---
 
