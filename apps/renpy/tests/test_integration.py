@@ -25,7 +25,7 @@ def _service_manager():
 
 
 def _choice_by_text(choices: list[RenPyChoice], text: str) -> UUID:
-    return next(choice.choice_id for choice in choices if choice.text == text)
+    return next(choice.edge_id for choice in choices if choice.text == text)
 
 
 def test_renpy_demo_start_turn_has_background_and_intro_choice() -> None:

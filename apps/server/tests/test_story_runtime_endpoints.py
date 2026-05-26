@@ -64,7 +64,7 @@ def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
         (package_dir / "domain.py").write_text(
             "\n".join(
                 [
-                    "from tangl.service import KvListValue, ProjectedKVItem, ProjectedSection, ProjectedState",
+                    "from tangl.service import KvListValue, KvRow, ProjectedSection, ProjectedState",
                     "",
                     "class DemoProjector:",
                     "    def project(self, *, ledger):",
@@ -76,8 +76,8 @@ def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
                     '                    kind="mystery",',
                     "                    value=KvListValue(",
                     "                        items=[",
-                    '                            ProjectedKVItem(key="Mood", value="tense"),',
-                    '                            ProjectedKVItem(key="Step Seen", value=ledger.step),',
+                    '                            KvRow(key="Mood", value="tense"),',
+                    '                            KvRow(key="Step Seen", value=ledger.step),',
                     "                        ]",
                     "                    ),",
                     "                )",
@@ -254,7 +254,7 @@ def test_story_rest_envelope_flow(
     assert ledger is not None
     start = ledger.cursor
     choice = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
-    choice_id = str(choice.uid)
+    edge_id = str(choice.uid)
 
     update = client.get("story/update", headers=headers)
     assert update.status_code == 200
@@ -274,7 +274,7 @@ def test_story_rest_envelope_flow(
     payload = {"move": "knight", "to": "b6"}
     do = client.post(
         "story/do",
-        json={"choice_id": choice_id, "payload": payload},
+        json={"edge_id": edge_id, "payload": payload},
         headers=headers,
     )
     assert do.status_code == 200

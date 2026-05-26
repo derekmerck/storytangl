@@ -314,8 +314,11 @@ def test_render_block_emits_choice_payload_accepts_and_ui_hints() -> None:
         predecessor_id=start.uid,
         successor_id=end.uid,
         text="Pick a color",
-        accepts={"type": "string", "enum": ["red", "blue", "green"]},
-        ui_hints={"widget": "select", "framework": "vuetify"},
+        accepts={
+            "kind": "text",
+            "validators": [{"kind": "enum", "values": ["red", "blue", "green"]}],
+        },
+        ui_hints={"source_kind": "select", "contribution": "vuetify"},
     )
     graph.add(action)
 
@@ -325,12 +328,28 @@ def test_render_block_emits_choice_payload_accepts_and_ui_hints() -> None:
     payload = choice.model_dump(mode="json")
 
     assert choice.edge_id == action.uid
-    assert choice.accepts == {"type": "string", "enum": ["red", "blue", "green"]}
-    assert choice.ui_hints == {"widget": "select", "framework": "vuetify"}
+    assert choice.accepts is not None
+    assert choice.accepts.kind == "text"
+    assert choice.ui_hints is not None
+    assert choice.ui_hints.source_kind == "select"
     assert payload["fragment_type"] == "choice"
     assert payload["edge_id"] == str(action.uid)
-    assert payload["accepts"] == {"type": "string", "enum": ["red", "blue", "green"]}
-    assert payload["ui_hints"] == {"widget": "select", "framework": "vuetify"}
+    assert payload["accepts"] == {
+        "kind": "text",
+        "required": True,
+        "validators": [
+            {
+                "kind": "enum",
+                "values": ["red", "blue", "green"],
+                "case_sensitive": False,
+            }
+        ],
+    }
+    assert payload["ui_hints"] == {
+        "source_kind": "select",
+        "contribution": "vuetify",
+        "cost_previews": [],
+    }
 
 
 def test_render_block_compatibility_facade_merges_split_handlers() -> None:

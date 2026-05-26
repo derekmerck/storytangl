@@ -288,7 +288,7 @@ class StoryController(CommandSet):
         choice = active_choices[index - 1]
         result = self._call_service(
             "resolve_choice",
-            choice_id=choice.uid,
+            edge_id=choice.uid,
         )
         self._apply_runtime_envelope(result)
         self._render_current_story_update()

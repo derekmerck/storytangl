@@ -4,6 +4,7 @@ import type {
   ControlStoryFragment,
   FragmentId,
   GroupStoryFragment,
+  InterpretationStoryFragment,
   MediaStoryFragment,
   RuntimeEnvelope,
   StoryFragment,
@@ -47,6 +48,10 @@ export const isPieceFragment = (fragment: StoryFragment): fragment is PieceStory
 
 export const isRollFragment = (fragment: StoryFragment): fragment is RollStoryFragment =>
   fragment.fragment_type === 'roll'
+
+export const isInterpretationFragment = (
+  fragment: StoryFragment,
+): fragment is InterpretationStoryFragment => fragment.fragment_type === 'interpretation'
 
 export const isControlFragment = (fragment: StoryFragment): fragment is ControlStoryFragment =>
   fragment.fragment_type === 'update' || fragment.fragment_type === 'delete'

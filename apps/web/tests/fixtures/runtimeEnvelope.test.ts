@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buyQuantityRuntimeEnvelope,
   commandHintRuntimeEnvelope,
+  composePayloadRuntimeEnvelope,
   crossroadsRuntimeEnvelope,
   sandboxPayloadRuntimeEnvelope,
 } from '.'
@@ -91,7 +92,8 @@ describe('runtime envelope fixtures', () => {
         if (!isOpenChoice(fragment)) {
           continue
         }
-        const refs = collectReferenceIds(fragment.accepts?.constraints)
+        const accepts: Record<string, unknown> = isRecord(fragment.accepts) ? fragment.accepts : {}
+        const refs = collectReferenceIds(accepts)
         if (refs.length > 0) {
           const entry = { choice: fragment, refs }
           referencedChoices.push(entry)
@@ -113,15 +115,24 @@ describe('runtime envelope fixtures', () => {
 
   it('covers text, quantity, piece, and raw command payload accepts', () => {
     const kinds = new Set(
-      [...sandboxPayloadRuntimeEnvelope.fragments, ...commandHintRuntimeEnvelope.fragments]
+      [
+        ...sandboxPayloadRuntimeEnvelope.fragments,
+        ...commandHintRuntimeEnvelope.fragments,
+        ...composePayloadRuntimeEnvelope.fragments,
+      ]
         .filter((fragment): fragment is ChoiceStoryFragment => fragment.fragment_type === 'choice')
-        .map((choice) => choice.accepts?.kind)
-        .filter((kind): kind is string => typeof kind === 'string'),
+        .map((choice) =>
+          isRecord(choice.accepts) && typeof choice.accepts.kind === 'string'
+            ? choice.accepts.kind
+            : undefined,
+        )
+        .filter((kind): kind is NonNullable<typeof kind> => typeof kind === 'string'),
     )
 
     expect(kinds.has('text')).toBe(true)
     expect(kinds.has('quantity')).toBe(true)
     expect(kinds.has('pieces')).toBe(true)
+    expect(kinds.has('compose')).toBe(true)
     expect(kinds.has('raw_command')).toBe(true)
   })
 

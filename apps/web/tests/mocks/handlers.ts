@@ -21,7 +21,7 @@ const apiBase = (import.meta.env?.VITE_DEFAULT_API_URL ?? 'http://localhost:8000
 
 type UserWorldRequest = { uid?: string }
 type UserSecretRequest = { secret?: string }
-type StoryDoRequest = { choice_id?: unknown; payload?: unknown }
+type StoryDoRequest = { edge_id?: unknown; payload?: unknown }
 
 export const handlers = [
   http.get(`${apiBase}/story/update`, () => {
@@ -30,9 +30,9 @@ export const handlers = [
 
   http.post(`${apiBase}/story/do`, async ({ request }) => {
     const body = (await request.json()) as StoryDoRequest | null
-    if (typeof body?.choice_id !== 'string') {
+    if (typeof body?.edge_id !== 'string') {
       return HttpResponse.json(
-        { error: 'story action payload requires choice_id' },
+        { error: 'story action payload requires edge_id' },
         { status: 400 },
       )
     }

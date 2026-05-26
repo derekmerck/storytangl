@@ -14,5 +14,7 @@ Current proposal set:
 - `piece_realization.json`: `piece.realized=true/false` lifecycle pressure.
 - `place_accepts.json`: `accepts.kind="place"` over source and target zones.
 - `roll_fragment.json`: proposed `roll` fragment for auditable outcomes.
+- `wireframe_v15_interpretation_samples.json`: UUID-shaped command feedback
+  examples translated from the v1.5 wireframe's `gravel.interp_samples`.
 - `carwars_garage_turn.json`: compact CarWars garage turn combining slot zones,
   catalog offers, `place`, `pieces`, and advisory drag/stat hints.

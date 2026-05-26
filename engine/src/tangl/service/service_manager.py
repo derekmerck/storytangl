@@ -344,7 +344,7 @@ class ServiceManager:
     def resolve_choice(
         self,
         *,
-        choice_id: UUID,
+        edge_id: UUID,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: "UserAuthInfo | None" = None,
@@ -359,7 +359,7 @@ class ServiceManager:
             user_auth=user_auth,
         ) as session:
             before_step = session.ledger.step
-            session.ledger.resolve_choice(choice_id, choice_payload=choice_payload)
+            session.ledger.resolve_choice(edge_id, choice_payload=choice_payload)
             fragments = list(session.ledger.get_journal(since_step=max(before_step + 1, 0)))
             return self._build_runtime_envelope(session.ledger, fragments=fragments)
 

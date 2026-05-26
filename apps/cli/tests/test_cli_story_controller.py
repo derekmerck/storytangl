@@ -17,7 +17,7 @@ class RecordingCLI(cmd2.Cmd):
         self.ledger_id = uuid4()
         self.outputs: list[str] = []
         self.calls: list[tuple[str, dict[str, object]]] = []
-        self.choice_id = uuid4()
+        self.edge_id = uuid4()
         self.story_controller = StoryController()
         self.register_command_set(self.story_controller)
 
@@ -39,8 +39,8 @@ class RecordingCLI(cmd2.Cmd):
                         choices=[
                             SimpleNamespace(
                                 fragment_type="choice",
-                                uid=self.choice_id,
-                                source_id=self.choice_id,
+                                uid=self.edge_id,
+                                source_id=self.edge_id,
                                 label="Go",
                                 active=True,
                             )
@@ -108,7 +108,7 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     resolve_calls = [call for call in cli.calls if call[0] == "resolve_choice"]
     assert resolve_calls
     _, params = resolve_calls[-1]
-    assert params["choice_id"] == cli.choice_id
+    assert params["edge_id"] == cli.edge_id
 
 
 def test_cli_shows_locked_choices_with_reason(story_controller: StoryController) -> None:
@@ -141,7 +141,7 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
 def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:
     cli = story_controller._cmd
     story_controller._current_story_update = [SimpleNamespace(content="previous")]
-    story_controller._current_choices = [SimpleNamespace(uid=cli.choice_id, label="Go")]
+    story_controller._current_choices = [SimpleNamespace(uid=cli.edge_id, label="Go")]
     cli.outputs.clear()
 
     story_controller.do_drop_story("--archive")

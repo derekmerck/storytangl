@@ -7,5 +7,6 @@ export { sandboxInfoAffordances, sandboxInfoState, sandboxProjectedState } from 
 export {
   buyQuantityRuntimeEnvelope,
   commandHintRuntimeEnvelope,
+  composePayloadRuntimeEnvelope,
   sandboxPayloadRuntimeEnvelope,
 } from './payloadInteractions'

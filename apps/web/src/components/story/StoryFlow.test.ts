@@ -168,7 +168,7 @@ describe('StoryFlow', () => {
       http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
         const body = await request.json()
         expect(body).toEqual({
-          choice_id: 'edge-1',
+          edge_id: 'edge-1',
           payload: { offer_silver: 12 },
         })
         return HttpResponse.json(crossroadsNextRuntimeEnvelope)
@@ -197,7 +197,7 @@ describe('StoryFlow', () => {
       http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
         const body = await request.json()
         expect(body).toEqual({
-          choice_id: 'interpret_command',
+          edge_id: 'interpret_command',
           payload: { text: 'take lamp' },
         })
         return HttpResponse.json(crossroadsNextRuntimeEnvelope)

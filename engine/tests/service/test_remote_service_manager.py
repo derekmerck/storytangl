@@ -80,7 +80,7 @@ class RecordingSession:
 
 
 def _runtime_envelope_payload() -> dict[str, object]:
-    choice_id = uuid4()
+    edge_id = uuid4()
     return {
         "cursor_id": str(uuid4()),
         "step": 3,
@@ -91,7 +91,7 @@ def _runtime_envelope_payload() -> dict[str, object]:
                 "choices": [
                     {
                         "fragment_type": "choice",
-                        "edge_id": str(choice_id),
+                        "edge_id": str(edge_id),
                         "content": "Continue",
                         "text": "Continue",
                         "active": True,

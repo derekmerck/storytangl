@@ -658,8 +658,8 @@ def render_block_choices(*, caller, ctx, **_kw):
                 available=available,
                 unavailable_reason=(None if available else reason),
                 blockers=blockers or None,
-                accepts=(dict(edge.accepts) if isinstance(edge.accepts, dict) else None),
-                ui_hints=(dict(edge.ui_hints) if isinstance(edge.ui_hints, dict) else None),
+                accepts=edge.accepts,
+                ui_hints=edge.ui_hints,
             )
         )
 

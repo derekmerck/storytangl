@@ -22,8 +22,8 @@
       "uid": "00000000-0000-4000-8000-000000000403",
       "fragment_type": "kv",
       "content": [
-        ["wallet", "7 coin"],
-        ["rations", 0]
+        {"key": "wallet", "value": "7 coin"},
+        {"key": "rations", "value": 0}
       ]
     },
     {

@@ -1,8 +1,8 @@
 # Carwars Bundle — Widget Vocabulary Extensions
 
 **Bundle id:** `carwars`
-**Vocab spec base:** `STORYTANGL_WIDGET_VOCAB.md` v1.3
-**Status:** draft v0.3 · `tokens → pieces` sweep applied (matches repo + spec v1.3)
+**Vocab spec base:** `STORYTANGL_WIDGET_VOCAB.md` v1.5
+**Status:** draft v0.4 · aligned to v1.5 core vocabulary
 **Audience:** authors writing carwars-genre bundles; port implementers covering the carwars profile suite
 
 This document is a **Tier P3 genre extension** (per main spec §8). It does
@@ -18,6 +18,12 @@ not modify Tier S/P1/P2 contract surfaces. It defines:
 Anything in this document that requires more than an extension to an
 existing open dict is a candidate for promotion to Tier P2. Such
 candidates go through the CLI Floor Rule (main spec §0.2).
+
+The genre-specific enrichments here are advisory render hints. A client
+that ignores `ui_hints.stat_check`, `ui_hints.drag`, or vehicle silhouette
+layout still conforms when it renders the underlying `choice`, `piece`,
+`zone`, `kv`, and `roll` surfaces with the click-pick fallbacks described
+in the main spec.
 
 ---
 
@@ -657,7 +663,7 @@ a deferred Tier P3 candidate.
 | Stat-check fail-branch (rolled below target) | next envelope's `RollFragment` with `outcome: "fail"` AND a different choice list (the fail branch) — backend's call | transcript shows roll + outcome; choice list updates |
 | Stat-check crit failure | `outcome: "crit_fail"` AND optional `ritual_hints.duration_ms` extension on the bundle | same as fail; bundles MAY add a one-shot animation, but per §5.2 still skippable |
 | Repair partial (paid but not enough) | backend's commit response carries an `interpretation` of the validation, OR a normal envelope with prose explaining what was repaired | transcript clarifies what was actually repaired |
-| Piece offer no longer available (race) | next envelope updates `available: false` on the offer; client re-renders disabled row | catalog row dimmed with `unavailable_reason` |
+| Offer no longer available (race) | next envelope updates `available: false` on the offer; client re-renders disabled row | catalog row dimmed with `unavailable_reason` |
 
 ---
 
@@ -763,4 +769,4 @@ building) are open candidates for genre-extension work; some depend on
 
 ---
 
-*End of carwars EXTENSIONS v0.3.*
+*End of carwars EXTENSIONS v0.4.*

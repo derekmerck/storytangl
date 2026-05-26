@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from tangl.core import Graph
 from tangl.persistence.factory import PersistenceManagerFactory
 from tangl.service import build_service_manager
-from tangl.service.response import KvListValue, ProjectedKVItem, ProjectedSection, ProjectedState
+from tangl.service.response import KvListValue, KvRow, ProjectedSection, ProjectedState
 from tangl.service.story_info import (
     DEFAULT_STORY_INFO_PROJECTOR,
     DefaultStoryInfoProjector,
@@ -39,7 +39,7 @@ def _custom_state(*, title: str, label: str) -> ProjectedState:
                 section_id="custom",
                 title=title,
                 kind="mystery",
-                value=KvListValue(items=[ProjectedKVItem(key="Label", value=label)]),
+                value=KvListValue(items=[KvRow(key="Label", value=label)]),
             )
         ]
     )

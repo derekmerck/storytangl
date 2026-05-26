@@ -6,7 +6,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from tangl.vm.runtime.ledger import Ledger
 
-from .response import KvListValue, ProjectedKVItem, ProjectedSection, ProjectedState
+from .response import KvListValue, KvRow, ProjectedSection, ProjectedState
 
 
 @runtime_checkable
@@ -20,11 +20,11 @@ class DefaultStoryInfoProjector:
     """Default projector that emits one minimal generic session section."""
 
     def project(self, *, ledger: Ledger) -> ProjectedState:
-        items: list[ProjectedKVItem] = []
+        items: list[KvRow] = []
 
         cursor_label = _resolve_cursor_label(ledger)
         if isinstance(cursor_label, str) and cursor_label.strip():
-            items.append(ProjectedKVItem(key="Cursor", value=cursor_label))
+            items.append(KvRow(key="Cursor", value=cursor_label))
 
         _append_kv_item(items, key="Step", value=getattr(ledger, "step", None))
         _append_kv_item(items, key="Turn", value=getattr(ledger, "turn", None))
@@ -72,14 +72,14 @@ def resolve_story_info_projector(ledger: Ledger) -> StoryInfoProjector:
 
 
 def _append_kv_item(
-    items: list[ProjectedKVItem],
+    items: list[KvRow],
     *,
     key: str,
     value: Any,
 ) -> None:
     if value is None or not isinstance(value, (str, int, float, bool)):
         return
-    items.append(ProjectedKVItem(key=key, value=value))
+    items.append(KvRow(key=key, value=value))
 
 
 def _resolve_cursor_label(ledger: Ledger) -> str | None:

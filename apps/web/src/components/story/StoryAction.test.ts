@@ -133,6 +133,38 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')).toBeUndefined()
   })
 
+  it('renders blockers and cost previews as decision details', () => {
+    const blockedChoice: ChoiceStoryFragment = {
+      uid: 'action_blocked',
+      fragment_type: 'choice',
+      text: 'Sneak away',
+      available: false,
+      unavailable_reason: 'Requires stealth',
+      blockers: [
+        {
+          code: 'skill_too_low',
+          message: 'Stealth 1, need 2.',
+          refs: ['pc-you'],
+        },
+      ],
+      ui_hints: {
+        cost_previews: [
+          { ledger_key: 'purse', delta: -40, unit: 'silver' },
+          { ledger_key: 'reputation', delta: 1 },
+        ],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: blockedChoice })
+
+    expect(wrapper.find('[data-testid="choice-blockers"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Stealth 1, need 2.')
+    expect(wrapper.text()).toContain('pc-you')
+    expect(wrapper.findAll('[data-testid="choice-cost-preview"]')).toHaveLength(2)
+    expect(wrapper.text()).toContain('purse -40 silver')
+    expect(wrapper.text()).toContain('reputation +1')
+  })
+
   it('renders sandbox choice provenance and time hints as advisory badges', () => {
     const hintedChoice: ChoiceStoryFragment = {
       uid: 'wait_evening',
@@ -429,7 +461,7 @@ describe('StoryAction', () => {
       text: 'Maybe take something',
       accepts: {
         kind: 'pieces',
-        required: false,
+        min: 0,
         constraints: { target_zone_ref: 'zone-room' },
       },
     }
@@ -498,7 +530,7 @@ describe('StoryAction', () => {
         kind: 'place',
         source_zone_ref: 'zone-loose',
         target_zone_ref: 'zone-front',
-        constraints: { target_kind: ['weapon'] },
+        source_constraints: { target_kind: ['weapon'] },
       },
     }
     const fragments: Record<string, StoryFragment> = {
@@ -580,6 +612,137 @@ describe('StoryAction', () => {
     await wrapper.find('button').trigger('click')
 
     expect(wrapper.emitted('doAction')![0]).toEqual(['edge_place_optional', undefined])
+  })
+
+  it('emits compose accepts payloads when every part is valid', async () => {
+    const composeChoice: ChoiceStoryFragment = {
+      uid: 'action_compose',
+      fragment_type: 'choice',
+      edge_id: 'edge_compose',
+      text: 'Give coins to someone',
+      accepts: {
+        kind: 'compose',
+        parts: [
+          { role: 'amount', accepts: { kind: 'quantity', min: 1, max: 3, unit: 'coin' } },
+          {
+            role: 'target',
+            accepts: {
+              kind: 'pieces',
+              min: 1,
+              max: 1,
+              constraints: { target_zone_ref: 'zone-people' },
+            },
+          },
+        ],
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-people': {
+        uid: 'zone-people',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['guard-fragment'],
+      },
+      'guard-fragment': {
+        uid: 'guard-fragment',
+        fragment_type: 'piece',
+        piece_id: 'guard',
+        content: 'gate guard',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: composeChoice, fragments })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.choice-button').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('input').setValue('2')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.choice-button').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('[data-piece-id="guard"]').trigger('click')
+    await wrapper.vm.$nextTick()
+    await wrapper.find('.choice-button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_compose',
+      {
+        parts: {
+          amount: { quantity: 2 },
+          target: { piece_ids: ['guard'] },
+        },
+      },
+    ])
+  })
+
+  it('keeps compose choices disabled while any part is invalid', async () => {
+    const composeChoice: ChoiceStoryFragment = {
+      uid: 'action_compose_invalid',
+      fragment_type: 'choice',
+      edge_id: 'edge_compose_invalid',
+      text: 'Give coins to someone',
+      accepts: {
+        kind: 'compose',
+        parts: [
+          { role: 'amount', accepts: { kind: 'quantity', min: 1, max: 3 } },
+          {
+            role: 'target',
+            accepts: {
+              kind: 'pieces',
+              min: 1,
+              max: 1,
+              constraints: { target_zone_ref: 'zone-people' },
+            },
+          },
+        ],
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-people': {
+        uid: 'zone-people',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['guard-fragment'],
+      },
+      'guard-fragment': {
+        uid: 'guard-fragment',
+        fragment_type: 'piece',
+        piece_id: 'guard',
+        content: 'gate guard',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: composeChoice, fragments })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('input').setValue('0')
+    await wrapper.find('[data-piece-id="guard"]').trigger('click')
+    await wrapper.find('.choice-button').trigger('click')
+
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+  })
+
+  it('keeps locked compose choices non-submitting', async () => {
+    const composeChoice: ChoiceStoryFragment = {
+      uid: 'action_compose_locked',
+      fragment_type: 'choice',
+      edge_id: 'edge_compose_locked',
+      text: 'Give coins to someone',
+      available: false,
+      unavailable_reason: 'You have no coins',
+      accepts: {
+        kind: 'compose',
+        parts: [{ role: 'amount', accepts: { kind: 'quantity', min: 1, max: 3 } }],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: composeChoice })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    await wrapper.find('.choice-button').trigger('click')
+
+    expect(wrapper.emitted('doAction')).toBeUndefined()
   })
 
   it('clears stale piece payload when a same-uid choice points at a new zone', async () => {

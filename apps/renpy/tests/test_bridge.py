@@ -36,14 +36,14 @@ class FakeServiceManager:
     def resolve_choice(
         self,
         *,
-        choice_id: UUID,
+        edge_id: UUID,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         choice_payload: object = None,
     ) -> RuntimeEnvelope:
         self.resolve_choice_calls.append(
             {
-                "choice_id": choice_id,
+                "edge_id": edge_id,
                 "user_id": user_id,
                 "ledger_id": ledger_id,
                 "choice_payload": choice_payload,
@@ -79,13 +79,13 @@ def test_bridge_syncs_user_and_ledger_ids_and_passes_choice_payload() -> None:
         {"user_id": service_manager.user_id, "world_id": "renpy_demo"}
     ]
 
-    choice_id = uuid4()
+    edge_id = uuid4()
     payload = {"branch": "lantern_road"}
-    bridge.choose(choice_id, choice_payload=payload)
+    bridge.choose(edge_id, choice_payload=payload)
 
     assert service_manager.resolve_choice_calls == [
         {
-            "choice_id": choice_id,
+            "edge_id": edge_id,
             "user_id": service_manager.user_id,
             "ledger_id": service_manager.ledger_id,
             "choice_payload": payload,
@@ -95,15 +95,15 @@ def test_bridge_syncs_user_and_ledger_ids_and_passes_choice_payload() -> None:
 
 def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
     bridge = RenPySessionBridge(service_manager=FakeServiceManager())
-    first_choice_id = uuid4()
-    second_choice_id = uuid4()
+    first_edge_id = uuid4()
+    second_edge_id = uuid4()
 
     turns = bridge.build_turns(
         [
             ContentFragment(content="Rain on the roof.", step=0),
-            ChoiceFragment(edge_id=first_choice_id, text="Step inside", available=True, step=0),
+            ChoiceFragment(edge_id=first_edge_id, text="Step inside", available=True, step=0),
             ChoiceFragment(
-                edge_id=second_choice_id,
+                edge_id=second_edge_id,
                 text="Open the cellar",
                 available=False,
                 unavailable_reason="missing_key",

@@ -140,7 +140,7 @@ def test_story_methods_return_typed_runtime_payloads(
     assert isinstance(ledger, Ledger)
     choice = _first_choice_edge(ledger)
 
-    updated = manager.resolve_choice(user_id=user.uid, choice_id=choice.uid)
+    updated = manager.resolve_choice(user_id=user.uid, edge_id=choice.uid)
     assert isinstance(updated, RuntimeEnvelope)
     assert updated.step is not None
     assert updated.step > created.step

@@ -1,0 +1,74 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000017000",
+  "step": 150,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000017001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000017002",
+        "00000000-0000-4000-8000-000000017003",
+        "00000000-0000-4000-8000-000000017004",
+        "00000000-0000-4000-8000-000000017005",
+        "00000000-0000-4000-8000-000000017006",
+        "00000000-0000-4000-8000-000000017007"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017002",
+      "fragment_type": "content",
+      "content": "The parser echoes command feedback into the transcript while ordinary choices remain available."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017003",
+      "fragment_type": "interpretation",
+      "result": "ambiguous",
+      "text": "take key",
+      "message": "Which key: brass or iron?",
+      "candidates": [
+        "00000000-0000-4000-8000-000000017101",
+        "00000000-0000-4000-8000-000000017102"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017004",
+      "fragment_type": "interpretation",
+      "result": "blocked",
+      "text": "climb to attic",
+      "message": "The hatch is bolted from above.",
+      "blocked_reason": "Locked: no obvious key.",
+      "hint": "Find another way up."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017005",
+      "fragment_type": "interpretation",
+      "result": "unknown_verb",
+      "text": "fly away",
+      "message": "Nothing here takes flight."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017006",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000017101",
+      "text": "Take the brass key.",
+      "available": true,
+      "ui_hints": {"hotkey": "1"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017007",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000017102",
+      "text": "Take the iron key.",
+      "available": true,
+      "ui_hints": {"hotkey": "2"}
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_wireframe_v15_interpretation_samples",
+    "proposal": true,
+    "vocab_version": "1.5",
+    "source": "docs/src/design/story/wireframes/v1_5/v15-fixtures-core.js",
+    "source_fixture": "gravel.interp_samples"
+  }
+}

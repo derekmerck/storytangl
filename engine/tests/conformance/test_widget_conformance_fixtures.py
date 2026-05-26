@@ -21,6 +21,7 @@ PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposal
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
+    "compose_payload.json",
     "control_delete.json",
     "crossroads_inn.json",
     "dialog_with_avatar.json",
@@ -35,6 +36,7 @@ EXPECTED_PROPOSALS = {
     "place_accepts.json",
     "record_kvrow.json",
     "roll_fragment.json",
+    "wireframe_v15_interpretation_samples.json",
 }
 
 
@@ -163,7 +165,10 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
     elif fragment_type == "kv":
         rows = fragment.get("content")
         assert isinstance(rows, list)
-        assert all(isinstance(row, list) and len(row) >= 2 for row in rows)
+        assert all(
+            isinstance(row, dict) and isinstance(row.get("key"), str) and "value" in row
+            for row in rows
+        )
     elif fragment_type == "choice":
         assert isinstance(fragment.get("text"), str)
         accepts = fragment.get("accepts")
@@ -177,7 +182,11 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
     elif fragment_type == "piece":
         assert isinstance(fragment.get("piece_id"), str)
     elif fragment_type == "interpretation":
-        assert isinstance(fragment.get("content"), str)
+        assert isinstance(fragment.get("message") or fragment.get("content"), str)
+        result = fragment.get("result")
+        text = fragment.get("text")
+        assert result is None or isinstance(result, str)
+        assert text is None or isinstance(text, str)
     else:
         pytest.fail(f"Fixture uses unexpected fragment type {fragment_type!r}")
 
