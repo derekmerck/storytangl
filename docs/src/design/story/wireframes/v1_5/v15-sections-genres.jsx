@@ -541,11 +541,13 @@ function TrainingDemo() {
               <div style={{display:"grid", gap:8}}>
                 <div className="callout" style={{fontSize:11, padding:"8px 10px", margin:0}}>
                   <b>Scheduled event = next envelope.</b> The roll fires immediately on commit. Result?
-                  <b> impressed_prince</b> badge added via <code>update</code> control fragment. The
-                  forking lives on the backend; the client just renders the path it was given. §7.3.
+                  <b> impressed_prince</b> badge can be added by the next envelope's projected state
+                  or by an <code>update</code> control fragment. The forking lives on the backend;
+                  the client just renders the path it was given. §7.3.
                 </div>
                 <pre style={{fontFamily:"var(--mono)", fontSize:10.5, background:"var(--paper)", border:"1px solid var(--rule)", padding:"8px", margin:0, overflow:"auto", lineHeight:1.4}}>
 {`{
+  "illustrative": true,
   "fragment_type": "control",
   "ref_type": "section",
   "ref_id": "inventory",

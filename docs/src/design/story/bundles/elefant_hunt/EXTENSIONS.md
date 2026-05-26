@@ -552,7 +552,7 @@ the journal-as-story claim. The test:
 **Expected transcript shape** (per the design doc, slightly
 formalized):
 
-```
+```text
 Port Stanley. The harbormaster greets you with a ledger. You hire
 two hunters and load four days of supplies.
 
@@ -669,4 +669,4 @@ of §0.3 backend authority working under pressure.
 
 ---
 
-*End of elefant_hunt EXTENSIONS v0.1.*
+*End of elefant_hunt EXTENSIONS v0.2.*

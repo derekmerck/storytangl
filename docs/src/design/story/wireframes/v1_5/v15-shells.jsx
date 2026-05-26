@@ -173,7 +173,7 @@ function StageLogShell({ envelope, onPick }) {
       <div className="stage-log" aria-label="fragment log">
         {log.map((r, i) => (
           <div key={i} className={"log-row" + (r.kind === "attributed" ? " current" : "")}>
-            <span className="t">+0:0{i}</span>
+            <span className="t">{`+0:0${i}`}</span>
             <span className="kind">{r.kind}</span>
             <span>{r.text}</span>
           </div>

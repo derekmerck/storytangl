@@ -1,4 +1,4 @@
-import type { KvRow, MediaStoryFragment, StoryFragment } from '@/types'
+import type { KvRow, MediaStoryFragment, PrimitiveValue, StoryFragment } from '@/types'
 
 export const contentClass = (fragment: StoryFragment): string[] => {
   const hints = fragment.hints ?? fragment.presentation_hints
@@ -14,13 +14,17 @@ export const kvItems = (fragment: StoryFragment): KvRow[] => {
   if (fragment.fragment_type !== 'kv' || !Array.isArray(fragment.content)) {
     return []
   }
+  const isPrimitiveValue = (value: unknown): value is PrimitiveValue =>
+    typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+
   return fragment.content.filter(
     (item): item is KvRow =>
       item !== null &&
       typeof item === 'object' &&
       'key' in item &&
       typeof item.key === 'string' &&
-      'value' in item,
+      'value' in item &&
+      isPrimitiveValue(item.value),
   )
 }
 

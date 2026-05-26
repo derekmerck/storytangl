@@ -71,6 +71,8 @@ const costPreviewLabel = (preview: CostPreview): string => {
   const unit = typeof preview.unit === 'string' && preview.unit ? ` ${preview.unit}` : ''
   return `${readableValue(preview.ledger_key)} ${sign}${preview.delta}${unit}`
 }
+const costPreviewKey = (preview: CostPreview): string =>
+  JSON.stringify([preview.ledger_key, preview.delta, preview.unit ?? null])
 const costPreviews = computed(() => {
   const previews: CostPreview[] = []
   const hintPreviews = props.choice.ui_hints?.cost_previews
@@ -81,7 +83,15 @@ const costPreviews = computed(() => {
   if (isRecord(accepts) && Array.isArray(accepts.cost_previews)) {
     previews.push(...accepts.cost_previews.filter(isCostPreview))
   }
-  return previews
+  const seen = new Set<string>()
+  return previews.filter((preview) => {
+    const key = costPreviewKey(preview)
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
 })
 const hasPayloadInput = computed(() => {
   const accepts = props.choice.accepts

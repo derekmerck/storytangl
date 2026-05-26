@@ -93,7 +93,7 @@ describe('runtime envelope fixtures', () => {
           continue
         }
         const accepts: Record<string, unknown> = isRecord(fragment.accepts) ? fragment.accepts : {}
-        const refs = collectReferenceIds([accepts.constraints, accepts.source_constraints])
+        const refs = collectReferenceIds(accepts)
         if (refs.length > 0) {
           const entry = { choice: fragment, refs }
           referencedChoices.push(entry)

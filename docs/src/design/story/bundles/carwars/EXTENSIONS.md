@@ -254,7 +254,7 @@ with finer gradation (`"partial"`, `"with_cost"`).
 
 ### CLI floor rendering
 
-```
+```text
 > drive
   Driving check (2d6 vs 12, modifier +0).
   rolled: 4 + 5 = 9.
@@ -534,7 +534,7 @@ Parity), the click flow IS the CLI floor.
 
 ### CLI port rendering of this turn
 
-```
+```text
 Murph's Auto, end of the strip. Your Beast sits on the lift, hood up,
 oil pan dripping. Murph wipes his hands on a rag and looks up. "What'll
 it be today?"
@@ -769,4 +769,4 @@ building) are open candidates for genre-extension work; some depend on
 
 ---
 
-*End of carwars EXTENSIONS v0.2.*
+*End of carwars EXTENSIONS v0.4.*

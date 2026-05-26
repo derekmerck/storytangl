@@ -67,8 +67,8 @@ const candidates = computed(() =>
       class="interpretation-candidates"
     >
       <span
-        v-for="candidate in candidates"
-        :key="candidate"
+        v-for="(candidate, index) in candidates"
+        :key="`${candidate}-${index}`"
         class="interpretation-candidate"
       >
         {{ candidate }}

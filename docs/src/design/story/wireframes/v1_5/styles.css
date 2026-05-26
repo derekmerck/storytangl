@@ -14,10 +14,10 @@
   --blue-pencil: #3a5d7a;
   --grid: #d6cfb8;
   --grid-minor: #e3dcc7;
-  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "Menlo", monospace;
   --hand: "Caveat", "Kalam", cursive;
-  --serif: "Newsreader", "Source Serif Pro", Georgia, serif;
-  --sans: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --serif: "Newsreader", "Source Serif Pro", "Georgia", serif;
+  --sans: "Inter Tight", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
 }
 
 * { box-sizing: border-box; }

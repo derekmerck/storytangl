@@ -238,7 +238,7 @@ and its mechanics *densest* — and it still produces a story.
 The conformance harness should grow exemplar transcripts per
 paradigm. Suggested set:
 
-```
+```text
 engine/contrib/conformance/transcripts/
   carwars_garage_to_combat.txt
   credentials_day1_morning.txt

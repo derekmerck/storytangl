@@ -229,7 +229,7 @@ EXTENSIONS:
 
 CLI rendering:
 
-```
+```text
 1) Receive the visiting prince  [Audience: 1d20 vs charm, 12/20]
 ```
 
@@ -426,7 +426,7 @@ projected_state: {
 
 ### CLI rendering
 
-```
+```text
 Week 2. A royal visitor is expected.
 
 [Schedule] Week 2 of 4
@@ -529,4 +529,4 @@ this document is rendering contract.
 
 ---
 
-*End of training EXTENSIONS v0.1.*
+*End of training EXTENSIONS v0.2.*

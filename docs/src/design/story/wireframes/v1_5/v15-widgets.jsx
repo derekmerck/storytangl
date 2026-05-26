@@ -63,13 +63,28 @@ function renderMdInline(text) {
   if (text == null) return null;
   const paras = String(text).split(/\n\n+/);
   return paras.map((p, i) => (
-    <p key={i} style={{margin: i === 0 ? 0 : "0.7em 0 0"}} dangerouslySetInnerHTML={{
-      __html: p
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.+?)\*/g, "<em>$1</em>")
-        .replace(/_(.+?)_/g, "<em>$1</em>")
-    }} />
+    <p key={i} style={{margin: i === 0 ? 0 : "0.7em 0 0"}}>
+      {renderMdInlineParts(p)}
+    </p>
   ));
+}
+
+function renderMdInlineParts(text) {
+  const parts = String(text).split(/(\*\*.+?\*\*|\*.+?\*|_.+?_)/g);
+  return parts
+    .filter(part => part.length > 0)
+    .map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      if (
+        (part.startsWith("*") && part.endsWith("*")) ||
+        (part.startsWith("_") && part.endsWith("_"))
+      ) {
+        return <em key={i}>{part.slice(1, -1)}</em>;
+      }
+      return <React.Fragment key={i}>{part}</React.Fragment>;
+    });
 }
 
 function DialogGroup({ group, byUid }) {

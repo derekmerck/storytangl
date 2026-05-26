@@ -99,7 +99,7 @@ Recommended layout:
 
 The CLI port renders the packet as:
 
-```
+```text
 [Credentials packet]
   - Permit (Imperial)  holder=Anya Volkov  expires 2027-04-12  purpose=merchant
   - ID card            holder=Anya Volkov  issued 2025-11-03   photo=present
@@ -434,7 +434,7 @@ fragments: [
 Same packet, same disposition slots — only an annotated finding fragment
 and a control mutation. The CLI port re-renders:
 
-```
+```text
 You unfold the permit. The Imperial seal is sound, but the date stamp
 shows expiry months past.
 
@@ -474,9 +474,9 @@ does — both update only on backend tick.
 |---|---|---|---|---|
 | Candidate piece | photo + declared-purpose chip | line: `<name> (declared <purpose>, from <origin>)` | `Label` + small image | NPC 3D portrait |
 | Packet zone | row of document tiles | `[packet]` block of `- <doc>` lines | `Frame` of document cards | spatial array on counter |
-| Finding row (`ok`) | check icon + muted text | `  ✓ <key> = <value>` | green text | green chip |
-| Finding row (`warn`) | warning chip + amber text | `  ! <key> = <value>` | amber text | amber chip |
-| Finding row (`danger`) | danger chip + red text + pulse | `  !! <key> = <value>` | red text | red chip + sound |
+| Finding row (`ok`) | check icon + muted text | `✓ <key> = <value>` | green text | green chip |
+| Finding row (`warn`) | warning chip + amber text | `! <key> = <value>` | amber text | amber chip |
+| Finding row (`danger`) | danger chip + red text + pulse | `!! <key> = <value>` | red text | red chip + sound |
 | Disposition (`primary`) | green button | `a) Allow passage.` | green `Button` | green panel |
 | Disposition (`warning`) | amber button | `d) Deny passage.` | amber `Button` | amber panel |
 | Disposition (`danger`) | red button with confirm | `x) Arrest.` | red `Button` (confirm dialog) | red panel + confirm |
@@ -509,4 +509,4 @@ doctrine are authoring concerns; this document is rendering contract.
 
 ---
 
-*End of credentials EXTENSIONS v0.1.*
+*End of credentials EXTENSIONS v0.2.*
