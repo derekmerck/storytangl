@@ -582,64 +582,92 @@ moves follow the same pattern).
 
 ### B.2 — Contraband mediation (deferred follow-up)
 
-Beyond ``request_search`` (which reveals concealment → existing ARREST), full
-contraband mediation needs a ``request_relinquish`` / ``request_declare``
-family with non-trivial interactions across possession state and permit
-validity. The matrix below is the spec to build against when B.2 lands.
+Beyond ``request_search`` (which reveals concealment), full contraband mediation
+needs a family of moves whose interactions span packet validity, possession
+state, and candidate willingness. The matrix below is the spec to build against
+when B.2 lands.
 
-**Dimensions**
-- *Possession*: ``none`` / ``declared`` / ``concealed``
-- *Permit* for that contraband indication: ``none`` / ``valid`` /
-  ``mitigatable_invalid`` (missing seal, expired, ...) / ``forged`` /
-  ``wrong_holder`` (the last two are crimes intrinsic to the permit itself)
-- *Mediation moves*: ``request_declare`` (prompt to declare any concealed),
-  ``request_relinquish`` (yield declared contraband), ``request_search``
-  (already in B.1; force reveal of concealed)
-- *Candidate compliance*: comply (declare truthfully / yield) vs decline (lie /
-  refuse to yield) — the declines-mediation axis
+**Packet validity taxonomy** (for the contraband's permit specifically):
 
-**Declared possession — relinquish path**
+- **valid** — covers the contraband; everything in order.
+- **incomplete** — required document is missing entirely (can be produced).
+- **invalid** — present but mitigatably wrong (missing seal, expired, etc.);
+  can't be repaired at the desk.
+- **illegal** — forged / wrong-holder (the document itself is criminal).
 
-| Permit | Yield (comply) | Decline yield | Notes |
-|---|---|---|---|
-| none | cleared → PASS | DENY | "fix what you brought" |
-| valid | (no mediation needed) | — | PASS by base derive |
-| mitigatable invalid | cleared → PASS | DENY | same as no permit |
-| forged | — (crime overrides) | — | ARREST |
-| wrong_holder | — (crime overrides) | — | ARREST |
+**Mediation moves B.2 introduces** (in addition to ``request_search`` from B.1):
 
-**Concealed possession — search path**
+- ``request_complete`` — ask the candidate to produce the missing piece (for
+  incomplete packets). Subsumes the "missing-doc request surface" deferred from
+  B.1.
+- ``request_disclosure`` — the polite "anything to declare?" ask. Subject to
+  the candidate's compliance (the "oops, I forgot I had this in my pocket"
+  path).
+- ``request_relinquish`` — ask the candidate to yield declared contraband.
 
-| Permit | Search reveals | Notes |
-|---|---|---|
-| none | ARREST | smuggling |
-| valid | *[open: ARREST or DENY?]* | failure-to-declare with otherwise legitimate paperwork |
-| mitigatable invalid | ARREST | smuggling + invalid paper |
-| forged | ARREST | two crimes |
-| wrong_holder | ARREST | two crimes |
-| any | (no search done) | base derive sees no contraband; player may incorrectly PASS |
+**Declared contraband** — what the player can do about visible possession:
 
-**No possession — declare path** (after request_declare or by default)
+| Packet | Outcomes available |
+|---|---|
+| valid | allow |
+| incomplete | ``request_complete``, ``request_relinquish``, or deny |
+| invalid | ``request_relinquish`` or deny |
+| illegal | arrest |
 
-| Permit | Outcome | Notes |
-|---|---|---|
-| none | PASS | nothing to assess |
-| valid | PASS | permit unused |
-| mitigatable invalid | *[open: PASS or DENY?]* | does an unused invalid permit matter? |
-| forged | *[open: ARREST or moot?]* | is presenting a fake document a crime on its own? |
-| wrong_holder | *[open: ARREST or moot?]* | same question |
+**Concealed contraband** — outcomes depend on how (or whether) it surfaces:
 
-**Open questions to resolve before B.2 implementation:**
+| Packet | If disclosed / discovered |
+|---|---|
+| valid | ``request_disclosure`` (the "oops" path) → becomes declared+valid → allow |
+| incomplete | ``request_complete``, ``request_relinquish``, or deny |
+| invalid | confusing — probably arrest |
+| illegal | arrest regardless of discovery |
 
-1. Concealed contraband with a *valid* permit — ARREST or DENY? (Failure-to-declare with otherwise legitimate paperwork.)
-2. Forged / wrong-holder permit with *no* actual contraband — is the forged document arrestable on its own, or moot?
-3. Mitigatable-invalid permit with no contraband — does the unused invalid paper deny, or pass?
+Unsearched concealment is invisible to inspection; the player decides on
+visible state alone.
 
-**B.2 ships:** the two new move kinds (``request_declare`` /
-``request_relinquish``), the declines-mediation axis (per-case
-``compliant: bool`` or per-failure-mode willingness), and the missing-doc
-request surface from B.1's deferred list. All three benefit from being
-designed together against this matrix.
+**Multiple contraband types.** A candidate may carry several restricted items;
+each is assessed against its own permit category and the worst outcome
+dominates.
+
+**Cross-product examples** (one indication's permit interacting with a
+different contraband):
+
+| Candidate | Outcome |
+|---|---|
+| medical permit (drugs) + open weapon (no weapon permit) | yield, ``request_complete``, or deny |
+| medical permit + concealed weapon | arrest |
+| medical permit + weapon that requires no permit | accept |
+| medical permit + concealed weapon that requires no permit | **[open]** |
+
+**Valid paperwork, nothing declared, but rules allow possible unpermitted
+contraband.** The gatekeeper can always request a search; the candidate may
+refuse (→ deny) or comply (search runs → arrest if anything is found, allow if
+clean).
+
+**Severity is environmental.** The arrest/deny boundary in several rows bends
+with **environment, discretion, and bribery** (a Phase C cross-cut). B.2
+computes a base disposition; Phase C composes the override on top.
+
+**Open questions (updated):**
+
+1. ~~Concealed contraband + valid permit~~ — *resolved:* takes the
+   ``request_disclosure`` path; if voluntarily disclosed → allow as
+   declared+valid. (Sub-question still open: if disclosure is refused or lied
+   and search forces the reveal, is the "oops" forgiveness still extended, or
+   does it escalate?)
+2. ~~Forged / wrong-holder permit + no actual contraband~~ — *resolved:* the
+   illegal-packet rule applies regardless of possession → arrest.
+3. Mitigatable-invalid permit + no contraband — does an unused-but-invalid
+   paper deny, or pass? *(Still open.)*
+4. **New:** concealed contraband whose category requires *no* permit — is the
+   concealment-when-not-required itself a violation, or moot?
+
+**B.2 ships, when it lands:** the three new move kinds above
+(``request_complete`` / ``request_disclosure`` / ``request_relinquish``); the
+declines-mediation axis (per-case ``compliant: bool`` or per-failure-mode
+willingness); and per-indication worst-case composition across multiple
+contraband items. The Phase C severity overlay layers on top.
 
 ---
 
