@@ -25,12 +25,12 @@ def _actions(ledger: Ledger) -> list[Action]:
 
 
 def _choose(ledger: Ledger, label: str) -> None:
-    # Story-authored actions surface their display string as ``text``;
-    # game-provisioned actions surface it as ``label`` (from get_move_label).
+    # Story-authored actions surface their display string as ``text`` (a typed
+    # ``str``, defaults to ``""``); game-provisioned actions surface it as
+    # ``label`` (from get_move_label). Both fields are declared, so equality
+    # checks are safe even when one side is the unused default.
     action = next(
-        a
-        for a in _actions(ledger)
-        if a.label == label or getattr(a, "text", None) == label
+        a for a in _actions(ledger) if a.label == label or a.text == label
     )
     ledger.resolve_choice(action.uid, choice_payload=action.payload)
 
@@ -98,8 +98,13 @@ class TestCredentialGateWorld:
 
         for _ in range(total):
             target = game.expected_disposition(game.active_case).value
+            # Action.label is Optional[str] (story-authored actions can have
+            # label=None and surface their text via .text instead); guard the
+            # None case before .startswith.
             inspect = next(
-                a for a in _actions(ledger) if a.label.startswith(("Inspect", "Review"))
+                a
+                for a in _actions(ledger)
+                if a.label and a.label.startswith(("Inspect", "Review"))
             )
             ledger.resolve_choice(inspect.uid, choice_payload=inspect.payload)
             _choose(ledger, f"Choose {target}")
