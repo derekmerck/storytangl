@@ -5,27 +5,43 @@ metadata:
   description: "Work a checkpoint shift: inspect each traveler's packet and rule on a disposition."
   start_at: gate.entrance
 
-# One re-entrant HasGame block walks the whole roster: each disposition keeps the
-# game READY and re-provisions moves for the next traveler, so no per-candidate
-# story edges are needed. The game only reports terminal once the final candidate
-# is ruled on, at which point the game_won / game_lost exits route to the summary.
+# Two ways to work the gate today: a hand-authored line (CredentialGateBlock,
+# Phase A.1's authored cases) or a randomized line (SampledGateBlock, Phase A.3's
+# offers generator). Both block kinds are one re-entrant HasGame block that
+# walks its roster until terminal, so each disposition stays on the block until
+# the game's POSTREQS game_won / game_lost exits route to the shared summary.
 scenes:
   gate:
     title: "Credential Gate"
     blocks:
       entrance:
         content: |
-          The checkpoint shutters rattle in the wind. A line of travelers waits,
-          packets in hand, while the first sets a thin sheaf on the counter.
+          The checkpoint shutters rattle in the wind. You can work today's
+          scheduled line of known travelers, or take a randomized shift drawn
+          from the day's quota.
         actions:
-          - text: "Open the gate ledger"
-            successor: challenge
+          - text: "Work the scheduled shift"
+            successor: standard_challenge
+          - text: "Work a randomized shift"
+            successor: sampled_challenge
 
-      challenge:
+      standard_challenge:
         kind: "credential_gate.domain.CredentialGateBlock"
         content: |
-          Each packet looks almost correct at first glance, which is exactly what
-          makes the line worth a closer review. Work them one at a time.
+          A short, hand-picked line: three travelers, each almost in order.
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      sampled_challenge:
+        kind: "credential_gate.domain.SampledGateBlock"
+        content: |
+          A randomized line drawn from today's quota; you won't know each
+          traveler's mix until they reach the counter.
         continues:
           - successor: victory
             trigger: last
@@ -36,10 +52,10 @@ scenes:
 
       victory:
         content: |
-          The last traveler clears the counter. Every call held up, and the line
-          moves on behind you without complaint.
+          The last traveler clears the counter. Every call held up, and the
+          line moves on behind you without complaint.
 
       defeat:
         content: |
-          The shift ends short. At least one ruling was wrong, and the desk feels
-          smaller for it when the tally is read back.
+          The shift ends short. At least one ruling was wrong, and the desk
+          feels smaller for it when the tally is read back.

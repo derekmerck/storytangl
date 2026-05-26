@@ -15,8 +15,14 @@ from tangl.mechanics.games.credentials_enums import (
 )
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
+    CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
+)
+from tangl.mechanics.games.credentials_roster import (
+    ScenarioOffer,
+    ShiftSpec,
+    generate_roster,
 )
 from tangl.story import Block
 
@@ -132,4 +138,51 @@ class CredentialGateBlock(HasGame, Block):
     _game_handler_class = CredentialsGameHandler
 
 
+# --- Sampled (procedurally generated) variant ---------------------------------
+
+
+def _sampled_offers() -> list[ScenarioOffer]:
+    """A deterministic, demo-sized procedural shift drawn from a ShiftSpec.
+
+    Fixed seed so the demo plays the same line each time. Purpose pool is
+    limited to travel/work so every candidate has an inspectable passport (and
+    sometimes a work permit), keeping the inspect surface usable end-to-end.
+    """
+
+    spec = ShiftSpec(
+        rules=Restrictions.from_map(GATE_RULES),
+        encounters=4,
+        origin_distribution={Region.LOCAL: 1.0},
+        disposition_distribution={
+            CredentialDisposition.PASS: 0.5,
+            CredentialDisposition.DENY: 0.25,
+            CredentialDisposition.ARREST: 0.25,
+        },
+        purpose_pool=(Indication.TRAVEL, Indication.WORK),
+        seed=20260522,
+    )
+    return generate_roster(spec)
+
+
+class SampledGateGame(CredentialsGame):
+    """A procedurally sampled shift drawn from a fixed ShiftSpec.
+
+    Candidates are not authored: they are sampled offers whose packets are
+    materialized lazily as each traveler reaches the counter (Phase A.3).
+    """
+
+    offers: list[ScenarioOffer] = Field(default_factory=_sampled_offers)
+    restriction_map: Restrictions = Field(
+        default_factory=lambda: Restrictions.from_map(GATE_RULES)
+    )
+
+
+class SampledGateBlock(HasGame, Block):
+    """Story block hosting the procedurally sampled shift."""
+
+    _game_class = SampledGateGame
+    _game_handler_class = CredentialsGameHandler
+
+
 CredentialGateBlock.model_rebuild(_types_namespace={"UUID": UUID})
+SampledGateBlock.model_rebuild(_types_namespace={"UUID": UUID})
