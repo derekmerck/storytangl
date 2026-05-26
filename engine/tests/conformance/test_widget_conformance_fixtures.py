@@ -7,8 +7,11 @@ the engine today.
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -18,6 +21,7 @@ from tangl.service.response import ProjectedState, RuntimeEnvelope
 
 FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"
 PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposals"
+LEGIBILITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "legibility.py"
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
@@ -38,6 +42,19 @@ EXPECTED_PROPOSALS = {
     "roll_fragment.json",
     "wireframe_v15_interpretation_samples.json",
 }
+
+
+def _load_legibility() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("legibility", LEGIBILITY_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+LEGIBILITY = _load_legibility()
 
 
 def _load_fixture(path: Path) -> dict[str, Any]:
@@ -89,64 +106,6 @@ def _registry_after_controls(fragments: list[dict[str, Any]]) -> dict[str, dict[
             continue
         registry[_fragment_uid(fragment)] = fragment
     return registry
-
-
-def _renderable_ids_by_scene(fragments: list[dict[str, Any]]) -> list[set[str]]:
-    registry = _registry_after_controls(fragments)
-    scenes = [
-        fragment
-        for fragment in registry.values()
-        if fragment.get("fragment_type") == "group" and fragment.get("group_type") == "scene"
-    ]
-
-    visible_by_scene: list[set[str]] = []
-    for scene in scenes:
-        visible: set[str] = set()
-
-        def visit(uid: str) -> None:
-            if uid in visible:
-                return
-            visible.add(uid)
-            fragment = registry.get(uid)
-            if fragment is None:
-                return
-            if fragment.get("fragment_type") == "group":
-                member_ids = fragment.get("member_ids", [])
-                assert isinstance(member_ids, list)
-                for member_id in member_ids:
-                    if isinstance(member_id, str):
-                        visit(member_id)
-
-        member_ids = scene.get("member_ids", [])
-        assert isinstance(member_ids, list)
-        for member_id in member_ids:
-            if isinstance(member_id, str):
-                visit(member_id)
-        visible_by_scene.append(visible)
-
-    return visible_by_scene
-
-
-def _collect_reference_ids(value: object, parent_key: str = "") -> list[str]:
-    if isinstance(value, str):
-        return [value] if parent_key.endswith(("_ref", "_id")) else []
-    if isinstance(value, list):
-        return [
-            ref
-            for item in value
-            for ref in _collect_reference_ids(item, parent_key)
-        ]
-    if not isinstance(value, dict):
-        return []
-
-    refs: list[str] = []
-    for key, item in value.items():
-        if key.endswith(("_refs", "_ids")):
-            if isinstance(item, list):
-                refs.extend(entry for entry in item if isinstance(entry, str))
-            continue
-        refs.extend(_collect_reference_ids(item, key))
-    return refs
 
 
 def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
@@ -245,29 +204,89 @@ def test_runtime_fixtures_have_portable_fragment_shapes(path: Path) -> None:
 
 
 @pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
-def test_open_choice_references_are_renderable(path: Path) -> None:
+def test_runtime_fixtures_pass_decision_legibility(path: Path) -> None:
     payload = _load_fixture(path)
-    fragments = payload["fragments"]
-    assert isinstance(fragments, list)
 
-    scenes = _renderable_ids_by_scene(fragments)
-    assert scenes, f"{path.name} must expose at least one scene"
+    result = LEGIBILITY.check_runtime_envelope(payload)
 
-    for fragment in fragments:
-        if not isinstance(fragment, dict) or fragment.get("fragment_type") != "choice":
-            continue
-        if fragment.get("available") is False:
-            continue
+    LEGIBILITY.assert_no_issues(result.issues)
 
-        refs = _collect_reference_ids(fragment.get("accepts", {}).get("constraints"))
-        if not refs:
-            continue
 
-        choice_uid = _fragment_uid(fragment)
-        scene = next((ids for ids in scenes if choice_uid in ids), None)
-        assert scene is not None, f"{path.name}: choice {choice_uid} is not in a scene"
-        for ref in refs:
-            assert ref in scene, f"{path.name}: choice {choice_uid} references hidden {ref}"
+def test_decision_legibility_reports_hidden_choice_references() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "hidden-zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "member_ids": [],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Take one.",
+                "available": True,
+                "accepts": {
+                    "kind": "pieces",
+                    "constraints": {"target_zone_ref": "hidden-zone"},
+                },
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert [issue.ref_id for issue in result.issues] == ["hidden-zone"]
+    assert result.issues[0].choice_uid == "choice"
+    assert result.issues[0].reason == "referenced state is not renderable"
+
+
+def test_decision_legibility_accepts_visible_piece_domain_ids() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["zone", "choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "member_ids": ["piece-fragment"],
+            },
+            {
+                "uid": "piece-fragment",
+                "fragment_type": "piece",
+                "piece_id": "lamp",
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Use the lamp.",
+                "available": True,
+                "accepts": {
+                    "kind": "pieces",
+                    "piece_ids": ["lamp"],
+                },
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert result.issues == ()
 
 
 def test_command_hint_fixture_keeps_grammar_advisory() -> None:

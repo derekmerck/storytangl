@@ -11,6 +11,7 @@
 # temporary
 dump*
 tmp*
+private/
 **/old
 **/old_*
 #schemas

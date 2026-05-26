@@ -63,7 +63,7 @@ the negotiation is mostly about typed-shape graduations.
 | `ProjectedState.sections` with five `value_type`s | S | done | done | — |
 | `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
 | Bundle customization / presentation profiles | S target | partial (docs + older world `ui_config`) | not_started | keep advisory; requires world-info catalog before conformance |
-| §5.1 Decision Legibility Contract | S | partial (no automated check) | n/a (contract; not a capability) | webapp conformance harness (see §F) |
+| §5.1 Decision Legibility Contract | S | partial (JSON harness covers fixtures/sequences) | n/a (contract; not a capability) | expand field coverage as new decision surfaces promote |
 | §5.2 Time Parity Rule (visual ritual skip, media advance) | S | partial (skip available, not enforced) | n/a | webapp conformance harness |
 | §5.3 Input Parity Rule (drag fallback, hotkey numbers) | S | partial (positional hotkeys done; drag-fallback in carwars) | n/a | webapp conformance harness |
 | §0.2 CLI Floor Rule | S | n/a | n/a (gating rule on PRs) | wire into CI for Tier S graduations |
@@ -182,7 +182,7 @@ graduations and as the regression suite for cross-port parity.
 | Harness | What it checks | Status | Plan |
 |---|---|---|---|
 | `engine/contrib/conformance/cli_reference_port.py` | Tier S CLI rendering for every fragment / value_type | partial (Tier S + current P1 widgets) | extend coverage as Tier P1 → S graduations happen |
-| `engine/contrib/conformance/legibility.py` | §5.1 — referenced UIDs are rendered | not_started | first conformance harness to write |
+| `engine/contrib/conformance/legibility.py` | §5.1 — referenced UIDs are rendered | initial | covers fixture and sequence choices; expand as new P1/P2 fields promote |
 | `engine/contrib/conformance/parity.py` | §5.2 time parity, §5.3 input parity | not_started | second harness |
 | `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
 | `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S + current P1 fixtures) | keep promoting proposal fixtures as implementation lands |
@@ -349,8 +349,8 @@ API maps them.
   3. Typed `metadata.grammar` and `metadata.info_affordances`.
   4. HTTP API: type responses on `/story/do` / `/story/update`; add `query`
      param routing on `/story/info`.
-  5. Conformance harness: write `legibility.py`, `parity.py`, extend
-     `cli_reference_port.py` for new Tier P1 surfaces.
+  5. Conformance harness: ✅ initial `legibility.py`; next write
+     `parity.py` and extend `cli_reference_port.py` for new Tier P1 surfaces.
 
 **Phase 4 — Tier P1 → S graduation.** Surfaces in §B promote one
 at a time, gated on the CLI reference port and the conformance
