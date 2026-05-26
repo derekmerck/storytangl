@@ -9,6 +9,8 @@ from tangl.journal.fragments import ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.sandbox import SandboxLocation
+from tangl.service.response import KvListValue
+from tangl.service.story_info import resolve_story_info_projector
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -91,7 +93,25 @@ class TestAdventureSandboxWorld:
 
         assert ledger.cursor.label == "cobble_crawl"
 
+        _choose(ledger, contribution="take", asset="gold_nugget")
         _choose(ledger, contribution="mob", mob="wounded_pirate", action="help")
+        _choose(ledger, contribution="magic_word", word="XYZZY")
+
+        assert ledger.cursor.label == "building"
+
+        _choose(ledger, contribution="deposit_treasure", asset="gold_nugget")
+
+        projected = resolve_story_info_projector(ledger).project(ledger=ledger)
+        score_section = next(
+            section
+            for section in projected.sections
+            if section.section_id == "adventure_score"
+        )
+        assert isinstance(score_section.value, KvListValue)
+        assert [(row.key, row.value) for row in score_section.value.items] == [
+            ("Score", 10),
+            ("Deposited", 1),
+        ]
 
         content = [
             fragment.content
@@ -101,3 +121,58 @@ class TestAdventureSandboxWorld:
         assert "The key turns with a click. The grate unlocks." in content
         assert "A wounded pirate leans against the wall, watching you." in content
         assert "The pirate eyes you suspiciously, but accepts your help." in content
+        assert "A hollow voice says \"Plugh.\" You are back in the well house." in content
+        assert (
+            "The gold nugget is safely deposited in the well house. "
+            "Your score has increased."
+        ) in content
+
+    def test_adventure_movement_hazard_blocks_heavy_nugget_climb(self) -> None:
+        bundle = WorldBundle.load(_adventure_root())
+        world = WorldCompiler().compile(bundle)
+        result = world.create_story("adventure_sandbox_slice", init_mode=InitMode.EAGER)
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        enter = next(
+            edge
+            for edge in ledger.cursor.edges_out()
+            if isinstance(edge, Action)
+            and edge.text == "Stand at the end of the road"
+        )
+        ledger.resolve_choice(enter.uid)
+
+        _choose(ledger, contribution="movement", direction="east")
+        _choose(ledger, contribution="take", asset="keys")
+        _choose(ledger, contribution="take", asset="brass_lamp")
+        _choose(ledger, contribution="light", asset="brass_lamp", verb="turn_on")
+        _choose(ledger, contribution="movement", direction="west")
+        _choose(ledger, contribution="movement", direction="south")
+        _choose(ledger, contribution="movement", direction="south")
+        _choose(ledger, contribution="movement", direction="south")
+        _choose(ledger, contribution="unlock", target="grate")
+        _choose(ledger, contribution="open", target="grate")
+        _choose(ledger, contribution="movement", direction="down")
+        _choose(ledger, contribution="movement", direction="west")
+        _choose(ledger, contribution="take", asset="gold_nugget")
+        _choose(ledger, contribution="movement", direction="west")
+
+        assert ledger.cursor.label == "hall_of_mists"
+
+        _choose(ledger, contribution="movement_hazard", direction="up")
+
+        assert ledger.cursor.label == "hall_of_mists"
+
+        _choose(ledger, contribution="drop", asset="gold_nugget")
+        _choose(ledger, contribution="movement", direction="up")
+
+        assert ledger.cursor.label == "top_of_small_pit"
+
+        content = [
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment, ContentFragment)
+        ]
+        assert (
+            "I'm not sure you'll be able to get up it with what you're carrying."
+            in content
+        )

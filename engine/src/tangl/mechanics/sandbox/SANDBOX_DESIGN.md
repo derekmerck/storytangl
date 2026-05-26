@@ -987,12 +987,15 @@ The point is not that the schema is final. The point is to keep an executable
 pressure fixture while negotiating which schema choices are authoring sugar,
 which are generic sandbox traits, and which require world-specific authorities.
 
-One small Adventure-flavored follow-up worth preserving is magic-word
-teleportation, such as `XYZZY`. It is charming, but architecturally it should be
-just another sponsored interaction or parser-facing choice: a scoped/world
-authority recognizes the word, projects the teleport affordance when appropriate,
-and resolves it through ordinary traversal/effects rather than giving parser
-input special semantic power.
+The demo world now also carries a small Adventure authority slice over the
+generic sandbox surface: a treasure asset can be deposited at a location marked
+as a deposit site, location-authored magic-word anchors project `Say XYZZY` as
+ordinary actions, and a first movement hazard rewrites an `up` movement into a
+self-looping blocked climb while the player carries the gold nugget. These are
+intentionally domain-owned policies over normal actions, assets, and journal
+fragments. A later compact-IR compiler can lower `magic_words`, treasure
+scoring, and `movement_hazards` sections into the same surfaces once the schema
+is stable.
 
 `SandboxSliceCompiler` is the current mechanics-level compiler boundary for
 that pressure fixture. It mirrors the broader compiler split in miniature:
