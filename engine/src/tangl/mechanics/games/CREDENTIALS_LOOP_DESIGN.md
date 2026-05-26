@@ -2,7 +2,8 @@
 
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
 (A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
-lazy offer roster, 2026-05-22); Phases B/C/D designed below as overlays  
+lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
+2026-05-23); Phases B.2/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -553,7 +554,7 @@ Phase B adds follow-up moves that can clear or confirm findings before a
 disposition. The work splits into two increments because contraband mediation
 has enough independent design surface to warrant its own pass.
 
-### B.1 — Core mediation (v1 increment)
+### B.1 — Core mediation (v1 increment, LANDED 2026-05-23)
 
 Adds three move kinds and a per-case ``finding_status: dict[str, str]``
 (values: ``"cleared"`` / ``"confirmed"``; reset by ``advance_case``).

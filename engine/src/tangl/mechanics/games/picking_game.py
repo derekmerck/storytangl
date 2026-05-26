@@ -170,17 +170,33 @@ class PickingGameHandler(GameHandler[PickingGameT]):
             "target": player_move.target,
         }
 
-        if player_move.kind == "inspect":
-            game.inspected_targets.append(player_move.target)
-            result = self.resolve_inspection(game, player_move.target, detail)
-        elif player_move.kind == "decide":
-            game.committed_decision = player_move.target
-            result = self.resolve_decision(game, player_move.target, detail)
-        else:
-            raise ValueError(f"Unknown picking move kind: {player_move.kind}")
+        result = self.resolve_move_kind(player_move.kind, game, player_move, detail)
 
         game.round_detail = detail
         return result
+
+    def resolve_move_kind(
+        self,
+        kind: str,
+        game: PickingGameT,
+        player_move: PickingMove,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        """Dispatch a move by its ``kind``.
+
+        Subclasses register new kinds by overriding this method, handling the
+        new kinds themselves and delegating unknown ones to ``super()``. The
+        base handles the picking kernel's two kinds: ``"inspect"`` and
+        ``"decide"``.
+        """
+
+        if kind == "inspect":
+            game.inspected_targets.append(player_move.target)
+            return self.resolve_inspection(game, player_move.target, detail)
+        if kind == "decide":
+            game.committed_decision = player_move.target
+            return self.resolve_decision(game, player_move.target, detail)
+        raise ValueError(f"Unknown picking move kind: {kind}")
 
     @abstractmethod
     def resolve_inspection(
