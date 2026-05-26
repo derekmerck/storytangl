@@ -23,6 +23,7 @@ FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"
 PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposals"
 LEGIBILITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "legibility.py"
 PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "parity.py"
+TIME_PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "time_parity.py"
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
@@ -57,6 +58,7 @@ def _load_module(name: str, path: Path) -> ModuleType:
 
 LEGIBILITY = _load_module("legibility", LEGIBILITY_PATH)
 PARITY = _load_module("parity", PARITY_PATH)
+TIME_PARITY = _load_module("time_parity", TIME_PARITY_PATH)
 
 
 def _load_fixture(path: Path) -> dict[str, Any]:
@@ -223,6 +225,15 @@ def test_runtime_fixtures_pass_input_parity(path: Path) -> None:
     PARITY.assert_no_issues(result.issues)
 
 
+@pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
+def test_runtime_fixtures_pass_time_parity(path: Path) -> None:
+    payload = _load_fixture(path)
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    TIME_PARITY.assert_no_issues(result.issues)
+
+
 def test_decision_legibility_reports_hidden_choice_references() -> None:
     payload = {
         "cursor_id": "fixture",
@@ -373,6 +384,78 @@ def test_input_parity_reports_invalid_compose_parts() -> None:
         "duplicate role 'amount'",
         "missing role",
         "missing or unsupported accepts kind",
+    ]
+
+
+def test_time_parity_reports_unreadable_pending_media() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["media"],
+            },
+            {
+                "uid": "media",
+                "fragment_type": "media",
+                "content": "",
+                "content_format": "rit",
+                "generation_status": "ready",
+            },
+        ],
+    }
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "media is missing readable content",
+        "ready media must resolve beyond rit",
+    ]
+
+
+def test_time_parity_accepts_roll_proposal_fallback() -> None:
+    payload = _load_fixture(PROPOSAL_DIR / "roll_fragment.json")
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    TIME_PARITY.assert_no_issues(result.issues)
+
+
+def test_time_parity_reports_blocking_roll_rituals() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["roll"],
+            },
+            {
+                "uid": "roll",
+                "fragment_type": "roll",
+                "label": "Fate",
+                "outcome": "fail",
+                "ritual_hints": {
+                    "duration_ms": True,
+                    "skip_label": "",
+                    "requires_completion": True,
+                },
+            },
+        ],
+    }
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "roll needs inputs or narrative for fallback",
+        "ritual duration_ms must be a non-negative integer",
+        "ritual skip_label must be readable when present",
+        "timing hint 'requires_completion' cannot be true",
     ]
 
 

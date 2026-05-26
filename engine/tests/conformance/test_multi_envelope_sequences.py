@@ -17,6 +17,7 @@ SEQUENCE_DIR = ROOT / "engine" / "contrib" / "conformance" / "sequences"
 REFERENCE_PATH = ROOT / "engine" / "contrib" / "conformance" / "reference_port.py"
 LEGIBILITY_PATH = ROOT / "engine" / "contrib" / "conformance" / "legibility.py"
 PARITY_PATH = ROOT / "engine" / "contrib" / "conformance" / "parity.py"
+TIME_PARITY_PATH = ROOT / "engine" / "contrib" / "conformance" / "time_parity.py"
 EXPECTED_SEQUENCES = {"garage_buy_mount.json"}
 
 MEDIA_ID = "00000000-0000-4000-8000-000000021003"
@@ -40,6 +41,7 @@ def _load_module(name: str, path: Path) -> ModuleType:
 PORT = _load_module("reference_port", REFERENCE_PATH)
 LEGIBILITY = _load_module("legibility", LEGIBILITY_PATH)
 PARITY = _load_module("parity", PARITY_PATH)
+TIME_PARITY = _load_module("time_parity", TIME_PARITY_PATH)
 
 
 def _load_sequence(name: str) -> dict[str, Any]:
@@ -111,6 +113,12 @@ def test_sequence_open_choices_keep_portable_input_shapes() -> None:
     sequence = _load_sequence("garage_buy_mount.json")
 
     PARITY.assert_no_issues(PARITY.check_sequence(sequence))
+
+
+def test_sequence_timed_fragments_keep_portable_fallbacks() -> None:
+    sequence = _load_sequence("garage_buy_mount.json")
+
+    TIME_PARITY.assert_no_issues(TIME_PARITY.check_sequence(sequence))
 
 
 def test_sequence_legibility_uses_current_registry_after_updates() -> None:

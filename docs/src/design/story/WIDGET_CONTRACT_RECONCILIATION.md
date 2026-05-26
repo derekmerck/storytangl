@@ -64,7 +64,7 @@ the negotiation is mostly about typed-shape graduations.
 | `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
 | Bundle customization / presentation profiles | S target | partial (docs + older world `ui_config`) | not_started | keep advisory; requires world-info catalog before conformance |
 | §5.1 Decision Legibility Contract | S | partial (JSON harness covers fixtures/sequences) | n/a (contract; not a capability) | expand field coverage as new decision surfaces promote |
-| §5.2 Time Parity Rule (visual ritual skip, media advance) | S | partial (skip available, not enforced) | n/a | webapp conformance harness |
+| §5.2 Time Parity Rule (visual ritual skip, media advance) | S | partial (JSON harness covers readable fallbacks) | n/a | browser timing/skip E2E remains later |
 | §5.3 Input Parity Rule (drag fallback, hotkey numbers) | S | partial (JSON harness covers fixture submit floors) | n/a | extend toward renderer-specific drag/keyboard fallbacks |
 | §0.2 CLI Floor Rule | S | n/a | n/a (gating rule on PRs) | wire into CI for Tier S graduations |
 
@@ -184,7 +184,7 @@ graduations and as the regression suite for cross-port parity.
 | `engine/contrib/conformance/cli_reference_port.py` | Tier S CLI rendering for every fragment / value_type | partial (Tier S + current P1 widgets) | extend coverage as Tier P1 → S graduations happen |
 | `engine/contrib/conformance/legibility.py` | §5.1 — referenced UIDs are rendered | initial | covers fixture and sequence choices; expand as new P1/P2 fields promote |
 | `engine/contrib/conformance/parity.py` | §5.3 input parity | initial | covers fixture and sequence submit floors; time parity remains next harness |
-| `engine/contrib/conformance/time_parity.py` | §5.2 time parity | not_started | third harness |
+| `engine/contrib/conformance/time_parity.py` | §5.2 time parity | initial | covers JSON-readable media/roll fallbacks; browser skip timing remains later |
 | `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
 | `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S + current P1 fixtures) | keep promoting proposal fixtures as implementation lands |
 | `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment, and one UUID-shaped v1.5 wireframe interpretation sample; CLI/Tk can inspect them without promotion |
@@ -351,8 +351,9 @@ API maps them.
   4. HTTP API: type responses on `/story/do` / `/story/update`; add `query`
      param routing on `/story/info`.
   5. Conformance harness: ✅ initial `legibility.py`; ✅ initial
-     input-parity `parity.py`; next write a time-parity harness and extend
-     `cli_reference_port.py` for new Tier P1 surfaces.
+     input-parity `parity.py`; ✅ initial `time_parity.py`; next extend
+     `cli_reference_port.py` for new Tier P1 surfaces and add browser timing
+     E2E only after promoted surfaces stabilize.
 
 **Phase 4 — Tier P1 → S graduation.** Surfaces in §B promote one
 at a time, gated on the CLI reference port and the conformance

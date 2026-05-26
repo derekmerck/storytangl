@@ -35,6 +35,9 @@ piece/zone/state references in its decision surfaces must also be renderable.
 enough `accepts` shape for a low-capability client to submit a portable payload
 for `pick`, `text`, `quantity`, `raw_command`, `pieces`, `place`, and recursive
 `compose` controls.
+`time_parity.py` covers the JSON-visible part of timed presentation parity:
+pending media and roll/ritual fragments need immediate readable fallbacks, and
+advisory timing hints cannot require waiting for presentation time.
 
 `reference_port.py` is the smallest current proof of that portability. It
 renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without
