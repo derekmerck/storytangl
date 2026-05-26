@@ -534,6 +534,16 @@ rule set, so an author can *see* which dispositions and failure modes are
 reachable today before committing a day's rules. It is an authoring/validation
 aid for rule sets, not a runtime component.
 
+**The rules are also a narrative surface.** In Pope's *Papers, Please*, daily
+rule changes carry inscrutable political messages: who is currently allied or
+belligerent, how much the regime trusts its own people, admissibility wielded as
+a hammer against political foes. Different checkpoints can carry different
+state-vs-local-enforcement variation, governance subtly diverging from rule. The
+mechanic gives the author a way to *say something* through bureaucratic minutiae
+alone -- the rules are the politics. This is the dramatic upside of the
+data-driven design: changing a `Restrictions` instance between shifts is
+authorially equivalent to a regime memo.
+
 ### A.6 Packet-as-tokens (when structure is needed)
 
 When narrative-string findings are no longer enough, the structured packet model
@@ -742,6 +752,95 @@ right stamps -- which is the degrade / generate machinery applied from the playe
 side (inspect -> assess -> remediate -> re-assess). That is a composite loop
 (shell = shop economy, spike = legality assessment), noted as a future direction
 (not v1 scope) and a natural wing of the unified showcase world.
+
+### Worked third skin: Hall Monitor (evolving daily rules)
+
+Another reskin, exercising a dimension Chop Shop doesn't really test: **rules
+that vary day-by-day with explicit exceptions**. Border rules and chop-shop
+permits are mostly static catalogs of who-needs-what; the Hall Monitor's daily
+rules compose several orthogonal exception axes on top of the indication
+catalog:
+
+- **attribute thresholds** -- "no one with a grade lower than a B is allowed to
+  go to the bathroom"
+- **calendar / event exceptions** -- "anyone can go to the gym for the pep
+  rally in the afternoon without a note because it's a Friday"
+- **documented exemptions** -- "students using inhalers should have
+  documentation of need on file with the nurses office"
+
+Each candidate (student) has attributes (grade, schedule, prior referrals) and
+a purpose (bathroom / nurse / gym / class). The day's rules combine the
+restriction map with these exception axes; the same `derive_disposition` shape
+applies, with the rule lookup parameterized over more axes than the border
+case. Locker searches and principal referrals reskin ``request_search`` and
+ARREST respectively.
+
+Mechanically, this is the strongest validation of the rules-as-authored-story-lever
+framing (A.5): when the rules are mid-week school schedules with calendar
+carve-outs and per-student exemptions, the per-day rule churn isn't a corner
+case -- it's the gameplay. The same framework supports authoritarian-dystopia
+fiction at any scale (checkpoint, chop shop, hallway, badge desk, comp tier,
+exam proctor, customs office); the engine is fundamentally a **bureaucratic
+gatekeeping kernel**.
+
+---
+
+## Beyond the phased roadmap: cross-shift continuity and recurring candidates
+
+A procedural candidate today is generated for one shift and disappears at
+terminal. A *real* checkpoint story wants candidates to return: the
+procedurally-sampled traveler you wrongly admitted on day 1 walks back through
+your line on day 4 and recognizes you; the hand-crafted recurring character
+appears at multiple checkpoints; the unjustly-denied applicant comes back with
+new paperwork. This needs **cross-shift continuity** the engine doesn't have
+today.
+
+The seams already exist; persistence is the missing piece:
+
+- **Identity persistence.** A `CredentialCaseResult` already captures one
+  decided candidate. Continuity needs a stable *candidate id* (and the option
+  to persist a materialized `CredentialCase` snapshot keyed to that id).
+- **Recurrence as a pinned offer.** `ScenarioOffer.pinned_case` already lets a
+  shift pin a fully-authored candidate. A recurring candidate is a pinned
+  offer whose payload carries prior `CredentialCaseResult`s alongside the
+  current packet.
+- **Prior-encounter context on the case.** A `prior_encounters:
+  list[CredentialCaseResult]` field (on `CredentialCase` or a "candidate
+  dossier" wrapper). `derive_disposition` and `expected_disposition` read it
+  for recognition-driven severity bending; `get_journal_fragments` narrates
+  "you've seen this one before."
+
+**Promotion paths** (procedural → recurring):
+
+- *Wrongly admitted.* A procedural candidate dispositioned ALLOW that should
+  have been DENY/ARREST is promoted into a future shift's pinned offers as a
+  returning narrative thread -- the smuggler whose forged permit you missed
+  comes back to blackmail you (the engine equivalent of Pope's recurring
+  political consequence).
+- *Unjustly denied.* A procedural candidate denied who *should* have been
+  allowed returns with a grievance, new paperwork, or as a sympathetic NPC in
+  another scene.
+- *Hand-crafted recurring.* Authored candidates pinned across multiple shifts;
+  their `prior_encounters` accumulate naturally as they're processed.
+
+**Cross-cuts with the existing phases:**
+
+- This is where **Phase C's "context bends severity"** gets its sharpest
+  narrative edge: the context is *the player's own past mistakes catching up*.
+  Whitelist-by-political-favor becomes blackmail-by-another-name when the
+  candidate carries a `prior_encounters` record of your error.
+- **`ShiftSpec`** (A.3) gains a `recurrences: list[CandidateDossier]` field
+  (or a hook predicate) that pins prior candidates back in when conditions
+  match (region, days-since, prior-disposition).
+- The promotion **bridges procedural and authored** without breaking the
+  funnel: a recurring candidate is just a Tier 1 offer enriched with prior
+  context; the rest of the engine never learns whether it was sampled or
+  authored.
+
+This is design intent only; no implementation in scope. Worth capturing now
+because it's a cross-shift persistence step the engine doesn't currently
+support, and the seams (`ScenarioOffer.pinned_case`, `CredentialCase`,
+`CredentialCaseResult`) all need to admit the continuity story when this lands.
 
 ---
 
