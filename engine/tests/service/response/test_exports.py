@@ -12,6 +12,7 @@ def test_service_response_types_importable() -> None:
         InfoModel,
         InfoState,
         ItemListValue,
+        JsonValue,
         KvListValue,
         MediaNative,
         NativeResponse,
@@ -34,6 +35,7 @@ def test_service_response_types_importable() -> None:
     assert InfoModel is not None
     assert InfoState is not None
     assert ItemListValue is not None
+    assert JsonValue is not None
     assert KvListValue is not None
     assert MediaNative is not None
     assert NativeResponse is not None
@@ -63,6 +65,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "InfoModel",
         "InfoState",
         "ItemListValue",
+        "JsonValue",
         "KvListValue",
         "MediaNative",
         "NativeResponse",

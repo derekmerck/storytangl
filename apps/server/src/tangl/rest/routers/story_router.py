@@ -103,7 +103,7 @@ def _parse_info_query(value: str | None) -> dict[str, JsonValue] | None:
             status_code=400,
             detail="story-info query must be a JSON object",
         )
-    return parsed
+    return dict(parsed)
 
 
 def _media_render_profile(render_profile: str | Iterable[str] | None) -> MediaRenderProfile:

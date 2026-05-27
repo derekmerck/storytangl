@@ -838,12 +838,12 @@ Current disclosed sections are intentionally conservative:
 - visible authored exits.
 
 Sandbox can also satisfy explicit story-info channel requests through the
-service `get_story_info` dispatch task. A future `kind="map"` provider should
-emit ordinary `ProjectedState` sections such as `map_summary`, `map_nodes`, and
-`map_edges` rather than a sandbox-only widget type. The map is still disclosed
-state: current and known locations, visible/known exits, and known blocked or
-locked state. It must not expose secret geography, hidden mobs, raw pathfinding
-truth, or future schedule state.
+service `get_story_info` dispatch task. The `kind="map"` provider emits ordinary
+`ProjectedState` sections (`sandbox_map_summary`, `sandbox_map_nodes`, and
+`sandbox_map_edges`) rather than a sandbox-only widget type. The map is still
+disclosed state: current and known locations, visible/known exits, and known
+blocked or locked state. It must not expose secret geography, hidden mobs, raw
+pathfinding truth, or future schedule state.
 
 Visibility rules filter projected state the same way they filter journal and
 local affordances. Darkness may leave current location, time, and inventory
