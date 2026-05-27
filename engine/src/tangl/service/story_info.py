@@ -6,7 +6,13 @@ from typing import Any, Protocol, runtime_checkable
 
 from tangl.vm.runtime.ledger import Ledger
 
-from .response import KvListValue, KvRow, ProjectedSection, ProjectedState
+from .response import (
+    KvListValue,
+    KvRow,
+    ProjectedSection,
+    ProjectedState,
+    StoryInfoRequest,
+)
 
 
 @runtime_checkable
@@ -71,6 +77,24 @@ def resolve_story_info_projector(ledger: Ledger) -> StoryInfoProjector:
     )
 
 
+def filter_projected_state(
+    state: ProjectedState,
+    *,
+    request: StoryInfoRequest,
+) -> ProjectedState:
+    """Filter projected sections by requested kind, preserving section order."""
+    requested = request.requested_kinds()
+    if not requested:
+        return state
+    return ProjectedState(
+        sections=[
+            section
+            for section in state.sections
+            if _section_matches_request(section, requested)
+        ]
+    )
+
+
 def _append_kv_item(
     items: list[KvRow],
     *,
@@ -97,9 +121,20 @@ def _resolve_cursor_label(ledger: Ledger) -> str | None:
     return str(label) if label is not None else None
 
 
+def _section_matches_request(
+    section: ProjectedSection,
+    requested: list[str],
+) -> bool:
+    labels = {section.section_id}
+    if section.kind is not None:
+        labels.add(section.kind)
+    return any(label in requested for label in labels)
+
+
 __all__ = [
     "DEFAULT_STORY_INFO_PROJECTOR",
     "DefaultStoryInfoProjector",
     "StoryInfoProjector",
+    "filter_projected_state",
     "resolve_story_info_projector",
 ]

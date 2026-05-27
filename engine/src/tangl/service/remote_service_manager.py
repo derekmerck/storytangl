@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -483,11 +484,26 @@ class RemoteServiceManager(ServiceManager):
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: UserAuthInfo | None = None,
+        kind: str | None = None,
+        kinds: list[str] | None = None,
+        query: dict[str, Any] | None = None,
     ) -> ProjectedState:
         self._validate_user_auth(user_id=user_id, user_auth=user_auth)
         self._check_bound_user(user_id)
         _ = ledger_id
-        payload = self._request("GET", "/story/info", auth_required=True)
+        params: dict[str, object] = {}
+        if kind is not None:
+            params["kind"] = kind
+        if kinds:
+            params["kinds"] = ",".join(kinds)
+        if query is not None:
+            params["query"] = json.dumps(query)
+        payload = self._request(
+            "GET",
+            "/story/info",
+            auth_required=True,
+            params=params,
+        )
         return self._decode_model(ProjectedState, payload, label="projected state")
 
     @service_method(

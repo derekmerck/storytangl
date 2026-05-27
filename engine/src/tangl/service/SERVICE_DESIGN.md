@@ -148,7 +148,32 @@ Service does not own transport formatting. HTML transforms, media URL shaping,
 and similar wire concerns belong in CLI/server adapters.
 
 `RuntimeEnvelope.fragments` carries real fragment models. Service does not
-maintain a second fragment representation.
+translate journal content into a second shape or maintain a second fragment
+representation.
+
+## Story-Info Channels
+
+`get_story_info` is the generic side-channel for supplementary projected state.
+It returns `ProjectedState`, the same portable section model used by status
+rails, command-line inspection, and future rich panels. The endpoint accepts an
+optional `kind`, comma-separated `kinds`, and opaque JSON `query` descriptor.
+Clients pass query descriptors back without interpreting them.
+
+Story-info has two service dispatch tasks:
+
+- `advertise_info_channels` gathers `InfoAffordance` values for the next
+  `RuntimeEnvelope.metadata.info_affordances` list.
+- `get_story_info` gathers `ProjectedSection` values for a concrete
+  `StoryInfoRequest`.
+
+The fulfillment task is additive: several handlers may contribute sections for
+a multi-kind request. Handlers should treat projected state as disclosed state,
+not authority state. A sandbox map may show known rooms and visible exits; a
+credentials loop may show presented documents and public rules. Neither should
+expose hidden truth, future schedules, or backend-only decision state.
+
+Any hotspot, edge reference, or action hint carried in a projected section is
+advisory. Committing a move still goes through ordinary action selection.
 
 ## Auth and Access
 

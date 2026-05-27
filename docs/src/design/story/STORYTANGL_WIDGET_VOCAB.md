@@ -481,9 +481,10 @@ cheap.
 
 **Status (L1):** committed Tier P1 target contract. **Status (L2):** reference
 webapp implements `info_affordances` with `query` descriptors against
-`/story/info`. **Status (L3):** engine emits `metadata.info_affordances`
-in some bundles but the typed `info_state` shape is not yet ratified at
-the engine response model layer.
+`/story/info`. **Status (L3):** engine defines typed `InfoAffordance`,
+`InfoState`, and `StoryInfoRequest` models, advertises available channels on
+runtime envelopes, and routes `/story/info` through the service-info dispatch
+surface. Fine-grained dirty-kind tracking remains conservative in v1.
 
 A bundle MAY expose **info channels** — typed sub-surfaces of world
 state the player can pull on demand: a map, an inventory, a watch

@@ -21,12 +21,16 @@ from tangl.vm.runtime.ledger import Ledger
 from .exceptions import AuthMismatchError
 from ._user_support import parse_bool_flag, parse_datetime_field
 from .diagnostics import diagnostics_from_codec_state, diagnostics_from_compile_issues
+from .dispatch import do_advertise_info_channels, do_get_story_info
 from .media import resolve_world_media
 from .response import (
+    InfoAffordance,
+    InfoState,
     PreflightReport,
     ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
+    StoryInfoRequest,
     SystemInfo,
     UserInfo,
     UserSecret,
@@ -42,7 +46,7 @@ from .service_method import (
     service_method,
 )
 from .system_info import get_system_info, reset_system
-from .story_info import resolve_story_info_projector
+from .story_info import filter_projected_state, resolve_story_info_projector
 from .user import User
 from .world_registry import (
     WorldRegistry,
@@ -57,6 +61,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from tangl.media import MediaDataType
     from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
     from .auth import UserAuthInfo
+    from tangl.vm.runtime.frame import PhaseCtx
 
 
 @dataclass
@@ -233,13 +238,47 @@ class ServiceManager:
         return None
 
     @staticmethod
+    def _make_story_info_ctx(ledger: Ledger) -> "PhaseCtx":
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        return PhaseCtx(
+            graph=ledger.graph,
+            cursor_id=ledger.cursor_id,
+            step=ledger.step,
+            local_authorities=[ledger.local_behaviors],
+        )
+
+    @staticmethod
+    def _story_info_metadata(ledger: Ledger) -> dict[str, Any]:
+        ctx = ServiceManager._make_story_info_ctx(ledger)
+        affordances = do_advertise_info_channels(ledger.cursor, ctx=ctx)
+        if not affordances:
+            return {}
+
+        available_kinds = _unique_info_kinds(affordances)
+        info_state = InfoState(
+            version=ledger.step,
+            dirty_kinds=list(available_kinds),
+            available_kinds=list(available_kinds),
+        )
+        return {
+            "info_affordances": [
+                affordance.model_dump(mode="python") for affordance in affordances
+            ],
+            "info_state": info_state.model_dump(mode="python"),
+        }
+
+    @staticmethod
     def _build_runtime_envelope(
         ledger: Ledger,
         *,
         fragments: list[BaseFragment],
         metadata: dict[str, Any] | None = None,
     ) -> RuntimeEnvelope:
-        merged_metadata = dict(metadata or {})
+        merged_metadata = {
+            **ServiceManager._story_info_metadata(ledger),
+            **dict(metadata or {}),
+        }
         world_id = ServiceManager._resolve_world_id(ledger)
         if world_id is not None:
             merged_metadata.setdefault("world_id", world_id)
@@ -402,6 +441,9 @@ class ServiceManager:
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: "UserAuthInfo | None" = None,
+        kind: str | None = None,
+        kinds: list[str] | None = None,
+        query: dict[str, Any] | None = None,
     ) -> ProjectedState:
         """Return projected current-state sections for the active story."""
 
@@ -411,8 +453,20 @@ class ServiceManager:
             write_back=False,
             user_auth=user_auth,
         ) as session:
+            request = StoryInfoRequest(
+                kind=kind,
+                kinds=list(kinds or []),
+                query=query,
+            )
+            ctx = self._make_story_info_ctx(session.ledger)
+            state = do_get_story_info(session.ledger.cursor, ctx=ctx, request=request)
+
             projector = resolve_story_info_projector(session.ledger)
-            return projector.project(ledger=session.ledger)
+            fallback = filter_projected_state(
+                projector.project(ledger=session.ledger),
+                request=request,
+            )
+            return ProjectedState(sections=[*state.sections, *fallback.sections])
 
     @service_method(
         access=ServiceAccess.CLIENT,
@@ -759,6 +813,14 @@ class ServiceManager:
         """Implementation-specific system reset hook."""
 
         return reset_system(hard=hard)
+
+
+def _unique_info_kinds(affordances: list[InfoAffordance]) -> list[str]:
+    kinds: list[str] = []
+    for affordance in affordances:
+        if affordance.kind not in kinds:
+            kinds.append(affordance.kind)
+    return kinds
 
 
 __all__ = [

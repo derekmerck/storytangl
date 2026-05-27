@@ -366,6 +366,18 @@ def test_story_info_returns_world_authored_projected_sections(
         assert sections[0]["kind"] == "mystery"
         assert sections[0]["value"]["items"][0]["key"] == "Mood"
         assert sections[0]["value"]["items"][0]["value"] == "tense"
+
+        filtered = client.get(
+            "story/info",
+            params={"query": '{"kinds":["mystery"]}'},
+            headers=headers,
+        )
+        assert filtered.status_code == 200
+        assert filtered.json()["sections"][0]["section_id"] == "world_state"
+
+        empty = client.get("story/info", params={"kind": "map"}, headers=headers)
+        assert empty.status_code == 200
+        assert empty.json()["sections"] == []
     finally:
         client.close()
         World.clear_instances()

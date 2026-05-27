@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Iterable
 from uuid import UUID
@@ -77,6 +78,32 @@ def _normalize_profile_tokens(render_profile: str | Iterable[str] | None) -> set
 
 def _profile_has(render_profile: str | Iterable[str] | None, token: str) -> bool:
     return token.lower() in _normalize_profile_tokens(render_profile)
+
+
+def _parse_kinds(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _parse_info_query(value: str | None) -> dict[str, Any] | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=_bad_request_detail(exc),
+        ) from exc
+    if parsed is None:
+        return None
+    if not isinstance(parsed, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="story-info query must be a JSON object",
+        )
+    return parsed
 
 
 def _media_render_profile(render_profile: str | Iterable[str] | None) -> MediaRenderProfile:
@@ -389,10 +416,20 @@ async def get_story_info(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
+    kind: str | None = Query(default=None, description="Projected-state channel kind."),
+    kinds: str | None = Query(
+        default=None,
+        description="Comma-separated projected-state channel kinds.",
+    ),
+    query: str | None = Query(
+        default=None,
+        description="JSON-encoded opaque projected-state query descriptor.",
+    ),
 ):
     """Return runtime status details for the active story."""
 
     user_auth = resolve_user_auth(api_key, service_manager=service_manager)
+    parsed_query = _parse_info_query(query)
     try:
         result = _call_service_method(
             service_manager,
@@ -400,6 +437,9 @@ async def get_story_info(
             auth_context=user_auth,
             user_id=user_auth.user_id,
             user_auth=user_auth,
+            kind=kind,
+            kinds=_parse_kinds(kinds),
+            query=parsed_query,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_bad_request_detail(exc)) from exc

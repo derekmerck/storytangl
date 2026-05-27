@@ -8,7 +8,9 @@ def test_service_response_types_importable() -> None:
         AuthoringDiagnostic,
         BadgeListValue,
         FragmentStream,
+        InfoAffordance,
         InfoModel,
+        InfoState,
         ItemListValue,
         KvListValue,
         MediaNative,
@@ -19,6 +21,7 @@ def test_service_response_types_importable() -> None:
         RuntimeEnvelope,
         RuntimeInfo,
         ScalarValue,
+        StoryInfoRequest,
         UserSecret,
         coerce_runtime_info,
     )
@@ -27,7 +30,9 @@ def test_service_response_types_importable() -> None:
     assert BadgeListValue is not None
     assert AuthoringDiagnostic is not None
     assert FragmentStream is not None
+    assert InfoAffordance is not None
     assert InfoModel is not None
+    assert InfoState is not None
     assert ItemListValue is not None
     assert KvListValue is not None
     assert MediaNative is not None
@@ -38,6 +43,7 @@ def test_service_response_types_importable() -> None:
     assert RuntimeEnvelope is not None
     assert RuntimeInfo is not None
     assert ScalarValue is not None
+    assert StoryInfoRequest is not None
     assert UserSecret is not None
     assert coerce_runtime_info is not None
     assert DefaultStoryInfoProjector is not None
@@ -53,7 +59,9 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "BlockingMode",
         "DefaultStoryInfoProjector",
         "FragmentStream",
+        "InfoAffordance",
         "InfoModel",
+        "InfoState",
         "ItemListValue",
         "KvListValue",
         "MediaNative",
@@ -76,6 +84,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "ServiceSession",
         "ServiceWriteback",
         "StoryInfoProjector",
+        "StoryInfoRequest",
         "SystemInfo",
         "TableValue",
         "UserAuthInfo",
@@ -85,7 +94,11 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "WorldRegistry",
         "build_service_manager",
         "coerce_runtime_info",
+        "do_advertise_info_channels",
+        "do_get_story_info",
         "get_service_method_spec",
+        "on_advertise_info_channels",
+        "on_get_story_info",
         "service_method",
         "user_id_by_key",
     }
