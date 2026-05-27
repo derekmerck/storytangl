@@ -518,8 +518,16 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             if key in game.finding_status:
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
-        # verify_id: single move, only if an id is presented and not yet verified.
-        if case.id_card is not None and "id" not in game.finding_status:
+        # verify_id: identity-check move. Narrow to statuses where "does the id
+        # match the bearer?" is the relevant question: VALID (clears the doubt)
+        # or WRONG_HOLDER (confirms the mismatch). Mitigatable id issues like
+        # EXPIRED / BAD_DATE / MISSING_SEAL are date-or-seal problems, not
+        # holder problems, and need an id-mediation move that lands with B.2.
+        if (
+            case.id_card is not None
+            and case.id_status() in (CredentialStatus.VALID, CredentialStatus.WRONG_HOLDER)
+            and "id" not in game.finding_status
+        ):
             moves.append(CredentialsMove(kind="verify_id", target=""))
         # request_search: single move, once per case.
         if "search" not in game.finding_status:
@@ -643,6 +651,21 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         indication_value: str,
         detail: dict[str, object],
     ) -> RoundResult:
+        # Defensive guard: the menu filters to presented permits with a
+        # mitigatable status, but ``GameHandler.receive_move`` does not call
+        # ``validate_move``. Skip rather than corrupt finding_status if an
+        # off-menu payload arrives. (Off-menu clears against valid/crime/missing
+        # permits are already idempotent for derive thanks to its short-circuits,
+        # but explicit validation keeps the audit trail honest.)
+        permit = next(
+            (t for t in game.active_case.packet if t.indication.value == indication_value),
+            None,
+        )
+        if permit is None or permit.status.is_valid or permit.status.is_crime:
+            detail["outcome"] = "request_document_not_applicable"
+            detail["target_indication"] = indication_value
+            return RoundResult.CONTINUE
+
         # B.1 assumes the candidate complies; the mitigatable finding is cleared.
         # Compliance (declines path) is part of B.2.
         game.finding_status[indication_value] = "cleared"
@@ -655,13 +678,19 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game: CredentialsGame,
         detail: dict[str, object],
     ) -> RoundResult:
+        # verify_id specifically answers "does the id match the bearer?", so it
+        # only ever clears for VALID or confirms for WRONG_HOLDER. Other id
+        # statuses (no id presented, expired, bad date) need different mediation
+        # (B.2's id-replacement path) and shouldn't have surfaced this move.
         status = game.active_case.id_status()
-        if status is None or status.is_valid:
+        if status is CredentialStatus.VALID:
             game.finding_status["id"] = "cleared"
             detail["outcome"] = "id_verified_clean"
-        else:
+        elif status is CredentialStatus.WRONG_HOLDER:
             game.finding_status["id"] = "confirmed"
             detail["outcome"] = "id_verified_problem"
+        else:
+            detail["outcome"] = "verify_id_not_applicable"
         return RoundResult.CONTINUE
 
     def _resolve_request_search(
@@ -742,11 +771,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 ContentFragment(content="The candidate produces a corrected copy."),
             ]
         if action == "verify_id":
-            line = (
-                "The id matches the bearer."
-                if notes.get("outcome") == "id_verified_clean"
-                else "The id does not match the bearer."
-            )
+            outcome = notes.get("outcome")
+            if outcome == "id_verified_clean":
+                line = "The id matches the bearer."
+            elif outcome == "id_verified_problem":
+                line = "The id does not match the bearer."
+            else:
+                line = "The id offers no clear answer to the bearer question."
             return [
                 ContentFragment(content="You verify the bearer's identity."),
                 ContentFragment(content=line),

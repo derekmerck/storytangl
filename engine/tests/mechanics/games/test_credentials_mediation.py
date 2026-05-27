@@ -91,6 +91,30 @@ class TestMediationAvailability:
 
         assert "verify_id" not in _move_kinds(handler, game)
 
+    def test_verify_id_skipped_for_mitigatable_id_status(self) -> None:
+        # EXPIRED is a date issue, not a holder mismatch; verify_id is the
+        # wrong move for it (id-renewal mediation is deferred to B.2).
+        case = CredentialCase(purpose=IND.TRAVEL, id_card=_id(S.EXPIRED))
+        game, handler = _game(case)
+        handler.receive_move(game, ("inspect", "passport"))
+
+        assert "verify_id" not in _move_kinds(handler, game)
+
+    def test_request_document_off_menu_target_is_noop(self) -> None:
+        # An off-menu request_document for an indication with no mitigatable
+        # permit (here, a forged work permit) must NOT clear finding_status.
+        case = CredentialCase(
+            purpose=IND.WORK, id_card=_id(), packet=[_permit(IND.WORK, S.FORGED)]
+        )
+        game, handler = _game(case)
+        handler.receive_move(game, ("inspect", "passport"))
+        # Forced off-menu invocation (the menu would not offer this).
+        handler.receive_move(game, ("request_document", IND.WORK.value))
+
+        # finding_status not mutated; expected disposition still ARREST.
+        assert IND.WORK.value not in game.finding_status
+        assert game.expected_disposition(case) is D.ARREST
+
     def test_each_mediation_move_offered_once_per_case(self) -> None:
         case = CredentialCase(
             purpose=IND.WORK, id_card=_id(), packet=[_permit(IND.WORK, S.MISSING_SEAL)]
