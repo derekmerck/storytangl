@@ -36,6 +36,11 @@ scenes:
         kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
         location_name: "Inside Building"
         light: true
+        treasure_deposit_site: true
+        magic_anchors:
+          - word: xyzzy
+            target: cobble_crawl
+            journal_text: "A hollow voice says \"Plugh.\" The world folds around you."
         content: |
           You are inside a building, a well house for a large spring.
         links:
@@ -102,6 +107,10 @@ scenes:
       cobble_crawl:
         kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
         location_name: "In Cobble Crawl"
+        magic_anchors:
+          - word: xyzzy
+            target: building
+            journal_text: "A hollow voice says \"Plugh.\" You are back in the well house."
         content: |
           You are crawling over cobbles in a low passage. There is a dim light
           at the east end of the passage.
@@ -109,3 +118,32 @@ scenes:
           It is now pitch dark. If you proceed you will likely fall into a pit.
         links:
           east: below_grate
+          west: hall_of_mists
+
+      hall_of_mists:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "In Hall of Mists"
+        content: |
+          You are at one end of a vast hall stretching forward out of sight to
+          the west. Nearby, a wide stone staircase leads upward.
+        dark_text: |
+          It is now pitch dark. If you proceed you will likely fall into a pit.
+        movement_hazards:
+          - direction: up
+            carried_asset: gold_nugget
+            outcome: block
+            journal_text: "I'm not sure you'll be able to get up it with what you're carrying."
+        links:
+          east: cobble_crawl
+          up: top_of_small_pit
+
+      top_of_small_pit:
+        kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"
+        location_name: "At Top of Small Pit"
+        content: |
+          At your feet is a small pit breathing traces of white mist. Rough
+          stone steps lead back down.
+        dark_text: |
+          It is now pitch dark. If you proceed you will likely fall into a pit.
+        links:
+          down: hall_of_mists

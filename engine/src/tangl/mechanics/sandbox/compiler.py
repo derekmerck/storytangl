@@ -52,6 +52,8 @@ class SandboxCompiledAssetType(AssetType):
     turn_off_text: str | None = None
     take_text: str | None = None
     drop_text: str | None = None
+    treasure_score: int = 0
+    treasure_loss_penalty: int = 0
     interactions: list[SandboxInteraction] = Field(default_factory=list)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
 
