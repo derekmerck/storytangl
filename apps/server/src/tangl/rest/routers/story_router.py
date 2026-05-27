@@ -25,7 +25,7 @@ from tangl.service.media import (
     MediaRenderProfile,
     media_fragment_to_payload,
 )
-from tangl.service.response import RuntimeEnvelope, RuntimeInfo
+from tangl.service.response import JsonValue, RuntimeEnvelope, RuntimeInfo
 from tangl.service.world_registry import resolve_world
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -86,7 +86,7 @@ def _parse_kinds(value: str | None) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
-def _parse_info_query(value: str | None) -> dict[str, Any] | None:
+def _parse_info_query(value: str | None) -> dict[str, JsonValue] | None:
     if value is None or not value.strip():
         return None
     try:

@@ -41,6 +41,7 @@ from .exceptions import (
     ValidationError,
 )
 from .response import (
+    JsonValue,
     ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
@@ -486,7 +487,7 @@ class RemoteServiceManager(ServiceManager):
         user_auth: UserAuthInfo | None = None,
         kind: str | None = None,
         kinds: list[str] | None = None,
-        query: dict[str, Any] | None = None,
+        query: dict[str, JsonValue] | None = None,
     ) -> ProjectedState:
         self._validate_user_auth(user_id=user_id, user_auth=user_auth)
         self._check_bound_user(user_id)

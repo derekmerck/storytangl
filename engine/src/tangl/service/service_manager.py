@@ -26,6 +26,7 @@ from .media import resolve_world_media
 from .response import (
     InfoAffordance,
     InfoState,
+    JsonValue,
     PreflightReport,
     ProjectedState,
     RuntimeEnvelope,
@@ -443,7 +444,7 @@ class ServiceManager:
         user_auth: "UserAuthInfo | None" = None,
         kind: str | None = None,
         kinds: list[str] | None = None,
-        query: dict[str, Any] | None = None,
+        query: dict[str, JsonValue] | None = None,
     ) -> ProjectedState:
         """Return projected current-state sections for the active story."""
 
@@ -816,11 +817,7 @@ class ServiceManager:
 
 
 def _unique_info_kinds(affordances: list[InfoAffordance]) -> list[str]:
-    kinds: list[str] = []
-    for affordance in affordances:
-        if affordance.kind not in kinds:
-            kinds.append(affordance.kind)
-    return kinds
+    return list(dict.fromkeys(affordance.kind for affordance in affordances))
 
 
 __all__ = [

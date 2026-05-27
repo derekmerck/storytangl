@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -331,9 +332,65 @@ def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_u
 
 
 def test_story_info_returns_world_authored_projected_sections(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = projected_story_client
+
+    response = client.get("story/info", headers=headers)
+    assert response.status_code == 200
+    payload = response.json()
+    sections = payload.get("sections")
+    assert isinstance(sections, list)
+    assert sections[0]["section_id"] == "world_state"
+    assert sections[0]["kind"] == "mystery"
+    assert sections[0]["value"]["items"][0]["key"] == "Mood"
+    assert sections[0]["value"]["items"][0]["value"] == "tense"
+
+
+def test_story_info_filters_sections_by_query_and_kind(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = projected_story_client
+
+    filtered = client.get(
+        "story/info",
+        params={"query": '{"kinds":["mystery"]}'},
+        headers=headers,
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["sections"][0]["section_id"] == "world_state"
+
+    empty = client.get("story/info", params={"kind": "map"}, headers=headers)
+    assert empty.status_code == 200
+    assert empty.json()["sections"] == []
+
+
+def test_story_info_rejects_invalid_query_json(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = projected_story_client
+
+    bad_json = client.get(
+        "story/info",
+        params={"query": "{"},
+        headers=headers,
+    )
+    assert bad_json.status_code == 400
+
+    non_object_query = client.get(
+        "story/info",
+        params={"query": '["mystery"]'},
+        headers=headers,
+    )
+    assert non_object_query.status_code == 400
+    assert "JSON object" in non_object_query.json()["detail"]
+
+
+@pytest.fixture()
+def projected_story_client(
     tmp_path: Path,
     monkeypatch,
-) -> None:
+) -> Iterator[tuple[TestClient, dict[str, str]]]:
     world_label = _write_story_bundle(tmp_path, with_projector=True)
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
@@ -357,42 +414,7 @@ def test_story_info_returns_world_authored_projected_sections(
         )
         assert create.status_code == 200
 
-        response = client.get("story/info", headers=headers)
-        assert response.status_code == 200
-        payload = response.json()
-        sections = payload.get("sections")
-        assert isinstance(sections, list)
-        assert sections[0]["section_id"] == "world_state"
-        assert sections[0]["kind"] == "mystery"
-        assert sections[0]["value"]["items"][0]["key"] == "Mood"
-        assert sections[0]["value"]["items"][0]["value"] == "tense"
-
-        filtered = client.get(
-            "story/info",
-            params={"query": '{"kinds":["mystery"]}'},
-            headers=headers,
-        )
-        assert filtered.status_code == 200
-        assert filtered.json()["sections"][0]["section_id"] == "world_state"
-
-        empty = client.get("story/info", params={"kind": "map"}, headers=headers)
-        assert empty.status_code == 200
-        assert empty.json()["sections"] == []
-
-        bad_json = client.get(
-            "story/info",
-            params={"query": "{"},
-            headers=headers,
-        )
-        assert bad_json.status_code == 400
-
-        non_object_query = client.get(
-            "story/info",
-            params={"query": '["mystery"]'},
-            headers=headers,
-        )
-        assert non_object_query.status_code == 400
-        assert "JSON object" in non_object_query.json()["detail"]
+        yield client, headers
     finally:
         client.close()
         World.clear_instances()

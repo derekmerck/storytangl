@@ -90,7 +90,7 @@ surface is small enough to settle with its immediate neighbors.
 | `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | done (typed; gathered through service-info dispatch) | bundles populate as needed |
 | `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | done | bundles choose descriptor contents |
 | `metadata.info_state: InfoState` typed | P1 | done (nested type + dirty-kind cache hints) | partial (typed; v1 conservatively marks advertised kinds dirty) | add finer dirty tracking only when a client needs caching |
-| `/story/info` accepts `kind` + `query` params | P1 | done client-side | done (same endpoint; query descriptor routing) | add bundle-specific providers |
+| `/story/info` accepts `kind`/`kinds` + `query` params | P1 | done client-side | done (same endpoint; singular/plural kind filters + query descriptor routing) | add bundle-specific providers |
 | HTTP body field `edge_id` | P1 | done | done | — |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
 | §1.6 Info channels graduation to Tier S | P1 | done | partial | gated on CLI reference port implementing the `?`/slash fallback |
