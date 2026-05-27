@@ -87,10 +87,10 @@ surface is small enough to settle with its immediate neighbors.
 | Typed `InterpretationFragment` | P1 | done (renders `result` / `text` / `message`) | untyped | engine PR |
 | `cost_previews: list[CostPreview]` (plural) | P1 | done (choice display) | not_started | engine PR |
 | `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
-| `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | partial (emits in some bundles, untyped) | engine PR: typed `InfoAffordance` model |
-| `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | partial | engine PR: declare the field; bundles populate as needed |
-| `metadata.info_state: InfoState` typed | P1 | done (nested type + dirty-kind cache hints) | not_started | engine PR: emit nested `info_state` |
-| `/story/info` accepts `kind` + `query` params | P1 | done client-side | partial (basic endpoint exists; no query routing) | API + engine PR (see §E) |
+| `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | done (typed; gathered through service-info dispatch) | bundles populate as needed |
+| `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | done | bundles choose descriptor contents |
+| `metadata.info_state: InfoState` typed | P1 | done (nested type + dirty-kind cache hints) | partial (typed; v1 conservatively marks advertised kinds dirty) | add finer dirty tracking only when a client needs caching |
+| `/story/info` accepts `kind`/`kinds` + `query` params | P1 | done client-side | done (same endpoint; singular/plural kind filters + query descriptor routing) | add bundle-specific providers |
 | HTTP body field `edge_id` | P1 | done | done | — |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
 | §1.6 Info channels graduation to Tier S | P1 | done | partial | gated on CLI reference port implementing the `?`/slash fallback |
@@ -159,7 +159,7 @@ implements.
 |---|---|---|---|---|
 | `/story/do` | POST | accepts `ChoiceRequest{edge_id, payload}`; returns `RuntimeEnvelope` | accepts `{edge_id, payload}` | type response |
 | `/story/update` | GET | returns `RuntimeEnvelope` typed | partial | type response |
-| `/story/info` | GET | accepts `kind?` and `query?` params (JSON-encoded descriptor); returns `ProjectedState` | basic endpoint exists | add `query` param routing; document descriptor semantics |
+| `/story/info` | GET | accepts `kind?`, `kinds?`, and `query?` params (JSON-encoded descriptor); returns `ProjectedState` | done | add bundle-specific providers |
 | `/system/info` | GET | public; rate-limited | done | — |
 | `/auth/whoami` | GET | returns current `Principal` | not_started | see auth thread |
 | `/auth/keys` (CRUD) | various | API key lifecycle | not_started | see auth thread |

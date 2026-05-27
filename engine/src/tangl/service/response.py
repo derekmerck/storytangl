@@ -89,6 +89,58 @@ class RuntimeEnvelope(InfoModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+JsonValue: TypeAlias = PydanticJsonValue
+
+
+class InfoAffordance(InfoModel):
+    """Advisory story-info channel advertised to clients."""
+
+    kind: str
+    label: str | None = None
+    shortcuts: list[str] = Field(default_factory=list)
+    query: dict[str, JsonValue] | None = None
+
+
+class InfoState(InfoModel):
+    """Lightweight story-info availability marker for one envelope."""
+
+    version: int
+    dirty_kinds: list[str] = Field(default_factory=list)
+    available_kinds: list[str] = Field(default_factory=list)
+
+
+class StoryInfoRequest(InfoModel):
+    """Opaque projected-state request descriptor from a client."""
+
+    kind: str | None = None
+    kinds: list[str] = Field(default_factory=list)
+    query: dict[str, JsonValue] | None = None
+
+    def requested_kinds(self) -> list[str]:
+        """Return requested info kinds in stable first-seen order."""
+        requested: list[str] = []
+
+        def append(value: object) -> None:
+            if not isinstance(value, str) or not value:
+                return
+            if value not in requested:
+                requested.append(value)
+
+        append(self.kind)
+        for kind in self.kinds:
+            append(kind)
+
+        query = self.query or {}
+        query_kinds = query.get("kinds")
+        if isinstance(query_kinds, list):
+            for kind in query_kinds:
+                append(kind)
+
+        query_kind = query.get("kind")
+        append(query_kind)
+        return requested
+
+
 class SystemInfo(InfoModel):
     engine: str
     version: str
@@ -140,9 +192,6 @@ class WorldInfo(InfoModel):
     label: str
     title: str | None = None
     author: str | None = None
-
-
-JsonValue: TypeAlias = PydanticJsonValue
 
 
 class AuthoringDiagnostic(InfoModel):
@@ -307,8 +356,11 @@ __all__ = [
     "AuthoringDiagnostic",
     "BadgeListValue",
     "FragmentStream",
+    "InfoAffordance",
     "InfoModel",
+    "InfoState",
     "ItemListValue",
+    "JsonValue",
     "KvListValue",
     "KvRow",
     "MediaNative",
@@ -324,6 +376,7 @@ __all__ = [
     "SectionValue",
     "SystemInfo",
     "TableValue",
+    "StoryInfoRequest",
     "UserInfo",
     "UserSecret",
     "WorldInfo",

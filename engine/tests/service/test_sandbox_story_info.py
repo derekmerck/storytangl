@@ -12,6 +12,7 @@ from tangl.mechanics.sandbox import (
     LightSourceFacet,
     LockableFacet,
     OpenableFacet,
+    SandboxExit,
     SandboxFixture,
     SandboxLocation,
     SandboxMob,
@@ -20,8 +21,16 @@ from tangl.mechanics.sandbox import (
     SwitchableFacet,
 )
 from tangl.mechanics.sandbox.story_info import SandboxStoryInfoProjector
-from tangl.service.response import ItemListValue, KvListValue, ProjectedSection
+from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.response import (
+    ItemListValue,
+    KvListValue,
+    ProjectedSection,
+    StoryInfoRequest,
+    TableValue,
+)
 from tangl.story.concepts.asset import AssetType
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
 
 
@@ -172,3 +181,118 @@ def test_sandbox_story_info_hides_suppressed_surroundings_but_keeps_inventory() 
     assert ("Visibility", "limited") in [
         (item.key, item.value) for item in sections["sandbox_location"].value.items
     ]
+
+
+def test_sandbox_advertises_map_info_channel() -> None:
+    graph = Graph(label="tiny_cave")
+    road = SandboxLocation(label="road", location_name="End of Road")
+    graph.add(road)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
+
+    affordances = do_advertise_info_channels(road, ctx=ctx)
+
+    assert [affordance.kind for affordance in affordances] == [
+        "world_time",
+        "location",
+        "inventory",
+        "map",
+        "presence",
+        "exits",
+    ]
+    map_affordance = next(
+        affordance for affordance in affordances if affordance.kind == "map"
+    )
+    assert map_affordance.query == {"kinds": ["map"], "scope": "known"}
+
+
+def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
+    graph = Graph(label="tiny_cave")
+    road = SandboxLocation(
+        label="road",
+        location_name="End of Road",
+        links={
+            "east": "building",
+            "down": SandboxExit(target="below_grate", through="grate"),
+        },
+        fixtures=[
+            SandboxFixture(
+                label="grate",
+                name="steel grate",
+                openable=OpenableFacet(is_open=False),
+                lockable=LockableFacet(is_locked=True),
+            )
+        ],
+    )
+    building = SandboxLocation(label="building", location_name="Inside Building")
+    below = SandboxLocation(label="below_grate", location_name="Below the Grate")
+    for item in (road, building, below):
+        graph.add(item)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
+
+    projected = do_get_story_info(
+        road,
+        ctx=ctx,
+        request=StoryInfoRequest(kind="map"),
+    )
+    sections = _section_by_id(projected.sections)
+
+    assert set(sections) == {
+        "sandbox_map_summary",
+        "sandbox_map_nodes",
+        "sandbox_map_edges",
+    }
+    summary = sections["sandbox_map_summary"].value
+    assert isinstance(summary, KvListValue)
+    assert [(item.key, item.value) for item in summary.items] == [
+        ("Current", "End of Road"),
+        ("Known locations", 3),
+        ("Known exits", 2),
+    ]
+    assert _item_labels(sections["sandbox_map_nodes"]) == [
+        "Below the Grate",
+        "Inside Building",
+        "End of Road",
+    ]
+    edges = sections["sandbox_map_edges"].value
+    assert isinstance(edges, TableValue)
+    assert edges.columns == ["From", "Direction", "To", "State"]
+    assert edges.rows == [
+        ["End of Road", "down", "Below the Grate", "locked, closed"],
+        ["End of Road", "east", "Inside Building", "open"],
+    ]
+
+
+def test_sandbox_map_honors_visibility_suppression() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(
+        label="dark_cave",
+        location_name="Dark Cave",
+        links={"west": "deeper_cave"},
+    )
+    deeper = SandboxLocation(label="deeper_cave", location_name="Deeper Cave")
+    for item in (scope, cave, deeper):
+        graph.add(item)
+    scope.add_child(cave)
+    scope.add_child(deeper)
+    ledger = Ledger.from_graph(graph, entry_id=cave.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave.uid, step=ledger.step)
+
+    projected = do_get_story_info(
+        cave,
+        ctx=ctx,
+        request=StoryInfoRequest(kind="map"),
+    )
+    sections = _section_by_id(projected.sections)
+
+    assert _item_labels(sections["sandbox_map_nodes"]) == ["Dark Cave"]
+    edges = sections["sandbox_map_edges"].value
+    assert isinstance(edges, TableValue)
+    assert edges.rows == []
