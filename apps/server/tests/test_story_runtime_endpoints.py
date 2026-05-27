@@ -378,6 +378,21 @@ def test_story_info_returns_world_authored_projected_sections(
         empty = client.get("story/info", params={"kind": "map"}, headers=headers)
         assert empty.status_code == 200
         assert empty.json()["sections"] == []
+
+        bad_json = client.get(
+            "story/info",
+            params={"query": "{"},
+            headers=headers,
+        )
+        assert bad_json.status_code == 400
+
+        non_object_query = client.get(
+            "story/info",
+            params={"query": '["mystery"]'},
+            headers=headers,
+        )
+        assert non_object_query.status_code == 400
+        assert "JSON object" in non_object_query.json()["detail"]
     finally:
         client.close()
         World.clear_instances()

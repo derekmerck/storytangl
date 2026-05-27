@@ -497,7 +497,7 @@ keys on `RuntimeEnvelope`:
 ```python
 class InfoAffordance(BaseModel):
     kind: str               # stable info-channel identifier
-    label: str              # short, player-facing
+    label: str | None = None # short, player-facing; clients fall back to kind
     shortcuts: list[str]    # CLI/keyboard aliases
     query: dict[str, Any] | None = None
     # Opaque query descriptor the backend interprets.

@@ -167,10 +167,13 @@ Story-info has two service dispatch tasks:
   `StoryInfoRequest`.
 
 The fulfillment task is additive: several handlers may contribute sections for
-a multi-kind request. Handlers should treat projected state as disclosed state,
-not authority state. A sandbox map may show known rooms and visible exits; a
-credentials loop may show presented documents and public rules. Neither should
-expose hidden truth, future schedules, or backend-only decision state.
+a multi-kind request. V1 does not deduplicate `section_id` values or apply
+priority-based override semantics, so providers should use non-overlapping
+section ids unless they intentionally want repeated sections. Handlers should
+treat projected state as disclosed state, not authority state. A sandbox map may
+show known rooms and visible exits; a credentials loop may show presented
+documents and public rules. Neither should expose hidden truth, future
+schedules, or backend-only decision state.
 
 Any hotspot, edge reference, or action hint carried in a projected section is
 advisory. Committing a move still goes through ordinary action selection.
