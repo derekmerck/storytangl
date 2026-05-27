@@ -2,7 +2,8 @@
 
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
 (A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
-lazy offer roster, 2026-05-22); Phases B/C/D designed below as overlays  
+lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
+2026-05-23); Phases B.2/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -533,6 +534,16 @@ rule set, so an author can *see* which dispositions and failure modes are
 reachable today before committing a day's rules. It is an authoring/validation
 aid for rule sets, not a runtime component.
 
+**The rules are also a narrative surface.** In Pope's *Papers, Please*, daily
+rule changes carry inscrutable political messages: who is currently allied or
+belligerent, how much the regime trusts its own people, admissibility wielded as
+a hammer against political foes. Different checkpoints can carry different
+state-vs-local-enforcement variation, governance subtly diverging from rule. The
+mechanic gives the author a way to *say something* through bureaucratic minutiae
+alone -- the rules are the politics. This is the dramatic upside of the
+data-driven design: changing a `Restrictions` instance between shifts is
+authorially equivalent to a regime memo.
+
 ### A.6 Packet-as-tokens (when structure is needed)
 
 When narrative-string findings are no longer enough, the structured packet model
@@ -549,20 +560,125 @@ rather than rebuilding tokens.
 
 ## Phase B: mediation moves
 
-Add a `"mediate"` move kind (`request_document` / `request_search` /
-`verify_id`). Override two methods in `CredentialsGameHandler`:
-`get_available_moves` (super + mediation targets) and `resolve_round` (handle
-`"mediate"`, else `super()`); the picking base is untouched. Add a per-case
-`finding_status` working dict (possible -> cleared / confirmed) reset by
-`advance_case`, which `derive_disposition` reads (e.g. a declined search becomes a
-deny). Port the move set and the discrepancy / mediation table from top-level
-`enums.py` and `notes.md`.
+Phase B adds follow-up moves that can clear or confirm findings before a
+disposition. The work splits into two increments because contraband mediation
+has enough independent design surface to warrant its own pass.
 
-**Optional enabling refactor:** before Phase B, change
-`PickingGameHandler.resolve_round` from `if inspect / elif decide / else raise`
-to dispatch through a `dict[str, resolver]` (or a `resolve_move_kind` hook with
-inspect/decide defaults). This turns "add a move kind" into a registration for
-*any* picking game, keeping B and C as true overlays.
+### B.1 — Core mediation (v1 increment, LANDED 2026-05-23)
+
+Adds three move kinds and a per-case ``finding_status: dict[str, str]``
+(values: ``"cleared"`` / ``"confirmed"``; reset by ``advance_case``).
+
+- **``request_document``** — per-target fanout, one Action per *presented*
+  document whose token has a mitigatable status. Applying clears that doc's
+  finding. Maps to ``accepts.kind="pieces"`` in the rendering contract
+  (`bundles/credentials/EXTENSIONS.md`).
+- **``verify_id``** — single Action, applicable when an id is presented. Clears
+  for VALID; confirms (records the crime in the audit trail) for WRONG_HOLDER.
+- **``request_search``** — single Action; reveals concealed contraband if any.
+
+``derive_disposition`` consults ``finding_status``: a cleared mitigatable doc
+finding contributes PASS instead of DENY; everything else as before.
+
+Enabled by a small base refactor: ``PickingGameHandler.resolve_round``
+dispatches through a kind-keyed registry (with inspect/decide as defaults), so
+the new kinds register cleanly without overriding ``resolve_round`` (and Phase C
+moves follow the same pattern).
+
+**v1 assumptions (deferred, see B.2):**
+- *Missing*-document requests are out of v1: ``request_document`` only targets
+  *presented-but-invalid* docs. Missing-doc requests need a different surface
+  (pick from "required-but-absent" indications).
+- All candidates comply truthfully with requests; no "declines mediation" path.
+
+### B.2 — Contraband mediation (deferred follow-up)
+
+Beyond ``request_search`` (which reveals concealment), full contraband mediation
+needs a family of moves whose interactions span packet validity, possession
+state, and candidate willingness. The matrix below is the spec to build against
+when B.2 lands.
+
+**Packet validity taxonomy** (for the contraband's permit specifically):
+
+- **valid** — covers the contraband; everything in order.
+- **incomplete** — required document is missing entirely (can be produced).
+- **invalid** — present but mitigatably wrong (missing seal, expired, etc.);
+  can't be repaired at the desk.
+- **illegal** — forged / wrong-holder (the document itself is criminal).
+
+**Mediation moves B.2 introduces** (in addition to ``request_search`` from B.1):
+
+- ``request_complete`` — ask the candidate to produce the missing piece (for
+  incomplete packets). Subsumes the "missing-doc request surface" deferred from
+  B.1.
+- ``request_disclosure`` — the polite "anything to declare?" ask. Subject to
+  the candidate's compliance (the "oops, I forgot I had this in my pocket"
+  path).
+- ``request_relinquish`` — ask the candidate to yield declared contraband.
+
+**Declared contraband** — what the player can do about visible possession:
+
+| Packet | Outcomes available |
+|---|---|
+| valid | allow |
+| incomplete | ``request_complete``, ``request_relinquish``, or deny |
+| invalid | ``request_relinquish`` or deny |
+| illegal | arrest |
+
+**Concealed contraband** — outcomes depend on how (or whether) it surfaces:
+
+| Packet | If disclosed / discovered |
+|---|---|
+| valid | ``request_disclosure`` (the "oops" path) → becomes declared+valid → allow |
+| incomplete | ``request_complete``, ``request_relinquish``, or deny |
+| invalid | confusing — probably arrest |
+| illegal | arrest regardless of discovery |
+
+Unsearched concealment is invisible to inspection; the player decides on
+visible state alone.
+
+**Multiple contraband types.** A candidate may carry several restricted items;
+each is assessed against its own permit category and the worst outcome
+dominates.
+
+**Cross-product examples** (one indication's permit interacting with a
+different contraband):
+
+| Candidate | Outcome |
+|---|---|
+| medical permit (drugs) + open weapon (no weapon permit) | yield, ``request_complete``, or deny |
+| medical permit + concealed weapon | arrest |
+| medical permit + weapon that requires no permit | accept |
+| medical permit + concealed weapon that requires no permit | **[open]** |
+
+**Valid paperwork, nothing declared, but rules allow possible unpermitted
+contraband.** The gatekeeper can always request a search; the candidate may
+refuse (→ deny) or comply (search runs → arrest if anything is found, allow if
+clean).
+
+**Severity is environmental.** The arrest/deny boundary in several rows bends
+with **environment, discretion, and bribery** (a Phase C cross-cut). B.2
+computes a base disposition; Phase C composes the override on top.
+
+**Open questions (updated):**
+
+1. ~~Concealed contraband + valid permit~~ — *resolved:* takes the
+   ``request_disclosure`` path; if voluntarily disclosed → allow as
+   declared+valid. (Sub-question still open: if disclosure is refused or lied
+   and search forces the reveal, is the "oops" forgiveness still extended, or
+   does it escalate?)
+2. ~~Forged / wrong-holder permit + no actual contraband~~ — *resolved:* the
+   illegal-packet rule applies regardless of possession → arrest.
+3. Mitigatable-invalid permit + no contraband — does an unused-but-invalid
+   paper deny, or pass? *(Still open.)*
+4. **New:** concealed contraband whose category requires *no* permit — is the
+   concealment-when-not-required itself a violation, or moot?
+
+**B.2 ships, when it lands:** the three new move kinds above
+(``request_complete`` / ``request_disclosure`` / ``request_relinquish``); the
+declines-mediation axis (per-case ``compliant: bool`` or per-failure-mode
+willingness); and per-indication worst-case composition across multiple
+contraband items. The Phase C severity overlay layers on top.
 
 ---
 
@@ -636,6 +752,95 @@ right stamps -- which is the degrade / generate machinery applied from the playe
 side (inspect -> assess -> remediate -> re-assess). That is a composite loop
 (shell = shop economy, spike = legality assessment), noted as a future direction
 (not v1 scope) and a natural wing of the unified showcase world.
+
+### Worked third skin: Hall Monitor (evolving daily rules)
+
+Another reskin, exercising a dimension Chop Shop doesn't really test: **rules
+that vary day-by-day with explicit exceptions**. Border rules and chop-shop
+permits are mostly static catalogs of who-needs-what; the Hall Monitor's daily
+rules compose several orthogonal exception axes on top of the indication
+catalog:
+
+- **attribute thresholds** -- "no one with a grade lower than a B is allowed to
+  go to the bathroom"
+- **calendar / event exceptions** -- "anyone can go to the gym for the pep
+  rally in the afternoon without a note because it's a Friday"
+- **documented exemptions** -- "students using inhalers should have
+  documentation of need on file with the nurses office"
+
+Each candidate (student) has attributes (grade, schedule, prior referrals) and
+a purpose (bathroom / nurse / gym / class). The day's rules combine the
+restriction map with these exception axes; the same `derive_disposition` shape
+applies, with the rule lookup parameterized over more axes than the border
+case. Locker searches and principal referrals reskin ``request_search`` and
+ARREST respectively.
+
+Mechanically, this is the strongest validation of the rules-as-authored-story-lever
+framing (A.5): when the rules are mid-week school schedules with calendar
+carve-outs and per-student exemptions, the per-day rule churn isn't a corner
+case -- it's the gameplay. The same framework supports authoritarian-dystopia
+fiction at any scale (checkpoint, chop shop, hallway, badge desk, comp tier,
+exam proctor, customs office); the engine is fundamentally a **bureaucratic
+gatekeeping kernel**.
+
+---
+
+## Beyond the phased roadmap: cross-shift continuity and recurring candidates
+
+A procedural candidate today is generated for one shift and disappears at
+terminal. A *real* checkpoint story wants candidates to return: the
+procedurally-sampled traveler you wrongly admitted on day 1 walks back through
+your line on day 4 and recognizes you; the hand-crafted recurring character
+appears at multiple checkpoints; the unjustly-denied applicant comes back with
+new paperwork. This needs **cross-shift continuity** the engine doesn't have
+today.
+
+The seams already exist; persistence is the missing piece:
+
+- **Identity persistence.** A `CredentialCaseResult` already captures one
+  decided candidate. Continuity needs a stable *candidate id* (and the option
+  to persist a materialized `CredentialCase` snapshot keyed to that id).
+- **Recurrence as a pinned offer.** `ScenarioOffer.pinned_case` already lets a
+  shift pin a fully-authored candidate. A recurring candidate is a pinned
+  offer whose payload carries prior `CredentialCaseResult`s alongside the
+  current packet.
+- **Prior-encounter context on the case.** A `prior_encounters:
+  list[CredentialCaseResult]` field (on `CredentialCase` or a "candidate
+  dossier" wrapper). `derive_disposition` and `expected_disposition` read it
+  for recognition-driven severity bending; `get_journal_fragments` narrates
+  "you've seen this one before."
+
+**Promotion paths** (procedural → recurring):
+
+- *Wrongly admitted.* A procedural candidate dispositioned ALLOW that should
+  have been DENY/ARREST is promoted into a future shift's pinned offers as a
+  returning narrative thread -- the smuggler whose forged permit you missed
+  comes back to blackmail you (the engine equivalent of Pope's recurring
+  political consequence).
+- *Unjustly denied.* A procedural candidate denied who *should* have been
+  allowed returns with a grievance, new paperwork, or as a sympathetic NPC in
+  another scene.
+- *Hand-crafted recurring.* Authored candidates pinned across multiple shifts;
+  their `prior_encounters` accumulate naturally as they're processed.
+
+**Cross-cuts with the existing phases:**
+
+- This is where **Phase C's "context bends severity"** gets its sharpest
+  narrative edge: the context is *the player's own past mistakes catching up*.
+  Whitelist-by-political-favor becomes blackmail-by-another-name when the
+  candidate carries a `prior_encounters` record of your error.
+- **`ShiftSpec`** (A.3) gains a `recurrences: list[CandidateDossier]` field
+  (or a hook predicate) that pins prior candidates back in when conditions
+  match (region, days-since, prior-disposition).
+- The promotion **bridges procedural and authored** without breaking the
+  funnel: a recurring candidate is just a Tier 1 offer enriched with prior
+  context; the rest of the engine never learns whether it was sampled or
+  authored.
+
+This is design intent only; no implementation in scope. Worth capturing now
+because it's a cross-shift persistence step the engine doesn't currently
+support, and the seams (`ScenarioOffer.pinned_case`, `CredentialCase`,
+`CredentialCaseResult`) all need to admit the continuity story when this lands.
 
 ---
 

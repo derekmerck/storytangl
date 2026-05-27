@@ -169,17 +169,27 @@ def _worse(a: CredentialDisposition, b: CredentialDisposition) -> CredentialDisp
     return a if _DISPOSITION_SEVERITY[a] >= _DISPOSITION_SEVERITY[b] else b
 
 
-def _assess_credential(token: CredentialToken | None) -> CredentialDisposition:
+def _assess_credential(
+    token: CredentialToken | None,
+    finding_status: dict[str, str] | None = None,
+) -> CredentialDisposition:
     if token is None:
         return CredentialDisposition.DENY  # missing -> produce it (mitigatable)
     if token.status.is_valid:
         return CredentialDisposition.PASS
     if token.status.is_crime:
-        return CredentialDisposition.ARREST  # forged
-    return CredentialDisposition.DENY  # missing seal / bad date / expired
+        return CredentialDisposition.ARREST  # forged; crimes not mediatable in B.1
+    # Mitigatable (missing seal / bad date / expired): Phase B.1 mediation can
+    # clear it via ``request_document``; check the per-case finding_status.
+    if finding_status and finding_status.get(token.indication.value) == "cleared":
+        return CredentialDisposition.PASS
+    return CredentialDisposition.DENY
 
 
-def _assess_id(case: CredentialCase) -> CredentialDisposition:
+def _assess_id(
+    case: CredentialCase,
+    finding_status: dict[str, str] | None = None,
+) -> CredentialDisposition:
     status = case.id_status()
     if status is None:
         return CredentialDisposition.DENY  # missing id -> produce it (mitigatable)
@@ -187,6 +197,9 @@ def _assess_id(case: CredentialCase) -> CredentialDisposition:
         return CredentialDisposition.PASS
     if status.is_crime:
         return CredentialDisposition.ARREST  # fake / wrong-holder id
+    # Mitigatable id (expired / bad date): cleared by future id-mediation.
+    if finding_status and finding_status.get("id") == "cleared":
+        return CredentialDisposition.PASS
     return CredentialDisposition.DENY
 
 
@@ -194,17 +207,18 @@ def _assess_requirement(
     case: CredentialCase,
     indication: Indication,
     level: RestrictionLevel,
+    finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
     """Assess one indication against its required level (the two error surfaces)."""
 
     worst = CredentialDisposition.PASS
     if level.requires_permit:
         permit = case.credential_for(indication)
-        worst = _worse(worst, _assess_credential(permit))
+        worst = _worse(worst, _assess_credential(permit, finding_status))
         if permit is not None and not permit.holder_matches:
             worst = _worse(worst, CredentialDisposition.ARREST)  # permit/id mismatch
     if level.requires_id:
-        worst = _worse(worst, _assess_id(case))
+        worst = _worse(worst, _assess_id(case, finding_status))
     return worst
 
 
@@ -212,23 +226,27 @@ def _assess_contraband(
     case: CredentialCase,
     item: ContrabandItem,
     level: RestrictionLevel,
+    finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
     if item.concealed:
         return CredentialDisposition.ARREST  # concealment is a crime
     if level is RestrictionLevel.FORBIDDEN:
         return CredentialDisposition.DENY  # declared but forbidden -> relinquish
-    return _assess_requirement(case, item.indication, level)
+    return _assess_requirement(case, item.indication, level, finding_status)
 
 
 def derive_disposition(
     case: CredentialCase,
     restrictions: Restrictions,
+    finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
     """Derive the correct disposition from the rules and the candidate's packet.
 
     Reads the candidate only through its discovery API, so the packet's internal
     representation stays opaque. Returns the most-severe applicable outcome
-    (ARREST > DENY > PASS).
+    (ARREST > DENY > PASS). If ``finding_status`` is given (Phase B.1 mediation
+    outcomes for the active case), cleared mitigatable findings contribute PASS
+    instead of DENY.
     """
 
     region = case.get_region()
@@ -239,11 +257,11 @@ def derive_disposition(
     if level is RestrictionLevel.FORBIDDEN:
         worst = _worse(worst, CredentialDisposition.DENY)  # purpose not allowed
     else:
-        worst = _worse(worst, _assess_requirement(case, purpose, level))
+        worst = _worse(worst, _assess_requirement(case, purpose, level, finding_status))
 
     for item in case.get_contraband():
         level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
-        worst = _worse(worst, _assess_contraband(case, item, level))
+        worst = _worse(worst, _assess_contraband(case, item, level, finding_status))
 
     return worst
 
@@ -294,6 +312,14 @@ class CredentialsGame(PickingGame):
     )
     shift_complete: bool = Field(
         default=False,
+        json_schema_extra={"reset_field": True},
+    )
+    # Mediation outcomes for the active case (Phase B.1): keys are an
+    # indication's value (a permit), or "id", or "search". Values are
+    # "cleared" / "confirmed". Reset by advance_case so each candidate starts
+    # with a clean slate.
+    finding_status: dict[str, str] = Field(
+        default_factory=dict,
         json_schema_extra={"reset_field": True},
     )
     # Lazy cache of materialized offers (cleared on setup; rebuilt on arrival).
@@ -410,7 +436,7 @@ class CredentialsGame(PickingGame):
             )
         if case.correct_disposition is not None:
             return case.correct_disposition
-        return derive_disposition(case, self.restriction_map)
+        return derive_disposition(case, self.restriction_map, self.finding_status)
 
     # ----- roster advancement ----------------------------------------------
     def advance_case(self) -> None:
@@ -433,6 +459,7 @@ class CredentialsGame(PickingGame):
         self.inspected_packet_targets = []
         self.packet_findings = {}
         self.committed_decision = None
+        self.finding_status = {}
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
@@ -470,6 +497,43 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
     game_cls: ClassVar[type[Game]] = CredentialsGame
 
+    def get_available_moves(self, game: CredentialsGame) -> list[CredentialsMove]:
+        """Inspect + decide + (Phase B.1) mediation moves.
+
+        Mediation moves are gated on the packet stage, same as decisions: the
+        player inspects at least one document before mediating or deciding.
+        """
+
+        moves = list(super().get_available_moves(game))
+        if game.current_stage == "documents":
+            return moves
+
+        case = game.active_case
+        # request_document: one Action per presented permit with a mitigatable
+        # status not yet cleared. Missing-doc requests are B.2.
+        for token in case.packet:
+            if token.status.is_valid or token.status.is_crime:
+                continue
+            key = token.indication.value
+            if key in game.finding_status:
+                continue
+            moves.append(CredentialsMove(kind="request_document", target=key))
+        # verify_id: identity-check move. Narrow to statuses where "does the id
+        # match the bearer?" is the relevant question: VALID (clears the doubt)
+        # or WRONG_HOLDER (confirms the mismatch). Mitigatable id issues like
+        # EXPIRED / BAD_DATE / MISSING_SEAL are date-or-seal problems, not
+        # holder problems, and need an id-mediation move that lands with B.2.
+        if (
+            case.id_card is not None
+            and case.id_status() in (CredentialStatus.VALID, CredentialStatus.WRONG_HOLDER)
+            and "id" not in game.finding_status
+        ):
+            moves.append(CredentialsMove(kind="verify_id", target=""))
+        # request_search: single move, once per case.
+        if "search" not in game.finding_status:
+            moves.append(CredentialsMove(kind="request_search", target=""))
+        return moves
+
     def get_available_inspect_targets(self, game: CredentialsGame) -> list[str]:
         case = game.active_case
         targets = [
@@ -488,6 +552,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             if move.target in game.active_case.packet_hidden_facts:
                 return f"Review {move.target}"
             return f"Inspect {move.target}"
+        if move.kind == "request_document":
+            return f"Request reissue of {move.target} permit"
+        if move.kind == "verify_id":
+            return "Verify identity"
+        if move.kind == "request_search":
+            return "Request search"
         return f"Choose {move.target}"
 
     def resolve_inspection(
@@ -558,6 +628,88 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game.advance_case()
         return round_result
 
+    # ----- Phase B.1 mediation moves ---------------------------------------
+
+    def resolve_move_kind(
+        self,
+        kind: str,
+        game: CredentialsGame,
+        player_move: CredentialsMove,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        if kind == "request_document":
+            return self._resolve_request_document(game, player_move.target, detail)
+        if kind == "verify_id":
+            return self._resolve_verify_id(game, detail)
+        if kind == "request_search":
+            return self._resolve_request_search(game, detail)
+        return super().resolve_move_kind(kind, game, player_move, detail)
+
+    def _resolve_request_document(
+        self,
+        game: CredentialsGame,
+        indication_value: str,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        # Defensive guard: the menu filters to presented permits with a
+        # mitigatable status, but ``GameHandler.receive_move`` does not call
+        # ``validate_move``. Skip rather than corrupt finding_status if an
+        # off-menu payload arrives. (Off-menu clears against valid/crime/missing
+        # permits are already idempotent for derive thanks to its short-circuits,
+        # but explicit validation keeps the audit trail honest.)
+        permit = next(
+            (t for t in game.active_case.packet if t.indication.value == indication_value),
+            None,
+        )
+        if permit is None or permit.status.is_valid or permit.status.is_crime:
+            detail["outcome"] = "request_document_not_applicable"
+            detail["target_indication"] = indication_value
+            return RoundResult.CONTINUE
+
+        # B.1 assumes the candidate complies; the mitigatable finding is cleared.
+        # Compliance (declines path) is part of B.2.
+        game.finding_status[indication_value] = "cleared"
+        detail["outcome"] = "request_document_cleared"
+        detail["target_indication"] = indication_value
+        return RoundResult.CONTINUE
+
+    def _resolve_verify_id(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        # verify_id specifically answers "does the id match the bearer?", so it
+        # only ever clears for VALID or confirms for WRONG_HOLDER. Other id
+        # statuses (no id presented, expired, bad date) need different mediation
+        # (B.2's id-replacement path) and shouldn't have surfaced this move.
+        status = game.active_case.id_status()
+        if status is CredentialStatus.VALID:
+            game.finding_status["id"] = "cleared"
+            detail["outcome"] = "id_verified_clean"
+        elif status is CredentialStatus.WRONG_HOLDER:
+            game.finding_status["id"] = "confirmed"
+            detail["outcome"] = "id_verified_problem"
+        else:
+            detail["outcome"] = "verify_id_not_applicable"
+        return RoundResult.CONTINUE
+
+    def _resolve_request_search(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        concealed = [item for item in game.active_case.get_contraband() if item.concealed]
+        if concealed:
+            game.finding_status["search"] = "confirmed"
+            detail["outcome"] = "search_found_concealment"
+            detail["concealed"] = [item.indication.value for item in concealed]
+        else:
+            game.finding_status["search"] = "cleared"
+            detail["outcome"] = "search_clean"
+        return RoundResult.CONTINUE
+
+    # ----- lifecycle / projection ------------------------------------------
+
     def evaluate(self, game: CredentialsGame) -> GameResult:
         """Own shift terminality: in process until the final candidate is decided."""
 
@@ -611,6 +763,35 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return [
                 ContentFragment(content=f"You inspect the {target}."),
                 ContentFragment(content=str(notes.get("finding", "Nothing new emerges."))),
+            ]
+
+        if action == "request_document":
+            return [
+                ContentFragment(content=f"You request a reissue of the {target} permit."),
+                ContentFragment(content="The candidate produces a corrected copy."),
+            ]
+        if action == "verify_id":
+            outcome = notes.get("outcome")
+            if outcome == "id_verified_clean":
+                line = "The id matches the bearer."
+            elif outcome == "id_verified_problem":
+                line = "The id does not match the bearer."
+            else:
+                line = "The id offers no clear answer to the bearer question."
+            return [
+                ContentFragment(content="You verify the bearer's identity."),
+                ContentFragment(content=line),
+            ]
+        if action == "request_search":
+            if notes.get("outcome") == "search_found_concealment":
+                items = notes.get("concealed") or []
+                what = ", ".join(items) if items else "contraband"
+                line = f"You uncover concealed {what}."
+            else:
+                line = "The search turns up nothing concealed."
+            return [
+                ContentFragment(content="You request a search."),
+                ContentFragment(content=line),
             ]
 
         candidate = notes.get("candidate", "the traveler")
