@@ -149,9 +149,14 @@ def _project_adventure_action(
     journal_text: str,
     **hints: object,
 ) -> None:
+    label_suffix = (
+        str(hints.get("asset") or hints.get("word") or target.get_label())
+        .lower()
+        .replace(" ", "_")
+    )
     Action(
         registry=location.graph,
-        label=f"adventure_{action}_{location.get_label()}",
+        label=f"adventure_{action}_{location.get_label()}_{label_suffix}",
         predecessor_id=location.uid,
         successor_id=target.uid,
         text=text,
@@ -167,8 +172,7 @@ def _project_adventure_action(
 
 
 def _asset_score(asset: Token) -> int:
-    score = getattr(asset, "treasure_score", 0)
-    return int(score)
+    return int(asset.treasure_score)
 
 
 def _held_treasures(location: AdventureSandboxLocation) -> list[Token]:
@@ -227,7 +231,7 @@ def _rewrite_movement_hazards(
         for edge in list(location.edges_out(Selector(has_kind=Action))):
             if not {"dynamic", "sandbox", "movement"}.issubset(edge.tags or set()):
                 continue
-            hints = edge.ui_hints.model_dump()
+            hints = edge.ui_hints.model_dump() if edge.ui_hints else {}
             if hints.get("direction") != hazard.direction:
                 continue
             graph.remove(edge.uid, _ctx=ctx)
@@ -535,7 +539,7 @@ def apply_adventure_world_action(
     **_kw: object,
 ) -> None:
     """Apply Adventure-specific world-authority action effects."""
-    payload = getattr(ctx, "selected_payload", None)
+    payload = ctx.selected_payload
     if not isinstance(payload, dict):
         return None
     if payload.get("adventure_action") == "deposit_treasure":
