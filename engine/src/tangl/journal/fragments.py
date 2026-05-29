@@ -55,11 +55,18 @@ class ContentFragment(BaseFragment):
 
 
 class GroupFragment(BaseFragment, extra="allow"):
-    """Relational overlay tying peer fragments together by identifier."""
+    """Relational overlay tying peer fragments together by identifier.
+
+    ``zone_role`` annotates a ``group_type="zone"`` group with its semantic role
+    (``"packet"``, ``"field"``, ...) for ports that style zones by role. ``hints``
+    carries the same advisory presentation metadata as the other fragments.
+    """
 
     fragment_type: Literal["group"] = "group"
     group_type: str | Enum | None = None
     member_ids: list[UUID] = Field(default_factory=list)
+    zone_role: str | None = None
+    presentation_hints: PresentationHints | None = Field(None, alias="hints")
 
     def members(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
         return [
@@ -67,6 +74,28 @@ class GroupFragment(BaseFragment, extra="allow"):
             for member_id in self.member_ids
             if (member := registry.get(member_id)) is not None
         ]
+
+
+class PieceFragment(BaseFragment, extra="allow"):
+    """Identified game piece: a tracked object the player can reference, place
+    into a zone, or pick as a choice payload (candidate, document, token, asset).
+
+    A stable ``piece_id`` (and ``uid``) let multi-envelope sequences update the
+    same piece in place as it changes state or moves between zones. ``zone_ref``
+    names the containing ``group_type="zone"`` fragment. ``properties`` carries
+    per-kind structured data (a candidate's declared purpose, a permit's expiry,
+    ...). Graduates the typed shape tracked as the ``PieceFragment`` row in
+    ``WIDGET_CONTRACT_RECONCILIATION.md``; matches the existing conformance
+    fixture shape.
+    """
+
+    fragment_type: Literal["piece"] = "piece"
+    piece_id: str
+    kind: str | None = None
+    display_state: str | None = None
+    zone_ref: UUID | None = None
+    properties: dict[str, Any] = Field(default_factory=dict)
+    presentation_hints: PresentationHints | None = Field(None, alias="hints")
 
 
 class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
@@ -232,6 +261,7 @@ __all__ = [
     "KvFragment",
     "KvRow",
     "MediaFragment",
+    "PieceFragment",
     "PresentationHints",
     "StagingHints",
     "UIHints",
