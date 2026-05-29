@@ -256,7 +256,7 @@ class TestCredentialsIntegration:
         content = " ".join(
             f.content
             for f in ledger.get_journal()
-            if isinstance(getattr(f, "content", None), str)
+            if isinstance(f.content, str)
         )
         assert "shift complete" in content.lower()
 

@@ -32,26 +32,6 @@ from tangl.journal.fragments import (
     PresentationHints,
 )
 
-# Fixed namespace so a candidate / packet / document gets a stable fragment uid
-# across rounds: the client fragment registry then updates pieces in place
-# rather than treating each round's re-emission as new.
-_PIECE_NS = uuid.UUID("b7c3f6e2-1d4a-4c9b-9f2e-7a6d5c4b3a21")
-
-
-def _piece_uid(case_index: int, key: str) -> uuid.UUID:
-    return uuid.uuid5(_PIECE_NS, f"credentials:{case_index}:{key}")
-
-
-def _document_kind(label: str) -> str:
-    low = label.lower()
-    if "passport" in low or "id" in low:
-        return "id_card"
-    if "permit" in low:
-        return "permit"
-    if "ticket" in low:
-        return "ticket"
-    return "document"
-
 from .credentials_enums import (
     DEFAULT_RESTRICTIONS,
     ContrabandItem,
@@ -65,6 +45,36 @@ from .credentials_enums import (
 from .enums import GameResult, RoundResult
 from .game import Game
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
+
+
+# Fixed namespace so a candidate / packet / document gets a stable fragment uid
+# across rounds: the client fragment registry then updates pieces in place
+# rather than treating each round's re-emission as new. The game uid is folded
+# into the seed so distinct credentials blocks in one journal (e.g. a scheduled
+# and a randomized shift) never collide on a shared global fragment id.
+_PIECE_NS = uuid.UUID("b7c3f6e2-1d4a-4c9b-9f2e-7a6d5c4b3a21")
+
+
+def _piece_uid(game_uid: uuid.UUID, case_index: int, key: str) -> uuid.UUID:
+    return uuid.uuid5(_PIECE_NS, f"credentials:{game_uid}:{case_index}:{key}")
+
+
+def _document_kind(label: str) -> str:
+    """Best-effort document classification for piece styling.
+
+    Specific document nouns first; a whole-word ``id`` / ``identity`` check last
+    so substrings like "valid"/"residence" don't masquerade as id cards.
+    """
+
+    low = label.lower()
+    words = set(low.split())
+    if "permit" in low:
+        return "permit"
+    if "ticket" in low:
+        return "ticket"
+    if "passport" in low or "identity" in low or {"id", "ids"} & words:
+        return "id_card"
+    return "document"
 
 
 class CredentialDisposition(Enum):
@@ -877,16 +887,16 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def _candidate_fragments(self, game: CredentialsGame) -> list[BaseFragment]:
         """Project the active candidate + packet zone + document pieces.
 
-        Deterministic uids (per case index) let the client update these pieces
-        in place across rounds rather than re-creating them each turn.
+        Deterministic uids (per game + case index) let the client update these
+        pieces in place across rounds rather than re-creating them each turn.
         """
 
         case = game.active_case
         idx = game.case_index
-        packet_uid = _piece_uid(idx, "packet")
+        packet_uid = _piece_uid(game.uid, idx, "packet")
 
         candidate = PieceFragment(
-            uid=_piece_uid(idx, "candidate"),
+            uid=_piece_uid(game.uid, idx, "candidate"),
             piece_id=f"candidate-{idx}",
             kind="candidate",
             content=case.candidate_name,
@@ -900,7 +910,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         doc_uids: list[uuid.UUID] = []
         doc_pieces: list[BaseFragment] = []
         for label, description in case.presented_documents.items():
-            doc_uid = _piece_uid(idx, f"doc:{label}")
+            doc_uid = _piece_uid(game.uid, idx, f"doc:{label}")
             doc_uids.append(doc_uid)
             doc_pieces.append(
                 PieceFragment(
@@ -918,7 +928,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             group_type="zone",
             member_ids=doc_uids,
             zone_role="packet",
-            hints={"label_text": "Credentials packet"},
+            hints=PresentationHints(label_text="Credentials packet"),
         )
         return [candidate, packet, *doc_pieces]
 

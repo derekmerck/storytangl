@@ -75,7 +75,7 @@ class TestCredentialGateWorld:
         content = " ".join(
             f.content
             for f in ledger.get_journal()
-            if isinstance(getattr(f, "content", None), str)
+            if isinstance(f.content, str)
         )
         assert "shift complete" in content.lower()
 
@@ -117,7 +117,7 @@ class TestCredentialGateWorld:
         content = " ".join(
             f.content
             for f in ledger.get_journal()
-            if isinstance(getattr(f, "content", None), str)
+            if isinstance(f.content, str)
         )
         assert "shift complete" in content.lower()
         assert f"of {total}" in content

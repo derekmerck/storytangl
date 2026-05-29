@@ -55,11 +55,18 @@ class ContentFragment(BaseFragment):
 
 
 class GroupFragment(BaseFragment, extra="allow"):
-    """Relational overlay tying peer fragments together by identifier."""
+    """Relational overlay tying peer fragments together by identifier.
+
+    ``zone_role`` annotates a ``group_type="zone"`` group with its semantic role
+    (``"packet"``, ``"field"``, ...) for ports that style zones by role. ``hints``
+    carries the same advisory presentation metadata as the other fragments.
+    """
 
     fragment_type: Literal["group"] = "group"
     group_type: str | Enum | None = None
     member_ids: list[UUID] = Field(default_factory=list)
+    zone_role: str | None = None
+    presentation_hints: PresentationHints | None = Field(None, alias="hints")
 
     def members(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
         return [

@@ -93,6 +93,22 @@ class TestStructuredEmission:
 
         assert first.uid == second.uid  # same candidate -> in-place update
 
+    def test_distinct_games_get_distinct_piece_uids(self) -> None:
+        # Two credentials games (e.g. a scheduled + a randomized shift) must not
+        # collide on a shared global fragment uid in the client registry.
+        game_a, handler_a = _game()
+        game_b, handler_b = _game()
+        handler_a.receive_move(game_a, ("inspect", "passport"))
+        handler_b.receive_move(game_b, ("inspect", "passport"))
+
+        def candidate_uid(handler, game):
+            return [
+                p for p in _by_type(handler.get_journal_fragments(game), PieceFragment)
+                if p.kind == "candidate"
+            ][0].uid
+
+        assert candidate_uid(handler_a, game_a) != candidate_uid(handler_b, game_b)
+
     def test_no_structural_pieces_once_shift_complete(self) -> None:
         game, handler = _game(_case())  # single-candidate shift
         handler.receive_move(game, ("inspect", "passport"))
