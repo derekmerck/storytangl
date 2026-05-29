@@ -72,7 +72,11 @@ class TestCredentialGateWorld:
         _choose(ledger, "Choose arrest")
 
         assert ledger.cursor.label == "victory"
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            f.content
+            for f in ledger.get_journal()
+            if isinstance(getattr(f, "content", None), str)
+        )
         assert "shift complete" in content.lower()
 
     def test_randomized_shift_materializes_lazily_and_routes_to_victory(self) -> None:
@@ -110,6 +114,10 @@ class TestCredentialGateWorld:
             _choose(ledger, f"Choose {target}")
 
         assert ledger.cursor.label == "victory"
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            f.content
+            for f in ledger.get_journal()
+            if isinstance(getattr(f, "content", None), str)
+        )
         assert "shift complete" in content.lower()
         assert f"of {total}" in content

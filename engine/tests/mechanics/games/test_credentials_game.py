@@ -253,7 +253,11 @@ class TestCredentialsIntegration:
         self._choose(ledger, "Choose pass")
 
         assert ledger.cursor_id == victory.uid
-        content = " ".join(getattr(f, "content", "") for f in ledger.get_journal())
+        content = " ".join(
+            f.content
+            for f in ledger.get_journal()
+            if isinstance(getattr(f, "content", None), str)
+        )
         assert "shift complete" in content.lower()
 
     def test_context_exports_discovered_findings(self) -> None:

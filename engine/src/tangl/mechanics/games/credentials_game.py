@@ -12,6 +12,7 @@ next candidate after every disposition until the game reports terminal.
 """
 from __future__ import annotations
 
+import uuid
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
@@ -20,8 +21,36 @@ from pydantic import Field
 if TYPE_CHECKING:
     from .credentials_roster import ScenarioOffer
 
+from tangl.core import BaseFragment
 from tangl.core.bases import BaseModelPlus
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import (
+    ContentFragment,
+    GroupFragment,
+    KvFragment,
+    KvRow,
+    PieceFragment,
+    PresentationHints,
+)
+
+# Fixed namespace so a candidate / packet / document gets a stable fragment uid
+# across rounds: the client fragment registry then updates pieces in place
+# rather than treating each round's re-emission as new.
+_PIECE_NS = uuid.UUID("b7c3f6e2-1d4a-4c9b-9f2e-7a6d5c4b3a21")
+
+
+def _piece_uid(case_index: int, key: str) -> uuid.UUID:
+    return uuid.uuid5(_PIECE_NS, f"credentials:{case_index}:{key}")
+
+
+def _document_kind(label: str) -> str:
+    low = label.lower()
+    if "passport" in low or "id" in low:
+        return "id_card"
+    if "permit" in low:
+        return "permit"
+    if "ticket" in low:
+        return "ticket"
+    return "document"
 
 from .credentials_enums import (
     DEFAULT_RESTRICTIONS,
@@ -744,16 +773,37 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail["shift_complete"] = game.shift_complete
         return detail
 
-    def get_journal_fragments(self, game: CredentialsGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(self, game: CredentialsGame) -> list[BaseFragment] | None:
         last_round = game.last_round
         if last_round is None:
             return []
 
         move = self._normalize_move(last_round.player_move)
-        action = move.kind
-        target = move.target
-        notes = last_round.notes or {}
+        prose = self._prose_fragments(game, last_round, move.kind, move.target, last_round.notes or {})
 
+        fragments: list[BaseFragment] = []
+        # Structured candidate / packet view (Bridge.1). Skip once the shift is
+        # over -- there is no next candidate to present. On a non-final decision
+        # this is the *arriving* candidate, which lands alongside the
+        # "next traveler steps up" prose.
+        if not game.shift_complete:
+            fragments.extend(self._candidate_fragments(game))
+        # Findings table for the active case; present on inspect / mediation
+        # rounds, empty after a decision resets the working state.
+        findings = self._findings_fragment(game)
+        if findings is not None:
+            fragments.append(findings)
+        fragments.extend(prose)
+        return fragments
+
+    def _prose_fragments(
+        self,
+        game: CredentialsGame,
+        last_round,
+        action: str,
+        target: str,
+        notes: dict,
+    ) -> list[ContentFragment]:
         if action == "inspect":
             if str(notes.get("outcome", "")).startswith("packet"):
                 return [
@@ -821,6 +871,73 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 ContentFragment(content="The next traveler steps up to the counter.")
             )
         return fragments
+
+    # ----- Bridge.1: structured (typed) fragment projection ----------------
+
+    def _candidate_fragments(self, game: CredentialsGame) -> list[BaseFragment]:
+        """Project the active candidate + packet zone + document pieces.
+
+        Deterministic uids (per case index) let the client update these pieces
+        in place across rounds rather than re-creating them each turn.
+        """
+
+        case = game.active_case
+        idx = game.case_index
+        packet_uid = _piece_uid(idx, "packet")
+
+        candidate = PieceFragment(
+            uid=_piece_uid(idx, "candidate"),
+            piece_id=f"candidate-{idx}",
+            kind="candidate",
+            content=case.candidate_name,
+            properties={
+                "declared_purpose": case.get_purpose().value,
+                "declared_region": case.get_region().value,
+            },
+            hints=PresentationHints(label_text=case.candidate_name),
+        )
+
+        doc_uids: list[uuid.UUID] = []
+        doc_pieces: list[BaseFragment] = []
+        for label, description in case.presented_documents.items():
+            doc_uid = _piece_uid(idx, f"doc:{label}")
+            doc_uids.append(doc_uid)
+            doc_pieces.append(
+                PieceFragment(
+                    uid=doc_uid,
+                    piece_id=f"{idx}:{label}",
+                    kind=_document_kind(label),
+                    content=description,
+                    zone_ref=packet_uid,
+                    hints=PresentationHints(label_text=label),
+                )
+            )
+
+        packet = GroupFragment(
+            uid=packet_uid,
+            group_type="zone",
+            member_ids=doc_uids,
+            zone_role="packet",
+            hints={"label_text": "Credentials packet"},
+        )
+        return [candidate, packet, *doc_pieces]
+
+    def _findings_fragment(self, game: CredentialsGame) -> KvFragment | None:
+        """Project revealed document/packet findings as a KvFragment.
+
+        Discloses only what the player has already surfaced through inspection
+        (no leaking of unrevealed truth). Document findings are flagged
+        ``warn``; packet-level contradictions are ``danger``.
+        """
+
+        rows: list[KvRow] = []
+        for target, finding in game.revealed_findings.items():
+            rows.append(KvRow(key=target, value=finding, emphasis="warn"))
+        for target, finding in game.packet_findings.items():
+            rows.append(KvRow(key=target, value=finding, emphasis="danger"))
+        if not rows:
+            return None
+        return KvFragment(content=rows)
 
     def _packet_finding(self, game: CredentialsGame, target: str) -> str | None:
         case = game.active_case
