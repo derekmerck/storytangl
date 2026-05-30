@@ -35,6 +35,18 @@ from .time import current_world_time
 
 DEFAULT_PERIOD_LABELS = ("morning", "afternoon", "evening", "night")
 MAP_KIND = "map"
+SANDBOX_INFO_KINDS = {
+    "exits",
+    "fixtures",
+    "inventory",
+    "local_assets",
+    "location",
+    MAP_KIND,
+    "map_edges",
+    "map_nodes",
+    "presence",
+    "world_time",
+}
 
 
 class ProjectedAssetSurface(Protocol):
@@ -64,27 +76,30 @@ class SandboxStoryInfoProjector:
             return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
 
         ctx = PhaseCtx(graph=ledger.graph, cursor_id=cursor.uid)
-        projection = sandbox_projection_state(cursor, ctx)
+        return ProjectedState(sections=self.sections_for(cursor, ctx=ctx))
+
+    def sections_for(
+        self,
+        location: SandboxLocation,
+        *,
+        ctx: PhaseCtx,
+    ) -> list[ProjectedSection]:
+        """Return disclosed sandbox status sections for ``location``."""
+        projection = sandbox_projection_state(location, ctx)
         sections = [
-            self._location_section(cursor, projection_active=projection.active),
-            self._time_section(cursor),
-            self._inventory_section(cursor),
+            self._location_section(location, projection_active=projection.active),
+            self._time_section(location),
+            self._inventory_section(location),
         ]
         if not projection.suppress_location_description:
-            sections.append(self._exits_section(cursor))
+            sections.append(self._exits_section(location))
         if not projection.suppress_asset_affordances:
-            sections.append(self._local_assets_section(cursor))
+            sections.append(self._local_assets_section(location))
         if not projection.suppress_fixture_affordances:
-            sections.append(self._fixtures_section(cursor))
+            sections.append(self._fixtures_section(location))
         if not projection.suppress_location_description:
-            sections.append(self._presence_section(cursor))
-        return ProjectedState(
-            sections=[
-                section
-                for section in sections
-                if not _section_empty(section)
-            ]
-        )
+            sections.append(self._presence_section(location))
+        return [section for section in sections if not _section_empty(section)]
 
     def _location_section(
         self,
@@ -247,10 +262,46 @@ def project_sandbox_map_info(
     request: StoryInfoRequest,
     **_kw: object,
 ) -> list[ProjectedSection] | None:
-    """Project disclosed sandbox geography for map-capable clients."""
-    if MAP_KIND not in request.requested_kinds():
+    """Project requested disclosed sandbox channels for side-panel clients."""
+    requested = request.requested_kinds()
+    if not requested:
+        return SandboxStoryInfoProjector().sections_for(caller, ctx=ctx)
+    if not any(kind in SANDBOX_INFO_KINDS for kind in requested):
         return None
-    return _map_sections(caller, ctx)
+
+    sections: list[ProjectedSection] = []
+    status_sections = SandboxStoryInfoProjector().sections_for(caller, ctx=ctx)
+    sections.extend(
+        section
+        for section in status_sections
+        if _section_matches_requested(section, requested)
+    )
+
+    map_sections = _requested_map_sections(caller, ctx=ctx, requested=requested)
+    sections.extend(map_sections)
+    return sections or None
+
+
+def _requested_map_sections(
+    location: SandboxLocation,
+    *,
+    ctx: PhaseCtx,
+    requested: list[str],
+) -> list[ProjectedSection]:
+    if not _map_requested(requested):
+        return []
+    sections = _map_sections(location, ctx)
+    if MAP_KIND in requested:
+        return sections
+    return [
+        section
+        for section in sections
+        if _section_matches_requested(section, requested)
+    ]
+
+
+def _map_requested(requested: list[str]) -> bool:
+    return any(kind in requested for kind in (MAP_KIND, "map_nodes", "map_edges"))
 
 
 def _map_sections(location: SandboxLocation, ctx: PhaseCtx) -> list[ProjectedSection]:
@@ -449,6 +500,16 @@ def _section_empty(section: ProjectedSection) -> bool:
     if isinstance(value, ItemListValue):
         return not value.items
     return False
+
+
+def _section_matches_requested(
+    section: ProjectedSection,
+    requested: list[str],
+) -> bool:
+    labels = {section.section_id}
+    if section.kind is not None:
+        labels.add(section.kind)
+    return any(label in requested for label in labels)
 
 
 def _asset_items(holder: HasAssets | None) -> list[ProjectedItem]:
