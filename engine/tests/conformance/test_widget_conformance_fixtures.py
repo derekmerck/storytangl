@@ -23,6 +23,7 @@ EXPECTED_FIXTURES = {
     "command_hints.json",
     "compose_payload.json",
     "control_delete.json",
+    "credentials_shift.json",
     "crossroads_inn.json",
     "dialog_with_avatar.json",
     "pending_media_update.json",
@@ -300,3 +301,49 @@ def test_control_update_and_delete_fixtures_apply_to_registry() -> None:
     delete_payload = _load_fixture(FIXTURE_DIR / "control_delete.json")
     delete_registry = _registry_after_controls(delete_payload["fragments"])
     assert "00000000-0000-4000-8000-000000000702" not in delete_registry
+
+
+def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
+    """Pin the credentials envelope to the typed engine fragments (Bridge.1/2b)."""
+
+    from tangl.journal.fragments import (
+        GroupFragment,
+        KvFragment,
+        PieceFragment,
+    )
+
+    payload = _load_fixture(FIXTURE_DIR / "credentials_shift.json")
+    by_uid = {f["uid"]: f for f in payload["fragments"]}
+
+    # Candidate + document pieces validate as typed PieceFragments.
+    candidate = PieceFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000603"])
+    assert candidate.kind == "candidate"
+    assert candidate.properties["declared_purpose"] == "work"
+
+    permit = PieceFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000606"])
+    assert permit.kind == "permit"
+    assert str(permit.zone_ref) == "00000000-0000-4000-8000-000000000604"
+
+    # Packet zone validates as a typed GroupFragment carrying its zone_role.
+    packet = GroupFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000604"])
+    assert packet.group_type == "zone"
+    assert packet.zone_role == "packet"
+    assert str(permit.uid) in {str(m) for m in packet.member_ids}
+
+    # Findings validate as a typed KvFragment with severity emphasis.
+    findings = KvFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000607"])
+    emphases = {row.key: row.emphasis for row in findings.content}
+    assert emphases["work permit"] == "warn"
+    assert emphases["packet consistency"] == "danger"
+
+    # Disclosure discipline: every plausible mediation is offered uniformly and
+    # no disposition is pre-gated by the answer, so the menu reveals nothing
+    # about which call is correct or which mediation is useful.
+    choices = [f for f in payload["fragments"] if f.get("fragment_type") == "choice"]
+    edge_ids = {c["edge_id"] for c in choices}
+    assert {"request_document", "verify_id", "request_search"} <= edge_ids
+    dispositions = [c for c in choices if c["edge_id"].startswith("decide_")]
+    assert dispositions and all(c.get("available") is not False for c in dispositions)
+
+    advertised = {a["kind"] for a in payload["metadata"]["info_affordances"]}
+    assert advertised == {"rules", "roster_progress", "case_summary"}

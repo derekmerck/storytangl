@@ -567,15 +567,32 @@ has enough independent design surface to warrant its own pass.
 ### B.1 — Core mediation (v1 increment, LANDED 2026-05-23)
 
 Adds three move kinds and a per-case ``finding_status: dict[str, str]``
-(values: ``"cleared"`` / ``"confirmed"``; reset by ``advance_case``).
+(values: ``"cleared"`` / ``"verified"`` / ``"confirmed"``; reset by
+``advance_case``).
 
 - **``request_document``** — per-target fanout, one Action per *presented*
-  document whose token has a mitigatable status. Applying clears that doc's
-  finding. Maps to ``accepts.kind="pieces"`` in the rendering contract
+  permit. Committing it discloses the permit's standing: a mitigatable flaw is
+  ``cleared`` (the candidate produces a corrected copy), a sound permit is
+  ``verified`` (re-presented unchanged), a forgery is ``confirmed`` (cannot be
+  reissued). Maps to ``accepts.kind="pieces"`` in the rendering contract
   (`bundles/credentials/EXTENSIONS.md`).
-- **``verify_id``** — single Action, applicable when an id is presented. Clears
-  for VALID; confirms (records the crime in the audit trail) for WRONG_HOLDER.
+- **``verify_id``** — single Action, available whenever an id is presented.
+  Answers only the holder question: ``confirmed`` for WRONG_HOLDER (a crime),
+  ``verified`` otherwise. It never repairs a stale id, so an expired/mis-dated
+  id stays a deny (id-reissue is B.2).
 - **``request_search``** — single Action; reveals concealed contraband if any.
+
+**Disclosure discipline on the move menu.** Mediation availability is gated on
+*visible* state only -- which documents the candidate presented -- never on
+hidden validity. A useful mediation is indistinguishable from a dud until it is
+committed; the *outcome* discloses, not the move's presence. (A move absent
+because a document is *visibly* not present, e.g. no id at all, reveals nothing
+the client cannot already see.) Likewise, dispositions are never pre-gated by
+the correct answer -- all of allow/deny/arrest stay available and correctness is
+hidden until the shift resolves. ``available=false`` with a reason is reserved
+for genuinely-blocked actions (e.g. deciding before any inspection), not for
+leaking backend logic. Only a ``cleared`` mitigatable finding upgrades
+``derive_disposition``; ``verified`` / ``confirmed`` are audit-only.
 
 ``derive_disposition`` consults ``finding_status``: a cleared mitigatable doc
 finding contributes PASS instead of DENY; everything else as before.
