@@ -336,8 +336,14 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
     assert emphases["work permit"] == "warn"
     assert emphases["packet consistency"] == "danger"
 
-    # The gated disposition carries a reason; the side-channels are advertised.
-    gated = by_uid["00000000-0000-4000-8000-000000000611"]
-    assert gated["available"] is False and gated["unavailable_reason"]
+    # Disclosure discipline: every plausible mediation is offered uniformly and
+    # no disposition is pre-gated by the answer, so the menu reveals nothing
+    # about which call is correct or which mediation is useful.
+    choices = [f for f in payload["fragments"] if f.get("fragment_type") == "choice"]
+    edge_ids = {c["edge_id"] for c in choices}
+    assert {"request_document", "verify_id", "request_search"} <= edge_ids
+    dispositions = [c for c in choices if c["edge_id"].startswith("decide_")]
+    assert dispositions and all(c.get("available") is not False for c in dispositions)
+
     advertised = {a["kind"] for a in payload["metadata"]["info_affordances"]}
     assert advertised == {"rules", "roster_progress", "case_summary"}
