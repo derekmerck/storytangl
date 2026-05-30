@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -307,6 +308,7 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
     """Pin the credentials envelope to the typed engine fragments (Bridge.1/2b)."""
 
     from tangl.journal.fragments import (
+        ChoiceFragment,
         GroupFragment,
         KvFragment,
         PieceFragment,
@@ -328,7 +330,7 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
     packet = GroupFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000604"])
     assert packet.group_type == "zone"
     assert packet.zone_role == "packet"
-    assert str(permit.uid) in {str(m) for m in packet.member_ids}
+    assert permit.uid in packet.member_ids
 
     # Findings validate as a typed KvFragment with severity emphasis.
     findings = KvFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000607"])
@@ -336,14 +338,24 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
     assert emphases["work permit"] == "warn"
     assert emphases["packet consistency"] == "danger"
 
+    # Choices validate as typed ChoiceFragments -- proving the edge_ids are
+    # real UUIDs that round-trip through the service/client typed path, not
+    # loose semantic strings the typed decoder would reject.
+    choices = [
+        ChoiceFragment.model_validate(f)
+        for f in payload["fragments"]
+        if f.get("fragment_type") == "choice"
+    ]
+    assert all(isinstance(c.edge_id, UUID) for c in choices)
+
     # Disclosure discipline: every plausible mediation is offered uniformly and
     # no disposition is pre-gated by the answer, so the menu reveals nothing
-    # about which call is correct or which mediation is useful.
-    choices = [f for f in payload["fragments"] if f.get("fragment_type") == "choice"]
-    edge_ids = {c["edge_id"] for c in choices}
-    assert {"request_document", "verify_id", "request_search"} <= edge_ids
-    dispositions = [c for c in choices if c["edge_id"].startswith("decide_")]
-    assert dispositions and all(c.get("available") is not False for c in dispositions)
+    # about which call is correct or which mediation is useful. (Choices are
+    # identified by display text; edge_ids are opaque to the client.)
+    texts = {c.text for c in choices}
+    assert {"Request reissue of work permit.", "Verify identity.", "Request search."} <= texts
+    dispositions = [c for c in choices if c.text.startswith("Choose ")]
+    assert dispositions and all(c.available is not False for c in dispositions)
 
     advertised = {a["kind"] for a in payload["metadata"]["info_affordances"]}
     assert advertised == {"rules", "roster_progress", "case_summary"}
