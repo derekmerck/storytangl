@@ -115,6 +115,17 @@ class TestProgressChannel:
         # No rulings table yet.
         assert "credential_rulings" not in sections
 
+    def test_progress_reads_shift_complete_at_end(self) -> None:
+        block, ctx = _block_and_ctx()
+        handler = block.game_handler
+        for _ in range(block.game._total_cases()):
+            handler.receive_move(block.game, ("inspect", "passport"))
+            handler.receive_move(block.game, ("decide", "pass"))
+        assert block.game.shift_complete
+
+        sections = _sections(block, ctx, kind="roster_progress")
+        assert sections["credential_progress"].value.value == "Shift complete"
+
     def test_progress_shows_rulings_without_correctness(self) -> None:
         block, ctx = _block_and_ctx()
         handler = block.game_handler
@@ -149,3 +160,36 @@ class TestCaseSummaryChannel:
         # The expected disposition (hidden truth) never appears.
         flat = str(value.model_dump()).lower()
         assert "deny" not in flat and "expected" not in flat
+
+    def test_mediation_outcome_row_uses_bare_target_key(self) -> None:
+        # A work candidate with a mitigatable (unsealed) work permit, so
+        # request_document is available and clears the finding.
+        graph = Graph(label="credentials_mediation_info")
+        block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+        block.game.roster = [
+            CredentialCase(
+                candidate_name="Goran Siv",
+                presented_documents={"passport": "An id.", "work permit": "Unsealed."},
+                region=Region.LOCAL,
+                purpose=IND.WORK,
+                id_card=CredentialToken(indication=IND.WORK, status=S.VALID),
+                packet=[
+                    CredentialToken(
+                        indication=IND.WORK, status=S.MISSING_SEAL, requires_id=True
+                    )
+                ],
+            )
+        ]
+        block.game.restriction_map = RULES
+        block.game_handler.setup(block.game)
+        ledger = Ledger.from_graph(graph, entry_id=block.uid)
+        ctx = PhaseCtx(graph=graph, cursor_id=block.uid, step=ledger.step)
+
+        block.game_handler.receive_move(block.game, ("inspect", "passport"))
+        block.game_handler.receive_move(block.game, ("request_document", IND.WORK.value))
+
+        sections = _sections(block, ctx, kind="case_summary")
+        value = sections["credential_case_summary"].value
+        cleared = [row for row in value.items if row.value == "cleared"]
+        assert cleared and cleared[0].key == IND.WORK.value  # no "(cleared)" suffix
+        assert cleared[0].emphasis == "ok"

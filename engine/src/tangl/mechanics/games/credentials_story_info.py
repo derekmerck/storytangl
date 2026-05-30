@@ -41,17 +41,22 @@ PROGRESS_KIND = "roster_progress"
 CASE_SUMMARY_KIND = "case_summary"
 
 
-def _credentials_game(caller: object) -> CredentialsGame | None:
-    """Return the active CredentialsGame if ``caller`` hosts one, else None."""
+def _credentials_game(caller: HasGame) -> CredentialsGame | None:
+    """Return the active game if it is a CredentialsGame, else None.
 
-    game = getattr(caller, "game", None)
+    The handlers register for every ``HasGame`` caller, so ``caller.game`` is the
+    typed accessor; the isinstance check discriminates the credentials mechanic
+    from the other game types that share the same story-info dispatch.
+    """
+
+    game = caller.game
     return game if isinstance(game, CredentialsGame) else None
 
 
 @on_advertise_info_channels(wants_caller_kind=HasGame, wants_exact_kind=False)
 def advertise_credentials_info_channels(
     *,
-    caller: object,
+    caller: HasGame,
     ctx: PhaseCtx,
     **_kw: object,
 ) -> list[InfoAffordance]:
@@ -84,7 +89,7 @@ def advertise_credentials_info_channels(
 @on_get_story_info(wants_caller_kind=HasGame, wants_exact_kind=False)
 def project_credentials_info(
     *,
-    caller: object,
+    caller: HasGame,
     ctx: PhaseCtx,
     request: StoryInfoRequest,
     **_kw: object,
@@ -136,11 +141,16 @@ def _progress_sections(game: CredentialsGame) -> list[ProjectedSection]:
 
     total = game._total_cases()
     decided = len(game.case_results)
+    progress_text = (
+        "Shift complete"
+        if game.shift_complete
+        else f"Candidate {min(decided + 1, total)} of {total}"
+    )
     summary = ProjectedSection(
         section_id="credential_progress",
         title="Shift Progress",
         kind=PROGRESS_KIND,
-        value=ScalarValue(value=f"Candidate {min(decided + 1, total)} of {total}"),
+        value=ScalarValue(value=progress_text),
     )
     if not game.case_results:
         return [summary]
@@ -174,7 +184,7 @@ def _case_summary_section(game: CredentialsGame) -> ProjectedSection | None:
         rows.append(KvRow(key=target, value=finding, emphasis="danger"))
     for target, status in game.finding_status.items():
         emphasis = "ok" if status == "cleared" else "danger"
-        rows.append(KvRow(key=f"{target} ({status})", value=status, emphasis=emphasis))
+        rows.append(KvRow(key=target, value=status, emphasis=emphasis))
     if not rows:
         return None
     return ProjectedSection(
