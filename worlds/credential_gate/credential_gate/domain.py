@@ -24,6 +24,12 @@ from tangl.mechanics.games.credentials_roster import (
     ShiftSpec,
     generate_roster,
 )
+
+# Importing the story-info module registers the credentials side-channels
+# (rules / roster_progress / case_summary) on the service dispatch when this
+# world loads. Mirrors how the adventure sandbox world pulls in its map channel.
+import tangl.mechanics.games.credentials_story_info  # noqa: F401
+
 from tangl.story import Block
 
 
