@@ -182,9 +182,11 @@ def _case_summary_section(game: CredentialsGame) -> ProjectedSection | None:
         rows.append(KvRow(key=target, value=finding, emphasis="warn"))
     for target, finding in game.packet_findings.items():
         rows.append(KvRow(key=target, value=finding, emphasis="danger"))
+    _mediation_emphasis = {"cleared": "ok", "verified": "subtle", "confirmed": "danger"}
     for target, status in game.finding_status.items():
-        emphasis = "ok" if status == "cleared" else "danger"
-        rows.append(KvRow(key=target, value=status, emphasis=emphasis))
+        rows.append(
+            KvRow(key=target, value=status, emphasis=_mediation_emphasis.get(status, "subtle"))
+        )
     if not rows:
         return None
     return ProjectedSection(
