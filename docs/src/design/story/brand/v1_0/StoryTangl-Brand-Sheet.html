@@ -1,0 +1,1774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>StoryTan⅁l · brand sheet</title>
+<link rel="stylesheet" href="assets/palette.css">
+<link rel="stylesheet" href="assets/type.css">
+
+<style>
+/* ─────────────────────────────────────────────────────────────────────
+   StoryTangl brand sheet — internal style.
+
+   This file is the canonical reference. Every CSS rule that defines the
+   wordmark, glyph, lockup, or applied surface lives below.
+
+   Read top-to-bottom. Edit nothing without updating USAGE.md to match.
+   ───────────────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--st-paper); color: var(--st-ink); }
+body { font-family: var(--st-font-chrome); font-size: 14px; line-height: 1.55; }
+
+a { color: var(--st-blue); }
+
+/* layout ──────────────────────────────────────────────────────────── */
+
+.sheet {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 56px 64px 96px;
+  position: relative;
+}
+
+.sheet > header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: flex-end;
+  padding-bottom: 24px;
+  border-bottom: 1.5px solid var(--st-rule-strong);
+  margin-bottom: 56px;
+}
+.sheet > header .meta {
+  text-align: right;
+  font-family: var(--st-font-mono);
+  font-size: 11px;
+  color: var(--st-ink-3);
+  line-height: 1.6;
+}
+
+h2.sec {
+  font-family: var(--st-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--st-ink-3);
+  margin: 56px 0 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px dotted var(--st-rule);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+}
+h2.sec .n { color: var(--st-ink); font-weight: 700; }
+h2.sec .right { color: var(--st-ink-4); font-weight: 500; letter-spacing: 0.06em; }
+
+h3.sub {
+  font-family: var(--st-font-prose);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+  color: var(--st-ink);
+}
+
+p.intro {
+  font-family: var(--st-font-prose);
+  font-size: 16.5px;
+  line-height: 1.6;
+  max-width: 70ch;
+  color: var(--st-ink-2);
+  margin: 6px 0 18px;
+}
+p.intro b { color: var(--st-ink); }
+
+p.note {
+  font-family: var(--st-font-chrome);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--st-ink-3);
+  max-width: 70ch;
+}
+.marg {
+  font-family: var(--st-font-prose);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--st-ink-3);
+  border-left: 2px solid var(--st-blue);
+  padding: 4px 0 4px 12px;
+  margin: 10px 0;
+  max-width: 56ch;
+}
+
+code, .mono { font-family: var(--st-font-mono); }
+code { font-size: 0.92em; background: var(--st-paper-2); padding: 1px 5px; border: 1px solid var(--st-rule); }
+
+/* ─────────────────────────────────────────────────────────────────────
+   THE WORDMARK
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Generic wordmark. Use .st-wm <span class=g>g</span> wraps the inverted glyph.
+ * Tunable per-font via the --st-wm-* custom properties.
+ */
+.st-wm {
+  font-family: var(--st-wm-font, var(--st-font-prose));
+  font-weight: var(--st-wm-weight, 600);
+  font-size: var(--st-wm-size, 96px);
+  letter-spacing: var(--st-wm-tracking, -0.005em);
+  line-height: 1;
+  color: var(--st-ink);
+  white-space: nowrap;
+  display: inline-block;
+}
+.st-wm .g {
+  display: inline-block;
+  text-transform: capitalize;       /* defends against parent text-transform */
+  transform-origin: center 50%;
+  transform: rotate(180deg)
+             scaleY(var(--st-wm-g-sy, 1.00))
+             scaleX(var(--st-wm-g-sx, 0.75))
+             translateY(var(--st-wm-g-ty, 5%));
+  margin-inline: var(--st-wm-g-margin, -0.10em);
+  color: inherit;
+}
+
+/* per-font tuning ─────────────────────────────────────────────────── */
+
+.st-wm.font-newsreader {
+  --st-wm-font: var(--st-font-prose);
+  --st-wm-weight: 600;
+  --st-wm-tracking: -0.01em;
+  /* Newsreader sits its bowl high and curls a deep descender. Flipped, the
+   * curl becomes the ascender and the bowl drops; the g rides DOWN (+5%) so
+   * its new descender seats on the basement line shared with the y. No
+   * vertical stretch needed — sy stays at 1.0. */
+  --st-wm-g-sy: 1.00;
+  --st-wm-g-sx: 0.75;
+  --st-wm-g-ty: 5%;
+  --st-wm-g-margin: -0.10em;
+}
+.st-wm.font-mono {
+  --st-wm-font: var(--st-font-mono);
+  --st-wm-weight: 700;
+  --st-wm-tracking: -0.02em;
+  /* JetBrains Mono is monospaced and vertically even: no horizontal squish,
+   * no sidebearing pull. The flipped g rides UP (-20%) onto the basement. */
+  --st-wm-g-sy: 1.00;
+  --st-wm-g-sx: 1.00;
+  --st-wm-g-ty: -20%;
+  --st-wm-g-margin: 0em;
+}
+.st-wm.font-chrome {
+  --st-wm-font: var(--st-font-chrome);
+  --st-wm-weight: 700;
+  --st-wm-tracking: -0.015em;
+  /* Inter Tight's single-storey g is wide; squish X to 0.75 and pull the
+   * sidebearings in (-0.10em). Rides UP (-20%) onto the basement line. */
+  --st-wm-g-sy: 1.00;
+  --st-wm-g-sx: 0.75;
+  --st-wm-g-ty: -20%;
+  --st-wm-g-margin: -0.10em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   THE STANDALONE GLYPH
+   The same flipped g, isolated as a mark. Used for favicon, social
+   card watermark, brand-only buttons, and any context the wordmark
+   is too wide for.
+   ───────────────────────────────────────────────────────────────────── */
+
+.st-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: var(--st-glyph-size, 96px);
+  height: var(--st-glyph-size, 96px);
+  font-family: var(--st-font-prose);
+  font-weight: 700;
+  font-size: calc(var(--st-glyph-size, 96px) * 0.78);
+  line-height: 1;
+  color: var(--st-paper);
+  background: var(--st-ink);
+  position: relative;
+  overflow: hidden;
+}
+.st-glyph::after {
+  /* the g, baked in via ::after content so the element can be a single tag in
+   * markup. Just a 180° turn plus a horizontal squish that varies by voice —
+   * NO vertical scale and NO shift. place-items:center on .st-glyph handles the
+   * centering; mono isn't squished at all. */
+  content: "g";
+  display: inline-block;
+  text-transform: capitalize;
+  transform: rotate(180deg) scaleX(var(--st-glyph-sx, 0.82));
+  line-height: 1;
+}
+.st-glyph.inverted    { background: var(--st-paper); color: var(--st-ink); border: 2px solid var(--st-ink); }
+.st-glyph.blue        { background: var(--st-blue); }
+.st-glyph.burnt       { background: var(--st-burnt); }
+.st-glyph.round       { border-radius: 50%; }
+.st-glyph.frame       { background: transparent; color: var(--st-ink); border: 2.5px solid var(--st-ink); }
+
+/* lockups ─────────────────────────────────────────────────────────── */
+
+.st-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+.st-lock .st-glyph { --st-glyph-size: 1.18em; font-size: 0.92em; }
+.st-lock .st-tag {
+  font-family: var(--st-font-mono);
+  font-size: 0.42em;
+  color: var(--st-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  border-left: 1px solid var(--st-rule-strong);
+  padding-left: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   tiles / grid scaffolding
+   ───────────────────────────────────────────────────────────────────── */
+
+.tile {
+  background: #fff;
+  border: 1.5px solid var(--st-rule);
+  padding: 22px;
+  position: relative;
+}
+.tile .tile-label {
+  position: absolute;
+  top: -10px; left: 14px;
+  background: var(--st-paper);
+  font-family: var(--st-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--st-ink-3);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.tile .tile-foot {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px dotted var(--st-rule);
+  font-family: var(--st-font-mono);
+  font-size: 10.5px;
+  color: var(--st-ink-3);
+  line-height: 1.6;
+}
+.tile .tile-foot code { background: transparent; border: none; padding: 0; color: var(--st-ink-2); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 18px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; }
+.grid-asym { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; margin-top: 18px; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   color swatches
+   ───────────────────────────────────────────────────────────────────── */
+
+.swatch {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px dotted var(--st-rule);
+  font-family: var(--st-font-mono);
+  font-size: 11.5px;
+}
+.swatch:last-child { border-bottom: none; }
+.swatch .sw-chip {
+  width: 56px; height: 32px;
+  border: 1px solid var(--st-ink);
+}
+.swatch .sw-name { color: var(--st-ink); }
+.swatch .sw-hex { color: var(--st-ink-3); letter-spacing: -0.01em; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   README banner mockup
+   ───────────────────────────────────────────────────────────────────── */
+
+.readme-banner {
+  background: var(--st-paper);
+  border: 1.5px solid var(--st-rule-strong);
+  padding: 56px 64px 64px;
+  position: relative;
+  overflow: hidden;
+  min-height: 380px;
+}
+.readme-banner::before {
+  /* knot of thin ink lines, marginalia-style */
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 280px;
+  background:
+    radial-gradient(circle at 60% 30%, var(--st-rule) 0 1.5px, transparent 1.5px 100%) 0 0 / 26px 26px,
+    radial-gradient(circle at 60% 30%, var(--st-rule) 0 1.5px, transparent 1.5px 100%) 13px 13px / 26px 26px;
+  opacity: 0.5;
+  mask-image: linear-gradient(to left, black 0%, transparent 80%);
+  -webkit-mask-image: linear-gradient(to left, black 0%, transparent 80%);
+  pointer-events: none;
+}
+.readme-banner .b-wm   { --st-wm-size: 96px; }
+.readme-banner .b-tag  {
+  font-family: var(--st-font-prose);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--st-ink-2);
+  margin-top: 14px;
+  margin-bottom: 56px;
+  max-width: 50ch;
+  line-height: 1.4;
+}
+.readme-banner .b-meta {
+  position: absolute;
+  bottom: 22px; left: 64px;
+  font-family: var(--st-font-mono);
+  font-size: 10.5px;
+  color: var(--st-ink-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.readme-banner .b-rule {
+  position: absolute;
+  bottom: 22px; right: 64px;
+  font-family: var(--st-font-mono);
+  font-size: 10.5px;
+  color: var(--st-ink-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   CLI splash
+   ───────────────────────────────────────────────────────────────────── */
+
+.cli-splash {
+  background: #15140f;
+  color: #e8dfc6;
+  font-family: var(--st-font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 22px 24px;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.cli-splash .dots {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.cli-splash .dots span {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #4d4a3d;
+}
+.cli-splash .cli-wm {
+  color: #e8dfc6;
+  --st-wm-size: 38px;
+  --st-wm-font: var(--st-font-mono);
+}
+.cli-splash .cli-banner-line { color: #6b6a64; }
+.cli-splash .cli-prompt {
+  color: #e8dfc6;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.cli-splash .cli-prompt .glyph {
+  font-family: var(--st-font-mono);
+  font-weight: 700;
+  display: inline-block;
+  transform: rotate(180deg);
+  text-transform: capitalize;
+  color: #d6a35a;
+}
+.cli-splash .cli-cursor {
+  display: inline-block;
+  width: 7px;
+  background: #e8dfc6;
+  animation: blink 1.1s steps(2) infinite;
+  margin-left: 2px;
+}
+.cli-splash .dim { color: #8a8472; }
+.cli-splash .accent { color: #d6a35a; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ─────────────────────────────────────────────────────────────────────
+   social card preview
+   ───────────────────────────────────────────────────────────────────── */
+
+.social-card {
+  width: 100%;
+  aspect-ratio: 1280 / 640;
+  background: var(--st-paper);
+  border: 1.5px solid var(--st-ink);
+  padding: 56px 64px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr auto auto;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.social-card::before {
+  content: "";
+  position: absolute;
+  top: 0; right: -80px; bottom: 0;
+  width: 480px;
+  background:
+    radial-gradient(circle, var(--st-rule-strong) 0 2px, transparent 2px 100%) 0 0 / 38px 38px;
+  opacity: 0.4;
+  mask-image: radial-gradient(circle at 100% 50%, black 0 50%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at 100% 50%, black 0 50%, transparent 80%);
+}
+.social-card .sc-wm { --st-wm-size: 96px; grid-column: 1 / 2; }
+.social-card .sc-tag {
+  grid-column: 1 / -1;
+  font-family: var(--st-font-prose);
+  font-style: italic;
+  font-size: 22px;
+  color: var(--st-ink-2);
+  max-width: 60ch;
+}
+.social-card .sc-meta {
+  grid-column: 1 / 2;
+  font-family: var(--st-font-mono);
+  font-size: 12.5px;
+  color: var(--st-ink-3);
+}
+.social-card .sc-glyph { grid-column: 2 / 3; grid-row: 3 / 4; align-self: end; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   rtd / docs header
+   ───────────────────────────────────────────────────────────────────── */
+
+.docs-strip {
+  background: var(--st-paper);
+  border: 1.5px solid var(--st-rule-strong);
+  border-bottom-width: 2px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 24px;
+  padding: 14px 22px;
+  align-items: center;
+}
+.docs-strip .d-wm   { --st-wm-size: 28px; }
+.docs-strip .d-nav  {
+  display: flex; gap: 22px;
+  font-family: var(--st-font-chrome);
+  font-size: 12.5px;
+  color: var(--st-ink-2);
+}
+.docs-strip .d-nav a { text-decoration: none; }
+.docs-strip .d-nav a.on { color: var(--st-ink); font-weight: 600; border-bottom: 1.5px solid var(--st-ink); padding-bottom: 4px; }
+.docs-strip .d-meta {
+  font-family: var(--st-font-mono);
+  font-size: 11px;
+  color: var(--st-ink-3);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   favicons
+   ───────────────────────────────────────────────────────────────────── */
+
+.favicon-grid {
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: 16px;
+  align-items: end;
+  justify-content: start;
+  padding-top: 12px;
+}
+.favicon-cell { display: grid; gap: 6px; text-align: center; font-family: var(--st-font-mono); font-size: 10px; color: var(--st-ink-3); }
+
+/* do / don't ─────────────────────────────────────────────────────── */
+
+.dodont {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.dodont .card {
+  background: #fff;
+  border: 1.5px solid var(--st-rule);
+  padding: 16px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  min-height: 140px;
+}
+.dodont .card.bad { border-color: var(--st-bad); }
+.dodont .card.good { border-color: var(--st-ok); }
+.dodont .card .demo { display: grid; place-items: center; padding: 12px; }
+.dodont .card .label {
+  font-family: var(--st-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--st-ink-3);
+  display: flex; align-items: center; gap: 6px;
+}
+.dodont .card .label .tag { padding: 1px 6px; font-weight: 700; color: #fff; }
+.dodont .card.bad .label .tag { background: var(--st-bad); }
+.dodont .card.good .label .tag { background: var(--st-ok); }
+.dodont .card .label .body { color: var(--st-ink-2); text-transform: none; font-family: var(--st-font-chrome); font-weight: 400; letter-spacing: 0; font-size: 12px; }
+
+/* asset index ───────────────────────────────────────────────────── */
+table.assets {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--st-font-mono); font-size: 11.5px;
+  margin-top: 4px;
+}
+table.assets th, table.assets td {
+  text-align: left; padding: 6px 10px;
+  border-bottom: 1px dotted var(--st-rule);
+}
+table.assets th {
+  font-weight: 600;
+  font-family: var(--st-font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--st-ink-3);
+  border-bottom: 1.5px solid var(--st-rule-strong);
+}
+table.assets td.path { color: var(--st-ink); }
+table.assets td.purpose { color: var(--st-ink-2); }
+table.assets td.note { color: var(--st-ink-3); }
+
+/* big hero ──────────────────────────────────────────────────────── */
+.hero {
+  padding: 40px 0 24px;
+  border-bottom: 1px dotted var(--st-rule);
+  margin-bottom: 32px;
+}
+.hero .st-wm { --st-wm-size: 160px; }
+.hero .tagline {
+  font-family: var(--st-font-prose);
+  font-style: italic;
+  font-size: 22px;
+  color: var(--st-ink-2);
+  margin: 18px 0 8px;
+  max-width: 56ch;
+}
+.hero .subtag {
+  font-family: var(--st-font-mono);
+  font-size: 12px;
+  color: var(--st-ink-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   TWEAKS — three expressive postures.
+   Each control rewrites a gestalt of the sheet, not a single property.
+   §1 variants and §4 type samples stay locked (see .voice-locked).
+   ───────────────────────────────────────────────────────────────────── */
+
+/* SURFACE — paper (canonical) · ink (negative) · blueprint (cyanotype) */
+
+body[data-st-mode="ink"] {
+  --st-paper:       #15140f;
+  --st-paper-2:     #1f1e18;
+  --st-paper-3:     #2a2920;
+  --st-ink:         #e8dfc6;
+  --st-ink-2:       #c9c2ad;
+  --st-ink-3:       #8a8472;
+  --st-ink-4:       #6b6a64;
+  --st-rule:        #2f2d24;
+  --st-rule-strong: #4d4a3d;
+  --st-blue:        #8db4ff;
+  --st-burnt:       #e07a40;
+  --st-ok:          #6fbf8c;
+  --st-warn:        #d6a35a;
+  --st-bad:         #d65a4a;
+}
+
+body[data-st-mode="blueprint"] {
+  --st-paper:       #c9d6e8;
+  --st-paper-2:     #b8c8dd;
+  --st-paper-3:     #a3b6d0;
+  --st-ink:         #0c2447;
+  --st-ink-2:       #1a3460;
+  --st-ink-3:       #486487;
+  --st-ink-4:       #6e83a4;
+  --st-rule:        #7891b3;
+  --st-rule-strong: #34507e;
+  --st-blue:        #0c2447;     /* ink IS the blue here */
+  --st-burnt:       #c25028;
+  --st-ok:          #2c6f54;
+  --st-warn:        #b58440;
+  --st-bad:         #962b22;
+}
+
+/* tile / card backgrounds were hard-coded #fff — make them mode-aware */
+body[data-st-mode="ink"] .tile,
+body[data-st-mode="ink"] .dodont .card { background: #1f1e18; }
+body[data-st-mode="blueprint"] .tile,
+body[data-st-mode="blueprint"] .dodont .card { background: #dde6f1; }
+
+/* sheet background follows the surface */
+body[data-st-mode="ink"],
+body[data-st-mode="blueprint"] { background: var(--st-paper); }
+html { background: var(--st-paper); }
+
+/* the bad-example gradient card should keep its identity in every mode */
+body[data-st-mode] .dodont .card.bad .demo[style*="gradient"] { background-image: linear-gradient(135deg, #ff6b9d, #c77dff, #4cc9f0) !important; }
+
+
+/* VOICE — swap the wordmark font globally for non-locked instances */
+
+body[data-st-voice="prose"] .st-wm:not(.voice-locked) {
+  --st-wm-font: var(--st-font-prose);
+  --st-wm-weight: 600;
+  --st-wm-tracking: -0.01em;
+  --st-wm-g-sy: 1.00;
+  --st-wm-g-sx: 0.75;
+  --st-wm-g-ty: 5%;
+  --st-wm-g-margin: -0.10em;
+}
+body[data-st-voice="mono"] .st-wm:not(.voice-locked) {
+  --st-wm-font: var(--st-font-mono);
+  --st-wm-weight: 700;
+  --st-wm-tracking: -0.02em;
+  --st-wm-g-sy: 1.00;
+  --st-wm-g-sx: 1.00;
+  --st-wm-g-ty: -20%;
+  --st-wm-g-margin: 0em;
+}
+body[data-st-voice="chrome"] .st-wm:not(.voice-locked) {
+  --st-wm-font: var(--st-font-chrome);
+  --st-wm-weight: 700;
+  --st-wm-tracking: -0.015em;
+  --st-wm-g-sy: 1.00;
+  --st-wm-g-sx: 0.75;
+  --st-wm-g-ty: -20%;
+  --st-wm-g-margin: -0.10em;
+}
+/* glyph follows voice too — same font fuels the standalone mark. Only the
+ * horizontal squish changes per font; mono stays at its natural width. */
+body[data-st-voice="prose"]  .st-glyph:not(.voice-locked) { font-family: var(--st-font-prose);  --st-glyph-sx: 0.82; }
+body[data-st-voice="mono"]   .st-glyph:not(.voice-locked) { font-family: var(--st-font-mono);   --st-glyph-sx: 1.00; }
+body[data-st-voice="chrome"] .st-glyph:not(.voice-locked) { font-family: var(--st-font-chrome); --st-glyph-sx: 0.75; }
+
+
+/* POSTURE — editorial (slow) · engineering (default) · terminal (fast) */
+
+body[data-st-posture="editorial"] .sheet { max-width: 1080px; padding: 88px 88px 128px; }
+body[data-st-posture="editorial"] p.intro {
+  font-size: 19.5px; line-height: 1.72; max-width: 60ch;
+  font-style: italic; color: var(--st-ink-2);
+}
+body[data-st-posture="editorial"] p.intro b { font-style: normal; color: var(--st-ink); }
+body[data-st-posture="editorial"] h2.sec { margin: 96px 0 24px; padding-bottom: 12px; }
+body[data-st-posture="editorial"] h3.sub { font-size: 28px; margin: 40px 0 18px; }
+body[data-st-posture="editorial"] .hero { padding: 64px 0 48px; }
+body[data-st-posture="editorial"] .hero .st-wm { --st-wm-size: 200px; }
+body[data-st-posture="editorial"] .hero .tagline { font-size: 26px; margin: 28px 0 10px; }
+body[data-st-posture="editorial"] .tile { padding: 32px; }
+body[data-st-posture="editorial"] .marg { font-size: 15px; padding: 6px 0 6px 18px; max-width: 50ch; }
+body[data-st-posture="editorial"] .grid-2,
+body[data-st-posture="editorial"] .grid-3,
+body[data-st-posture="editorial"] .grid-4,
+body[data-st-posture="editorial"] .grid-asym { gap: 28px; margin-top: 28px; }
+
+body[data-st-posture="terminal"] { font-family: var(--st-font-mono); font-size: 12.5px; }
+body[data-st-posture="terminal"] .sheet { max-width: 1280px; padding: 28px 36px 56px; }
+body[data-st-posture="terminal"] > .sheet > header { margin-bottom: 28px; padding-bottom: 12px; }
+body[data-st-posture="terminal"] p.intro {
+  font-family: var(--st-font-mono);
+  font-size: 12.5px; line-height: 1.55;
+  max-width: 84ch;
+}
+body[data-st-posture="terminal"] p.intro::before {
+  content: "// "; color: var(--st-ink-3); font-weight: 400;
+}
+body[data-st-posture="terminal"] h2.sec { margin: 36px 0 8px; font-size: 11.5px; }
+body[data-st-posture="terminal"] h3.sub {
+  font-family: var(--st-font-mono); font-size: 13.5px;
+  text-transform: lowercase; letter-spacing: 0;
+  font-weight: 700; margin: 16px 0 6px;
+}
+body[data-st-posture="terminal"] h3.sub::before { content: "$ "; color: var(--st-ink-3); font-weight: 400; }
+body[data-st-posture="terminal"] .hero { padding: 18px 0 14px; }
+body[data-st-posture="terminal"] .hero .st-wm { --st-wm-size: 96px; }
+body[data-st-posture="terminal"] .hero .tagline {
+  font-family: var(--st-font-mono); font-size: 14px;
+  font-style: normal; margin: 8px 0 4px;
+}
+body[data-st-posture="terminal"] .tile { padding: 14px 16px; }
+body[data-st-posture="terminal"] .marg {
+  font-family: var(--st-font-mono); font-style: normal;
+  font-size: 12px; border-left-color: var(--st-warn);
+  padding: 3px 0 3px 10px;
+}
+body[data-st-posture="terminal"] .marg::before { content: "// "; color: var(--st-ink-3); }
+body[data-st-posture="terminal"] .grid-2,
+body[data-st-posture="terminal"] .grid-3,
+body[data-st-posture="terminal"] .grid-4,
+body[data-st-posture="terminal"] .grid-asym { gap: 10px; margin-top: 10px; }
+body[data-st-posture="terminal"] .readme-banner { padding: 28px 36px 36px; min-height: 0; }
+body[data-st-posture="terminal"] .readme-banner::before { display: none; }
+body[data-st-posture="terminal"] .readme-banner .b-tag {
+  font-family: var(--st-font-mono); font-style: normal; font-size: 14px; margin-bottom: 28px;
+}
+body[data-st-posture="terminal"] .social-card { padding: 28px 36px; }
+body[data-st-posture="terminal"] .social-card .sc-tag { font-family: var(--st-font-mono); font-style: normal; font-size: 16px; }
+
+
+/* ─────────────────────────────────────────────────────────────────────
+   TWEAKS PANEL — host-driven; hidden until toolbar toggle activates it.
+   ───────────────────────────────────────────────────────────────────── */
+
+.tw-panel {
+  position: fixed; bottom: 24px; right: 24px;
+  z-index: 1000;
+  width: 280px;
+  background: var(--st-paper);
+  color: var(--st-ink);
+  border: 1.5px solid var(--st-ink);
+  box-shadow: 0 18px 40px -12px rgba(0,0,0,0.35);
+  font-family: var(--st-font-chrome);
+  display: none;
+}
+.tw-panel.on { display: block; }
+.tw-panel .tw-hd {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--st-font-mono);
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-weight: 700; color: var(--st-ink);
+  background: var(--st-paper-2);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--st-rule-strong);
+}
+.tw-panel .tw-hd .close {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--st-font-mono); font-size: 16px; color: var(--st-ink-3);
+  padding: 0 4px; line-height: 1;
+}
+.tw-panel .tw-hd .close:hover { color: var(--st-ink); }
+.tw-panel .tw-bd { padding: 14px; display: grid; gap: 16px; }
+.tw-panel .tw-row { display: grid; gap: 5px; }
+.tw-panel .tw-lab {
+  font-family: var(--st-font-mono);
+  font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--st-ink-3);
+}
+.tw-panel .tw-seg { display: flex; border: 1px solid var(--st-ink); }
+.tw-panel .tw-seg button {
+  flex: 1;
+  background: var(--st-paper); color: var(--st-ink-2);
+  border: none; border-right: 1px solid var(--st-rule);
+  font-family: var(--st-font-mono); font-size: 11px;
+  padding: 7px 6px; cursor: pointer;
+  letter-spacing: 0; text-transform: lowercase;
+}
+.tw-panel .tw-seg button:last-child { border-right: none; }
+.tw-panel .tw-seg button:hover { background: var(--st-paper-3); }
+.tw-panel .tw-seg button.on {
+  background: var(--st-ink); color: var(--st-paper); font-weight: 700;
+}
+.tw-panel .tw-foot {
+  font-family: var(--st-font-mono);
+  font-size: 9.5px; line-height: 1.55;
+  color: var(--st-ink-4);
+  padding: 0 14px 12px;
+}
+
+/* G-tune sliders ─────────────────────────────────────────────────── */
+.tw-panel .tw-tune {
+  display: grid; gap: 7px;
+  border-top: 1px dotted var(--st-rule);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.tw-panel .tw-tune .tw-tune-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 50px;
+  align-items: center;
+  gap: 8px;
+}
+.tw-panel .tw-tune .tw-tune-row > label {
+  font-family: var(--st-font-mono);
+  font-size: 9.5px; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--st-ink-3);
+}
+.tw-panel .tw-tune .tw-tune-row > .tw-num {
+  font-family: var(--st-font-mono);
+  font-size: 10.5px;
+  color: var(--st-ink);
+  text-align: right;
+}
+.tw-panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%; height: 4px;
+  background: var(--st-rule);
+  outline: none; margin: 0;
+}
+.tw-panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  background: var(--st-ink);
+  cursor: pointer; border-radius: 0;
+}
+.tw-panel input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  background: var(--st-ink);
+  cursor: pointer; border-radius: 0; border: none;
+}
+.tw-panel .tw-reset {
+  font-family: var(--st-font-mono);
+  font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent; color: var(--st-ink-3);
+  border: 1px solid var(--st-rule);
+  padding: 5px 8px;
+  cursor: pointer;
+  justify-self: start;
+  margin-top: 4px;
+}
+.tw-panel .tw-reset:hover { color: var(--st-ink); border-color: var(--st-ink); }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+
+  <!-- ──────────────────────────────────────────────────────────────
+       HEADER
+       ────────────────────────────────────────────────────────────── -->
+  <header>
+    <div>
+      <div class="st-lock" style="font-size: 0">
+        <span class="st-glyph round" style="--st-glyph-size: 36px"></span>
+        <span class="st-wm font-newsreader" style="--st-wm-size: 28px">StoryTan<span class="g">g</span>l</span>
+        <span class="st-tag" style="font-size: 28px">brand sheet<br/>v1.0 · 2026-05</span>
+      </div>
+    </div>
+    <div class="meta">
+      a research platform for graph-based<br/>
+      computational narratology<br/>
+      <span style="color: var(--st-ink-4)">github.com/derekmerck/storytangl</span>
+    </div>
+  </header>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       HERO
+       ────────────────────────────────────────────────────────────── -->
+  <div class="hero">
+    <span class="st-wm font-newsreader">StoryTan<span class="g">g</span>l</span>
+    <div class="tagline">A research platform for graph-based computational narratology.</div>
+    <div class="subtag">Turn the <code style="font-family: var(--st-font-mono); font-size: 12px; background:transparent; border:none; padding:0; font-weight:700;">g</code> over and read the rest.</div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §1 — Wordmark (the canonical form)
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§1</span>
+    <span>Wordmark</span>
+    <span class="right">canonical · do not redraw</span>
+  </h2>
+
+  <p class="intro">
+    The wordmark is <b>"StoryTangl" set in the body font, with the lowercase <code>g</code> rotated 180°.</b>
+    The rotation is the mark; everything else is typography. The flipped descender becomes an ascender,
+    the bowl becomes a descender, and the joke is visible at every size from favicon to billboard.
+    Origin: an earlier project used an inverted <code>Ɐ</code> as a currency mark — when this engine
+    needed a name, the same transformation applied to a different letter produced both the name and
+    its identity in one stroke.
+  </p>
+
+  <div class="marg">
+    The inversion exists on the page in CSS, in the terminal as Unicode <code>U+2141 ⅁</code>, and
+    in SVG as a transform on the glyph. The mark survives medium-shift; the transform doesn't matter.
+  </div>
+
+  <h3 class="sub">Canonical · Newsreader 600</h3>
+  <div class="tile" style="padding: 36px; background: var(--st-paper);">
+    <div class="tile-label">canonical wordmark</div>
+    <div style="text-align: center; padding: 18px 0;">
+      <span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 132px">StoryTan<span class="g">g</span>l</span>
+    </div>
+    <div class="tile-foot">
+      <code>font: Newsreader 600</code> · <code>--st-wm-g-sy: 1.00</code> ·
+      <code>--st-wm-g-sx: 0.75</code> · <code>--st-wm-g-ty: 5%</code> ·
+      <code>--st-wm-g-margin: -.10em</code>
+    </div>
+  </div>
+
+  <h3 class="sub">Variants · per context</h3>
+  <p class="note">
+    Different surfaces use different fonts in the underlying type stack. The <code>g</code>
+    transform is re-tuned per font so the lip lands on the baseline and the new descender matches
+    the depth of neighboring descenders. The three tunings below are the only sanctioned variants.
+  </p>
+
+  <div class="grid-3" style="margin-top: 18px">
+    <div class="tile" style="padding: 28px 22px;">
+      <div class="tile-label">Newsreader · prose / docs</div>
+      <div style="display: grid; place-items: center; padding: 14px 0;">
+        <span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 56px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="tile-foot">use in: README banner · RTD title · social card · paper-form prose · the wireframe doc</div>
+    </div>
+
+    <div class="tile" style="padding: 28px 22px;">
+      <div class="tile-label">JetBrains Mono · code / CLI</div>
+      <div style="display: grid; place-items: center; padding: 14px 0;">
+        <span class="st-wm voice-locked font-mono" style="--st-wm-size: 48px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="tile-foot">use in: CLI splash · log banners · terminal headers · prompts where the wordmark appears verbatim</div>
+    </div>
+
+    <div class="tile" style="padding: 28px 22px;">
+      <div class="tile-label">Inter Tight · web chrome</div>
+      <div style="display: grid; place-items: center; padding: 14px 0;">
+        <span class="st-wm voice-locked font-chrome" style="--st-wm-size: 52px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="tile-foot">use in: web app navbar · admin chrome · any context already typeset in Inter Tight</div>
+    </div>
+  </div>
+
+  <h3 class="sub">Sizes — keep the ratios; no minimum height</h3>
+  <p class="note">
+    The wordmark scales freely; the transform is unitless. The flipped <code>g</code> remains legible
+    at small sizes because the inversion <i>is</i> the legibility. Below 16px the wordmark drops to
+    the glyph-only form (see §2).
+  </p>
+  <div class="tile" style="padding: 22px; display: grid; gap: 18px;">
+    <div><span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 132px">StoryTan<span class="g">g</span>l</span></div>
+    <div><span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 88px">StoryTan<span class="g">g</span>l</span></div>
+    <div><span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 56px">StoryTan<span class="g">g</span>l</span></div>
+    <div><span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 32px">StoryTan<span class="g">g</span>l</span></div>
+    <div><span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 20px">StoryTan<span class="g">g</span>l</span></div>
+    <div><span class="st-wm voice-locked font-newsreader" style="--st-wm-size: 16px">StoryTan<span class="g">g</span>l</span></div>
+  </div>
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §2 — Glyph
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§2</span>
+    <span>Glyph</span>
+    <span class="right">standalone mark · favicon · social card</span>
+  </h2>
+
+  <p class="intro">
+    The glyph is the wordmark's <code>g</code> alone, set bold in the wordmark font and centered.
+    Use it when the wordmark is too wide (favicons, app icons, social-card watermark, small UI
+    chrome). The glyph is always square; choose round or framed only when the host surface demands it.
+  </p>
+
+  <div class="grid-4" style="margin-top: 18px">
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">primary</div>
+      <span class="st-glyph" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">ink on paper-knockout</div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">inverted</div>
+      <span class="st-glyph inverted" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">paper on ink-knockout</div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">blue-pencil</div>
+      <span class="st-glyph blue" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">for moments of emphasis</div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">framed</div>
+      <span class="st-glyph frame" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">for narrow chrome lines</div>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-top: 18px">
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">round</div>
+      <span class="st-glyph round" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">app icons · circular avatars</div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">round · inverted</div>
+      <span class="st-glyph round inverted" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">light-on-dark contexts</div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">burnt accent</div>
+      <span class="st-glyph burnt round" style="--st-glyph-size: 132px"></span>
+      <div class="tile-foot" style="text-align: center">single brand pop · sparingly</div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 32px 22px 22px;">
+      <div class="tile-label">mono · ASCII fallback</div>
+      <div style="font-family: var(--st-font-mono); font-weight: 700; font-size: 132px; line-height: 1; color: var(--st-ink); transform: scaleX(0.9);">⅁</div>
+      <div class="tile-foot" style="text-align: center"><code>U+2141</code> · terminal · text-only</div>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §3 — Lockups
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§3</span>
+    <span>Lockups</span>
+    <span class="right">one mark + descriptor · never both marks</span>
+  </h2>
+
+  <p class="intro">
+    A lockup pairs <b>one</b> mark with a descriptor — never two marks. The glyph <i>is</i> the
+    wordmark's flipped <code>g</code>, so setting them together just says the same thing twice.
+    Use the <b>wordmark</b> when there's room to read it, the <b>glyph</b> when there isn't. The
+    optional descriptor sits behind a <code>1px</code> ink-3 rule at a <code>0.18em</code> gap.
+  </p>
+
+  <div class="grid-2" style="margin-top: 30px">
+    <div class="tile" style="display: grid; place-items: center; padding: 36px;">
+      <div class="tile-label">wordmark + descriptor</div>
+      <div class="st-lock" style="font-size: 48px;">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 1em">StoryTan<span class="g">g</span>l</span>
+        <span class="st-tag">interactive<br/>narrative engine</span>
+      </div>
+    </div>
+    <div class="tile" style="display: grid; place-items: center; padding: 36px;">
+      <div class="tile-label">glyph + descriptor · compact</div>
+      <div class="st-lock" style="font-size: 48px;">
+        <span class="st-glyph round" style="--st-glyph-size: 1.2em"></span>
+        <span class="st-tag">interactive<br/>narrative engine</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dodont" style="margin-top: 18px;">
+    <div class="card good">
+      <div class="demo">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 52px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DO</span><span class="body">one mark, standing alone · the wordmark already carries the glyph</span></div>
+    </div>
+    <div class="card bad">
+      <div class="demo">
+        <div class="st-lock" style="font-size: 52px;">
+          <span class="st-glyph round" style="--st-glyph-size: 1.2em"></span>
+          <span class="st-wm font-newsreader" style="--st-wm-size: 1em">StoryTan<span class="g">g</span>l</span>
+        </div>
+      </div>
+      <div class="label"><span class="tag">DON'T</span><span class="body">glyph + wordmark together · the flipped <code>g</code>, twice over</span></div>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §4 — Typography
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§4</span>
+    <span>Type stack</span>
+    <span class="right">three families · three roles · never mixed</span>
+  </h2>
+
+  <p class="intro">
+    Three families. Each family belongs to one role. No fourth family. If a context needs typographic
+    emphasis, reach for weight or size, never an additional family. The wordmark sets in the prose
+    family by default and falls back per §1 when context demands.
+  </p>
+
+  <div class="grid-3" style="margin-top: 18px">
+    <div class="tile" style="padding: 22px;">
+      <div class="tile-label">prose · titles · wordmark</div>
+      <div style="font-family: var(--st-font-prose); margin-top: 8px;">
+        <div style="font-size: 11px; color: var(--st-ink-3); font-family: var(--st-font-mono); letter-spacing: 0.06em; text-transform: uppercase;">Newsreader</div>
+        <div style="font-size: 64px; line-height: 1; font-weight: 600; margin: 6px 0 4px;">Aa Gg</div>
+        <div style="font-size: 22px; line-height: 1.3; color: var(--st-ink-2); font-weight: 500;">The bridge is out — you'll want the long way.</div>
+        <div style="font-size: 13.5px; line-height: 1.55; color: var(--st-ink-3); font-style: italic; margin-top: 6px;">A finger-post points east toward the river and west toward the mill.</div>
+      </div>
+      <div class="tile-foot">
+        weights · <code>400 / 500 / 600 / 700</code><br/>
+        use · prose · titles · wordmark · narrative copy
+      </div>
+    </div>
+
+    <div class="tile" style="padding: 22px;">
+      <div class="tile-label">engine output · cli · code</div>
+      <div style="font-family: var(--st-font-mono); margin-top: 8px;">
+        <div style="font-size: 11px; color: var(--st-ink-3); letter-spacing: 0.06em; text-transform: uppercase;">JetBrains Mono</div>
+        <div style="font-size: 56px; line-height: 1; font-weight: 700; margin: 6px 0 4px;">Aa Gg</div>
+        <div style="font-size: 13px; line-height: 1.5; color: var(--st-ink-2);">{ uid: "g-scene", fragment_type: "group" }</div>
+        <div style="font-size: 12px; line-height: 1.6; color: var(--st-ink-3); margin-top: 6px;">
+          $ tangl-cli<br/>
+          ⅁&gt; play coronate_the_regent
+        </div>
+      </div>
+      <div class="tile-foot">
+        weights · <code>400 / 500 / 600 / 700</code><br/>
+        use · engine output · cli · code · fragment data
+      </div>
+    </div>
+
+    <div class="tile" style="padding: 22px;">
+      <div class="tile-label">ui chrome · small labels</div>
+      <div style="font-family: var(--st-font-chrome); margin-top: 8px;">
+        <div style="font-size: 11px; color: var(--st-ink-3); font-family: var(--st-font-mono); letter-spacing: 0.06em; text-transform: uppercase;">Inter Tight</div>
+        <div style="font-size: 56px; line-height: 1; font-weight: 700; margin: 6px 0 4px;">Aa Gg</div>
+        <div style="font-size: 14px; line-height: 1.4; color: var(--st-ink-2); font-weight: 500;">World &nbsp;·&nbsp; Inspect &nbsp;·&nbsp; History</div>
+        <div style="font-size: 11px; line-height: 1.4; color: var(--st-ink-3); margin-top: 8px; text-transform: uppercase; letter-spacing: 0.08em;">Ledger · Step 14 · Cursor active</div>
+      </div>
+      <div class="tile-foot">
+        weights · <code>400 / 500 / 600 / 700</code><br/>
+        use · navbar · buttons · tags · table headers
+      </div>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §5 — Palette
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§5</span>
+    <span>Palette</span>
+    <span class="right">engineering-notebook · closed set</span>
+  </h2>
+
+  <p class="intro">
+    The palette is small and closed. <b>Paper, ink, blue-pencil, burnt accent</b>, plus three
+    severity tokens that round-trip with <code>KvRow.emphasis</code> in the widget vocabulary.
+    Do not add hues; if a new severity surfaces, propose an addition in <code>USAGE.md</code>.
+    The dark mode is a literal photographic negative; it is not a second palette.
+  </p>
+
+  <div class="grid-2" style="margin-top: 18px">
+    <div class="tile" style="padding: 20px;">
+      <div class="tile-label">surface · structure</div>
+      <div style="margin-top: 10px;">
+        <div class="swatch">
+          <div class="sw-chip" style="background: #f6f3ea"></div>
+          <div><div class="sw-name">--st-paper</div><div style="font-size: 10px; color: var(--st-ink-3)">primary surface</div></div>
+          <div class="sw-hex">#f6f3ea</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #eee8d6"></div>
+          <div><div class="sw-name">--st-paper-2</div><div style="font-size: 10px; color: var(--st-ink-3)">banded · hover</div></div>
+          <div class="sw-hex">#eee8d6</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #e3dcc4"></div>
+          <div><div class="sw-name">--st-paper-3</div><div style="font-size: 10px; color: var(--st-ink-3)">margins · inactive</div></div>
+          <div class="sw-hex">#e3dcc4</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #c9c2ad"></div>
+          <div><div class="sw-name">--st-rule</div><div style="font-size: 10px; color: var(--st-ink-3)">hairline rules</div></div>
+          <div class="sw-hex">#c9c2ad</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #8a8472"></div>
+          <div><div class="sw-name">--st-rule-strong</div><div style="font-size: 10px; color: var(--st-ink-3)">structural borders</div></div>
+          <div class="sw-hex">#8a8472</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile" style="padding: 20px;">
+      <div class="tile-label">ink · text</div>
+      <div style="margin-top: 10px;">
+        <div class="swatch">
+          <div class="sw-chip" style="background: #1a1a1a"></div>
+          <div><div class="sw-name">--st-ink</div><div style="font-size: 10px; color: var(--st-ink-3)">primary · wordmark</div></div>
+          <div class="sw-hex">#1a1a1a</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #3b3a36"></div>
+          <div><div class="sw-name">--st-ink-2</div><div style="font-size: 10px; color: var(--st-ink-3)">body prose</div></div>
+          <div class="sw-hex">#3b3a36</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #6b6a64"></div>
+          <div><div class="sw-name">--st-ink-3</div><div style="font-size: 10px; color: var(--st-ink-3)">metadata · secondary</div></div>
+          <div class="sw-hex">#6b6a64</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #93918a"></div>
+          <div><div class="sw-name">--st-ink-4</div><div style="font-size: 10px; color: var(--st-ink-3)">tertiary · disabled</div></div>
+          <div class="sw-hex">#93918a</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top: 18px">
+    <div class="tile" style="padding: 20px;">
+      <div class="tile-label">accents</div>
+      <div style="margin-top: 10px;">
+        <div class="swatch">
+          <div class="sw-chip" style="background: #2a4e87"></div>
+          <div><div class="sw-name">--st-blue</div><div style="font-size: 10px; color: var(--st-ink-3)">blue-pencil · links · brand mark</div></div>
+          <div class="sw-hex">#2a4e87</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #b2542a"></div>
+          <div><div class="sw-name">--st-burnt</div><div style="font-size: 10px; color: var(--st-ink-3)">single warm pop · sparingly</div></div>
+          <div class="sw-hex">#b2542a</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile" style="padding: 20px;">
+      <div class="tile-label">severity · round-trip with KvRow.emphasis</div>
+      <div style="margin-top: 10px;">
+        <div class="swatch">
+          <div class="sw-chip" style="background: #3e7f57"></div>
+          <div><div class="sw-name">--st-ok</div><div style="font-size: 10px; color: var(--st-ink-3)">✓ &nbsp; passed · no issue</div></div>
+          <div class="sw-hex">#3e7f57</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #a8762a"></div>
+          <div><div class="sw-name">--st-warn</div><div style="font-size: 10px; color: var(--st-ink-3)">! &nbsp;&nbsp; flagged for review</div></div>
+          <div class="sw-hex">#a8762a</div>
+        </div>
+        <div class="swatch">
+          <div class="sw-chip" style="background: #a8362a"></div>
+          <div><div class="sw-name">--st-bad</div><div style="font-size: 10px; color: var(--st-ink-3)">!! &nbsp; failed · criminal</div></div>
+          <div class="sw-hex">#a8362a</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §6 — Applications
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§6</span>
+    <span>Applications</span>
+    <span class="right">what the brand looks like in the wild</span>
+  </h2>
+
+  <h3 class="sub">README banner</h3>
+  <p class="note">Drop into <code>assets/brand/README-banner.svg</code>; reference in README.md as a hero image above the title. Replaces the markdown title that lost the rotated <code>g</code>.</p>
+
+  <div class="readme-banner" style="margin-top: 12px;">
+    <span class="st-wm font-newsreader b-wm">StoryTan<span class="g">g</span>l</span>
+    <div class="b-tag">A research platform for graph-based computational narratology.<br/>Fabula, navigation, journal — written once, projected three ways.</div>
+    <div class="b-meta">github.com/derekmerck/storytangl · MIT</div>
+    <div class="b-rule">v38 · ⅁</div>
+  </div>
+
+
+  <h3 class="sub">CLI splash</h3>
+  <p class="note">What <code>tangl-cli</code> prints on launch. Already-implemented surface; this just dresses it. The prompt itself uses <code>⅁&gt;</code> as the input prompt — the same flipped <code>g</code> the wordmark uses.</p>
+
+  <div class="cli-splash" style="margin-top: 12px;">
+    <div class="dots"><span></span><span></span><span></span></div>
+    <div style="margin-bottom: 4px;">
+      <span class="cli-wm st-wm font-mono" style="color:#e8dfc6">StoryTan<span class="g">g</span>l</span>
+      <span style="font-family: var(--st-font-mono); font-size: 14px; color: #8a8472; margin-left: 12px;">v38.3</span>
+    </div>
+    <div class="cli-banner-line">────────────────────────────────────────────────────────────</div>
+    <div style="color: #c9c2ad; margin-top: 6px;">
+      a research platform for graph-based computational narratology
+    </div>
+    <div class="dim" style="margin-top: 4px;">type <span class="accent">help</span> for commands · <span class="accent">play &lt;world&gt;</span> to begin · <span class="accent">^d</span> to exit</div>
+    <div style="margin-top: 14px;" class="dim">user: derek · ledger: (none) · world: (none)</div>
+    <div style="margin-top: 18px;" class="cli-prompt">
+      <span class="glyph">g</span><span>&gt;</span>
+      <span class="cli-cursor">&nbsp;</span>
+    </div>
+  </div>
+
+  <h3 class="sub">GitHub social card · 1280×640</h3>
+  <p class="note">The image GitHub uses when the repo is shared on Mastodon, Bluesky, X, Slack. Drop as <code>.github/social-preview.png</code>.</p>
+
+  <div class="social-card" style="margin-top: 12px;">
+    <span class="st-wm font-newsreader sc-wm">StoryTan<span class="g">g</span>l</span>
+    <div class="sc-tag">A research platform for graph-based computational narratology. Fabula, navigation, journal — written once, projected three ways.</div>
+    <div class="sc-meta">github.com/derekmerck/storytangl · MIT · v38</div>
+    <span class="st-glyph round sc-glyph" style="--st-glyph-size: 96px"></span>
+  </div>
+
+  <h3 class="sub">RTD docs header strip</h3>
+  <p class="note">Replaces the default Sphinx top-bar. Shipped via <code>docs/src/_static/storytangl-theme.css</code> + <code>docs/src/_templates/layout.html</code>.</p>
+
+  <div class="docs-strip" style="margin-top: 12px;">
+    <span class="st-wm font-newsreader d-wm">StoryTan<span class="g">g</span>l</span>
+    <div class="d-nav">
+      <a href="#" class="on">overview</a>
+      <a href="#">vocabulary</a>
+      <a href="#">authoring</a>
+      <a href="#">api</a>
+      <a href="#">design notes</a>
+    </div>
+    <div class="d-meta">v38.3 · github</div>
+  </div>
+
+  <h3 class="sub">Favicons</h3>
+  <p class="note">All sizes derive from <code>brand/assets/glyph.svg</code>. The 16×16 case drops the round mask and uses the glyph alone to preserve readability.</p>
+
+  <div class="favicon-grid" style="margin-top: 12px;">
+    <div class="favicon-cell">
+      <span class="st-glyph round" style="--st-glyph-size: 192px"></span>
+      <div>192 × 192 · apple-touch</div>
+    </div>
+    <div class="favicon-cell">
+      <span class="st-glyph round" style="--st-glyph-size: 96px"></span>
+      <div>96 × 96</div>
+    </div>
+    <div class="favicon-cell">
+      <span class="st-glyph round" style="--st-glyph-size: 48px"></span>
+      <div>48 × 48</div>
+    </div>
+    <div class="favicon-cell">
+      <span class="st-glyph round" style="--st-glyph-size: 32px"></span>
+      <div>32 × 32</div>
+    </div>
+    <div class="favicon-cell">
+      <span class="st-glyph" style="--st-glyph-size: 16px"></span>
+      <div>16 × 16 · no mask</div>
+    </div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §7 — Do / Don't
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§7</span>
+    <span>Do · Don't</span>
+    <span class="right">opinionated · short list · enforce in PRs</span>
+  </h2>
+
+  <div class="dodont">
+    <div class="card good">
+      <div class="demo">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 64px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DO</span><span class="body">flipped <code>g</code> tuned per font · ascender depth matches neighbors</span></div>
+    </div>
+    <div class="card bad">
+      <div class="demo">
+        <span style="font-family: var(--st-font-prose); font-weight: 600; font-size: 64px; line-height: 1;">StoryTangl</span>
+      </div>
+      <div class="label"><span class="tag">DON'T</span><span class="body">plain wordmark · no rotation · indistinguishable from any other project</span></div>
+    </div>
+
+    <div class="card good">
+      <div class="demo">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 64px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DO</span><span class="body">wordmark in the body font · part of the typesetting</span></div>
+    </div>
+    <div class="card bad">
+      <div class="demo">
+        <span style="font-family: 'Brush Script MT', 'Lucida Handwriting', cursive; font-weight: 700; font-size: 56px; line-height: 1;">StoryTan<span style="display:inline-block; transform: rotate(180deg);">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DON'T</span><span class="body">decorative or display fonts · the wordmark is editorial, not whimsical</span></div>
+    </div>
+
+    <div class="card good">
+      <div class="demo">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 64px; color: var(--st-ink)">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DO</span><span class="body">monochrome ink-on-paper · the mark holds without color</span></div>
+    </div>
+    <div class="card bad">
+      <div class="demo" style="background: linear-gradient(135deg, #ff6b9d, #c77dff, #4cc9f0); border-radius: 8px;">
+        <span style="font-family: var(--st-font-prose); font-weight: 700; font-size: 64px; line-height: 1; color: white; text-shadow: 0 2px 8px rgba(0,0,0,.3);">StoryTan<span style="display:inline-block; transform: rotate(180deg) scaleY(1.2) scaleX(0.8) translateY(-15%);">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DON'T</span><span class="body">gradient backgrounds · color-pop wordmark · saas-startup typography</span></div>
+    </div>
+
+    <div class="card good">
+      <div class="demo" style="background: var(--st-paper); padding: 14px 28px;">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 64px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DO</span><span class="body">generous clear-space · at least <code>0.6em</code> on every side</span></div>
+    </div>
+    <div class="card bad">
+      <div class="demo" style="background: var(--st-paper); padding: 2px;">
+        <span class="st-wm font-newsreader" style="--st-wm-size: 64px">StoryTan<span class="g">g</span>l</span>
+      </div>
+      <div class="label"><span class="tag">DON'T</span><span class="body">crowded edges · the descender needs room</span></div>
+    </div>
+
+    <div class="card good">
+      <div class="demo">
+        <div style="font-family: var(--st-font-prose); font-size: 16px; color: var(--st-ink-2); max-width: 38ch; text-align: center; line-height: 1.5;">
+          The <span class="st-wm font-newsreader" style="--st-wm-size: 18px; display: inline;">StoryTan<span class="g">g</span>l</span> engine compiles authored scripts into a runtime graph.
+        </div>
+      </div>
+      <div class="label"><span class="tag">DO</span><span class="body">wordmark inline in body prose · scales naturally with line-height</span></div>
+    </div>
+    <div class="card bad">
+      <div class="demo">
+        <div style="font-family: var(--st-font-prose); font-size: 16px; color: var(--st-ink-2); max-width: 38ch; text-align: center; line-height: 1.5;">
+          The <b>StoryTangl</b> engine compiles authored scripts into a runtime graph.
+        </div>
+      </div>
+      <div class="label"><span class="tag">DON'T</span><span class="body">strip the rotation when inline · in prose it's <em>especially</em> the rotation</span></div>
+    </div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §8 — Voice & tone
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§8</span>
+    <span>Voice &amp; tone</span>
+    <span class="right">how the project writes about itself</span>
+  </h2>
+
+  <div class="grid-asym" style="margin-top: 18px">
+    <div class="tile" style="padding: 22px;">
+      <div class="tile-label">voice</div>
+      <p class="intro" style="font-size: 14px;">
+        Cynical, wry, technically precise. The writer is a research engineer with a PhD, dry humor,
+        and no patience for marketing copy. Prose makes claims it can back up. Jokes are dry; metaphors
+        are accurate; superlatives are rare and earned. When the project is honest about being a research
+        platform, the writing says so without apology.
+      </p>
+      <p class="intro" style="font-size: 14px;">
+        Lineage: the README, ARCHITECTURE.md, and AGENTS.md set the canonical voice. New copy lives at the
+        intersection of those three documents. Anything that sounds like a SaaS landing page belongs
+        somewhere else.
+      </p>
+    </div>
+    <div class="tile" style="padding: 22px;">
+      <div class="tile-label">tone register</div>
+      <table style="width: 100%; font-family: var(--st-font-mono); font-size: 11px; border-collapse: collapse;">
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-ok); font-weight: 700;">YES</td><td style="padding: 6px 0;">"the engine's real job is untangling"</td></tr>
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-ok); font-weight: 700;">YES</td><td style="padding: 6px 0;">"~37 architectural iterations"</td></tr>
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-ok); font-weight: 700;">YES</td><td style="padding: 6px 0;">"useful for development, not a production MVP"</td></tr>
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-ok); font-weight: 700;">YES</td><td style="padding: 6px 0;">"AI agents occasionally suggest things that are actually good"</td></tr>
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-bad); font-weight: 700;">NO</td><td style="padding: 6px 0;">"revolutionize interactive storytelling"</td></tr>
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-bad); font-weight: 700;">NO</td><td style="padding: 6px 0;">"the world's first…"</td></tr>
+        <tr style="border-bottom: 1px dotted var(--st-rule);"><td style="padding: 6px 0; color: var(--st-bad); font-weight: 700;">NO</td><td style="padding: 6px 0;">"unlock the full potential of…"</td></tr>
+        <tr><td style="padding: 6px 0; color: var(--st-bad); font-weight: 700;">NO</td><td style="padding: 6px 0;">emoji 🎉 in headlines</td></tr>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §9 — Lineage
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§9</span>
+    <span>Lineage</span>
+    <span class="right">where the mark came from · why it's the right one</span>
+  </h2>
+
+  <p class="intro">
+    The flipped letterform is older than this project. Earlier work used an inverted <code>Ɐ</code>
+    as the mark of an imperial currency — soldiers' helmets, occupier coinage, the "<b>Ɐ$</b> horn"
+    of an earlier game. When the engine needed a name, the same transform applied to a different
+    letter produced both. <b>StoryTangl</b> means what its glyph means: a thing that has been
+    turned over, and reads differently from that side.
+  </p>
+
+  <div class="grid-3" style="margin-top: 14px;">
+    <div class="tile" style="padding: 22px; text-align: center;">
+      <div class="tile-label">ancestor · Ɐ$ horn</div>
+      <div style="font-size: 88px; font-family: var(--st-font-prose); font-weight: 700; color: var(--st-ink); line-height: 1; padding: 16px 0;">Ɐ$</div>
+      <div class="tile-foot" style="text-align: center;">inverted A · earlier currency mark</div>
+    </div>
+    <div class="tile" style="padding: 22px; text-align: center;">
+      <div class="tile-label">transformation</div>
+      <div style="font-family: var(--st-font-mono); font-size: 14px; line-height: 1.7; padding: 24px 0; color: var(--st-ink-2);">
+        rotate 180°<br/>
+        ↓<br/>
+        same operation,<br/>
+        different letter<br/>
+        ↓<br/>
+        new mark
+      </div>
+      <div class="tile-foot" style="text-align: center;">the transform is the brand</div>
+    </div>
+    <div class="tile" style="padding: 22px; text-align: center;">
+      <div class="tile-label">descendant · StoryTangl glyph</div>
+      <div style="padding: 16px 0;">
+        <span class="st-glyph" style="--st-glyph-size: 88px"></span>
+      </div>
+      <div class="tile-foot" style="text-align: center;">flipped g · the engine's untangle</div>
+    </div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────────────────────────────
+       §10 — Asset index
+       ────────────────────────────────────────────────────────────── -->
+  <h2 class="sec">
+    <span class="n">§10</span>
+    <span>Assets · index</span>
+    <span class="right">files in this directory · drop-in for the repo</span>
+  </h2>
+
+  <table class="assets">
+    <thead><tr><th style="width: 32%">path</th><th style="width: 36%">purpose</th><th>note</th></tr></thead>
+    <tbody>
+      <tr><td class="path">brand/StoryTangl-Brand-Sheet.html</td><td class="purpose">this document — canonical reference</td><td class="note">review-only; not a production artifact</td></tr>
+      <tr><td class="path">brand/assets/palette.css</td><td class="purpose">color tokens (light + ink-mode)</td><td class="note"><code>:root</code> + <code>[data-st-mode="ink"]</code></td></tr>
+      <tr><td class="path">brand/assets/type.css</td><td class="purpose">type stack (Newsreader / Mono / Inter Tight)</td><td class="note">Google Fonts import</td></tr>
+      <tr><td class="path">brand/assets/wordmark.svg</td><td class="purpose">canonical wordmark · Newsreader 600</td><td class="note">paths only, no font dependency</td></tr>
+      <tr><td class="path">brand/assets/wordmark-mono.svg</td><td class="purpose">mono wordmark · for CLI banner</td><td class="note">JetBrains Mono</td></tr>
+      <tr><td class="path">brand/assets/glyph.svg</td><td class="purpose">standalone glyph · ink-on-paper</td><td class="note">square; clip-path-friendly</td></tr>
+      <tr><td class="path">brand/assets/glyph-round.svg</td><td class="purpose">round-masked glyph · for favicons</td><td class="note">used at 16/32/48/96/192 px</td></tr>
+      <tr><td class="path">brand/assets/favicon.svg</td><td class="purpose">browser tab icon · 32×32 source</td><td class="note">deploys at <code>apps/web/public/favicon.svg</code></td></tr>
+      <tr><td class="path">brand/assets/social-card.svg</td><td class="purpose">GitHub social preview · 1280×640</td><td class="note">deploys at <code>.github/social-preview.png</code> (rasterize)</td></tr>
+      <tr><td class="path">brand/assets/README-banner.svg</td><td class="purpose">README hero · 1280×320</td><td class="note">drop above the <code># StoryTangl</code> line</td></tr>
+      <tr><td class="path">brand/assets/cli-splash.txt</td><td class="purpose">terminal launch banner · ANSI</td><td class="note">used by <code>tangl-cli</code> on start</td></tr>
+      <tr><td class="path">brand/USAGE.md</td><td class="purpose">do / don't · sizing rules · what an LLM agent must never do</td><td class="note">opinionated; enforce in PRs</td></tr>
+    </tbody>
+  </table>
+
+  <div class="marg" style="margin-top: 24px;">
+    The brand is intentionally small. If an asset doesn't exist here, the answer is probably "you
+    don't need one." If you genuinely do, add it here first; then deploy.
+  </div>
+
+
+  <!-- end ──────────────────────────────────────────────────────────────── -->
+  <div style="margin-top: 80px; padding-top: 18px; border-top: 1px dotted var(--st-rule); font-family: var(--st-font-mono); font-size: 10.5px; color: var(--st-ink-3); display: grid; grid-template-columns: 1fr auto; gap: 16px;">
+    <div>StoryTangl brand sheet v1.0 · 2026-05 · supersedes nothing · all values closed unless re-opened in USAGE.md</div>
+    <div>⅁</div>
+  </div>
+
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────
+     Tweaks panel — host-driven; appears when the toolbar toggle activates it.
+     ──────────────────────────────────────────────────────────────── -->
+<div class="tw-panel" id="tw-panel">
+  <div class="tw-hd">
+    <span>Tweaks</span>
+    <button class="close" type="button" aria-label="close" id="tw-close">×</button>
+  </div>
+  <div class="tw-bd">
+    <div class="tw-row">
+      <div class="tw-lab">Surface · mode</div>
+      <div class="tw-seg" data-tweak="mode">
+        <button type="button" data-val="paper">paper</button>
+        <button type="button" data-val="ink">ink</button>
+        <button type="button" data-val="blueprint">blueprint</button>
+      </div>
+    </div>
+    <div class="tw-row">
+      <div class="tw-lab">Wordmark · voice</div>
+      <div class="tw-seg" data-tweak="voice">
+        <button type="button" data-val="prose">prose</button>
+        <button type="button" data-val="mono">mono</button>
+        <button type="button" data-val="chrome">chrome</button>
+      </div>
+    </div>
+    <div class="tw-row">
+      <div class="tw-lab">Posture · rhythm</div>
+      <div class="tw-seg" data-tweak="posture">
+        <button type="button" data-val="editorial">editorial</button>
+        <button type="button" data-val="engineering">engineering</button>
+        <button type="button" data-val="terminal">terminal</button>
+      </div>
+    </div>
+
+    <div class="tw-tune">
+      <div class="tw-lab" style="margin-bottom: 2px;">G · fine tuning <span id="tw-tune-voice" style="color: var(--st-ink); letter-spacing: 0;"></span></div>
+      <div class="tw-tune-row">
+        <label for="tw-sy">scale y</label>
+        <input type="range" id="tw-sy" min="0.60" max="1.60" step="0.01">
+        <span class="tw-num" id="tw-sy-n"></span>
+      </div>
+      <div class="tw-tune-row">
+        <label for="tw-sx">scale x</label>
+        <input type="range" id="tw-sx" min="0.50" max="1.20" step="0.01">
+        <span class="tw-num" id="tw-sx-n"></span>
+      </div>
+      <div class="tw-tune-row">
+        <label for="tw-ty">shift y</label>
+        <input type="range" id="tw-ty" min="-40" max="20" step="1">
+        <span class="tw-num" id="tw-ty-n"></span>
+      </div>
+      <div class="tw-tune-row">
+        <label for="tw-mg">margin</label>
+        <input type="range" id="tw-mg" min="-0.20" max="0.05" step="0.005">
+        <span class="tw-num" id="tw-mg-n"></span>
+      </div>
+      <button type="button" class="tw-reset" id="tw-reset">reset tuning</button>
+    </div>
+  </div>
+  <div class="tw-foot">
+    Segmented controls rewrite a whole gestalt. The sliders tune the flipped-<code>g</code> for the
+    <b>active voice only</b> — each font needs its own geometry — and persist per voice. §1 variants
+    and the sizing scale stay locked as reference.
+  </div>
+</div>
+
+<script>
+(function(){
+  // Default state — these are the canonical Newsreader-tuned values. The
+  // host writes them back through the EDITMODE-BEGIN/END block when the
+  // user persists a tweak.
+  const TWEAKS = /*EDITMODE-BEGIN*/{
+    "mode": "ink",
+    "voice": "chrome",
+    "posture": "terminal",
+    "prose_sy": 1,
+    "prose_sx": 0.85,
+    "prose_ty": 5,
+    "prose_mg": -0.1,
+    "mono_sy": 1,
+    "mono_sx": 1,
+    "mono_ty": -20,
+    "mono_mg": 0,
+    "chrome_sy": 1,
+    "chrome_sx": 0.75,
+    "chrome_ty": -20,
+    "chrome_mg": -0.1
+  }/*EDITMODE-END*/;
+
+  // Canonical per-voice geometry for the flipped g. Each font needs its own
+  // numbers — the same transform can't sit right on Newsreader, JetBrains Mono
+  // and Inter Tight at once. These mirror the per-font CSS classes and feed
+  // the per-voice reset button.
+  const CANON = {
+    prose:  { sy: 1.00, sx: 0.75, ty: 5,   mg: -0.10 },
+    mono:   { sy: 1.00, sx: 1.00, ty: -20, mg:  0.00 },
+    chrome: { sy: 1.00, sx: 0.75, ty: -20, mg: -0.10 },
+  };
+
+  let state = Object.assign({}, TWEAKS);
+  const panel = document.getElementById("tw-panel");
+  const root  = document.documentElement;
+
+  // ── segmented controls (mode / voice / posture) ───────────────────
+  panel.querySelectorAll(".tw-seg").forEach(seg => {
+    const key = seg.dataset.tweak;
+    seg.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state[key] = btn.dataset.val;
+        applyAll();
+        // sliders tune ONE voice at a time — reload them when voice changes
+        if (key === "voice") { syncSliders(); writeNums(); }
+        persist();
+      });
+    });
+  });
+
+  // ── G fine-tuning sliders ──────────────────────────────────────────
+  const sliders = {
+    sy: { el: document.getElementById("tw-sy"), out: document.getElementById("tw-sy-n"),
+          fmt: v => Number(v).toFixed(2) },
+    sx: { el: document.getElementById("tw-sx"), out: document.getElementById("tw-sx-n"),
+          fmt: v => Number(v).toFixed(2) },
+    ty: { el: document.getElementById("tw-ty"), out: document.getElementById("tw-ty-n"),
+          fmt: v => Math.round(v) + "%" },
+    mg: { el: document.getElementById("tw-mg"), out: document.getElementById("tw-mg-n"),
+          fmt: v => Number(v).toFixed(3) + "em" },
+  };
+  // each slider edits the field for the CURRENTLY ACTIVE voice (e.g. chrome_sx)
+  Object.entries(sliders).forEach(([field, s]) => {
+    s.el.addEventListener("input", () => {
+      state[state.voice + "_" + field] = parseFloat(s.el.value);
+      applyTune();
+      writeNums();
+    });
+    s.el.addEventListener("change", persist);
+  });
+
+  document.getElementById("tw-reset").addEventListener("click", () => {
+    const c = CANON[state.voice];
+    state[state.voice + "_sy"] = c.sy;
+    state[state.voice + "_sx"] = c.sx;
+    state[state.voice + "_ty"] = c.ty;
+    state[state.voice + "_mg"] = c.mg;
+    syncSliders();
+    applyTune();
+    writeNums();
+    persist();
+  });
+
+  document.getElementById("tw-close").addEventListener("click", () => {
+    panel.classList.remove("on");
+    try { window.parent.postMessage({type: "__edit_mode_dismissed"}, "*"); } catch(e) {}
+  });
+
+  // ── apply ──────────────────────────────────────────────────────────
+  function applyAll() {
+    root.setAttribute("data-st-mode",    state.mode);
+    root.setAttribute("data-st-voice",   state.voice);
+    root.setAttribute("data-st-posture", state.posture);
+    document.body.setAttribute("data-st-mode",    state.mode);
+    document.body.setAttribute("data-st-voice",   state.voice);
+    document.body.setAttribute("data-st-posture", state.posture);
+    // light up the active button in each segmented control
+    panel.querySelectorAll(".tw-seg").forEach(seg => {
+      const key = seg.dataset.tweak;
+      seg.querySelectorAll("button").forEach(b => {
+        b.classList.toggle("on", b.dataset.val === state[key]);
+      });
+    });
+    applyTune();
+  }
+
+  function applyTune() {
+    // Inline custom-property overrides on every non-locked .st-wm element,
+    // using the ACTIVE voice's geometry. Inline beats the per-font class rules,
+    // so the sliders win. Because every non-locked wordmark already follows the
+    // active voice's FONT, one set of numbers is correct for all of them at
+    // once. .voice-locked wordmarks keep their spec-canonical per-font tuning.
+    const v = state.voice;
+    document.querySelectorAll(".st-wm:not(.voice-locked)").forEach(el => {
+      el.style.setProperty("--st-wm-g-sy",     state[v + "_sy"]);
+      el.style.setProperty("--st-wm-g-sx",     state[v + "_sx"]);
+      el.style.setProperty("--st-wm-g-ty",     state[v + "_ty"] + "%");
+      el.style.setProperty("--st-wm-g-margin", state[v + "_mg"] + "em");
+    });
+  }
+
+  function syncSliders() {
+    const v = state.voice;
+    sliders.sy.el.value = state[v + "_sy"];
+    sliders.sx.el.value = state[v + "_sx"];
+    sliders.ty.el.value = state[v + "_ty"];
+    sliders.mg.el.value = state[v + "_mg"];
+    const tag = document.getElementById("tw-tune-voice");
+    if (tag) tag.textContent = "· " + v;
+  }
+
+  function writeNums() {
+    const v = state.voice;
+    Object.entries(sliders).forEach(([field, s]) => {
+      s.out.textContent = s.fmt(state[v + "_" + field]);
+    });
+  }
+
+  function persist() {
+    try { window.parent.postMessage({type: "__edit_mode_set_keys", edits: state}, "*"); } catch(e) {}
+  }
+
+  // ── host protocol (listener BEFORE announcement) ───────────────────
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || typeof m !== "object") return;
+    if (m.type === "__activate_edit_mode")   panel.classList.add("on");
+    if (m.type === "__deactivate_edit_mode") panel.classList.remove("on");
+  });
+  try { window.parent.postMessage({type: "__edit_mode_available"}, "*"); } catch(e) {}
+
+  // ── init ───────────────────────────────────────────────────────────
+  syncSliders();
+  writeNums();
+  applyAll();
+})();
+</script>
+
+</body>
+</html>

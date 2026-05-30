@@ -3,6 +3,10 @@
 The canonical wireframe bundle for the current widget vocabulary is archived
 under `docs/src/design/story/wireframes/v1_5/`.
 
+Brand-direction references from the same design pass are archived separately
+under [`brand/`](brand/). They are visual and tone references only; they are not
+deployed app/docs assets.
+
 - [`StoryTangl-Wireframes-v1.5.html`](wireframes/v1_5/StoryTangl-Wireframes-v1.5.html)
   is the rendered reference artifact.
 - The adjacent `v15-*.jsx`, `v15-*.js`, and `v15-*.css` files are retained as
