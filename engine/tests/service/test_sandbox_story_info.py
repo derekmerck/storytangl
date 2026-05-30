@@ -206,6 +206,107 @@ def test_sandbox_advertises_map_info_channel() -> None:
     assert map_affordance.query == {"kinds": ["map"], "scope": "known"}
 
 
+def test_sandbox_dispatch_projects_requested_status_channels() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 1})
+    road = SandboxLocation(
+        label="road",
+        location_name="End of Road",
+        links={"east": "building"},
+    )
+    building = SandboxLocation(label="building", location_name="Inside Building")
+    pirate = SandboxMob(label="pirate", name="wounded pirate", location="road")
+    SandboxInfoItemType(label="lamp", name="brass lantern", traits={"portable"})
+    lamp = Token[SandboxInfoItemType](token_from="lamp", label="lamp")
+    scope.player_assets.add_asset(lamp)
+    for item in (scope, road, building, pirate, lamp):
+        graph.add(item)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+    scope.mobs.append(pirate)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
+
+    projected = do_get_story_info(
+        road,
+        ctx=ctx,
+        request=StoryInfoRequest(
+            kinds=["location", "world_time", "inventory", "presence", "exits"]
+        ),
+    )
+    sections = _section_by_id(projected.sections)
+
+    assert set(sections) == {
+        "sandbox_location",
+        "sandbox_time",
+        "sandbox_inventory",
+        "sandbox_presence",
+        "sandbox_exits",
+    }
+    assert _item_labels(sections["sandbox_inventory"]) == ["brass lantern"]
+    assert _item_labels(sections["sandbox_presence"]) == ["wounded pirate"]
+    assert _item_labels(sections["sandbox_exits"]) == ["east"]
+
+
+def test_sandbox_dispatch_filters_requested_status_channels() -> None:
+    graph = Graph(label="tiny_cave")
+    road = SandboxLocation(
+        label="road",
+        location_name="End of Road",
+        links={"east": "building"},
+    )
+    building = SandboxLocation(label="building", location_name="Inside Building")
+    for item in (road, building):
+        graph.add(item)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
+
+    projected = do_get_story_info(
+        road,
+        ctx=ctx,
+        request=StoryInfoRequest(kind="location"),
+    )
+    assert [section.section_id for section in projected.sections] == [
+        "sandbox_location"
+    ]
+
+    map_nodes = do_get_story_info(
+        road,
+        ctx=ctx,
+        request=StoryInfoRequest(kind="map_nodes"),
+    )
+    assert [section.section_id for section in map_nodes.sections] == [
+        "sandbox_map_nodes"
+    ]
+
+
+def test_sandbox_dispatch_empty_request_projects_default_status_bundle() -> None:
+    graph = Graph(label="tiny_cave")
+    road = SandboxLocation(
+        label="road",
+        location_name="End of Road",
+        links={"east": "building"},
+    )
+    building = SandboxLocation(label="building", location_name="Inside Building")
+    for item in (road, building):
+        graph.add(item)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
+
+    projected = do_get_story_info(
+        road,
+        ctx=ctx,
+        request=StoryInfoRequest(),
+    )
+
+    assert [section.section_id for section in projected.sections] == [
+        "sandbox_location",
+        "sandbox_time",
+        "sandbox_exits",
+    ]
+
+
 def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
     graph = Graph(label="tiny_cave")
     road = SandboxLocation(

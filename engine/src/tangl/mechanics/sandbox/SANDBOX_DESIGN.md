@@ -817,14 +817,17 @@ surface. The backend owns world truth, action availability, hidden schedules,
 and mutation. A client receives only the facts the current reader/player is
 allowed to know.
 
-`SandboxStoryInfoProjector` lives in the sandbox package and attaches through
-the existing service `StoryInfoProjector` seam. Service remains generic; sandbox
-worlds opt in by installing the projector on the world. The projector emits
-ordinary `ProjectedState` sections using the existing `kv_list` and `item_list`
-value types. It does not add sandbox widgets or require a SugarCube-like
-interface. A web client may render those sections as a room header, inventory
-panel, time chip, map modal, or roster; a CLI may print them as status lines; an
-ebook compiler may ignore them or fold them into generated prose.
+Sandbox attaches through the service story-info dispatch seam. Service remains
+generic; sandbox handlers advertise and fulfill ordinary channel requests for
+location, time, inventory, local presence, exits, and map state. The older
+`SandboxStoryInfoProjector` remains as a compatibility/convenience wrapper over
+the same disclosed sections for worlds that still install a world projector
+directly. Both paths emit ordinary `ProjectedState` sections using the existing
+`kv_list`, `item_list`, and `table` value types. They do not add sandbox widgets
+or require a SugarCube-like interface. A web client may render those sections as
+a room header, inventory panel, time chip, map modal, or roster; a CLI may print
+them as status lines; an ebook compiler may ignore them or fold them into
+generated prose.
 
 Current disclosed sections are intentionally conservative:
 
@@ -837,13 +840,16 @@ Current disclosed sections are intentionally conservative:
 - present visible mobs;
 - visible authored exits.
 
-Sandbox can also satisfy explicit story-info channel requests through the
-service `get_story_info` dispatch task. The `kind="map"` provider emits ordinary
-`ProjectedState` sections (`sandbox_map_summary`, `sandbox_map_nodes`, and
-`sandbox_map_edges`) rather than a sandbox-only widget type. The map is still
-disclosed state: current and known locations, visible/known exits, and known
-blocked or locked state. It must not expose secret geography, hidden mobs, raw
-pathfinding truth, or future schedule state.
+Explicit story-info channel requests use the same service `get_story_info`
+dispatch task. Status-like channels (`location`, `world_time`, `inventory`,
+`presence`, `exits`, `fixtures`, and `local_assets`) return the matching
+portable section. The `kind="map"` provider emits ordinary `ProjectedState`
+sections (`sandbox_map_summary`, `sandbox_map_nodes`, and `sandbox_map_edges`)
+rather than a sandbox-only widget type; clients may also request narrower map
+sections such as `map_nodes` or `map_edges`. The map is still disclosed state:
+current and known locations, visible/known exits, and known blocked or locked
+state. It must not expose secret geography, hidden mobs, raw pathfinding truth,
+or future schedule state.
 
 Visibility rules filter projected state the same way they filter journal and
 local affordances. Darkness may leave current location, time, and inventory
