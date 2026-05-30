@@ -548,25 +548,20 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return moves
 
         case = game.active_case
-        # request_document: one Action per presented permit with a mitigatable
-        # status not yet cleared. Missing-doc requests are B.2.
+        # Mediation availability is gated on *visible* state only -- which
+        # documents the candidate presented -- never on hidden validity. The
+        # menu must not let a client read backend logic off it: a useful
+        # mediation is indistinguishable from a dud until it is committed. (The
+        # outcome is disclosed by running the move, not by its presence.)
+        #
+        # request_document: offer for every presented permit not yet requested.
         for token in case.packet:
-            if token.status.is_valid or token.status.is_crime:
-                continue
             key = token.indication.value
             if key in game.finding_status:
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
-        # verify_id: identity-check move. Narrow to statuses where "does the id
-        # match the bearer?" is the relevant question: VALID (clears the doubt)
-        # or WRONG_HOLDER (confirms the mismatch). Mitigatable id issues like
-        # EXPIRED / BAD_DATE / MISSING_SEAL are date-or-seal problems, not
-        # holder problems, and need an id-mediation move that lands with B.2.
-        if (
-            case.id_card is not None
-            and case.id_status() in (CredentialStatus.VALID, CredentialStatus.WRONG_HOLDER)
-            and "id" not in game.finding_status
-        ):
+        # verify_id: offer whenever an id is presented and not yet verified.
+        if case.id_card is not None and "id" not in game.finding_status:
             moves.append(CredentialsMove(kind="verify_id", target=""))
         # request_search: single move, once per case.
         if "search" not in game.finding_status:
@@ -690,25 +685,30 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         indication_value: str,
         detail: dict[str, object],
     ) -> RoundResult:
-        # Defensive guard: the menu filters to presented permits with a
-        # mitigatable status, but ``GameHandler.receive_move`` does not call
-        # ``validate_move``. Skip rather than corrupt finding_status if an
-        # off-menu payload arrives. (Off-menu clears against valid/crime/missing
-        # permits are already idempotent for derive thanks to its short-circuits,
-        # but explicit validation keeps the audit trail honest.)
+        # The outcome -- not the move's availability -- is what discloses the
+        # permit's standing. Requesting a reissue:
+        #   mitigatable -> the candidate produces a corrected copy ("cleared");
+        #   valid       -> they re-present the same sound permit ("verified");
+        #   crime        -> the forgery cannot be reissued; it stands ("confirmed").
+        # Only a cleared mitigatable finding upgrades derive_disposition.
         permit = next(
             (t for t in game.active_case.packet if t.indication.value == indication_value),
             None,
         )
-        if permit is None or permit.status.is_valid or permit.status.is_crime:
+        if permit is None:  # off-menu safety; receive_move does not validate
             detail["outcome"] = "request_document_not_applicable"
             detail["target_indication"] = indication_value
             return RoundResult.CONTINUE
 
-        # B.1 assumes the candidate complies; the mitigatable finding is cleared.
-        # Compliance (declines path) is part of B.2.
-        game.finding_status[indication_value] = "cleared"
-        detail["outcome"] = "request_document_cleared"
+        if permit.status.is_crime:
+            game.finding_status[indication_value] = "confirmed"
+            detail["outcome"] = "request_document_confirmed"
+        elif permit.status.is_valid:
+            game.finding_status[indication_value] = "verified"
+            detail["outcome"] = "request_document_verified"
+        else:
+            game.finding_status[indication_value] = "cleared"
+            detail["outcome"] = "request_document_cleared"
         detail["target_indication"] = indication_value
         return RoundResult.CONTINUE
 
@@ -717,19 +717,17 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game: CredentialsGame,
         detail: dict[str, object],
     ) -> RoundResult:
-        # verify_id specifically answers "does the id match the bearer?", so it
-        # only ever clears for VALID or confirms for WRONG_HOLDER. Other id
-        # statuses (no id presented, expired, bad date) need different mediation
-        # (B.2's id-replacement path) and shouldn't have surfaced this move.
+        # verify_id answers only "does the id match the bearer?". It discloses a
+        # holder mismatch (a crime) but never mechanically repairs a stale id --
+        # an expired or mis-dated id stays a deny until a future id-reissue move
+        # (B.2). So it records "verified" / "confirmed", never "cleared".
         status = game.active_case.id_status()
-        if status is CredentialStatus.VALID:
-            game.finding_status["id"] = "cleared"
-            detail["outcome"] = "id_verified_clean"
-        elif status is CredentialStatus.WRONG_HOLDER:
+        if status is CredentialStatus.WRONG_HOLDER:
             game.finding_status["id"] = "confirmed"
             detail["outcome"] = "id_verified_problem"
         else:
-            detail["outcome"] = "verify_id_not_applicable"
+            game.finding_status["id"] = "verified"
+            detail["outcome"] = "id_verified_clean"
         return RoundResult.CONTINUE
 
     def _resolve_request_search(
@@ -826,18 +824,25 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             ]
 
         if action == "request_document":
+            outcome = notes.get("outcome")
+            if outcome == "request_document_cleared":
+                line = "The candidate produces a corrected copy."
+            elif outcome == "request_document_verified":
+                line = "The candidate re-presents the same sound permit."
+            elif outcome == "request_document_confirmed":
+                line = "No valid copy is forthcoming; the permit will not hold up."
+            else:
+                line = "There is nothing to reissue."
             return [
                 ContentFragment(content=f"You request a reissue of the {target} permit."),
-                ContentFragment(content="The candidate produces a corrected copy."),
+                ContentFragment(content=line),
             ]
         if action == "verify_id":
             outcome = notes.get("outcome")
-            if outcome == "id_verified_clean":
-                line = "The id matches the bearer."
-            elif outcome == "id_verified_problem":
+            if outcome == "id_verified_problem":
                 line = "The id does not match the bearer."
             else:
-                line = "The id offers no clear answer to the bearer question."
+                line = "The id matches the bearer."
             return [
                 ContentFragment(content="You verify the bearer's identity."),
                 ContentFragment(content=line),
