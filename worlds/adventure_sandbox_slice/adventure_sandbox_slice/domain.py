@@ -22,8 +22,8 @@ from tangl.mechanics.sandbox import (
     SwitchableFacet,
 )
 from tangl.mechanics.sandbox.handlers import sandbox_player_assets
-from tangl.mechanics.sandbox.story_info import SandboxStoryInfoProjector
 from tangl.service.response import KvListValue, ProjectedSection, ProjectedState
+from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
 from tangl.story import Action, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager
 from tangl.vm import Ledger, on_gather_ns, on_provision, on_update
@@ -258,19 +258,14 @@ def _rewrite_movement_hazards(
 
 
 class AdventureSandboxStoryInfoProjector:
-    """Adventure-specific story-info wrapper over the generic sandbox projector."""
-
-    def __init__(self) -> None:
-        self.sandbox = SandboxStoryInfoProjector()
+    """Adventure-specific story-info wrapper for world-owned sections."""
 
     def project(self, *, ledger: Ledger) -> ProjectedState:
-        projected = self.sandbox.project(ledger=ledger)
         cursor = ledger.cursor
         if not isinstance(cursor, AdventureSandboxLocation):
-            return projected
+            return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
         return ProjectedState(
             sections=[
-                *projected.sections,
                 ProjectedSection(
                     section_id="adventure_score",
                     title="Score",
