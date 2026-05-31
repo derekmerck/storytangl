@@ -232,6 +232,24 @@ def advertise_sandbox_info_channels(
     ]
     if projection.suppress_location_description:
         return affordances
+    if not projection.suppress_asset_affordances:
+        affordances.append(
+            InfoAffordance(
+                kind="local_assets",
+                label="Here",
+                shortcuts=["a", "assets"],
+                query={"kinds": ["local_assets"]},
+            )
+        )
+    if not projection.suppress_fixture_affordances:
+        affordances.append(
+            InfoAffordance(
+                kind="fixtures",
+                label="Fixtures",
+                shortcuts=["f"],
+                query={"kinds": ["fixtures"]},
+            )
+        )
     affordances.append(
         InfoAffordance(
             kind="presence",
@@ -263,10 +281,10 @@ def project_sandbox_map_info(
     **_kw: object,
 ) -> list[ProjectedSection] | None:
     """Project requested disclosed sandbox channels for side-panel clients."""
-    requested = request.requested_kinds()
+    requested = set(request.requested_kinds())
     if not requested:
-        return SandboxStoryInfoProjector().sections_for(caller, ctx=ctx)
-    if not any(kind in SANDBOX_INFO_KINDS for kind in requested):
+        return None
+    if requested.isdisjoint(SANDBOX_INFO_KINDS):
         return None
 
     sections: list[ProjectedSection] = []
@@ -286,7 +304,7 @@ def _requested_map_sections(
     location: SandboxLocation,
     *,
     ctx: PhaseCtx,
-    requested: list[str],
+    requested: set[str],
 ) -> list[ProjectedSection]:
     if not _map_requested(requested):
         return []
@@ -300,8 +318,8 @@ def _requested_map_sections(
     ]
 
 
-def _map_requested(requested: list[str]) -> bool:
-    return any(kind in requested for kind in (MAP_KIND, "map_nodes", "map_edges"))
+def _map_requested(requested: set[str]) -> bool:
+    return not requested.isdisjoint({MAP_KIND, "map_nodes", "map_edges"})
 
 
 def _map_sections(location: SandboxLocation, ctx: PhaseCtx) -> list[ProjectedSection]:
@@ -504,12 +522,12 @@ def _section_empty(section: ProjectedSection) -> bool:
 
 def _section_matches_requested(
     section: ProjectedSection,
-    requested: list[str],
+    requested: set[str],
 ) -> bool:
     labels = {section.section_id}
     if section.kind is not None:
         labels.add(section.kind)
-    return any(label in requested for label in labels)
+    return not labels.isdisjoint(requested)
 
 
 def _asset_items(holder: HasAssets | None) -> list[ProjectedItem]:

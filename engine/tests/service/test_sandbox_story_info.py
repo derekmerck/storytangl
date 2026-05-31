@@ -197,6 +197,8 @@ def test_sandbox_advertises_map_info_channel() -> None:
         "location",
         "inventory",
         "map",
+        "local_assets",
+        "fixtures",
         "presence",
         "exits",
     ]
@@ -281,7 +283,7 @@ def test_sandbox_dispatch_filters_requested_status_channels() -> None:
     ]
 
 
-def test_sandbox_dispatch_empty_request_projects_default_status_bundle() -> None:
+def test_sandbox_dispatch_empty_request_stays_explicit_only() -> None:
     graph = Graph(label="tiny_cave")
     road = SandboxLocation(
         label="road",
@@ -300,11 +302,7 @@ def test_sandbox_dispatch_empty_request_projects_default_status_bundle() -> None
         request=StoryInfoRequest(),
     )
 
-    assert [section.section_id for section in projected.sections] == [
-        "sandbox_location",
-        "sandbox_time",
-        "sandbox_exits",
-    ]
+    assert projected.sections == []
 
 
 def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:

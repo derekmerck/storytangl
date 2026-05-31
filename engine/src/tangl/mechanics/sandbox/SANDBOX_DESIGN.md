@@ -841,15 +841,17 @@ Current disclosed sections are intentionally conservative:
 - visible authored exits.
 
 Explicit story-info channel requests use the same service `get_story_info`
-dispatch task. Status-like channels (`location`, `world_time`, `inventory`,
-`presence`, `exits`, `fixtures`, and `local_assets`) return the matching
-portable section. The `kind="map"` provider emits ordinary `ProjectedState`
-sections (`sandbox_map_summary`, `sandbox_map_nodes`, and `sandbox_map_edges`)
-rather than a sandbox-only widget type; clients may also request narrower map
-sections such as `map_nodes` or `map_edges`. The map is still disclosed state:
-current and known locations, visible/known exits, and known blocked or locked
-state. It must not expose secret geography, hidden mobs, raw pathfinding truth,
-or future schedule state.
+dispatch task. The dispatch handler is explicit-only so it can coexist with
+worlds that still install `SandboxStoryInfoProjector` as a broad fallback
+projector without duplicating default sections. Status-like channels
+(`location`, `world_time`, `inventory`, `presence`, `exits`, `fixtures`, and
+`local_assets`) return the matching portable section. The `kind="map"` provider
+emits ordinary `ProjectedState` sections (`sandbox_map_summary`,
+`sandbox_map_nodes`, and `sandbox_map_edges`) rather than a sandbox-only widget
+type; clients may also request narrower map sections such as `map_nodes` or
+`map_edges`. The map is still disclosed state: current and known locations,
+visible/known exits, and known blocked or locked state. It must not expose
+secret geography, hidden mobs, raw pathfinding truth, or future schedule state.
 
 Visibility rules filter projected state the same way they filter journal and
 local affordances. Darkness may leave current location, time, and inventory

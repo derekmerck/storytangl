@@ -23,6 +23,7 @@ from tangl.mechanics.sandbox import (
 )
 from tangl.mechanics.sandbox.handlers import sandbox_player_assets
 from tangl.service.response import KvListValue, ProjectedSection, ProjectedState
+from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
 from tangl.story import Action, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager
 from tangl.vm import Ledger, on_gather_ns, on_provision, on_update
@@ -262,7 +263,7 @@ class AdventureSandboxStoryInfoProjector:
     def project(self, *, ledger: Ledger) -> ProjectedState:
         cursor = ledger.cursor
         if not isinstance(cursor, AdventureSandboxLocation):
-            return ProjectedState()
+            return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
         return ProjectedState(
             sections=[
                 ProjectedSection(
