@@ -8,8 +8,7 @@ target in `STORYTANGL_WIDGET_VOCAB.md`. In particular:
 
 - `piece` / `zone` fixtures are current web pressure fixtures and decision-
   legibility examples while engine-side typed fragment support catches up.
-- `kv` fragments use the current web tuple-like row shape. Record-shaped
-  `KvRow` remains a migration target.
+- `kv` fragments use the unified record-shaped `KvRow` contract.
 - `interpretation` uses the v1.5 `result` / `text` / `message` shape while the
   reference renderers still accept the older fallback field names.
 
@@ -27,6 +26,18 @@ and reference-port-renderable, but they are not conformance requirements until
 fragment registry: media placeholders update in place, pieces move between
 zones, stale offers or fallback fragments can be deleted, and open choices keep
 their referenced state renderable after each envelope.
+
+`legibility.py` contains the first promoted conformance harness. It is a
+JSON-only decision-legibility check: after applying update/delete controls, each
+available choice must be renderable in the current scene shell and any
+piece/zone/state references in its decision surfaces must also be renderable.
+`parity.py` is the sibling input-parity harness: available choices must expose
+enough `accepts` shape for a low-capability client to submit a portable payload
+for `pick`, `text`, `quantity`, `raw_command`, `pieces`, `place`, and recursive
+`compose` controls.
+`time_parity.py` covers the JSON-visible part of timed presentation parity:
+pending media and roll/ritual fragments need immediate readable fallbacks, and
+advisory timing hints cannot require waiting for presentation time.
 
 `reference_port.py` is the smallest current proof of that portability. It
 renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without

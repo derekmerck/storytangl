@@ -7,8 +7,11 @@ the engine today.
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 from uuid import UUID
 
@@ -19,6 +22,9 @@ from tangl.service.response import ProjectedState, RuntimeEnvelope
 
 FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"
 PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposals"
+LEGIBILITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "legibility.py"
+PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "parity.py"
+TIME_PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "time_parity.py"
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
@@ -40,6 +46,22 @@ EXPECTED_PROPOSALS = {
     "roll_fragment.json",
     "wireframe_v15_interpretation_samples.json",
 }
+
+
+def _load_module(name: str, path: Path) -> ModuleType:
+    module_name = f"{__name__}.{name}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+LEGIBILITY = _load_module("legibility", LEGIBILITY_PATH)
+PARITY = _load_module("parity", PARITY_PATH)
+TIME_PARITY = _load_module("time_parity", TIME_PARITY_PATH)
 
 
 def _load_fixture(path: Path) -> dict[str, Any]:
@@ -91,64 +113,6 @@ def _registry_after_controls(fragments: list[dict[str, Any]]) -> dict[str, dict[
             continue
         registry[_fragment_uid(fragment)] = fragment
     return registry
-
-
-def _renderable_ids_by_scene(fragments: list[dict[str, Any]]) -> list[set[str]]:
-    registry = _registry_after_controls(fragments)
-    scenes = [
-        fragment
-        for fragment in registry.values()
-        if fragment.get("fragment_type") == "group" and fragment.get("group_type") == "scene"
-    ]
-
-    visible_by_scene: list[set[str]] = []
-    for scene in scenes:
-        visible: set[str] = set()
-
-        def visit(uid: str) -> None:
-            if uid in visible:
-                return
-            visible.add(uid)
-            fragment = registry.get(uid)
-            if fragment is None:
-                return
-            if fragment.get("fragment_type") == "group":
-                member_ids = fragment.get("member_ids", [])
-                assert isinstance(member_ids, list)
-                for member_id in member_ids:
-                    if isinstance(member_id, str):
-                        visit(member_id)
-
-        member_ids = scene.get("member_ids", [])
-        assert isinstance(member_ids, list)
-        for member_id in member_ids:
-            if isinstance(member_id, str):
-                visit(member_id)
-        visible_by_scene.append(visible)
-
-    return visible_by_scene
-
-
-def _collect_reference_ids(value: object, parent_key: str = "") -> list[str]:
-    if isinstance(value, str):
-        return [value] if parent_key.endswith(("_ref", "_id")) else []
-    if isinstance(value, list):
-        return [
-            ref
-            for item in value
-            for ref in _collect_reference_ids(item, parent_key)
-        ]
-    if not isinstance(value, dict):
-        return []
-
-    refs: list[str] = []
-    for key, item in value.items():
-        if key.endswith(("_refs", "_ids")):
-            if isinstance(item, list):
-                refs.extend(entry for entry in item if isinstance(entry, str))
-            continue
-        refs.extend(_collect_reference_ids(item, key))
-    return refs
 
 
 def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
@@ -247,29 +211,411 @@ def test_runtime_fixtures_have_portable_fragment_shapes(path: Path) -> None:
 
 
 @pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
-def test_open_choice_references_are_renderable(path: Path) -> None:
+def test_runtime_fixtures_pass_decision_legibility(path: Path) -> None:
     payload = _load_fixture(path)
-    fragments = payload["fragments"]
-    assert isinstance(fragments, list)
 
-    scenes = _renderable_ids_by_scene(fragments)
-    assert scenes, f"{path.name} must expose at least one scene"
+    result = LEGIBILITY.check_runtime_envelope(payload)
 
-    for fragment in fragments:
-        if not isinstance(fragment, dict) or fragment.get("fragment_type") != "choice":
-            continue
-        if fragment.get("available") is False:
-            continue
+    LEGIBILITY.assert_no_issues(result.issues)
 
-        refs = _collect_reference_ids(fragment.get("accepts", {}).get("constraints"))
-        if not refs:
-            continue
 
-        choice_uid = _fragment_uid(fragment)
-        scene = next((ids for ids in scenes if choice_uid in ids), None)
-        assert scene is not None, f"{path.name}: choice {choice_uid} is not in a scene"
-        for ref in refs:
-            assert ref in scene, f"{path.name}: choice {choice_uid} references hidden {ref}"
+@pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
+def test_runtime_fixtures_pass_input_parity(path: Path) -> None:
+    payload = _load_fixture(path)
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    PARITY.assert_no_issues(result.issues)
+
+
+@pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
+def test_runtime_fixtures_pass_time_parity(path: Path) -> None:
+    payload = _load_fixture(path)
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    TIME_PARITY.assert_no_issues(result.issues)
+
+
+def test_decision_legibility_reports_hidden_choice_references() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "hidden-zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "member_ids": [],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Take one.",
+                "available": True,
+                "accepts": {
+                    "kind": "pieces",
+                    "constraints": {"target_zone_ref": "hidden-zone"},
+                },
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert [issue.ref_id for issue in result.issues] == ["hidden-zone"]
+    assert result.issues[0].choice_uid == "choice"
+    assert result.issues[0].reason == "referenced state is not renderable"
+
+
+def test_decision_legibility_accepts_visible_piece_domain_ids() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["zone", "choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "member_ids": ["piece-fragment"],
+            },
+            {
+                "uid": "piece-fragment",
+                "fragment_type": "piece",
+                "piece_id": "lamp",
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Use the lamp.",
+                "available": True,
+                "accepts": {
+                    "kind": "pieces",
+                    "piece_ids": ["lamp"],
+                },
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert result.issues == ()
+
+
+def test_decision_legibility_reports_blocker_refs() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Unlock it.",
+                "available": True,
+                "blockers": [
+                    {
+                        "code": "missing_key",
+                        "message": "Needs the brass key.",
+                        "refs": ["hidden-key"],
+                    }
+                ],
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert [issue.ref_id for issue in result.issues] == ["hidden-key"]
+
+
+def test_decision_legibility_reports_place_edge_refs() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["zone", "piece", "choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "zone_id": "inventory",
+                "member_ids": ["piece"],
+            },
+            {
+                "uid": "piece",
+                "fragment_type": "piece",
+                "piece_id": "lamp",
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Move the lamp.",
+                "available": True,
+                "accepts": {
+                    "kind": "place",
+                    "source_zone_ref": "inventory",
+                    "edge_ref": "hidden-exit",
+                },
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert [issue.ref_id for issue in result.issues] == ["hidden-exit"]
+
+
+def test_input_parity_reports_unsubmittable_piece_choices() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "member_ids": [],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Take one.",
+                "available": True,
+                "accepts": {
+                    "kind": "pieces",
+                    "min": 1,
+                    "constraints": {"target_zone_ref": "zone"},
+                },
+            },
+        ],
+    }
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "target zone 'zone' is not renderable",
+    ]
+
+
+def test_input_parity_reports_invalid_compose_parts() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Give something.",
+                "available": True,
+                "accepts": {
+                    "kind": "compose",
+                    "parts": [
+                        {"role": "amount", "accepts": {"kind": "quantity", "min": 5, "max": 1}},
+                        {"role": "amount", "accepts": {"kind": "text"}},
+                        {"accepts": {"kind": "unknown"}},
+                    ],
+                },
+            },
+        ],
+    }
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "`min` exceeds `max`",
+        "duplicate role 'amount'",
+        "missing role",
+        "missing or unsupported accepts kind",
+    ]
+
+
+def test_input_parity_reports_negative_bounds() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["zone", "piece", "choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "zone_id": "inventory",
+                "member_ids": ["piece"],
+            },
+            {
+                "uid": "piece",
+                "fragment_type": "piece",
+                "piece_id": "lamp",
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Give supplies.",
+                "available": True,
+                "accepts": {
+                    "kind": "compose",
+                    "parts": [
+                        {"role": "amount", "accepts": {"kind": "quantity", "min": -1}},
+                        {
+                            "role": "item",
+                            "accepts": {
+                                "kind": "pieces",
+                                "target_zone_ref": "inventory",
+                                "max": -1,
+                            },
+                        },
+                    ],
+                },
+            },
+        ],
+    }
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "`min` must be non-negative",
+        "`max` must be non-negative",
+    ]
+
+
+def test_time_parity_reports_unreadable_pending_media() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["media"],
+            },
+            {
+                "uid": "media",
+                "fragment_type": "media",
+                "content": "",
+                "content_format": "rit",
+                "generation_status": "ready",
+            },
+        ],
+    }
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "media is missing readable content",
+        "ready media must resolve beyond rit",
+    ]
+
+
+@pytest.mark.parametrize("content", [{}, []], ids=["empty-object", "empty-list"])
+def test_time_parity_reports_empty_container_fallbacks(content: Any) -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["media"],
+            },
+            {
+                "uid": "media",
+                "fragment_type": "media",
+                "content": content,
+                "content_format": "url",
+            },
+        ],
+    }
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "media is missing readable content",
+    ]
+
+
+def test_time_parity_accepts_roll_proposal_fallback() -> None:
+    payload = _load_fixture(PROPOSAL_DIR / "roll_fragment.json")
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    TIME_PARITY.assert_no_issues(result.issues)
+
+
+def test_time_parity_reports_blocking_roll_rituals() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["roll"],
+            },
+            {
+                "uid": "roll",
+                "fragment_type": "roll",
+                "label": "Fate",
+                "outcome": "fail",
+                "ritual_hints": {
+                    "duration_ms": True,
+                    "skip_label": "",
+                    "requires_completion": True,
+                },
+            },
+        ],
+    }
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "roll needs inputs or narrative for fallback",
+        "ritual duration_ms must be a non-negative integer",
+        "ritual skip_label must be readable when present",
+        "timing hint 'requires_completion' cannot be true",
+    ]
 
 
 def test_command_hint_fixture_keeps_grammar_advisory() -> None:
