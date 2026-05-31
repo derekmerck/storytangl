@@ -16,18 +16,29 @@ the new descender matches its neighbors. Three tunings are sanctioned:
 Newsreader (canonical), JetBrains Mono (CLI), Inter Tight (web chrome).
 Custom tunings for new fonts require updating the brand sheet first.
 
-## 2. Where each asset goes
+## 2. What is archived here
 
-| Asset | Destination | Format |
-|-------|-------------|--------|
-| `wordmark.svg` | `assets/brand/wordmark.svg` (or wherever the repo's brand assets live) | SVG with webfont |
-| `glyph.svg` / `glyph-round.svg` | `assets/brand/glyph*.svg` | SVG with webfont |
-| `favicon.svg` | `apps/web/public/favicon.svg`, `docs/src/_static/favicon.svg` | SVG with webfont (browsers cache it locally; fallback to `favicon.ico` for IE11-era) |
-| `README-banner.svg` | `assets/brand/README-banner.svg`; reference in `README.md` as the hero image above the `# StoryTangl` line | SVG with webfont |
-| `social-card.svg` | `.github/social-preview.png` (rasterize first; GitHub doesn't accept SVG for social previews) | PNG export at 1280×640 |
-| `cli-splash.txt` | `apps/cli/src/tangl/cli/assets/splash.txt`, loaded by the cmd2 app on launch | plain text |
-| `palette.css` | `apps/web/src/styles/storytangl-palette.css`; `docs/src/_static/storytangl-palette.css` | CSS |
-| `type.css` | same | CSS |
+This directory is a reference archive, not a deployed asset package.
+
+| Archived file | Purpose | Note |
+|---------------|---------|------|
+| `StoryTangl-Brand-Sheet.html` | visual reference | review-only; not production HTML |
+| `USAGE.md` | rules and deployment guidance | this file |
+| `assets/palette.css` | color tokens | copied from the brand package |
+| `assets/type.css` | type tokens | copied from the brand package |
+
+Generated outputs stay out of this archive until they are visually reviewed.
+When the brand stabilizes, regenerate and deploy only the outputs a target
+client actually needs.
+
+| Generated output | Intended destination | Format |
+|------------------|----------------------|--------|
+| `wordmark.svg` | `assets/brand/wordmark.svg` | SVG, reviewed for font tuning |
+| `glyph.svg` / `glyph-round.svg` | `assets/brand/glyph*.svg` | SVG |
+| `favicon.svg` | `apps/web/public/favicon.svg`, `docs/src/_static/favicon.svg` | SVG |
+| `README-banner.svg` | README hero above the `# StoryTangl` line | SVG |
+| `social-card.png` | `.github/social-preview.png` | PNG export at 1280×640 |
+| `cli-splash.txt` | CLI launch splash, if adopted | plain text |
 
 ## 3. SVGs are font-dependent — when to convert to paths
 
@@ -50,15 +61,18 @@ inkscape wordmark.svg --export-type=svg --export-filename=wordmark-paths.svg \
 # online: https://danmarshall.github.io/google-font-to-svg-path/
 ```
 
-The path version is checked in alongside the font-dependent SVG; downstream
-choose by context. Do not regenerate paths without confirming the
-typographic tuning matches §1 of the brand sheet (per-font sx/sy/ty values).
+No path exports are checked in here. If a downstream target needs one, commit
+the font-dependent source and the path export together in that target's asset
+directory. Do not regenerate paths without confirming the typographic tuning
+matches §1 of the brand sheet (per-font sx/sy/ty values).
 
-## 4. The lockup is the wordmark or the wordmark + glyph — never the glyph alone with text
+## 4. Lockups use one primary mark plus a descriptor
 
-The glyph stands alone. The wordmark stands alone. A glyph + wordmark
-lockup is sanctioned (see §3 of the brand sheet). What is **not** sanctioned:
+The glyph stands alone. The wordmark stands alone. A lockup may pair either
+primary mark with a descriptor such as `engine`, `docs`, or `cli`. It should
+not pair the glyph and wordmark together. What is **not** sanctioned:
 
+- **glyph + wordmark together** (two primary marks competing)
 - **glyph + plain "StoryTangl" text** (defeats the whole mark)
 - **glyph + a different word** (the mark is bound to its wordmark)
 - **two glyphs as a repeating pattern** (use the dotty knot texture instead)

@@ -232,7 +232,11 @@ def _blocking_hint_issues(
 def _has_readable_value(value: JsonValue | None) -> bool:
     if isinstance(value, str):
         return bool(value.strip())
-    return isinstance(value, (int, float, bool, dict, list))
+    if isinstance(value, list):
+        return any(_has_readable_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(_has_readable_value(item) for item in value.values())
+    return isinstance(value, (int, float, bool))
 
 
 def _is_int(value: JsonValue | None) -> bool:

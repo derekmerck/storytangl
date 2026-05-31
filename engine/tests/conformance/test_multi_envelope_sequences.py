@@ -29,11 +29,12 @@ FLAME_ID = "00000000-0000-4000-8000-000000021013"
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(name, path)
+    module_name = f"{__name__}.{name}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 

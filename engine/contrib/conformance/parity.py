@@ -174,11 +174,10 @@ def current_shell_reference_ids(
         fragment = registry.get(uid)
         if fragment is None:
             continue
-        refs.update(
-            value
-            for key in ("piece_id", "state_id", "zone_id")
-            if isinstance((value := fragment.get(key)), str)
-        )
+        for key in ("piece_id", "state_id", "zone_id"):
+            value = fragment.get(key)
+            if isinstance(value, str):
+                refs.add(value)
     return refs
 
 
@@ -233,20 +232,7 @@ def _check_quantity(
     accepts_path: str,
     step_index: int | None,
 ) -> list[InputParityIssue]:
-    issues: list[InputParityIssue] = []
-    minimum = accepts.get("min")
-    maximum = accepts.get("max")
-    if minimum is not None and not _is_int(minimum):
-        issues.append(
-            InputParityIssue(choice_uid, accepts_path, "`min` must be an integer", step_index)
-        )
-    if maximum is not None and not _is_int(maximum):
-        issues.append(
-            InputParityIssue(choice_uid, accepts_path, "`max` must be an integer", step_index)
-        )
-    if _is_int(minimum) and _is_int(maximum) and minimum > maximum:
-        issues.append(InputParityIssue(choice_uid, accepts_path, "`min` exceeds `max`", step_index))
-    return issues
+    return _check_non_negative_bounds(accepts, choice_uid, accepts_path, step_index)
 
 
 def _check_pieces(
@@ -409,17 +395,46 @@ def _check_selection_bounds(
     accepts_path: str,
     step_index: int | None,
 ) -> list[InputParityIssue]:
+    return _check_non_negative_bounds(accepts, choice_uid, accepts_path, step_index)
+
+
+def _check_non_negative_bounds(
+    accepts: JsonObject,
+    choice_uid: str,
+    accepts_path: str,
+    step_index: int | None,
+) -> list[InputParityIssue]:
     issues: list[InputParityIssue] = []
     minimum = accepts.get("min")
     maximum = accepts.get("max")
-    if minimum is not None and not _is_int(minimum):
-        issues.append(
-            InputParityIssue(choice_uid, accepts_path, "`min` must be an integer", step_index)
-        )
-    if maximum is not None and not _is_int(maximum):
-        issues.append(
-            InputParityIssue(choice_uid, accepts_path, "`max` must be an integer", step_index)
-        )
+    if minimum is not None:
+        if not _is_int(minimum):
+            issues.append(
+                InputParityIssue(choice_uid, accepts_path, "`min` must be an integer", step_index)
+            )
+        elif minimum < 0:
+            issues.append(
+                InputParityIssue(
+                    choice_uid,
+                    accepts_path,
+                    "`min` must be non-negative",
+                    step_index,
+                )
+            )
+    if maximum is not None:
+        if not _is_int(maximum):
+            issues.append(
+                InputParityIssue(choice_uid, accepts_path, "`max` must be an integer", step_index)
+            )
+        elif maximum < 0:
+            issues.append(
+                InputParityIssue(
+                    choice_uid,
+                    accepts_path,
+                    "`max` must be non-negative",
+                    step_index,
+                )
+            )
     if _is_int(minimum) and _is_int(maximum) and minimum > maximum:
         issues.append(InputParityIssue(choice_uid, accepts_path, "`min` exceeds `max`", step_index))
     return issues
@@ -464,11 +479,7 @@ def _fragment_by_uid_or_domain_id(
     if fragment is not None:
         return fragment
     for candidate in registry.values():
-        if ref in {
-            value
-            for key in ("piece_id", "state_id", "zone_id")
-            if isinstance((value := candidate.get(key)), str)
-        }:
+        if ref in (candidate.get("piece_id"), candidate.get("state_id"), candidate.get("zone_id")):
             return candidate
     return None
 

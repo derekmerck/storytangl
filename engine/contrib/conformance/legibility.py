@@ -25,6 +25,8 @@ FragmentRegistry = dict[str, JsonObject]
 REFERENCE_KEYS = {
     "blocker_ref",
     "blocker_refs",
+    "edge_ref",
+    "edge_refs",
     "fragment_ref",
     "fragment_refs",
     "piece_id",
@@ -32,6 +34,7 @@ REFERENCE_KEYS = {
     "piece_ref",
     "piece_refs",
     "source_zone_ref",
+    "refs",
     "state_ref",
     "state_refs",
     "target_zone_ref",
@@ -196,11 +199,10 @@ def current_shell_reference_ids(
         fragment = registry.get(uid)
         if fragment is None:
             continue
-        refs.update(
-            value
-            for key in ("piece_id", "state_id", "zone_id")
-            if isinstance((value := fragment.get(key)), str)
-        )
+        for key in ("piece_id", "state_id", "zone_id"):
+            value = fragment.get(key)
+            if isinstance(value, str):
+                refs.add(value)
     return refs
 
 

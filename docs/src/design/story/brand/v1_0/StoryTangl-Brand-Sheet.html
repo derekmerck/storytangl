@@ -1510,30 +1510,31 @@ body[data-st-posture="terminal"] .social-card .sc-tag { font-family: var(--st-fo
   <h2 class="sec">
     <span class="n">§10</span>
     <span>Assets · index</span>
-    <span class="right">files in this directory · drop-in for the repo</span>
+    <span class="right">archived reference files · generated targets</span>
   </h2>
 
   <table class="assets">
     <thead><tr><th style="width: 32%">path</th><th style="width: 36%">purpose</th><th>note</th></tr></thead>
     <tbody>
       <tr><td class="path">brand/StoryTangl-Brand-Sheet.html</td><td class="purpose">this document — canonical reference</td><td class="note">review-only; not a production artifact</td></tr>
+      <tr><td class="path">brand/USAGE.md</td><td class="purpose">do / don't · sizing rules · what an LLM agent must never do</td><td class="note">opinionated; enforce in PRs</td></tr>
       <tr><td class="path">brand/assets/palette.css</td><td class="purpose">color tokens (light + ink-mode)</td><td class="note"><code>:root</code> + <code>[data-st-mode="ink"]</code></td></tr>
       <tr><td class="path">brand/assets/type.css</td><td class="purpose">type stack (Newsreader / Mono / Inter Tight)</td><td class="note">Google Fonts import</td></tr>
-      <tr><td class="path">brand/assets/wordmark.svg</td><td class="purpose">canonical wordmark · Newsreader 600</td><td class="note">paths only, no font dependency</td></tr>
-      <tr><td class="path">brand/assets/wordmark-mono.svg</td><td class="purpose">mono wordmark · for CLI banner</td><td class="note">JetBrains Mono</td></tr>
-      <tr><td class="path">brand/assets/glyph.svg</td><td class="purpose">standalone glyph · ink-on-paper</td><td class="note">square; clip-path-friendly</td></tr>
-      <tr><td class="path">brand/assets/glyph-round.svg</td><td class="purpose">round-masked glyph · for favicons</td><td class="note">used at 16/32/48/96/192 px</td></tr>
-      <tr><td class="path">brand/assets/favicon.svg</td><td class="purpose">browser tab icon · 32×32 source</td><td class="note">deploys at <code>apps/web/public/favicon.svg</code></td></tr>
-      <tr><td class="path">brand/assets/social-card.svg</td><td class="purpose">GitHub social preview · 1280×640</td><td class="note">deploys at <code>.github/social-preview.png</code> (rasterize)</td></tr>
-      <tr><td class="path">brand/assets/README-banner.svg</td><td class="purpose">README hero · 1280×320</td><td class="note">drop above the <code># StoryTangl</code> line</td></tr>
-      <tr><td class="path">brand/assets/cli-splash.txt</td><td class="purpose">terminal launch banner · ANSI</td><td class="note">used by <code>tangl-cli</code> on start</td></tr>
-      <tr><td class="path">brand/USAGE.md</td><td class="purpose">do / don't · sizing rules · what an LLM agent must never do</td><td class="note">opinionated; enforce in PRs</td></tr>
+      <tr><td class="path">brand/assets/wordmark.svg</td><td class="purpose">canonical wordmark · Newsreader 600</td><td class="note">not archived here; regenerate and review before deploying</td></tr>
+      <tr><td class="path">brand/assets/wordmark-mono.svg</td><td class="purpose">mono wordmark · for CLI banner</td><td class="note">not archived here; regenerate and review before deploying</td></tr>
+      <tr><td class="path">brand/assets/glyph.svg</td><td class="purpose">standalone glyph · ink-on-paper</td><td class="note">not archived here; regenerate and review before deploying</td></tr>
+      <tr><td class="path">brand/assets/glyph-round.svg</td><td class="purpose">round-masked glyph · for favicons</td><td class="note">not archived here; regenerate and review before deploying</td></tr>
+      <tr><td class="path">brand/assets/favicon.svg</td><td class="purpose">browser tab icon · 32×32 source</td><td class="note">deployment target: <code>apps/web/public/favicon.svg</code></td></tr>
+      <tr><td class="path">brand/assets/social-card.svg</td><td class="purpose">GitHub social preview · 1280×640</td><td class="note">deployment target: rasterized <code>.github/social-preview.png</code></td></tr>
+      <tr><td class="path">brand/assets/README-banner.svg</td><td class="purpose">README hero · 1280×320</td><td class="note">deployment target: README hero above the H1</td></tr>
+      <tr><td class="path">brand/assets/cli-splash.txt</td><td class="purpose">terminal launch banner · ANSI</td><td class="note">proposal only; regenerate if the CLI adopts it</td></tr>
     </tbody>
   </table>
 
   <div class="marg" style="margin-top: 24px;">
-    The brand is intentionally small. If an asset doesn't exist here, the answer is probably "you
-    don't need one." If you genuinely do, add it here first; then deploy.
+    The brand is intentionally small. Generated targets listed above are deployment guidance, not
+    broken references in this archive. If you genuinely need a new target, add the rule here first;
+    then deploy.
   </div>
 
 
@@ -1617,9 +1618,9 @@ body[data-st-posture="terminal"] .social-card .sc-tag { font-family: var(--st-fo
   // host writes them back through the EDITMODE-BEGIN/END block when the
   // user persists a tweak.
   const TWEAKS = /*EDITMODE-BEGIN*/{
-    "mode": "ink",
-    "voice": "chrome",
-    "posture": "terminal",
+    "mode": "paper",
+    "voice": "prose",
+    "posture": "engineering",
     "prose_sy": 1,
     "prose_sx": 0.85,
     "prose_ty": 5,

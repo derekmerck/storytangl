@@ -47,11 +47,12 @@ EXPECTED_PROPOSALS = {
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(name, path)
+    module_name = f"{__name__}.{name}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -311,6 +312,80 @@ def test_decision_legibility_accepts_visible_piece_domain_ids() -> None:
     assert result.issues == ()
 
 
+def test_decision_legibility_reports_blocker_refs() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["choice"],
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Unlock it.",
+                "available": True,
+                "blockers": [
+                    {
+                        "code": "missing_key",
+                        "message": "Needs the brass key.",
+                        "refs": ["hidden-key"],
+                    }
+                ],
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert [issue.ref_id for issue in result.issues] == ["hidden-key"]
+
+
+def test_decision_legibility_reports_place_edge_refs() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["zone", "piece", "choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "zone_id": "inventory",
+                "member_ids": ["piece"],
+            },
+            {
+                "uid": "piece",
+                "fragment_type": "piece",
+                "piece_id": "lamp",
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Move the lamp.",
+                "available": True,
+                "accepts": {
+                    "kind": "place",
+                    "source_zone_ref": "inventory",
+                    "edge_ref": "hidden-exit",
+                },
+            },
+        ],
+    }
+
+    result = LEGIBILITY.check_runtime_envelope(payload)
+
+    assert [issue.ref_id for issue in result.issues] == ["hidden-exit"]
+
+
 def test_input_parity_reports_unsubmittable_piece_choices() -> None:
     payload = {
         "cursor_id": "fixture",
@@ -387,6 +462,60 @@ def test_input_parity_reports_invalid_compose_parts() -> None:
     ]
 
 
+def test_input_parity_reports_negative_bounds() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["zone", "piece", "choice"],
+            },
+            {
+                "uid": "zone",
+                "fragment_type": "group",
+                "group_type": "zone",
+                "zone_id": "inventory",
+                "member_ids": ["piece"],
+            },
+            {
+                "uid": "piece",
+                "fragment_type": "piece",
+                "piece_id": "lamp",
+            },
+            {
+                "uid": "choice",
+                "fragment_type": "choice",
+                "text": "Give supplies.",
+                "available": True,
+                "accepts": {
+                    "kind": "compose",
+                    "parts": [
+                        {"role": "amount", "accepts": {"kind": "quantity", "min": -1}},
+                        {
+                            "role": "item",
+                            "accepts": {
+                                "kind": "pieces",
+                                "target_zone_ref": "inventory",
+                                "max": -1,
+                            },
+                        },
+                    ],
+                },
+            },
+        ],
+    }
+
+    result = PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "`min` must be non-negative",
+        "`max` must be non-negative",
+    ]
+
+
 def test_time_parity_reports_unreadable_pending_media() -> None:
     payload = {
         "cursor_id": "fixture",
@@ -413,6 +542,34 @@ def test_time_parity_reports_unreadable_pending_media() -> None:
     assert [issue.reason for issue in result.issues] == [
         "media is missing readable content",
         "ready media must resolve beyond rit",
+    ]
+
+
+@pytest.mark.parametrize("content", [{}, []], ids=["empty-object", "empty-list"])
+def test_time_parity_reports_empty_container_fallbacks(content: Any) -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": ["media"],
+            },
+            {
+                "uid": "media",
+                "fragment_type": "media",
+                "content": content,
+                "content_format": "url",
+            },
+        ],
+    }
+
+    result = TIME_PARITY.check_runtime_envelope(payload)
+
+    assert [issue.reason for issue in result.issues] == [
+        "media is missing readable content",
     ]
 
 
