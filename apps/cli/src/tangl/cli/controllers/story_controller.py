@@ -112,8 +112,6 @@ class StoryController(CommandSet):
 
     def _apply_runtime_envelope(self, envelope: Any) -> None:
         metadata = getattr(envelope, "metadata", None) or {}
-        if hasattr(metadata, "model_dump"):
-            metadata = metadata.model_dump()
         if not isinstance(metadata, Mapping):
             metadata = {}
         self._current_metadata = dict(metadata)

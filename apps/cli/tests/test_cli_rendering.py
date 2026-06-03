@@ -3,6 +3,12 @@ from __future__ import annotations
 import io
 from types import SimpleNamespace
 
+import pytest
+
+pytest.importorskip("rich")
+
+from rich.table import Table
+
 from tangl.cli.rendering import RichTerminalRenderer
 
 
@@ -85,3 +91,27 @@ def test_rich_renderer_exports_diagnostic_transcript() -> None:
     assert "Projected State" in transcript
     assert "Candidates" in transcript
     assert "/r Registry" in transcript
+
+
+def test_rich_projected_state_renders_native_tables() -> None:
+    renderer = RichTerminalRenderer()
+
+    renderables = renderer.projected_state(
+        {
+            "sections": [
+                {
+                    "section_id": "candidates",
+                    "title": "Candidates",
+                    "value": {
+                        "value_type": "table",
+                        "columns": ["Candidate", "Decision"],
+                        "rows": [["Bek Tarsus", "Review"]],
+                    },
+                }
+            ]
+        }
+    )
+
+    assert len(renderables) == 1
+    assert isinstance(renderables[0], Table)
+    assert renderables[0].title == "Candidates"

@@ -54,10 +54,13 @@ def test_cli_loads_brand_splash() -> None:
 
 
 def test_cli_can_use_rich_terminal_renderer() -> None:
+    pytest.importorskip("rich")
+    from tangl.cli.rendering import RichTerminalRenderer
+
     app = TanglShell(register_controllers=False, terminal_style="rich")
 
     assert app.terminal_style == "rich"
-    assert type(app.terminal_renderer).__name__ == "RichTerminalRenderer"
+    assert isinstance(app.terminal_renderer, RichTerminalRenderer)
 
 
 def test_cli_diagnostic_command_renders_standard_transcript() -> None:

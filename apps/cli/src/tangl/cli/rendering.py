@@ -208,6 +208,13 @@ class RichTerminalRenderer(PlainTerminalRenderer):
                 renderables.append(_rich_text(str(section)))
                 continue
             title = str(section.get("title") or section.get("section_id") or "Section")
+            value = section.get("value")
+            if isinstance(value, Mapping) and value.get("value_type") == "table":
+                table = _rich_projected_table(title, value)
+                if table is not None:
+                    renderables.append(table)
+                    continue
+
             lines = _projected_section_lines(section)
             if not lines:
                 lines = ["(No details)"]
@@ -330,6 +337,23 @@ def _rich_media_placeholder(fragment: Any) -> Any:
 
     role = _read(fragment, "media_role") or _read(fragment, "role") or "media"
     return Panel(_basename(_fragment_text(fragment)), title=str(role), expand=False)
+
+
+def _rich_projected_table(title: str, value: JsonMapping) -> Any | None:
+    from rich.table import Table
+
+    columns = value.get("columns")
+    rows = value.get("rows")
+    if not isinstance(columns, list) or not isinstance(rows, list):
+        return None
+
+    table = Table(title=title, padding=(0, 2))
+    for column in columns:
+        table.add_column(str(column))
+    for row in rows:
+        if isinstance(row, list):
+            table.add_row(*(str(cell) for cell in row))
+    return table
 
 
 def _rich_info_affordances(metadata: JsonMapping | None) -> list[Any]:
