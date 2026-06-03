@@ -39,6 +39,16 @@ def _capture_output(app: TanglShell) -> str:
     return output
 
 
+def test_cli_loads_brand_splash() -> None:
+    app = TanglShell(register_controllers=False)
+
+    assert app.intro is not None
+    assert "StoryTan⅁l" in app.intro
+    assert "user: (none)" in app.intro
+    assert "derek" not in app.intro
+    assert "v38.3" not in app.intro
+
+
 def test_load_script_and_show_story(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()

@@ -61,6 +61,11 @@ the negotiation is mostly about typed-shape graduations.
 | `ControlFragment` (`update` / `delete`) | S | done | done | — |
 | `UserEventFragment` | S | done | done | — |
 | `ProjectedState.sections` with five `value_type`s | S | done | done | — |
+| `metadata.info_affordances: list[InfoAffordance]` | S | done (web + CLI `?`/slash floor) | done (typed; gathered through service-info dispatch) | sandbox and credentials fixtures cover advertised channels |
+| `InfoAffordance.query` optional dict (opaque descriptor) | S | done | done | bundles choose descriptor contents; clients hand it back |
+| `metadata.info_state: InfoState` typed | S | done (nested type + dirty-kind cache hints) | partial (typed; v1 conservatively marks advertised kinds dirty) | add finer dirty tracking only when a client needs caching |
+| `/story/info` accepts `kind`/`kinds` + `query` params | S | done client-side | done (same endpoint; singular/plural kind filters + query descriptor routing) | add bundle-specific providers as worlds need them |
+| §1.6 Info channels | S | done (info pills + CLI floor) | done | keep rich renderers optional; `ProjectedState` fallback remains required |
 | `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
 | Bundle customization / presentation profiles | S target | partial (docs + older world `ui_config`) | not_started | keep advisory; requires world-info catalog before conformance |
 | §5.1 Decision Legibility Contract | S | partial (JSON harness covers fixtures/sequences) | n/a (contract; not a capability) | expand field coverage as new decision surfaces promote |
@@ -87,13 +92,8 @@ surface is small enough to settle with its immediate neighbors.
 | Typed `InterpretationFragment` | P1 | done (renders `result` / `text` / `message`) | untyped | engine PR |
 | `cost_previews: list[CostPreview]` (plural) | P1 | done (choice display) | not_started | engine PR |
 | `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
-| `metadata.info_affordances: list[InfoAffordance]` | P1 | done (with `query` descriptor) | done (typed; gathered through service-info dispatch) | bundles populate as needed |
-| `InfoAffordance.query` optional dict (opaque descriptor) | P1 | done | done | bundles choose descriptor contents |
-| `metadata.info_state: InfoState` typed | P1 | done (nested type + dirty-kind cache hints) | partial (typed; v1 conservatively marks advertised kinds dirty) | add finer dirty tracking only when a client needs caching |
-| `/story/info` accepts `kind`/`kinds` + `query` params | P1 | done client-side | done (same endpoint; singular/plural kind filters + query descriptor routing) | add bundle-specific providers |
 | HTTP body field `edge_id` | P1 | done | done | — |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
-| §1.6 Info channels graduation to Tier S | P1 | done | partial | gated on CLI reference port implementing the `?`/slash fallback |
 
 **Block on Tier P1 graduation to Tier S:** the CLI reference port
 (`engine/contrib/conformance/cli_reference_port.py`) must implement
@@ -347,13 +347,12 @@ API maps them.
 - Engine PR sequence:
   1. Typed `Blocker` model in `tangl/journal/intent.py`.
   2. Typed `InterpretationFragment` with `result` / `text` fields.
-  3. Typed `metadata.grammar` and `metadata.info_affordances`.
-  4. HTTP API: type responses on `/story/do` / `/story/update`; add `query`
-     param routing on `/story/info`.
+  3. Typed `metadata.grammar` model.
+  4. HTTP API: type responses on `/story/do` / `/story/update`.
   5. Conformance harness: ✅ initial `legibility.py`; ✅ initial
-     input-parity `parity.py`; ✅ initial `time_parity.py`; next extend
-     `cli_reference_port.py` for new Tier P1 surfaces and add browser timing
-     E2E only after promoted surfaces stabilize.
+     input-parity `parity.py`; ✅ initial `time_parity.py`; ✅ CLI-floor
+     info-channel reachability; next add browser timing E2E only after
+     promoted surfaces stabilize.
 
 **Phase 4 — Tier P1 → S graduation.** Surfaces in §B promote one
 at a time, gated on the CLI reference port and the conformance

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="StoryTangl">
+  <defs>
+    
+    <pattern id="dots-lg" width="38" height="38" patternUnits="userSpaceOnUse">
+      <circle cx="19" cy="19" r="2" fill="#8a8472"></circle>
+    </pattern>
+    <radialGradient id="fade-rad" cx="100%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#f6f3ea" stop-opacity="0"></stop>
+      <stop offset="50%" stop-color="#f6f3ea" stop-opacity="0"></stop>
+      <stop offset="100%" stop-color="#f6f3ea" stop-opacity="1"></stop>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="#f6f3ea"></rect>
+  <rect x="800" width="480" height="640" fill="url(#dots-lg)" opacity="0.4"></rect>
+  <rect x="800" width="480" height="640" fill="url(#fade-rad)"></rect>
+  <rect x="1" y="1" width="1278" height="638" fill="none" stroke="#1a1a1a" stroke-width="1.5"></rect>
+
+  
+  <text x="64" y="312" textLength="677.34" lengthAdjust="spacingAndGlyphs" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="600" font-size="150" fill="#1a1a1a">StoryTan</text>
+  <g transform="translate(785.5 234.47) scale(0.75 1) rotate(180)">
+    <text x="0" y="0" text-anchor="middle" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="600" font-size="150" fill="#1a1a1a">G</text>
+  </g>
+  <text x="829.6" y="312" textLength="45.15" lengthAdjust="spacingAndGlyphs" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="600" font-size="150" fill="#1a1a1a">l</text>
+
+  <text x="64" y="404" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-style="italic" font-weight="500" font-size="30" fill="#3b3a36">A research platform for graph-based</text>
+  <text x="64" y="448" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-style="italic" font-weight="500" font-size="30" fill="#3b3a36">computational narratology.</text>
+  <text x="64" y="508" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-style="italic" font-weight="500" font-size="30" fill="#3b3a36">Fabula, navigation, journal —</text>
+  <text x="64" y="552" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-style="italic" font-weight="500" font-size="30" fill="#3b3a36">written once, projected three ways.</text>
+
+  <text x="64" y="608" font-family="&#39;JetBrains Mono&#39;, &#39;Courier New&#39;, Courier, monospace" font-size="16" fill="#6b6a64">github.com/derekmerck/storytangl · MIT · v38</text>
+
+  <circle cx="1148" cy="540" r="64" fill="#1a1a1a"></circle>
+  <g transform="translate(1148 540) rotate(180) scale(0.82 1)">
+    <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="700" font-size="100" fill="#f6f3ea">G</text>
+  </g>
+</svg>
