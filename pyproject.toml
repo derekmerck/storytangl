@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "StoryTangl"
-version = "3.7.2"
+version = "3.8"
 description = "The abstract narrative graph lib for interactive stories"
 authors = ["TangleDev <dev@storytan.gl>"]
 readme = "README.md"

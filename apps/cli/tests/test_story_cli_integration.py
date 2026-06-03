@@ -51,6 +51,13 @@ def test_cli_loads_brand_splash() -> None:
     assert "⅁>" not in app.intro
     assert "derek" not in app.intro
     assert "v38.3" not in app.intro
+    assert "{version_line}" not in app.intro
+
+    lines = app.intro.splitlines()
+    border_line = lines[0]
+    version_line = next(line for line in lines if "StoryTan⅁l" in line)
+    assert len(version_line) == len(border_line)
+    assert version_line.endswith("│")
 
 
 def test_cli_can_use_rich_terminal_renderer() -> None:

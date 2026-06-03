@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import inspect
+import re
 from pathlib import Path
 from uuid import UUID
 
 import cmd2
 
+from tangl.info import __version__
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import ServiceManager, build_service_manager
 
@@ -116,7 +118,39 @@ def create_cli_app(*, terminal_style: str = "plain") -> StoryTanglCLI:
 def _load_splash_text() -> str | None:
     if not _SPLASH_PATH.exists():
         return None
-    return _SPLASH_PATH.read_text(encoding="utf-8").rstrip()
+    return _format_splash_text(_SPLASH_PATH.read_text(encoding="utf-8")).rstrip()
+
+
+def _format_splash_text(template: str) -> str:
+    display_version = _major_minor_version(__version__)
+    return template.replace("{version_line}", _splash_version_line(template, display_version))
+
+
+def _major_minor_version(version: str) -> str:
+    match = re.match(r"^(\d+)\.(\d+)", version)
+    if match is None:
+        return version
+    return f"{match.group(1)}.{match.group(2)}"
+
+
+def _splash_version_line(template: str, version: str) -> str:
+    top_border = next(
+        (line for line in template.splitlines() if "╭" in line and "╮" in line),
+        None,
+    )
+    if top_border is None:
+        return f"StoryTan⅁l v{version}"
+
+    box_start = top_border.index("╭")
+    box_end = top_border.index("╮")
+    indent = top_border[:box_start]
+    interior_width = box_end - box_start - 1
+    left_content = "   StoryTan⅁l"
+    version_text = f"v{version}"
+    right_padding = 10
+    spacing = max(1, interior_width - len(left_content) - len(version_text) - right_padding)
+    right_padding = max(1, interior_width - len(left_content) - spacing - len(version_text))
+    return f"{indent}│{left_content}{' ' * spacing}{version_text}{' ' * right_padding}│"
 
 
 __all__ = ["StoryTanglCLI", "create_cli_app"]

@@ -1,6 +1,6 @@
   ╭───────────────────────────────────────────────────────────╮
   │                                                           │
-  │   StoryTan⅁l                                v3.8          │
+{version_line}
   │   ─────────────────────────────────────────────────       │
   │   a research platform for graph-based                     │
   │   computational narratology                               │
