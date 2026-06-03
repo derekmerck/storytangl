@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
@@ -10,78 +10,6 @@ from cmd2 import CommandSet, with_argparser, with_default_category
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
-
-
-def _fragment_text(fragment: Any) -> str:
-    for attr in ("content", "text", "label"):
-        value = getattr(fragment, attr, None)
-        if isinstance(value, str) and value.strip():
-            return value.strip().replace("_", " ")
-    return str(fragment)
-
-
-def _projected_section_lines(section: dict[str, Any]) -> list[str]:
-    value = section.get("value")
-    if not isinstance(value, dict):
-        return [str(value)] if value is not None else []
-
-    value_type = value.get("value_type")
-    if value_type == "kv_list":
-        items = value.get("items")
-        if not isinstance(items, list):
-            return []
-        return [
-            f"{item.get('key')}: {item.get('value')}"
-            for item in items
-            if isinstance(item, dict) and item.get("key") is not None
-        ]
-
-    if value_type == "item_list":
-        items = value.get("items")
-        if not isinstance(items, list):
-            return []
-        lines: list[str] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            label = item.get("label")
-            if label is None:
-                continue
-            line = str(label)
-            detail = item.get("detail")
-            tags = item.get("tags")
-            extras: list[str] = []
-            if detail:
-                extras.append(str(detail))
-            if isinstance(tags, list) and tags:
-                extras.append(", ".join(str(tag) for tag in tags))
-            if extras:
-                line = f"{line}: {' | '.join(extras)}"
-            lines.append(line)
-        return lines
-
-    if value_type == "table":
-        columns = value.get("columns")
-        rows = value.get("rows")
-        if not isinstance(columns, list) or not isinstance(rows, list):
-            return []
-        lines = [" | ".join(str(column) for column in columns)]
-        for row in rows:
-            if isinstance(row, list):
-                lines.append(" | ".join(str(cell) for cell in row))
-        return lines
-
-    if value_type == "badges":
-        badges = value.get("items")
-        if isinstance(badges, list) and badges:
-            return [", ".join(str(item) for item in badges)]
-        return []
-
-    if value_type == "scalar":
-        scalar = value.get("value")
-        return [str(scalar)] if scalar is not None else []
-
-    return [str(value)]
 
 
 @with_default_category("Story")
@@ -94,6 +22,7 @@ class StoryController(CommandSet):
         super().__init__()
         self._current_story_update: list[Any] = []
         self._current_choices: list[SimpleNamespace] = []
+        self._current_metadata: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # helpers
@@ -108,31 +37,13 @@ class StoryController(CommandSet):
         return True
 
     def _render_current_story_update(self) -> None:
-        if not self._current_story_update:
-            self._cmd.poutput("No journal entries available.")
-            return
-
-        self._cmd.poutput("Story Update:")
-        self._cmd.poutput("-------------------------")
-        for fragment in self._current_story_update:
-            self._cmd.poutput(_fragment_text(fragment))
-
-        if not self._current_choices:
-            self._cmd.poutput("No available choices.")
-            return
-
-        self._cmd.poutput("Choices:")
-        active_index = 1
-        for choice in self._current_choices:
-            label = choice.label or str(choice.uid)
-            is_active = getattr(choice, "active", True)
-            reason = getattr(choice, "unavailable_reason", None)
-            if is_active:
-                self._cmd.poutput(f"{active_index}. {label}")
-                active_index += 1
-                continue
-            reason_text = f" [locked: {reason}]" if reason else " [locked]"
-            self._cmd.poutput(f"x) {label}{reason_text}")
+        self._cmd.emit_terminal(
+            self._cmd.terminal_renderer.story_update(
+                fragments=self._current_story_update,
+                choices=self._current_choices,
+                metadata=self._current_metadata,
+            )
+        )
 
     def _load_choices_from_fragments(self) -> list[SimpleNamespace]:
         """Extract choices from fragment stream (from blocks or loose)."""
@@ -201,6 +112,11 @@ class StoryController(CommandSet):
 
     def _apply_runtime_envelope(self, envelope: Any) -> None:
         metadata = getattr(envelope, "metadata", None) or {}
+        if hasattr(metadata, "model_dump"):
+            metadata = metadata.model_dump()
+        if not isinstance(metadata, Mapping):
+            metadata = {}
+        self._current_metadata = dict(metadata)
         ledger_id_value = metadata.get("ledger_id")
         if ledger_id_value is not None:
             self._cmd.set_ledger(UUID(str(ledger_id_value)))
@@ -230,32 +146,15 @@ class StoryController(CommandSet):
         title = args.world_id
         ledger_id = self._cmd.ledger_id
 
-        self._cmd.poutput(f"\nCreated story: {title}")
-        if ledger_id is not None:
-            self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
-
-        if self._current_story_update:
-            self._cmd.poutput("--- Story Begins ---")
-            for fragment in self._current_story_update:
-                self._cmd.poutput(_fragment_text(fragment))
-            self._cmd.poutput()
-
-        if self._current_choices:
-            self._cmd.poutput("Choices:")
-            active_index = 1
-            for choice in self._current_choices:
-                label = choice.label or str(choice.uid)
-                if getattr(choice, "active", True):
-                    self._cmd.poutput(f"{active_index}. {label}")
-                    active_index += 1
-                    continue
-                reason = getattr(choice, "unavailable_reason", None)
-                reason_text = f" [locked: {reason}]" if reason else " [locked]"
-                self._cmd.poutput(f"x) {label}{reason_text}")
-        else:
-            self._cmd.poutput("(No choices available)")
-
-        self._cmd.poutput("\nUse 'do <number>' to make a choice.")
+        self._cmd.emit_terminal(
+            self._cmd.terminal_renderer.story_created(
+                title=title,
+                ledger_id=ledger_id,
+                fragments=self._current_story_update,
+                choices=self._current_choices,
+                metadata=self._current_metadata,
+            )
+        )
 
     def do_story(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if not self._require_story_context():
@@ -318,6 +217,7 @@ class StoryController(CommandSet):
         self._cmd.set_ledger(None)
         self._current_story_update.clear()
         self._current_choices.clear()
+        self._current_metadata.clear()
 
         if getattr(result, "status", None) == "error":
             self._cmd.perror(result.message or "Failed to drop story")
@@ -361,28 +261,4 @@ class StoryController(CommandSet):
         else:
             payload = {"info": str(info)}
 
-        sections = payload.get("sections")
-        if isinstance(sections, list):
-            if not sections:
-                self._cmd.poutput("No status data available.")
-                return
-
-            for index, section in enumerate(sections):
-                if not isinstance(section, dict):
-                    self._cmd.poutput(str(section))
-                    continue
-
-                title = section.get("title") or section.get("section_id") or "Section"
-                self._cmd.poutput(f"{title}:")
-                lines = _projected_section_lines(section)
-                if not lines:
-                    self._cmd.poutput("  (No details)")
-                else:
-                    for line in lines:
-                        self._cmd.poutput(f"  {line}")
-                if index < len(sections) - 1:
-                    self._cmd.poutput("")
-            return
-
-        for key, value in payload.items():
-            self._cmd.poutput(f"{key}: {value}")
+        self._cmd.emit_terminal(self._cmd.terminal_renderer.projected_state(payload))

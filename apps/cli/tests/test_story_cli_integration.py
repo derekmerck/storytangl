@@ -49,6 +49,13 @@ def test_cli_loads_brand_splash() -> None:
     assert "v38.3" not in app.intro
 
 
+def test_cli_can_use_rich_terminal_renderer() -> None:
+    app = TanglShell(register_controllers=False, terminal_style="rich")
+
+    assert app.terminal_style == "rich"
+    assert type(app.terminal_renderer).__name__ == "RichTerminalRenderer"
+
+
 def test_load_script_and_show_story(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
