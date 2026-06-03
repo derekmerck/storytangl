@@ -1,6 +1,6 @@
   ╭───────────────────────────────────────────────────────────╮
   │                                                           │
-  │   StoryTan⅁l                                v38.3         │
+  │   StoryTan⅁l                                v{version}     │
   │   ─────────────────────────────────────────────────       │
   │   a research platform for graph-based                     │
   │   computational narratology                               │
@@ -10,6 +10,6 @@
   │                                                           │
   ╰───────────────────────────────────────────────────────────╯
 
-  user: derek · ledger: (none) · world: (none)
+  user: {user} · ledger: {ledger} · world: {world}
 
   ⅁>

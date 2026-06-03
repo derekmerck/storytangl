@@ -103,8 +103,11 @@
       "version": 12,
       "dirty_kinds": [
         "location",
+        "world_time",
         "inventory",
-        "map"
+        "map",
+        "presence",
+        "exits"
       ],
       "available_kinds": [
         "world_time",

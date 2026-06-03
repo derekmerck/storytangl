@@ -53,7 +53,7 @@ def _available_info_affordances(payload: dict[str, Any]) -> list[dict[str, Any]]
     return [
         item
         for item in affordances
-        if isinstance(item, dict) and item.get("kind") in available_kinds
+        if isinstance(item, dict) and (item.get("kind") or "info") in available_kinds
     ]
 
 

@@ -11,10 +11,10 @@
  * never an additional family.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=JetBrains+Mono:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600;700&display=swap');
+@import "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=JetBrains+Mono:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600;700&display=swap";
 
 :root {
-  --st-font-prose:  "Newsreader", "Source Serif Pro", Georgia, serif;
+  --st-font-prose:  "Newsreader", "Source Serif Pro", georgia, serif;
   --st-font-mono:   "JetBrains Mono", "SF Mono", "Menlo", monospace;
   --st-font-chrome: "Inter Tight", -apple-system, "Segoe UI", sans-serif;
 }

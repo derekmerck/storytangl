@@ -235,7 +235,7 @@ def _render_info_affordances(envelope: JsonObject) -> list[RenderItem]:
     visible_affordances = [
         affordance
         for affordance in affordances
-        if available_kinds is None or _text(affordance, "kind") in available_kinds
+        if available_kinds is None or (_text(affordance, "kind") or "info") in available_kinds
     ]
     if not visible_affordances:
         return []

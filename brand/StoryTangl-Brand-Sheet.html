@@ -922,8 +922,8 @@ body[data-st-posture="terminal"] .social-card .sc-tag { font-family: var(--st-fo
     </div>
     <div class="tile-foot">
       <code>font: Newsreader 600</code> · <code>--st-wm-g-sy: 1.00</code> ·
-      <code>--st-wm-g-sx: 0.75</code> · <code>--st-wm-g-ty: 5%</code> ·
-      <code>--st-wm-g-margin: -.10em</code>
+      <code>--st-wm-g-sx: 0.85</code> · <code>--st-wm-g-ty: -2%</code> ·
+      <code>--st-wm-g-margin: -0.065em</code>
     </div>
   </div>
 
@@ -1621,7 +1621,7 @@ body[data-st-posture="terminal"] .social-card .sc-tag { font-family: var(--st-fo
   const TWEAKS = /*EDITMODE-BEGIN*/{
     "mode": "paper",
     "voice": "prose",
-    "posture": "terminal",
+    "posture": "engineering",
     "prose_sy": 1,
     "prose_sx": 0.85,
     "prose_ty": -2,
@@ -1728,8 +1728,8 @@ body[data-st-posture="terminal"] .social-card .sc-tag { font-family: var(--st-fo
     // once. .voice-locked wordmarks keep their spec-canonical per-font tuning.
     const v = state.voice;
     document.querySelectorAll(".st-wm:not(.voice-locked)").forEach(el => {
-      el.style.setProperty("--st-wm-g-sy",     state[v + "_sy"]);
-      el.style.setProperty("--st-wm-g-sx",     state[v + "_sx"]);
+      el.style.setProperty("--st-wm-g-sy",     String(state[v + "_sy"]));
+      el.style.setProperty("--st-wm-g-sx",     String(state[v + "_sx"]));
       el.style.setProperty("--st-wm-g-ty",     state[v + "_ty"] + "%");
       el.style.setProperty("--st-wm-g-margin", state[v + "_mg"] + "em");
     });
