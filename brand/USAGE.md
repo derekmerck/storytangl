@@ -81,7 +81,7 @@ Examples:
 ```
 StoryTan⅁l         ← H1 in plain markdown
 ⅁>                  ← CLI prompt
-[ ⅁ v38.3 ]        ← log banner
+[ ⅁ v3.8 ]         ← log banner
 ```
 
 ## 6. Type stack rules

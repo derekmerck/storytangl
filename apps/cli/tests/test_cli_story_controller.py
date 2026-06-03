@@ -7,6 +7,7 @@ import pytest
 import cmd2
 
 from tangl.cli.controllers.story_controller import StoryController
+from tangl.cli.rendering import PlainTerminalRenderer
 
 # This uses a test-app to focus on the StoryController
 
@@ -18,11 +19,15 @@ class RecordingCLI(cmd2.Cmd):
         self.outputs: list[str] = []
         self.calls: list[tuple[str, dict[str, object]]] = []
         self.edge_id = uuid4()
+        self.terminal_renderer = PlainTerminalRenderer()
         self.story_controller = StoryController()
         self.register_command_set(self.story_controller)
 
     def poutput(self, message: object, *, end: str = "\n", **_: object) -> None:
         self.outputs.append(str(message))
+
+    def emit_terminal(self, renderables: list[object]) -> None:
+        self.terminal_renderer.emit(self, renderables)
 
     def set_ledger(self, ledger_id: UUID | None) -> None:  # type: ignore[override]
         self.ledger_id = ledger_id

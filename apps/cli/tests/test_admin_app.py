@@ -24,7 +24,7 @@ class FakeManager:
     def get_system_info(self) -> SystemInfo:
         return SystemInfo(
             engine="StoryTangl",
-            version="3.7.2",
+            version="3.8",
             uptime="a moment",
             worlds=1,
             num_users=2,

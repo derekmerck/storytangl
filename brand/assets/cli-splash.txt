@@ -1,6 +1,6 @@
   ╭───────────────────────────────────────────────────────────╮
   │                                                           │
-  │   StoryTan⅁l                                v{version}     │
+{version_line}
   │   ─────────────────────────────────────────────────       │
   │   a research platform for graph-based                     │
   │   computational narratology                               │
@@ -9,7 +9,3 @@
   │                            ·  ^d  to exit                 │
   │                                                           │
   ╰───────────────────────────────────────────────────────────╯
-
-  user: {user} · ledger: {ledger} · world: {world}
-
-  ⅁>

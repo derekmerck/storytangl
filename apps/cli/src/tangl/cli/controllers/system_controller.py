@@ -20,3 +20,8 @@ class SystemController(CommandSet):
     def do_system_info(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         info = self._call_service("get_system_info")
         self._cmd.poutput(info)
+
+    def do_diagnostic(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
+        """Render the standard CLI widget diagnostic transcript."""
+
+        self._cmd.emit_terminal(self._cmd.terminal_renderer.diagnostic())
