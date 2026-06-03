@@ -37,6 +37,7 @@ EXPECTED_FIXTURES = {
     "projected_state_all_values.json",
     "quantity_payload.json",
     "sandbox_payload.json",
+    "sandbox_info_channels.json",
 }
 EXPECTED_PROPOSALS = {
     "carwars_garage_turn.json",

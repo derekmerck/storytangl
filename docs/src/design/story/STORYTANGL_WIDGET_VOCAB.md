@@ -473,15 +473,16 @@ coordination that the contract treats as a bundle concern; they are
 expressible only via backend orchestration the spec does not make
 cheap.
 
-### 1.6 Info channels — Tier P1
+### 1.6 Info channels — Tier S
 
 > An info channel is an advisory side-projection of world state the
 > player MAY query. Info channels are **discovery hints, not mandatory
 > client UI**.
 
-**Status (L1):** committed Tier P1 target contract. **Status (L2):** reference
-webapp implements `info_affordances` with `query` descriptors against
-`/story/info`. **Status (L3):** engine defines typed `InfoAffordance`,
+**Status (L1):** promoted Tier S contract. **Status (L2):** reference webapp
+implements `info_affordances` with `query` descriptors against `/story/info`,
+and the CLI reference floor exposes the same affordances through `?` /
+slash-command output. **Status (L3):** engine defines typed `InfoAffordance`,
 `InfoState`, and `StoryInfoRequest` models, advertises available channels on
 runtime envelopes, and routes `/story/info` through the service-info dispatch
 surface. Fine-grained dirty-kind tracking remains conservative in v1.

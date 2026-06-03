@@ -169,6 +169,7 @@ def _render_runtime_document(envelope: JsonObject, registry: FragmentRegistry) -
     ]
 
     items = [_item("title", _runtime_title(envelope))]
+    items.extend(_render_info_affordances(envelope))
     visited: set[str] = set()
     if not scenes:
         items.append(_item("empty", "(no scene)"))
@@ -222,6 +223,61 @@ def _runtime_title(envelope: JsonObject) -> str:
     if isinstance(step, int):
         bits.append(f"step={step}")
     return " | ".join(bits)
+
+
+def _render_info_affordances(envelope: JsonObject) -> list[RenderItem]:
+    metadata = _object(envelope.get("metadata"))
+    affordances = _object_list(metadata.get("info_affordances")) if metadata else []
+    if not affordances:
+        return []
+
+    available_kinds = _available_info_kinds(metadata)
+    visible_affordances = [
+        affordance
+        for affordance in affordances
+        if available_kinds is None or _text(affordance, "kind") in available_kinds
+    ]
+    if not visible_affordances:
+        return []
+
+    items = [_item("info_label", "Story info:")]
+    for affordance in visible_affordances:
+        items.append(_info_affordance_item(affordance))
+    return items
+
+
+def _available_info_kinds(metadata: JsonObject) -> set[str] | None:
+    info_state = _object(metadata.get("info_state"))
+    if info_state is None or "available_kinds" not in info_state:
+        return None
+    return set(_string_list(info_state.get("available_kinds")))
+
+
+def _info_affordance_item(affordance: JsonObject) -> RenderItem:
+    kind = _text(affordance, "kind") or "info"
+    label = _text(affordance, "label") or kind
+    shortcuts = _string_list(affordance.get("shortcuts"))
+    query = _object(affordance.get("query"))
+    command = f"/info {kind}"
+    shortcut_text = f" (shortcuts: {_slash_shortcuts(shortcuts)})" if shortcuts else ""
+    query_text = f" query={json.dumps(query, sort_keys=True)}" if query is not None else ""
+    return _item(
+        "info_affordance",
+        f"? {label}: {command}{shortcut_text}{query_text}",
+        indent=1,
+        ref_id=kind,
+        data={
+            "kind": kind,
+            "label": label,
+            "shortcuts": shortcuts,
+            "query": query,
+            "commands": [command, *[f"/{shortcut}" for shortcut in shortcuts]],
+        },
+    )
+
+
+def _slash_shortcuts(shortcuts: Sequence[str]) -> str:
+    return ", ".join(f"/{shortcut}" for shortcut in shortcuts)
 
 
 def _apply_fragments(registry: FragmentRegistry, fragments: Sequence[JsonObject]) -> None:

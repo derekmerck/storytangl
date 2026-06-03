@@ -1,0 +1,60 @@
+/* StoryTangl · color tokens
+ *
+ * Engineering-notebook palette. Paper-warm neutrals, ink darks,
+ * blue-pencil accent (the editor's color), three severity tokens.
+ *
+ * Tokens are stable across surfaces (README banner, CLI, web shell,
+ * RTD theme). The only acceptable additions to this palette are new
+ * severity tokens; the rest is closed.
+ */
+
+:root {
+  /* surface / structure */
+  --st-paper:       #f6f3ea;   /* card / page background           */
+  --st-paper-2:     #eee8d6;   /* hover / banded rows / tape       */
+  --st-paper-3:     #e3dcc4;   /* margins / inactive surfaces      */
+
+  /* ink / text */
+  --st-ink:         #1a1a1a;   /* primary text, wordmark           */
+  --st-ink-2:       #3b3a36;   /* body prose                       */
+  --st-ink-3:       #6b6a64;   /* secondary / metadata             */
+  --st-ink-4:       #93918a;   /* tertiary / disabled              */
+
+  /* rules / borders */
+  --st-rule:        #c9c2ad;   /* hairline rules                   */
+  --st-rule-strong: #8a8472;   /* structural borders               */
+
+  /* accents */
+  --st-blue:        #2a4e87;   /* blue-pencil / link / brand mark  */
+  --st-burnt:       #b2542a;   /* warm accent / single brand pop   */
+
+  /* severity (must round-trip with KvRow.emphasis) */
+  --st-ok:          #3e7f57;
+  --st-warn:        #a8762a;
+  --st-bad:         #a8362a;
+}
+
+/* dark inversion — used in CLI splash, social card, web "lights-off"
+ * mode. Not a different palette: a literal photographic negative of
+ * the paper one, with one or two tone adjustments.
+ */
+:root[data-st-mode="ink"] {
+  --st-paper:       #15140f;
+  --st-paper-2:     #1f1e18;
+  --st-paper-3:     #2a2920;
+
+  --st-ink:         #e8dfc6;
+  --st-ink-2:       #c9c2ad;
+  --st-ink-3:       #8a8472;
+  --st-ink-4:       #6b6a64;
+
+  --st-rule:        #2f2d24;
+  --st-rule-strong: #4d4a3d;
+
+  --st-blue:        #8db4ff;
+  --st-burnt:       #e07a40;
+
+  --st-ok:          #6fbf8c;
+  --st-warn:        #d6a35a;
+  --st-bad:         #d65a4a;
+}

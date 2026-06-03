@@ -6,6 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 
 ROOT = Path(__file__).parents[3]
@@ -36,6 +37,24 @@ def _render(name: str) -> str:
 def _render_proposal(name: str) -> str:
     payload = PORT.load_fixture(PROPOSAL_DIR / name)
     return "\n".join(PORT.render_fixture(payload))
+
+
+def _available_info_affordances(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    metadata = payload.get("metadata")
+    assert isinstance(metadata, dict)
+    affordances = metadata.get("info_affordances")
+    assert isinstance(affordances, list)
+    info_state = metadata.get("info_state")
+    if not isinstance(info_state, dict) or "available_kinds" not in info_state:
+        return [item for item in affordances if isinstance(item, dict)]
+
+    available_kinds = info_state.get("available_kinds")
+    assert isinstance(available_kinds, list)
+    return [
+        item
+        for item in affordances
+        if isinstance(item, dict) and item.get("kind") in available_kinds
+    ]
 
 
 def test_cli_reference_port_stays_json_only() -> None:
@@ -109,6 +128,77 @@ def test_cli_reference_renders_command_hints_as_advisory_prompt() -> None:
     assert "blocked: The mailbox is fixed to the wall." in output
     assert "hint: Try opening it instead." in output
     assert ">) Try a command. <command: e.g. take lamp>" in output
+
+
+def test_cli_reference_renders_info_affordances_as_queryable_commands() -> None:
+    sandbox_output = _render("sandbox_info_channels.json")
+    credentials_output = _render("credentials_shift.json")
+
+    assert "Story info:" in sandbox_output
+    assert "? Map: /info map (shortcuts: /m, /map) query=" in sandbox_output
+    assert '"scope": "known"' in sandbox_output
+    assert "? Today's rules: /info rules (shortcuts: /r, /rules)" in credentials_output
+    assert "? Shift progress: /info roster_progress (shortcuts: /p, /shift)" in credentials_output
+    assert "? Findings: /info case_summary (shortcuts: /c, /findings)" in credentials_output
+
+
+def test_cli_reference_makes_every_available_info_affordance_reachable() -> None:
+    for name in ("sandbox_info_channels.json", "credentials_shift.json"):
+        payload = PORT.load_fixture(FIXTURE_DIR / name)
+        document = PORT.render_fixture_document(payload)
+        floor_items = {
+            item.data["kind"]: item
+            for item in document.items
+            if item.role == "info_affordance" and item.data is not None
+        }
+        advertised = _available_info_affordances(payload)
+
+        assert set(floor_items) == {str(item["kind"]) for item in advertised}
+        for affordance in advertised:
+            kind = str(affordance["kind"])
+            item = floor_items[kind]
+            commands = item.data["commands"]
+            assert f"/info {kind}" in commands
+            assert f"/info {kind}" in item.text
+            assert item.data["query"] == affordance.get("query")
+            for shortcut in affordance.get("shortcuts", []):
+                assert f"/{shortcut}" in commands
+                assert f"/{shortcut}" in item.text
+
+
+def test_cli_reference_hides_unavailable_info_affordances() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": [],
+            }
+        ],
+        "metadata": {
+            "info_affordances": [
+                {"kind": "map", "label": "Map", "shortcuts": ["m"]},
+                {"kind": "inventory", "label": "Carrying", "shortcuts": ["i"]},
+            ],
+            "info_state": {
+                "version": 1,
+                "dirty_kinds": ["map"],
+                "available_kinds": ["map"],
+            },
+        },
+    }
+
+    document = PORT.render_fixture_document(payload)
+    visible_kinds = [
+        item.data["kind"]
+        for item in document.items
+        if item.role == "info_affordance" and item.data is not None
+    ]
+
+    assert visible_kinds == ["map"]
 
 
 def test_cli_reference_renders_projected_state_value_types() -> None:

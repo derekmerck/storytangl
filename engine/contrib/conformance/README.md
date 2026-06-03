@@ -44,7 +44,8 @@ renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without
 importing engine models or calling the service layer. `cli_reference_port.py`
 then formats that document as plain terminal text, including choice blockers,
 cost previews, typed accepts prompts, command interpretation feedback, and
-unknown-fragment fallbacks.
+unknown-fragment fallbacks, plus info-channel `?` / slash-command fallbacks
+from `metadata.info_affordances`.
 
 `tk_reference_port.py` is a tiny desktop-toolkit proof over the same view model.
 Its `--inspect` mode prints the planned widgets and sample submission payloads

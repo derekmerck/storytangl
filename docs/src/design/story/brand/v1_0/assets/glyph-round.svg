@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="StoryTangl glyph">
+  <defs>
+    
+  </defs>
+  <circle cx="120" cy="120" r="120" fill="#1a1a1a"></circle>
+  <g transform="translate(120 120) rotate(180) scale(0.82 1)">
+    <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="700" font-size="188" fill="#f6f3ea">G</text>
+  </g>
+</svg>

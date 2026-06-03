@@ -1,0 +1,119 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000701",
+  "step": 12,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000701",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000702"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000702",
+      "fragment_type": "content",
+      "content": "The road bends east toward the building. The grate waits under your boots.",
+      "content_format": "md"
+    }
+  ],
+  "metadata": {
+    "fixture": "sandbox_info_channels",
+    "info_affordances": [
+      {
+        "kind": "world_time",
+        "label": "Watch",
+        "shortcuts": [
+          "t",
+          "time"
+        ],
+        "query": {
+          "kinds": [
+            "world_time"
+          ]
+        }
+      },
+      {
+        "kind": "location",
+        "label": "Here",
+        "shortcuts": [
+          "h",
+          "look"
+        ],
+        "query": {
+          "kinds": [
+            "location",
+            "presence"
+          ]
+        }
+      },
+      {
+        "kind": "inventory",
+        "label": "Carrying",
+        "shortcuts": [
+          "i",
+          "inv"
+        ],
+        "query": {
+          "kinds": [
+            "inventory"
+          ]
+        }
+      },
+      {
+        "kind": "map",
+        "label": "Map",
+        "shortcuts": [
+          "m",
+          "map"
+        ],
+        "query": {
+          "kinds": [
+            "map"
+          ],
+          "scope": "known"
+        }
+      },
+      {
+        "kind": "presence",
+        "label": "Present",
+        "shortcuts": [
+          "p"
+        ],
+        "query": {
+          "kinds": [
+            "presence"
+          ]
+        }
+      },
+      {
+        "kind": "exits",
+        "label": "Exits",
+        "shortcuts": [
+          "x"
+        ],
+        "query": {
+          "kinds": [
+            "exits"
+          ]
+        }
+      }
+    ],
+    "info_state": {
+      "version": 12,
+      "dirty_kinds": [
+        "location",
+        "inventory",
+        "map"
+      ],
+      "available_kinds": [
+        "world_time",
+        "location",
+        "inventory",
+        "map",
+        "presence",
+        "exits"
+      ]
+    }
+  }
+}

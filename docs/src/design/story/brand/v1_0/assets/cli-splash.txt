@@ -1,0 +1,15 @@
+  ╭───────────────────────────────────────────────────────────╮
+  │                                                           │
+  │   StoryTan⅁l                                v38.3         │
+  │   ─────────────────────────────────────────────────       │
+  │   a research platform for graph-based                     │
+  │   computational narratology                               │
+  │                                                           │
+  │   type  help  for commands  ·  play <world>  to begin     │
+  │                            ·  ^d  to exit                 │
+  │                                                           │
+  ╰───────────────────────────────────────────────────────────╯
+
+  user: derek · ledger: (none) · world: (none)
+
+  ⅁>
