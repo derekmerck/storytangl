@@ -66,3 +66,22 @@ def test_rich_renderer_exports_envelope_text() -> None:
     assert "Permit expired" in transcript
     assert "/m Map" in transcript
     assert "Inventory" not in transcript
+
+
+def test_rich_renderer_exports_diagnostic_transcript() -> None:
+    renderer = RichTerminalRenderer()
+    output = io.StringIO()
+    cmd = SimpleNamespace(stdout=output)
+
+    renderer.emit(cmd, renderer.diagnostic())
+
+    transcript = output.getvalue()
+    assert "Diagnostic Envelope" in transcript
+    assert "Bek" in transcript
+    assert "narrative_image" in transcript
+    assert "Allow passage" in transcript
+    assert "Permit expired" in transcript
+    assert "Unknown fragments remain visible" in transcript
+    assert "Projected State" in transcript
+    assert "Candidates" in transcript
+    assert "/r Registry" in transcript

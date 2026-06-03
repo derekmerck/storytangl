@@ -44,7 +44,11 @@ def test_cli_loads_brand_splash() -> None:
 
     assert app.intro is not None
     assert "StoryTan⅁l" in app.intro
-    assert "user: (none)" in app.intro
+    assert "v3.8" in app.intro
+    assert "user:" not in app.intro
+    assert "ledger:" not in app.intro
+    assert "world:" not in app.intro
+    assert "⅁>" not in app.intro
     assert "derek" not in app.intro
     assert "v38.3" not in app.intro
 
@@ -54,6 +58,20 @@ def test_cli_can_use_rich_terminal_renderer() -> None:
 
     assert app.terminal_style == "rich"
     assert type(app.terminal_renderer).__name__ == "RichTerminalRenderer"
+
+
+def test_cli_diagnostic_command_renders_standard_transcript() -> None:
+    app = TanglShell(service_manager=None)
+    app.stdout = io.StringIO()
+
+    app.onecmd("diagnostic")
+    output = _capture_output(app)
+
+    assert "Diagnostic Envelope" in output
+    assert "Choices:" in output
+    assert "Allow passage [locked: Permit expired]" in output
+    assert "Projected State:" in output
+    assert "Candidates:" in output
 
 
 def test_load_script_and_show_story(tangl_cli: TanglShell) -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import inspect
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from uuid import UUID
 
@@ -44,7 +43,7 @@ class StoryTanglCLI(cmd2.Cmd):
         self.ledger_id = ledger_id
         self.terminal_style = terminal_style
         self.terminal_renderer = create_terminal_renderer(terminal_style)
-        self.intro = _load_splash_text(user_id=self.user_id, ledger_id=self.ledger_id)
+        self.intro = _load_splash_text()
 
         if register_controllers:
             self._register_controllers()
@@ -114,22 +113,10 @@ def create_cli_app(*, terminal_style: str = "plain") -> StoryTanglCLI:
     return StoryTanglCLI(service_manager=service_manager, terminal_style=terminal_style)
 
 
-def _load_splash_text(*, user_id: UUID | None, ledger_id: UUID | None) -> str | None:
+def _load_splash_text() -> str | None:
     if not _SPLASH_PATH.exists():
         return None
-    return _SPLASH_PATH.read_text(encoding="utf-8").format(
-        version=_package_version(),
-        user=str(user_id) if user_id is not None else "(none)",
-        ledger=str(ledger_id) if ledger_id is not None else "(none)",
-        world="(none)",
-    ).rstrip()
-
-
-def _package_version() -> str:
-    try:
-        return version("StoryTangl")
-    except PackageNotFoundError:
-        return "dev"
+    return _SPLASH_PATH.read_text(encoding="utf-8").rstrip()
 
 
 __all__ = ["StoryTanglCLI", "create_cli_app"]

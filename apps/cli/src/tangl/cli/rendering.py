@@ -97,6 +97,18 @@ class PlainTerminalRenderer:
                 lines.append("")
         return lines
 
+    def diagnostic(self) -> list[Any]:
+        renderables = self.story_update(
+            title="Diagnostic Envelope",
+            fragments=_diagnostic_fragments(),
+            choices=_diagnostic_choices(),
+            metadata=_diagnostic_metadata(),
+        )
+        renderables.append("")
+        renderables.append("Projected State:")
+        renderables.extend(self.projected_state(_diagnostic_projected_state()))
+        return renderables
+
     def _choice_lines(
         self,
         choices: list[Any],
@@ -368,6 +380,129 @@ def _plain_info_affordance_lines(metadata: JsonMapping | None) -> list[str]:
     if not labels:
         return []
     return ["Info: " + " · ".join(labels)]
+
+
+def _diagnostic_fragments() -> list[JsonMapping]:
+    return [
+        {
+            "fragment_type": "content",
+            "content_format": "md",
+            "content": "You unfold the **permit** beside a guttering blue lamp.",
+        },
+        {
+            "fragment_type": "attributed",
+            "who": "Bek",
+            "how": "without expression",
+            "content": "There is nothing wrong with that permit.",
+        },
+        {
+            "fragment_type": "media",
+            "media_role": "narrative_image",
+            "content": "/diagnostic/permit-9472.jpg",
+        },
+        {
+            "fragment_type": "kv",
+            "content": [
+                {"key": "permit_seal", "value": "Imperial", "emphasis": "ok"},
+                {"key": "permit_expiry", "value": "expired", "emphasis": "danger"},
+                {"key": "origin", "value": "Kalden", "emphasis": "warn"},
+            ],
+        },
+        {
+            "fragment_type": "user_event",
+            "event_type": "shift_bell",
+            "content": "Ten minutes remain in the shift.",
+        },
+        {
+            "fragment_type": "mystery_widget",
+            "content": "Unknown fragments remain visible as fallback text.",
+        },
+    ]
+
+
+def _diagnostic_choices() -> list[JsonMapping]:
+    return [
+        {"label": "Verify ID against registry", "active": True},
+        {"label": "Deny passage", "active": True},
+        {
+            "label": "Allow passage",
+            "active": False,
+            "unavailable_reason": "Permit expired",
+        },
+    ]
+
+
+def _diagnostic_metadata() -> JsonMapping:
+    return {
+        "world": "diagnostic",
+        "story": "renderer",
+        "cursor": "credential_gate",
+        "info_affordances": [
+            {"kind": "map", "label": "Map", "shortcuts": ["m"]},
+            {"kind": "inventory", "label": "Inventory", "shortcuts": ["i"]},
+            {"kind": "registry", "label": "Registry", "shortcuts": ["r"]},
+        ],
+        "info_state": {"available_kinds": ["map", "inventory", "registry"]},
+    }
+
+
+def _diagnostic_projected_state() -> JsonMapping:
+    return {
+        "sections": [
+            {
+                "section_id": "shift",
+                "title": "Shift",
+                "value": {
+                    "value_type": "kv_list",
+                    "items": [
+                        {"key": "remaining", "value": "42/90 min"},
+                        {"key": "candidates", "value": "3 of 8"},
+                    ],
+                },
+            },
+            {
+                "section_id": "directives",
+                "title": "Directives",
+                "value": {
+                    "value_type": "item_list",
+                    "items": [
+                        {
+                            "label": "Imperial citizens",
+                            "detail": "allowed",
+                            "tags": ["policy"],
+                        },
+                        {
+                            "label": "Eastern merchants",
+                            "detail": "denied",
+                            "tags": ["embargo"],
+                        },
+                    ],
+                },
+            },
+            {
+                "section_id": "tags",
+                "title": "Tags",
+                "value": {
+                    "value_type": "badges",
+                    "items": ["merchant", "flagged", "kalden"],
+                },
+            },
+            {
+                "section_id": "score",
+                "title": "Score",
+                "value": {"value_type": "scalar", "value": 21},
+            },
+            {
+                "section_id": "candidates",
+                "title": "Candidates",
+                "value": {
+                    "value_type": "table",
+                    "columns": ["Candidate", "Decision"],
+                    "rows": [["Bek Tarsus", "Review"], ["Tomi Ren", "Denied"]],
+                },
+            },
+        ]
+    }
 
 
 def _projected_section_lines(section: JsonMapping) -> list[str]:
