@@ -1,4 +1,4 @@
-# StoryTangl Web Client Dockerfile (v3.7)
+# StoryTangl Web Client Dockerfile (v3.8)
 # Multi-stage build: Node builder → Nginx runtime
 
 # ============================================================================
@@ -57,7 +57,7 @@ FROM nginx:stable-alpine as runtime
 
 # Metadata
 LABEL maintainer="tangldev"
-LABEL version="3.7.2"
+LABEL version="3.8"
 LABEL description="StoryTangl Web Client - Interactive narrative interface"
 
 # Copy built application from builder stage

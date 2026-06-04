@@ -3,7 +3,7 @@
 
 **Status:** Draft/Tentative - Pending MVP validation  
 **Layer:** Application (tangl.story.concepts.asset)  
-**Version:** 3.7
+**Version:** 3.8
 
 ---
 

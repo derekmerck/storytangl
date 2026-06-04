@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const version = computed(() => import.meta.env?.VITE_APP_VERSION ?? '3.7.0')
+const version = computed(() => import.meta.env?.VITE_APP_VERSION ?? '3.8')
 const year = new Date().getFullYear()
 </script>
 
