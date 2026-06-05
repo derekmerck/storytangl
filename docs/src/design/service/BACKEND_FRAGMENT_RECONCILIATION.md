@@ -87,6 +87,18 @@ boundary and keeps service semantics intact.
 
 ## Diagnostic Fixtures And Transcripts
 
+`engine/contrib/conformance/backend_widget_demo.py` now generates the first
+backend-emitted diagnostic payloads:
+
+- `engine/contrib/conformance/diagnostics/backend_widget_contract_runtime.json`
+- `engine/contrib/conformance/diagnostics/backend_widget_contract_projected_state.json`
+
+These are not canonical conformance fixtures yet. They prove that the current
+service layer can emit a real widget-shaped `RuntimeEnvelope` and
+`ProjectedState` covering content, typed choices, `accepts`, `ui_hints`,
+`metadata.info_affordances`, `metadata.info_state`, and generic projected-state
+values.
+
 Diagnostic transcripts should be generated only after backend output can be
 captured as a real `RuntimeEnvelope` stream. The durable source of truth should
 be:

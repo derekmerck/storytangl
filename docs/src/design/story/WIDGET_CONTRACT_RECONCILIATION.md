@@ -188,6 +188,7 @@ graduations and as the regression suite for cross-port parity.
 | `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
 | `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S + current P1 fixtures) | keep promoting proposal fixtures as implementation lands |
 | `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment, and one UUID-shaped v1.5 wireframe interpretation sample; CLI/Tk can inspect them without promotion |
+| `engine/contrib/conformance/diagnostics/*.json` | backend-emitted service payloads | initial | non-gating proof that `ServiceManager` can emit widget-shaped `RuntimeEnvelope` and `ProjectedState`; promote only after ports/harness agree |
 | webapp Vitest conformance suite | webapp DOM matches expected for each fixture | not_started | written from fixtures; webapp regression mechanism |
 
 ---
@@ -197,6 +198,29 @@ graduations and as the regression suite for cross-port parity.
 A short log of what changed across recent spec / UI / engine releases.
 Each entry names which layer moved and what the consequence is for the
 others.
+
+### 2026-06 — backend fragment-contract audit (L2/L3 update)
+
+- Pinned service-created runtime envelopes as independent fragments rather
+  than legacy display blocks. **Impact:** choice fragment `uid` and action
+  `edge_id` are distinct and both survive REST serialization.
+- Pinned authored `Action.accepts` and `Action.ui_hints` through
+  `ServiceManager`, REST JSON, and remote Python-client hydration.
+  **Impact:** generic clients can depend on typed payload contracts without
+  REST inventing a second fragment model.
+- Pinned `ProjectedState` remote hydration for `kind`, `kinds`, and opaque
+  `query` routing. **Impact:** info-channel sections remain typed for Python
+  clients while REST stays a transcription boundary.
+- Added backend-emitted diagnostics under
+  `engine/contrib/conformance/diagnostics/`. **Impact:** the current backend
+  can now generate a real widget-shaped `RuntimeEnvelope` plus
+  `ProjectedState`; these remain diagnostic until promoted into canonical
+  fixtures and conformance gates.
+- Documented the service/REST responsibility split in
+  `docs/src/design/service/BACKEND_FRAGMENT_RECONCILIATION.md`. **Impact:**
+  backend/service owns typed widget-shaped Python payloads; FastAPI handles
+  auth, routing, JSON transcription, render profiles, and media transport
+  policy.
 
 ### 2026-05 — spec v1.5 (L1 update only)
 

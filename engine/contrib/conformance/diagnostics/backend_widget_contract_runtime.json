@@ -1,0 +1,102 @@
+{
+  "cursor_id": "04b7d8af-0d53-56df-bdfe-7d5e8bb521b5",
+  "step": 1,
+  "fragments": [
+    {
+      "uid": "93d7085a-d4e5-5d1a-92f2-27f107a2b0aa",
+      "fragment_type": "content",
+      "content": "The road forks under cold rain.",
+      "source_id": "04b7d8af-0d53-56df-bdfe-7d5e8bb521b5"
+    },
+    {
+      "uid": "a6f1367a-2dcf-549f-badd-4c609b7e284c",
+      "fragment_type": "choice",
+      "content": "Buy rations.",
+      "edge_id": "2850fcc1-11b5-5333-a32f-c7dad8b8ef79",
+      "text": "Buy rations.",
+      "available": true,
+      "active": true,
+      "accepts": {
+        "kind": "quantity",
+        "required": true,
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "unit": "ration",
+        "cost_previews": []
+      },
+      "ui_hints": {
+        "hotkey": "b",
+        "source_kind": "market",
+        "contribution": "purchase",
+        "cost_previews": []
+      }
+    },
+    {
+      "uid": "4a8267ad-2196-5311-8e39-825941b0ce4c",
+      "fragment_type": "choice",
+      "content": "Name the mule.",
+      "edge_id": "82231e85-74af-51b5-81b0-fc8bd7235ac9",
+      "text": "Name the mule.",
+      "available": true,
+      "active": true,
+      "accepts": {
+        "kind": "text",
+        "required": true,
+        "placeholder": "Buttercup",
+        "validators": []
+      },
+      "ui_hints": {
+        "hotkey": "n",
+        "source_kind": "stable",
+        "contribution": "rename",
+        "cost_previews": []
+      }
+    }
+  ],
+  "last_redirect": null,
+  "redirect_trace": [],
+  "metadata": {
+    "info_affordances": [
+      {
+        "kind": "inventory",
+        "label": "Inventory",
+        "shortcuts": [
+          "i",
+          "inv"
+        ],
+        "query": {
+          "kinds": [
+            "inventory"
+          ]
+        }
+      },
+      {
+        "kind": "map",
+        "label": "Map",
+        "shortcuts": [
+          "m"
+        ],
+        "query": {
+          "kinds": [
+            "map"
+          ],
+          "format": "text"
+        }
+      }
+    ],
+    "info_state": {
+      "version": 1,
+      "dirty_kinds": [
+        "inventory",
+        "map"
+      ],
+      "available_kinds": [
+        "inventory",
+        "map"
+      ]
+    },
+    "world_id": "widget_contract_demo",
+    "ledger_id": "c59747d5-53a8-5617-9a4f-4aaeda16adc8"
+  }
+}
