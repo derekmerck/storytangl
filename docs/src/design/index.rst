@@ -24,6 +24,7 @@ See also
    story/STORYTANGL_WIDGET_VOCAB
    story/WIDGET_CONTRACT_RECONCILIATION
    story/WIDGET_WIREFRAMES
+   story/reference_clients/README
    story/brand/README
    story/brand/v1_0/USAGE
    story/GENRE_AUDIT_NOTES

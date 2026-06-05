@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StoryTan⅁l · Vue 3 + Vuetify 3 component guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="vue-guide.css" />
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ───────────────────────── header ───────────────────────── -->
+  <header class="doc">
+    <div class="lockup">
+      <span class="glyph"><span>g</span></span>
+      <span class="tag">web client<br/>component guide</span>
+    </div>
+    <div class="meta">
+      widget vocab <b>v1.5</b> · tier S<br/>
+      stack · <b>Vue 3 + Vuetify 3</b><br/>
+      ts strict · composition api
+    </div>
+  </header>
+
+  <h1 class="title">Vue&nbsp;3 + Vuetify&nbsp;3 reference component guide</h1>
+  <p class="lede">
+    An implementation guide — not a mockup — for the StoryTangl web client. Every component is
+    designed against the canonical <b>RuntimeEnvelope</b> fragment stream, not the legacy block
+    adapter. Props, emits, and payloads are derived <b>only</b> from the v1.5 contract
+    (<span class="ic">VOCAB_DIGEST.md</span> §2–§7); no backend field, fragment type, or service shape
+    is invented here. Components are written <span class="ic">&lt;script setup lang="ts"&gt;</span>,
+    strict mode, Composition API.
+  </p>
+  <div class="marg">
+    <b>Scope discipline.</b> Tier S components are specified to build now. P1/P2 widgets
+    (<span class="ic">piece</span>, <span class="ic">zone</span>, <span class="ic">roll</span>,
+    <span class="ic">interpretation</span>) are named but kept design-only — see §6. Visual styling
+    that doesn't touch a contract is isolated there too.
+  </div>
+
+  <!-- ───────────────────────── framework note ───────────────────────── -->
+  <h2 class="sec"><span class="n">note</span><span>On the framework choice</span><span class="r">read before adopting Vuetify</span></h2>
+  <div class="cols2">
+    <div>
+      <p class="note">
+        Vuetify is Material Design: rounded surfaces, elevation shadows, Roboto, ripple. The StoryTangl
+        brand is the opposite — square engineering-notebook surfaces, hairline rules, <b>no</b> shadows,
+        the Newsreader / JetBrains&nbsp;Mono / Inter&nbsp;Tight stack. Vuetify <i>can</i> wear the brand,
+        but only after a theme + defaults override (given in §6). If the team isn't committed to it, a
+        <b>headless</b> base would reach brand fidelity faster:
+      </p>
+      <ul class="tight">
+        <li><b>Reka UI</b> (Radix Vue successor) or <b>PrimeVue unstyled</b> — own every pixel, a11y primitives handled. Best brand fit.</li>
+        <li><b>PrimeVue styled</b> — strongest <span class="ic">DataTable</span> for the <span class="ic">table</span> value_type.</li>
+        <li><b>Vuetify 3</b> — batteries included; budget time to override Material defaults.</li>
+      </ul>
+    </div>
+    <div>
+      <p class="note">
+        This guide targets <b>Vuetify 3</b> as requested. Crucially, the <b>contract surface is
+        framework-agnostic</b>: the component names, props, emits, and payloads below hold whether the
+        primitive underneath is a <span class="vch">v-card</span> or a Reka <span class="ic">Primitive</span>.
+        Swapping frameworks later changes §1's "Vuetify primitive" line and §6's theme — nothing else.
+      </p>
+      <p class="note">
+        Treat the Vuetify mapping as the rendering layer; treat props/emits/payloads as the contract
+        boundary. Keep the dispatch (<span class="ic">FragmentRenderer</span>) and the store
+        (<span class="ic">useEnvelope</span>) free of any Vuetify import so the floor stays portable.
+      </p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §0 contract + pipeline ───────────────────────── -->
+  <h2 class="sec"><span class="n">§0</span><span>Contract types &amp; the render pipeline</span><span class="r">authoritative · do not extend</span></h2>
+  <p class="note">
+    These TypeScript types are a transcription of the wire contract — the source of truth is the engine,
+    not this file. The renderer dispatches on <span class="ic">fragment_type</span> through a registry;
+    an unknown type degrades to <span class="ic">StUnknownFragment</span> (§4) rather than throwing. The
+    store applies <span class="ic">control</span> mutations and never re-renders silently-updated state
+    as prose.
+  </p>
+  <div class="row2">
+    <div class="field">
+      <div class="lbl">contract · fragments</div>
+<pre class="code lg"><span class="kw">interface</span> <span class="ty">RuntimeEnvelope</span> {
+  cursor_id: <span class="ty">string</span>
+  step: <span class="ty">number</span>
+  fragments: <span class="ty">Fragment</span>[]
+  metadata?: <span class="ty">EnvelopeMetadata</span>
+}
+
+<span class="kw">type</span> <span class="ty">Fragment</span> <span class="kw">=</span>
+  | <span class="ty">ContentFragment</span>    <span class="cm">// content</span>
+  | <span class="ty">AttributedFragment</span> <span class="cm">// attributed</span>
+  | <span class="ty">MediaFragment</span>      <span class="cm">// media</span>
+  | <span class="ty">GroupFragment</span>      <span class="cm">// group</span>
+  | <span class="ty">KvFragment</span>         <span class="cm">// kv</span>
+  | <span class="ty">ChoiceFragment</span>     <span class="cm">// choice</span>
+  | <span class="ty">ControlFragment</span>    <span class="cm">// control</span>
+  | <span class="ty">UserEventFragment</span>  <span class="cm">// user_event</span>
+
+<span class="kw">interface</span> <span class="ty">FragmentBase</span> {
+  uid: <span class="ty">string</span>
+  fragment_type: <span class="ty">string</span>
+  visibility?: <span class="str">"public"</span> | <span class="str">"owner_only"</span> | <span class="ty">string</span>[]
+}</pre>
+    </div>
+    <div class="field">
+      <div class="lbl">pipeline · dispatch</div>
+<pre class="code lg"><span class="cm">// FragmentRenderer.vue — registry dispatch, no Vuetify import</span>
+<span class="kw">const</span> registry: <span class="ty">Record</span>&lt;<span class="ty">string</span>, <span class="ty">Component</span>&gt; = {
+  content:    StContent,
+  attributed: StAttributed,
+  media:      StMedia,
+  group:      StGroup,
+  kv:         StKvStrip,
+  choice:     StChoice,
+  user_event: StUserEvent,
+  control:    StControlSink,   <span class="cm">// renders nothing</span>
+}
+
+<span class="kw">const</span> resolved = <span class="fn">computed</span>(() =&gt;
+  registry[props.fragment.fragment_type] ?? StUnknownFragment)
+</pre>
+      <div class="attr" style="margin-top:12px">
+        <div class="at-k">commit bus</div>
+        <div class="at-v">One event type bubbles to the host: <code>commit</code> with <code>{ edgeId: string; payload: CommitPayload }</code>. Only choice-family components emit it; everything else is presentational or store-bound.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §1 fragments ───────────────────────── -->
+  <h2 class="sec"><span class="n">§1</span><span>Tier S fragment components</span><span class="r">ready to implement</span></h2>
+  <p class="note">
+    Eight components, one per Tier&nbsp;S fragment type. Props are exactly the fragment's fields; nothing
+    is added. Presentational components emit nothing (the host reads the stream); only the choice family
+    emits <span class="ic">commit</span>.
+  </p>
+
+  <div class="comps">
+
+    <!-- StContent -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StContent</span><span class="maps">renders <b>content</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">Narrative prose. Renders <b>md</b> through a sanitized markdown pipeline, <b>text</b> as escaped plain text, and <b>rit</b> as a pending skeleton until the ritual resolves.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  contentFormat: <span class="str">'md'</span> | <span class="str">'text'</span> | <span class="str">'rit'</span>
+  content: <span class="ty">string</span>
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="cm">// presentational — no emits</span>
+<span class="cm">// md is sanitized (markdown-it +</span>
+<span class="cm">// DOMPurify); links open in-app</span>
+<span class="cm">// via the host router, not _blank</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-sheet</span> wrapper; markdown into a scoped <code>.prose</code> block. <b>rit</b> → <span class="vch">v-skeleton-loader</span> type="paragraph".</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v"><code>aria-busy="true"</code> while <b>rit</b> pending. If markdown fails to parse, fall back to escaped <b>text</b> — never inject raw HTML. Respects <code>prefers-reduced-motion</code> on the skeleton shimmer.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">md w/ <b>bold</b>, list, inline code, link · plain text · rit pending · empty string · a 1,200-word wall (scroll/measure).</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">measure capped at <code>68ch</code> desktop, full-width mobile; font-size steps down one notch under 360px.</div></div>
+      </div>
+    </div>
+
+    <!-- StAttributed -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StAttributed</span><span class="maps">renders <b>attributed</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">A spoken line. <b>who</b> is the speaker (stable across the session, §9), <b>how</b> an optional stage direction. The speaker tints from a deterministic hash of <b>who</b>, never random.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  who: <span class="ty">string</span>
+  how?: <span class="ty">string</span>
+  content: <span class="ty">string</span>
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="cm">// presentational — no emits</span>
+<span class="cm">// avatar is OPTIONAL chrome; it is</span>
+<span class="cm">// NOT sourced here — a dialog_im</span>
+<span class="cm">// media fragment carries portraits</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-list-item</span> with speaker in <span class="vch">v-list-item-title</span> (weight 700), <b>how</b> in a dim <span class="vch">v-list-item-subtitle</span>, content in the slot.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">rendered as <code>&lt;figure&gt;&lt;figcaption&gt;</code>: <code>aria-label="{who}, {how}"</code>. Speaker color is decoration only — the name is always printed in text. Quote marks are CSS, not content.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">with / without <b>how</b> · long speaker name (truncate) · two consecutive lines, same speaker (collapse heading) · RTL content.</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop: speaker inline-left; mobile: speaker stacked above the line, avatar (if present) shrinks to 28px.</div></div>
+      </div>
+    </div>
+
+    <!-- StMedia -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StMedia</span><span class="maps">renders <b>media</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc"><b>media_role</b> sets placement: <b>cover_im</b> full-bleed banner · <b>narrative_im</b> inline figure · <b>avatar_im</b> circular · <b>dialog_im</b> portrait beside a line. <b>rit</b> format shows a generating state.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  mediaRole: <span class="str">'cover_im'</span> | <span class="str">'narrative_im'</span>
+           | <span class="str">'avatar_im'</span> | <span class="str">'dialog_im'</span>
+  contentFormat: <span class="str">'url'</span> | <span class="str">'rit'</span>
+  content: <span class="ty">string</span>   <span class="cm">// url or ritual ref</span>
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="fn">defineEmits</span>&lt;{
+  open: [src: <span class="ty">string</span>]  <span class="cm">// optional</span>
+}&gt;()  <span class="cm">// lightbox; safe to ignore</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-img</span> with <code>aspect-ratio</code> + <span class="vch">v-responsive</span>; <code>lazy-src</code> blur-up. <b>rit</b> → <span class="vch">v-skeleton-loader</span> type="image". <b>avatar_im</b> → <span class="vch">v-avatar</span>.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">alt text from <b>media_role</b> + any caption; decorative cover marked <code>alt=""</code> only if a heading repeats it. No-image / load error → a labelled placeholder box, never a broken icon. <b>rit</b> → <code>aria-busy</code>.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">each of the 4 roles · url ok · url 404 · rit pending · portrait vs landscape aspect · very tall image (clamp).</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">cover_im 16:9 desktop → 4:3 mobile; dialog_im drops above the line under 600px; reserves space to avoid layout shift (CLS).</div></div>
+      </div>
+    </div>
+
+    <!-- StKvStrip -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StKvStrip</span><span class="maps">renders <b>kv</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">An inline status strip of <b>KvRow</b>. <b>emphasis</b> ∈ <span class="ic">ok/warn/danger/subtle</span> drives the severity ladder; <b>hint</b> picks the cell renderer (<b>bar/fraction/delta/tag</b>). This is how warnings &amp; errors appear inline (e.g. inspection findings).</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props (KvRow[])</div>
+<pre class="code"><span class="kw">interface</span> <span class="ty">KvRow</span> {
+  key: <span class="ty">string</span>
+  value: <span class="ty">string</span> | <span class="ty">number</span>
+  unit?: <span class="ty">string</span>;  max?: <span class="ty">number</span>
+  delta?: <span class="ty">number</span>
+  emphasis?: <span class="str">'ok'</span>|<span class="str">'warn'</span>|<span class="str">'danger'</span>|<span class="str">'subtle'</span>
+  hint?: <span class="str">'bar'</span>|<span class="str">'fraction'</span>|<span class="str">'delta'</span>|<span class="str">'tag'</span>
+}</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="cm">// presentational — no emits.</span>
+<span class="cm">// row.code / row.target / row.state</span>
+<span class="cm">// may be present (genre findings);</span>
+<span class="cm">// render as data-attrs, do not</span>
+<span class="cm">// require them.</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-table</span> density="compact"; <b>bar</b> → <span class="vch">v-progress-linear</span>, <b>delta</b> → <span class="vch">v-icon</span> mdi-arrow-up/down, <b>tag</b> → <span class="vch">v-chip</span>. Severity → themed text color + leading glyph.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v"><b>severity never by color alone:</b> glyph (✓ / ! / ‼) + <code>&lt;span class="sr-only"&gt;</code> "ok/warn/danger". Bars expose <code>role="progressbar"</code> + value text. High-contrast mode keeps glyph + border.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">all four emphases in one strip · bar at 0 / 50 / over-max · delta +/− / 0 · fraction with unit · missing emphasis (neutral) · long key (wrap/truncate).</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop two-column grid; mobile each row stacks key over value; bars go full-width.</div></div>
+      </div>
+    </div>
+
+    <!-- StChoice / StChoiceList -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StChoiceList · StChoice</span><span class="maps">renders <b>choice</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">An open edge. <b>StChoiceList</b> owns ordinal numbering + keyboard routing; <b>StChoice</b> renders one edge and delegates input to <b>StCommitInput</b> (§2) per <span class="ic">accepts.kind</span>. Locked edges stay listed with their reason (decision legibility).</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props (StChoice)</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  edgeId: <span class="ty">string</span>
+  text: <span class="ty">string</span>
+  available: <span class="ty">boolean</span>
+  ordinal: <span class="ty">number</span>          <span class="cm">// from list</span>
+  accepts: <span class="ty">Accepts</span>
+  unavailableReason?: <span class="ty">string</span>
+  blockers?: <span class="ty">Blocker</span>[]
+  uiHints?: <span class="ty">ChoiceHints</span>     <span class="cm">// hotkey,</span>
+}&gt;()  <span class="cm">// emphasis, cost_previews, reserved</span></pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="fn">defineEmits</span>&lt;{
+  commit: [{
+    edgeId: <span class="ty">string</span>
+    payload: <span class="ty">CommitPayload</span>  <span class="cm">// §2</span>
+  }]
+}&gt;()
+<span class="cm">// pick commits immediately;</span>
+<span class="cm">// other kinds commit after their</span>
+<span class="cm">// input resolves.</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-list</span> of <span class="vch">v-btn</span> variant="outlined" block; hotkey in a <span class="vch">v-kbd</span>; cost_previews as dim <span class="vch">v-chip</span>; <b>emphasis="primary"</b> → tonal, <b>danger</b> → color="danger". Locked → <code>disabled</code> + <span class="vch">v-tooltip</span> reason.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">ordinal always printed (typed "2" works even if hotkey doesn't). <code>aria-keyshortcuts="{hotkey}"</code>; locked → <code>aria-disabled</code> + <code>aria-describedby</code> → reason; blocker <code>refs</code> rendered as anchors to the on-screen UIDs (gate 2). Focus ring visible; Enter/Space commit.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">available pick · locked w/ reason + refs · each accepts.kind · no hotkey · danger emphasis · cost previews present/absent · 200-char label (wrap) · 12 choices (scroll).</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop: hotkey + text + cost on one row; mobile: full-width buttons, cost wraps below, hotkeys hidden (ordinal/tap remain).</div></div>
+      </div>
+    </div>
+
+    <!-- StUserEvent -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StUserEvent</span><span class="maps">renders <b>user_event</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">An out-of-band notice that does not advance the edge — a bell, a timer, a peer's move. Rendered as an aside / toast, visually distinct from prose so it's never mistaken for narration.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  eventType: <span class="ty">string</span>   <span class="cm">// open-set label</span>
+  content: <span class="ty">string</span>
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="fn">defineEmits</span>&lt;{
+  dismiss: []   <span class="cm">// optional</span>
+}&gt;()  <span class="cm">// host may auto-expire</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-banner</span> inline, or <span class="vch">v-snackbar</span> for transient events; leading <span class="vch">v-icon</span> keyed off <b>event_type</b> with a generic default.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v"><code>role="status"</code> + <code>aria-live="polite"</code> so it's announced without stealing focus. Unknown <b>event_type</b> → neutral icon, still readable.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">known event_type (icon) · unknown type (default) · long content · two events in one envelope (stack).</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop top-right aside; mobile bottom snackbar, single line w/ ellipsis + expand.</div></div>
+      </div>
+    </div>
+
+    <!-- StControlSink -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StControlSink</span><span class="maps">handles <b>control</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">A silent state mutation. <b>Not a visual component</b> — a store handler. Renders nothing; any narrative weight is carried by a companion <b>content</b> fragment (§9). A dev-only log surfaces it under a debug flag.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props / payload</div>
+<pre class="code"><span class="kw">interface</span> <span class="ty">ControlFragment</span> {
+  ref_type: <span class="ty">string</span>   <span class="cm">// 'piece' | 'section' …</span>
+  ref_id: <span class="ty">string</span>
+  payload?: <span class="ty">Record</span>&lt;<span class="ty">string</span>, <span class="ty">unknown</span>&gt;
+}</pre></div>
+          <div class="field"><div class="lbl">behavior</div>
+<pre class="code"><span class="cm">// useEnvelope() applies the</span>
+<span class="cm">// mutation to projected state;</span>
+<span class="cm">// component returns null.</span>
+<span class="cm">// debug flag → Console-style log row</span>
+<span class="cm">// (dev only, never in prod DOM)</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">no DOM in production → nothing to announce. If a control should be felt by the player, the author ships a paired content/user_event — the client does not invent narration for it.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">update payload · delete (ref only) · unknown ref_type (ignore safely) · control with paired content fragment present.</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">n/a (non-visual). Debug log honors the same narrow/stacked rules as the dev panel.</div></div>
+      </div>
+    </div>
+
+    <!-- StGroup -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StGroup</span><span class="maps">renders <b>group</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">A semantic container. Resolves <b>member_ids</b> against the envelope index and frames them by <b>group_type</b>: <b>scene</b> = transparent ordering · <b>dialog</b> = grouped lines · <b>overlay</b> = modal · <b>zone</b> = labelled member list (P2 pieces live here).</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  groupType: <span class="str">'scene'</span> | <span class="str">'dialog'</span>
+           | <span class="str">'overlay'</span> | <span class="str">'zone'</span>
+  memberIds: <span class="ty">string</span>[]
+  hints?: <span class="ty">GroupHints</span>      <span class="cm">// label_text</span>
+  layoutHints?: <span class="ty">LayoutHints</span> <span class="cm">// zone_role</span>
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="cm">// transparent — re-emits child</span>
+<span class="cm">// `commit` upward unchanged.</span>
+<span class="cm">// overlay adds: close []</span>
+<span class="cm">// members resolved via inject()'d</span>
+<span class="cm">// envelope index, not refetched.</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><b>scene</b> → bare <span class="vch">v-container</span> · <b>dialog</b> → <span class="vch">v-list</span> · <b>overlay</b> → <span class="vch">v-dialog</span> / <span class="vch">v-overlay</span> · <b>zone</b> → <span class="vch">v-card</span> titled from <code>hints.label_text</code>.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">overlay traps focus + restores on close + Esc dismisses; <code>aria-modal</code>. Unknown <b>group_type</b> → render members in document order (degrade to scene), no frame. Empty members → render nothing.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">scene w/ mixed members · dialog of 3 attributed · overlay w/ a confirm choice · zone w/ pieces (P2) · unknown group_type · dangling member_id (skip).</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">overlay → full-screen sheet under 600px; zone members reflow from row to stacked.</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ───────────────────────── §2 accepts.kind ───────────────────────── -->
+  <h2 class="sec"><span class="n">§2</span><span>Commit inputs · <span style="text-transform:none">accepts.kind</span></span><span class="r">StCommitInput · gate 4</span></h2>
+  <p class="note">
+    <b>StCommitInput</b> dispatches on <span class="ic">accepts.kind</span> (closed set of 7, digest §4) and
+    emits the typed payload up through StChoice. Every richer modality has a typed/click fallback in the
+    same turn. <b>pieces</b> and <b>place</b> reference P2 piece/zone data — the inputs are specified now
+    but only exercised once those fragments are present.
+  </p>
+  <table class="ref">
+    <thead><tr><th style="width:13%">accepts.kind</th><th style="width:26%">input component</th><th style="width:34%">emitted payload</th><th style="width:27%">Vuetify primitive</th></tr></thead>
+    <tbody>
+      <tr><td class="kind"><b>pick</b></td><td class="r">none — commit on activate</td><td class="r"><b>{}</b></td><td class="r"><span class="vch">v-btn</span></td></tr>
+      <tr><td class="kind"><b>text</b></td><td class="r">inline field (length/regex advisory)</td><td class="r">{ text: string }</td><td class="r"><span class="vch">v-text-field</span></td></tr>
+      <tr><td class="kind"><b>quantity</b></td><td class="r">stepper clamped to min/max</td><td class="r">{ quantity: number }</td><td class="r"><span class="vch">v-number-input</span></td></tr>
+      <tr><td class="kind"><b>pieces</b></td><td class="r">multi-select from referenced zone <span class="ic">P2</span></td><td class="r">{ piece_ids: string[] }</td><td class="r"><span class="vch">v-chip-group</span> · <span class="vch">v-select</span></td></tr>
+      <tr><td class="kind"><b>place</b></td><td class="r">drag <i>or</i> two-step pick (piece → zone) <span class="ic">P2</span></td><td class="r">{ piece_id, target_zone_ref \| edge_ref, source_zone_ref? }</td><td class="r"><span class="vch">v-select</span> ×2 · drag opt.</td></tr>
+      <tr><td class="kind"><b>compose</b></td><td class="r">sub-form, one control per part</td><td class="r">{ parts: { [name]: sub } }</td><td class="r"><span class="vch">v-expansion-panels</span></td></tr>
+      <tr><td class="kind"><b>raw_command</b></td><td class="r">command bar, parsed by grammar (§4)</td><td class="r">{ text: string }</td><td class="r"><span class="vch">v-text-field</span> + <span class="vch">v-autocomplete</span></td></tr>
+    </tbody>
+  </table>
+  <div class="row2" style="margin-top:18px">
+    <div class="attr"><div class="at-k">locked state</div><div class="at-v">When <code>available === false</code>, StCommitInput is not mounted; StChoice shows the disabled button + <b>unavailable_reason</b> + linked blocker <code>refs</code>. Drag affordances are removed, not just hidden, so keyboard users never tab into a dead control.</div></div>
+    <div class="attr"><div class="at-k">parity</div><div class="at-v"><b>place</b>'s drag is the rich path; the two-step <span class="vch">v-select</span> is the floor and ships first. <code>source_zone_ref</code> is included whenever the piece was taken from a visible source zone (clarified v1.5). Every input validates against <code>accepts.constraints</code> before emitting.</div></div>
+  </div>
+
+  <!-- ───────────────────────── §3 value_types ───────────────────────── -->
+  <h2 class="sec"><span class="n">§3</span><span>ProjectedState · the status rail</span><span class="r">StStatusRail · 5 value_types</span></h2>
+  <p class="note">
+    <b>StStatusRail</b> renders <span class="ic">projected_state.sections[]</span>. Each section dispatches
+    on <span class="ic">value.value_type</span> (digest §5). <span class="ic">section.kind</span> is a free
+    label rendered as the heading; the client does not branch on it. All five sub-components are
+    presentational (no emits) — the rail reflects state, it doesn't commit.
+  </p>
+  <div class="comps">
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StScalar · StKvList · StItemList · StTable · StBadges</span><span class="maps">renders <b>ProjectedSection.value</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="row2">
+          <div class="field"><div class="lbl">value union</div>
+<pre class="code"><span class="kw">type</span> <span class="ty">ProjectedValue</span> =
+ | { value_type: <span class="str">'scalar'</span>;  value: <span class="ty">string</span>|<span class="ty">number</span> }
+ | { value_type: <span class="str">'kv_list'</span>; items: <span class="ty">KvRow</span>[] }
+ | { value_type: <span class="str">'item_list'</span>;
+     items: { label: <span class="ty">string</span>; detail?: <span class="ty">string</span>;
+              tags?: <span class="ty">string</span>[] }[] }
+ | { value_type: <span class="str">'table'</span>;
+     columns: <span class="ty">string</span>[]; rows: <span class="ty">string</span>[][] }
+ | { value_type: <span class="str">'badges'</span>; items: <span class="ty">string</span>[] }</pre></div>
+          <div class="field"><div class="lbl">section wrapper</div>
+<pre class="code"><span class="kw">interface</span> <span class="ty">ProjectedSection</span> {
+  section_id: <span class="ty">string</span>
+  title: <span class="ty">string</span>     <span class="cm">// → heading</span>
+  kind: <span class="ty">string</span>      <span class="cm">// free label, not branched</span>
+  value: <span class="ty">ProjectedValue</span>
+}
+<span class="cm">// StStatusRail keys each section by</span>
+<span class="cm">// section_id; unknown value_type →</span>
+<span class="cm">// StUnknownFragment (§4).</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><b>scalar</b> → <span class="vch">v-card</span> big number · <b>kv_list</b> → reuse <b>StKvStrip</b> cells (bar/delta/tag) · <b>item_list</b> → <span class="vch">v-list</span> w/ <span class="vch">v-list-item-subtitle</span> + <span class="vch">v-chip</span> tags · <b>table</b> → <span class="vch">v-data-table</span> · <b>badges</b> → <span class="vch">v-chip-group</span>.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">each section is a <code>&lt;section aria-labelledby&gt;</code>. Tables get a <code>&lt;caption&gt;</code> from <b>title</b> + proper <code>&lt;th scope&gt;</code>. Badges are a list, not a sentence. Numeric scalars get <code>aria-label</code> with the unit.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">scalar number vs string · kv_list mixing all hints · item_list with/without tags/detail · table 6-col (overflow) · table 0 rows · badges empty / 20 items (wrap) · unknown value_type.</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop: rail is a fixed right column. Mobile: rail collapses into a <span class="vch">v-bottom-sheet</span> / tab; <b>table</b> → horizontal scroll with a sticky first column, or stacks to key:value rows under 480px.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §4 metadata + unknown ───────────────────────── -->
+  <h2 class="sec"><span class="n">§4</span><span>Metadata, command bar &amp; unknown fallback</span><span class="r">info_affordances · grammar · safety net</span></h2>
+  <div class="comps">
+
+    <!-- StInfoBar -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StInfoBar</span><span class="maps">renders <b>metadata.info_affordances</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">Discoverable side-projections (map, inventory, help…). A footer/rail of affordance buttons. <b>info_state.dirty_kinds</b> marks which are stale; the projection only crosses the wire when invoked — this is a hint surface, never a state dump.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  affordances: <span class="ty">InfoAffordance</span>[]
+  infoState?: { version: <span class="ty">number</span>
+    dirty_kinds?: <span class="ty">string</span>[]
+    available_kinds?: <span class="ty">string</span>[] }
+}&gt;()
+<span class="cm">// InfoAffordance = { kind, label,</span>
+<span class="cm">//   shortcuts?: string[], query?: unknown|null }</span></pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="fn">defineEmits</span>&lt;{
+  invoke: [{ kind: <span class="ty">string</span>
+             query: <span class="ty">unknown</span> | <span class="kw">null</span> }]
+}&gt;()
+<span class="cm">// host runs the side-projection;</span>
+<span class="cm">// query is opaque to the client.</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-bottom-navigation</span> (mobile) / <span class="vch">v-navigation-rail</span> (desktop); each item a <span class="vch">v-btn</span> with <span class="vch">v-badge</span> dot when dirty.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">shortcuts → <code>aria-keyshortcuts</code>, announced in the label ("Map, m"). Dirty state mirrored in text ("stale"), not just the dot, via <code>aria-live</code>. Shortcut namespace is separate from edge hotkeys — never collides.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">empty affordances (hide bar) · with dirty_kinds · available_kinds gating an item · 8 affordances (wrap/scroll) · query=null vs object.</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop left rail icons+labels; mobile bottom nav icons only, labels on long-press; overflow into a "more" menu.</div></div>
+      </div>
+    </div>
+
+    <!-- StCommandBar -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StCommandBar</span><span class="maps">drives <b>raw_command</b> · <b>metadata.grammar</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">The typed command line for any <span class="ic">accepts.kind === 'raw_command'</span> edge. <b>grammar.placeholder</b> seeds the hint; <b>verbs/nouns</b> feed autocomplete. Parsing is the backend's job — the bar submits raw text.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  edgeId: <span class="ty">string</span>
+  grammar?: {
+    verbs?: { verb: <span class="ty">string</span>; aliases?: <span class="ty">string</span>[] }[]
+    nouns?: { noun: <span class="ty">string</span>; aliases?: <span class="ty">string</span>[] }[]
+    placeholder?: <span class="ty">string</span>
+  }
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">emits</div>
+<pre class="code"><span class="fn">defineEmits</span>&lt;{
+  commit: [{ edgeId: <span class="ty">string</span>
+    payload: { text: <span class="ty">string</span> } }]
+}&gt;()
+<span class="cm">// never parses locally; backend</span>
+<span class="cm">// interpretation (P1) returns feedback.</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">vuetify</div><div class="at-v"><span class="vch">v-text-field</span> prefix="⅁&gt;" with <span class="vch">v-autocomplete</span> suggestions from verbs+nouns; submit on Enter.</div></div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v"><code>role="search"</code>-style labelled input; autocomplete is <code>aria-autocomplete="list"</code>. Works with zero grammar (free text). Backend <span class="ic">interpretation</span> echo (P1) rendered as a polite live region.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">grammar present/absent · alias resolution · empty submit (no-op) · very long input · interpretation rejection echo.</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">desktop sticky above choices; mobile docked above the keyboard, suggestions in a sheet.</div></div>
+      </div>
+    </div>
+
+    <!-- StUnknownFragment -->
+    <div class="comp">
+      <div class="comp-hd"><span class="cname">StUnknownFragment</span><span class="maps">fallback · unrecognized <b>type</b></span><span></span><span class="tier s">tier S</span></div>
+      <div class="comp-bd">
+        <div class="desc">The safety net that lets a client ignore the genre layer and still conform (§10). An unknown type is <b>never</b> a crash: dev shows a labelled diagnostic; prod renders nothing visible and logs once.</div>
+        <div class="row2">
+          <div class="field"><div class="lbl">props</div>
+<pre class="code"><span class="fn">defineProps</span>&lt;{
+  fragment: <span class="ty">Record</span>&lt;<span class="ty">string</span>, <span class="ty">unknown</span>&gt;
+  context: <span class="str">'fragment'</span> | <span class="str">'value_type'</span>
+}&gt;()</pre></div>
+          <div class="field"><div class="lbl">behavior</div>
+<pre class="code"><span class="kw">if</span> (import.meta.env.DEV)
+  <span class="cm">// v-alert type="warning" w/ the type +</span>
+  <span class="cm">// a collapsed JSON preview</span>
+<span class="kw">else</span>
+  <span class="cm">// render nothing; console.warn once</span>
+  <span class="cm">// per unknown type (dedup by key)</span></pre></div>
+        </div>
+        <div class="attr"><div class="at-k">a11y / fallback</div><div class="at-v">dev diagnostic is <code>role="note"</code>, not an error landmark. Prod renders an empty comment node so the stream order is preserved if the type is later recognized.</div></div>
+        <div class="attr"><div class="at-k">fixtures</div><div class="at-v">bogus fragment_type (e.g. <span class="ic">piece</span> before P2 ships) · unknown value_type · malformed fragment (missing uid) · dev vs prod build.</div></div>
+        <div class="attr"><div class="at-k">responsive</div><div class="at-v">diagnostic clamps to container width, JSON preview scrolls; identical at all breakpoints.</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ───────────────────────── §5 responsive + a11y ───────────────────────── -->
+  <h2 class="sec"><span class="n">§5</span><span>Layout, overflow &amp; accessibility</span><span class="r">cross-cutting · all components</span></h2>
+  <div class="resp">
+    <div>
+      <h3 class="sub">Desktop · the dossier layout</h3>
+      <p class="note">
+        Three regions via Vuetify's grid: an affordance rail, the story column (the fragment stream),
+        and the status rail (projected state). The story column is the only scroll region; rails are
+        sticky. The command bar pins below the choices.
+      </p>
+      <div class="wf">
+        <div class="wf-cap">≥ 960px · v-layout 3-col</div>
+        <div class="wf-body">
+          <div class="wf-row wf-3">
+            <div class="wf-box dim">info<br/>rail</div>
+            <div class="wf-box">story column<br/><span style="color:var(--ink-4)">content · dialog · kv · choices</span></div>
+            <div class="wf-box dim">status<br/>rail</div>
+          </div>
+          <div class="wf-box" style="text-align:center">⅁&gt; command bar</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 class="sub">Mobile · single column</h3>
+      <p class="note">
+        Below 600px the rails leave the flow: info → bottom nav, status → a pull-up sheet or tab. The
+        story stacks full-width. Nothing in the contract changes — only placement.
+      </p>
+      <div class="wf">
+        <div class="wf-cap">&lt; 600px · stacked</div>
+        <div class="wf-body">
+          <div class="wf-box">story stream</div>
+          <div class="wf-box">choices (full-width)</div>
+          <div class="wf-box" style="text-align:center">⅁&gt; command bar</div>
+          <div class="wf-box dim" style="text-align:center">▸ status sheet · ⬚⬚⬚ bottom nav</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2" style="margin-top:30px">
+    <div>
+      <h3 class="sub">No-color &amp; high-contrast</h3>
+      <ul class="tight">
+        <li><b>Severity never by hue alone</b> — glyph (<code>✓ ! ‼</code>) + <code>sr-only</code> label + border accompany every emphasis color.</li>
+        <li>Theme exposes a <code>high-contrast</code> variant; <code>forced-colors</code> media query swaps to system colors and keeps borders.</li>
+        <li>Locked choices read <code>[LOCKED]</code> in text, not a faded tint; disabled state has a non-color cue.</li>
+        <li>Focus rings are 2px and never removed; <code>:focus-visible</code> throughout.</li>
+        <li>Hit targets ≥ 44px; <code>prefers-reduced-motion</code> kills skeleton shimmer + ripple.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="sub">Long labels &amp; overflow</h3>
+      <ul class="tight">
+        <li>Choice text wraps to 2 lines then ellipsizes with full text in <code>title</code> / tooltip.</li>
+        <li>KvRow keys truncate with <code>text-overflow</code>; value stays visible (the value is the data).</li>
+        <li><span class="ic">table</span> value_type → horizontal scroll + sticky first column; never squashes columns illegibly.</li>
+        <li>Speaker names + badges truncate at a max-width; tags wrap to a new line, never overflow the rail.</li>
+        <li>All measures use <code>ch</code>/<code>%</code>, not fixed px, so zoom to 200% reflows cleanly.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §6 tiering ───────────────────────── -->
+  <h2 class="sec"><span class="n">§6</span><span>What ships, what stays design-only, what's just paint</span><span class="r">the boundary</span></h2>
+  <p class="note">
+    The contract boundary is sacred. Column 1 is buildable against v1.5 today. Column 2 names components
+    for P1/P2 fragment types that must stay design-only until the engine ships them — building them now
+    would tempt invented fields. Column 3 is pure styling: change it freely, it touches no contract.
+  </p>
+  <div class="tiers">
+    <div class="tcol ready">
+      <div class="tc-hd">① Tier S · build now</div>
+      <div class="tc-bd">
+        <p class="lead">Backed by shipped, tested Tier S fragments + ProjectedState. Safe to implement.</p>
+        <ul class="tlist">
+          <li>StContent <span class="m">content</span></li>
+          <li>StAttributed <span class="m">attributed</span></li>
+          <li>StMedia <span class="m">media</span></li>
+          <li>StKvStrip <span class="m">kv</span></li>
+          <li>StChoiceList / StChoice <span class="m">choice</span></li>
+          <li>StCommitInput <span class="m">accepts: pick·text·quantity·compose·raw_command</span></li>
+          <li>StUserEvent <span class="m">user_event</span></li>
+          <li>StControlSink <span class="m">control</span></li>
+          <li>StGroup <span class="m">scene·dialog·overlay</span></li>
+          <li>StStatusRail + scalar·kv_list·item_list·table·badges</li>
+          <li>StInfoBar <span class="m">info_affordances</span></li>
+          <li>StCommandBar <span class="m">grammar</span></li>
+          <li>StUnknownFragment <span class="m">fallback</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="tcol design">
+      <div class="tc-hd">② P1 / P2 · design-only</div>
+      <div class="tc-bd">
+        <p class="lead">Named, sketched, <b>not</b> implemented — the fragment types aren't Tier S. Wait for the engine.</p>
+        <ul class="tlist">
+          <li>StPiece <span class="m">piece · P2</span></li>
+          <li>StZone <span class="m">group·zone + zone_role · P2</span></li>
+          <li>StCommitInput: pieces / place <span class="m">need piece+zone · P2</span></li>
+          <li>StRoll <span class="m">roll ritual + ritual_hints · P2</span></li>
+          <li>StInterpretation <span class="m">raw_command feedback · P1</span></li>
+          <li>Multi-cursor channel switch <span class="m">visibility · P1</span></li>
+          <li>Genre ui_hints previews <span class="m">stat_check, validity_check… · P3</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="tcol style">
+      <div class="tc-hd">③ Styling · no contract</div>
+      <div class="tc-bd">
+        <p class="lead">Recommendations that change appearance only — adjust without engine coordination.</p>
+        <ul class="tlist">
+          <li>Vuetify theme tokens → brand palette</li>
+          <li>Square corners <span class="m">rounded: 0</span></li>
+          <li>De-elevate <span class="m">flat / variant=outlined defaults</span></li>
+          <li>Font stack <span class="m">Newsreader · JetBrains · Inter Tight</span></li>
+          <li>density="compact" defaults</li>
+          <li>Severity colors → ok/warn/danger</li>
+          <li>Speaker tint hash palette</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub" style="margin-top:36px">Vuetify theme — making it wear the brand (§6③)</h3>
+  <p class="note">
+    The styling column, concretely. This is a <span class="ic">createVuetify</span> config: it re-skins
+    Material to the engineering-notebook palette and kills the rounded/elevated defaults. It changes no
+    prop, emit, or payload — drop it in or swap it out freely.
+  </p>
+  <pre class="code lg"><span class="kw">export default</span> <span class="fn">createVuetify</span>({
+  <span class="cm">// ③ paint only — no contract impact</span>
+  defaults: {
+    global: { rounded: <span class="str">0</span>, flat: <span class="kw">true</span> },          <span class="cm">// square + no shadow</span>
+    VBtn:   { variant: <span class="str">'outlined'</span>, ripple: <span class="kw">false</span> },
+    VCard:  { variant: <span class="str">'outlined'</span> },
+    VChip:  { variant: <span class="str">'outlined'</span>, size: <span class="str">'small'</span> },
+    VTable: { density: <span class="str">'compact'</span> },
+  },
+  theme: {
+    defaultTheme: <span class="str">'storytangl'</span>,
+    themes: {
+      storytangl: {
+        dark: <span class="kw">false</span>,
+        colors: {
+          background: <span class="str">'#f6f3ea'</span>, surface: <span class="str">'#ffffff'</span>,  <span class="cm">// paper</span>
+          'on-surface': <span class="str">'#1a1a1a'</span>,                       <span class="cm">// ink</span>
+          primary: <span class="str">'#2a4e87'</span>,  <span class="cm">// blue-pencil</span>
+          secondary: <span class="str">'#b2542a'</span>, <span class="cm">// burnt — one moment per page</span>
+          ok: <span class="str">'#3e7f57'</span>, warn: <span class="str">'#a8762a'</span>, danger: <span class="str">'#a8362a'</span>, <span class="cm">// severity ladder</span>
+        },
+      },
+    },
+  },
+})</pre>
+
+  <div class="foot">
+    <span>StoryTan⅁l · web client · vue 3 + vuetify 3 component guide</span>
+    <span>tier S · v1.5 · invents no fields — see VOCAB_DIGEST §2–§7 · §10</span>
+  </div>
+
+</div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#f6f3ea"/>
+    <rect x="16" y="20" width="30" height="60" fill="none" stroke="#8a8472" stroke-width="2"/>
+    <rect x="50" y="20" width="34" height="60" fill="none" stroke="#1a1a1a" stroke-width="2"/>
+    <rect x="22" y="28" width="18" height="5" fill="#2a4e87"/>
+    <rect x="56" y="28" width="22" height="5" fill="#1a1a1a"/>
+    <rect x="56" y="40" width="22" height="5" fill="#c9c2ad"/>
+    <rect x="56" y="52" width="14" height="5" fill="#3e7f57"/>
+  </svg>
+</template>
+
+</body>
+</html>
