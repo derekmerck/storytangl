@@ -76,9 +76,9 @@ def build_valid(
 
     for c_ind in contraband:
         c_level = restrictions.level_for(region, c_ind, RestrictionLevel.FORBIDDEN)
-        if c_level is RestrictionLevel.FORBIDDEN:
+        if c_level in (RestrictionLevel.CRIMINAL, RestrictionLevel.FORBIDDEN):
             raise ValueError(
-                f"Cannot build a valid case with forbidden contraband: "
+                f"Cannot build a valid case with criminal/forbidden contraband: "
                 f"{c_ind.value} in {region.value}."
             )
         if c_level.requires_permit:

@@ -349,11 +349,15 @@ def _assess_requirement(
 def _contraband_class(level: RestrictionLevel) -> str:
     """Classify a contraband indication's rule (Phase B.2)."""
 
+    if level is RestrictionLevel.CRIMINAL:
+        return "criminal"  # per-se crime; possession arrests, no rescue
     if level is RestrictionLevel.FORBIDDEN:
         return "forbidden"
-    if level.requires_permit:
-        return "permit_required"
-    return "declaration_only"  # allowed if declared (anonymous / id level)
+    if level.requires_permit or level.requires_id:
+        # Needs a valid permit and/or bearer id: route through _assess_requirement
+        # so the id is actually checked (a WITH_ID good is not merely declarable).
+        return "credentialed"
+    return "declaration_only"  # anonymous level: allowed once declared
 
 
 def _assess_contraband(
@@ -372,6 +376,13 @@ def _assess_contraband(
 
     fs = finding_status or {}
     cls = _contraband_class(level)
+    if cls == "criminal":
+        # Per-se crime: mere possession is the offense. Declaring or surrendering
+        # it does not rescue (you cannot relinquish your way out of trafficking).
+        # A permissive regime that tolerates the good simply maps it below
+        # CRIMINAL. (A privileged-origin whitelist exemption is a Phase C overlay
+        # applied above derive_disposition, not here.)
+        return CredentialDisposition.ARREST
     # disclosure declares all concealed goods; a bare un-concealed item is
     # already declared. The contraband's permit (when one is required) lives in
     # the packet keyed by indication, so its standing is assessed by
@@ -383,7 +394,7 @@ def _assess_contraband(
             return CredentialDisposition.PASS  # voluntarily surrendered
         if cls == "forbidden":
             return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
-        if cls == "permit_required":
+        if cls == "credentialed":
             return _assess_requirement(case, item.indication, level, fs)
         return CredentialDisposition.PASS  # declaration-only, declared -> allow
 
@@ -392,10 +403,10 @@ def _assess_contraband(
         return CredentialDisposition.ARREST  # smuggling forbidden goods
     if cls == "declaration_only":
         return CredentialDisposition.DENY  # concealed declarable goods
-    # permit-required, concealed:
+    # credentialed (permit and/or id required), concealed:
     if _assess_requirement(case, item.indication, level, fs) is CredentialDisposition.PASS:
-        return CredentialDisposition.DENY  # had a valid permit but concealed it (Q1)
-    return CredentialDisposition.ARREST  # smuggling unpermitted goods
+        return CredentialDisposition.DENY  # had a valid credential but concealed it (Q1)
+    return CredentialDisposition.ARREST  # smuggling un-credentialed goods
 
 
 def derive_disposition(
@@ -417,7 +428,11 @@ def derive_disposition(
 
     purpose = case.get_purpose()
     level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
-    if level is RestrictionLevel.FORBIDDEN:
+    if level is RestrictionLevel.CRIMINAL:
+        # The stated purpose is itself a crime (RestrictionLevel is shared by
+        # purpose and contraband rules) -- e.g. an authored {WORK: CRIMINAL} regime.
+        worst = _worse(worst, CredentialDisposition.ARREST)
+    elif level is RestrictionLevel.FORBIDDEN:
         worst = _worse(worst, CredentialDisposition.DENY)  # purpose not allowed
     else:
         worst = _worse(worst, _assess_requirement(case, purpose, level, finding_status))
@@ -879,8 +894,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         purpose = case.get_purpose()
         plevel = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
-        if plevel is RestrictionLevel.FORBIDDEN:
-            return True  # the stated purpose is itself disallowed -- self-evident
+        if plevel in (RestrictionLevel.CRIMINAL, RestrictionLevel.FORBIDDEN):
+            return True  # the stated purpose is itself criminal/disallowed -- self-evident
         if plevel.requires_id and case.id_status() is None:
             return True
         if plevel.requires_permit and case.credential_for(purpose) is None:
@@ -890,8 +905,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             if item.concealed:
                 continue  # a hidden item's grounds are not self-evident
             clevel = rules.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
-            if clevel is RestrictionLevel.FORBIDDEN:
-                return True  # openly forbidden goods
+            if clevel in (RestrictionLevel.CRIMINAL, RestrictionLevel.FORBIDDEN):
+                return True  # openly criminal / forbidden goods
             if clevel.requires_permit and case.credential_for(item.indication) is None:
                 return True  # visible item, plainly missing its permit
         return False

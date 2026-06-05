@@ -5,7 +5,8 @@
 lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
 2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); penalty-matrix
 scorer + soft time budget + per-rule-set scoring config (configurable
-`penalty_matrix`, `no_evidence_penalty` toggle) LANDED 2026-06-05; Phases
+`penalty_matrix`, `no_evidence_penalty` toggle) LANDED 2026-06-05; B.2.1 CRIMINAL
+contraband tier (per-se crime, no rescue, per-rule-set) LANDED 2026-06-05; Phases
 B.3 (declines axis)/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
@@ -684,12 +685,34 @@ computes a base disposition; Phase C composes the override on top.
 
 The matrix collapses once you see that **contraband is, by definition, what must
 be declared.** If concealment doesn't matter for an item, it simply isn't
-contraband — there is no fourth "ignored" category. So contraband has exactly
-three levels (from the restriction map for that indication):
+contraband — there is no fourth "ignored" category. So contraband has these
+levels (from the restriction map for that indication):
 
 - **declaration-only** (anonymous / id level) — allowed *if declared*.
 - **permit-required** (with-permit level) — declared *and* a valid permit.
-- **forbidden** — denied regardless.
+- **forbidden** — denied regardless (but *relinquishable* — surrender it and the
+  candidate walks).
+- **criminal** (`RestrictionLevel.CRIMINAL`, LANDED B.2.1 2026-06-05) — a **per-se
+  crime**: mere possession arrests, and **neither declaring nor surrendering it
+  rescues** (you cannot relinquish your way out of trafficking — heroin, slaves, a
+  case of counterfeit). `_contraband_class` returns `"criminal"` and
+  `_assess_contraband` short-circuits to ARREST before any rescue path. This is the
+  arrestible-severity *forbidden* sits below: which goods are criminal is **per
+  rule set** — a permissive regime simply maps the same good down to a lower level,
+  and a privileged-origin **whitelist** exemption (Phase C overlay above
+  `derive_disposition`) is the only thing that bends it back. It is also the target
+  severity the deferred *planting* malfeasance move aims for: a discovered criminal
+  good is what launders a shadow-blacklist arrest into "arrest with reason."
+
+`RestrictionLevel` is shared by purpose and contraband rules, so two corners are
+pinned for "weird but legal" authored configs: a **CRIMINAL purpose** (e.g.
+`{WORK: CRIMINAL}`) derives ARREST (the stated purpose is itself a crime; the
+purpose branch special-cases it like FORBIDDEN→DENY), and a **WITH_ID contraband**
+good is routed through `_assess_requirement` (class `"credentialed"`, = needs a
+permit and/or id) rather than treated as merely declarable, so its bearer-id check
+is not bypassed. `build_valid` keeps raising only for criminal/forbidden
+*contraband* (a caller asking to add a disallowed good); a criminal/forbidden
+*purpose* is left to derive its inherent ARREST/DENY, which the roster relies on.
 
 And **concealment is itself the violation** — concealing *any* contraband is a
 problem, independent of whether it would have been permitted. The disclosure /

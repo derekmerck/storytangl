@@ -209,3 +209,119 @@ class TestForgedDocumentIsAlwaysACrime:
         # renewal); a merely-invalid unused permit is not a crime.
         case = _case(packet=[_permit(IND.WEAPON, S.EXPIRED)])
         assert _derive(case) is D.PASS
+
+
+# drugs as a per-se crime in THIS regime; a permissive regime maps it lower.
+CRIMINAL_RULES = Restrictions.from_map(
+    {Region.LOCAL: {IND.TRAVEL: L.WITH_ID, IND.DRUGS: L.CRIMINAL}}
+)
+
+
+def _derive_crim(case: CredentialCase, fs: dict | None = None) -> CredentialDisposition:
+    return derive_disposition(case, CRIMINAL_RULES, fs)
+
+
+class TestCriminalContrabandTier:
+    """A CRIMINAL good is a per-se crime: possession arrests, no rescue (B.2.1)."""
+
+    def test_declared_criminal_arrests(self) -> None:
+        assert _derive_crim(_case(ContrabandItem(indication=IND.DRUGS))) is D.ARREST
+
+    def test_concealed_criminal_arrests(self) -> None:
+        case = _case(ContrabandItem(indication=IND.DRUGS, concealed=True))
+        assert _derive_crim(case) is D.ARREST
+
+    def test_relinquish_does_not_rescue_criminal(self) -> None:
+        case = _case(ContrabandItem(indication=IND.DRUGS))  # declared
+        assert _derive_crim(case, {"relinquish": "yielded"}) is D.ARREST
+
+    def test_disclose_and_relinquish_do_not_rescue_smuggled_criminal(self) -> None:
+        case = _case(ContrabandItem(indication=IND.DRUGS, concealed=True))
+        fs = {"disclosure": "declared", "relinquish": "yielded"}
+        assert _derive_crim(case, fs) is D.ARREST
+
+    def test_per_rule_set_contrast(self) -> None:
+        # Same declared good: relinquishable to PASS under FORBIDDEN (module RULES),
+        # but a per-se arrest under CRIMINAL -- the criminality is regime data.
+        case = _case(ContrabandItem(indication=IND.DRUGS))
+        assert _derive(case, {"relinquish": "yielded"}) is D.PASS
+        assert _derive_crim(case, {"relinquish": "yielded"}) is D.ARREST
+
+
+class TestCriminalSelfEvidence:
+    """How the criminal tier interacts with the no_evidence_penalty tax."""
+
+    def _game(self, *possessions):
+        game = CredentialsGame(
+            roster=[_case(*possessions)],
+            restriction_map=CRIMINAL_RULES,
+            no_evidence_penalty=1,
+        )
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        return game, handler
+
+    def test_visible_criminal_is_self_evident_arrest(self) -> None:
+        # Openly carried criminal goods justify an arrest on their face.
+        game, handler = self._game(ContrabandItem(indication=IND.DRUGS))
+        assert game.expected_disposition(game.active_case) is D.ARREST
+        handler.receive_move(game, ("decide", "arrest"))
+        result = game.case_results[-1]
+        assert result.unjustified is False
+        assert result.penalty == 0
+
+    def test_concealed_criminal_blind_arrest_is_taxed(self) -> None:
+        # Smuggled criminal goods are hidden: arresting without searching is a
+        # blind (if correct) call, so the tax fires.
+        game, handler = self._game(ContrabandItem(indication=IND.DRUGS, concealed=True))
+        assert game.expected_disposition(game.active_case) is D.ARREST
+        handler.receive_move(game, ("decide", "arrest"))  # no search
+        assert game.case_results[-1].unjustified is True
+
+    def test_concealed_criminal_after_search_is_justified(self) -> None:
+        game, handler = self._game(ContrabandItem(indication=IND.DRUGS, concealed=True))
+        handler.receive_move(game, ("request_search", ""))  # confirms concealment
+        handler.receive_move(game, ("decide", "arrest"))
+        result = game.case_results[-1]
+        assert result.unjustified is False
+        assert result.penalty == 0
+
+
+# RestrictionLevel is shared by purpose and contraband rules; these pin the
+# matrix corners for "weird but legal" authored configs.
+PURPOSE_CRIMINAL_RULES = Restrictions.from_map({Region.LOCAL: {IND.WORK: L.CRIMINAL}})
+# A good allowed only with a valid bearer id, under an anonymous purpose so the id
+# is not otherwise required -- isolates the contraband's own id check.
+ID_CONTRABAND_RULES = Restrictions.from_map(
+    {Region.LOCAL: {IND.TRAVEL: L.ANONYMOUS, IND.SECRETS: L.WITH_ID}}
+)
+
+
+class TestSharedRestrictionLevelEdges:
+    def test_criminal_purpose_arrests(self) -> None:
+        # The stated purpose is itself a crime -> arrest (not a fall-through PASS).
+        case = CredentialCase(
+            purpose=IND.WORK,
+            presented_documents={"passport": "An id."},
+            id_card=_id(),
+        )
+        assert derive_disposition(case, PURPOSE_CRIMINAL_RULES) is D.ARREST
+
+    def test_with_id_contraband_does_not_bypass_the_id_check(self) -> None:
+        # A WITH_ID good is not merely declarable: a declared one with no id denies.
+        no_id = CredentialCase(
+            purpose=IND.TRAVEL,
+            presented_documents={"passport": "(none)"},
+            id_card=None,
+            possessions=[ContrabandItem(indication=IND.SECRETS)],
+        )
+        assert derive_disposition(no_id, ID_CONTRABAND_RULES) is D.DENY
+
+    def test_with_id_contraband_allows_with_a_valid_id(self) -> None:
+        with_id = CredentialCase(
+            purpose=IND.TRAVEL,
+            presented_documents={"passport": "An id."},
+            id_card=_id(),
+            possessions=[ContrabandItem(indication=IND.SECRETS)],
+        )
+        assert derive_disposition(with_id, ID_CONTRABAND_RULES) is D.PASS
