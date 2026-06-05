@@ -720,11 +720,14 @@ chided for the wrong call, see it again in a different context — not a random
 spawn.
 
 **B.2 scope (compliance assumed):** the new move kinds ``request_disclosure`` /
-``request_relinquish`` / ``request_complete`` (missing-doc, the B.1-deferred
-surface), plus the graduated contraband assessment above and per-indication
-worst-case composition. **Deferred to B.3:** the declines-mediation axis (the
-candidate who lies when asked or refuses to yield), where disclosure can fail.
-Phase C severity overlay (origin bends arrest↔deny) layers on top of all of it.
+``request_relinquish`` (search forecloses: a disclosure *after* a search has
+confirmed concealment is too late to rescue), plus the graduated contraband
+assessment above and per-indication worst-case composition. **Deferred:**
+``request_complete`` (the missing-doc surface — ``request_relinquish`` already
+clears declared problematic contraband, so it was not needed for B.2); and **to
+B.3**, the declines-mediation axis (the candidate who lies when asked or refuses
+to yield), where disclosure can fail. Phase C severity overlay (origin bends
+arrest↔deny) layers on top of all of it.
 
 ---
 

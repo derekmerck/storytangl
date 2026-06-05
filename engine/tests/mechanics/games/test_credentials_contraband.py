@@ -164,6 +164,30 @@ class TestContrabandMoves:
         assert game.finding_status["relinquish"] == "yielded"
         assert game.expected_disposition(game.active_case) is D.PASS
 
+    def test_search_then_disclosure_does_not_rescue(self) -> None:
+        # Search forecloses: once a search confirms concealment, a later
+        # disclosure is too late and cannot rescue the concealed-permitted item.
+        game, handler = self._game(
+            ContrabandItem(indication=IND.WEAPON, concealed=True), packet=[_permit(IND.WEAPON)]
+        )
+        handler.receive_move(game, ("request_search", ""))
+        assert game.expected_disposition(game.active_case) is D.DENY
+        handler.receive_move(game, ("request_disclosure", ""))
+        assert game.finding_status["disclosure"] == "too_late"
+        assert game.expected_disposition(game.active_case) is D.DENY  # not rescued
+
+    def test_disclosure_then_search_still_rescues(self) -> None:
+        # Voluntary disclosure before searching rescues; a subsequent search
+        # only confirms what was already declared.
+        game, handler = self._game(
+            ContrabandItem(indication=IND.WEAPON, concealed=True), packet=[_permit(IND.WEAPON)]
+        )
+        handler.receive_move(game, ("request_disclosure", ""))
+        assert game.expected_disposition(game.active_case) is D.PASS
+        handler.receive_move(game, ("request_search", ""))
+        assert game.finding_status["disclosure"] == "declared"
+        assert game.expected_disposition(game.active_case) is D.PASS  # still rescued
+
     def test_disclosure_with_nothing_to_declare_is_clean(self) -> None:
         game, handler = self._game()  # no contraband
         result = handler.receive_move(game, ("request_disclosure", ""))

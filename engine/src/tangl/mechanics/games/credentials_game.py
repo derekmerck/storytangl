@@ -854,16 +854,24 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail: dict[str, object],
     ) -> RoundResult:
         # "Anything to declare?" -- a compliant candidate (B.2 assumes compliance;
-        # lying is B.3) declares any concealed contraband. Declaring rescues
-        # concealed-but-permitted goods to the declared assessment (the "oops"
-        # path); contrast request_search, which only reveals and forecloses.
-        game.finding_status["disclosure"] = "declared"
+        # lying is B.3) declares any concealed contraband. *Voluntary* disclosure
+        # rescues concealed-but-permitted goods to the declared assessment (the
+        # "oops" path). But search forecloses: once a search has already
+        # confirmed concealment, a later disclosure is too late to rescue -- it
+        # records "too_late" (which derive does not treat as declared) rather
+        # than "declared".
         concealed = [item for item in game.active_case.get_contraband() if item.concealed]
-        if concealed:
-            detail["outcome"] = "disclosure_declared"
+        if concealed and game.finding_status.get("search") == "confirmed":
+            game.finding_status["disclosure"] = "too_late"
+            detail["outcome"] = "disclosure_too_late"
             detail["declared"] = [item.indication.value for item in concealed]
         else:
-            detail["outcome"] = "disclosure_nothing"
+            game.finding_status["disclosure"] = "declared"
+            if concealed:
+                detail["outcome"] = "disclosure_declared"
+                detail["declared"] = [item.indication.value for item in concealed]
+            else:
+                detail["outcome"] = "disclosure_nothing"
         return RoundResult.CONTINUE
 
     def _resolve_request_relinquish(
@@ -991,10 +999,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 ContentFragment(content=line),
             ]
         if action == "request_disclosure":
-            if notes.get("outcome") == "disclosure_declared":
-                items = notes.get("declared") or []
-                what = ", ".join(items) if items else "something"
+            outcome = notes.get("outcome")
+            items = notes.get("declared") or []
+            what = ", ".join(items) if items else "something"
+            if outcome == "disclosure_declared":
                 line = f"The candidate hesitates, then sets out {what}."
+            elif outcome == "disclosure_too_late":
+                line = f"Too late -- the {what} you already turned up is on the counter between you."
             else:
                 line = "The candidate has nothing to declare."
             return [
