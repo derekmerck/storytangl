@@ -69,6 +69,11 @@ The service layer already returns Python-native `RuntimeEnvelope` objects for
 story creation, updates, and choice resolution. The first pinned backend
 contract test now asserts that a simple story emits sibling content and choice
 fragments, not a legacy block, and that `uid` and `edge_id` stay separate.
+Additional contract tests pin the authored `Action.accepts` and `Action.ui_hints`
+path through service envelopes and REST JSON. These are UI-facing intent
+contracts, even when the engine's internal vocabulary also uses fields named
+`kind`; any future service adapter that maps UI intent onto engine mechanics
+should be explicit and narrow rather than handled by the REST serializer.
 
 The REST layer still performs JSON serialization manually because it owns HTTP
 transport concerns such as media profiles and optional markdown-to-HTML

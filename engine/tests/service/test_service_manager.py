@@ -22,7 +22,21 @@ from tangl.story.episode import Action
 from tangl.vm.runtime.ledger import Ledger
 
 
-def _story_script() -> dict[str, object]:
+def _story_script(*, with_choice_payload_hints: bool = False) -> dict[str, object]:
+    action: dict[str, object] = {"text": "Continue", "successor": "end"}
+    if with_choice_payload_hints:
+        action["accepts"] = {
+            "kind": "quantity",
+            "min": 1,
+            "max": 3,
+            "unit": "ration",
+        }
+        action["ui_hints"] = {
+            "hotkey": "b",
+            "source_kind": "market",
+            "contribution": "purchase",
+        }
+
     return {
         "label": "svc_manager_world",
         "metadata": {
@@ -35,7 +49,7 @@ def _story_script() -> dict[str, object]:
                 "blocks": {
                     "start": {
                         "content": "Start",
-                        "actions": [{"text": "Continue", "successor": "end"}],
+                        "actions": [action],
                     },
                     "end": {
                         "content": "End",
@@ -183,6 +197,44 @@ def test_story_envelope_keeps_fragments_independent_from_actions(
     assert payload["uid"] == str(choice.uid)
     assert payload["edge_id"] == str(edge.uid)
     assert payload["uid"] != payload["edge_id"]
+
+
+def test_story_envelope_preserves_choice_payload_contracts(
+    manager: ServiceManager,
+    user: User,
+) -> None:
+    world = World.from_script_data(script_data=_story_script(with_choice_payload_hints=True))
+    created = manager.create_story(
+        user_id=user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc_manager_story_choice_contracts",
+    )
+
+    assert isinstance(created, RuntimeEnvelope)
+    choice = next(fragment for fragment in created.fragments if isinstance(fragment, ChoiceFragment))
+    assert choice.accepts is not None
+    assert choice.accepts.kind == "quantity"
+    assert choice.ui_hints is not None
+    assert choice.ui_hints.hotkey == "b"
+
+    payload = choice.model_dump(mode="json", by_alias=True, exclude_none=True)
+    assert payload["accepts"] == {
+        "kind": "quantity",
+        "required": True,
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "unit": "ration",
+        "cost_previews": [],
+    }
+    assert payload["ui_hints"] == {
+        "hotkey": "b",
+        "source_kind": "market",
+        "contribution": "purchase",
+        "cost_previews": [],
+    }
 
 
 def test_create_story_passes_user_namespace_to_world_override(
