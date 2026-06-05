@@ -844,11 +844,26 @@ costs that much: guessing right is fine but taxed, so gathering evidence (which
 costs budget, §1) is rewarded without being mandatory. It is **off by default**
 because it is regime-specific — a rule-of-law gate turns it on; an arrest-by-decree
 regime (§3) must leave it off, since arresting without evidence is the *norm*
-there. "Surfaced evidence" (`_has_surfaced_evidence`) = a revealed document/packet
-finding, an adverse `finding_status` (`confirmed`/`cleared`/`yielded`), or a logged
-declaration of contraband actually present. Justification will also include
-**behavioral** evidence once B.3 lands ("the smuggler tried to bribe his way out of
-a search" → grounds for arrest); `_EVIDENCE_FINDINGS` is the seam for that.
+there. A rejection is **justified** (`_rejection_is_justified`) if it is backed by
+either *surfaced* or *self-evident* evidence, and the tax errs toward justified so
+it never punishes a fair call:
+
+- *Surfaced* (`_has_surfaced_evidence`) — a revealed document/packet finding, an
+  adverse `finding_status` (`confirmed`/`cleared`/`yielded`, but **not** a clean
+  `search: cleared`, which turned nothing up), or a logged declaration of
+  contraband actually present.
+- *Self-evident* (`_has_visible_grounds`) — facts visible without investigation: a
+  credential the purpose plainly requires but the packet lacks, or openly
+  (non-concealed) contraband that is forbidden or plainly missing its permit. A
+  concealed item is not self-evident; a declared declaration-only item is allowed,
+  so neither counts.
+
+The tax keys off `correct` (not `penalty == 0`), so a custom matrix that tolerates
+a non-expected call at zero cost is never mistaken for a correct one, and it never
+fires on an allow (the point of an allow is that there is *no* adverse evidence).
+Justification will also grow **behavioral** evidence once B.3 lands ("the smuggler
+tried to bribe his way out of a search" → grounds for arrest); `_EVIDENCE_FINDINGS`
+is the seam for that.
 
 `derive_disposition` is unchanged; this was a refactor of the **decision scorer**
 (penalty lookup + accumulation + the evidence check) and the shift terminal

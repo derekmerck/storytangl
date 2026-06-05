@@ -244,9 +244,16 @@ def disposition_penalty(
     matrix: dict[str, dict[str, int]] | None = None,
 ) -> int:
     """Penalty for choosing ``chosen`` when ``expected`` was correct, under
-    ``matrix`` (the standard matrix by default)."""
+    ``matrix`` (the standard matrix by default).
 
-    return (matrix or DISPOSITION_PENALTY)[expected.value][chosen.value]
+    A custom matrix may be *partial* -- a regime can override just the rows/cells
+    that differ from the standard (e.g. only the ``"arrest"`` row) and any missing
+    expected-row or chosen-cell falls back to the standard matrix.
+    """
+
+    m = matrix or DISPOSITION_PENALTY
+    row = m.get(expected.value, DISPOSITION_PENALTY[expected.value])
+    return row.get(chosen.value, DISPOSITION_PENALTY[expected.value][chosen.value])
 
 
 # finding_status values that represent *surfaced* evidence -- an investigation
@@ -826,23 +833,66 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game.current_stage = "packet"
         return RoundResult.CONTINUE
 
-    def _has_surfaced_evidence(self, game: CredentialsGame) -> bool:
-        """Whether the player surfaced any adverse evidence for the active case.
+    def _rejection_is_justified(self, game: CredentialsGame) -> bool:
+        """Whether a deny/arrest on the active case is backed by evidence -- either
+        surfaced by the player's investigation or self-evidently visible. Backs the
+        no_evidence_penalty toggle (only an *unjustified* correct rejection is
+        taxed), and errs toward "justified" so the tax never punishes a fair call.
+        """
 
-        Backs the no_evidence_penalty toggle: a correct rejection is "justified"
-        only if the player actually turned something up -- a revealed document or
-        packet finding, an adverse finding_status, or a logged declaration of
-        contraband that is actually present.
+        return self._has_surfaced_evidence(game) or self._has_visible_grounds(game)
+
+    def _has_surfaced_evidence(self, game: CredentialsGame) -> bool:
+        """Adverse evidence the player turned up: a revealed document/packet
+        finding, an adverse finding_status, or a logged declaration of contraband
+        actually present.
         """
 
         if game.revealed_findings or game.packet_findings:
             return True
         fs = game.finding_status
-        if any(value in _EVIDENCE_FINDINGS for value in fs.values()):
+        for key, value in fs.items():
+            if value not in _EVIDENCE_FINDINGS:
+                continue
+            # A *clean* search ("search": "cleared") turned nothing up -- it is
+            # not adverse evidence and must not suppress the tax on an unrelated
+            # unsurfaced issue.
+            if key == "search" and value == "cleared":
+                continue
             return True
         # A logged disclosure counts only when there was something to declare.
         if fs.get("disclosure") in ("declared", "too_late") and game.active_case.get_contraband():
             return True
+        return False
+
+    def _has_visible_grounds(self, game: CredentialsGame) -> bool:
+        """Self-evident grounds for a rejection -- facts visible without any
+        investigation: a credential the purpose plainly requires but the packet
+        does not hold, or openly (non-concealed) contraband that is forbidden or
+        plainly missing its permit. A concealed item is *not* self-evident, and a
+        declared declaration-only item is allowed (not grounds), so neither counts.
+        """
+
+        case = game.active_case
+        rules = game.restriction_map
+        region = case.get_region()
+
+        purpose = case.get_purpose()
+        plevel = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
+        if plevel is not RestrictionLevel.FORBIDDEN:
+            if plevel.requires_id and case.id_status() is None:
+                return True
+            if plevel.requires_permit and case.credential_for(purpose) is None:
+                return True
+
+        for item in case.get_contraband():
+            if item.concealed:
+                continue  # a hidden item's grounds are not self-evident
+            clevel = rules.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
+            if clevel is RestrictionLevel.FORBIDDEN:
+                return True  # openly forbidden goods
+            if clevel.requires_permit and case.credential_for(item.indication) is None:
+                return True  # visible item, plainly missing its permit
         return False
 
     def resolve_decision(
@@ -859,14 +909,16 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         penalty = disposition_penalty(expected, chosen, game.penalty_matrix)
 
         # The "justify your disposition" tax (opt-in, off by default): a *correct*
-        # rejection that the player never backed with surfaced evidence still
-        # costs no_evidence_penalty. A decree regime that needs no evidence leaves
+        # rejection that is backed by neither surfaced nor self-evident evidence
+        # still costs no_evidence_penalty. Keyed off ``correct`` (not penalty == 0)
+        # so a custom matrix that tolerates a non-expected call at zero cost is not
+        # mistaken for a correct one. A decree regime that needs no evidence leaves
         # the toggle at 0; a rule-of-law regime sets it to make profiling cost.
         unjustified = (
-            penalty == 0
+            correct
             and game.no_evidence_penalty > 0
             and chosen in (CredentialDisposition.DENY, CredentialDisposition.ARREST)
-            and not self._has_surfaced_evidence(game)
+            and not self._rejection_is_justified(game)
         )
         if unjustified:
             penalty += game.no_evidence_penalty
