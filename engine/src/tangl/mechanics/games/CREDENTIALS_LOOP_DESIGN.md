@@ -704,6 +704,16 @@ levels (from the restriction map for that indication):
   severity the deferred *planting* malfeasance move aims for: a discovered criminal
   good is what launders a shadow-blacklist arrest into "arrest with reason."
 
+`RestrictionLevel` is shared by purpose and contraband rules, so two corners are
+pinned for "weird but legal" authored configs: a **CRIMINAL purpose** (e.g.
+`{WORK: CRIMINAL}`) derives ARREST (the stated purpose is itself a crime; the
+purpose branch special-cases it like FORBIDDEN→DENY), and a **WITH_ID contraband**
+good is routed through `_assess_requirement` (class `"credentialed"`, = needs a
+permit and/or id) rather than treated as merely declarable, so its bearer-id check
+is not bypassed. `build_valid` keeps raising only for criminal/forbidden
+*contraband* (a caller asking to add a disallowed good); a criminal/forbidden
+*purpose* is left to derive its inherent ARREST/DENY, which the roster relies on.
+
 And **concealment is itself the violation** — concealing *any* contraband is a
 problem, independent of whether it would have been permitted. The disclosure /
 search distinction decides severity:

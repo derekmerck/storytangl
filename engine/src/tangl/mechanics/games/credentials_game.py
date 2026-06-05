@@ -353,9 +353,11 @@ def _contraband_class(level: RestrictionLevel) -> str:
         return "criminal"  # per-se crime; possession arrests, no rescue
     if level is RestrictionLevel.FORBIDDEN:
         return "forbidden"
-    if level.requires_permit:
-        return "permit_required"
-    return "declaration_only"  # allowed if declared (anonymous / id level)
+    if level.requires_permit or level.requires_id:
+        # Needs a valid permit and/or bearer id: route through _assess_requirement
+        # so the id is actually checked (a WITH_ID good is not merely declarable).
+        return "credentialed"
+    return "declaration_only"  # anonymous level: allowed once declared
 
 
 def _assess_contraband(
@@ -392,7 +394,7 @@ def _assess_contraband(
             return CredentialDisposition.PASS  # voluntarily surrendered
         if cls == "forbidden":
             return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
-        if cls == "permit_required":
+        if cls == "credentialed":
             return _assess_requirement(case, item.indication, level, fs)
         return CredentialDisposition.PASS  # declaration-only, declared -> allow
 
@@ -401,10 +403,10 @@ def _assess_contraband(
         return CredentialDisposition.ARREST  # smuggling forbidden goods
     if cls == "declaration_only":
         return CredentialDisposition.DENY  # concealed declarable goods
-    # permit-required, concealed:
+    # credentialed (permit and/or id required), concealed:
     if _assess_requirement(case, item.indication, level, fs) is CredentialDisposition.PASS:
-        return CredentialDisposition.DENY  # had a valid permit but concealed it (Q1)
-    return CredentialDisposition.ARREST  # smuggling unpermitted goods
+        return CredentialDisposition.DENY  # had a valid credential but concealed it (Q1)
+    return CredentialDisposition.ARREST  # smuggling un-credentialed goods
 
 
 def derive_disposition(
@@ -426,7 +428,11 @@ def derive_disposition(
 
     purpose = case.get_purpose()
     level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
-    if level is RestrictionLevel.FORBIDDEN:
+    if level is RestrictionLevel.CRIMINAL:
+        # The stated purpose is itself a crime (RestrictionLevel is shared by
+        # purpose and contraband rules) -- e.g. an authored {WORK: CRIMINAL} regime.
+        worst = _worse(worst, CredentialDisposition.ARREST)
+    elif level is RestrictionLevel.FORBIDDEN:
         worst = _worse(worst, CredentialDisposition.DENY)  # purpose not allowed
     else:
         worst = _worse(worst, _assess_requirement(case, purpose, level, finding_status))
@@ -888,8 +894,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         purpose = case.get_purpose()
         plevel = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
-        if plevel is RestrictionLevel.FORBIDDEN:
-            return True  # the stated purpose is itself disallowed -- self-evident
+        if plevel in (RestrictionLevel.CRIMINAL, RestrictionLevel.FORBIDDEN):
+            return True  # the stated purpose is itself criminal/disallowed -- self-evident
         if plevel.requires_id and case.id_status() is None:
             return True
         if plevel.requires_permit and case.credential_for(purpose) is None:

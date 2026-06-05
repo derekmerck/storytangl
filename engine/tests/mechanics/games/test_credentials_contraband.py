@@ -285,3 +285,43 @@ class TestCriminalSelfEvidence:
         result = game.case_results[-1]
         assert result.unjustified is False
         assert result.penalty == 0
+
+
+# RestrictionLevel is shared by purpose and contraband rules; these pin the
+# matrix corners for "weird but legal" authored configs.
+PURPOSE_CRIMINAL_RULES = Restrictions.from_map({Region.LOCAL: {IND.WORK: L.CRIMINAL}})
+# A good allowed only with a valid bearer id, under an anonymous purpose so the id
+# is not otherwise required -- isolates the contraband's own id check.
+ID_CONTRABAND_RULES = Restrictions.from_map(
+    {Region.LOCAL: {IND.TRAVEL: L.ANONYMOUS, IND.SECRETS: L.WITH_ID}}
+)
+
+
+class TestSharedRestrictionLevelEdges:
+    def test_criminal_purpose_arrests(self) -> None:
+        # The stated purpose is itself a crime -> arrest (not a fall-through PASS).
+        case = CredentialCase(
+            purpose=IND.WORK,
+            presented_documents={"passport": "An id."},
+            id_card=_id(),
+        )
+        assert derive_disposition(case, PURPOSE_CRIMINAL_RULES) is D.ARREST
+
+    def test_with_id_contraband_does_not_bypass_the_id_check(self) -> None:
+        # A WITH_ID good is not merely declarable: a declared one with no id denies.
+        no_id = CredentialCase(
+            purpose=IND.TRAVEL,
+            presented_documents={"passport": "(none)"},
+            id_card=None,
+            possessions=[ContrabandItem(indication=IND.SECRETS)],
+        )
+        assert derive_disposition(no_id, ID_CONTRABAND_RULES) is D.DENY
+
+    def test_with_id_contraband_allows_with_a_valid_id(self) -> None:
+        with_id = CredentialCase(
+            purpose=IND.TRAVEL,
+            presented_documents={"passport": "An id."},
+            id_card=_id(),
+            possessions=[ContrabandItem(indication=IND.SECRETS)],
+        )
+        assert derive_disposition(with_id, ID_CONTRABAND_RULES) is D.PASS
