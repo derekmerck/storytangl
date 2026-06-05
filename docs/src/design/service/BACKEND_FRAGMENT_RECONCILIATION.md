@@ -83,10 +83,11 @@ The same pattern applies to `ProjectedState`: service methods own the typed
 section/value model, REST serializes it, and remote Python clients decode it
 back into typed projected-state values.
 
-The REST layer still performs JSON serialization manually because it owns HTTP
-transport concerns such as media profiles and optional markdown-to-HTML
-conversion. That is acceptable as long as the serializer remains a transcription
-boundary and keeps service semantics intact.
+The REST layer starts from `RuntimeEnvelope.to_dto()` and keeps any remaining
+manual shaping limited to HTTP-adjacent concerns: media profiles, optional
+markdown-to-HTML conversion, and harmless compatibility aliases such as
+`choice.label`. That is acceptable as long as the serializer remains a
+transcription boundary and keeps service semantics intact.
 
 ## Diagnostic Fixtures And Transcripts
 

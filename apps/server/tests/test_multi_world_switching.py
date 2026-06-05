@@ -274,7 +274,8 @@ def test_multi_world_switching_flow(
     assert isinstance(step_before, int)
 
     first_choice_frag = choices_one[0]
-    first_choice = first_choice_frag.get("uid") or first_choice_frag.get("source_id")
+    first_choice = first_choice_frag.get("edge_id")
+    assert isinstance(first_choice, str)
     choose_resp = client.post("story/do", json={"edge_id": first_choice}, headers=headers)
     assert choose_resp.status_code == 200
     choice_step = choose_resp.json()["step"]
@@ -324,7 +325,8 @@ def test_multi_world_switching_flow(
     third_choices = extract_choices_from_fragments(fragments_three)
     assert len(third_choices) == 1
 
-    continue_choice = third_choices[0].get("uid") or third_choices[0].get("source_id")
+    continue_choice = third_choices[0].get("edge_id")
+    assert isinstance(continue_choice, str)
     continue_resp = client.post("story/do", json={"edge_id": continue_choice}, headers=headers)
     assert continue_resp.status_code == 200
 

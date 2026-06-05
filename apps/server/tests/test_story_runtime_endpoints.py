@@ -377,6 +377,8 @@ def test_story_update_preserves_choice_fragment_uid_and_edge_id(
     assert isinstance(choice.get("edge_id"), str)
     assert choice["uid"] != choice["edge_id"]
     assert choice["label"] == "Continue"
+    assert "seq" not in choice
+    assert "step" not in choice
 
     resolved = client.post(
         "story/do",
