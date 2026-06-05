@@ -2,7 +2,7 @@ Media Subsystem Design
 ======================
 
 **Last Updated:** March 2026  
-**Status:** ⚠️ PARTIALLY IMPLEMENTED media architecture for v3.7+; static flow, inline sync generation, and server-side async lifecycle are landed, while concrete worker backends and richer authoring remain in progress
+**Status:** ⚠️ PARTIALLY IMPLEMENTED media architecture for v3.8+; static flow, inline sync generation, and server-side async lifecycle are landed, while concrete worker backends and richer authoring remain in progress
 **Location:** `engine/src/tangl/media/` and `engine/src/tangl/journal/media/`
 
 > Package-level architecture now lives in `engine/src/tangl/media/MEDIA_DESIGN.md`.
@@ -1386,7 +1386,7 @@ def test_block_emits_media_fragment():
 
 ### Design Documents
 
-- This document (authoritative for v3.7 media integration)
+- This document (authoritative for v3.8 media integration)
 - `PLANNING_PROVISIONING_DESIGN_v37.md` (provisioning patterns)
 - `SERVICE_LAYER_DESIGN_v37.md` (orchestrator and controller patterns)
 - `engine/src/tangl/media/notes.md` (original vocabulary)
