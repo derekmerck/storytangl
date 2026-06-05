@@ -58,10 +58,17 @@ CONTRABAND = frozenset({Indication.WEAPON, Indication.DRUGS, Indication.SECRETS}
 class RestrictionLevel(Enum):
     """How permissive the rule is for an indication, most to least restrictive.
 
-    ``forbidden -> with_permit (req id) -> with_id -> anonymous``. A day's
-    authored rule change is a delta along this axis for some indication.
+    ``criminal -> forbidden -> with_permit (req id) -> with_id -> anonymous``. A
+    day's authored rule change is a delta along this axis for some indication.
+
+    ``criminal`` and ``forbidden`` differ for *contraband*: a forbidden good can
+    be relinquished (declared -> deny, surrender -> pass), but a criminal good is
+    a per-se crime -- mere possession arrests, and neither declaring nor
+    surrendering it rescues. Which goods are criminal is per rule set: a
+    permissive regime simply maps the same good down to a lower level.
     """
 
+    CRIMINAL = "criminal"          # possession is itself a crime; always arrest
     FORBIDDEN = "forbidden"        # never; no valid credential exists
     WITH_PERMIT = "with_permit"    # requires a permit (which itself requires id)
     WITH_ID = "with_id"            # requires a valid bearer id

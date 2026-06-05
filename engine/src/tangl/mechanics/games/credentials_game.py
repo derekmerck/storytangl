@@ -349,6 +349,8 @@ def _assess_requirement(
 def _contraband_class(level: RestrictionLevel) -> str:
     """Classify a contraband indication's rule (Phase B.2)."""
 
+    if level is RestrictionLevel.CRIMINAL:
+        return "criminal"  # per-se crime; possession arrests, no rescue
     if level is RestrictionLevel.FORBIDDEN:
         return "forbidden"
     if level.requires_permit:
@@ -372,6 +374,13 @@ def _assess_contraband(
 
     fs = finding_status or {}
     cls = _contraband_class(level)
+    if cls == "criminal":
+        # Per-se crime: mere possession is the offense. Declaring or surrendering
+        # it does not rescue (you cannot relinquish your way out of trafficking).
+        # A permissive regime that tolerates the good simply maps it below
+        # CRIMINAL. (A privileged-origin whitelist exemption is a Phase C overlay
+        # applied above derive_disposition, not here.)
+        return CredentialDisposition.ARREST
     # disclosure declares all concealed goods; a bare un-concealed item is
     # already declared. The contraband's permit (when one is required) lives in
     # the packet keyed by indication, so its standing is assessed by
@@ -890,8 +899,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             if item.concealed:
                 continue  # a hidden item's grounds are not self-evident
             clevel = rules.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
-            if clevel is RestrictionLevel.FORBIDDEN:
-                return True  # openly forbidden goods
+            if clevel in (RestrictionLevel.CRIMINAL, RestrictionLevel.FORBIDDEN):
+                return True  # openly criminal / forbidden goods
             if clevel.requires_permit and case.credential_for(item.indication) is None:
                 return True  # visible item, plainly missing its permit
         return False
