@@ -148,10 +148,6 @@ def _normalize_choice_labels_in_fragments(fragments: list[dict[str, Any]]) -> li
 
     def _normalize_choice_data(choice: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(choice)
-        if normalized.get("edge_id"):
-            normalized["uid"] = normalized["edge_id"]
-        if normalized.get("source_id") and "uid" not in normalized:
-            normalized["uid"] = normalized["source_id"]
         if normalized.get("source_label") and not normalized.get("label"):
             normalized["label"] = normalized["source_label"]
         if normalized.get("text") and not normalized.get("label"):

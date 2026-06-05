@@ -152,6 +152,15 @@ def _session_value(payload: dict[str, object], key: str) -> object | None:
     return None
 
 
+def _first_choice_fragment(payload: dict[str, object]) -> dict[str, object]:
+    fragments = payload.get("fragments")
+    assert isinstance(fragments, list)
+    for fragment in fragments:
+        if isinstance(fragment, dict) and fragment.get("fragment_type") == "choice":
+            return fragment
+    raise AssertionError(f"No choice fragment found in {fragments}")
+
+
 @pytest.fixture()
 def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str], str]:
     world_label = _write_story_bundle(tmp_path)
@@ -298,6 +307,35 @@ def test_story_rest_envelope_flow(
     dropped = drop.json()
     assert dropped.get("status") == "ok"
     assert dropped.get("dropped_ledger_id")
+
+
+def test_story_update_preserves_choice_fragment_uid_and_edge_id(
+    story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, headers, world_label = story_client
+
+    create = client.post(
+        "story/story/create",
+        params={"world_id": world_label, "init_mode": "EAGER"},
+        headers=headers,
+    )
+    assert create.status_code == 200
+
+    update = client.get("story/update", headers=headers)
+    assert update.status_code == 200
+    choice = _first_choice_fragment(update.json())
+
+    assert isinstance(choice.get("uid"), str)
+    assert isinstance(choice.get("edge_id"), str)
+    assert choice["uid"] != choice["edge_id"]
+    assert choice["label"] == "Continue"
+
+    resolved = client.post(
+        "story/do",
+        json={"edge_id": choice["edge_id"]},
+        headers=headers,
+    )
+    assert resolved.status_code == 200
 
 
 def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(

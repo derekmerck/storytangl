@@ -7,6 +7,7 @@ from uuid import UUID
 import pytest
 
 from tangl.core import BaseFragment, Selector
+from tangl.journal.fragments import BlockFragment, ChoiceFragment, ContentFragment
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service.response import ProjectedState, RuntimeEnvelope, RuntimeInfo, UserInfo, WorldInfo
 from tangl.service.service_manager import ServiceManager
@@ -147,6 +148,41 @@ def test_story_methods_return_typed_runtime_payloads(
 
     projected = manager.get_story_info(user_id=user.uid)
     assert isinstance(projected, ProjectedState)
+
+
+def test_story_envelope_keeps_fragments_independent_from_actions(
+    manager: ServiceManager,
+    persistence,
+    user: User,
+) -> None:
+    world = World.from_script_data(script_data=_story_script())
+    created = manager.create_story(
+        user_id=user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc_manager_story_fragments",
+    )
+
+    assert isinstance(created, RuntimeEnvelope)
+    assert not any(isinstance(fragment, BlockFragment) for fragment in created.fragments)
+    assert any(isinstance(fragment, ContentFragment) for fragment in created.fragments)
+
+    ledger = persistence[user.current_ledger_id]
+    assert isinstance(ledger, Ledger)
+    edge = _first_choice_edge(ledger)
+    choice = next(fragment for fragment in created.fragments if isinstance(fragment, ChoiceFragment))
+
+    assert choice.uid != edge.uid
+    assert choice.edge_id == edge.uid
+    assert choice.text == "Continue"
+    assert choice.available is True
+
+    payload = choice.model_dump(mode="json", by_alias=True, exclude_none=True)
+    assert payload["fragment_type"] == "choice"
+    assert payload["uid"] == str(choice.uid)
+    assert payload["edge_id"] == str(edge.uid)
+    assert payload["uid"] != payload["edge_id"]
 
 
 def test_create_story_passes_user_namespace_to_world_override(
