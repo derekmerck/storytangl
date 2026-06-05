@@ -742,6 +742,93 @@ flavor.
 
 ---
 
+## Phase B.3: declines, bluffing, and ambiguity
+
+B.1/B.2 assume **compliance** — the candidate truthfully declares, produces, and
+yields when asked. B.3 adds the **declines axis** and, with it, genuine
+*ambiguity*:
+
+- A candidate may **lie** when asked to declare, **refuse** a search, or **refuse
+  to produce** a document.
+- **Bluffing:** a smuggler with no permit (where a permit is even possible) tries
+  to talk their way in and *declines the search*. The player can deny (safe), or
+  arrest (right *if* guilty), or press.
+- **Crucially, you also need innocents who decline** — someone who refuses a
+  search on principle, or refuses to produce a permit they feel they shouldn't
+  need. Declining is a *signal correlated with* guilt, not proof of it.
+
+This breaks the single-answer assumption (see below): a declined search has no
+one correct disposition. Deny is always *safe*; arresting a decliner is right
+only if they were actually guilty, and a **fail if they were innocent**.
+
+**Authored beat — the abandoned forgery.** A candidate departs and leaves behind
+an unnecessary illegal id/permit. The player can offer to return it — or inspect
+it, find it forged, *offer to return it* as a lure, and arrest the holder when
+they come back for it. A scripted multi-step encounter (departure → left item →
+inspect → set trap → return → arrest), which is **continuity-thread** content
+(recurring candidate + delayed consequence), not core derive.
+
+---
+
+## Engine review: expressiveness gaps & refinements (2026-06-04)
+
+The matrix captures the **document-validity logic** completely and correctly — it
+is, if anything, more rigorous than Papers Please's per-person scripting. What it
+does not yet model is the **pressure and ambiguity** that turn a correct
+rule-checker into a *game*. Two genuine engine-level additions (the rest is
+content/already-planned):
+
+### 1. Attention / time budget — the missing tension (high value)
+
+Mediation is currently **free**, so the dominant strategy is "run every probe on
+everyone" — which collapses the very judgment the disclosure discipline was
+protecting (you can't read the answer off the menu, but you *can* brute-force
+it). Papers Please's core tension is **scarcity**: you can't scrutinize everyone,
+so you triage on suspicion. A per-candidate or per-shift **budget** (inspection
+points / time) gives each inspect/mediate a cost and forces "who is worth a closer
+look?" This is the single highest-leverage addition; it is also what makes the
+already-built disclosure discipline *matter*, and what makes the concealed-
+contraband god's-eye rule *play* correctly (you deny the suspicious and sometimes
+miss, because you couldn't search everyone).
+
+### 2. Two-error / acceptable-set scoring (needed for B.3)
+
+`expected_disposition` returns a **single** answer, but the bluff/decline cases
+have a *band*: for a guilty bluffer, deny *and* arrest are acceptable; for an
+indignant innocent, deny is acceptable but arrest is a **fail**. Single-answer
+scoring cannot express this. The fix is to score on the **two independent error
+types** Papers Please actually penalizes:
+
+- **false admit** — let through someone who should have been kept out (the
+  serious error), and
+- **false reject** — deny/arrest someone who was admissible (the other error).
+
+`expected_disposition` becomes an *admissibility* judgment (a set / severity band
+of acceptable calls), and scoring checks the chosen call against both error axes.
+This is more PP-faithful and is the prerequisite for B.3's ambiguity to be
+playable. Moderate refactor of `expected_disposition` + the decision scorer;
+`finding_status` and the derive logic feed it unchanged.
+
+### Smaller / done / deferred
+
+- **Forged document is always a crime** *(done, B.2)* — presenting a fake id/permit
+  arrests on its own, regardless of whether it was required.
+- **Cite-the-finding justification** *(optional rigor)* — "you may have to justify
+  your disposition": require a disposition to be backed by a revealed finding
+  (arrest ⇐ a confirmed crime finding; deny ⇐ a deny finding). Uses findings we
+  already track; pairs naturally with the budget. A per-world toggle.
+- **Behavioral demeanor** *(defer; content-heavy)* — nervousness/pleading/bluffing
+  as a readable signal beyond the documents. The psychological dimension; its own
+  layer.
+
+### What to keep unchanged
+
+The matrix core, most-severe-wins composition, the disclosure discipline, and
+`finding_status` as the mediation surface are all sound — the additions read from
+them, they don't replace them.
+
+---
+
 ## Phase D: media (deferred)
 
 The media layer is specced in `credential_forge/credforge.py`,
