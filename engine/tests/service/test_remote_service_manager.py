@@ -296,6 +296,55 @@ class TestRemoteResponseHydration:
             "render_profile": "raw",
         }
 
+    def test_story_update_decodes_choice_payload_contracts(self) -> None:
+        user_id = uuid4()
+        payload = {
+            "cursor_id": str(uuid4()),
+            "step": 3,
+            "fragments": [
+                {
+                    "fragment_type": "choice",
+                    "edge_id": str(uuid4()),
+                    "text": "Buy rations",
+                    "available": True,
+                    "accepts": {
+                        "kind": "quantity",
+                        "required": True,
+                        "min": 1,
+                        "max": 3,
+                        "step": 1,
+                        "unit": "ration",
+                        "cost_previews": [],
+                    },
+                    "ui_hints": {
+                        "hotkey": "b",
+                        "source_kind": "market",
+                        "contribution": "purchase",
+                        "cost_previews": [],
+                    },
+                }
+            ],
+            "metadata": {},
+        }
+        session = RecordingSession([StubResponse(200, payload)])
+        manager = RemoteServiceManager(
+            "https://example.test/api/v2",
+            api_key="bound-key",
+            session=session,
+        )
+        manager._bound_user_id = user_id
+
+        envelope = manager.get_story_update(user_id=user_id)
+
+        choice = envelope.fragments[0]
+        assert isinstance(choice, ChoiceFragment)
+        assert choice.accepts is not None
+        assert choice.accepts.kind == "quantity"
+        assert choice.accepts.unit == "ration"
+        assert choice.ui_hints is not None
+        assert choice.ui_hints.hotkey == "b"
+        assert choice.ui_hints.source_kind == "market"
+
     def test_unknown_fragment_payloads_survive_remote_decode(self) -> None:
         user_id = uuid4()
         payload = {

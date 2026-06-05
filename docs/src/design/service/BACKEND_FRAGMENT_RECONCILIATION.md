@@ -74,6 +74,8 @@ path through service envelopes and REST JSON. These are UI-facing intent
 contracts, even when the engine's internal vocabulary also uses fields named
 `kind`; any future service adapter that maps UI intent onto engine mechanics
 should be explicit and narrow rather than handled by the REST serializer.
+Remote Python clients rehydrate those REST payloads into the same typed fragment
+models used by in-process clients.
 
 The REST layer still performs JSON serialization manually because it owns HTTP
 transport concerns such as media profiles and optional markdown-to-HTML
