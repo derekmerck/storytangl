@@ -117,6 +117,7 @@ from .credentials_game import (
     CredentialsMove,
     derive_disposition,
     disposition_penalty,
+    default_penalty_matrix,
     DISPOSITION_PENALTY,
     move_time_cost,
 )
@@ -192,6 +193,7 @@ __all__ = [
     "CredentialCaseResult",
     "derive_disposition",
     "disposition_penalty",
+    "default_penalty_matrix",
     "DISPOSITION_PENALTY",
     "move_time_cost",
     "ContrabandItem",

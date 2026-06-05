@@ -3,7 +3,9 @@
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
 (A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
 lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
-2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); Phases
+2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); penalty-matrix
+scorer + soft time budget + per-rule-set scoring config (configurable
+`penalty_matrix`, `no_evidence_penalty` toggle) LANDED 2026-06-05; Phases
 B.3 (declines axis)/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
@@ -814,7 +816,7 @@ shift *ends* when time runs out, leaving the queue unprocessed) is a possible
 later mode; the soft overtime model was chosen for v1 because it bolts directly
 onto the penalty accumulation with no early-termination machinery.
 
-### 2. Graduated penalty scoring with a failure threshold (resolved 2026-06-04)
+### 2. Graduated penalty scoring with a failure threshold (LANDED 2026-06-05)
 
 Keep the **single** `expected_disposition` (there is always one correct call).
 Replace the binary correct/incorrect score with a **penalty matrix** over the
@@ -836,16 +838,59 @@ caps the downside at 2 whether they turn out innocent (should-allow) or guilty
 matrix without any acceptable-set machinery. (The earlier "two-error /
 acceptable-set" sketch is superseded by this.)
 
-**+1 for right-but-unjustified.** Add a small penalty when the call is correct
-but unsupported by a revealed finding — guessing right is fine but taxed, so
-gathering evidence (which costs budget, §1) is rewarded without being mandatory.
-Justification includes **behavioral** evidence, not just documents: "the smuggler
-tried to bribe his way out of a search" justifies an arrest.
+**+1 for right-but-unjustified — a toggle (`no_evidence_penalty`, LANDED).** When
+> 0, a *correct* deny/arrest that the player never backed with surfaced evidence
+costs that much: guessing right is fine but taxed, so gathering evidence (which
+costs budget, §1) is rewarded without being mandatory. It is **off by default**
+because it is regime-specific — a rule-of-law gate turns it on; an arrest-by-decree
+regime (§3) must leave it off, since arresting without evidence is the *norm*
+there. "Surfaced evidence" (`_has_surfaced_evidence`) = a revealed document/packet
+finding, an adverse `finding_status` (`confirmed`/`cleared`/`yielded`), or a logged
+declaration of contraband actually present. Justification will also include
+**behavioral** evidence once B.3 lands ("the smuggler tried to bribe his way out of
+a search" → grounds for arrest); `_EVIDENCE_FINDINGS` is the seam for that.
 
-`derive_disposition` is unchanged; this is a refactor of the **decision scorer**
+`derive_disposition` is unchanged; this was a refactor of the **decision scorer**
 (penalty lookup + accumulation + the evidence check) and the shift terminal
 condition (penalty-threshold instead of correct-count). `CredentialCaseResult`
-records the per-case penalty.
+records the per-case `penalty` and an `unjustified` flag.
+
+### 3. Per-rule-set scoring + adversarial mediation (LANDED scoring 2026-06-05; degrade-events deferred)
+
+Scoring is **per rule set**, not a global constant. The penalty matrix is a
+per-game field (`penalty_matrix`, string-keyed by disposition value so it stays
+JSON-safe), defaulting to the standard rule-of-law matrix above. A world overrides
+it to score a different regime. The motivating example — **"arrest everyone, any
+non-arrest is a failure"** — is just a matrix where a non-arrest is a hard failure
+rather than a mild hedge:
+
+```text
+should arrest = { allow: 5, deny: 5, arrest: 0 }   # decree: only arrest is clean
+```
+
+There are **two independent ways to express such a regime**, and they compose:
+
+- **Decree via matrix** — set `expected_disposition` (or the matrix) so ARREST is
+  the only zero-penalty call even on *clean* packets. You arrest the innocent; the
+  regime, not the packet, defines correct. Leave `no_evidence_penalty` at 0.
+- **Manufactured grounds via generation** — author the shift with a skewed
+  `disposition_distribution` (e.g. `{ARREST: 1.0}`); `generate_roster`/`make_offer`
+  degrade every packet (FORGED / WRONG_HOLDER / CONCEALED, etc.) until it *derives*
+  to ARREST. The arrest is then "justified" by a real (planted) violation. This is
+  the existing factory machinery — "build legal, then degrade by target
+  disposition" — pointed at a uniform target.
+
+**Adversarial / packet-degrading mediations (deferred).** The B.1/B.2 mediations
+are *clearing* (favorable: request_document, relinquish, disclosure). Their mirror
+image is a **degrade** transform that worsens the packet during play — lose a
+packet piece, smear a date to invalid, strip a seal — the corrupt-gatekeeper move
+that manufactures grounds *in the moment* rather than at generation. The transforms
+themselves already exist as `FailureMode`s (`MISSING_PERMIT` = lose a piece,
+`EXPIRED_ID`/`BAD_DATE` = invalidate a date); what is deferred is a **live event /
+move** that applies one mid-case and re-derives. Model it as the adversarial
+counterpart of `finding_status` (a `case_mutations` overlay so `advance_case` still
+resets cleanly and the underlying authored packet is untouched), gated behind a
+regime flag so only a corruption-flavored skin exposes it.
 
 ### Generation: presentation vs. truth (confirmed)
 
