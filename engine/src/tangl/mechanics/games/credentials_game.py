@@ -173,6 +173,7 @@ class CredentialCaseResult(BaseModelPlus):
     chosen_disposition: CredentialDisposition
     expected_disposition: CredentialDisposition
     correct: bool
+    penalty: int = 0
     discovered_findings: dict[str, str] = Field(default_factory=dict)
     packet_findings: dict[str, str] = Field(default_factory=dict)
 
@@ -206,6 +207,31 @@ _DISPOSITION_SEVERITY: dict[CredentialDisposition, int] = {
 
 def _worse(a: CredentialDisposition, b: CredentialDisposition) -> CredentialDisposition:
     return a if _DISPOSITION_SEVERITY[a] >= _DISPOSITION_SEVERITY[b] else b
+
+
+# Graduated scoring: the cost of the chosen call given the correct one, over the
+# ordered allow -> deny -> arrest axis. One step off costs 2; two steps off
+# (allow <-> arrest) costs 5; correct costs 0. Arrest-when-wrong is always the
+# heavy 5, so the heavy hammer is appropriately high-stakes and deny is the
+# low-variance hedge for ambiguous calls. Penalties accumulate to a per-shift
+# failure threshold (the Papers Please citation model).
+# (The "+1 right-but-unjustified" evidence tax lands with the justification model
+# in B.3, where behavioral evidence -- a declined search, a bribe attempt --
+# also counts as justification.)
+_D = CredentialDisposition
+DISPOSITION_PENALTY: dict[CredentialDisposition, dict[CredentialDisposition, int]] = {
+    _D.PASS: {_D.PASS: 0, _D.DENY: 2, _D.ARREST: 5},
+    _D.DENY: {_D.PASS: 2, _D.DENY: 0, _D.ARREST: 5},
+    _D.ARREST: {_D.PASS: 5, _D.DENY: 2, _D.ARREST: 0},
+}
+
+
+def disposition_penalty(
+    expected: CredentialDisposition, chosen: CredentialDisposition
+) -> int:
+    """Penalty for choosing ``chosen`` when ``expected`` was correct."""
+
+    return DISPOSITION_PENALTY[expected][chosen]
 
 
 def _assess_credential(
@@ -368,8 +394,10 @@ class CredentialsGame(PickingGame):
         ]
     )
     allow_arrest: bool = True
-    # ``None`` means "every candidate must be correct" (the strict default).
-    pass_threshold: int | None = None
+    # The shift is lost when accumulated decision penalty exceeds this. 0 is the
+    # strict default (any wrong call ends the shift); a world raises it to make a
+    # more forgiving day. See DISPOSITION_PENALTY.
+    penalty_threshold: int = 0
     # The day's rules. Cases derive their disposition against this unless they
     # carry an authored ``correct_disposition`` override.
     restriction_map: Restrictions = Field(
@@ -477,10 +505,10 @@ class CredentialsGame(PickingGame):
         return sum(1 for result in self.case_results if result.correct)
 
     @property
-    def required_correct(self) -> int:
-        if self.pass_threshold is not None:
-            return self.pass_threshold
-        return self._total_cases()
+    def total_penalty(self) -> int:
+        """Accumulated decision penalty across the shift so far."""
+
+        return sum(result.penalty for result in self.case_results)
 
     # ----- picking-kernel surface (reads the active case) -------------------
     def get_visible_items(self) -> list[str]:
@@ -571,6 +599,8 @@ class CredentialsGame(PickingGame):
                 "credential_roster_size": self._total_cases(),
                 "credential_cases_remaining": self._total_cases() - len(self.case_results),
                 "credential_correct_count": self.correct_count,
+                "credential_total_penalty": self.total_penalty,
+                "credential_penalty_threshold": self.penalty_threshold,
                 "credential_shift_score": dict(self.score),
                 "credential_shift_complete": self.shift_complete,
             }
@@ -702,6 +732,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         chosen = CredentialDisposition(target)
         expected = game.expected_disposition(case)
         correct = chosen == expected
+        penalty = disposition_penalty(expected, chosen)
 
         game.case_results.append(
             CredentialCaseResult(
@@ -709,6 +740,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 chosen_disposition=chosen,
                 expected_disposition=expected,
                 correct=correct,
+                penalty=penalty,
                 discovered_findings=dict(game.revealed_findings),
                 packet_findings=dict(game.packet_findings),
             )
@@ -716,6 +748,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         detail["candidate"] = case.candidate_name
         detail["credential_stage"] = game.current_stage
+        detail["penalty"] = penalty
         if correct:
             game.score["player"] = game.score.get("player", 0) + 1
             detail["outcome"] = "correct_disposition"
@@ -846,11 +879,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     # ----- lifecycle / projection ------------------------------------------
 
     def evaluate(self, game: CredentialsGame) -> GameResult:
-        """Own shift terminality: in process until the final candidate is decided."""
+        """Own shift terminality: in process until the final candidate is decided,
+        then win if accumulated penalty stayed within the threshold."""
 
         if not game.shift_complete:
             return GameResult.IN_PROCESS
-        if game.correct_count >= game.required_correct:
+        if game.total_penalty <= game.penalty_threshold:
             return GameResult.WIN
         return GameResult.LOSE
 
