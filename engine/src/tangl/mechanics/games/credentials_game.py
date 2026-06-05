@@ -879,11 +879,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         purpose = case.get_purpose()
         plevel = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
-        if plevel is not RestrictionLevel.FORBIDDEN:
-            if plevel.requires_id and case.id_status() is None:
-                return True
-            if plevel.requires_permit and case.credential_for(purpose) is None:
-                return True
+        if plevel is RestrictionLevel.FORBIDDEN:
+            return True  # the stated purpose is itself disallowed -- self-evident
+        if plevel.requires_id and case.id_status() is None:
+            return True
+        if plevel.requires_permit and case.credential_for(purpose) is None:
+            return True
 
         for item in case.get_contraband():
             if item.concealed:

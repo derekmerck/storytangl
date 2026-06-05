@@ -37,6 +37,7 @@ RULES = Restrictions.from_map(
             IND.TRAVEL: L.WITH_ID,
             IND.WEAPON: L.WITH_PERMIT,
             IND.DRUGS: L.FORBIDDEN,
+            IND.WORK: L.FORBIDDEN,  # the purpose itself is disallowed today
         }
     }
 )
@@ -76,6 +77,18 @@ def _missing_id_case(name: str = "Cleo") -> CredentialCase:
         purpose=IND.TRAVEL,
         presented_documents={"passport": "(none presented)"},
         id_card=None,
+        packet=[],
+    )
+
+
+def _forbidden_purpose_case(name: str = "Eve") -> CredentialCase:
+    # Valid id, but the stated purpose (WORK) is forbidden today -> expected DENY;
+    # the purpose itself is the visible ground, nothing to inspect.
+    return CredentialCase(
+        candidate_name=name,
+        purpose=IND.WORK,
+        presented_documents={"passport": "An id."},
+        id_card=_id(),
         packet=[],
     )
 
@@ -265,6 +278,16 @@ class TestEvidenceTaxEdgeCases:
         # No id presented for a WITH_ID purpose: the absence is visible, so a deny
         # is justified without any inspection -- not taxed.
         game, handler = _game([_missing_id_case()], no_evidence_penalty=1)
+        _decide(handler, game, "deny")
+        result = game.case_results[-1]
+        assert result.correct is True
+        assert result.unjustified is False
+        assert result.penalty == 0
+
+    def test_forbidden_purpose_is_self_evident(self) -> None:
+        # The stated purpose is disallowed today; denying needs no inspection.
+        game, handler = _game([_forbidden_purpose_case()], no_evidence_penalty=1)
+        assert game.expected_disposition(game.active_case) is D.DENY
         _decide(handler, game, "deny")
         result = game.case_results[-1]
         assert result.correct is True
