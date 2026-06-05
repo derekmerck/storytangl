@@ -234,6 +234,35 @@ def disposition_penalty(
     return DISPOSITION_PENALTY[expected][chosen]
 
 
+# Time cost of each action, in shift-budget units. Cheap probes (a glance at a
+# document, a date/seal check) cost 1; verifying an id or requesting a reissue
+# costs 2; a search is expensive at 3. Decisions cost too: passing or denying is
+# quick, but an arrest takes longer (escort/paperwork) -- which also reinforces
+# the penalty matrix's "don't reach for arrest idly". Costs are fixed defaults
+# for now; the per-shift time_budget is the tuning knob.
+_MOVE_TIME_COST: dict[str, int] = {
+    "inspect": 1,
+    "request_document": 2,
+    "verify_id": 2,
+    "request_search": 3,
+    "request_disclosure": 1,
+    "request_relinquish": 1,
+}
+_DECISION_TIME_COST: dict[CredentialDisposition, int] = {
+    CredentialDisposition.PASS: 1,
+    CredentialDisposition.DENY: 1,
+    CredentialDisposition.ARREST: 3,
+}
+
+
+def move_time_cost(move: PickingMove) -> int:
+    """Time cost of one move (see ``_MOVE_TIME_COST`` / ``_DECISION_TIME_COST``)."""
+
+    if move.kind == "decide":
+        return _DECISION_TIME_COST.get(CredentialDisposition(move.target), 1)
+    return _MOVE_TIME_COST.get(move.kind, 1)
+
+
 def _assess_credential(
     token: CredentialToken | None,
     finding_status: dict[str, str] | None = None,
@@ -394,10 +423,16 @@ class CredentialsGame(PickingGame):
         ]
     )
     allow_arrest: bool = True
-    # The shift is lost when accumulated decision penalty exceeds this. 0 is the
-    # strict default (any wrong call ends the shift); a world raises it to make a
-    # more forgiving day. See DISPOSITION_PENALTY.
+    # The shift is lost when accumulated penalty exceeds this. 0 is the strict
+    # default (any wrong call ends the shift); a world raises it for a more
+    # forgiving day. Penalty = decision penalties (DISPOSITION_PENALTY) + overtime.
     penalty_threshold: int = 0
+    # Soft attention/time budget. None disables time pressure (the default).
+    # When set, every probe and decision costs time (see _MOVE_TIME_COST); time
+    # spent over the budget converts to penalty at overtime_penalty_rate. Going
+    # thorough costs time; going fast risks wrong calls.
+    time_budget: int | None = None
+    overtime_penalty_rate: int = 1
     # The day's rules. Cases derive their disposition against this unless they
     # carry an authored ``correct_disposition`` override.
     restriction_map: Restrictions = Field(
@@ -426,6 +461,12 @@ class CredentialsGame(PickingGame):
     )
     shift_complete: bool = Field(
         default=False,
+        json_schema_extra={"reset_field": True},
+    )
+    # Shift-level time spent on probes and decisions (not per-case; reset only on
+    # setup). Compared against time_budget for the overtime penalty.
+    time_spent: int = Field(
+        default=0,
         json_schema_extra={"reset_field": True},
     )
     # Mediation outcomes for the active case (Phase B.1): keys are an
@@ -505,10 +546,29 @@ class CredentialsGame(PickingGame):
         return sum(1 for result in self.case_results if result.correct)
 
     @property
-    def total_penalty(self) -> int:
-        """Accumulated decision penalty across the shift so far."""
+    def decision_penalty(self) -> int:
+        """Accumulated per-case decision penalty across the shift so far."""
 
         return sum(result.penalty for result in self.case_results)
+
+    @property
+    def overtime(self) -> int:
+        """Time spent over the budget (0 when no budget is set)."""
+
+        if self.time_budget is None:
+            return 0
+        return max(0, self.time_spent - self.time_budget)
+
+    @property
+    def overtime_penalty(self) -> int:
+        return self.overtime * self.overtime_penalty_rate
+
+    @property
+    def total_penalty(self) -> int:
+        """Decision penalties plus the overtime penalty, against which the
+        shift's failure threshold is judged."""
+
+        return self.decision_penalty + self.overtime_penalty
 
     # ----- picking-kernel surface (reads the active case) -------------------
     def get_visible_items(self) -> list[str]:
@@ -600,7 +660,11 @@ class CredentialsGame(PickingGame):
                 "credential_cases_remaining": self._total_cases() - len(self.case_results),
                 "credential_correct_count": self.correct_count,
                 "credential_total_penalty": self.total_penalty,
+                "credential_decision_penalty": self.decision_penalty,
                 "credential_penalty_threshold": self.penalty_threshold,
+                "credential_time_budget": self.time_budget,
+                "credential_time_spent": self.time_spent,
+                "credential_overtime": self.overtime,
                 "credential_shift_score": dict(self.score),
                 "credential_shift_complete": self.shift_complete,
             }
@@ -612,6 +676,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     """Handler for an inspect-and-dispose checkpoint shift."""
 
     game_cls: ClassVar[type[Game]] = CredentialsGame
+
+    def resolve_round(self, game, player_move, opponent_move):
+        # Charge the move's time cost to the shift budget before resolving it.
+        # Soft budget: actions are never blocked; overtime converts to penalty.
+        game.time_spent += move_time_cost(self._normalize_move(player_move))
+        return super().resolve_round(game, player_move, opponent_move)
 
     def get_available_moves(self, game: CredentialsGame) -> list[CredentialsMove]:
         """Inspect + decide + (Phase B.1) mediation moves.

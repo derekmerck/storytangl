@@ -781,18 +781,38 @@ does not yet model is the **pressure and ambiguity** that turn a correct
 rule-checker into a *game*. Two genuine engine-level additions (the rest is
 content/already-planned):
 
-### 1. Attention / time budget — the missing tension (high value)
+### 1. Attention / time budget — the missing tension (LANDED 2026-06-05)
 
-Mediation is currently **free**, so the dominant strategy is "run every probe on
-everyone" — which collapses the very judgment the disclosure discipline was
+Mediation was **free**, so the dominant strategy was "run every probe on
+everyone" — which collapsed the very judgment the disclosure discipline was
 protecting (you can't read the answer off the menu, but you *can* brute-force
 it). Papers Please's core tension is **scarcity**: you can't scrutinize everyone,
-so you triage on suspicion. A per-candidate or per-shift **budget** (inspection
-points / time) gives each inspect/mediate a cost and forces "who is worth a closer
-look?" This is the single highest-leverage addition; it is also what makes the
-already-built disclosure discipline *matter*, and what makes the concealed-
-contraband god's-eye rule *play* correctly (you deny the suspicious and sometimes
-miss, because you couldn't search everyone).
+so you triage on suspicion.
+
+**Shipped model — a soft per-shift time budget.** `CredentialsGame.time_budget`
+(None disables time pressure, the default). Every probe and decision costs time
+(`_MOVE_TIME_COST` / `_DECISION_TIME_COST`): a glance at a document or a
+date/seal check is cheap (1), verify-id and request-reissue cost 2, a **search**
+is expensive (3); passing/denying is quick (1) but an **arrest costs more** (3 —
+escort/paperwork, which also reinforces the matrix's "don't reach for arrest
+idly"). Time accrues per shift (`time_spent`). Time over the budget converts to
+penalty at `overtime_penalty_rate` and is folded into `total_penalty`, so going
+over the budget pushes you toward the failure threshold.
+
+**Soft, not a wall.** Actions are never blocked — you *can* go slow, but it costs
+you toward the LOSE line. The pressure is economic: investigate thoroughly and
+pay in time, or move fast and risk wrong calls. This is what makes the
+disclosure discipline *matter* (probing has a price now) and the
+concealed-contraband god's-eye rule *play* correctly (you can't afford to search
+everyone, so you deny the suspicious and sometimes miss).
+
+Costs are fixed defaults; the per-shift `time_budget` (and
+`overtime_penalty_rate`) are the tuning knobs. *Deferred:* the thoroughness
+slider (quick-vs-thorough search) and the reference-doc progression (checks get
+cheaper as you build your rulebook). A hard-clock / throughput variant (the
+shift *ends* when time runs out, leaving the queue unprocessed) is a possible
+later mode; the soft overtime model was chosen for v1 because it bolts directly
+onto the penalty accumulation with no early-termination machinery.
 
 ### 2. Graduated penalty scoring with a failure threshold (resolved 2026-06-04)
 
