@@ -18,6 +18,18 @@ eventually moves toward a more headless component base.
 
 ## CLI / Rich
 
-The matching CLI/Rich guide has not been checked in yet in this worktree. If it
-resurfaces, place it beside the Vue guide under this directory so reference
-client implementation notes stay together.
+- [Rich CLI rendering guide](cli_guide/rich-cli-rendering-guide.html)
+- [Guide stylesheet](cli_guide/rich-cli-guide.css)
+- [World profiles design study](cli_guide/world_profiles/world-profiles.html)
+- World profile study assets:
+  [app](cli_guide/world_profiles/wp-app.jsx),
+  [fixtures](cli_guide/world_profiles/wp-fixtures.js),
+  [profiles](cli_guide/world_profiles/wp-profiles.js),
+  [sections](cli_guide/world_profiles/wp-sections.jsx),
+  [sections 2](cli_guide/world_profiles/wp-sections2.jsx),
+  [theme](cli_guide/world_profiles/wp-theme.css)
+
+The Rich guide maps the same v1.5 surfaces to terminal renderables and plain
+fallbacks. The world-profiles study explores the related render negotiation
+idea: client capability profiles, world preference profiles, and a degraded or
+enriched render plan that never changes the underlying fragment vocabulary.

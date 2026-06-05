@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StoryTan⅁l · Rich terminal rendering guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="rich-cli-guide.css" />
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ───────────────────────── header ───────────────────────── -->
+  <header class="doc">
+    <div class="lockup">
+      <span class="glyph"><span>g</span></span>
+      <span class="tag">default cli port<br/>rendering guide</span>
+    </div>
+    <div class="meta">
+      widget vocab <b>v1.5</b> · tier S<br/>
+      renderer · <b>Rich</b> (python)<br/>
+      parity floor · §0.2
+    </div>
+  </header>
+
+  <h1 class="title">Rich terminal rendering guide</h1>
+  <p class="lede">
+    The CLI port is the <b>parity floor</b> every richer shell must clear — if a turn can't be
+    read as story in a wrapped terminal pane, it doesn't ship. This guide pins the default port to
+    <b>Rich</b> and maps each Tier&nbsp;S fragment, every <span class="ic">accepts.kind</span>, and
+    every projected <span class="ic">value_type</span> to a concrete Rich renderable, with a
+    plain-text fallback for monochrome and dumb terminals. It invents no fields: every shape below
+    traces to <span class="ic">VOCAB_DIGEST.md</span> §3–§7.
+  </p>
+  <div class="marg">
+    Rich is the rendering target, not a dependency of the contract. The same envelope must still
+    render through <b>cmd2 + print()</b> with <span class="ic">--no-color</span>; the fallback column
+    is that floor-of-the-floor, and it is normative.
+  </div>
+
+  <!-- ───────────────────────── §0 console contract ───────────────────────── -->
+  <h2 class="sec"><span class="n">§0</span><span>Console contract &amp; the four gates</span><span class="r">how the floor holds</span></h2>
+  <p class="note">
+    One <span class="ic">Console</span> per cursor channel. Detect width from the TTY and clamp to a
+    legible measure; detect color support and degrade in one switch. Severity is the only thing the
+    renderer adds on top of the contract — it round-trips with <span class="ic">KvRow.emphasis</span>
+    and the closed three-token ladder <span class="ic">ok / warn / danger</span>, never a fourth hue.
+  </p>
+  <pre class="code"><span class="c"># one console per cursor; width + color detected once, degraded once</span>
+con = Console(<span class="k">width</span>=<span class="s">min</span>(os.get_terminal_size().columns, <span class="s">100</span>),
+              <span class="k">no_color</span>=(<span class="s">"NO_COLOR"</span> <span class="k">in</span> os.environ) <span class="k">or</span> <span class="k">not</span> sys.stdout.isatty())
+THEME = Theme({<span class="s">"ok"</span>: <span class="s">"#6fbf8c"</span>, <span class="s">"warn"</span>: <span class="s">"#d6a35a"</span>, <span class="s">"danger"</span>: <span class="s">"#d65a4a"</span>,
+               <span class="s">"hotkey"</span>: <span class="s">"reverse #d6a35a"</span>, <span class="s">"speaker"</span>: <span class="s">"bold"</span>, <span class="s">"dim"</span>: <span class="s">"#8a8472"</span>})</pre>
+
+  <div class="gates">
+    <div class="gate">
+      <div class="gn">gate 1</div>
+      <div class="gt">CLI floor</div>
+      <div class="gd">Every Tier&nbsp;S widget renders here in <b>Rich</b>. This guide <b>is</b> the reference port; richer shells degrade <i>to</i> it.</div>
+    </div>
+    <div class="gate">
+      <div class="gn">gate 2</div>
+      <div class="gt">Decision legibility</div>
+      <div class="gd">Every UID an open choice references via <span class="ic">blockers.refs</span> is printed <b>this turn</b>. Locked <i>Allow</i> cites <span class="ic">permit</span> + <span class="ic">findings</span> — both on screen.</div>
+    </div>
+    <div class="gate">
+      <div class="gn">gate 3</div>
+      <div class="gt">Time parity</div>
+      <div class="gd">Every ritual (a <span class="ic">roll</span> spinner, a <span class="ic">Live</span> reveal) is skippable to canonical-instant in one action. Honor <span class="ic">--skip</span> and <span class="ic">ritual_hints</span>.</div>
+    </div>
+    <div class="gate">
+      <div class="gn">gate 4</div>
+      <div class="gt">Input parity</div>
+      <div class="gd">Every richer modality has a typed fallback reachable the same turn: <b>hotkey</b>, <b>ordinal</b>, and <b>raw_command</b> all reach the same edge.</div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §1 fragment mapping ───────────────────────── -->
+  <h2 class="sec"><span class="n">§1</span><span>Tier S fragments → Rich renderables</span><span class="r">schema · render · fallback</span></h2>
+  <p class="note">
+    Eight Tier&nbsp;S fragment types (digest §3). Each card shows the fragment shape verbatim, the
+    Rich renderable it maps to, and the rendered output beside its <span class="ic">--no-color</span>
+    plain-text fallback. <span class="ic">scene</span> groups carry ordering only; the renderer walks
+    <span class="ic">member_ids</span> and emits each member in turn.
+  </p>
+
+  <div class="maps">
+
+    <!-- content -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">content</span><span class="tier">S</span><span class="role">prose paragraph</span></div>
+        <div class="purpose">Narrative prose. <span class="ic">content_format</span> is <span class="ic">md</span>, <span class="ic">text</span>, or <span class="ic">rit</span> (pending ritual text).</div>
+        <pre class="code">{ <span class="k">fragment_type</span>: <span class="s">"content"</span>,
+  <span class="k">content_format</span>: <span class="s">"md"</span>,
+  <span class="k">content</span>: <span class="s">"You unfold the permit. The
+    **Imperial seal** is sound, but the
+    date stamp shows expiry months past."</span> }</pre>
+        <div class="renderable"><b>md</b> → <b>Markdown</b>(content) · <b>text</b> → <b>Text</b>, wrapped · <b>rit</b> → dim <b>Text</b> placeholder until resolved</div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich · Markdown</div>
+<pre class="term">You unfold the permit. The <span class="bold">Imperial seal</span> is
+sound, but the date stamp shows expiry months
+past.</pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback · --no-color</div>
+<pre class="term plain">You unfold the permit. The Imperial seal is
+sound, but the date stamp shows expiry months
+past.</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- attributed -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">attributed</span><span class="tier">S</span><span class="role">dialog line</span></div>
+        <div class="purpose">A spoken line. <span class="ic">who</span> is the speaker, <span class="ic">how</span> the stage direction. Speaker names stay stable across a session (digest §9).</div>
+        <pre class="code">{ <span class="k">fragment_type</span>: <span class="s">"attributed"</span>,
+  <span class="k">who</span>: <span class="s">"Bek"</span>,
+  <span class="k">how</span>: <span class="s">"without expression"</span>,
+  <span class="k">content</span>: <span class="s">"There's nothing wrong
+            with that permit."</span> }</pre>
+        <div class="renderable"><b>Text.assemble</b>( (who, <span class="s">"speaker"</span>), (f" ‹{how}›", <span class="s">"italic dim"</span>) ) then the line, indented</div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich</div>
+<pre class="term"><span class="bold">Bek</span> <span class="dim">‹without expression›</span>
+  <span class="fg2">"There's nothing wrong with that permit."</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback</div>
+<pre class="term plain">BEK (without expression):
+  "There's nothing wrong with that permit."</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- media -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">media</span><span class="tier">S</span><span class="role">image / video</span></div>
+        <div class="purpose">A terminal can't always show pixels. Render an addressable placeholder; emit the real image only where an inline protocol (kitty/iTerm/sixel) is present.</div>
+        <pre class="code">{ <span class="k">fragment_type</span>: <span class="s">"media"</span>,
+  <span class="k">media_role</span>: <span class="s">"narrative_im"</span>,
+  <span class="k">content_format</span>: <span class="s">"url"</span>,
+  <span class="k">content</span>: <span class="s">".../permit-9472.jpg"</span> }</pre>
+        <div class="renderable"><b>Panel</b>(Text, box=SQUARE, title=media_role) · with a protocol, <b>rich-pixels</b> / <b>Pixels.from_image</b></div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich · Panel</div>
+<pre class="term"><span class="box">┌─</span> <span class="dim">narrative_im</span> <span class="box">───────────────┐</span>
+<span class="box">│</span> permit-9472.jpg          <span class="box">│</span>
+<span class="box">│</span> <span class="dim">image · inline if supported</span> <span class="box">│</span>
+<span class="box">└───────────────────────────┘</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback</div>
+<pre class="term plain">[narrative_im: permit-9472.jpg]</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- kv -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">kv</span><span class="tier">S</span><span class="role">inline status strip · findings</span></div>
+        <div class="purpose">A list of <span class="ic">KvRow</span>. <span class="ic">emphasis</span> ∈ ok/warn/danger drives the glyph + color ladder. This is how warnings and errors surface inline.</div>
+        <pre class="code"><span class="k">content</span>: [
+ {<span class="k">key</span>:<span class="s">"permit_seal"</span>,  <span class="k">value</span>:<span class="s">"Imperial"</span>,  <span class="k">emphasis</span>:<span class="s">"ok"</span>},
+ {<span class="k">key</span>:<span class="s">"permit_expiry"</span>,<span class="k">value</span>:<span class="s">"2026-03-01"</span>,<span class="k">emphasis</span>:<span class="s">"danger"</span>},
+ {<span class="k">key</span>:<span class="s">"origin"</span>,       <span class="k">value</span>:<span class="s">"Kalden"</span>,    <span class="k">emphasis</span>:<span class="s">"warn"</span>} ]</pre>
+        <div class="renderable"><b>Table.grid</b>(2 col) · glyph cell styled per emphasis: <b>✓ ok</b> · <b>! warn</b> · <b>‼ danger</b></div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich</div>
+<pre class="term">  <span class="o">✓</span>  permit_seal     <span class="fg2">Imperial</span>
+  <span class="o">✓</span>  permit_holder   <span class="fg2">Bek Tarsus</span>
+  <span class="d">‼</span>  permit_expiry   <span class="d">2026-03-01</span>  <span class="dim">expired</span>
+  <span class="w">!</span>  origin          <span class="w">Kalden</span>      <span class="dim">review</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback</div>
+<pre class="term plain">  [ok]  permit_seal     Imperial
+  [ok]  permit_holder   Bek Tarsus
+  [!!]  permit_expiry   2026-03-01  expired
+  [! ]  origin          Kalden      review</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- choice -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">choice</span><span class="tier">S</span><span class="role">an open edge</span></div>
+        <div class="purpose">A commitable edge. <span class="ic">ui_hints.hotkey</span> + ordinal are both bound (gate&nbsp;4). Locked choices print <span class="ic">unavailable_reason</span> and stay listed so the decision reads completely.</div>
+        <pre class="code">{ <span class="k">edge_id</span>:<span class="s">"e-allow"</span>, <span class="k">text</span>:<span class="s">"Allow passage."</span>,
+  <span class="k">available</span>: <span class="s">false</span>,
+  <span class="k">unavailable_reason</span>:<span class="s">"Permit expired (see findings)."</span>,
+  <span class="k">blockers</span>:[{<span class="k">refs</span>:[<span class="s">"pc-permit"</span>,<span class="s">"f-findings"</span>]}],
+  <span class="k">ui_hints</span>:{ <span class="k">hotkey</span>:<span class="s">"a"</span>, <span class="k">emphasis</span>:<span class="s">"primary"</span> } }</pre>
+        <div class="renderable">numbered <b>Text</b> rows · hotkey in <b>reverse</b> · cost in dim · locked → faint + <b>✗</b> reason + <span class="ic">refs</span> echo</div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich</div>
+<pre class="term">  <span class="rev"> 2 </span> Verify ID against registry.  <span class="dim">−1 min</span>
+  <span class="rev"> d </span> Deny passage.
+  <span class="faint">[a]</span> <span class="faint">Allow passage.</span>
+      <span class="d">✗</span> <span class="dim">permit expired · see: permit · findings</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback</div>
+<pre class="term plain">  2) Verify ID against registry.  (-1 min)
+  d) Deny passage.
+  a) Allow passage.  [LOCKED]
+     reason: permit expired (see findings)</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- user_event -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">user_event</span><span class="tier">S</span><span class="role">side-channel notice</span></div>
+        <div class="purpose">An out-of-band notification that doesn't advance the edge — a bell, a peer's action, a timer. Rendered as an aside, never confused with prose.</div>
+        <pre class="code">{ <span class="k">fragment_type</span>: <span class="s">"user_event"</span>,
+  <span class="k">event_type</span>: <span class="s">"shift_bell"</span>,
+  <span class="k">content</span>: <span class="s">"Ten minutes remain in the shift."</span> }</pre>
+        <div class="renderable"><b>Rule</b> or dim italic <b>Text</b> with a <span class="ic">‹ … ›</span> bracket; routed to stderr-style aside line</div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich</div>
+<pre class="term"><span class="dim">‹ shift_bell ›</span> <span class="fg2">Ten minutes remain in the shift.</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback</div>
+<pre class="term plain">* shift_bell: Ten minutes remain in the shift.</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- control -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">control</span><span class="tier">S</span><span class="role">silent update / delete</span></div>
+        <div class="purpose">A state mutation with no narrative surface. Renders <b>nothing</b> by default; a companion <span class="ic">content</span> fragment carries any story weight (digest §9).</div>
+        <pre class="code">{ <span class="k">fragment_type</span>: <span class="s">"control"</span>,
+  <span class="k">ref_type</span>: <span class="s">"piece"</span>,
+  <span class="k">ref_id</span>: <span class="s">"permit-9472"</span>,
+  <span class="k">payload</span>: { <span class="k">state</span>: <span class="s">"flagged"</span> } }</pre>
+        <div class="renderable">no output · under <span class="ic">--verbose</span>, a dim ledger line via <b>Console.log</b></div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich · --verbose only</div>
+<pre class="term"><span class="faint">· update piece permit-9472 → state=flagged</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback · default</div>
+<pre class="term plain"><span class="dim">(no output — silent control)</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- group -->
+    <div class="map">
+      <div class="schema">
+        <div class="hd"><span class="ft">group</span><span class="tier">S</span><span class="role">container w/ semantics</span></div>
+        <div class="purpose"><span class="ic">group_type</span> sets the frame: <span class="ic">scene</span> = ordering only · <span class="ic">dialog</span> = grouped lines · <span class="ic">overlay</span> = modal · <span class="ic">zone</span> = labelled member list.</div>
+        <pre class="code">{ <span class="k">fragment_type</span>:<span class="s">"group"</span>, <span class="k">group_type</span>:<span class="s">"overlay"</span>,
+  <span class="k">member_ids</span>: [ <span class="s">"c-warning"</span>, <span class="s">"ch-ack"</span> ] }</pre>
+        <div class="renderable"><b>scene</b> → walk members · <b>dialog</b> → <b>Padding</b> block · <b>overlay</b> → <b>Panel</b>(box=HEAVY) · <b>zone</b> → <b>Panel</b>(title)</div>
+      </div>
+      <div class="render">
+        <div>
+          <div class="term-cap"><span class="dot"></span>Rich · overlay = Panel(box=HEAVY)</div>
+<pre class="term"><span class="box">┏━</span> <span class="a">supervisor</span> <span class="box">━━━━━━━━━━━━━┓</span>
+<span class="box">┃</span> Embargo in effect on the    <span class="box">┃</span>
+<span class="box">┃</span> eastern line.               <span class="box">┃</span>
+<span class="box">┃</span> <span class="rev"> ↵ </span> Acknowledge             <span class="box">┃</span>
+<span class="box">┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛</span></pre>
+        </div>
+        <div>
+          <div class="term-cap mono"><span class="dot"></span>fallback</div>
+<pre class="term plain">== supervisor ==================
+Embargo in effect on the
+eastern line.
+  &gt;) Acknowledge
+================================</pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ───────────────────────── §2 accepts.kind ───────────────────────── -->
+  <h2 class="sec"><span class="n">§2</span><span>Commit affordances · <span style="text-transform:none">accepts.kind</span></span><span class="r">7 kinds · gate 4</span></h2>
+  <p class="note">
+    The <span class="ic">accepts.kind</span> on a choice decides what the prompt collects (digest §4).
+    Every rich modality (drag, place, stepper) has a typed fallback in the same turn — the CLI is
+    where that promise is kept. The closed set is fixed at seven; the renderer never adds an eighth.
+  </p>
+  <table class="ref">
+    <thead><tr><th style="width:13%">kind</th><th style="width:30%">Rich prompt</th><th style="width:30%">commit payload</th><th style="width:27%">sample line</th></tr></thead>
+    <tbody>
+      <tr><td class="kind"><b>pick</b></td><td class="r">hotkey / ordinal only — <b>Prompt.ask</b></td><td class="r">{ }</td><td class="s">  <span class="a"> d </span> Deny passage.</td></tr>
+      <tr><td class="kind"><b>text</b></td><td class="r"><b>Prompt.ask</b> w/ validator (length/regex advisory)</td><td class="r">{ text: str }</td><td class="s">  reason <span class="dim">›</span> _____</td></tr>
+      <tr><td class="kind"><b>quantity</b></td><td class="r"><b>IntPrompt.ask</b>, clamped to min/max</td><td class="r">{ quantity: int }</td><td class="s">  qty <span class="dim">(1–5)</span> <span class="dim">›</span> _</td></tr>
+      <tr><td class="kind"><b>pieces</b></td><td class="r">numbered pick from the referenced zone</td><td class="r">{ piece_ids: [...] }</td><td class="s">  pick 1 of <span class="dim">{</span>permit·id·ticket<span class="dim">}</span></td></tr>
+      <tr><td class="kind"><b>place</b></td><td class="r">two-part: choose piece, then target zone</td><td class="r">{ piece_id, target_zone_ref, source_zone_ref? }</td><td class="s">  place <span class="b">id</span> <span class="dim">→</span> <span class="b">registry</span></td></tr>
+      <tr><td class="kind"><b>compose</b></td><td class="r"><b>Table</b> of parts; each part its own sub-prompt</td><td class="r">{ parts: { name: sub } }</td><td class="s">  week <span class="dim">›</span> {study, rest, …}</td></tr>
+      <tr><td class="kind"><b>raw_command</b></td><td class="r">the command bar — parsed by <span class="ic">metadata.grammar</span></td><td class="r">{ text: str }</td><td class="s"><span class="a">⅁&gt;</span> inspect ticket<span class="dim">_</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ───────────────────────── §3 value_type ───────────────────────── -->
+  <h2 class="sec"><span class="n">§3</span><span>Projected state · the status rail</span><span class="r">5 value_types · §5</span></h2>
+  <p class="note">
+    <span class="ic">projected_state.sections[]</span> renders as a status rail beside or below the story.
+    Five <span class="ic">value_type</span>s (digest §5); <span class="ic">section.kind</span> is a free
+    label the CLI prints but doesn't specialize on. <span class="ic">KvRow</span> hints
+    (<span class="ic">bar</span>/<span class="ic">fraction</span>/<span class="ic">delta</span>/<span class="ic">tag</span>)
+    pick the cell renderer.
+  </p>
+  <table class="ref">
+    <thead><tr><th style="width:13%">value_type</th><th style="width:32%">Rich renderable</th><th style="width:55%">sample</th></tr></thead>
+    <tbody>
+      <tr><td class="kind"><b>scalar</b></td><td class="r"><b>Text</b> / <b>Panel</b> — one big value</td><td class="s">Score  <span class="a">21</span></td></tr>
+      <tr><td class="kind"><b>kv_list</b></td><td class="r"><b>Table.grid</b>; <b>bar</b>→<b>BarColumn</b>, <b>delta</b>→▲▼, <b>tag</b>→chip</td><td class="s">remaining <span class="a">███████░░░░░░░</span> 42/90 min
+salary    14 cr  <span class="o">▲ +6</span></td></tr>
+      <tr><td class="kind"><b>item_list</b></td><td class="r"><b>Table.grid</b> — label bold · detail dim · tags bracketed</td><td class="s">Zartan   <span class="dim">HV 4 · fit</span>   <span class="dim">[hunter]</span>
+Ivory    <span class="dim">to appraise</span>  <span class="dim">[asset]</span></td></tr>
+      <tr><td class="kind"><b>table</b></td><td class="r"><b>Table</b>(box=SIMPLE_HEAD) — columns + rows</td><td class="s"><span class="dim">Candidate     Decision  ✓</span>
+Tomi Ren      Denied    <span class="o">✓</span></td></tr>
+      <tr><td class="kind"><b>badges</b></td><td class="r"><b>Columns</b> of bracketed chips</td><td class="s"><span class="dim">[</span>merchant<span class="dim">]</span> <span class="dim">[</span>flagged<span class="dim">]</span> <span class="dim">[</span>kalden<span class="dim">]</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ───────────────────────── §4 metadata ───────────────────────── -->
+  <h2 class="sec"><span class="n">§4</span><span>Metadata · grammar, affordances, info-state</span><span class="r">§7 · footer chrome</span></h2>
+  <div class="cols2">
+    <div>
+      <p class="note">
+        <span class="ic">metadata.grammar</span> feeds the <span class="ic">raw_command</span> parser and
+        supplies the prompt placeholder. <span class="ic">info_affordances[]</span> are discoverable
+        side-projections — rendered as a footer hint, never a state dump. <span class="ic">info_state.dirty_kinds</span>
+        marks which are stale (a <span class="ic">*</span>); <span class="ic">version</span> is monotonic.
+      </p>
+      <pre class="code"><span class="k">metadata</span>: {
+  <span class="k">world</span>: <span class="s">"credentials"</span>,
+  <span class="k">grammar</span>: { <span class="k">placeholder</span>: <span class="s">"try: inspect ticket · verify id · deny"</span> },
+  <span class="k">info_affordances</span>: [
+    {<span class="k">kind</span>:<span class="s">"registry"</span>,  <span class="k">label</span>:<span class="s">"Registry"</span>,  <span class="k">shortcuts</span>:[<span class="s">"r"</span>]},
+    {<span class="k">kind</span>:<span class="s">"ledger"</span>,    <span class="k">label</span>:<span class="s">"Ledger"</span>,    <span class="k">shortcuts</span>:[<span class="s">"l"</span>]},
+    {<span class="k">kind</span>:<span class="s">"directives"</span>,<span class="k">label</span>:<span class="s">"Directives"</span>,<span class="k">shortcuts</span>:[<span class="s">"k"</span>]},
+    {<span class="k">kind</span>:<span class="s">"help"</span>,      <span class="k">label</span>:<span class="s">"Help"</span>,      <span class="k">shortcuts</span>:[<span class="s">"?"</span>]} ],
+  <span class="k">info_state</span>: { <span class="k">version</span>: <span class="s">8</span>, <span class="k">dirty_kinds</span>: [<span class="s">"directives"</span>] } }</pre>
+    </div>
+    <div>
+      <div class="term-cap"><span class="dot"></span>Rich · footer affordance bar</div>
+<pre class="term"><span class="box">─────────────────────────────────────────</span>
+<span class="dim">info</span>  <span class="a">r</span> registry   <span class="a">l</span> ledger
+      <span class="a">k</span> directives <span class="d">*</span>   <span class="a">?</span> help
+<span class="faint">      * stale since last commit · v8</span></pre>
+      <p class="note" style="margin-top:14px">
+        Shortcuts live in their own namespace — <span class="ic">/r</span> or <span class="ic">registry</span>
+        — and never collide with edge hotkeys. The bar is the only place hidden state is <i>hinted</i>;
+        the projection itself only crosses the wire when the player asks.
+      </p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §5 worked envelope ───────────────────────── -->
+  <h2 class="sec"><span class="n">§5</span><span>One envelope, rendered whole</span><span class="r">credentials · step 14 · Bek Tarsus</span></h2>
+  <p class="note">
+    A complete inspection turn through the floor: scene prose, a dialog line, severity-coded findings
+    (the warnings and errors), available moves, gated dispositions whose blocker <span class="ic">refs</span>
+    are all on screen, the projected status rail, a side-channel event, and the metadata footer.
+    Read top-to-bottom it is legible as story — the journal-as-story claim (digest §9), met by the floor itself.
+  </p>
+  <div class="worked">
+    <div>
+      <div class="col-cap">story column · ~54 cols</div>
+<pre class="term tall"><span class="a">⅁</span> <span class="bold">credentials</span>  <span class="dim">cursor cred-bek-t2 · step 14</span>
+<span class="box">══════════════════════════════════════════════════════</span>
+
+You unfold the permit. The <span class="bold">Imperial seal</span> is sound,
+but the date stamp shows expiry months past. Bek waits
+without expression, breath fogging the slot.
+
+<span class="bold">Bek</span> <span class="dim">‹without expression›</span>
+  <span class="fg2">"There's nothing wrong with that permit."</span>
+
+<span class="box">── findings ──────────────────────────────────────────</span>
+  <span class="o">✓</span>  permit_seal     <span class="fg2">Imperial</span>
+  <span class="o">✓</span>  permit_holder   <span class="fg2">Bek Tarsus</span>
+  <span class="d">‼</span>  permit_expiry   <span class="d">2026-03-01</span>  <span class="dim">expired</span>
+  <span class="w">!</span>  origin          <span class="w">Kalden</span>      <span class="dim">review</span>
+
+<span class="box">── moves ─────────────────────────────────────────────</span>
+  <span class="rev"> 1 </span> Inspect another document.       <span class="dim">−1 min</span>
+  <span class="rev"> 2 </span> Verify ID against registry.     <span class="dim">−1 min</span>
+  <span class="rev"> 3 </span> Search the candidate.  <span class="w">⚠</span>        <span class="dim">−2 min</span>
+
+<span class="box">── disposition ───────────────────────────────────────</span>
+  <span class="faint">[a]</span> <span class="faint">Allow passage.</span>
+      <span class="d">✗</span> <span class="dim">permit expired 2026-03-01</span>
+        <span class="dim">see: permit · findings</span>
+  <span class="rev"> d </span> Deny passage.
+  <span class="faint">[x]</span> <span class="faint">Arrest.</span>
+      <span class="d">✗</span> <span class="dim">insufficient evidence for arrest</span>
+
+<span class="dim">‹ shift_bell ›</span> <span class="fg2">Ten minutes remain in the shift.</span>
+
+<span class="box">──────────────────────────────────────────────────────</span>
+<span class="dim">info</span>  <span class="a">r</span> registry   <span class="a">l</span> ledger   <span class="a">k</span> directives <span class="d">*</span>   <span class="a">?</span> help
+<span class="a">⅁&gt;</span> <span class="dim">try: inspect ticket · verify id · deny</span><span class="bold">_</span></pre>
+    </div>
+    <div>
+      <div class="col-cap">status rail · projected_state · ~40 cols</div>
+<pre class="term tall"><span class="box">── shift ───────────────────────────</span>
+  remaining  <span class="a">███████░░░░░░░░</span> 42/90 min
+  candidates 3 of 8
+
+<span class="box">── shift directives ────────────────</span>
+  <span class="o">●</span> Imperial citizens  <span class="fg2">allowed</span>
+  <span class="w">●</span> Kaldenese refugees <span class="w">w/ permit</span>
+  <span class="d">●</span> Eastern merchants  <span class="d">denied</span>
+  <span class="dim">○ Diplomatic envoys  privileged</span>
+
+<span class="box">── shift so far ────────────────────</span>
+  <span class="dim">Candidate     Decision  ✓</span>
+  Anya Volkov   Allowed   <span class="o">✓</span>
+  Tomi Ren      Denied    <span class="o">✓</span>
+  Bek Tarsus    <span class="dim">(open)</span>    <span class="dim">—</span>
+
+<span class="box">── accuracy ────────────────────────</span>
+  correct  <span class="o">2 / 2</span>
+  salary   14 cr   <span class="o">▲ +6</span></pre>
+
+      <div class="col-cap" style="margin-top:18px">layout note</div>
+      <p class="note" style="font-size:12.5px">
+        Wide TTYs pin the rail beside the story with <b>Layout</b> (split columns). The scrolling
+        journal above — story then rail then prompt — is the canonical floor and what every narrow or
+        piped session collapses to.
+      </p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── §6 degradation ───────────────────────── -->
+  <h2 class="sec"><span class="n">§6</span><span>Monochrome &amp; narrow widths</span><span class="r">the floor of the floor</span></h2>
+  <div class="cols2">
+    <div>
+      <h3 class="sub">Monochrome &amp; <span class="ic" style="font-size:14px">NO_COLOR</span></h3>
+      <p class="note">
+        When color is gone, severity must survive in <b>glyph + bracket + weight</b>, never hue alone
+        (the ladder is what carries meaning). Set <span class="ic">Console(no_color=True)</span> and the
+        theme collapses to text styling Rich still honors: <b>bold</b>, <b>dim</b>, <b>reverse</b>,
+        <b>underline</b>.
+      </p>
+      <ul class="tight">
+        <li><b>ok</b> → <code>✓</code> &nbsp; <b>warn</b> → <code>!</code> / <code>[!&nbsp;]</code> &nbsp; <b>danger</b> → <code>‼</code> / <code>[!!]</code></li>
+        <li>hotkeys keep <b>reverse</b> video — readable on any monochrome TTY.</li>
+        <li>locked choices: <code>[a]</code> in brackets + <code>[LOCKED]</code> tag, not a faded color.</li>
+        <li>bars degrade to ASCII <code>[#######-------]</code> with the fraction always printed.</li>
+      </ul>
+      <div class="term-cap mono"><span class="dot"></span>findings · --no-color</div>
+<pre class="term plain">  <span class="bold">[ok]</span> permit_seal     Imperial
+  <span class="bold">[!!]</span> permit_expiry   2026-03-01  expired
+  <span class="bold">[! ]</span> origin          Kalden      review</pre>
+    </div>
+    <div>
+      <h3 class="sub">Narrow widths · ≤ 40 cols</h3>
+      <p class="note">
+        Below the rail's measure, the <b>Layout</b> split drops and everything stacks in one column.
+        Tables fold to stacked key/value pairs; long choice text wraps under its hotkey; rules shorten
+        to the live width. Detect once from <span class="ic">Console.width</span>; never hard-code 80.
+      </p>
+      <ul class="tight">
+        <li>side-by-side rail → stacked sections, same order.</li>
+        <li><span class="ic">table</span> value_type → one <code>key: value</code> block per row.</li>
+        <li>cost previews move to their own dim line under the choice.</li>
+        <li>the affordance bar wraps; shortcuts never truncate.</li>
+      </ul>
+      <div class="term-cap"><span class="dot"></span>same turn · 32 cols</div>
+<pre class="term">You unfold the permit. The
+<span class="bold">Imperial seal</span> is sound, but the
+stamp shows expiry months past.
+
+<span class="box">── findings ──────────────────</span>
+ <span class="d">‼</span> permit_expiry  <span class="d">2026-03-01</span>
+ <span class="w">!</span> origin         <span class="w">Kalden</span>
+
+<span class="box">── moves ─────────────────────</span>
+ <span class="rev"> 2 </span> Verify ID
+       <span class="dim">−1 min</span>
+ <span class="rev"> d </span> Deny passage.
+ <span class="faint">[a]</span> <span class="faint">Allow — ✗ locked</span>
+     <span class="dim">permit expired</span>
+
+<span class="a">⅁&gt;</span> <span class="dim">deny</span><span class="bold">_</span></pre>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>StoryTan⅁l · default cli port · rich rendering guide</span>
+    <span>tier S · v1.5 · invents no fields — see VOCAB_DIGEST §3–§7</span>
+  </div>
+
+</div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#15140f"/>
+    <text x="14" y="44" font-family="monospace" font-size="22" fill="#d6a35a">⅁&gt;</text>
+    <rect x="14" y="58" width="46" height="6" fill="#6fbf8c"/>
+    <rect x="14" y="70" width="62" height="6" fill="#d6a35a"/>
+    <rect x="14" y="82" width="34" height="6" fill="#d65a4a"/>
+  </svg>
+</template>
+
+</body>
+</html>
