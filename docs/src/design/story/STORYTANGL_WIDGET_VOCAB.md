@@ -571,7 +571,7 @@ port sketches.
 
 ```python
 class ContentFragment(BaseFragment):
-    fragment_type: str | Enum = "content"
+    fragment_type: Literal["content"] = "content"
     content: Any = None              # usually str; may be richer
     source_id: UUID | None = None
     content_format: str | None = Field(None, alias="format")  # md/plain/html
@@ -599,10 +599,9 @@ class AttributedFragment(ContentFragment):
     media: str
 ```
 
-Note the `alias="type"` on `fragment_type` — the wire shape may use
-either `fragment_type: "attributed"` or `type: "attributed"`. Clients
-MUST accept both. (This is a legacy-compat surface; future fragment
-types should not introduce aliases.)
+The canonical fragment DTO shape uses `fragment_type: "attributed"`.
+The local model may accept the older `type` alias while hydrating internal
+objects, but reference clients should not emit or require the alias.
 
 | | |
 |---|---|
@@ -619,7 +618,7 @@ types should not introduce aliases.)
 
 ```python
 class MediaFragment(ContentFragment):
-    fragment_type: str = "media"
+    fragment_type: Literal["media"] = "media"
     content: Pathlike | bytes | str | dict | MediaRIT
     content_format: Literal["url", "data", "xml", "json", "rit"]
     media_role: str | None = None       # see below

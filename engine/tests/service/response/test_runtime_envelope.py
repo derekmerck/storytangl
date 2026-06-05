@@ -37,3 +37,29 @@ def test_runtime_envelope_model_dump_preserves_fragment_subclass_fields() -> Non
     assert choice["accepts"]["unit"] == "ration"
     assert choice["ui_hints"]["hotkey"] == "b"
     assert choice["ui_hints"]["source_kind"] == "market"
+
+
+def test_runtime_envelope_to_dto_uses_fragment_dto_projection() -> None:
+    envelope = RuntimeEnvelope(
+        cursor_id=uuid4(),
+        step=1,
+        fragments=[
+            ContentFragment(content="Start", step=1),
+            ChoiceFragment(
+                edge_id=uuid4(),
+                text="Buy rations.",
+                accepts={"kind": "quantity", "min": 1, "max": 3},
+                step=1,
+            ),
+        ],
+    )
+
+    payload = envelope.to_dto()
+    choice = payload["fragments"][1]
+
+    assert choice["fragment_type"] == "choice"
+    assert choice["text"] == "Buy rations."
+    assert choice["accepts"]["kind"] == "quantity"
+    assert "seq" not in choice
+    assert "step" not in choice
+    assert "tags" not in choice

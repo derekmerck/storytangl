@@ -74,10 +74,11 @@ path through service envelopes and REST JSON. These are UI-facing intent
 contracts, even when the engine's internal vocabulary also uses fields named
 `kind`; any future service adapter that maps UI intent onto engine mechanics
 should be explicit and narrow rather than handled by the REST serializer.
-Direct `RuntimeEnvelope` serialization preserves concrete fragment subclass
-fields, so in-process Python clients, diagnostic fixture generation, REST
-serialization, and remote Python rehydration all operate on the same
-widget-shaped payload surface.
+`RuntimeEnvelope.to_dto()` projects fragments through the journal fragment DTO
+pathway, preserving concrete fragment subclass fields while omitting
+transport-only stream bookkeeping. In-process Python clients, diagnostic
+fixture generation, REST serialization, and remote Python rehydration all
+operate on that same widget-shaped payload surface.
 The same pattern applies to `ProjectedState`: service methods own the typed
 section/value model, REST serializes it, and remote Python clients decode it
 back into typed projected-state values.

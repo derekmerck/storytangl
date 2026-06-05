@@ -8,6 +8,7 @@ compatibility.
 from __future__ import annotations
 
 from base64 import b64encode
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
@@ -47,7 +48,7 @@ class ContentFragment(BaseFragment):
     the composing cursor or source of the new composite instead.
     """
 
-    fragment_type: str | Enum = "content"
+    fragment_type: Literal["content"] = "content"
     content: Any = None
     source_id: UUID | None = None
     content_format: str | None = Field(None, alias="format")
@@ -216,7 +217,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     staging_hints: StagingHints | None = None
     media_role: str | None = None
     scope: str | None = "world"
-    fragment_type: str = "media"
+    fragment_type: Literal["media"] = "media"
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:
@@ -248,6 +249,69 @@ class BlockFragment(ContentFragment):
     choices: list[ChoiceFragment] = Field(default_factory=list)
 
 
+_FRAGMENT_DTO_TYPES: dict[str, type[BaseFragment]] = {
+    "attributed": AttributedFragment,
+    "block": BlockFragment,
+    "choice": ChoiceFragment,
+    "content": ContentFragment,
+    "delete": ControlFragment,
+    "dialog": DialogFragment,
+    "group": GroupFragment,
+    "kv": KvFragment,
+    "media": MediaFragment,
+    "piece": PieceFragment,
+    "update": ControlFragment,
+    "user_event": UserEventFragment,
+}
+
+
+def fragment_to_dto(
+    fragment: BaseFragment,
+    *,
+    exclude: set[str] | None = None,
+) -> UnstructuredData:
+    """Return the client DTO projection of a journal fragment.
+
+    DTO projection is distinct from :meth:`unstructure`: it is JSON-safe,
+    keyed by ``fragment_type``, and selected through ``dto_exclude`` field
+    metadata rather than persistence's constructor-form ``kind`` path.
+    """
+
+    exclude_fields = set(fragment._match_fields(dto_exclude=True))
+    if exclude is not None:
+        exclude_fields.update(exclude)
+    payload = fragment.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+        exclude=exclude_fields,
+    )
+    payload.pop("step", None)
+    if payload.get("type") == payload.get("fragment_type"):
+        payload.pop("type")
+    if payload.get("tags") == []:
+        payload.pop("tags")
+    return payload
+
+
+def fragment_from_dto(payload: object) -> BaseFragment:
+    """Hydrate a fragment DTO, preserving unknown extension fragments."""
+
+    if not isinstance(payload, Mapping):
+        return BaseFragment(fragment_type="unknown", content=payload)
+
+    raw_fragment = dict(payload)
+    fragment_type = raw_fragment.get("fragment_type")
+    if not isinstance(fragment_type, str) or not fragment_type:
+        return BaseFragment(fragment_type="unknown", content=raw_fragment)
+
+    fragment_model = _FRAGMENT_DTO_TYPES.get(fragment_type)
+    if fragment_model is None:
+        return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
+
+    return fragment_model.model_validate(raw_fragment)
+
+
 __all__ = [
     "AttributedFragment",
     "BlockFragment",
@@ -266,4 +330,6 @@ __all__ = [
     "StagingHints",
     "UIHints",
     "UserEventFragment",
+    "fragment_from_dto",
+    "fragment_to_dto",
 ]

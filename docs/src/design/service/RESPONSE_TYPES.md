@@ -35,7 +35,7 @@ metadata.
 
 **Characteristics:**
 - Carries `cursor_id`, `step`, redirect metadata, and service metadata
-- Carries concrete fragment models through a `BaseFragment`-typed stream
+- Carries concrete fragment DTOs through a `BaseFragment`-typed stream
 - The client renders fragments directly through a registry/shell model
 - Unknown fragment types are valid extension points and must survive transport
 

@@ -210,8 +210,7 @@ def build_demo_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         )
         projected = manager.get_story_info(user_id=user.uid)
 
-        runtime_payload = envelope.model_dump(mode="json", by_alias=True, exclude_none=True)
-        _strip_volatile_fragment_fields(runtime_payload)
+        runtime_payload = envelope.to_dto()
         projected_payload = projected.model_dump(mode="json", by_alias=True, exclude_none=True)
         return _normalize_uuids(runtime_payload), _normalize_uuids(projected_payload)
     finally:
@@ -235,19 +234,6 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         json.dumps(payload, indent=2, sort_keys=False) + "\n",
         encoding="utf-8",
     )
-
-
-def _strip_volatile_fragment_fields(payload: dict[str, Any]) -> None:
-    fragments = payload.get("fragments")
-    if not isinstance(fragments, list):
-        return
-    for fragment in fragments:
-        if not isinstance(fragment, dict):
-            continue
-        fragment.pop("seq", None)
-        fragment.pop("step", None)
-        if fragment.get("tags") == []:
-            fragment.pop("tags")
 
 
 def _normalize_uuids(payload: Any) -> Any:

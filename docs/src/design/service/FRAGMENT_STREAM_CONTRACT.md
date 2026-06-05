@@ -44,10 +44,13 @@ directly. Acknowledgement-only operations such as `drop_story` return
 `RuntimeInfo`.
 
 `fragments` are ordered for reading and replay. The Python type is rooted at
-`BaseFragment`, but direct `RuntimeEnvelope` serialization preserves concrete
-fragment fields such as `ChoiceFragment.edge_id`, `accepts`, and `ui_hints`.
-A fragment's `uid` is also a stable reference target within the envelope and
-across later update/delete control fragments.
+`BaseFragment`, while `RuntimeEnvelope.to_dto()` projects each fragment through
+the journal fragment DTO pathway. That pathway uses `fragment_type` as the
+transport discriminator, preserves concrete fields such as
+`ChoiceFragment.edge_id`, `accepts`, and `ui_hints`, and omits stream
+bookkeeping selected by `dto_exclude` field metadata. A fragment's `uid` is also
+a stable reference target within the envelope and across later update/delete
+control fragments.
 
 ## Fragment Registry Model
 

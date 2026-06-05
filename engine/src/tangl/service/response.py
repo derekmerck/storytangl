@@ -21,7 +21,12 @@ from pydantic import (
 from tangl.core import BaseFragment
 from tangl.info import __url__
 from tangl.journal.intent import KvRow, PrimitiveValue
-from tangl.journal.fragments import KvFragment, MediaFragment, PresentationHints
+from tangl.journal.fragments import (
+    KvFragment,
+    MediaFragment,
+    PresentationHints,
+    fragment_to_dto,
+)
 from tangl.service.user.user import User
 
 
@@ -88,6 +93,25 @@ class RuntimeEnvelope(InfoModel):
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    def to_dto(self) -> dict[str, Any]:
+        """Return the transport DTO projection for client-facing envelopes."""
+
+        base_payload = self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_none=True,
+            exclude={"fragments"},
+        )
+        payload: dict[str, Any] = {}
+        for field_name in ("cursor_id", "step"):
+            if field_name in base_payload:
+                payload[field_name] = base_payload[field_name]
+        payload["fragments"] = [fragment_to_dto(fragment) for fragment in self.fragments]
+        for field_name in ("last_redirect", "redirect_trace", "metadata"):
+            if field_name in base_payload:
+                payload[field_name] = base_payload[field_name]
+        return payload
 
 
 JsonValue: TypeAlias = PydanticJsonValue
