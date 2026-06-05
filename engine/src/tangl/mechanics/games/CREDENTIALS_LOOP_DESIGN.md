@@ -791,41 +791,69 @@ already-built disclosure discipline *matter*, and what makes the concealed-
 contraband god's-eye rule *play* correctly (you deny the suspicious and sometimes
 miss, because you couldn't search everyone).
 
-### 2. Two-error / acceptable-set scoring (needed for B.3)
+### 2. Graduated penalty scoring with a failure threshold (resolved 2026-06-04)
 
-`expected_disposition` returns a **single** answer, but the bluff/decline cases
-have a *band*: for a guilty bluffer, deny *and* arrest are acceptable; for an
-indignant innocent, deny is acceptable but arrest is a **fail**. Single-answer
-scoring cannot express this. The fix is to score on the **two independent error
-types** Papers Please actually penalizes:
+Keep the **single** `expected_disposition` (there is always one correct call).
+Replace the binary correct/incorrect score with a **penalty matrix** over the
+ordered severity axis allow → deny → arrest, accumulated to a failure threshold
+(Papers Please's citation/strike model):
 
-- **false admit** — let through someone who should have been kept out (the
-  serious error), and
-- **false reject** — deny/arrest someone who was admissible (the other error).
+```text
+should allow   = { allow: 0,  deny: 2,  arrest: 5 }
+should deny    = { allow: 2,  deny: 0,  arrest: 5 }
+should arrest  = { allow: 5,  deny: 2,  arrest: 0 }
+```
 
-`expected_disposition` becomes an *admissibility* judgment (a set / severity band
-of acceptable calls), and scoring checks the chosen call against both error axes.
-This is more PP-faithful and is the prerequisite for B.3's ambiguity to be
-playable. Moderate refactor of `expected_disposition` + the decision scorer;
-`finding_status` and the derive logic feed it unchanged.
+One step off costs 2; two steps off (allow ↔ arrest) costs 5; correct costs 0.
+The shift is lost when accumulated penalty crosses a threshold.
+
+This makes **deny the low-variance hedge**: for a suspicious decliner, denying
+caps the downside at 2 whether they turn out innocent (should-allow) or guilty
+(should-deny) — which is exactly the bluffing tension, and it falls out of the
+matrix without any acceptable-set machinery. (The earlier "two-error /
+acceptable-set" sketch is superseded by this.)
+
+**+1 for right-but-unjustified.** Add a small penalty when the call is correct
+but unsupported by a revealed finding — guessing right is fine but taxed, so
+gathering evidence (which costs budget, §1) is rewarded without being mandatory.
+Justification includes **behavioral** evidence, not just documents: "the smuggler
+tried to bribe his way out of a search" justifies an arrest.
+
+`derive_disposition` is unchanged; this is a refactor of the **decision scorer**
+(penalty lookup + accumulation + the evidence check) and the shift terminal
+condition (penalty-threshold instead of correct-count). `CredentialCaseResult`
+records the per-case penalty.
+
+### Generation: presentation vs. truth (confirmed)
+
+Always **build legal, then degrade by the target disposition**, with a single
+expected disposition per candidate. Two presentation moves on top of the truth:
+
+- A **legal** candidate (should-allow) may get a **degraded initial
+  presentation** — looks suspicious but is actually fine (the innocent who looks
+  guilty; the indignant decliner).
+- An **illegal** candidate (should-deny/arrest) is degraded (made actually
+  illegal) and then **illegally upgraded back to a legal-looking presentation**
+  (the forger — fake seal / id makes the surface read as valid).
+
+The gap between *presentation* (what they show) and *truth* (the expected
+disposition) is what inspection and mediation close. The factory's
+`build_valid → degrade` already models the truth axis; this adds a
+presentation-degrade layer on top.
 
 ### Smaller / done / deferred
 
 - **Forged document is always a crime** *(done, B.2)* — presenting a fake id/permit
   arrests on its own, regardless of whether it was required.
-- **Cite-the-finding justification** *(optional rigor)* — "you may have to justify
-  your disposition": require a disposition to be backed by a revealed finding
-  (arrest ⇐ a confirmed crime finding; deny ⇐ a deny finding). Uses findings we
-  already track; pairs naturally with the budget. A per-world toggle.
 - **Behavioral demeanor** *(defer; content-heavy)* — nervousness/pleading/bluffing
-  as a readable signal beyond the documents. The psychological dimension; its own
-  layer.
+  as a readable signal beyond the documents, and a justification source (bribe
+  attempt → grounds for arrest). The psychological dimension; its own layer.
 
 ### What to keep unchanged
 
-The matrix core, most-severe-wins composition, the disclosure discipline, and
-`finding_status` as the mediation surface are all sound — the additions read from
-them, they don't replace them.
+The matrix core, the single `expected_disposition`, most-severe-wins composition,
+the disclosure discipline, and `finding_status` as the mediation surface are all
+sound — the additions read from them, they don't replace them.
 
 ---
 
