@@ -190,6 +190,8 @@ __all__ = [
     "CredentialCase",
     "CredentialCaseResult",
     "derive_disposition",
+    "disposition_penalty",
+    "DISPOSITION_PENALTY",
     "ContrabandItem",
     "CredentialStatus",
     "CredentialToken",
