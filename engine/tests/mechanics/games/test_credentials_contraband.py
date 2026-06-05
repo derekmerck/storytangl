@@ -171,3 +171,17 @@ class TestContrabandMoves:
         assert game.finding_status["disclosure"] == "declared"
         # A clean candidate still derives PASS.
         assert game.expected_disposition(game.active_case) is D.PASS
+
+
+class TestForgedDocumentIsAlwaysACrime:
+    def test_forged_unused_permit_arrests(self) -> None:
+        # A forged weapon permit with no weapon -> arrest (presenting a fake is
+        # criminal on its own), even though the contraband is absent.
+        case = _case(packet=[_permit(IND.WEAPON, S.FORGED)])
+        assert _derive(case) is D.ARREST
+
+    def test_invalid_unused_permit_is_moot(self) -> None:
+        # An expired weapon permit with no weapon -> allow (just remit it for
+        # renewal); a merely-invalid unused permit is not a crime.
+        case = _case(packet=[_permit(IND.WEAPON, S.EXPIRED)])
+        assert _derive(case) is D.PASS

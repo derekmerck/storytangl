@@ -341,6 +341,14 @@ def derive_disposition(
         level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
         worst = _worse(worst, _assess_contraband(case, item, level, finding_status))
 
+    # Presenting a forged / fake document is a crime in itself, regardless of
+    # whether the document was required -- handing over a fake id unasked still
+    # arrests. (A merely *invalid* document -- expired, unsealed -- with nothing
+    # to back is moot, since its status is not a crime.)
+    for token in (case.id_card, *case.packet):
+        if token is not None and token.status.is_crime:
+            worst = _worse(worst, CredentialDisposition.ARREST)
+
     return worst
 
 
