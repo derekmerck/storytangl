@@ -33,7 +33,7 @@ clients and remote managers can degrade safely.
 RuntimeEnvelope
   cursor_id: UUID | null
   step: int | null
-  fragments: list[BaseFragment]
+  fragments: list[BaseFragment]  # serialized as concrete fragment payloads
   last_redirect: dict | null
   redirect_trace: list[dict]
   metadata: dict
@@ -43,9 +43,11 @@ RuntimeEnvelope
 directly. Acknowledgement-only operations such as `drop_story` return
 `RuntimeInfo`.
 
-`fragments` are ordered for reading and replay. A fragment's `uid` is also a
-stable reference target within the envelope and across later update/delete
-control fragments.
+`fragments` are ordered for reading and replay. The Python type is rooted at
+`BaseFragment`, but direct `RuntimeEnvelope` serialization preserves concrete
+fragment fields such as `ChoiceFragment.edge_id`, `accepts`, and `ui_hints`.
+A fragment's `uid` is also a stable reference target within the envelope and
+across later update/delete control fragments.
 
 ## Fragment Registry Model
 

@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     Field,
     JsonValue as PydanticJsonValue,
+    SerializeAsAny,
     ValidationError,
     field_serializer,
     model_validator,
@@ -83,7 +84,7 @@ class RuntimeEnvelope(InfoModel):
 
     cursor_id: UUID | None = None
     step: int | None = None
-    fragments: list[BaseFragment] = Field(default_factory=list)
+    fragments: list[SerializeAsAny[BaseFragment]] = Field(default_factory=list)
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)

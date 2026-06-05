@@ -210,7 +210,8 @@ def build_demo_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         )
         projected = manager.get_story_info(user_id=user.uid)
 
-        runtime_payload = _runtime_envelope_payload(envelope)
+        runtime_payload = envelope.model_dump(mode="json", by_alias=True, exclude_none=True)
+        _strip_volatile_fragment_fields(runtime_payload)
         projected_payload = projected.model_dump(mode="json", by_alias=True, exclude_none=True)
         return _normalize_uuids(runtime_payload), _normalize_uuids(projected_payload)
     finally:
@@ -236,24 +237,17 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
-def _runtime_envelope_payload(envelope: Any) -> dict[str, Any]:
-    return {
-        "cursor_id": str(envelope.cursor_id) if envelope.cursor_id is not None else None,
-        "step": envelope.step,
-        "fragments": [_fragment_payload(fragment) for fragment in envelope.fragments],
-        "last_redirect": envelope.last_redirect,
-        "redirect_trace": list(envelope.redirect_trace),
-        "metadata": dict(envelope.metadata),
-    }
-
-
-def _fragment_payload(fragment: Any) -> dict[str, Any]:
-    payload = fragment.model_dump(mode="json", by_alias=True, exclude_none=True)
-    payload.pop("seq", None)
-    payload.pop("step", None)
-    if payload.get("tags") == []:
-        payload.pop("tags")
-    return payload
+def _strip_volatile_fragment_fields(payload: dict[str, Any]) -> None:
+    fragments = payload.get("fragments")
+    if not isinstance(fragments, list):
+        return
+    for fragment in fragments:
+        if not isinstance(fragment, dict):
+            continue
+        fragment.pop("seq", None)
+        fragment.pop("step", None)
+        if fragment.get("tags") == []:
+            fragment.pop("tags")
 
 
 def _normalize_uuids(payload: Any) -> Any:
