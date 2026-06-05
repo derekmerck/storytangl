@@ -855,7 +855,7 @@ a search" → grounds for arrest); `_EVIDENCE_FINDINGS` is the seam for that.
 condition (penalty-threshold instead of correct-count). `CredentialCaseResult`
 records the per-case `penalty` and an `unjustified` flag.
 
-### 3. Per-rule-set scoring + adversarial mediation (LANDED scoring 2026-06-05; degrade-events deferred)
+### 3. Per-rule-set scoring + malfeasance/doctoring (LANDED scoring 2026-06-05; malfeasance deferred)
 
 Scoring is **per rule set**, not a global constant. The penalty matrix is a
 per-game field (`penalty_matrix`, string-keyed by disposition value so it stays
@@ -880,17 +880,35 @@ There are **two independent ways to express such a regime**, and they compose:
   the existing factory machinery — "build legal, then degrade by target
   disposition" — pointed at a uniform target.
 
-**Adversarial / packet-degrading mediations (deferred).** The B.1/B.2 mediations
-are *clearing* (favorable: request_document, relinquish, disclosure). Their mirror
-image is a **degrade** transform that worsens the packet during play — lose a
-packet piece, smear a date to invalid, strip a seal — the corrupt-gatekeeper move
-that manufactures grounds *in the moment* rather than at generation. The transforms
-themselves already exist as `FailureMode`s (`MISSING_PERMIT` = lose a piece,
-`EXPIRED_ID`/`BAD_DATE` = invalidate a date); what is deferred is a **live event /
-move** that applies one mid-case and re-derives. Model it as the adversarial
-counterpart of `finding_status` (a `case_mutations` overlay so `advance_case` still
-resets cleanly and the underlying authored packet is untouched), gated behind a
-regime flag so only a corruption-flavored skin exposes it.
+**Malfeasance: doctoring evidence (deferred — opens its own design space).** The
+B.1/B.2 mediations are *clearing* and honest (request_document, relinquish,
+disclosure). Their counterpart is the player **doctoring evidence** — lose a piece,
+smear a date to invalid, strip or forge a seal — and that is a *malfeasance axis*,
+not merely a regime event. Two observations fix its shape:
+
+- It spans a **severity spectrum**. *Turning a blind eye* (don't investigate;
+  accept a bribe to pass someone) is the low, passive end — this is the Phase C
+  bribery/favoritism layer. *Actively doctoring the packet into false testimony*
+  (manufacturing or destroying a finding) is the high, active end. Both can point
+  **in favor of or against** the candidate. So Phase C bribery is the low-level
+  instance of the same spine, not a separate mechanic.
+- It is driven by the **no-evidence penalty**. Because `no_evidence_penalty` is a
+  scalar strike-cost, fabricating a justification is "just another step to keep
+  your strikes down." The balance question is therefore explicit and tunable:
+  **is having (or manufacturing) evidence worth more than the expected penalty for
+  getting caught at malfeasance?** A regime that prizes correct-seeming paperwork
+  makes doctoring rational; one that catches-and-punishes hard makes honest
+  investigation (paying budget, §1) the cheaper path.
+
+The transforms already exist as `FailureMode`s (`MISSING_PERMIT` = lose a piece,
+`EXPIRED_ID`/`BAD_DATE` = invalidate a date); what is deferred is the **live move**
+that applies one mid-case and re-derives, *plus* the catch/strike model that prices
+it (getting-caught probability, the malfeasance penalty, reputation). Model the
+mutation as the adversarial counterpart of `finding_status` (a `case_mutations`
+overlay so `advance_case` resets cleanly and the authored packet is untouched),
+gated behind a regime flag. Defer the whole malfeasance layer — it pulls in
+bribery, detection odds, and reputation at once — but build it as one axis with
+blind-eye/bribe at the bottom and false-testimony doctoring at the top.
 
 ### Generation: presentation vs. truth (confirmed)
 
