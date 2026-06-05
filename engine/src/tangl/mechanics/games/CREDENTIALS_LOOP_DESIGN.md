@@ -3,7 +3,8 @@
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
 (A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
 lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
-2026-05-23); Phases B.2/C/D designed below as overlays  
+2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); Phases
+B.3 (declines axis)/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -677,25 +678,56 @@ clean).
 with **environment, discretion, and bribery** (a Phase C cross-cut). B.2
 computes a base disposition; Phase C composes the override on top.
 
-**Open questions (updated):**
+**Resolved model (2026-06-04): declaration is the requirement.**
 
-1. ~~Concealed contraband + valid permit~~ — *resolved:* takes the
-   ``request_disclosure`` path; if voluntarily disclosed → allow as
-   declared+valid. (Sub-question still open: if disclosure is refused or lied
-   and search forces the reveal, is the "oops" forgiveness still extended, or
-   does it escalate?)
-2. ~~Forged / wrong-holder permit + no actual contraband~~ — *resolved:* the
-   illegal-packet rule applies regardless of possession → arrest.
-3. Mitigatable-invalid permit + no contraband — does an unused-but-invalid
-   paper deny, or pass? *(Still open.)*
-4. **New:** concealed contraband whose category requires *no* permit — is the
-   concealment-when-not-required itself a violation, or moot?
+The matrix collapses once you see that **contraband is, by definition, what must
+be declared.** If concealment doesn't matter for an item, it simply isn't
+contraband — there is no fourth "ignored" category. So contraband has exactly
+three levels (from the restriction map for that indication):
 
-**B.2 ships, when it lands:** the three new move kinds above
-(``request_complete`` / ``request_disclosure`` / ``request_relinquish``); the
-declines-mediation axis (per-case ``compliant: bool`` or per-failure-mode
-willingness); and per-indication worst-case composition across multiple
-contraband items. The Phase C severity overlay layers on top.
+- **declaration-only** (anonymous / id level) — allowed *if declared*.
+- **permit-required** (with-permit level) — declared *and* a valid permit.
+- **forbidden** — denied regardless.
+
+And **concealment is itself the violation** — concealing *any* contraband is a
+problem, independent of whether it would have been permitted. The disclosure /
+search distinction decides severity:
+
+- **`request_disclosure` rescues.** Asking "anything to declare?" → (compliant)
+  candidate declares → assess as *declared* (allow if permitted or
+  declaration-only). This is the "oops, I forgot" path.
+- **`request_search` forecloses.** The concealment stands; the player learns of
+  it but forfeits the benign explanation.
+
+| Contraband state | declaration-only | permit-required | forbidden |
+|---|---|---|---|
+| declared, valid permit | allow | allow | (n/a) |
+| declared, no/invalid permit | allow | **deny** (produce/relinquish) | — |
+| declared, forbidden | — | — | **deny** (relinquish) |
+| concealed → disclosed | allow | allow if permit valid, else deny | deny (honesty mitigates arrest) |
+| concealed → searched / undiscovered | **deny** | **deny** if permit valid (Q1), else **arrest** (smuggling) | **arrest** (smuggling) |
+
+`request_relinquish` clears *declared* contraband (the candidate yields it →
+allow). The god's-eye `expected_disposition` accounts for concealed contraband
+(a perfect inspector would find it), so allowing an unsearched smuggler is wrong;
+`request_disclosure` is the only move that *rescues* concealed-but-permitted goods
+to allow.
+
+**Generator note.** The sampler will **not** randomly produce a candidate that
+conceals something it didn't need to declare-and-permit; that edge (concealing
+declaration-only goods) is an **authored** teaching beat — flex it once, get
+chided for the wrong call, see it again in a different context — not a random
+spawn.
+
+**B.2 scope (compliance assumed):** the new move kinds ``request_disclosure`` /
+``request_relinquish`` (search forecloses: a disclosure *after* a search has
+confirmed concealment is too late to rescue), plus the graduated contraband
+assessment above and per-indication worst-case composition. **Deferred:**
+``request_complete`` (the missing-doc surface — ``request_relinquish`` already
+clears declared problematic contraband, so it was not needed for B.2); and **to
+B.3**, the declines-mediation axis (the candidate who lies when asked or refuses
+to yield), where disclosure can fail. Phase C severity overlay (origin bends
+arrest↔deny) layers on top of all of it.
 
 ---
 
@@ -710,6 +742,121 @@ POSTREQS edges keyed on `credential_*` predicates -- no engine change. The
 `ScreeningRound` narrative-override idea from the (dropped) `screening.py`
 (`on_invalid_seal`, `on_allow`, ...) is worth reviving as per-finding journal
 flavor.
+
+---
+
+## Phase B.3: declines, bluffing, and ambiguity
+
+B.1/B.2 assume **compliance** — the candidate truthfully declares, produces, and
+yields when asked. B.3 adds the **declines axis** and, with it, genuine
+*ambiguity*:
+
+- A candidate may **lie** when asked to declare, **refuse** a search, or **refuse
+  to produce** a document.
+- **Bluffing:** a smuggler with no permit (where a permit is even possible) tries
+  to talk their way in and *declines the search*. The player can deny (safe), or
+  arrest (right *if* guilty), or press.
+- **Crucially, you also need innocents who decline** — someone who refuses a
+  search on principle, or refuses to produce a permit they feel they shouldn't
+  need. Declining is a *signal correlated with* guilt, not proof of it.
+
+This breaks the single-answer assumption (see below): a declined search has no
+one correct disposition. Deny is always *safe*; arresting a decliner is right
+only if they were actually guilty, and a **fail if they were innocent**.
+
+**Authored beat — the abandoned forgery.** A candidate departs and leaves behind
+an unnecessary illegal id/permit. The player can offer to return it — or inspect
+it, find it forged, *offer to return it* as a lure, and arrest the holder when
+they come back for it. A scripted multi-step encounter (departure → left item →
+inspect → set trap → return → arrest), which is **continuity-thread** content
+(recurring candidate + delayed consequence), not core derive.
+
+---
+
+## Engine review: expressiveness gaps & refinements (2026-06-04)
+
+The matrix captures the **document-validity logic** completely and correctly — it
+is, if anything, more rigorous than Papers Please's per-person scripting. What it
+does not yet model is the **pressure and ambiguity** that turn a correct
+rule-checker into a *game*. Two genuine engine-level additions (the rest is
+content/already-planned):
+
+### 1. Attention / time budget — the missing tension (high value)
+
+Mediation is currently **free**, so the dominant strategy is "run every probe on
+everyone" — which collapses the very judgment the disclosure discipline was
+protecting (you can't read the answer off the menu, but you *can* brute-force
+it). Papers Please's core tension is **scarcity**: you can't scrutinize everyone,
+so you triage on suspicion. A per-candidate or per-shift **budget** (inspection
+points / time) gives each inspect/mediate a cost and forces "who is worth a closer
+look?" This is the single highest-leverage addition; it is also what makes the
+already-built disclosure discipline *matter*, and what makes the concealed-
+contraband god's-eye rule *play* correctly (you deny the suspicious and sometimes
+miss, because you couldn't search everyone).
+
+### 2. Graduated penalty scoring with a failure threshold (resolved 2026-06-04)
+
+Keep the **single** `expected_disposition` (there is always one correct call).
+Replace the binary correct/incorrect score with a **penalty matrix** over the
+ordered severity axis allow → deny → arrest, accumulated to a failure threshold
+(Papers Please's citation/strike model):
+
+```text
+should allow   = { allow: 0,  deny: 2,  arrest: 5 }
+should deny    = { allow: 2,  deny: 0,  arrest: 5 }
+should arrest  = { allow: 5,  deny: 2,  arrest: 0 }
+```
+
+One step off costs 2; two steps off (allow ↔ arrest) costs 5; correct costs 0.
+The shift is lost when accumulated penalty crosses a threshold.
+
+This makes **deny the low-variance hedge**: for a suspicious decliner, denying
+caps the downside at 2 whether they turn out innocent (should-allow) or guilty
+(should-deny) — which is exactly the bluffing tension, and it falls out of the
+matrix without any acceptable-set machinery. (The earlier "two-error /
+acceptable-set" sketch is superseded by this.)
+
+**+1 for right-but-unjustified.** Add a small penalty when the call is correct
+but unsupported by a revealed finding — guessing right is fine but taxed, so
+gathering evidence (which costs budget, §1) is rewarded without being mandatory.
+Justification includes **behavioral** evidence, not just documents: "the smuggler
+tried to bribe his way out of a search" justifies an arrest.
+
+`derive_disposition` is unchanged; this is a refactor of the **decision scorer**
+(penalty lookup + accumulation + the evidence check) and the shift terminal
+condition (penalty-threshold instead of correct-count). `CredentialCaseResult`
+records the per-case penalty.
+
+### Generation: presentation vs. truth (confirmed)
+
+Always **build legal, then degrade by the target disposition**, with a single
+expected disposition per candidate. Two presentation moves on top of the truth:
+
+- A **legal** candidate (should-allow) may get a **degraded initial
+  presentation** — looks suspicious but is actually fine (the innocent who looks
+  guilty; the indignant decliner).
+- An **illegal** candidate (should-deny/arrest) is degraded (made actually
+  illegal) and then **illegally upgraded back to a legal-looking presentation**
+  (the forger — fake seal / id makes the surface read as valid).
+
+The gap between *presentation* (what they show) and *truth* (the expected
+disposition) is what inspection and mediation close. The factory's
+`build_valid → degrade` already models the truth axis; this adds a
+presentation-degrade layer on top.
+
+### Smaller / done / deferred
+
+- **Forged document is always a crime** *(done, B.2)* — presenting a fake id/permit
+  arrests on its own, regardless of whether it was required.
+- **Behavioral demeanor** *(defer; content-heavy)* — nervousness/pleading/bluffing
+  as a readable signal beyond the documents, and a justification source (bribe
+  attempt → grounds for arrest). The psychological dimension; its own layer.
+
+### What to keep unchanged
+
+The matrix core, the single `expected_disposition`, most-severe-wins composition,
+the disclosure discipline, and `finding_status` as the mediation surface are all
+sound — the additions read from them, they don't replace them.
 
 ---
 

@@ -146,16 +146,32 @@ class TestCredentialsCore:
         assert game.result is GameResult.LOSE
         assert game.correct_count == 1
 
-    def test_pass_threshold_allows_a_miss(self) -> None:
-        game, handler = _ready_game(pass_threshold=1)
+    def test_penalty_threshold_allows_a_miss(self) -> None:
+        # Edda should DENY; passing her is one step off (penalty 2). A threshold
+        # of 2 tolerates exactly that.
+        game, handler = _ready_game(penalty_threshold=2)
 
         handler.receive_move(game, ("inspect", "passport"))
-        handler.receive_move(game, ("decide", "pass"))  # wrong
+        handler.receive_move(game, ("decide", "pass"))  # wrong (deny expected) -> +2
         handler.receive_move(game, ("inspect", "passport"))
-        handler.receive_move(game, ("decide", "pass"))  # correct
+        handler.receive_move(game, ("decide", "pass"))  # correct -> +0
 
+        assert game.total_penalty == 2
         assert game.result is GameResult.WIN
         assert game.correct_count == 1
+
+    def test_arrest_when_wrong_is_a_grave_penalty(self) -> None:
+        # Arresting Edda (should DENY) is two steps off -> penalty 5, over the
+        # strict default threshold of 0.
+        game, handler = _ready_game()  # penalty_threshold defaults to 0
+        handler.receive_move(game, ("inspect", "passport"))
+        handler.receive_move(game, ("decide", "arrest"))  # deny expected -> +5
+
+        assert game.case_results[0].penalty == 5
+        handler.receive_move(game, ("inspect", "passport"))
+        handler.receive_move(game, ("decide", "pass"))  # Tomas correct
+        assert game.total_penalty == 5
+        assert game.result is GameResult.LOSE
 
     def test_terminal_routing_only_after_final_case(self) -> None:
         game, handler = _ready_game()

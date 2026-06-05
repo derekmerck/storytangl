@@ -173,6 +173,7 @@ class CredentialCaseResult(BaseModelPlus):
     chosen_disposition: CredentialDisposition
     expected_disposition: CredentialDisposition
     correct: bool
+    penalty: int = 0
     discovered_findings: dict[str, str] = Field(default_factory=dict)
     packet_findings: dict[str, str] = Field(default_factory=dict)
 
@@ -206,6 +207,31 @@ _DISPOSITION_SEVERITY: dict[CredentialDisposition, int] = {
 
 def _worse(a: CredentialDisposition, b: CredentialDisposition) -> CredentialDisposition:
     return a if _DISPOSITION_SEVERITY[a] >= _DISPOSITION_SEVERITY[b] else b
+
+
+# Graduated scoring: the cost of the chosen call given the correct one, over the
+# ordered allow -> deny -> arrest axis. One step off costs 2; two steps off
+# (allow <-> arrest) costs 5; correct costs 0. Arrest-when-wrong is always the
+# heavy 5, so the heavy hammer is appropriately high-stakes and deny is the
+# low-variance hedge for ambiguous calls. Penalties accumulate to a per-shift
+# failure threshold (the Papers Please citation model).
+# (The "+1 right-but-unjustified" evidence tax lands with the justification model
+# in B.3, where behavioral evidence -- a declined search, a bribe attempt --
+# also counts as justification.)
+_D = CredentialDisposition
+DISPOSITION_PENALTY: dict[CredentialDisposition, dict[CredentialDisposition, int]] = {
+    _D.PASS: {_D.PASS: 0, _D.DENY: 2, _D.ARREST: 5},
+    _D.DENY: {_D.PASS: 2, _D.DENY: 0, _D.ARREST: 5},
+    _D.ARREST: {_D.PASS: 5, _D.DENY: 2, _D.ARREST: 0},
+}
+
+
+def disposition_penalty(
+    expected: CredentialDisposition, chosen: CredentialDisposition
+) -> int:
+    """Penalty for choosing ``chosen`` when ``expected`` was correct."""
+
+    return DISPOSITION_PENALTY[expected][chosen]
 
 
 def _assess_credential(
@@ -261,17 +287,56 @@ def _assess_requirement(
     return worst
 
 
+def _contraband_class(level: RestrictionLevel) -> str:
+    """Classify a contraband indication's rule (Phase B.2)."""
+
+    if level is RestrictionLevel.FORBIDDEN:
+        return "forbidden"
+    if level.requires_permit:
+        return "permit_required"
+    return "declaration_only"  # allowed if declared (anonymous / id level)
+
+
 def _assess_contraband(
     case: CredentialCase,
     item: ContrabandItem,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
-    if item.concealed:
-        return CredentialDisposition.ARREST  # concealment is a crime
-    if level is RestrictionLevel.FORBIDDEN:
-        return CredentialDisposition.DENY  # declared but forbidden -> relinquish
-    return _assess_requirement(case, item.indication, level, finding_status)
+    """Assess one contraband item under the declaration-is-the-requirement model.
+
+    Contraband is, by definition, what must be declared; concealing any of it is
+    itself the violation. ``request_disclosure`` rescues (the candidate declares,
+    so it is assessed as declared); ``request_search`` only reveals it (the
+    concealment stands). See ``CREDENTIALS_LOOP_DESIGN.md`` B.2.
+    """
+
+    fs = finding_status or {}
+    cls = _contraband_class(level)
+    # disclosure declares all concealed goods; a bare un-concealed item is
+    # already declared. The contraband's permit (when one is required) lives in
+    # the packet keyed by indication, so its standing is assessed by
+    # _assess_requirement -- the same machinery as a purpose permit.
+    declared = (not item.concealed) or fs.get("disclosure") == "declared"
+
+    if declared:
+        if fs.get("relinquish") == "yielded":
+            return CredentialDisposition.PASS  # voluntarily surrendered
+        if cls == "forbidden":
+            return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
+        if cls == "permit_required":
+            return _assess_requirement(case, item.indication, level, fs)
+        return CredentialDisposition.PASS  # declaration-only, declared -> allow
+
+    # Concealed and not disclosed: concealment is the violation.
+    if cls == "forbidden":
+        return CredentialDisposition.ARREST  # smuggling forbidden goods
+    if cls == "declaration_only":
+        return CredentialDisposition.DENY  # concealed declarable goods
+    # permit-required, concealed:
+    if _assess_requirement(case, item.indication, level, fs) is CredentialDisposition.PASS:
+        return CredentialDisposition.DENY  # had a valid permit but concealed it (Q1)
+    return CredentialDisposition.ARREST  # smuggling unpermitted goods
 
 
 def derive_disposition(
@@ -302,6 +367,14 @@ def derive_disposition(
         level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
         worst = _worse(worst, _assess_contraband(case, item, level, finding_status))
 
+    # Presenting a forged / fake document is a crime in itself, regardless of
+    # whether the document was required -- handing over a fake id unasked still
+    # arrests. (A merely *invalid* document -- expired, unsealed -- with nothing
+    # to back is moot, since its status is not a crime.)
+    for token in (case.id_card, *case.packet):
+        if token is not None and token.status.is_crime:
+            worst = _worse(worst, CredentialDisposition.ARREST)
+
     return worst
 
 
@@ -321,8 +394,10 @@ class CredentialsGame(PickingGame):
         ]
     )
     allow_arrest: bool = True
-    # ``None`` means "every candidate must be correct" (the strict default).
-    pass_threshold: int | None = None
+    # The shift is lost when accumulated decision penalty exceeds this. 0 is the
+    # strict default (any wrong call ends the shift); a world raises it to make a
+    # more forgiving day. See DISPOSITION_PENALTY.
+    penalty_threshold: int = 0
     # The day's rules. Cases derive their disposition against this unless they
     # carry an authored ``correct_disposition`` override.
     restriction_map: Restrictions = Field(
@@ -430,10 +505,10 @@ class CredentialsGame(PickingGame):
         return sum(1 for result in self.case_results if result.correct)
 
     @property
-    def required_correct(self) -> int:
-        if self.pass_threshold is not None:
-            return self.pass_threshold
-        return self._total_cases()
+    def total_penalty(self) -> int:
+        """Accumulated decision penalty across the shift so far."""
+
+        return sum(result.penalty for result in self.case_results)
 
     # ----- picking-kernel surface (reads the active case) -------------------
     def get_visible_items(self) -> list[str]:
@@ -524,6 +599,8 @@ class CredentialsGame(PickingGame):
                 "credential_roster_size": self._total_cases(),
                 "credential_cases_remaining": self._total_cases() - len(self.case_results),
                 "credential_correct_count": self.correct_count,
+                "credential_total_penalty": self.total_penalty,
+                "credential_penalty_threshold": self.penalty_threshold,
                 "credential_shift_score": dict(self.score),
                 "credential_shift_complete": self.shift_complete,
             }
@@ -566,7 +643,22 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # request_search: single move, once per case.
         if "search" not in game.finding_status:
             moves.append(CredentialsMove(kind="request_search", target=""))
+        # request_disclosure (B.2): "anything to declare?" -- always offerable
+        # (asking reveals nothing the menu shouldn't), once per case.
+        if "disclosure" not in game.finding_status:
+            moves.append(CredentialsMove(kind="request_disclosure", target=""))
+        # request_relinquish (B.2): offer when the candidate has *declared*
+        # contraband to surrender (visible, or disclosed via request_disclosure).
+        if "relinquish" not in game.finding_status and self._has_declared_contraband(game):
+            moves.append(CredentialsMove(kind="request_relinquish", target=""))
         return moves
+
+    @staticmethod
+    def _has_declared_contraband(game: CredentialsGame) -> bool:
+        disclosed = game.finding_status.get("disclosure") == "declared"
+        return any(
+            (not item.concealed) or disclosed for item in game.active_case.get_contraband()
+        )
 
     def get_available_inspect_targets(self, game: CredentialsGame) -> list[str]:
         case = game.active_case
@@ -592,6 +684,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return "Verify identity"
         if move.kind == "request_search":
             return "Request search"
+        if move.kind == "request_disclosure":
+            return "Ask for anything to declare"
+        if move.kind == "request_relinquish":
+            return "Have the contraband surrendered"
         return f"Choose {move.target}"
 
     def resolve_inspection(
@@ -636,6 +732,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         chosen = CredentialDisposition(target)
         expected = game.expected_disposition(case)
         correct = chosen == expected
+        penalty = disposition_penalty(expected, chosen)
 
         game.case_results.append(
             CredentialCaseResult(
@@ -643,6 +740,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 chosen_disposition=chosen,
                 expected_disposition=expected,
                 correct=correct,
+                penalty=penalty,
                 discovered_findings=dict(game.revealed_findings),
                 packet_findings=dict(game.packet_findings),
             )
@@ -650,6 +748,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         detail["candidate"] = case.candidate_name
         detail["credential_stage"] = game.current_stage
+        detail["penalty"] = penalty
         if correct:
             game.score["player"] = game.score.get("player", 0) + 1
             detail["outcome"] = "correct_disposition"
@@ -677,6 +776,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return self._resolve_verify_id(game, detail)
         if kind == "request_search":
             return self._resolve_request_search(game, detail)
+        if kind == "request_disclosure":
+            return self._resolve_request_disclosure(game, detail)
+        if kind == "request_relinquish":
+            return self._resolve_request_relinquish(game, detail)
         return super().resolve_move_kind(kind, game, player_move, detail)
 
     def _resolve_request_document(
@@ -745,14 +848,51 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             detail["outcome"] = "search_clean"
         return RoundResult.CONTINUE
 
+    def _resolve_request_disclosure(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        # "Anything to declare?" -- a compliant candidate (B.2 assumes compliance;
+        # lying is B.3) declares any concealed contraband. *Voluntary* disclosure
+        # rescues concealed-but-permitted goods to the declared assessment (the
+        # "oops" path). But search forecloses: once a search has already
+        # confirmed concealment, a later disclosure is too late to rescue -- it
+        # records "too_late" (which derive does not treat as declared) rather
+        # than "declared".
+        concealed = [item for item in game.active_case.get_contraband() if item.concealed]
+        if concealed and game.finding_status.get("search") == "confirmed":
+            game.finding_status["disclosure"] = "too_late"
+            detail["outcome"] = "disclosure_too_late"
+            detail["declared"] = [item.indication.value for item in concealed]
+        else:
+            game.finding_status["disclosure"] = "declared"
+            if concealed:
+                detail["outcome"] = "disclosure_declared"
+                detail["declared"] = [item.indication.value for item in concealed]
+            else:
+                detail["outcome"] = "disclosure_nothing"
+        return RoundResult.CONTINUE
+
+    def _resolve_request_relinquish(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        # The candidate surrenders declared contraband, clearing the violation.
+        game.finding_status["relinquish"] = "yielded"
+        detail["outcome"] = "relinquished"
+        return RoundResult.CONTINUE
+
     # ----- lifecycle / projection ------------------------------------------
 
     def evaluate(self, game: CredentialsGame) -> GameResult:
-        """Own shift terminality: in process until the final candidate is decided."""
+        """Own shift terminality: in process until the final candidate is decided,
+        then win if accumulated penalty stayed within the threshold."""
 
         if not game.shift_complete:
             return GameResult.IN_PROCESS
-        if game.correct_count >= game.required_correct:
+        if game.total_penalty <= game.penalty_threshold:
             return GameResult.WIN
         return GameResult.LOSE
 
@@ -857,6 +997,25 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return [
                 ContentFragment(content="You request a search."),
                 ContentFragment(content=line),
+            ]
+        if action == "request_disclosure":
+            outcome = notes.get("outcome")
+            items = notes.get("declared") or []
+            what = ", ".join(items) if items else "something"
+            if outcome == "disclosure_declared":
+                line = f"The candidate hesitates, then sets out {what}."
+            elif outcome == "disclosure_too_late":
+                line = f"Too late -- the {what} you already turned up is on the counter between you."
+            else:
+                line = "The candidate has nothing to declare."
+            return [
+                ContentFragment(content="You ask whether there is anything to declare."),
+                ContentFragment(content=line),
+            ]
+        if action == "request_relinquish":
+            return [
+                ContentFragment(content="You direct the candidate to surrender the contraband."),
+                ContentFragment(content="They hand it over and step back, lighter."),
             ]
 
         candidate = notes.get("candidate", "the traveler")
