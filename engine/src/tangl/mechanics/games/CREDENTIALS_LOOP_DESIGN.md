@@ -3,7 +3,9 @@
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
 (A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
 lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
-2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); Phases
+2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); penalty-matrix
+scorer + soft time budget + per-rule-set scoring config (configurable
+`penalty_matrix`, `no_evidence_penalty` toggle) LANDED 2026-06-05; Phases
 B.3 (declines axis)/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
@@ -814,7 +816,7 @@ shift *ends* when time runs out, leaving the queue unprocessed) is a possible
 later mode; the soft overtime model was chosen for v1 because it bolts directly
 onto the penalty accumulation with no early-termination machinery.
 
-### 2. Graduated penalty scoring with a failure threshold (resolved 2026-06-04)
+### 2. Graduated penalty scoring with a failure threshold (LANDED 2026-06-05)
 
 Keep the **single** `expected_disposition` (there is always one correct call).
 Replace the binary correct/incorrect score with a **penalty matrix** over the
@@ -836,16 +838,92 @@ caps the downside at 2 whether they turn out innocent (should-allow) or guilty
 matrix without any acceptable-set machinery. (The earlier "two-error /
 acceptable-set" sketch is superseded by this.)
 
-**+1 for right-but-unjustified.** Add a small penalty when the call is correct
-but unsupported by a revealed finding — guessing right is fine but taxed, so
-gathering evidence (which costs budget, §1) is rewarded without being mandatory.
-Justification includes **behavioral** evidence, not just documents: "the smuggler
-tried to bribe his way out of a search" justifies an arrest.
+**+1 for right-but-unjustified — a toggle (`no_evidence_penalty`, LANDED).** When
+> 0, a *correct* deny/arrest that the player never backed with surfaced evidence
+costs that much: guessing right is fine but taxed, so gathering evidence (which
+costs budget, §1) is rewarded without being mandatory. It is **off by default**
+because it is regime-specific — a rule-of-law gate turns it on; an arrest-by-decree
+regime (§3) must leave it off, since arresting without evidence is the *norm*
+there. A rejection is **justified** (`_rejection_is_justified`) if it is backed by
+either *surfaced* or *self-evident* evidence, and the tax errs toward justified so
+it never punishes a fair call:
 
-`derive_disposition` is unchanged; this is a refactor of the **decision scorer**
+- *Surfaced* (`_has_surfaced_evidence`) — a revealed document/packet finding, an
+  adverse `finding_status` (`confirmed`/`cleared`/`yielded`, but **not** a clean
+  `search: cleared`, which turned nothing up), or a logged declaration of
+  contraband actually present.
+- *Self-evident* (`_has_visible_grounds`) — facts visible without investigation: a
+  credential the purpose plainly requires but the packet lacks, or openly
+  (non-concealed) contraband that is forbidden or plainly missing its permit. A
+  concealed item is not self-evident; a declared declaration-only item is allowed,
+  so neither counts.
+
+The tax keys off `correct` (not `penalty == 0`), so a custom matrix that tolerates
+a non-expected call at zero cost is never mistaken for a correct one, and it never
+fires on an allow (the point of an allow is that there is *no* adverse evidence).
+Justification will also grow **behavioral** evidence once B.3 lands ("the smuggler
+tried to bribe his way out of a search" → grounds for arrest); `_EVIDENCE_FINDINGS`
+is the seam for that.
+
+`derive_disposition` is unchanged; this was a refactor of the **decision scorer**
 (penalty lookup + accumulation + the evidence check) and the shift terminal
 condition (penalty-threshold instead of correct-count). `CredentialCaseResult`
-records the per-case penalty.
+records the per-case `penalty` and an `unjustified` flag.
+
+### 3. Per-rule-set scoring + malfeasance/doctoring (LANDED scoring 2026-06-05; malfeasance deferred)
+
+Scoring is **per rule set**, not a global constant. The penalty matrix is a
+per-game field (`penalty_matrix`, string-keyed by disposition value so it stays
+JSON-safe), defaulting to the standard rule-of-law matrix above. A world overrides
+it to score a different regime. The motivating example — **"arrest everyone, any
+non-arrest is a failure"** — is just a matrix where a non-arrest is a hard failure
+rather than a mild hedge:
+
+```text
+should arrest = { allow: 5, deny: 5, arrest: 0 }   # decree: only arrest is clean
+```
+
+There are **two independent ways to express such a regime**, and they compose:
+
+- **Decree via matrix** — set `expected_disposition` (or the matrix) so ARREST is
+  the only zero-penalty call even on *clean* packets. You arrest the innocent; the
+  regime, not the packet, defines correct. Leave `no_evidence_penalty` at 0.
+- **Manufactured grounds via generation** — author the shift with a skewed
+  `disposition_distribution` (e.g. `{ARREST: 1.0}`); `generate_roster`/`make_offer`
+  degrade every packet (FORGED / WRONG_HOLDER / CONCEALED, etc.) until it *derives*
+  to ARREST. The arrest is then "justified" by a real (planted) violation. This is
+  the existing factory machinery — "build legal, then degrade by target
+  disposition" — pointed at a uniform target.
+
+**Malfeasance: doctoring evidence (deferred — opens its own design space).** The
+B.1/B.2 mediations are *clearing* and honest (request_document, relinquish,
+disclosure). Their counterpart is the player **doctoring evidence** — lose a piece,
+smear a date to invalid, strip or forge a seal — and that is a *malfeasance axis*,
+not merely a regime event. Two observations fix its shape:
+
+- It spans a **severity spectrum**. *Turning a blind eye* (don't investigate;
+  accept a bribe to pass someone) is the low, passive end — this is the Phase C
+  bribery/favoritism layer. *Actively doctoring the packet into false testimony*
+  (manufacturing or destroying a finding) is the high, active end. Both can point
+  **in favor of or against** the candidate. So Phase C bribery is the low-level
+  instance of the same spine, not a separate mechanic.
+- It is driven by the **no-evidence penalty**. Because `no_evidence_penalty` is a
+  scalar strike-cost, fabricating a justification is "just another step to keep
+  your strikes down." The balance question is therefore explicit and tunable:
+  **is having (or manufacturing) evidence worth more than the expected penalty for
+  getting caught at malfeasance?** A regime that prizes correct-seeming paperwork
+  makes doctoring rational; one that catches-and-punishes hard makes honest
+  investigation (paying budget, §1) the cheaper path.
+
+The transforms already exist as `FailureMode`s (`MISSING_PERMIT` = lose a piece,
+`EXPIRED_ID`/`BAD_DATE` = invalidate a date); what is deferred is the **live move**
+that applies one mid-case and re-derives, *plus* the catch/strike model that prices
+it (getting-caught probability, the malfeasance penalty, reputation). Model the
+mutation as the adversarial counterpart of `finding_status` (a `case_mutations`
+overlay so `advance_case` resets cleanly and the authored packet is untouched),
+gated behind a regime flag. Defer the whole malfeasance layer — it pulls in
+bribery, detection odds, and reputation at once — but build it as one axis with
+blind-eye/bribe at the bottom and false-testimony doctoring at the top.
 
 ### Generation: presentation vs. truth (confirmed)
 

@@ -174,6 +174,9 @@ class CredentialCaseResult(BaseModelPlus):
     expected_disposition: CredentialDisposition
     correct: bool
     penalty: int = 0
+    # True when the call was correct but unbacked by surfaced evidence and the
+    # no_evidence_penalty toggle was on (the "justify your disposition" tax fired).
+    unjustified: bool = False
     discovered_findings: dict[str, str] = Field(default_factory=dict)
     packet_findings: dict[str, str] = Field(default_factory=dict)
 
@@ -218,20 +221,47 @@ def _worse(a: CredentialDisposition, b: CredentialDisposition) -> CredentialDisp
 # (The "+1 right-but-unjustified" evidence tax lands with the justification model
 # in B.3, where behavioral evidence -- a declined search, a bribe attempt --
 # also counts as justification.)
-_D = CredentialDisposition
-DISPOSITION_PENALTY: dict[CredentialDisposition, dict[CredentialDisposition, int]] = {
-    _D.PASS: {_D.PASS: 0, _D.DENY: 2, _D.ARREST: 5},
-    _D.DENY: {_D.PASS: 2, _D.DENY: 0, _D.ARREST: 5},
-    _D.ARREST: {_D.PASS: 5, _D.DENY: 2, _D.ARREST: 0},
+# String-keyed (disposition .value) so it is a plain JSON-serializable structure
+# a world can override per rule set. The default is the standard rule-of-law
+# matrix; a regime could supply, e.g., {"arrest": {"pass": 5, "deny": 5,
+# "arrest": 0}} to make any non-arrest a hard failure.
+DISPOSITION_PENALTY: dict[str, dict[str, int]] = {
+    "pass": {"pass": 0, "deny": 2, "arrest": 5},
+    "deny": {"pass": 2, "deny": 0, "arrest": 5},
+    "arrest": {"pass": 5, "deny": 2, "arrest": 0},
 }
 
 
-def disposition_penalty(
-    expected: CredentialDisposition, chosen: CredentialDisposition
-) -> int:
-    """Penalty for choosing ``chosen`` when ``expected`` was correct."""
+def default_penalty_matrix() -> dict[str, dict[str, int]]:
+    """A fresh copy of the standard penalty matrix (for per-game defaults)."""
 
-    return DISPOSITION_PENALTY[expected][chosen]
+    return {expected: dict(row) for expected, row in DISPOSITION_PENALTY.items()}
+
+
+def disposition_penalty(
+    expected: CredentialDisposition,
+    chosen: CredentialDisposition,
+    matrix: dict[str, dict[str, int]] | None = None,
+) -> int:
+    """Penalty for choosing ``chosen`` when ``expected`` was correct, under
+    ``matrix`` (the standard matrix by default).
+
+    A custom matrix may be *partial* -- a regime can override just the rows/cells
+    that differ from the standard (e.g. only the ``"arrest"`` row) and any missing
+    expected-row or chosen-cell falls back to the standard matrix.
+    """
+
+    m = matrix or DISPOSITION_PENALTY
+    row = m.get(expected.value, DISPOSITION_PENALTY[expected.value])
+    return row.get(chosen.value, DISPOSITION_PENALTY[expected.value][chosen.value])
+
+
+# finding_status values that represent *surfaced* evidence -- an investigation
+# that turned a problem up ("confirmed"), repaired a mitigatable one ("cleared"),
+# or recovered contraband ("yielded"). A plain "verified" (checked, sound) is not
+# adverse evidence, so it is excluded. Behavioral evidence (a declined search, a
+# bribe attempt) extends this set in Phase B.3.
+_EVIDENCE_FINDINGS = frozenset({"confirmed", "cleared", "yielded"})
 
 
 # Time cost of each action, in shift-budget units. Cheap probes (a glance at a
@@ -425,8 +455,18 @@ class CredentialsGame(PickingGame):
     allow_arrest: bool = True
     # The shift is lost when accumulated penalty exceeds this. 0 is the strict
     # default (any wrong call ends the shift); a world raises it for a more
-    # forgiving day. Penalty = decision penalties (DISPOSITION_PENALTY) + overtime.
+    # forgiving day. Penalty = decision penalties + overtime.
     penalty_threshold: int = 0
+    # Scoring is per rule set. The penalty matrix (keyed by disposition value)
+    # is overridable so a regime can score differently -- e.g. "arrest everyone,
+    # any non-arrest fails". no_evidence_penalty is the toggle for the "justify
+    # your disposition" tax: when > 0, a *correct* deny/arrest that is not backed
+    # by a revealed finding costs that much (off by default; a decree regime that
+    # needs no evidence leaves it at 0).
+    penalty_matrix: dict[str, dict[str, int]] = Field(
+        default_factory=default_penalty_matrix
+    )
+    no_evidence_penalty: int = 0
     # Soft attention/time budget. None disables time pressure (the default).
     # When set, every probe and decision costs time (see _MOVE_TIME_COST); time
     # spent over the budget converts to penalty at overtime_penalty_rate. Going
@@ -662,6 +702,7 @@ class CredentialsGame(PickingGame):
                 "credential_total_penalty": self.total_penalty,
                 "credential_decision_penalty": self.decision_penalty,
                 "credential_penalty_threshold": self.penalty_threshold,
+                "credential_no_evidence_penalty": self.no_evidence_penalty,
                 "credential_time_budget": self.time_budget,
                 "credential_time_spent": self.time_spent,
                 "credential_overtime": self.overtime,
@@ -792,6 +833,69 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game.current_stage = "packet"
         return RoundResult.CONTINUE
 
+    def _rejection_is_justified(self, game: CredentialsGame) -> bool:
+        """Whether a deny/arrest on the active case is backed by evidence -- either
+        surfaced by the player's investigation or self-evidently visible. Backs the
+        no_evidence_penalty toggle (only an *unjustified* correct rejection is
+        taxed), and errs toward "justified" so the tax never punishes a fair call.
+        """
+
+        return self._has_surfaced_evidence(game) or self._has_visible_grounds(game)
+
+    def _has_surfaced_evidence(self, game: CredentialsGame) -> bool:
+        """Adverse evidence the player turned up: a revealed document/packet
+        finding, an adverse finding_status, or a logged declaration of contraband
+        actually present.
+        """
+
+        if game.revealed_findings or game.packet_findings:
+            return True
+        fs = game.finding_status
+        for key, value in fs.items():
+            if value not in _EVIDENCE_FINDINGS:
+                continue
+            # A *clean* search ("search": "cleared") turned nothing up -- it is
+            # not adverse evidence and must not suppress the tax on an unrelated
+            # unsurfaced issue.
+            if key == "search" and value == "cleared":
+                continue
+            return True
+        # A logged disclosure counts only when there was something to declare.
+        if fs.get("disclosure") in ("declared", "too_late") and game.active_case.get_contraband():
+            return True
+        return False
+
+    def _has_visible_grounds(self, game: CredentialsGame) -> bool:
+        """Self-evident grounds for a rejection -- facts visible without any
+        investigation: a credential the purpose plainly requires but the packet
+        does not hold, or openly (non-concealed) contraband that is forbidden or
+        plainly missing its permit. A concealed item is *not* self-evident, and a
+        declared declaration-only item is allowed (not grounds), so neither counts.
+        """
+
+        case = game.active_case
+        rules = game.restriction_map
+        region = case.get_region()
+
+        purpose = case.get_purpose()
+        plevel = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
+        if plevel is RestrictionLevel.FORBIDDEN:
+            return True  # the stated purpose is itself disallowed -- self-evident
+        if plevel.requires_id and case.id_status() is None:
+            return True
+        if plevel.requires_permit and case.credential_for(purpose) is None:
+            return True
+
+        for item in case.get_contraband():
+            if item.concealed:
+                continue  # a hidden item's grounds are not self-evident
+            clevel = rules.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
+            if clevel is RestrictionLevel.FORBIDDEN:
+                return True  # openly forbidden goods
+            if clevel.requires_permit and case.credential_for(item.indication) is None:
+                return True  # visible item, plainly missing its permit
+        return False
+
     def resolve_decision(
         self,
         game: CredentialsGame,
@@ -802,7 +906,23 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         chosen = CredentialDisposition(target)
         expected = game.expected_disposition(case)
         correct = chosen == expected
-        penalty = disposition_penalty(expected, chosen)
+        # Scoring is per rule set: the penalty matrix is the game's, not a global.
+        penalty = disposition_penalty(expected, chosen, game.penalty_matrix)
+
+        # The "justify your disposition" tax (opt-in, off by default): a *correct*
+        # rejection that is backed by neither surfaced nor self-evident evidence
+        # still costs no_evidence_penalty. Keyed off ``correct`` (not penalty == 0)
+        # so a custom matrix that tolerates a non-expected call at zero cost is not
+        # mistaken for a correct one. A decree regime that needs no evidence leaves
+        # the toggle at 0; a rule-of-law regime sets it to make profiling cost.
+        unjustified = (
+            correct
+            and game.no_evidence_penalty > 0
+            and chosen in (CredentialDisposition.DENY, CredentialDisposition.ARREST)
+            and not self._rejection_is_justified(game)
+        )
+        if unjustified:
+            penalty += game.no_evidence_penalty
 
         game.case_results.append(
             CredentialCaseResult(
@@ -811,6 +931,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 expected_disposition=expected,
                 correct=correct,
                 penalty=penalty,
+                unjustified=unjustified,
                 discovered_findings=dict(game.revealed_findings),
                 packet_findings=dict(game.packet_findings),
             )
@@ -819,6 +940,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail["candidate"] = case.candidate_name
         detail["credential_stage"] = game.current_stage
         detail["penalty"] = penalty
+        if unjustified:
+            detail["unjustified"] = True
         if correct:
             game.score["player"] = game.score.get("player", 0) + 1
             detail["outcome"] = "correct_disposition"
