@@ -76,6 +76,9 @@ contracts, even when the engine's internal vocabulary also uses fields named
 should be explicit and narrow rather than handled by the REST serializer.
 Remote Python clients rehydrate those REST payloads into the same typed fragment
 models used by in-process clients.
+The same pattern applies to `ProjectedState`: service methods own the typed
+section/value model, REST serializes it, and remote Python clients decode it
+back into typed projected-state values.
 
 The REST layer still performs JSON serialization manually because it owns HTTP
 transport concerns such as media profiles and optional markdown-to-HTML
