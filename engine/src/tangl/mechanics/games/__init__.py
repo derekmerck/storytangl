@@ -116,6 +116,8 @@ from .credentials_game import (
     CredentialsGameHandler,
     CredentialsMove,
     derive_disposition,
+    disposition_penalty,
+    DISPOSITION_PENALTY,
 )
 from .credentials_factory import (
     applicable_modes,
