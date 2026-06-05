@@ -3,7 +3,8 @@
 **Status:** v1 LANDED (candidate-roster shift, 2026-05-21); Phase A LANDED
 (A.1 rules-derived dispositions, A.2 candidate factory, A.3 day-spec sampling +
 lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
-2026-05-23); Phases B.2/C/D designed below as overlays  
+2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); Phases
+B.3 (declines axis)/C/D designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -677,25 +678,53 @@ clean).
 with **environment, discretion, and bribery** (a Phase C cross-cut). B.2
 computes a base disposition; Phase C composes the override on top.
 
-**Open questions (updated):**
+**Resolved model (2026-06-04): declaration is the requirement.**
 
-1. ~~Concealed contraband + valid permit~~ — *resolved:* takes the
-   ``request_disclosure`` path; if voluntarily disclosed → allow as
-   declared+valid. (Sub-question still open: if disclosure is refused or lied
-   and search forces the reveal, is the "oops" forgiveness still extended, or
-   does it escalate?)
-2. ~~Forged / wrong-holder permit + no actual contraband~~ — *resolved:* the
-   illegal-packet rule applies regardless of possession → arrest.
-3. Mitigatable-invalid permit + no contraband — does an unused-but-invalid
-   paper deny, or pass? *(Still open.)*
-4. **New:** concealed contraband whose category requires *no* permit — is the
-   concealment-when-not-required itself a violation, or moot?
+The matrix collapses once you see that **contraband is, by definition, what must
+be declared.** If concealment doesn't matter for an item, it simply isn't
+contraband — there is no fourth "ignored" category. So contraband has exactly
+three levels (from the restriction map for that indication):
 
-**B.2 ships, when it lands:** the three new move kinds above
-(``request_complete`` / ``request_disclosure`` / ``request_relinquish``); the
-declines-mediation axis (per-case ``compliant: bool`` or per-failure-mode
-willingness); and per-indication worst-case composition across multiple
-contraband items. The Phase C severity overlay layers on top.
+- **declaration-only** (anonymous / id level) — allowed *if declared*.
+- **permit-required** (with-permit level) — declared *and* a valid permit.
+- **forbidden** — denied regardless.
+
+And **concealment is itself the violation** — concealing *any* contraband is a
+problem, independent of whether it would have been permitted. The disclosure /
+search distinction decides severity:
+
+- **`request_disclosure` rescues.** Asking "anything to declare?" → (compliant)
+  candidate declares → assess as *declared* (allow if permitted or
+  declaration-only). This is the "oops, I forgot" path.
+- **`request_search` forecloses.** The concealment stands; the player learns of
+  it but forfeits the benign explanation.
+
+| Contraband state | declaration-only | permit-required | forbidden |
+|---|---|---|---|
+| declared, valid permit | allow | allow | (n/a) |
+| declared, no/invalid permit | allow | **deny** (produce/relinquish) | — |
+| declared, forbidden | — | — | **deny** (relinquish) |
+| concealed → disclosed | allow | allow if permit valid, else deny | deny (honesty mitigates arrest) |
+| concealed → searched / undiscovered | **deny** | **deny** if permit valid (Q1), else **arrest** (smuggling) | **arrest** (smuggling) |
+
+`request_relinquish` clears *declared* contraband (the candidate yields it →
+allow). The god's-eye `expected_disposition` accounts for concealed contraband
+(a perfect inspector would find it), so allowing an unsearched smuggler is wrong;
+`request_disclosure` is the only move that *rescues* concealed-but-permitted goods
+to allow.
+
+**Generator note.** The sampler will **not** randomly produce a candidate that
+conceals something it didn't need to declare-and-permit; that edge (concealing
+declaration-only goods) is an **authored** teaching beat — flex it once, get
+chided for the wrong call, see it again in a different context — not a random
+spawn.
+
+**B.2 scope (compliance assumed):** the new move kinds ``request_disclosure`` /
+``request_relinquish`` / ``request_complete`` (missing-doc, the B.1-deferred
+surface), plus the graduated contraband assessment above and per-indication
+worst-case composition. **Deferred to B.3:** the declines-mediation axis (the
+candidate who lies when asked or refuses to yield), where disclosure can fail.
+Phase C severity overlay (origin bends arrest↔deny) layers on top of all of it.
 
 ---
 

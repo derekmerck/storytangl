@@ -261,17 +261,56 @@ def _assess_requirement(
     return worst
 
 
+def _contraband_class(level: RestrictionLevel) -> str:
+    """Classify a contraband indication's rule (Phase B.2)."""
+
+    if level is RestrictionLevel.FORBIDDEN:
+        return "forbidden"
+    if level.requires_permit:
+        return "permit_required"
+    return "declaration_only"  # allowed if declared (anonymous / id level)
+
+
 def _assess_contraband(
     case: CredentialCase,
     item: ContrabandItem,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
-    if item.concealed:
-        return CredentialDisposition.ARREST  # concealment is a crime
-    if level is RestrictionLevel.FORBIDDEN:
-        return CredentialDisposition.DENY  # declared but forbidden -> relinquish
-    return _assess_requirement(case, item.indication, level, finding_status)
+    """Assess one contraband item under the declaration-is-the-requirement model.
+
+    Contraband is, by definition, what must be declared; concealing any of it is
+    itself the violation. ``request_disclosure`` rescues (the candidate declares,
+    so it is assessed as declared); ``request_search`` only reveals it (the
+    concealment stands). See ``CREDENTIALS_LOOP_DESIGN.md`` B.2.
+    """
+
+    fs = finding_status or {}
+    cls = _contraband_class(level)
+    # disclosure declares all concealed goods; a bare un-concealed item is
+    # already declared. The contraband's permit (when one is required) lives in
+    # the packet keyed by indication, so its standing is assessed by
+    # _assess_requirement -- the same machinery as a purpose permit.
+    declared = (not item.concealed) or fs.get("disclosure") == "declared"
+
+    if declared:
+        if fs.get("relinquish") == "yielded":
+            return CredentialDisposition.PASS  # voluntarily surrendered
+        if cls == "forbidden":
+            return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
+        if cls == "permit_required":
+            return _assess_requirement(case, item.indication, level, fs)
+        return CredentialDisposition.PASS  # declaration-only, declared -> allow
+
+    # Concealed and not disclosed: concealment is the violation.
+    if cls == "forbidden":
+        return CredentialDisposition.ARREST  # smuggling forbidden goods
+    if cls == "declaration_only":
+        return CredentialDisposition.DENY  # concealed declarable goods
+    # permit-required, concealed:
+    if _assess_requirement(case, item.indication, level, fs) is CredentialDisposition.PASS:
+        return CredentialDisposition.DENY  # had a valid permit but concealed it (Q1)
+    return CredentialDisposition.ARREST  # smuggling unpermitted goods
 
 
 def derive_disposition(
@@ -566,7 +605,22 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # request_search: single move, once per case.
         if "search" not in game.finding_status:
             moves.append(CredentialsMove(kind="request_search", target=""))
+        # request_disclosure (B.2): "anything to declare?" -- always offerable
+        # (asking reveals nothing the menu shouldn't), once per case.
+        if "disclosure" not in game.finding_status:
+            moves.append(CredentialsMove(kind="request_disclosure", target=""))
+        # request_relinquish (B.2): offer when the candidate has *declared*
+        # contraband to surrender (visible, or disclosed via request_disclosure).
+        if "relinquish" not in game.finding_status and self._has_declared_contraband(game):
+            moves.append(CredentialsMove(kind="request_relinquish", target=""))
         return moves
+
+    @staticmethod
+    def _has_declared_contraband(game: CredentialsGame) -> bool:
+        disclosed = game.finding_status.get("disclosure") == "declared"
+        return any(
+            (not item.concealed) or disclosed for item in game.active_case.get_contraband()
+        )
 
     def get_available_inspect_targets(self, game: CredentialsGame) -> list[str]:
         case = game.active_case
@@ -592,6 +646,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return "Verify identity"
         if move.kind == "request_search":
             return "Request search"
+        if move.kind == "request_disclosure":
+            return "Ask for anything to declare"
+        if move.kind == "request_relinquish":
+            return "Have the contraband surrendered"
         return f"Choose {move.target}"
 
     def resolve_inspection(
@@ -677,6 +735,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return self._resolve_verify_id(game, detail)
         if kind == "request_search":
             return self._resolve_request_search(game, detail)
+        if kind == "request_disclosure":
+            return self._resolve_request_disclosure(game, detail)
+        if kind == "request_relinquish":
+            return self._resolve_request_relinquish(game, detail)
         return super().resolve_move_kind(kind, game, player_move, detail)
 
     def _resolve_request_document(
@@ -743,6 +805,34 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         else:
             game.finding_status["search"] = "cleared"
             detail["outcome"] = "search_clean"
+        return RoundResult.CONTINUE
+
+    def _resolve_request_disclosure(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        # "Anything to declare?" -- a compliant candidate (B.2 assumes compliance;
+        # lying is B.3) declares any concealed contraband. Declaring rescues
+        # concealed-but-permitted goods to the declared assessment (the "oops"
+        # path); contrast request_search, which only reveals and forecloses.
+        game.finding_status["disclosure"] = "declared"
+        concealed = [item for item in game.active_case.get_contraband() if item.concealed]
+        if concealed:
+            detail["outcome"] = "disclosure_declared"
+            detail["declared"] = [item.indication.value for item in concealed]
+        else:
+            detail["outcome"] = "disclosure_nothing"
+        return RoundResult.CONTINUE
+
+    def _resolve_request_relinquish(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        # The candidate surrenders declared contraband, clearing the violation.
+        game.finding_status["relinquish"] = "yielded"
+        detail["outcome"] = "relinquished"
         return RoundResult.CONTINUE
 
     # ----- lifecycle / projection ------------------------------------------
@@ -857,6 +947,22 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return [
                 ContentFragment(content="You request a search."),
                 ContentFragment(content=line),
+            ]
+        if action == "request_disclosure":
+            if notes.get("outcome") == "disclosure_declared":
+                items = notes.get("declared") or []
+                what = ", ".join(items) if items else "something"
+                line = f"The candidate hesitates, then sets out {what}."
+            else:
+                line = "The candidate has nothing to declare."
+            return [
+                ContentFragment(content="You ask whether there is anything to declare."),
+                ContentFragment(content=line),
+            ]
+        if action == "request_relinquish":
+            return [
+                ContentFragment(content="You direct the candidate to surrender the contraband."),
+                ContentFragment(content="They hand it over and step back, lighter."),
             ]
 
         candidate = notes.get("candidate", "the traveler")

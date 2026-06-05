@@ -1,0 +1,173 @@
+"""Tests for Phase B.2 contraband mediation (disclosure / relinquish / search).
+
+The model (CREDENTIALS_LOOP_DESIGN.md B.2): contraband is what must be declared;
+concealment is itself the violation. request_disclosure rescues (declare ->
+assess as declared); request_search forecloses (concealment stands).
+"""
+
+from __future__ import annotations
+
+from tangl.mechanics.games import (
+    ContrabandItem,
+    CredentialCase,
+    CredentialDisposition,
+    CredentialStatus,
+    CredentialToken,
+    CredentialsGame,
+    CredentialsGameHandler,
+    Indication,
+    Region,
+    Restrictions,
+    RestrictionLevel,
+    derive_disposition,
+)
+
+D = CredentialDisposition
+S = CredentialStatus
+IND = Indication
+L = RestrictionLevel
+
+# weapon = permit-required, secrets = declaration-only, drugs = forbidden.
+RULES = Restrictions.from_map(
+    {
+        Region.LOCAL: {
+            IND.TRAVEL: L.WITH_ID,
+            IND.WEAPON: L.WITH_PERMIT,
+            IND.SECRETS: L.ANONYMOUS,
+            IND.DRUGS: L.FORBIDDEN,
+        }
+    }
+)
+
+
+def _id(status: S = S.VALID) -> CredentialToken:
+    return CredentialToken(indication=IND.TRAVEL, status=status)
+
+
+def _permit(indication: IND, status: S = S.VALID) -> CredentialToken:
+    return CredentialToken(indication=indication, status=status, requires_id=True)
+
+
+def _case(*possessions: ContrabandItem, packet: list | None = None) -> CredentialCase:
+    return CredentialCase(
+        purpose=IND.TRAVEL,
+        presented_documents={"passport": "An id."},
+        id_card=_id(),
+        packet=packet or [],
+        possessions=list(possessions),
+    )
+
+
+def _derive(case: CredentialCase, fs: dict | None = None) -> CredentialDisposition:
+    return derive_disposition(case, RULES, fs)
+
+
+class TestContrabandDerivation:
+    """The graduated declared/concealed x level matrix (no mediation)."""
+
+    def test_declared_declaration_only_allows(self) -> None:
+        assert _derive(_case(ContrabandItem(indication=IND.SECRETS))) is D.PASS
+
+    def test_concealed_declaration_only_denies(self) -> None:
+        assert _derive(_case(ContrabandItem(indication=IND.SECRETS, concealed=True))) is D.DENY
+
+    def test_declared_permitted_with_permit_allows(self) -> None:
+        case = _case(ContrabandItem(indication=IND.WEAPON), packet=[_permit(IND.WEAPON)])
+        assert _derive(case) is D.PASS
+
+    def test_declared_permitted_without_permit_denies(self) -> None:
+        assert _derive(_case(ContrabandItem(indication=IND.WEAPON))) is D.DENY
+
+    def test_concealed_permitted_without_permit_arrests(self) -> None:
+        # Classic smuggling: hidden weapon, no permit.
+        assert _derive(_case(ContrabandItem(indication=IND.WEAPON, concealed=True))) is D.ARREST
+
+    def test_concealed_permitted_with_valid_permit_denies(self) -> None:
+        # Had the permit but concealed the weapon -> deny (Q1), not arrest.
+        case = _case(ContrabandItem(indication=IND.WEAPON, concealed=True), packet=[_permit(IND.WEAPON)])
+        assert _derive(case) is D.DENY
+
+    def test_declared_forbidden_denies(self) -> None:
+        assert _derive(_case(ContrabandItem(indication=IND.DRUGS))) is D.DENY
+
+    def test_concealed_forbidden_arrests(self) -> None:
+        assert _derive(_case(ContrabandItem(indication=IND.DRUGS, concealed=True))) is D.ARREST
+
+
+class TestDisclosureRescuesSearchForecloses:
+    def test_disclosure_rescues_concealed_permitted(self) -> None:
+        case = _case(ContrabandItem(indication=IND.WEAPON, concealed=True), packet=[_permit(IND.WEAPON)])
+        assert _derive(case) is D.DENY  # concealed, undiscovered
+        assert _derive(case, {"disclosure": "declared"}) is D.PASS  # declared -> permitted
+
+    def test_search_does_not_rescue_concealed_permitted(self) -> None:
+        case = _case(ContrabandItem(indication=IND.WEAPON, concealed=True), packet=[_permit(IND.WEAPON)])
+        # Searching reveals but forecloses the benign explanation -> still deny.
+        assert _derive(case, {"search": "confirmed"}) is D.DENY
+
+    def test_disclosure_downgrades_smuggled_forbidden_to_deny(self) -> None:
+        case = _case(ContrabandItem(indication=IND.DRUGS, concealed=True))
+        assert _derive(case) is D.ARREST  # smuggling forbidden goods
+        assert _derive(case, {"disclosure": "declared"}) is D.DENY  # honesty mitigates
+
+    def test_relinquish_clears_declared_contraband(self) -> None:
+        case = _case(ContrabandItem(indication=IND.DRUGS))  # declared forbidden -> deny
+        assert _derive(case) is D.DENY
+        assert _derive(case, {"relinquish": "yielded"}) is D.PASS
+
+    def test_disclose_then_relinquish_clears_smuggled_goods(self) -> None:
+        case = _case(ContrabandItem(indication=IND.DRUGS, concealed=True))
+        fs = {"disclosure": "declared", "relinquish": "yielded"}
+        assert _derive(case, fs) is D.PASS
+
+
+class TestContrabandMoves:
+    def _game(self, *possessions, packet=None):
+        game = CredentialsGame(roster=[_case(*possessions, packet=packet)], restriction_map=RULES)
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        handler.receive_move(game, ("inspect", "passport"))  # reach packet stage
+        return game, handler
+
+    def _kinds(self, handler, game):
+        return {m.kind for m in handler.get_available_moves(game)}
+
+    def test_disclosure_always_offered_relinquish_gated_on_declared(self) -> None:
+        # Concealed-only: disclosure offered, relinquish not (nothing declared yet).
+        game, handler = self._game(ContrabandItem(indication=IND.WEAPON, concealed=True))
+        kinds = self._kinds(handler, game)
+        assert "request_disclosure" in kinds
+        assert "request_relinquish" not in kinds
+
+    def test_relinquish_offered_after_disclosure(self) -> None:
+        game, handler = self._game(ContrabandItem(indication=IND.WEAPON, concealed=True))
+        handler.receive_move(game, ("request_disclosure", ""))
+        # Disclosure declared the concealed weapon -> relinquish now offered.
+        assert "request_relinquish" in self._kinds(handler, game)
+
+    def test_relinquish_offered_for_declared_contraband(self) -> None:
+        game, handler = self._game(ContrabandItem(indication=IND.DRUGS))  # declared
+        assert "request_relinquish" in self._kinds(handler, game)
+
+    def test_disclosure_move_rescues_to_pass(self) -> None:
+        game, handler = self._game(
+            ContrabandItem(indication=IND.WEAPON, concealed=True), packet=[_permit(IND.WEAPON)]
+        )
+        assert game.expected_disposition(game.active_case) is D.DENY
+        handler.receive_move(game, ("request_disclosure", ""))
+        assert game.finding_status["disclosure"] == "declared"
+        assert game.expected_disposition(game.active_case) is D.PASS
+
+    def test_relinquish_move_clears(self) -> None:
+        game, handler = self._game(ContrabandItem(indication=IND.DRUGS))
+        handler.receive_move(game, ("request_relinquish", ""))
+        assert game.finding_status["relinquish"] == "yielded"
+        assert game.expected_disposition(game.active_case) is D.PASS
+
+    def test_disclosure_with_nothing_to_declare_is_clean(self) -> None:
+        game, handler = self._game()  # no contraband
+        result = handler.receive_move(game, ("request_disclosure", ""))
+        assert result.name == "CONTINUE"
+        assert game.finding_status["disclosure"] == "declared"
+        # A clean candidate still derives PASS.
+        assert game.expected_disposition(game.active_case) is D.PASS
