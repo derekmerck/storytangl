@@ -118,6 +118,7 @@ from .credentials_game import (
     derive_disposition,
     disposition_penalty,
     DISPOSITION_PENALTY,
+    move_time_cost,
 )
 from .credentials_factory import (
     applicable_modes,
@@ -192,6 +193,7 @@ __all__ = [
     "derive_disposition",
     "disposition_penalty",
     "DISPOSITION_PENALTY",
+    "move_time_cost",
     "ContrabandItem",
     "CredentialStatus",
     "CredentialToken",
