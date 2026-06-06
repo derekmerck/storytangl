@@ -40,6 +40,9 @@ RULES = Restrictions.from_map(
 )
 
 
+# --------------------------------------------------------------------------- #
+# fixtures / helpers
+# --------------------------------------------------------------------------- #
 def _id(status: S = S.VALID) -> CredentialToken:
     return CredentialToken(indication=IND.TRAVEL, status=status)
 
@@ -64,13 +67,18 @@ def _smuggler(**kw) -> CredentialCase:
     )
 
 
-def _game(case: CredentialCase, **kw):
+def _game(
+    case: CredentialCase, **kw
+) -> tuple[CredentialsGame, CredentialsGameHandler]:
     game = CredentialsGame(roster=[case], restriction_map=RULES, **kw)
     handler = CredentialsGameHandler()
     handler.setup(game)
     return game, handler
 
 
+# --------------------------------------------------------------------------- #
+# test classes
+# --------------------------------------------------------------------------- #
 class TestWhitelist:
     def test_whitelist_clamps_a_criminal_packet_to_pass(self) -> None:
         # The sponsored-carrier exemption: even per-se-criminal goods are waved
