@@ -79,6 +79,9 @@ pathway, preserving concrete fragment subclass fields while omitting
 transport-only stream bookkeeping. In-process Python clients, diagnostic
 fixture generation, REST serialization, and remote Python rehydration all
 operate on that same widget-shaped payload surface.
+The reference CLI stores runtime updates from `RuntimeEnvelope.to_dto()` before
+rendering, while still accepting lightweight object-shaped stubs in tests and
+diagnostic harnesses.
 The same pattern applies to `ProjectedState`: service methods own the typed
 section/value model, REST serializes it, and remote Python clients decode it
 back into typed projected-state values.

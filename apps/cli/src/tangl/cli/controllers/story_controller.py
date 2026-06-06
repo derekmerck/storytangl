@@ -50,25 +50,30 @@ class StoryController(CommandSet):
 
         choices: list[SimpleNamespace] = []
 
+        def read(source: Any, key: str, default: Any = None) -> Any:
+            if isinstance(source, Mapping):
+                return source.get(key, default)
+            return getattr(source, key, default)
+
         for fragment in self._current_story_update:
-            ftype = getattr(fragment, "fragment_type", None)
+            ftype = read(fragment, "fragment_type")
 
             if ftype == "block":
-                embedded = getattr(fragment, "choices", None) or []
+                embedded = read(fragment, "choices") or []
                 for choice_frag in embedded:
                     uid = (
-                        getattr(choice_frag, "edge_id", None)
-                        or getattr(choice_frag, "source_id", None)
-                        or getattr(choice_frag, "uid", None)
+                        read(choice_frag, "edge_id")
+                        or read(choice_frag, "source_id")
+                        or read(choice_frag, "uid")
                     )
                     label = (
-                        getattr(choice_frag, "label", None)
-                        or getattr(choice_frag, "content", "")
-                        or getattr(choice_frag, "text", "")
-                        or getattr(choice_frag, "source_label", "")
+                        read(choice_frag, "label")
+                        or read(choice_frag, "content", "")
+                        or read(choice_frag, "text", "")
+                        or read(choice_frag, "source_label", "")
                     )
-                    active = getattr(choice_frag, "active", True)
-                    reason = getattr(choice_frag, "unavailable_reason", None)
+                    active = read(choice_frag, "active", True)
+                    reason = read(choice_frag, "unavailable_reason")
 
                     if uid:
                         choices.append(
@@ -82,18 +87,18 @@ class StoryController(CommandSet):
 
             elif ftype == "choice":
                 uid = (
-                    getattr(fragment, "edge_id", None)
-                    or getattr(fragment, "source_id", None)
-                    or getattr(fragment, "uid", None)
+                    read(fragment, "edge_id")
+                    or read(fragment, "source_id")
+                    or read(fragment, "uid")
                 )
                 label = (
-                    getattr(fragment, "label", None)
-                    or getattr(fragment, "content", "")
-                    or getattr(fragment, "text", "")
-                    or getattr(fragment, "source_label", "")
+                    read(fragment, "label")
+                    or read(fragment, "content", "")
+                    or read(fragment, "text", "")
+                    or read(fragment, "source_label", "")
                 )
-                active = getattr(fragment, "active", True)
-                reason = getattr(fragment, "unavailable_reason", None)
+                active = read(fragment, "active", True)
+                reason = read(fragment, "unavailable_reason")
 
                 if uid:
                     choices.append(
@@ -111,14 +116,24 @@ class StoryController(CommandSet):
         return self._cmd.call_service(method_name, **params)
 
     def _apply_runtime_envelope(self, envelope: Any) -> None:
-        metadata = getattr(envelope, "metadata", None) or {}
+        payload = envelope.to_dto() if hasattr(envelope, "to_dto") else None
+        metadata = (
+            payload.get("metadata")
+            if isinstance(payload, Mapping)
+            else getattr(envelope, "metadata", None)
+        ) or {}
         if not isinstance(metadata, Mapping):
             metadata = {}
         self._current_metadata = dict(metadata)
         ledger_id_value = metadata.get("ledger_id")
         if ledger_id_value is not None:
             self._cmd.set_ledger(UUID(str(ledger_id_value)))
-        self._current_story_update = list(getattr(envelope, "fragments", []) or [])
+        fragments = (
+            payload.get("fragments")
+            if isinstance(payload, Mapping)
+            else getattr(envelope, "fragments", [])
+        )
+        self._current_story_update = list(fragments or [])
         self._current_choices = self._load_choices_from_fragments()
 
     # ------------------------------------------------------------------

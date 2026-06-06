@@ -8,6 +8,8 @@ import cmd2
 
 from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.service.response import RuntimeEnvelope
 
 # This uses a test-app to focus on the StoryController
 
@@ -114,6 +116,28 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     assert resolve_calls
     _, params = resolve_calls[-1]
     assert params["edge_id"] == cli.edge_id
+
+
+def test_cli_applies_runtime_envelope_dto_projection(
+    story_controller: StoryController,
+) -> None:
+    cli = story_controller._cmd
+    edge_id = uuid4()
+    envelope = RuntimeEnvelope(
+        metadata={"ledger_id": str(cli.ledger_id)},
+        fragments=[
+            ContentFragment(content="start", step=3),
+            ChoiceFragment(edge_id=edge_id, text="Go north", step=3),
+        ],
+    )
+
+    story_controller._apply_runtime_envelope(envelope)
+
+    assert story_controller._current_story_update[0]["content"] == "start"
+    assert "seq" not in story_controller._current_story_update[0]
+    assert "step" not in story_controller._current_story_update[0]
+    assert story_controller._current_choices[0].uid == edge_id
+    assert story_controller._current_choices[0].label == "Go north"
 
 
 def test_cli_shows_locked_choices_with_reason(story_controller: StoryController) -> None:
