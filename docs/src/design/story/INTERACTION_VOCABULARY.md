@@ -105,6 +105,16 @@ Today, `ChoiceFragment` is the concrete affordance carrier. `text`, `available`,
 `blockers`, `accepts`, and `ui_hints` describe how the client can present and
 collect the action.
 
+> **Altitude note — two senses of "affordance."** Here the word is the
+> *render-layer* action offer: what the player sees they can do, carried by
+> `ChoiceFragment`. This is distinct from the VM open-edge `Affordance` primitive
+> in [AFFORDANCE_MODEL.md](../planning/AFFORDANCE_MODEL.md), which is a
+> broadcast requirement-bearing edge on the runtime graph. The two are related by
+> projection — a bound VM affordance projects to an `Action`, which serializes to
+> a `ChoiceFragment`, which the client renders as the affordance defined here.
+> Same word, three layers apart: that document governs how an offer comes to
+> exist and bind; this one governs how a bound offer is presented and collected.
+
 ### Move
 
 A move is the handler-facing committed action. It is what `resolve_choice` or a
