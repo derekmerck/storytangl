@@ -143,6 +143,29 @@ genuinely symmetric, an edge can be authored in whichever stance reads naturally
 (`X needs Y` / `Y affords X`) and both lower to the same matching — but
 obligation/failure stays an explicit property of the link.
 
+### Mapping to the current VM linkage (do not reverse the wiring)
+
+"Fixed endpoint" above is a statement about **ownership/origination** — which side
+the open link conceptually belongs to and offers from — *not* a prescription for
+the graph's `predecessor`/`successor` slots. The current provisioner deliberately
+keeps both forms cursor-centric:
+
+> Contract (`Resolver._iter_local_affordance_providers`): the frontier/source is
+> the affordance **`predecessor`**, and the pushed provider/resource is the
+> affordance **`successor`**. Fanout creates `Affordance(predecessor_id=source.uid)`
+> then `set_provider(provider)`.
+
+So in code **both** `Dependency` and `Affordance` wire `predecessor = frontier`,
+`successor = provider`; they resolve at the cursor either way. The difference the
+current `Affordance` encodes is *EXISTING-bias and push semantics* (a preferred,
+already-available local provider), not a reversed edge. The conceptual
+"provider-fixed" framing describes who *owns/offers* the link (e.g. "the sword
+affords DrawSword"); it does **not** mean an implementer should swap the graph
+endpoints. Converging #255 should preserve the `predecessor=frontier /
+successor=provider` linkage and the existing provisioner semantics — the matrix
+below is about classifying ownership, direction, and provider state, not about
+rewiring topology.
+
 ---
 
 ## The planning matrix
@@ -373,7 +396,7 @@ def plan_frontier(ctx):
 
     # 3. Satisfy explicit dependencies, preferring already-attached affordances.
     for dep in dependencies:
-        if dep.bound_provider:
+        if dep.provider:
             validate_or_refresh(dep, ctx, ns)
             continue
         candidates = []
@@ -508,8 +531,8 @@ The framing question for any new mechanic:
 First drafted as `AFFORDANCE_MODEL.md`. After the open-link correction,
 "affordance" is only the provider-fixed *direction* of the primitive, so a name
 like `OPEN_LINKS_AND_PLANNING.md` / `OPEN_EDGES_AND_PLANNING.md` /
-`REQUIREMENT_EDGES.md` is more accurate. Filename retained for now to keep issue
-#255 / CodeRabbit references stable; rename is a pending decision.
+`REQUIREMENT_EDGES.md` is more accurate. Filename retained for now to keep the
+issue #255 / CodeRabbit references stable; rename is a pending decision.
 
 ---
 

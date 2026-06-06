@@ -36,6 +36,7 @@ See also
    story/compilers
    story/notes-create_world
 
+   planning/AFFORDANCE_MODEL
    planning/COST_MODEL
    planning/PLANNING_DESIGN
    planning/PROVISIONING
