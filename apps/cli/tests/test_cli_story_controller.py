@@ -9,7 +9,13 @@ import cmd2
 from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
 from tangl.journal.fragments import ChoiceFragment, ContentFragment
-from tangl.service.response import RuntimeEnvelope
+from tangl.service.response import (
+    KvListValue,
+    KvRow,
+    ProjectedSection,
+    ProjectedState,
+    RuntimeEnvelope,
+)
 
 # This uses a test-app to focus on the StoryController
 
@@ -199,3 +205,28 @@ def test_status_renders_projected_sections_generically(story_controller: StoryCo
     assert "Cursor: Dark Forest" in output
     assert "Flags:" in output
     assert "torch_lit, met_guide" in output
+
+
+def test_status_uses_projected_state_dto(
+    story_controller: StoryController,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cli = story_controller._cmd
+    state = ProjectedState(
+        sections=[
+            ProjectedSection(
+                section_id="session",
+                title="Session",
+                kind="stats",
+                value=KvListValue(items=[KvRow(key="Step", value=4)]),
+            )
+        ]
+    )
+    monkeypatch.setattr(cli, "call_service", lambda *_args, **_kwargs: state)
+    cli.outputs.clear()
+
+    story_controller.do_status()
+
+    output = "\n".join(cli.outputs)
+    assert "Session:" in output
+    assert "Step: 4" in output

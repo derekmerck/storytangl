@@ -267,7 +267,9 @@ class StoryController(CommandSet):
             return
 
         info = self._call_service("get_story_info")
-        if hasattr(info, "model_dump"):
+        if hasattr(info, "to_dto"):
+            payload = info.to_dto()
+        elif hasattr(info, "model_dump"):
             payload = info.model_dump()
         elif isinstance(info, dict):
             payload = info

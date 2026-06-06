@@ -211,7 +211,7 @@ def build_demo_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         projected = manager.get_story_info(user_id=user.uid)
 
         runtime_payload = envelope.to_dto()
-        projected_payload = projected.model_dump(mode="json", by_alias=True, exclude_none=True)
+        projected_payload = projected.to_dto()
         return _normalize_uuids(runtime_payload), _normalize_uuids(projected_payload)
     finally:
         World.clear_instances()

@@ -101,6 +101,19 @@ def test_projected_state_round_trips_through_model_dump_and_validate() -> None:
     assert restored == state
 
 
+def test_projected_state_to_dto_preserves_value_discriminators() -> None:
+    state = _fixture()
+
+    payload = state.to_dto()
+    restored = ProjectedState.model_validate(payload)
+
+    assert payload["sections"][0]["value"]["value_type"] == "kv_list"
+    assert payload["sections"][1]["hints"]["style_name"] == "sidebar"
+    assert payload["sections"][2]["value"]["value_type"] == "table"
+    assert payload["sections"][4]["value"]["value_type"] == "scalar"
+    assert restored == state
+
+
 def test_projected_state_preserves_section_order() -> None:
     state = _fixture()
 

@@ -57,6 +57,7 @@ See `FRAGMENT_STREAM_CONTRACT.md` for the detailed client-facing contract.
 **Characteristics:**
 - Read-only (MethodType.READ)
 - Returns structured metadata (not narrative)
+- `ProjectedState.to_dto()` preserves `value_type` discriminators for clients
 - Idempotent queries
 
 ---

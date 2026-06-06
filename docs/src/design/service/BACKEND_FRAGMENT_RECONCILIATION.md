@@ -83,8 +83,9 @@ The reference CLI stores runtime updates from `RuntimeEnvelope.to_dto()` before
 rendering, while still accepting lightweight object-shaped stubs in tests and
 diagnostic harnesses.
 The same pattern applies to `ProjectedState`: service methods own the typed
-section/value model, REST serializes it, and remote Python clients decode it
-back into typed projected-state values.
+section/value model, `ProjectedState.to_dto()` emits the client-facing
+`value_type` discriminated DTO surface, REST and CLI use that projection, and
+remote Python clients decode it back into typed projected-state values.
 
 The REST layer starts from `RuntimeEnvelope.to_dto()` and keeps any remaining
 manual shaping limited to HTTP-adjacent concerns: media profiles, optional

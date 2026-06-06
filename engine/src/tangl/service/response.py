@@ -328,6 +328,11 @@ class ProjectedState(InfoModel):
 
     sections: list[ProjectedSection] = Field(default_factory=list)
 
+    def to_dto(self) -> dict[str, Any]:
+        """Return the transport DTO projection for projected-state clients."""
+
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
+
 
 def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
     """Best-effort coercion from runtime-like payloads to ``RuntimeInfo``."""
