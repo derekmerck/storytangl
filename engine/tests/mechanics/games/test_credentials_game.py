@@ -202,15 +202,19 @@ class TestCredentialsCore:
         assert opening["credential_cases_remaining"] == 2
         assert opening["credential_correct_count"] == 0
         assert opening["credential_shift_complete"] is False
-        assert opening["credential_shift_score"] == {"player": 0, "opponent": 0}
+        # Correct/incorrect counts come from the base game's player/opponent score
+        # (no credentials-specific duplicate of it).
+        assert opening["player_score"] == 0
+        assert opening["opponent_score"] == 0
 
         handler.receive_move(game, ("inspect", "passport"))
-        handler.receive_move(game, ("decide", "deny"))
+        handler.receive_move(game, ("decide", "deny"))  # first case is a correct deny
 
         mid = game.to_namespace()
         assert mid["credential_case_number"] == 2
         assert mid["credential_cases_remaining"] == 1
         assert mid["credential_correct_count"] == 1
+        assert mid["player_score"] == 1
         assert mid["credential_candidate_name"] == "Tomas Vey"
 
 
