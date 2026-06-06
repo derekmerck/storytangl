@@ -6,8 +6,10 @@ lazy offer roster, 2026-05-22); Phase B.1 LANDED (core mediation moves,
 2026-05-23); Phase B.2 LANDED (contraband mediation, 2026-06-04); penalty-matrix
 scorer + soft time budget + per-rule-set scoring config (configurable
 `penalty_matrix`, `no_evidence_penalty` toggle) LANDED 2026-06-05; B.2.1 CRIMINAL
-contraband tier (per-se crime, no rescue, per-rule-set) LANDED 2026-06-05; Phases
-B.3 (declines axis)/C/D designed below as overlays  
+contraband tier (per-se crime, no rescue, per-rule-set) LANDED 2026-06-05; Phase C
+whitelist/blacklist override (data flags clamping `expected_disposition`; overt vs
+shadow = the tax toggle) LANDED 2026-06-06; B.3 (declines axis) + the malfeasance
+layer (bribe/plant/invalidate) designed below as overlays  
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -758,15 +760,35 @@ arrest↔deny) layers on top of all of it.
 
 ## Phase C: context and haggling
 
-Whitelist / blacklist are already wired through `expected_disposition` and
-`_packet_finding`; Phase C only needs authored cases that set the flags plus
-journal flavor. Bribe / threat is another move kind (`accept_bribe` /
-`refuse_bribe`) plus additive shift tallies (`reputation`, `coin`) updated in
-resolution and exported to namespace; richer endings are then authored as extra
-POSTREQS edges keyed on `credential_*` predicates -- no engine change. The
-`ScreeningRound` narrative-override idea from the (dropped) `screening.py`
-(`on_invalid_seal`, `on_allow`, ...) is worth reviving as per-finding journal
-flavor.
+**Whitelist / blacklist — LANDED 2026-06-06 (was always data, not a subsystem).**
+The override is `whitelist`/`blacklist` flags on the case feeding
+`expected_disposition`: whitelist clamps the expected call **down** to PASS
+(the sponsored carrier waved through even with per-se-criminal goods), blacklist
+clamps it **up** to ARREST (wanted by name; DENY if `allow_arrest` is off). It is
+authored data propagated by the roster (`ScenarioOffer.whitelist/blacklist` →
+`materialize`), with `_packet_finding` flavor; an origin-scoped whitelist is just
+"set the flag for those origins" at authoring — no engine set needed. This is the
+parsimonious shape; nothing to build, only compositions to cover.
+
+**Overt vs shadow blacklist is the `no_evidence_penalty` toggle, not new code.**
+A blacklisted *clean* candidate derives ARREST via the override but has no surfaced
+or self-evident grounds, so:
+- *overt* (tax off, `no_evidence_penalty == 0`) — the name is authorization; the
+  arrest is free.
+- *shadow* (tax on, `> 0`) — the bare name-arrest reads as `unjustified`, which is
+  exactly the pressure to manufacture cover (plant a CRIMINAL good and "discover"
+  it → arrest *with reason*). The planting itself is the deferred malfeasance layer.
+
+**Deferred — fold into the malfeasance layer, do NOT build piecemeal.** Bribe /
+favoritism (`bribe_offer` exists only as a narrative data seam today) is the
+*passive, low* pole of the one malfeasance axis (turning a blind eye), and
+origin-bends-severity (a privileged origin overlooks *some* crimes — a graduated
+bend rather than a hard PASS clamp) is the same family. Building `accept_bribe` or
+a partial severity-bend now would fragment a layer that wants to ship as one thing
+(blind-eye/bribe at the bottom, doctoring/false-testimony at the top, inventory +
+catch-strike pricing throughout). The `ScreeningRound` narrative-override idea from
+the dropped `screening.py` (`on_invalid_seal`, `on_allow`, …) is still worth
+reviving as per-finding journal flavor when that lands.
 
 ---
 
