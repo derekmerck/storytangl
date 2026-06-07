@@ -338,9 +338,16 @@ class TestMediationOffMenuSafety:
         handler.setup(game)
         return game, handler
 
+    @staticmethod
+    def _journal_text(handler: CredentialsGameHandler, game: CredentialsGame) -> str:
+        frags = handler.get_journal_fragments(game) or []
+        return " ".join(
+            f.content for f in frags if isinstance(getattr(f, "content", None), str)
+        )
+
     def test_verify_id_with_no_id_records_nothing(self) -> None:
         # No id presented (missing-id deny); verifying off-menu must not record a
-        # bogus "id verified clean".
+        # bogus "id verified clean" -- in state or in the prose.
         case = CredentialCase(
             purpose=IND.TRAVEL,
             presented_documents={"passport": "(none)"},
@@ -349,6 +356,7 @@ class TestMediationOffMenuSafety:
         game, handler = self._game(case)
         handler.receive_move(game, ("verify_id", ""))
         assert "id" not in game.finding_status
+        assert "matches the bearer" not in self._journal_text(handler, game)
 
     def test_relinquish_with_no_contraband_does_not_fake_evidence(self) -> None:
         # An off-menu relinquish on a clean packet must not record YIELDED -- else
@@ -363,6 +371,7 @@ class TestMediationOffMenuSafety:
         game, handler = self._game(case, no_evidence_penalty=1)
         handler.receive_move(game, ("request_relinquish", ""))
         assert "relinquish" not in game.finding_status
+        assert "hand it over" not in self._journal_text(handler, game)
 
         handler.receive_move(game, ("decide", "deny"))  # correct, but unbacked
         result = game.case_results[-1]

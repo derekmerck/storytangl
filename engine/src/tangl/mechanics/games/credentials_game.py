@@ -1226,6 +1226,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             outcome = notes.get("outcome")
             if outcome == "id_verified_problem":
                 line = "The id does not match the bearer."
+            elif outcome == "id_verified_not_applicable":
+                line = "There is no id to verify."
             else:
                 line = "The id matches the bearer."
             return [
@@ -1258,6 +1260,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 ContentFragment(content=line),
             ]
         if action == "request_relinquish":
+            if notes.get("outcome") == "request_relinquish_not_applicable":
+                return [
+                    ContentFragment(
+                        content="You look for contraband to have surrendered, but there is none."
+                    ),
+                ]
             return [
                 ContentFragment(content="You direct the candidate to surrender the contraband."),
                 ContentFragment(content="They hand it over and step back, lighter."),
