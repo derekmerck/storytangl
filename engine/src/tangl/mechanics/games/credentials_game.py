@@ -1061,6 +1061,9 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # an expired or mis-dated id stays a deny until a future id-reissue move
         # (B.2). So it records VERIFIED / CONFIRMED, never CLEARED.
         status = game.active_case.id_status()
+        if status is None:  # off-menu safety; the menu offers this only with an id
+            detail["outcome"] = "id_verified_not_applicable"
+            return RoundResult.CONTINUE
         if status is CredentialStatus.WRONG_HOLDER:
             game.finding_status[FindingKey.ID] = Finding.CONFIRMED
             detail["outcome"] = "id_verified_problem"
@@ -1116,6 +1119,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail: dict[str, object],
     ) -> RoundResult:
         # The candidate surrenders declared contraband, clearing the violation.
+        # Off-menu safety: with nothing declared to surrender, record nothing --
+        # else a spurious YIELDED would count as surfaced evidence and suppress
+        # the no_evidence_penalty on an unrelated rejection.
+        if not self._has_declared_contraband(game):
+            detail["outcome"] = "request_relinquish_not_applicable"
+            return RoundResult.CONTINUE
         game.finding_status[FindingKey.RELINQUISH] = Finding.YIELDED
         detail["outcome"] = "relinquished"
         return RoundResult.CONTINUE
