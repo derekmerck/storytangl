@@ -325,3 +325,56 @@ class TestSharedRestrictionLevelEdges:
             possessions=[ContrabandItem(indication=IND.SECRETS)],
         )
         assert derive_disposition(with_id, ID_CONTRABAND_RULES) is D.PASS
+
+
+class TestMediationOffMenuSafety:
+    """Mediation moves are menu-gated, but receive_move does not revalidate, so
+    each resolver guards its own precondition (matching _resolve_request_document).
+    """
+
+    def _game(self, case: CredentialCase, **kw):
+        game = CredentialsGame(roster=[case], restriction_map=RULES, **kw)
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        return game, handler
+
+    @staticmethod
+    def _journal_text(handler: CredentialsGameHandler, game: CredentialsGame) -> str:
+        frags = handler.get_journal_fragments(game) or []
+        return " ".join(
+            f.content for f in frags if isinstance(getattr(f, "content", None), str)
+        )
+
+    def test_verify_id_with_no_id_records_nothing(self) -> None:
+        # No id presented (missing-id deny); verifying off-menu must not record a
+        # bogus "id verified clean" -- in state or in the prose.
+        case = CredentialCase(
+            purpose=IND.TRAVEL,
+            presented_documents={"passport": "(none)"},
+            id_card=None,
+        )
+        game, handler = self._game(case)
+        handler.receive_move(game, ("verify_id", ""))
+        assert "id" not in game.finding_status
+        assert "matches the bearer" not in self._journal_text(handler, game)
+
+    def test_relinquish_with_no_contraband_does_not_fake_evidence(self) -> None:
+        # An off-menu relinquish on a clean packet must not record YIELDED -- else
+        # it would count as surfaced evidence and suppress the tax on an unrelated
+        # rejection (here, an expired-id deny).
+        case = CredentialCase(
+            purpose=IND.TRAVEL,
+            presented_documents={"passport": "A worn id."},
+            id_card=_id(S.EXPIRED),
+            possessions=[],
+        )
+        game, handler = self._game(case, no_evidence_penalty=1)
+        handler.receive_move(game, ("request_relinquish", ""))
+        assert "relinquish" not in game.finding_status
+        assert "hand it over" not in self._journal_text(handler, game)
+
+        handler.receive_move(game, ("decide", "deny"))  # correct, but unbacked
+        result = game.case_results[-1]
+        assert result.correct is True
+        assert result.unjustified is True  # not falsely justified by the relinquish
+        assert result.penalty == 1

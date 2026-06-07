@@ -256,12 +256,44 @@ def disposition_penalty(
     return row.get(chosen.value, DISPOSITION_PENALTY[expected.value][chosen.value])
 
 
+class Finding:
+    """finding_status *values* (Phase B mediation outcomes). Plain-string
+    constants (not an Enum) so finding_status stays a JSON-serializable
+    ``dict[str, str]`` for the VM value_hash and round-trips through persistence."""
+
+    CLEARED = "cleared"      # a mitigatable problem was found and repaired
+    VERIFIED = "verified"    # checked and sound -- no adverse evidence
+    CONFIRMED = "confirmed"  # an adverse fact confirmed (crime / concealment)
+    DECLARED = "declared"    # contraband voluntarily disclosed
+    TOO_LATE = "too_late"    # disclosure after a confirming search; no rescue
+    YIELDED = "yielded"      # contraband surrendered
+
+
+class FindingKey:
+    """finding_status *keys* with a fixed name (the others are an indication
+    value -- a permit keyed by the good it covers)."""
+
+    ID = "id"
+    SEARCH = "search"
+    DISCLOSURE = "disclosure"
+    RELINQUISH = "relinquish"
+
+
+class ContrabandClass:
+    """How a contraband indication's restriction level is handled (B.2)."""
+
+    CRIMINAL = "criminal"
+    FORBIDDEN = "forbidden"
+    CREDENTIALED = "credentialed"  # needs a valid permit and/or bearer id
+    DECLARATION_ONLY = "declaration_only"
+
+
 # finding_status values that represent *surfaced* evidence -- an investigation
-# that turned a problem up ("confirmed"), repaired a mitigatable one ("cleared"),
-# or recovered contraband ("yielded"). A plain "verified" (checked, sound) is not
-# adverse evidence, so it is excluded. Behavioral evidence (a declined search, a
-# bribe attempt) extends this set in Phase B.3.
-_EVIDENCE_FINDINGS = frozenset({"confirmed", "cleared", "yielded"})
+# that turned a problem up (CONFIRMED), repaired a mitigatable one (CLEARED), or
+# recovered contraband (YIELDED). A plain VERIFIED (checked, sound) is not adverse
+# evidence, so it is excluded. Behavioral evidence (a declined search, a bribe
+# attempt) extends this set in Phase B.3.
+_EVIDENCE_FINDINGS = frozenset({Finding.CONFIRMED, Finding.CLEARED, Finding.YIELDED})
 
 
 # Time cost of each action, in shift-budget units. Cheap probes (a glance at a
@@ -305,7 +337,7 @@ def _assess_credential(
         return CredentialDisposition.ARREST  # forged; crimes not mediatable in B.1
     # Mitigatable (missing seal / bad date / expired): Phase B.1 mediation can
     # clear it via ``request_document``; check the per-case finding_status.
-    if finding_status and finding_status.get(token.indication.value) == "cleared":
+    if finding_status and finding_status.get(token.indication.value) == Finding.CLEARED:
         return CredentialDisposition.PASS
     return CredentialDisposition.DENY
 
@@ -322,7 +354,7 @@ def _assess_id(
     if status.is_crime:
         return CredentialDisposition.ARREST  # fake / wrong-holder id
     # Mitigatable id (expired / bad date): cleared by future id-mediation.
-    if finding_status and finding_status.get("id") == "cleared":
+    if finding_status and finding_status.get(FindingKey.ID) == Finding.CLEARED:
         return CredentialDisposition.PASS
     return CredentialDisposition.DENY
 
@@ -350,14 +382,14 @@ def _contraband_class(level: RestrictionLevel) -> str:
     """Classify a contraband indication's rule (Phase B.2)."""
 
     if level is RestrictionLevel.CRIMINAL:
-        return "criminal"  # per-se crime; possession arrests, no rescue
+        return ContrabandClass.CRIMINAL  # per-se crime; possession arrests, no rescue
     if level is RestrictionLevel.FORBIDDEN:
-        return "forbidden"
+        return ContrabandClass.FORBIDDEN
     if level.requires_permit or level.requires_id:
         # Needs a valid permit and/or bearer id: route through _assess_requirement
         # so the id is actually checked (a WITH_ID good is not merely declarable).
-        return "credentialed"
-    return "declaration_only"  # anonymous level: allowed once declared
+        return ContrabandClass.CREDENTIALED
+    return ContrabandClass.DECLARATION_ONLY  # anonymous level: allowed once declared
 
 
 def _assess_contraband(
@@ -376,7 +408,7 @@ def _assess_contraband(
 
     fs = finding_status or {}
     cls = _contraband_class(level)
-    if cls == "criminal":
+    if cls == ContrabandClass.CRIMINAL:
         # Per-se crime: mere possession is the offense. Declaring or surrendering
         # it does not rescue (you cannot relinquish your way out of trafficking).
         # A permissive regime that tolerates the good simply maps it below
@@ -387,21 +419,21 @@ def _assess_contraband(
     # already declared. The contraband's permit (when one is required) lives in
     # the packet keyed by indication, so its standing is assessed by
     # _assess_requirement -- the same machinery as a purpose permit.
-    declared = (not item.concealed) or fs.get("disclosure") == "declared"
+    declared = (not item.concealed) or fs.get(FindingKey.DISCLOSURE) == Finding.DECLARED
 
     if declared:
-        if fs.get("relinquish") == "yielded":
+        if fs.get(FindingKey.RELINQUISH) == Finding.YIELDED:
             return CredentialDisposition.PASS  # voluntarily surrendered
-        if cls == "forbidden":
+        if cls == ContrabandClass.FORBIDDEN:
             return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
-        if cls == "credentialed":
+        if cls == ContrabandClass.CREDENTIALED:
             return _assess_requirement(case, item.indication, level, fs)
         return CredentialDisposition.PASS  # declaration-only, declared -> allow
 
     # Concealed and not disclosed: concealment is the violation.
-    if cls == "forbidden":
+    if cls == ContrabandClass.FORBIDDEN:
         return CredentialDisposition.ARREST  # smuggling forbidden goods
-    if cls == "declaration_only":
+    if cls == ContrabandClass.DECLARATION_ONLY:
         return CredentialDisposition.DENY  # concealed declarable goods
     # credentialed (permit and/or id required), concealed:
     if _assess_requirement(case, item.indication, level, fs) is CredentialDisposition.PASS:
@@ -461,12 +493,6 @@ class CredentialsGame(PickingGame):
     # on arrival (Phase A.3), and `offers` is the source of truth instead of
     # `roster`. See credentials_roster.py.
     offers: list["ScenarioOffer"] = Field(default_factory=list)
-    checkpoint_rules: list[str] = Field(
-        default_factory=lambda: [
-            "Travelers need a valid passport.",
-            "This route also requires a travel permit.",
-        ]
-    )
     allow_arrest: bool = True
     # The shift is lost when accumulated penalty exceeds this. 0 is the strict
     # default (any wrong call ends the shift); a world raises it for a more
@@ -525,9 +551,10 @@ class CredentialsGame(PickingGame):
         json_schema_extra={"reset_field": True},
     )
     # Mediation outcomes for the active case (Phase B.1): keys are an
-    # indication's value (a permit), or "id", or "search". Values are
-    # "cleared" / "confirmed". Reset by advance_case so each candidate starts
-    # with a clean slate.
+    # indication's value (a permit) or a fixed ``FindingKey`` (id / search /
+    # disclosure / relinquish); values are ``Finding`` constants. Kept as plain
+    # ``dict[str, str]`` so it stays JSON-serializable for the VM value_hash.
+    # Reset by advance_case so each candidate starts with a clean slate.
     finding_status: dict[str, str] = Field(
         default_factory=dict,
         json_schema_extra={"reset_field": True},
@@ -671,7 +698,7 @@ class CredentialsGame(PickingGame):
     def advance_case(self) -> None:
         """Reset per-case working state and step to the next candidate.
 
-        Never touches roster, checkpoint rules, threshold, score, or
+        Never touches roster, rules, threshold, score, or
         ``case_results``. Sets ``shift_complete`` instead of letting
         ``case_index`` run past the roster, so
         :meth:`CredentialsGameHandler.evaluate` owns shift terminality.
@@ -703,7 +730,6 @@ class CredentialsGame(PickingGame):
                 "credential_stage": self.current_stage,
                 "credential_packet_findings": dict(self.packet_findings),
                 "credential_num_packet_findings": len(self.packet_findings),
-                "credential_checkpoint_rules": list(self.checkpoint_rules),
                 "credential_allow_arrest": self.allow_arrest,
                 "credential_disposition": (
                     self.disposition.value if self.disposition is not None else None
@@ -721,7 +747,6 @@ class CredentialsGame(PickingGame):
                 "credential_time_budget": self.time_budget,
                 "credential_time_spent": self.time_spent,
                 "credential_overtime": self.overtime,
-                "credential_shift_score": dict(self.score),
                 "credential_shift_complete": self.shift_complete,
             }
         )
@@ -764,24 +789,24 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
         # verify_id: offer whenever an id is presented and not yet verified.
-        if case.id_card is not None and "id" not in game.finding_status:
+        if case.id_card is not None and FindingKey.ID not in game.finding_status:
             moves.append(CredentialsMove(kind="verify_id", target=""))
         # request_search: single move, once per case.
-        if "search" not in game.finding_status:
+        if FindingKey.SEARCH not in game.finding_status:
             moves.append(CredentialsMove(kind="request_search", target=""))
         # request_disclosure (B.2): "anything to declare?" -- always offerable
         # (asking reveals nothing the menu shouldn't), once per case.
-        if "disclosure" not in game.finding_status:
+        if FindingKey.DISCLOSURE not in game.finding_status:
             moves.append(CredentialsMove(kind="request_disclosure", target=""))
         # request_relinquish (B.2): offer when the candidate has *declared*
         # contraband to surrender (visible, or disclosed via request_disclosure).
-        if "relinquish" not in game.finding_status and self._has_declared_contraband(game):
+        if FindingKey.RELINQUISH not in game.finding_status and self._has_declared_contraband(game):
             moves.append(CredentialsMove(kind="request_relinquish", target=""))
         return moves
 
     @staticmethod
     def _has_declared_contraband(game: CredentialsGame) -> bool:
-        disclosed = game.finding_status.get("disclosure") == "declared"
+        disclosed = game.finding_status.get(FindingKey.DISCLOSURE) == Finding.DECLARED
         return any(
             (not item.concealed) or disclosed for item in game.active_case.get_contraband()
         )
@@ -869,14 +894,17 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         for key, value in fs.items():
             if value not in _EVIDENCE_FINDINGS:
                 continue
-            # A *clean* search ("search": "cleared") turned nothing up -- it is
-            # not adverse evidence and must not suppress the tax on an unrelated
+            # A *clean* search (SEARCH: CLEARED) turned nothing up -- it is not
+            # adverse evidence and must not suppress the tax on an unrelated
             # unsurfaced issue.
-            if key == "search" and value == "cleared":
+            if key == FindingKey.SEARCH and value == Finding.CLEARED:
                 continue
             return True
         # A logged disclosure counts only when there was something to declare.
-        if fs.get("disclosure") in ("declared", "too_late") and game.active_case.get_contraband():
+        if (
+            fs.get(FindingKey.DISCLOSURE) in (Finding.DECLARED, Finding.TOO_LATE)
+            and game.active_case.get_contraband()
+        ):
             return True
         return False
 
@@ -1012,13 +1040,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return RoundResult.CONTINUE
 
         if permit.status.is_crime:
-            game.finding_status[indication_value] = "confirmed"
+            game.finding_status[indication_value] = Finding.CONFIRMED
             detail["outcome"] = "request_document_confirmed"
         elif permit.status.is_valid:
-            game.finding_status[indication_value] = "verified"
+            game.finding_status[indication_value] = Finding.VERIFIED
             detail["outcome"] = "request_document_verified"
         else:
-            game.finding_status[indication_value] = "cleared"
+            game.finding_status[indication_value] = Finding.CLEARED
             detail["outcome"] = "request_document_cleared"
         detail["target_indication"] = indication_value
         return RoundResult.CONTINUE
@@ -1031,13 +1059,16 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # verify_id answers only "does the id match the bearer?". It discloses a
         # holder mismatch (a crime) but never mechanically repairs a stale id --
         # an expired or mis-dated id stays a deny until a future id-reissue move
-        # (B.2). So it records "verified" / "confirmed", never "cleared".
+        # (B.2). So it records VERIFIED / CONFIRMED, never CLEARED.
         status = game.active_case.id_status()
+        if status is None:  # off-menu safety; the menu offers this only with an id
+            detail["outcome"] = "id_verified_not_applicable"
+            return RoundResult.CONTINUE
         if status is CredentialStatus.WRONG_HOLDER:
-            game.finding_status["id"] = "confirmed"
+            game.finding_status[FindingKey.ID] = Finding.CONFIRMED
             detail["outcome"] = "id_verified_problem"
         else:
-            game.finding_status["id"] = "verified"
+            game.finding_status[FindingKey.ID] = Finding.VERIFIED
             detail["outcome"] = "id_verified_clean"
         return RoundResult.CONTINUE
 
@@ -1048,11 +1079,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     ) -> RoundResult:
         concealed = [item for item in game.active_case.get_contraband() if item.concealed]
         if concealed:
-            game.finding_status["search"] = "confirmed"
+            game.finding_status[FindingKey.SEARCH] = Finding.CONFIRMED
             detail["outcome"] = "search_found_concealment"
             detail["concealed"] = [item.indication.value for item in concealed]
         else:
-            game.finding_status["search"] = "cleared"
+            game.finding_status[FindingKey.SEARCH] = Finding.CLEARED
             detail["outcome"] = "search_clean"
         return RoundResult.CONTINUE
 
@@ -1069,12 +1100,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # records "too_late" (which derive does not treat as declared) rather
         # than "declared".
         concealed = [item for item in game.active_case.get_contraband() if item.concealed]
-        if concealed and game.finding_status.get("search") == "confirmed":
-            game.finding_status["disclosure"] = "too_late"
+        if concealed and game.finding_status.get(FindingKey.SEARCH) == Finding.CONFIRMED:
+            game.finding_status[FindingKey.DISCLOSURE] = Finding.TOO_LATE
             detail["outcome"] = "disclosure_too_late"
             detail["declared"] = [item.indication.value for item in concealed]
         else:
-            game.finding_status["disclosure"] = "declared"
+            game.finding_status[FindingKey.DISCLOSURE] = Finding.DECLARED
             if concealed:
                 detail["outcome"] = "disclosure_declared"
                 detail["declared"] = [item.indication.value for item in concealed]
@@ -1088,7 +1119,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail: dict[str, object],
     ) -> RoundResult:
         # The candidate surrenders declared contraband, clearing the violation.
-        game.finding_status["relinquish"] = "yielded"
+        # Off-menu safety: with nothing declared to surrender, record nothing --
+        # else a spurious YIELDED would count as surfaced evidence and suppress
+        # the no_evidence_penalty on an unrelated rejection.
+        if not self._has_declared_contraband(game):
+            detail["outcome"] = "request_relinquish_not_applicable"
+            return RoundResult.CONTINUE
+        game.finding_status[FindingKey.RELINQUISH] = Finding.YIELDED
         detail["outcome"] = "relinquished"
         return RoundResult.CONTINUE
 
@@ -1189,6 +1226,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             outcome = notes.get("outcome")
             if outcome == "id_verified_problem":
                 line = "The id does not match the bearer."
+            elif outcome == "id_verified_not_applicable":
+                line = "There is no id to verify."
             else:
                 line = "The id matches the bearer."
             return [
@@ -1221,6 +1260,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 ContentFragment(content=line),
             ]
         if action == "request_relinquish":
+            if notes.get("outcome") == "request_relinquish_not_applicable":
+                return [
+                    ContentFragment(
+                        content="You look for contraband to have surrendered, but there is none."
+                    ),
+                ]
             return [
                 ContentFragment(content="You direct the candidate to surrender the contraband."),
                 ContentFragment(content="They hand it over and step back, lighter."),
