@@ -1,3 +1,9 @@
+"""Tests for client-facing fragment DTO projection and hydration.
+
+Coverage includes bookkeeping omission, typed fragment round trips, aliases,
+unknown-fragment fallback, and discriminator validation.
+"""
+
 from __future__ import annotations
 
 from uuid import UUID, uuid4

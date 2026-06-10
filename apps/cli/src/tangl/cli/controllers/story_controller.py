@@ -61,7 +61,7 @@ class StoryController(CommandSet):
             if ftype == "block":
                 embedded = read(fragment, "choices") or []
                 for choice_frag in embedded:
-                    uid = (
+                    edge_id = (
                         read(choice_frag, "edge_id")
                         or read(choice_frag, "source_id")
                         or read(choice_frag, "uid")
@@ -75,10 +75,10 @@ class StoryController(CommandSet):
                     active = read(choice_frag, "active", True)
                     reason = read(choice_frag, "unavailable_reason")
 
-                    if uid:
+                    if edge_id:
                         choices.append(
                             SimpleNamespace(
-                                uid=UUID(str(uid)),
+                                edge_id=UUID(str(edge_id)),
                                 label=label.replace("_", " "),
                                 active=active,
                                 unavailable_reason=reason,
@@ -86,7 +86,7 @@ class StoryController(CommandSet):
                         )
 
             elif ftype == "choice":
-                uid = (
+                edge_id = (
                     read(fragment, "edge_id")
                     or read(fragment, "source_id")
                     or read(fragment, "uid")
@@ -100,10 +100,10 @@ class StoryController(CommandSet):
                 active = read(fragment, "active", True)
                 reason = read(fragment, "unavailable_reason")
 
-                if uid:
+                if edge_id:
                     choices.append(
                         SimpleNamespace(
-                            uid=UUID(str(uid)),
+                            edge_id=UUID(str(edge_id)),
                             label=label.replace("_", " "),
                             active=active,
                             unavailable_reason=reason,
@@ -200,7 +200,7 @@ class StoryController(CommandSet):
         choice = active_choices[index - 1]
         result = self._call_service(
             "resolve_choice",
-            edge_id=choice.uid,
+            edge_id=choice.edge_id,
         )
         self._apply_runtime_envelope(result)
         self._render_current_story_update()

@@ -129,11 +129,17 @@ def test_cli_applies_runtime_envelope_dto_projection(
 ) -> None:
     cli = story_controller._cmd
     edge_id = uuid4()
+    fragment_uid = uuid4()
     envelope = RuntimeEnvelope(
         metadata={"ledger_id": str(cli.ledger_id)},
         fragments=[
             ContentFragment(content="start", step=3),
-            ChoiceFragment(edge_id=edge_id, text="Go north", step=3),
+            ChoiceFragment(
+                uid=fragment_uid,
+                edge_id=edge_id,
+                text="Go north",
+                step=3,
+            ),
         ],
     )
 
@@ -142,7 +148,8 @@ def test_cli_applies_runtime_envelope_dto_projection(
     assert story_controller._current_story_update[0]["content"] == "start"
     assert "seq" not in story_controller._current_story_update[0]
     assert "step" not in story_controller._current_story_update[0]
-    assert story_controller._current_choices[0].uid == edge_id
+    assert story_controller._current_story_update[1]["uid"] == str(fragment_uid)
+    assert story_controller._current_choices[0].edge_id == edge_id
     assert story_controller._current_choices[0].label == "Go north"
 
 
@@ -176,7 +183,7 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
 def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:
     cli = story_controller._cmd
     story_controller._current_story_update = [SimpleNamespace(content="previous")]
-    story_controller._current_choices = [SimpleNamespace(uid=cli.edge_id, label="Go")]
+    story_controller._current_choices = [SimpleNamespace(edge_id=cli.edge_id, label="Go")]
     cli.outputs.clear()
 
     story_controller.do_drop_story("--archive")
