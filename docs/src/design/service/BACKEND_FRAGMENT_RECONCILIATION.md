@@ -87,6 +87,37 @@ section/value model, `ProjectedState.to_dto()` emits the client-facing
 `value_type` discriminated DTO surface, REST and CLI use that projection, and
 remote Python clients decode it back into typed projected-state values.
 
+The credentials demo now provides the first real mechanic-to-widget vertical
+slice. Entering its `HasGame` block asks the game handler for a current-state
+projection before any round has completed. The handler emits a candidate
+`PieceFragment`, a packet `GroupFragment(group_type="zone")`, and document
+`PieceFragment` members alongside the block's authored prose and provisioned
+choices. `ServiceManager.resolve_choice()` returns those same typed siblings in
+the `RuntimeEnvelope`, and `RuntimeEnvelope.to_dto()` preserves their identities,
+zone references, structured properties, and text fallbacks. The engine-side
+field is named `piece_kind` because `kind` is reserved for constructor-form
+persistence; fragment DTO metadata maps it to and from the widget contract's
+`kind` key.
+
+The same slice exercises input in the reverse direction. The credentials game
+provisions one `ChoiceFragment(accepts.kind="pieces")` targeting the packet
+zone. `GameHandler` owns the small generic hooks that declare a move's
+`Accepts` contract and resolve submitted widget data into an engine move.
+Selecting a document's `piece_id` therefore becomes the existing credentials
+inspection move before rule evaluation; malformed or stale selections fail at
+that mechanics boundary. `Action` preserves the nested accepts discriminator
+through graph snapshots, while service and REST remain generic. The test in
+`engine/tests/integration/test_credentials_widget_flow.py` pins the complete
+path.
+
+Nim provides the second use of the same hooks for bounded integer input.
+`get_available_moves()` remains the rules-facing list of legal takes, while
+`get_provisioned_moves()` projects those moves as one
+`ChoiceFragment(accepts.kind="quantity")`. The submitted quantity is validated
+against the current heap and resolved back to the ordinary integer move before
+the round runs. This distinction keeps client action aggregation out of the
+mechanics API and is the intended pattern for future “how many?” interactions.
+
 The REST layer starts from `RuntimeEnvelope.to_dto()` and keeps any remaining
 manual shaping limited to HTTP-adjacent concerns: media profiles, optional
 markdown-to-HTML conversion, and harmless compatibility aliases such as

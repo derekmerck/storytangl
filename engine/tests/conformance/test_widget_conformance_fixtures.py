@@ -666,11 +666,11 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
 
     # Candidate + document pieces validate as typed PieceFragments.
     candidate = PieceFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000603"])
-    assert candidate.kind == "candidate"
+    assert candidate.piece_kind == "candidate"
     assert candidate.properties["declared_purpose"] == "work"
 
     permit = PieceFragment.model_validate(by_uid["00000000-0000-4000-8000-000000000606"])
-    assert permit.kind == "permit"
+    assert permit.piece_kind == "permit"
     assert str(permit.zone_ref) == "00000000-0000-4000-8000-000000000604"
 
     # Packet zone validates as a typed GroupFragment carrying its zone_role.

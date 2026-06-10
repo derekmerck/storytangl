@@ -11,12 +11,15 @@ from typing import ClassVar
 
 from pydantic import Field
 
+from tangl.journal.intent import QuantityAccepts
 from tangl.journal.fragments import ContentFragment
 
 from .enums import RoundResult
 from .game import Game
 from .handler import GameHandler
 from .strategies import opponent_strategies
+
+_QUANTITY_SELECTOR_MOVE = 0
 
 
 class NimGame(Game[int]):
@@ -75,9 +78,39 @@ class NimGameHandler(GameHandler[NimGame]):
     def get_available_moves(self, game: NimGame) -> list[int]:
         return game.get_available_moves()
 
+    def get_provisioned_moves(self, game: NimGame) -> list[int]:
+        return [_QUANTITY_SELECTOR_MOVE] if game.get_available_moves() else []
+
     def get_move_label(self, game: NimGame, move: int) -> str:
+        if move == _QUANTITY_SELECTOR_MOVE:
+            return "Take tokens"
         noun = "token" if move == 1 else "tokens"
         return f"Take {move} {noun}"
+
+    def get_move_accepts(self, game: NimGame, move: int) -> QuantityAccepts | None:
+        if move != _QUANTITY_SELECTOR_MOVE:
+            return None
+        return QuantityAccepts(
+            min=game.min_take,
+            max=min(game.max_take, game.heap_size),
+            unit="token",
+        )
+
+    def resolve_move_payload(
+        self,
+        game: NimGame,
+        move: int,
+        payload: dict[str, object],
+    ) -> int:
+        if move != _QUANTITY_SELECTOR_MOVE:
+            return move
+
+        quantity = payload.get("quantity")
+        if isinstance(quantity, bool) or not isinstance(quantity, int):
+            raise ValueError("Take tokens requires an integer quantity")
+        if quantity not in game.get_available_moves():
+            raise ValueError(f"Invalid token quantity: {quantity}")
+        return quantity
 
     def resolve_round(
         self,

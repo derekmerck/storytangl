@@ -32,7 +32,16 @@ def _choose(ledger: Ledger, label: str) -> None:
     action = next(
         a for a in _actions(ledger) if a.label == label or a.text == label
     )
-    ledger.resolve_choice(action.uid, choice_payload=action.payload)
+    ledger.resolve_choice(action.uid)
+
+
+def _inspect(ledger: Ledger, target: str) -> None:
+    action = next(a for a in _actions(ledger) if a.label == "Inspect a document")
+    game = ledger.cursor.game
+    ledger.resolve_choice(
+        action.uid,
+        choice_payload={"piece_ids": [f"{game.case_index}:{target}"]},
+    )
 
 
 class TestCredentialGateWorld:
@@ -60,15 +69,15 @@ class TestCredentialGateWorld:
         assert ledger.cursor.label == "standard_challenge"
 
         # The authored roster: Tomas (pass), Edda (deny), Goran (arrest).
-        _choose(ledger, "Inspect passport")
+        _inspect(ledger, "passport")
         _choose(ledger, "Choose pass")
         assert ledger.cursor.label == "standard_challenge"  # still mid-shift
 
-        _choose(ledger, "Inspect passport")
+        _inspect(ledger, "passport")
         _choose(ledger, "Choose deny")
         assert ledger.cursor.label == "standard_challenge"
 
-        _choose(ledger, "Inspect passport")
+        _inspect(ledger, "passport")
         _choose(ledger, "Choose arrest")
 
         assert ledger.cursor.label == "victory"
@@ -102,15 +111,8 @@ class TestCredentialGateWorld:
 
         for _ in range(total):
             target = game.expected_disposition(game.active_case).value
-            # Action.label is Optional[str] (story-authored actions can have
-            # label=None and surface their text via .text instead); guard the
-            # None case before .startswith.
-            inspect = next(
-                a
-                for a in _actions(ledger)
-                if a.label and a.label.startswith(("Inspect", "Review"))
-            )
-            ledger.resolve_choice(inspect.uid, choice_payload=inspect.payload)
+            inspect_target = next(iter(game.presented_documents))
+            _inspect(ledger, inspect_target)
             _choose(ledger, f"Choose {target}")
 
         assert ledger.cursor.label == "victory"

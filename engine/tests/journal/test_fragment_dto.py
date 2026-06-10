@@ -35,7 +35,7 @@ def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
 def test_fragment_to_dto_preserves_piece_kind() -> None:
     fragment = PieceFragment(
         piece_id="permit-a17",
-        kind="document",
+        piece_kind="document",
         content="Permit A17",
     )
 
@@ -43,6 +43,21 @@ def test_fragment_to_dto_preserves_piece_kind() -> None:
 
     assert payload["fragment_type"] == "piece"
     assert payload["kind"] == "document"
+    assert "piece_kind" not in payload
+
+
+def test_fragment_from_dto_maps_piece_kind_to_engine_field() -> None:
+    fragment = fragment_from_dto(
+        {
+            "fragment_type": "piece",
+            "piece_id": "permit-a17",
+            "kind": "document",
+            "content": "Permit A17",
+        }
+    )
+
+    assert isinstance(fragment, PieceFragment)
+    assert fragment.piece_kind == "document"
 
 
 def test_fragment_to_dto_omits_redundant_type_alias() -> None:

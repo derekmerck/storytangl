@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.core import Graph
 from tangl.mechanics.games import GameResult, HasGame
 from tangl.mechanics.games.credentials_game import (
@@ -78,6 +80,49 @@ class TestCredentialsCore:
 
         assert result.name == "CONTINUE"
         assert "packet consistency" in game.packet_findings
+
+    def test_document_inspection_is_one_piece_selector_move(self) -> None:
+        game, handler = _ready_game()
+
+        inspect_moves = [
+            move for move in handler.get_provisioned_moves(game) if move.kind == "inspect"
+        ]
+
+        assert len(inspect_moves) == 1
+        assert handler.get_move_label(game, inspect_moves[0]) == "Inspect a document"
+        accepts = handler.get_move_accepts(game, inspect_moves[0])
+        assert accepts.kind == "pieces"
+        assert accepts.constraints is not None
+        assert accepts.constraints.target_zone_ref
+
+    def test_piece_payload_resolves_to_document_inspection(self) -> None:
+        game, handler = _ready_game()
+        selector = next(
+            move for move in handler.get_provisioned_moves(game) if move.kind == "inspect"
+        )
+
+        resolved = handler.resolve_move_payload(
+            game,
+            selector,
+            {"piece_ids": ["0:passport"]},
+        )
+
+        assert resolved.kind == "inspect"
+        assert resolved.target == "passport"
+
+    def test_stale_document_piece_payload_is_rejected(self) -> None:
+        game, handler = _ready_game()
+        selector = next(
+            move for move in handler.get_provisioned_moves(game) if move.kind == "inspect"
+        )
+        handler.receive_move(game, ("inspect", "passport"))
+
+        with pytest.raises(ValueError, match="not inspectable"):
+            handler.resolve_move_payload(
+                game,
+                selector,
+                {"piece_ids": ["0:passport"]},
+            )
 
     def test_arrest_move_can_be_disabled(self) -> None:
         game, handler = _ready_game(allow_arrest=False)
@@ -227,9 +272,23 @@ class TestCredentialsIntegration:
     def _labels(self, ledger: Ledger) -> set[str]:
         return {a.label for a in self._actions(ledger)}
 
-    def _choose(self, ledger: Ledger, label: str) -> None:
+    def _choose(
+        self,
+        ledger: Ledger,
+        label: str,
+        *,
+        choice_payload: dict[str, object] | None = None,
+    ) -> None:
         action = next(a for a in self._actions(ledger) if a.label == label)
-        ledger.resolve_choice(action.uid, choice_payload=action.payload)
+        ledger.resolve_choice(action.uid, choice_payload=choice_payload)
+
+    def _inspect(self, ledger: Ledger, target: str) -> None:
+        game = ledger.cursor.game
+        self._choose(
+            ledger,
+            "Inspect a document",
+            choice_payload={"piece_ids": [f"{game.case_index}:{target}"]},
+        )
 
     def test_walk_full_roster_to_victory(self) -> None:
         graph = Graph(label="credential_shift")
@@ -258,18 +317,18 @@ class TestCredentialsIntegration:
         ledger.resolve_choice(intro_to_checkpoint.uid)
 
         # Candidate 1 (Edda) -> deny.
-        self._choose(ledger, "Inspect passport")
+        self._inspect(ledger, "passport")
         self._choose(ledger, "Choose deny")
 
         # Stale move cleanup: the desk now shows candidate 2's documents only.
         labels = self._labels(ledger)
-        assert "Inspect passport" in labels
+        assert "Inspect a document" in labels
         assert "Inspect baggage" not in labels  # belonged to candidate 1
         assert not any(label.startswith("Choose ") for label in labels)  # must inspect first
         assert ledger.cursor_id == block.uid  # still mid-shift
 
         # Candidate 2 (Tomas) -> pass, completing the shift.
-        self._choose(ledger, "Inspect passport")
+        self._inspect(ledger, "passport")
         self._choose(ledger, "Choose pass")
 
         assert ledger.cursor_id == victory.uid

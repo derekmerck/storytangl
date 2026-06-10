@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import field_serializer
+
 from tangl.journal.intent import Accepts, UIHints
 from tangl.vm import ResolutionPhase, TraversableEdge
 
@@ -25,6 +27,12 @@ class Action(TraversableEdge):
     accepts: Accepts | None = None
     ui_hints: UIHints | None = None
     journal_text: str | None = None
+
+    @field_serializer("accepts")
+    def _serialize_accepts(self, accepts: Accepts | None) -> dict[str, Any] | None:
+        if accepts is None:
+            return None
+        return accepts.model_dump(mode="python", by_alias=True, exclude_none=True)
 
     @classmethod
     def trigger_phase_from_activation(cls, activation: str | None) -> ResolutionPhase | None:

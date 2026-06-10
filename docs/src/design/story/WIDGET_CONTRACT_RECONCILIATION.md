@@ -83,8 +83,8 @@ surface is small enough to settle with its immediate neighbors.
 
 | Surface | Spec tier | Reference UI | Engine backend | Plan |
 |---|---|---|---|---|
-| Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` + typed TS shape) | done (`Accepts` union) | expand conformance cases only as new widgets land |
-| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done | done (`Accepts` union) | keep legacy web `payload_type` path as local UI compatibility until fixtures stop using it |
+| Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` + typed TS shape) | done (`Accepts` union + credentials mechanic-to-service flow) | expand conformance cases only as new widgets land |
+| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done | done (`Accepts` union; Nim quantity flow) | keep legacy web `payload_type` path as local UI compatibility until fixtures stop using it |
 | Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial (`edge_ref` not rendered) | done (`Accepts` union) | add `edge_ref` fixture when route/network MVP lands |
 | Typed `ComposeAccepts` | P1 | partial (web nested renderer + CLI/Tk inspection fixture) | done (`Accepts` union) | harden layout and add broader part combinations as worlds emit them |
 | Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
@@ -109,12 +109,12 @@ question in the spec).
 
 | Surface | Spec tier | Reference UI | Engine backend | Plan |
 |---|---|---|---|---|
-| `PieceFragment` (core shape) | P2 | partial (basic web widget + carwars wireframes) | partial (untyped equivalent) | engine PR: typed `PieceFragment` with required `hints.label_text` |
+| `PieceFragment` (core shape) | P2 | partial (basic web widget + carwars wireframes) | done (typed; credentials mechanic-to-service flow) | keep P2 until a second bundle exercises the same shape |
 | `PieceFragment.realized` + `cost` (offers) | P2 | done in carwars catalog fixtures | not_started | engine PR for typed lifecycle; bundle MVP needed for shop semantics |
 | `PieceFragment.owner` | P2 (proposal fixture) | not_started | not_started | wait for multi-cursor MVP |
 | `PieceFragment.position` | P2 (proposal fixture) | not_started | not_started | wait for grid/hex bundle MVP (Patchwork, Carcassonne) |
 | `PieceFragment.available` + `unavailable_reason` | P2 | done | not_started | engine PR with `PieceFragment` graduation |
-| `group_type="zone"` with `ZoneConstraints` | P2 | partial (basic web widget + carwars wireframes) | not_started | engine PR: typed `GroupFragment.constraints`; bundle MVP for capacity |
+| `group_type="zone"` with `ZoneConstraints` | P2 | partial (basic web widget + carwars wireframes) | partial (credentials packet zone; constraints untyped) | type constraints when a bundle needs capacity or placement rules |
 | `ZoneLayoutHints` (orientation, fan, grid, hex, graph, floorplan) | P2 | partial (orientation/grid/fan) | not_started | engine PR; render-port catches up as needed |
 | `GraphLayout.edges` (first-class adjacencies with UIDs) | P2 (proposal fixture) | not_started | not_started | wait for network/route bundle MVP (Ticket-to-Ride-shaped) |
 | `PlaceAccepts.edge_ref` fixture coverage | P2 pressure fixture | not_started | not_started | P1 typed field exists in the target; graph-route fixture remains gated on a route/network MVP |

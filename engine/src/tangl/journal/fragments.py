@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from tangl.core import BaseFragment, Registry, Selector
 from tangl.journal.intent import Accepts, KvRow, UIHints
@@ -85,14 +85,20 @@ class PieceFragment(BaseFragment, extra="allow"):
     same piece in place as it changes state or moves between zones. ``zone_ref``
     names the containing ``group_type="zone"`` fragment. ``properties`` carries
     per-kind structured data (a candidate's declared purpose, a permit's expiry,
-    ...). Graduates the typed shape tracked as the ``PieceFragment`` row in
+    ...). Python uses ``piece_kind`` because constructor-form persistence reserves
+    ``kind`` for the model class; DTO projection exposes it as contract field
+    ``kind``. Graduates the typed shape tracked as the ``PieceFragment`` row in
     ``WIDGET_CONTRACT_RECONCILIATION.md``; matches the existing conformance
     fixture shape.
     """
 
     fragment_type: Literal["piece"] = "piece"
     piece_id: str
-    kind: str | None = None
+    piece_kind: str = Field(
+        ...,
+        validation_alias=AliasChoices("piece_kind", "kind"),
+        json_schema_extra={"dto": True, "dto_alias": "kind"},
+    )
     display_state: str | None = None
     zone_ref: UUID | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
@@ -291,6 +297,10 @@ def fragment_to_dto(
         payload.pop("type")
     if payload.get("tags") == []:
         payload.pop("tags")
+    for field_name in fragment._match_fields(dto=True):
+        dto_alias = type(fragment).model_fields[field_name].json_schema_extra["dto_alias"]
+        if field_name in payload:
+            payload[dto_alias] = payload.pop(field_name)
     return payload
 
 
@@ -309,6 +319,10 @@ def fragment_from_dto(payload: object) -> BaseFragment:
     if fragment_model is None:
         return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
 
+    for field_name in fragment_model._match_fields(dto=True):
+        dto_alias = fragment_model.model_fields[field_name].json_schema_extra["dto_alias"]
+        if dto_alias in raw_fragment:
+            raw_fragment[field_name] = raw_fragment.pop(dto_alias)
     return fragment_model.model_validate(raw_fragment)
 
 
