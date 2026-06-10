@@ -1,15 +1,27 @@
 from __future__ import annotations
 
 import argparse
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Mapping
+import json
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
+from tangl.service.response import ProjectedState, RuntimeEnvelope
+
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
+
+
+@dataclass(frozen=True)
+class _CachedChoice:
+    edge_id: UUID
+    label: str
+    available: bool
+    unavailable_reason: str | None
+    accepts: dict[str, Any] | None
 
 
 @with_default_category("Story")
@@ -20,8 +32,8 @@ class StoryController(CommandSet):
 
     def __init__(self) -> None:
         super().__init__()
-        self._current_story_update: list[Any] = []
-        self._current_choices: list[SimpleNamespace] = []
+        self._current_story_update: list[dict[str, Any]] = []
+        self._current_choices: list[_CachedChoice] = []
         self._current_metadata: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
@@ -45,96 +57,109 @@ class StoryController(CommandSet):
             )
         )
 
-    def _load_choices_from_fragments(self) -> list[SimpleNamespace]:
-        """Extract choices from fragment stream (from blocks or loose)."""
+    def _load_choices_from_fragments(self) -> list[_CachedChoice]:
+        """Extract actionable choices from the canonical fragment DTO stream."""
 
-        choices: list[SimpleNamespace] = []
-
-        def read(source: Any, key: str, default: Any = None) -> Any:
-            if isinstance(source, Mapping):
-                return source.get(key, default)
-            return getattr(source, key, default)
-
+        choices: list[_CachedChoice] = []
         for fragment in self._current_story_update:
-            ftype = read(fragment, "fragment_type")
+            if fragment.get("fragment_type") != "choice":
+                continue
 
-            if ftype == "block":
-                embedded = read(fragment, "choices") or []
-                for choice_frag in embedded:
-                    edge_id = (
-                        read(choice_frag, "edge_id")
-                        or read(choice_frag, "source_id")
-                        or read(choice_frag, "uid")
-                    )
-                    label = (
-                        read(choice_frag, "label")
-                        or read(choice_frag, "content", "")
-                        or read(choice_frag, "text", "")
-                        or read(choice_frag, "source_label", "")
-                    )
-                    active = read(choice_frag, "active", True)
-                    reason = read(choice_frag, "unavailable_reason")
+            edge_id = fragment.get("edge_id")
+            if edge_id is None:
+                continue
 
-                    if edge_id:
-                        choices.append(
-                            SimpleNamespace(
-                                edge_id=UUID(str(edge_id)),
-                                label=label.replace("_", " "),
-                                active=active,
-                                unavailable_reason=reason,
-                            )
-                        )
-
-            elif ftype == "choice":
-                edge_id = (
-                    read(fragment, "edge_id")
-                    or read(fragment, "source_id")
-                    or read(fragment, "uid")
+            accepts = fragment.get("accepts")
+            choices.append(
+                _CachedChoice(
+                    edge_id=UUID(str(edge_id)),
+                    label=str(fragment.get("text") or "choice"),
+                    available=bool(fragment.get("available", True)),
+                    unavailable_reason=fragment.get("unavailable_reason"),
+                    accepts=dict(accepts) if isinstance(accepts, dict) else None,
                 )
-                label = (
-                    read(fragment, "label")
-                    or read(fragment, "content", "")
-                    or read(fragment, "text", "")
-                    or read(fragment, "source_label", "")
-                )
-                active = read(fragment, "active", True)
-                reason = read(fragment, "unavailable_reason")
-
-                if edge_id:
-                    choices.append(
-                        SimpleNamespace(
-                            edge_id=UUID(str(edge_id)),
-                            label=label.replace("_", " "),
-                            active=active,
-                            unavailable_reason=reason,
-                        )
-                    )
+            )
 
         return choices
 
     def _call_service(self, method_name: str, **params: Any) -> Any:
         return self._cmd.call_service(method_name, **params)
 
-    def _apply_runtime_envelope(self, envelope: Any) -> None:
-        payload = envelope.to_dto() if hasattr(envelope, "to_dto") else None
-        metadata = (
-            payload.get("metadata")
-            if isinstance(payload, Mapping)
-            else getattr(envelope, "metadata", None)
-        ) or {}
-        if not isinstance(metadata, Mapping):
-            metadata = {}
-        self._current_metadata = dict(metadata)
-        ledger_id_value = metadata.get("ledger_id")
+    def _apply_runtime_envelope(self, envelope: RuntimeEnvelope) -> None:
+        payload = envelope.to_dto()
+        self._current_metadata = payload.get("metadata", {})
+        ledger_id_value = self._current_metadata.get("ledger_id")
         if ledger_id_value is not None:
             self._cmd.set_ledger(UUID(str(ledger_id_value)))
-        fragments = (
-            payload.get("fragments")
-            if isinstance(payload, Mapping)
-            else getattr(envelope, "fragments", [])
-        )
-        self._current_story_update = list(fragments or [])
+        self._current_story_update = payload["fragments"]
         self._current_choices = self._load_choices_from_fragments()
+
+    @staticmethod
+    def _choice_payload(
+        choice: _CachedChoice,
+        values: list[str],
+        raw_payload: str | None,
+    ) -> dict[str, Any] | None:
+        """Build one documented choice payload from CLI input."""
+
+        if raw_payload is not None:
+            if values:
+                raise ValueError("Use positional values or --payload, not both.")
+            try:
+                payload = json.loads(raw_payload)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSON payload: {exc.msg}") from exc
+            if not isinstance(payload, dict):
+                raise ValueError("--payload must decode to a JSON object.")
+            return payload
+
+        accepts = choice.accepts
+        kind = accepts.get("kind", "pick") if accepts is not None else "pick"
+        if kind == "pick":
+            if values:
+                raise ValueError("This choice does not accept an input value.")
+            return {}
+
+        if kind in {"text", "raw_command"}:
+            text = " ".join(values).strip()
+            required = kind == "raw_command" or bool(accepts.get("required", True))
+            if required and not text:
+                raise ValueError(f"This choice requires {kind.replace('_', ' ')} input.")
+            return {"text": text}
+
+        if kind == "quantity":
+            if len(values) != 1:
+                raise ValueError("This choice requires one integer quantity.")
+            try:
+                quantity = int(values[0])
+            except ValueError as exc:
+                raise ValueError("Quantity must be an integer.") from exc
+
+            minimum = accepts.get("min")
+            maximum = accepts.get("max")
+            step = accepts.get("step", 1)
+            if isinstance(minimum, int) and quantity < minimum:
+                raise ValueError(f"Quantity must be at least {minimum}.")
+            if isinstance(maximum, int) and quantity > maximum:
+                raise ValueError(f"Quantity must be at most {maximum}.")
+            if isinstance(step, int) and step > 1:
+                origin = minimum if isinstance(minimum, int) else 0
+                if (quantity - origin) % step:
+                    raise ValueError(f"Quantity must advance in steps of {step}.")
+            return {"quantity": quantity}
+
+        if kind == "pieces":
+            minimum = accepts.get("min", 1)
+            maximum = accepts.get("max", 1)
+            if isinstance(minimum, int) and len(values) < minimum:
+                raise ValueError(f"Select at least {minimum} piece(s).")
+            if isinstance(maximum, int) and len(values) > maximum:
+                raise ValueError(f"Select at most {maximum} piece(s).")
+            return {"piece_ids": values}
+
+        raise ValueError(
+            f"{kind} input requires an explicit JSON object via --payload."
+        )
 
     # ------------------------------------------------------------------
     # commands
@@ -153,7 +178,7 @@ class StoryController(CommandSet):
         if args.label:
             kwargs["story_label"] = args.label
 
-        result = self._call_service("create_story", **kwargs)
+        result = cast(RuntimeEnvelope, self._call_service("create_story", **kwargs))
         self._apply_runtime_envelope(result)
 
         title = args.world_id
@@ -173,21 +198,28 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        result = self._call_service("get_story_update", limit=10)
+        result = cast(RuntimeEnvelope, self._call_service("get_story_update", limit=10))
         self._apply_runtime_envelope(result)
         self._render_current_story_update()
 
     choose_parser = argparse.ArgumentParser()
     choose_parser.add_argument("action", type=int, help="Choice number to execute")
+    choose_parser.add_argument(
+        "values",
+        nargs="*",
+        help="Text, quantity, or piece identifiers required by the choice",
+    )
+    choose_parser.add_argument(
+        "--payload",
+        help="Explicit JSON object for place, compose, or extension choices",
+    )
 
     @with_argparser(choose_parser)
     def do_do(self, args: argparse.Namespace) -> None:
         if not self._require_story_context():
             return
 
-        active_choices = [
-            choice for choice in self._current_choices if getattr(choice, "active", True)
-        ]
+        active_choices = [choice for choice in self._current_choices if choice.available]
         if not active_choices:
             self._cmd.poutput("No cached choices. Run `story` to refresh choices first.")
             return
@@ -198,9 +230,19 @@ class StoryController(CommandSet):
             return
 
         choice = active_choices[index - 1]
-        result = self._call_service(
-            "resolve_choice",
-            edge_id=choice.edge_id,
+        try:
+            choice_payload = self._choice_payload(choice, args.values, args.payload)
+        except ValueError as exc:
+            self._cmd.poutput(str(exc))
+            return
+
+        result = cast(
+            RuntimeEnvelope,
+            self._call_service(
+                "resolve_choice",
+                edge_id=choice.edge_id,
+                choice_payload=choice_payload,
+            ),
         )
         self._apply_runtime_envelope(result)
         self._render_current_story_update()
@@ -266,14 +308,5 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        info = self._call_service("get_story_info")
-        if hasattr(info, "to_dto"):
-            payload = info.to_dto()
-        elif hasattr(info, "model_dump"):
-            payload = info.model_dump()
-        elif isinstance(info, dict):
-            payload = info
-        else:
-            payload = {"info": str(info)}
-
-        self._cmd.emit_terminal(self._cmd.terminal_renderer.projected_state(payload))
+        info = cast(ProjectedState, self._call_service("get_story_info"))
+        self._cmd.emit_terminal(self._cmd.terminal_renderer.projected_state(info.to_dto()))

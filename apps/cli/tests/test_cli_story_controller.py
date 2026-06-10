@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from uuid import UUID, uuid4
 
-import pytest
 import cmd2
+import pytest
 
 from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
-from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment
 from tangl.service.response import (
+    BadgeListValue,
     KvListValue,
     KvRow,
     ProjectedSection,
@@ -17,7 +17,9 @@ from tangl.service.response import (
     RuntimeEnvelope,
 )
 
+
 # This uses a test-app to focus on the StoryController
+
 
 class RecordingCLI(cmd2.Cmd):
     def __init__(self) -> None:
@@ -31,7 +33,7 @@ class RecordingCLI(cmd2.Cmd):
         self.story_controller = StoryController()
         self.register_command_set(self.story_controller)
 
-    def poutput(self, message: object, *, end: str = "\n", **_: object) -> None:
+    def poutput(self, message: object, *, end: str = "\n", **_: object) -> None:  # noqa: ARG002
         self.outputs.append(str(message))
 
     def emit_terminal(self, renderables: list[object]) -> None:
@@ -43,55 +45,43 @@ class RecordingCLI(cmd2.Cmd):
     def call_service(self, method_name: str, /, **params: object) -> object:
         self.calls.append((method_name, params))
         if method_name in {"create_story", "get_story_update"}:
-            return SimpleNamespace(
+            return RuntimeEnvelope(
                 metadata={"ledger_id": str(self.ledger_id)},
                 fragments=[
-                    SimpleNamespace(
-                        fragment_type="block",
-                        content="start",
-                        choices=[
-                            SimpleNamespace(
-                                fragment_type="choice",
-                                uid=self.edge_id,
-                                source_id=self.edge_id,
-                                label="Go",
-                                active=True,
-                            )
-                        ],
+                    ContentFragment(content="start"),
+                    ChoiceFragment(
+                        edge_id=self.edge_id,
+                        text="Go",
                     ),
                 ],
             )
         if method_name == "resolve_choice":
-            return SimpleNamespace(
+            return RuntimeEnvelope(
                 metadata={"ledger_id": str(self.ledger_id)},
-                fragments=[SimpleNamespace(content="moved")],
+                fragments=[ContentFragment(content="moved")],
             )
         if method_name == "get_story_info":
-            return {
-                "sections": [
-                    {
-                        "section_id": "session",
-                        "title": "Session",
-                        "kind": "stats",
-                        "value": {
-                            "value_type": "kv_list",
-                            "items": [
-                                {"key": "Cursor", "value": "Dark Forest"},
-                                {"key": "Step", "value": 0},
-                            ],
-                        },
-                    },
-                    {
-                        "section_id": "flags",
-                        "title": "Flags",
-                        "kind": "custom_metrics",
-                        "value": {
-                            "value_type": "badges",
-                            "items": ["torch_lit", "met_guide"],
-                        },
-                    },
+            return ProjectedState(
+                sections=[
+                    ProjectedSection(
+                        section_id="session",
+                        title="Session",
+                        kind="stats",
+                        value=KvListValue(
+                            items=[
+                                KvRow(key="Cursor", value="Dark Forest"),
+                                KvRow(key="Step", value=0),
+                            ]
+                        ),
+                    ),
+                    ProjectedSection(
+                        section_id="flags",
+                        title="Flags",
+                        kind="custom_metrics",
+                        value=BadgeListValue(items=["torch_lit", "met_guide"]),
+                    ),
                 ]
-            }
+            )
         if method_name == "drop_story":
             return {
                 "status": "dropped",
@@ -106,6 +96,7 @@ class RecordingCLI(cmd2.Cmd):
 def story_controller() -> StoryController:
     cli = RecordingCLI()
     return cli.story_controller
+
 
 def test_story_command_fetches_journal_and_choices(story_controller: StoryController) -> None:
     story_controller.do_story()
@@ -122,6 +113,7 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     assert resolve_calls
     _, params = resolve_calls[-1]
     assert params["edge_id"] == cli.edge_id
+    assert params["choice_payload"] == {}
 
 
 def test_cli_applies_runtime_envelope_dto_projection(
@@ -155,24 +147,24 @@ def test_cli_applies_runtime_envelope_dto_projection(
 
 def test_cli_shows_locked_choices_with_reason(story_controller: StoryController) -> None:
     cli = story_controller._cmd
-    locked_fragment = SimpleNamespace(
-        fragment_type="choice",
-        content="Open vault",
-        active=False,
-        unavailable_reason="Requires keycard",
-        uid=uuid4(),
-    )
-    active_fragment = SimpleNamespace(
-        fragment_type="choice",
-        content="Go north",
-        active=True,
-        uid=uuid4(),
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                ChoiceFragment(
+                    edge_id=uuid4(),
+                    text="Open vault",
+                    available=False,
+                    unavailable_reason="Requires keycard",
+                ),
+                ChoiceFragment(
+                    edge_id=uuid4(),
+                    text="Go north",
+                ),
+            ]
+        )
     )
 
     cli.outputs.clear()
-    story_controller._current_story_update = [locked_fragment, active_fragment]
-    story_controller._current_choices = story_controller._load_choices_from_fragments()
-
     story_controller._render_current_story_update()
 
     output = "\n".join(cli.outputs)
@@ -180,10 +172,105 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
     assert "x) Open vault [locked: Requires keycard]" in output
 
 
+def test_do_command_submits_quantity_payload(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                ChoiceFragment(
+                    edge_id=cli.edge_id,
+                    text="Take tokens",
+                    accepts={"kind": "quantity", "min": 1, "max": 3},
+                )
+            ]
+        )
+    )
+
+    story_controller.do_do("1 2")
+
+    _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
+    assert params["choice_payload"] == {"quantity": 2}
+
+
+def test_do_command_submits_piece_payload(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                PieceFragment(
+                    piece_id="permit-7",
+                    piece_kind="document",
+                    content="Gate permit",
+                ),
+                ChoiceFragment(
+                    edge_id=cli.edge_id,
+                    text="Inspect a document",
+                    accepts={"kind": "pieces", "min": 1, "max": 1},
+                ),
+            ]
+        )
+    )
+
+    story_controller.do_do("1 permit-7")
+
+    _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
+    assert params["choice_payload"] == {"piece_ids": ["permit-7"]}
+
+
+def test_do_command_rejects_invalid_quantity(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                ChoiceFragment(
+                    edge_id=cli.edge_id,
+                    text="Take tokens",
+                    accepts={"kind": "quantity", "min": 1, "max": 3},
+                )
+            ]
+        )
+    )
+    calls_before = len(cli.calls)
+
+    story_controller.do_do("1 4")
+
+    assert len(cli.calls) == calls_before
+    assert cli.outputs[-1] == "Quantity must be at most 3."
+
+
+def test_do_command_accepts_explicit_compose_payload(
+    story_controller: StoryController,
+) -> None:
+    cli = story_controller._cmd
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                ChoiceFragment(
+                    edge_id=cli.edge_id,
+                    text="Give coins",
+                    accepts={
+                        "kind": "compose",
+                        "parts": [
+                            {
+                                "role": "amount",
+                                "accepts": {"kind": "quantity", "min": 1},
+                            }
+                        ],
+                    },
+                )
+            ]
+        )
+    )
+
+    story_controller.do_do("""1 --payload '{"parts":{"amount":{"quantity":2}}}'""")
+
+    _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
+    assert params["choice_payload"] == {"parts": {"amount": {"quantity": 2}}}
+
+
 def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:
     cli = story_controller._cmd
-    story_controller._current_story_update = [SimpleNamespace(content="previous")]
-    story_controller._current_choices = [SimpleNamespace(edge_id=cli.edge_id, label="Go")]
+    story_controller.do_story()
     cli.outputs.clear()
 
     story_controller.do_drop_story("--archive")

@@ -141,7 +141,7 @@ class TestProvisioningHandler:
         assert all(action.successor_id == game_block.uid for action in actions)
         assert all(
             action.payload == {"move": move}
-            for action, move in zip(actions, ["win", "lose", "draw"])
+            for action, move in zip(actions, ["win", "lose", "draw"], strict=True)
         )
 
     def test_provisioning_replaces_previous_dynamic_game_actions(

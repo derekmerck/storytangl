@@ -437,7 +437,7 @@ async def get_story_info(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_bad_request_detail(exc)) from exc
 
-    payload = result.to_dto() if hasattr(result, "to_dto") else _serialize(result)
+    payload = result.to_dto()
     if _profile_has(render_profile, "html"):
         payload = _transform_text_fields(payload)
     return payload

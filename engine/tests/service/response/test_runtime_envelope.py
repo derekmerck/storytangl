@@ -6,6 +6,10 @@ from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.service.response import RuntimeEnvelope
 
 
+class ExtendedRuntimeEnvelope(RuntimeEnvelope):
+    diagnostic_id: str
+
+
 def test_runtime_envelope_model_dump_preserves_fragment_subclass_fields() -> None:
     edge_id = uuid4()
     envelope = RuntimeEnvelope(
@@ -63,3 +67,16 @@ def test_runtime_envelope_to_dto_uses_fragment_dto_projection() -> None:
     assert "seq" not in choice
     assert "step" not in choice
     assert "tags" not in choice
+
+
+def test_runtime_envelope_to_dto_preserves_public_envelope_fields() -> None:
+    envelope = ExtendedRuntimeEnvelope(
+        step=0,
+        diagnostic_id="trace-7",
+        fragments=[ContentFragment(content="Start")],
+    )
+
+    payload = envelope.to_dto()
+
+    assert payload["step"] == 0
+    assert payload["diagnostic_id"] == "trace-7"

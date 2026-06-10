@@ -41,9 +41,18 @@ def test_rich_renderer_exports_envelope_text() -> None:
                 event_type="shift_bell",
                 content="Ten minutes remain.",
             ),
+            {
+                "fragment_type": "piece",
+                "piece_id": "permit-7",
+                "content": "Gate permit",
+            },
         ],
         choices=[
-            SimpleNamespace(label="Verify ID", active=True),
+            {
+                "label": "Verify ID",
+                "available": True,
+                "accepts": {"kind": "pieces", "min": 1, "max": 1},
+            },
             SimpleNamespace(
                 label="Allow passage",
                 active=False,
@@ -67,7 +76,9 @@ def test_rich_renderer_exports_envelope_text() -> None:
     assert "permit-9472.jpg" in transcript
     assert "permit_expiry" in transcript
     assert "shift_bell" in transcript
+    assert "[permit-7] Gate permit" in transcript
     assert "Verify ID" in transcript
+    assert "piece ids: 1" in transcript
     assert "Allow passage" in transcript
     assert "Permit expired" in transcript
     assert "/m Map" in transcript

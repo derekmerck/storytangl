@@ -106,11 +106,9 @@ class RuntimeEnvelope(InfoModel):
         payload: dict[str, Any] = {}
         for field_name in ("cursor_id", "step"):
             if field_name in base_payload:
-                payload[field_name] = base_payload[field_name]
+                payload[field_name] = base_payload.pop(field_name)
         payload["fragments"] = [fragment_to_dto(fragment) for fragment in self.fragments]
-        for field_name in ("last_redirect", "redirect_trace", "metadata"):
-            if field_name in base_payload:
-                payload[field_name] = base_payload[field_name]
+        payload.update(base_payload)
         return payload
 
 
