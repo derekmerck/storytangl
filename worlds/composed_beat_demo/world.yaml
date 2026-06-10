@@ -1,0 +1,8 @@
+label: composed_beat_demo
+scripts: script.yaml
+domain_module: composed_beat_demo.domain
+metadata:
+  title: "Composed Beat Demo"
+  description: "Reference walkthrough of journal beat composition: gather, enrich, compose."
+  author: "StoryTangl Team"
+  version: "1.0.0"

@@ -257,21 +257,34 @@ def do_journal(caller, *, ctx, **kwargs):
 
 
 def do_compose_journal(caller, *, fragments: list[Record], ctx, **kwargs):
-    """Run optional post-merge journal composition handlers."""
-    receipts = _run_task(
-        "compose_journal",
-        caller=caller,
+    """Pipe the merged fragment list through ordered composition handlers.
+
+    Each ``compose_journal`` handler receives the *current* composed list in
+    ``fragments``: the output of earlier handlers, starting from the merged
+    render output. Returning ``None`` passes the list through unchanged; a
+    returned fragment or batch becomes the input to the next handler. The
+    final composed batch (or ``None`` when no handler replaced anything) is
+    the result.
+    """
+    _validate_dispatch_ctx(ctx)
+    call_kwargs = {"caller": caller, "fragments": list(fragments), **kwargs}
+    receipts = dispatch.execute_all(
+        task="compose_journal",
+        call_kwargs=call_kwargs,
         ctx=ctx,
-        fragments=list(fragments),
-        **kwargs,
+        selector=Selector(caller_kind=type(caller)),
     )
-    result = CallReceipt.last_result(*receipts)
-    normalized = _assert_fragment_result(result, task="compose_journal")
-    if normalized is None:
-        return None
-    if isinstance(normalized, Record):
-        return normalized
-    return list(normalized)
+    composed: list[Record] | None = None
+    # Receipts are generated lazily: each iteration executes one handler, so
+    # updating ``call_kwargs`` here feeds the folded batch to the next one.
+    for receipt in receipts:
+        _push_ctx_result(ctx, receipt.result)
+        normalized = _assert_fragment_result(receipt.result, task="compose_journal")
+        if normalized is None:
+            continue
+        composed = [normalized] if isinstance(normalized, Record) else list(normalized)
+        call_kwargs["fragments"] = list(composed)
+    return composed
 
 
 def do_finalize(caller, *, ctx, **kwargs):

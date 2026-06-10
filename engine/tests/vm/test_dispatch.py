@@ -298,7 +298,7 @@ class TestDoJournal:
 
 
 class TestDoComposeJournal:
-    """do_compose_journal uses last non-None replacement semantics."""
+    """do_compose_journal folds the fragment batch through ordered handlers."""
 
     def test_no_handlers_returns_none(self, null_ctx) -> None:
         g = Graph()
@@ -318,6 +318,47 @@ class TestDoComposeJournal:
         result = do_compose_journal(node, ctx=null_ctx, fragments=[Record(label="raw")])
 
         assert result == [second]
+
+    def test_handlers_fold_each_receives_prior_composed_batch(self, null_ctx) -> None:
+        raw = Record(label="raw")
+        seen: dict[str, list[Record]] = {}
+
+        on_compose_journal(
+            lambda *, caller, ctx, fragments, **kw: [*fragments, Record(label="a")]
+        )
+
+        @on_compose_journal
+        def _second(*, caller, ctx, fragments, **kw):
+            seen["fragments"] = list(fragments)
+            return [*fragments, Record(label="b")]
+
+        g = Graph()
+        node = _node(g, label="n")
+        result = do_compose_journal(node, ctx=null_ctx, fragments=[raw])
+
+        assert [f.label for f in seen["fragments"]] == ["raw", "a"]
+        assert [f.label for f in result] == ["raw", "a", "b"]
+
+    def test_none_returning_handler_passes_batch_through_unchanged(self, null_ctx) -> None:
+        raw = Record(label="raw")
+        seen: dict[str, list[Record]] = {}
+
+        on_compose_journal(
+            lambda *, caller, ctx, fragments, **kw: [*fragments, Record(label="a")]
+        )
+        on_compose_journal(lambda *, caller, ctx, fragments, **kw: None)
+
+        @on_compose_journal
+        def _third(*, caller, ctx, fragments, **kw):
+            seen["fragments"] = list(fragments)
+            return None
+
+        g = Graph()
+        node = _node(g, label="n")
+        result = do_compose_journal(node, ctx=null_ctx, fragments=[raw])
+
+        assert [f.label for f in seen["fragments"]] == ["raw", "a"]
+        assert [f.label for f in result] == ["raw", "a"]
 
     def test_later_handlers_can_inspect_prior_compose_results_on_ctx_pipe(self) -> None:
         first = Record(label="first")
