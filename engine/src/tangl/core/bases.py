@@ -414,7 +414,12 @@ class HasOrder(BaseModelPlus):
         >>> assert h < i < j
     """
 
-    seq: int = Field(None, init=False, validate_default=True)
+    seq: int = Field(
+        None,
+        init=False,
+        validate_default=True,
+        json_schema_extra={"dto_exclude": True},
+    )
     _seq: ClassVar[int] = time.time_ns()  # initialize to something strictly larger than the previous run
 
     @classmethod

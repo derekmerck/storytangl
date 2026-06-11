@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Graph
+from tangl.journal.intent import PieceConstraints, PiecesAccepts
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
 from tangl.story import Action, Block
 from tangl.mechanics.games.handlers import (
@@ -138,7 +139,10 @@ class TestProvisioningHandler:
         assert all(isinstance(action, Action) for action in actions)
         assert all(action.predecessor_id == game_block.uid for action in actions)
         assert all(action.successor_id == game_block.uid for action in actions)
-        assert all(action.payload == {"move": move} for action, move in zip(actions, ["win", "lose", "draw"]))
+        assert all(
+            action.payload == {"move": move}
+            for action, move in zip(actions, ["win", "lose", "draw"], strict=True)
+        )
 
     def test_provisioning_replaces_previous_dynamic_game_actions(
         self,
@@ -167,6 +171,26 @@ class TestProvisioningHandler:
         actions = provision_game_moves(game_block, ctx=ctx)
 
         assert actions == []
+
+    def test_typed_accepts_survives_graph_snapshot(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        action = Action(
+            graph=game_graph,
+            predecessor_id=game_block.uid,
+            successor_id=game_block.uid,
+            accepts=PiecesAccepts(
+                constraints=PieceConstraints(target_zone_ref="packet"),
+            ),
+        )
+
+        restored = Graph.structure(game_graph.unstructure()).get(action.uid)
+
+        assert isinstance(restored, Action)
+        assert restored.accepts is not None
+        assert restored.accepts.kind == "pieces"
 
 
 class TestUpdateHandler:

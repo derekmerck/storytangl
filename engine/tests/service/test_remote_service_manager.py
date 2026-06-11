@@ -16,6 +16,7 @@ import requests
 from tangl.core import BaseFragment
 from tangl.journal.fragments import BlockFragment, ChoiceFragment
 from tangl.persistence import PersistenceManagerFactory
+from tangl.service import KvListValue, ProjectedState, TableValue
 from tangl.service.bootstrap import build_service_manager
 from tangl.service.exceptions import AccessDeniedError, InvalidOperationError, ServiceError
 from tangl.service.remote_service_manager import RemoteServiceManager
@@ -293,6 +294,116 @@ class TestRemoteResponseHydration:
         assert session.calls[0]["params"] == {
             "limit": 5,
             "since_step": 2,
+            "render_profile": "raw",
+        }
+
+    def test_story_update_decodes_choice_payload_contracts(self) -> None:
+        user_id = uuid4()
+        payload = {
+            "cursor_id": str(uuid4()),
+            "step": 3,
+            "fragments": [
+                {
+                    "fragment_type": "choice",
+                    "edge_id": str(uuid4()),
+                    "text": "Buy rations",
+                    "available": True,
+                    "accepts": {
+                        "kind": "quantity",
+                        "required": True,
+                        "min": 1,
+                        "max": 3,
+                        "step": 1,
+                        "unit": "ration",
+                        "cost_previews": [],
+                    },
+                    "ui_hints": {
+                        "hotkey": "b",
+                        "source_kind": "market",
+                        "contribution": "purchase",
+                        "cost_previews": [],
+                    },
+                }
+            ],
+            "metadata": {},
+        }
+        session = RecordingSession([StubResponse(200, payload)])
+        manager = RemoteServiceManager(
+            "https://example.test/api/v2",
+            api_key="bound-key",
+            session=session,
+        )
+        manager._bound_user_id = user_id
+
+        envelope = manager.get_story_update(user_id=user_id)
+
+        choice = envelope.fragments[0]
+        assert isinstance(choice, ChoiceFragment)
+        assert choice.accepts is not None
+        assert choice.accepts.kind == "quantity"
+        assert choice.accepts.unit == "ration"
+        assert choice.ui_hints is not None
+        assert choice.ui_hints.hotkey == "b"
+        assert choice.ui_hints.source_kind == "market"
+
+    def test_story_info_decodes_projected_state_contracts(self) -> None:
+        user_id = uuid4()
+        payload = {
+            "sections": [
+                {
+                    "section_id": "stats",
+                    "title": "Stats",
+                    "kind": "status",
+                    "value": {
+                        "value_type": "kv_list",
+                        "items": [
+                            {
+                                "key": "Health",
+                                "value": 9,
+                                "max": 12,
+                                "hint": "bar",
+                            }
+                        ],
+                    },
+                },
+                {
+                    "section_id": "matrix",
+                    "title": "Matrix",
+                    "kind": "map",
+                    "value": {
+                        "value_type": "table",
+                        "columns": ["Room", "Seen"],
+                        "rows": [["Hall", True]],
+                    },
+                },
+            ],
+        }
+        session = RecordingSession([StubResponse(200, payload)])
+        manager = RemoteServiceManager(
+            "https://example.test/api/v2",
+            api_key="bound-key",
+            session=session,
+        )
+        manager._bound_user_id = user_id
+
+        state = manager.get_story_info(
+            user_id=user_id,
+            kind="status",
+            kinds=["map", "inventory"],
+            query={"kinds": ["map"], "format": "table"},
+        )
+
+        assert isinstance(state, ProjectedState)
+        assert isinstance(state.sections[0].value, KvListValue)
+        assert state.sections[0].value.items[0].key == "Health"
+        assert state.sections[0].value.items[0].hint == "bar"
+        assert isinstance(state.sections[1].value, TableValue)
+        assert state.sections[1].value.rows == [["Hall", True]]
+        assert session.calls[0]["url"] == "https://example.test/api/v2/story/info"
+        assert session.calls[0]["params"] == {
+            "kind": "status",
+            "kinds": "map,inventory",
+            "query": '{"kinds": ["map"], "format": "table"}',
             "render_profile": "raw",
         }
 

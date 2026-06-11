@@ -19,6 +19,7 @@ from .strategies import opponent_strategies, scoring_strategies
 
 if TYPE_CHECKING:
     from tangl.core import BaseFragment
+    from tangl.journal.intent import Accepts
 
 GameT = TypeVar("GameT", bound=Game)
 
@@ -108,6 +109,26 @@ class GameHandler(ABC, Generic[GameT]):
 
         move_value = getattr(move, "value", move)
         return f"Play {move_value}"
+
+    def get_provisioned_moves(self, game: GameT) -> list[Move]:
+        """Return the moves represented as client-facing actions."""
+
+        return self.get_available_moves(game)
+
+    def get_move_accepts(self, game: GameT, move: Move) -> Accepts | None:
+        """Return the client input contract for a move action."""
+
+        return None
+
+    def resolve_move_payload(
+        self,
+        game: GameT,
+        move: Move,
+        payload: dict[str, Any],
+    ) -> Move:
+        """Resolve submitted widget data into the engine move."""
+
+        return move
 
     def build_round_notes(
         self,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.core import Graph
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.nim_game import NimGame, NimGameHandler
@@ -57,6 +59,16 @@ class TestNimCore:
         assert ns["nim_heap_size"] == 5
         assert ns["nim_max_take"] == 3
 
+    def test_quantity_payload_resolves_to_legal_take(self) -> None:
+        game = NimGame(opening_heap_size=2, max_take=3)
+        handler = NimGameHandler()
+        handler.setup(game)
+        selector = handler.get_provisioned_moves(game)[0]
+
+        assert handler.resolve_move_payload(game, selector, {"quantity": 2}) == 2
+        with pytest.raises(ValueError, match="Invalid token quantity"):
+            handler.resolve_move_payload(game, selector, {"quantity": 3})
+
 
 class TestNimIntegration:
     """VM and HasGame integration tests for nim."""
@@ -73,11 +85,11 @@ class TestNimIntegration:
 
         actions = provision_game_moves(block, ctx=ctx)
 
-        assert [action.label for action in actions] == [
-            "Take 1 token",
-            "Take 2 tokens",
-            "Take 3 tokens",
-        ]
+        assert [action.label for action in actions] == ["Take tokens"]
+        assert actions[0].accepts is not None
+        assert actions[0].accepts.kind == "quantity"
+        assert actions[0].accepts.min == 1
+        assert actions[0].accepts.max == 3
 
     def test_nim_routes_to_victory(self) -> None:
         graph = Graph(label="nim_flow")
@@ -106,12 +118,12 @@ class TestNimIntegration:
         ledger = Ledger.from_graph(graph=graph, entry_id=intro.uid)
         ledger.resolve_choice(intro_to_heap.uid)
 
-        take_one = next(
+        take = next(
             action
             for action in ledger.cursor.edges_out()
-            if isinstance(action, Action) and action.payload and action.payload["move"] == 1
+            if isinstance(action, Action) and action.label == "Take tokens"
         )
-        ledger.resolve_choice(take_one.uid, choice_payload=take_one.payload)
+        ledger.resolve_choice(take.uid, choice_payload={"quantity": 1})
 
         assert ledger.cursor_id == victory.uid
         content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())

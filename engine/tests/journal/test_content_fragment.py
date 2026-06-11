@@ -12,10 +12,9 @@ from tangl.journal.ux import ControlFragment
 def test_content_fragment_creation():
     # Test basic fragment creation
     fragment = ContentFragment(
-        fragment_type="test",
-        content="Test content"
+        content="Test content",
     )
-    assert fragment.fragment_type == "test"
+    assert fragment.fragment_type == "content"
     assert fragment.content == "Test content"
     assert fragment.uid is not None
     assert isinstance(fragment.uid, UUID)
@@ -23,13 +22,12 @@ def test_content_fragment_creation():
 def test_fragment_serialization():
     # Test that fragments serialize correctly
     fragment = ContentFragment(
-        fragment_type="test",
         label="test_label",
         content="Test content",
-        format="plain"
+        format="plain",
     )
     data = fragment.model_dump()
-    assert data["fragment_type"] == "test"
+    assert data["fragment_type"] == "content"
     assert data["label"] == "test_label"
     assert data["content"] == "Test content"
     assert data["format"] == "plain"

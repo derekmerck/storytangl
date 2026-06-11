@@ -45,14 +45,29 @@ def _by_type(fragments, kind):
 
 
 class TestStructuredEmission:
+    def test_initial_projection_emits_candidate_packet_and_documents(self) -> None:
+        game, handler = _game()
+
+        frags = handler.get_journal_fragments(game)
+
+        assert any(
+            isinstance(fragment, PieceFragment) and fragment.piece_kind == "candidate"
+            for fragment in frags
+        )
+        assert any(
+            isinstance(fragment, GroupFragment) and fragment.zone_role == "packet"
+            for fragment in frags
+        )
+        assert not _by_type(frags, ContentFragment)
+
     def test_inspect_emits_candidate_packet_and_documents(self) -> None:
         game, handler = _game()
         handler.receive_move(game, ("inspect", "passport"))
         frags = handler.get_journal_fragments(game)
 
         pieces = _by_type(frags, PieceFragment)
-        candidate = [p for p in pieces if p.kind == "candidate"]
-        docs = [p for p in pieces if p.kind != "candidate"]
+        candidate = [p for p in pieces if p.piece_kind == "candidate"]
+        docs = [p for p in pieces if p.piece_kind != "candidate"]
 
         assert candidate and candidate[0].content == "Edda Marrow"
         assert candidate[0].properties["declared_purpose"]  # populated
@@ -86,10 +101,18 @@ class TestStructuredEmission:
     def test_candidate_uid_is_stable_across_rounds(self) -> None:
         game, handler = _game()
         handler.receive_move(game, ("inspect", "passport"))
-        first = [p for p in _by_type(handler.get_journal_fragments(game), PieceFragment) if p.kind == "candidate"][0]
+        first = [
+            p
+            for p in _by_type(handler.get_journal_fragments(game), PieceFragment)
+            if p.piece_kind == "candidate"
+        ][0]
 
         handler.receive_move(game, ("inspect", "work permit"))
-        second = [p for p in _by_type(handler.get_journal_fragments(game), PieceFragment) if p.kind == "candidate"][0]
+        second = [
+            p
+            for p in _by_type(handler.get_journal_fragments(game), PieceFragment)
+            if p.piece_kind == "candidate"
+        ][0]
 
         assert first.uid == second.uid  # same candidate -> in-place update
 
@@ -104,7 +127,7 @@ class TestStructuredEmission:
         def candidate_uid(handler, game):
             return [
                 p for p in _by_type(handler.get_journal_fragments(game), PieceFragment)
-                if p.kind == "candidate"
+                if p.piece_kind == "candidate"
             ][0].uid
 
         assert candidate_uid(handler_a, game_a) != candidate_uid(handler_b, game_b)
@@ -128,5 +151,7 @@ class TestStructuredEmission:
         handler.receive_move(game, ("decide", "deny"))
 
         frags = handler.get_journal_fragments(game)
-        candidate = [p for p in _by_type(frags, PieceFragment) if p.kind == "candidate"]
+        candidate = [
+            p for p in _by_type(frags, PieceFragment) if p.piece_kind == "candidate"
+        ]
         assert candidate and candidate[0].content == "Tomas Vey"

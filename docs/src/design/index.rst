@@ -56,6 +56,7 @@ See also
    traversal/notes-sinks
 
    service/SERVICE_DESIGN
+   service/BACKEND_FRAGMENT_RECONCILIATION
    service/RESPONSE_TYPES
    service/FRAGMENT_STREAM_CONTRACT
 

@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     Field,
     JsonValue as PydanticJsonValue,
+    SerializeAsAny,
     ValidationError,
     field_serializer,
     model_validator,
@@ -20,7 +21,12 @@ from pydantic import (
 from tangl.core import BaseFragment
 from tangl.info import __url__
 from tangl.journal.intent import KvRow, PrimitiveValue
-from tangl.journal.fragments import KvFragment, MediaFragment, PresentationHints
+from tangl.journal.fragments import (
+    KvFragment,
+    MediaFragment,
+    PresentationHints,
+    fragment_to_dto,
+)
 from tangl.service.user.user import User
 
 
@@ -83,10 +89,27 @@ class RuntimeEnvelope(InfoModel):
 
     cursor_id: UUID | None = None
     step: int | None = None
-    fragments: list[BaseFragment] = Field(default_factory=list)
+    fragments: list[SerializeAsAny[BaseFragment]] = Field(default_factory=list)
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    def to_dto(self) -> dict[str, Any]:
+        """Return the transport DTO projection for client-facing envelopes."""
+
+        base_payload = self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_none=True,
+            exclude={"fragments"},
+        )
+        payload: dict[str, Any] = {}
+        for field_name in ("cursor_id", "step"):
+            if field_name in base_payload:
+                payload[field_name] = base_payload.pop(field_name)
+        payload["fragments"] = [fragment_to_dto(fragment) for fragment in self.fragments]
+        payload.update(base_payload)
+        return payload
 
 
 JsonValue: TypeAlias = PydanticJsonValue
@@ -302,6 +325,11 @@ class ProjectedState(InfoModel):
     """Canonical ordered projected-state payload for runtime surfaces."""
 
     sections: list[ProjectedSection] = Field(default_factory=list)
+
+    def to_dto(self) -> dict[str, Any]:
+        """Return the transport DTO projection for projected-state clients."""
+
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
 
 
 def coerce_runtime_info(value: Any) -> RuntimeInfo | None:

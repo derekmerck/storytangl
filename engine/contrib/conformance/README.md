@@ -27,6 +27,13 @@ fragment registry: media placeholders update in place, pieces move between
 zones, stale offers or fallback fragments can be deleted, and open choices keep
 their referenced state renderable after each envelope.
 
+`diagnostics/` contains JSON payloads generated from the real service/backend
+path. These files are not gating conformance fixtures. They are the first proof
+that the current backend can emit widget-shaped `RuntimeEnvelope` and
+`ProjectedState` payloads before a genre demo depends on the widget framework.
+Regenerate them with
+`poetry run python engine/contrib/conformance/backend_widget_demo.py`.
+
 `legibility.py` contains the first promoted conformance harness. It is a
 JSON-only decision-legibility check: after applying update/delete controls, each
 available choice must be renderable in the current scene shell and any

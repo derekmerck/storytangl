@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 from tangl.core import BaseFragment
 from tangl.core.bases import BaseModelPlus
+from tangl.journal.intent import PieceConstraints, PiecesAccepts, PickAccepts
 from tangl.journal.fragments import (
     ContentFragment,
     GroupFragment,
@@ -53,10 +54,15 @@ from .picking_game import PickingGame, PickingGameHandler, PickingMove
 # into the seed so distinct credentials blocks in one journal (e.g. a scheduled
 # and a randomized shift) never collide on a shared global fragment id.
 _PIECE_NS = uuid.UUID("b7c3f6e2-1d4a-4c9b-9f2e-7a6d5c4b3a21")
+_DOCUMENT_SELECTOR_TARGET = "__document_piece__"
 
 
 def _piece_uid(game_uid: uuid.UUID, case_index: int, key: str) -> uuid.UUID:
     return uuid.uuid5(_PIECE_NS, f"credentials:{game_uid}:{case_index}:{key}")
+
+
+def _document_piece_id(case_index: int, label: str) -> str:
+    return f"{case_index}:{label}"
 
 
 def _document_kind(label: str) -> str:
@@ -804,6 +810,25 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             moves.append(CredentialsMove(kind="request_relinquish", target=""))
         return moves
 
+    def get_provisioned_moves(self, game: CredentialsGame) -> list[CredentialsMove]:
+        moves = list(self.get_available_moves(game))
+        document_moves = [
+            move
+            for move in moves
+            if move.kind == "inspect" and move.target in game.presented_documents
+        ]
+        moves = [
+            move
+            for move in moves
+            if move.kind != "inspect" or move.target not in game.presented_documents
+        ]
+        if document_moves:
+            moves.insert(
+                0,
+                CredentialsMove(kind="inspect", target=_DOCUMENT_SELECTOR_TARGET),
+            )
+        return moves
+
     @staticmethod
     def _has_declared_contraband(game: CredentialsGame) -> bool:
         disclosed = game.finding_status.get(FindingKey.DISCLOSURE) == Finding.DECLARED
@@ -826,6 +851,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
     def get_move_label(self, game: CredentialsGame, move: CredentialsMove) -> str:
         if move.kind == "inspect":
+            if move.target == _DOCUMENT_SELECTOR_TARGET:
+                return "Inspect a document"
             if move.target in game.active_case.packet_hidden_facts:
                 return f"Review {move.target}"
             return f"Inspect {move.target}"
@@ -840,6 +867,48 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if move.kind == "request_relinquish":
             return "Have the contraband surrendered"
         return f"Choose {move.target}"
+
+    def get_move_accepts(
+        self,
+        game: CredentialsGame,
+        move: CredentialsMove,
+    ) -> PiecesAccepts | PickAccepts:
+        if move.kind == "inspect" and move.target == _DOCUMENT_SELECTOR_TARGET:
+            return PiecesAccepts(
+                constraints=PieceConstraints(
+                    target_zone_ref=str(
+                        _piece_uid(game.uid, game.case_index, "packet"),
+                    ),
+                ),
+            )
+        return PickAccepts()
+
+    def resolve_move_payload(
+        self,
+        game: CredentialsGame,
+        move: CredentialsMove,
+        payload: dict[str, object],
+    ) -> CredentialsMove:
+        move = self._normalize_move(move)
+        if move.kind != "inspect" or move.target != _DOCUMENT_SELECTOR_TARGET:
+            return move
+
+        piece_ids = payload.get("piece_ids")
+        if not isinstance(piece_ids, list) or len(piece_ids) != 1:
+            raise ValueError("Inspect a document requires exactly one piece_id")
+
+        selected_piece_id = piece_ids[0]
+        if not isinstance(selected_piece_id, str):
+            raise ValueError("Document piece_id must be a string")
+        target_by_piece_id = {
+            _document_piece_id(game.case_index, target): target
+            for target in self.get_available_inspect_targets(game)
+            if target in game.presented_documents
+        }
+        target = target_by_piece_id.get(selected_piece_id)
+        if target is None:
+            raise ValueError(f"Document piece is not inspectable: {selected_piece_id}")
+        return CredentialsMove(kind="inspect", target=target)
 
     def resolve_inspection(
         self,
@@ -1169,7 +1238,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def get_journal_fragments(self, game: CredentialsGame) -> list[BaseFragment] | None:
         last_round = game.last_round
         if last_round is None:
-            return []
+            return [] if game.shift_complete else self._candidate_fragments(game)
 
         move = self._normalize_move(last_round.player_move)
         prose = self._prose_fragments(game, last_round, move.kind, move.target, last_round.notes or {})
@@ -1315,7 +1384,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         candidate = PieceFragment(
             uid=_piece_uid(game.uid, idx, "candidate"),
             piece_id=f"candidate-{idx}",
-            kind="candidate",
+            piece_kind="candidate",
             content=case.candidate_name,
             properties={
                 "declared_purpose": case.get_purpose().value,
@@ -1332,8 +1401,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             doc_pieces.append(
                 PieceFragment(
                     uid=doc_uid,
-                    piece_id=f"{idx}:{label}",
-                    kind=_document_kind(label),
+                    piece_id=_document_piece_id(idx, label),
+                    piece_kind=_document_kind(label),
                     content=description,
                     zone_ref=packet_uid,
                     hints=PresentationHints(label_text=label),

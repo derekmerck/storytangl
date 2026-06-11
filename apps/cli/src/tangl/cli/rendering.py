@@ -123,7 +123,8 @@ class PlainTerminalRenderer:
         for choice in choices:
             label = _choice_label(choice)
             if _choice_active(choice):
-                lines.append(f"{active_index}. {label}")
+                hint = _choice_input_hint(choice)
+                lines.append(f"{active_index}. {label}{f' {hint}' if hint else ''}")
                 active_index += 1
                 continue
 
@@ -254,6 +255,10 @@ def _plain_fragment_lines(fragment: Any) -> list[str]:
     if ftype == "user_event":
         event_type = _read(fragment, "event_type") or "event"
         return [f"* {event_type}: {_fragment_text(fragment)}"]
+    if ftype == "piece":
+        piece_id = _read(fragment, "piece_id")
+        label = _fragment_text(fragment)
+        return [f"[{piece_id}] {label}" if piece_id else label]
 
     text = _fragment_text(fragment)
     return [text] if text else []
@@ -280,6 +285,11 @@ def _rich_fragment_renderables(fragment: Any) -> list[Any]:
     if ftype == "user_event":
         event_type = _read(fragment, "event_type") or "event"
         return [_rich_text(f"‹ {event_type} › {_fragment_text(fragment)}", style="italic dim")]
+    if ftype == "piece":
+        piece_id = _read(fragment, "piece_id")
+        label = _fragment_text(fragment)
+        text = f"[{piece_id}] {label}" if piece_id else label
+        return [_rich_text(text)]
 
     content_format = _read(fragment, "content_format")
     text = _fragment_text(fragment)
@@ -310,7 +320,7 @@ def _rich_choices(choices: list[Any], *, no_choices_text: str = "No available ch
     for choice in choices:
         label = _choice_label(choice)
         if _choice_active(choice):
-            table.add_row(str(active_index), label, "")
+            table.add_row(str(active_index), label, _choice_input_hint(choice))
             active_index += 1
             continue
 
@@ -628,8 +638,36 @@ def _choice_label(choice: Any) -> str:
 
 
 def _choice_active(choice: Any) -> bool:
-    active = _read(choice, "active", True)
-    return bool(active)
+    available = _read(choice, "available")
+    if available is not None:
+        return bool(available)
+    return bool(_read(choice, "active", True))
+
+
+def _choice_input_hint(choice: Any) -> str:
+    accepts = _read(choice, "accepts")
+    if not isinstance(accepts, Mapping):
+        return ""
+
+    kind = accepts.get("kind")
+    if kind == "quantity":
+        bounds = "-".join(
+            str(value)
+            for value in (accepts.get("min"), accepts.get("max"))
+            if value is not None
+        )
+        unit = f" {accepts['unit']}" if accepts.get("unit") else ""
+        return f"<quantity{f' {bounds}' if bounds else ''}{unit}>"
+    if kind == "pieces":
+        minimum = accepts.get("min", 1)
+        maximum = accepts.get("max", 1)
+        count = str(minimum) if minimum == maximum else f"{minimum}-{maximum}"
+        return f"<piece ids: {count}>"
+    if kind in {"text", "raw_command"}:
+        return f"<{str(kind).replace('_', ' ')}>"
+    if kind not in {None, "pick"}:
+        return f"<{kind}: --payload JSON>"
+    return ""
 
 
 def _read(source: Any, key: str, default: Any = None) -> Any:

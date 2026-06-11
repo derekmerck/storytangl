@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tangl.journal.fragments import PieceFragment, PresentationHints
+from tangl.journal.fragments import (
+    PieceFragment,
+    PresentationHints,
+    fragment_to_dto,
+)
 
 
 def test_piece_fragment_serializes_to_fixture_shape() -> None:
@@ -18,14 +22,14 @@ def test_piece_fragment_serializes_to_fixture_shape() -> None:
     piece = PieceFragment(
         uid=uid,
         piece_id="lamp",
-        kind="item",
+        piece_kind="item",
         content="brass lamp",
         display_state="available",
         zone_ref=zone,
         hints=PresentationHints(label_text="brass lamp"),
     )
 
-    data = piece.model_dump(mode="json", by_alias=True, exclude_none=True)
+    data = fragment_to_dto(piece)
 
     assert data["fragment_type"] == "piece"
     assert data["piece_id"] == "lamp"
@@ -39,7 +43,7 @@ def test_piece_fragment_serializes_to_fixture_shape() -> None:
 def test_piece_fragment_carries_properties_for_richer_kinds() -> None:
     piece = PieceFragment(
         piece_id="candidate-0",
-        kind="candidate",
+        piece_kind="candidate",
         content="Bek Tarsus",
         properties={"declared_purpose": "merchant", "declared_origin": "Kalden"},
         hints=PresentationHints(label_text="Bek Tarsus (merchant)"),
@@ -48,5 +52,18 @@ def test_piece_fragment_carries_properties_for_richer_kinds() -> None:
     data = piece.model_dump(mode="json", by_alias=True, exclude_none=True)
 
     assert data["properties"]["declared_purpose"] == "merchant"
-    assert data["kind"] == "candidate"
+    assert data["piece_kind"] == "candidate"
     assert data["hints"]["label_text"] == "Bek Tarsus (merchant)"
+
+
+def test_piece_kind_survives_constructor_form_round_trip() -> None:
+    piece = PieceFragment(
+        piece_id="candidate-0",
+        piece_kind="candidate",
+        content="Bek Tarsus",
+    )
+
+    restored = PieceFragment.structure(piece.unstructure())
+
+    assert isinstance(restored, PieceFragment)
+    assert restored.piece_kind == "candidate"

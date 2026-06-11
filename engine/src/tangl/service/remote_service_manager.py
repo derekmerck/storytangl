@@ -15,18 +15,7 @@ import requests
 from pydantic import ValidationError as PydanticValidationError
 
 from tangl.core import BaseFragment
-from tangl.journal.fragments import (
-    AttributedFragment,
-    BlockFragment,
-    ChoiceFragment,
-    ContentFragment,
-    ControlFragment,
-    DialogFragment,
-    GroupFragment,
-    KvFragment,
-    MediaFragment,
-    UserEventFragment,
-)
+from tangl.journal.fragments import fragment_from_dto
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.persistence import PersistenceManager
 from tangl.type_hints import Identifier, UnstructuredData
@@ -64,21 +53,6 @@ _STANDARD_RUNTIME_INFO_FIELDS = {
     "step",
     "details",
 }
-_KNOWN_FRAGMENT_TYPES: dict[str, type[BaseFragment]] = {
-    "attributed": AttributedFragment,
-    "block": BlockFragment,
-    "choice": ChoiceFragment,
-    "content": ContentFragment,
-    "delete": ControlFragment,
-    "dialog": DialogFragment,
-    "group": GroupFragment,
-    "kv": KvFragment,
-    "media": MediaFragment,
-    "update": ControlFragment,
-    "user_event": UserEventFragment,
-}
-
-
 class RemoteServiceManager(ServiceManager):
     """Service-manager adapter that fulfills calls through the REST API."""
 
@@ -250,21 +224,12 @@ class RemoteServiceManager(ServiceManager):
             raise ServiceError(f"Remote service returned invalid {label} payload") from exc
 
     def _decode_fragment(self, payload: object) -> BaseFragment:
-        if not isinstance(payload, Mapping):
-            return BaseFragment(fragment_type="unknown", content=payload)
-
-        raw_fragment = dict(payload)
-        fragment_type = raw_fragment.get("fragment_type")
-        if not isinstance(fragment_type, str) or not fragment_type:
-            return BaseFragment(fragment_type="unknown", content=raw_fragment)
-
-        fragment_model = _KNOWN_FRAGMENT_TYPES.get(fragment_type)
-        if fragment_model is None:
-            return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
-
         try:
-            return fragment_model.model_validate(raw_fragment)
+            return fragment_from_dto(payload)
         except PydanticValidationError as exc:
+            fragment_type = (
+                payload.get("fragment_type") if isinstance(payload, Mapping) else "unknown"
+            )
             raise ServiceError(
                 f"Remote service returned invalid {fragment_type} fragment payload",
             ) from exc

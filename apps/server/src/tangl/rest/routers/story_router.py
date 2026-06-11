@@ -10,7 +10,7 @@ from markdown_it import MarkdownIt
 from pydantic import BaseModel, ConfigDict
 
 from tangl.config import get_story_media_dir, get_sys_media_dir, settings
-from tangl.journal.fragments import MediaFragment
+from tangl.journal.fragments import MediaFragment, fragment_to_dto
 from tangl.rest.dependencies_gateway import (
     get_service_manager,
     get_user_locks,
@@ -148,10 +148,6 @@ def _normalize_choice_labels_in_fragments(fragments: list[dict[str, Any]]) -> li
 
     def _normalize_choice_data(choice: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(choice)
-        if normalized.get("edge_id"):
-            normalized["uid"] = normalized["edge_id"]
-        if normalized.get("source_id") and "uid" not in normalized:
-            normalized["uid"] = normalized["source_id"]
         if normalized.get("source_label") and not normalized.get("label"):
             normalized["label"] = normalized["source_label"]
         if normalized.get("text") and not normalized.get("label"):
@@ -214,7 +210,7 @@ def _serialize_fragment(
     if isinstance(fragment, MediaFragment):
         return None
     if hasattr(fragment, "model_dump"):
-        return _serialize(fragment.model_dump(mode="python"))
+        return _serialize(fragment_to_dto(fragment))
     if hasattr(fragment, "unstructure"):
         return _serialize(fragment.unstructure())
     return {"fragment_type": "unknown", "content": str(fragment)}
@@ -227,7 +223,8 @@ def _serialize_runtime_envelope(
 ) -> dict[str, Any]:
     profile_tokens = _normalize_profile_tokens(render_profile)
     media_profile = _media_render_profile(profile_tokens)
-    metadata = dict(envelope.metadata or {})
+    envelope_payload = envelope.to_dto()
+    metadata = dict(envelope_payload.get("metadata") or {})
     world_id = str(metadata["world_id"]) if metadata.get("world_id") is not None else None
     story_id = str(metadata["ledger_id"]) if metadata.get("ledger_id") is not None else None
     world_media_root = _resolve_world_media_root(world_id)
@@ -249,12 +246,8 @@ def _serialize_runtime_envelope(
             fragments.append(payload)
 
     payload = {
-        "cursor_id": envelope.cursor_id,
-        "step": envelope.step,
+        **envelope_payload,
         "fragments": _normalize_choice_labels_in_fragments(fragments),
-        "last_redirect": envelope.last_redirect,
-        "redirect_trace": envelope.redirect_trace,
-        "metadata": metadata,
     }
     serialized = _serialize(payload)
     if "html" in profile_tokens:
@@ -444,7 +437,7 @@ async def get_story_info(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_bad_request_detail(exc)) from exc
 
-    payload = _serialize(result)
+    payload = result.to_dto()
     if _profile_has(render_profile, "html"):
         payload = _transform_text_fields(payload)
     return payload

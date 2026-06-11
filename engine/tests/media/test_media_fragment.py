@@ -7,7 +7,6 @@ from tangl.journal.media import MediaFragment, StagingHints
 def test_media_fragment_with_url():
     # Test media fragment with URL
     fragment = MediaFragment(
-        fragment_type="image",
         content="https://example.com/image.jpg",
         content_type="image",
         content_format="url",
@@ -17,7 +16,8 @@ def test_media_fragment_with_url():
             media_transition="fade_in"
         )
     )
-    assert fragment.fragment_type == "image"
+    assert fragment.fragment_type == "media"
+    assert fragment.content_type.value == "image"
     assert fragment.content == "https://example.com/image.jpg"
     assert fragment.content_format == "url"
     assert fragment.staging_hints.media_shape == "landscape"
