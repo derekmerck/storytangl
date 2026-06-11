@@ -66,10 +66,31 @@ _PROSE_BY_LABEL: dict[str, str] = {
 }
 
 
-def logic_prose_for_block(block: LogicBlock) -> str:
+_SKIN_PROSE: dict[str, dict[str, str]] = {
+    "loomworks": {
+        "choose_machine": "Three looms stand in the weaving hall, each strung for a different pattern.",
+        "parity_first_input": "The parity loom waits, warp threads taut. Throw the first shuttle.",
+        "parity_even_state": "The cloth holds an even weave so far. Throw the second shuttle.",
+        "parity_odd_state": "A stray thread crosses the weave. Throw the second shuttle.",
+        "parity_even_output": "The bolt comes off the loom true: an even weave.",
+        "parity_odd_output": "The bolt comes off the loom marked: an odd weave.",
+    },
+}
+"""Narrative skins: sparse prose overlays keyed by block label.
+
+A skin changes only the telling. The machine — topology, gate types,
+badges — is shared, and labels a skin does not cover fall back to the
+shared voice below.
+"""
+
+
+def logic_prose_for_block(block: LogicBlock, *, skin: str | None = None) -> str:
     """Return deterministic prose for one already-resolved logic block."""
 
     label = block.get_label()
+    overlay = _SKIN_PROSE.get(skin) if skin else None
+    if overlay is not None and label in overlay:
+        return overlay[label]
     prose = _PROSE_BY_LABEL.get(label)
     if prose is not None:
         return prose
@@ -90,12 +111,12 @@ def logic_prose_for_block(block: LogicBlock) -> str:
     priority=Priority.EARLY,
 )
 def render_logic_block_content(*, caller, ctx, **_kw):
-    """Emit domain-local prose for logic blocks."""
+    """Emit domain-local prose, voiced by the ``logic_skin`` namespace chunk."""
 
     if not isinstance(caller, LogicBlock):
         return None
     return ContentFragment(
-        content=logic_prose_for_block(caller),
+        content=logic_prose_for_block(caller, skin=ctx.get_ns(caller).get("logic_skin")),
         source_id=caller.uid,
     )
 

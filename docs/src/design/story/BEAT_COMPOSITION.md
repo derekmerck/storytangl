@@ -47,6 +47,12 @@ Data overrides sit *above* handler overrides: an author writing
 data scopes for authored variation (skins, per-node mood) and handler
 scopes for computed or stateful chunks.
 
+A **narrative skin** is this ladder applied at presentation scale: one
+selector chunk (`logic_skin` in `worlds/logic_demo`) chooses a sparse prose
+overlay while the underlying machine stays untouched. Skins are a gather
+concern (what the chunks say); beats are a compose concern (how the telling
+is ordered). The two layers are orthogonal.
+
 ## The blessed stanzas
 
 `tangl.journal.compose` names the recurring compose moves:
