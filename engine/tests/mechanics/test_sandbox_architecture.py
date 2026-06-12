@@ -273,6 +273,96 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     )
 
 
+# Cleanup-discriminator contract. Each projector family removes its own stale
+# dynamic actions by matching one of these tag sets against its source node's
+# edges_out. Disjointness is what keeps the families from deleting each other's
+# edges; until now it held by convention only. See AFFORDANCE_MODEL.md,
+# "The audit table (filled)".
+#
+# Engine-owned families only, deliberately: the adventure world's
+# {dynamic, sandbox, adventure} discriminator is excluded because its hazard
+# actions also wear "movement" and legitimately match two families today
+# (see the hazard row of the audit table). Adding it here would fail the
+# exactly-one-family test until that overlap is resolved by contract.
+FAMILY_DISCRIMINATORS: dict[str, frozenset[str]] = {
+    "menu": frozenset({"dynamic", "fanout", "menu"}),
+    "game": frozenset({"dynamic", "fanout", "game"}),
+    **{
+        f"sandbox:{kind}": frozenset({"dynamic", "sandbox", kind})
+        for kind in (
+            "movement", "asset", "unlock", "lock", "fixture",
+            "mob", "location", "wait", "event", "incremental",
+        )
+    },
+}
+
+
+def _matching_families(tags: set[str]) -> set[str]:
+    return {name for name, disc in FAMILY_DISCRIMINATORS.items() if disc <= tags}
+
+
+def test_dynamic_action_family_discriminators_are_pairwise_disjoint() -> None:
+    """No family's cleanup discriminator may match another family's actions."""
+    from itertools import combinations
+
+    for (a, disc_a), (b, disc_b) in combinations(FAMILY_DISCRIMINATORS.items(), 2):
+        assert not disc_a <= disc_b and not disc_b <= disc_a, (a, b)
+
+
+def test_generated_actions_match_exactly_one_family_discriminator() -> None:
+    """A projected dynamic action is owned by exactly one cleanup family."""
+    compiled = SandboxSliceCompiler().compile(ARCHITECTURE_SLICE)
+    seen: set[str] = set()
+    for label in ("road", "cave"):
+        location = compiled.locations[label]
+        do_provision(location, ctx=PhaseCtx(graph=compiled.graph, cursor_id=location.uid))
+        for action in location.edges_out(Selector(has_kind=Action)):
+            tags = set(action.tags or set())
+            if "dynamic" not in tags:
+                continue
+            families = _matching_families(tags)
+            assert len(families) == 1, (action.get_label(), sorted(tags))
+            seen |= families
+
+    # Menu family: project from a hand-wired dynamic fanout affordance.
+    from tangl.story import Block
+    from tangl.story.system_handlers import project_menu_affordances
+    from tangl.vm import Affordance
+
+    menu = compiled.graph.add_node(kind=MenuBlock, label="family_menu")
+    item = compiled.graph.add_node(kind=Block, label="family_item")
+    Affordance(
+        registry=compiled.graph,
+        predecessor_id=menu.uid,
+        successor_id=item.uid,
+        requirement={"has_identifier": "family_item"},
+        tags={"dynamic", "fanout"},
+    )
+    project_menu_affordances(caller=menu, ctx=PhaseCtx(graph=compiled.graph, cursor_id=menu.uid))
+
+    # Game family: provision self-loop moves for a minimal hosted game.
+    from tangl.mechanics.games import HasGame
+    from tangl.mechanics.games.handlers import provision_game_moves
+    from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler
+
+    class _GameBlock(HasGame, Block):
+        _game_class = RpsGame
+        _game_handler_class = RpsGameHandler
+
+    game_block = compiled.graph.add_node(kind=_GameBlock, label="family_game")
+    game_block.game_handler.setup(game_block.game)
+    provision_game_moves(game_block, ctx=PhaseCtx(graph=compiled.graph, cursor_id=game_block.uid))
+
+    for node in (menu, game_block):
+        for action in node.edges_out(Selector(has_kind=Action)):
+            families = _matching_families(set(action.tags or set()))
+            assert len(families) == 1, (action.get_label(), sorted(action.tags))
+            seen |= families
+
+    assert {"menu", "game", "sandbox:movement", "sandbox:asset", "sandbox:fixture",
+            "sandbox:mob", "sandbox:location", "sandbox:wait", "sandbox:event"} <= seen
+
+
 @pytest.mark.parametrize(
     ("section", "expected"),
     [
