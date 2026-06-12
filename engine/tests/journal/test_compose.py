@@ -6,6 +6,8 @@ Organized as one test class per helper: ``TestReplaceFirst``,
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 
 from tangl.journal.compose import REST_SLOT, assemble_slots, beat_overlay, replace_first
@@ -66,7 +68,7 @@ class TestAssembleSlots:
 
     def test_rest_slot_collects_unclassified_at_marker(self) -> None:
         setting = _content("setting")
-        choice = ChoiceFragment(text="go")
+        choice = ChoiceFragment(edge_id=uuid4(), text="go")
 
         result = assemble_slots(
             [choice, setting],
@@ -78,7 +80,7 @@ class TestAssembleSlots:
 
     def test_rest_appends_at_end_when_marker_omitted(self) -> None:
         setting = _content("setting")
-        choice = ChoiceFragment(text="go")
+        choice = ChoiceFragment(edge_id=uuid4(), text="go")
 
         result = assemble_slots(
             [choice, setting],
