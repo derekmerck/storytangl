@@ -71,6 +71,8 @@ def assemble_slots(
     emitted where ``order`` places :data:`REST_SLOT` (appended at the end
     when ``order`` omits it). Relative order within a slot is preserved.
     """
+    if len(order) != len(set(order)):
+        raise ValueError(f"assemble_slots order must be unique, got {order!r}")
     slots: dict[str, list[Record]] = {name: [] for name in order if name != REST_SLOT}
     rest: list[Record] = []
     for fragment in fragments:

@@ -1,13 +1,28 @@
-"""Contract tests for the blessed ``tangl.journal.compose`` stanzas."""
+"""Contract tests for the blessed ``tangl.journal.compose`` stanzas.
+
+Organized as one test class per helper: ``TestReplaceFirst``,
+``TestAssembleSlots``, and ``TestBeatOverlay``.
+"""
 
 from __future__ import annotations
+
+import pytest
 
 from tangl.journal.compose import REST_SLOT, assemble_slots, beat_overlay, replace_first
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, GroupFragment
 
+# ============================================================================
+# Helpers
+# ============================================================================
+
 
 def _content(text: str, **kwargs) -> ContentFragment:
     return ContentFragment(content=text, **kwargs)
+
+
+# ============================================================================
+# Test classes
+# ============================================================================
 
 
 class TestReplaceFirst:
@@ -72,6 +87,10 @@ class TestAssembleSlots:
         )
 
         assert result == [setting, choice]
+
+    def test_duplicate_slot_names_raise(self) -> None:
+        with pytest.raises(ValueError, match="unique"):
+            assemble_slots([], order=("setting", "setting"), classify=lambda f: None)
 
     def test_relative_order_within_slot_is_stable(self) -> None:
         first, second = _content("first"), _content("second")

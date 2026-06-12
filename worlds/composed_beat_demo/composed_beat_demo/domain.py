@@ -57,8 +57,6 @@ def contribute_author_porter_chunk(*, caller, ctx, **_kw):
 )
 def apply_beat_consequences(*, caller, ctx, **_kw):
     """Apply authored consequences and stage cross-phase journal enrichment."""
-    if not isinstance(caller, BeatBlock):
-        return None
     if caller.reputation_delta:
         reputation = int(caller.graph.locals.get("reputation", 0))
         caller.graph.locals["reputation"] = reputation + caller.reputation_delta
@@ -76,7 +74,7 @@ def apply_beat_consequences(*, caller, ctx, **_kw):
 @on_journal(wants_caller_kind=BeatBlock, wants_exact_kind=False, priority=Priority.NORMAL)
 def render_porter_reaction(*, caller, ctx, **_kw):
     """Conditional enrichment: Maro reacts when reputation has slipped."""
-    if not isinstance(caller, BeatBlock) or not caller.incident:
+    if not caller.incident:
         return None
     if int(ctx.get_ns(caller).get("reputation", 0)) >= 0:
         return None
@@ -108,8 +106,6 @@ def _classify_beat_fragment(fragment: Record) -> str | None:
 )
 def compose_beat(*, caller, ctx, fragments, **_kw):
     """Assemble the beat: slot the telling, veil it in fog, bind the overlay."""
-    if not isinstance(caller, BeatBlock):
-        return None
     composed = assemble_slots(
         fragments,
         order=BEAT_SLOTS,

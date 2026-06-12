@@ -277,6 +277,8 @@ def do_compose_journal(caller, *, fragments: list[Record], ctx, **kwargs):
     composed: list[Record] | None = None
     # Receipts are generated lazily: each iteration executes one handler, so
     # updating ``call_kwargs`` here feeds the folded batch to the next one.
+    # If execute_all ever becomes eager, the fold contract test
+    # (test_handlers_fold_each_receives_prior_composed_batch) fails loudly.
     for receipt in receipts:
         _push_ctx_result(ctx, receipt.result)
         normalized = _assert_fragment_result(receipt.result, task="compose_journal")
