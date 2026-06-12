@@ -126,7 +126,7 @@ describe('StoryFlow', () => {
     expect(wrapper.find('[data-testid="interrupt-ux-event"]').exists()).toBe(true)
   })
 
-  it('renders inline UX events without requiring command grammar metadata', async () => {
+  it('renders the command floor and inline UX events without grammar metadata', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
         HttpResponse.json({
@@ -151,7 +151,8 @@ describe('StoryFlow', () => {
     const wrapper = mountFlow()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="command-bar"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="command-bar"]').exists()).toBe(true)
+    expect(wrapper.find('input').attributes('placeholder')).toBe('Type a command')
     expect(wrapper.find('[data-testid="inline-ux-event"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Choose at least one piece.')
   })

@@ -7,6 +7,11 @@ def test_service_response_types_importable() -> None:
     from tangl.service.response import (
         AuthoringDiagnostic,
         BadgeListValue,
+        CommandEdgeQuery,
+        DirectEdgeRequest,
+        EdgeQuery,
+        EdgeResolutionRequest,
+        FindEdgeRequest,
         FragmentStream,
         InfoAffordance,
         InfoModel,
@@ -23,6 +28,7 @@ def test_service_response_types_importable() -> None:
         RuntimeInfo,
         ScalarValue,
         StoryInfoRequest,
+        UxEvent,
         UserSecret,
         coerce_runtime_info,
     )
@@ -30,6 +36,11 @@ def test_service_response_types_importable() -> None:
 
     assert BadgeListValue is not None
     assert AuthoringDiagnostic is not None
+    assert CommandEdgeQuery is not None
+    assert DirectEdgeRequest is not None
+    assert EdgeQuery is not None
+    assert EdgeResolutionRequest is not None
+    assert FindEdgeRequest is not None
     assert FragmentStream is not None
     assert InfoAffordance is not None
     assert InfoModel is not None
@@ -46,6 +57,7 @@ def test_service_response_types_importable() -> None:
     assert RuntimeInfo is not None
     assert ScalarValue is not None
     assert StoryInfoRequest is not None
+    assert UxEvent is not None
     assert UserSecret is not None
     assert coerce_runtime_info is not None
     assert DefaultStoryInfoProjector is not None
@@ -59,7 +71,12 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "AuthoringDiagnostic",
         "BadgeListValue",
         "BlockingMode",
+        "CommandEdgeQuery",
         "DefaultStoryInfoProjector",
+        "DirectEdgeRequest",
+        "EdgeQuery",
+        "EdgeResolutionRequest",
+        "FindEdgeRequest",
         "FragmentStream",
         "InfoAffordance",
         "InfoModel",
@@ -90,6 +107,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "StoryInfoRequest",
         "SystemInfo",
         "TableValue",
+        "UxEvent",
         "UserAuthInfo",
         "UserInfo",
         "UserSecret",

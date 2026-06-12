@@ -17,6 +17,7 @@ from tangl.service.response import (
     ProjectedSection,
     ProjectedState,
     RuntimeEnvelope,
+    UxEvent,
 )
 
 
@@ -155,6 +156,42 @@ def test_cli_applies_runtime_envelope_dto_projection(
     assert story_controller._current_story_update[1]["uid"] == str(fragment_uid)
     assert story_controller._current_choices[0].edge_id == edge_id
     assert story_controller._current_choices[0].label == "Go north"
+
+
+def test_cli_preserves_choices_for_same_turn_guidance_envelope(
+    story_controller: StoryController,
+) -> None:
+    cursor_id = uuid4()
+    edge_id = uuid4()
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            cursor_id=cursor_id,
+            step=3,
+            fragments=[
+                ContentFragment(content="start"),
+                ChoiceFragment(edge_id=edge_id, text="Go north"),
+            ],
+        )
+    )
+
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            cursor_id=cursor_id,
+            step=3,
+            fragments=[],
+            ux_events=[
+                UxEvent(
+                    event_type="edge_not_found",
+                    message="I couldn't match that command.",
+                    severity="warning",
+                )
+            ],
+        )
+    )
+
+    assert story_controller._current_story_update[0]["content"] == "start"
+    assert story_controller._current_choices[0].edge_id == edge_id
+    assert story_controller._current_ux_events[0]["event_type"] == "edge_not_found"
 
 
 def test_cli_shows_locked_choices_with_reason(story_controller: StoryController) -> None:
@@ -296,6 +333,8 @@ def test_drop_story_invokes_service_and_clears_context(story_controller: StoryCo
     assert not story_controller._current_choices
     assert not story_controller._current_ux_events
     assert not story_controller._current_metadata
+    assert story_controller._current_cursor_id is None
+    assert story_controller._current_step is None
     assert cli.outputs[0] == "Story dropped."
     assert cli.outputs[1].startswith("Dropped ledger:")
     assert cli.outputs[2] == "Archived: True"

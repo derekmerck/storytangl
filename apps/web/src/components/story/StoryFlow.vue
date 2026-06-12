@@ -40,7 +40,7 @@ const error = ref<string | null>(null)
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 const commandGrammar = computed(() => {
   const grammar = currentMetadata.value.grammar
-  return isRecord(grammar) ? grammar : null
+  return isRecord(grammar) ? grammar : {}
 })
 
 const isSceneGroup = (fragment: StoryFragment): fragment is GroupStoryFragment =>
@@ -262,28 +262,11 @@ const doCommand = async (command: string) => {
     />
 
     <CommandBar
-      v-if="commandGrammar"
       :grammar="commandGrammar"
       :events="inlineEvents"
       :disabled="loading"
       @submit="doCommand"
     />
-    <div
-      v-else-if="inlineEvents.length"
-    >
-      <v-alert
-        v-for="event in inlineEvents"
-        :key="event.event_id"
-        class="mt-2"
-        :type="event.severity"
-        density="compact"
-        data-testid="inline-ux-event"
-        role="status"
-        variant="tonal"
-      >
-        {{ event.message }}
-      </v-alert>
-    </div>
 
     <v-card v-if="debugEnabled" class="mt-4">
       <v-card-item>

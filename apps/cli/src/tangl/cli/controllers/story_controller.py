@@ -42,6 +42,8 @@ class StoryController(CommandSet):
         self._current_choices: list[_CachedChoice] = []
         self._current_ux_events: list[dict[str, Any]] = []
         self._current_metadata: dict[str, Any] = {}
+        self._current_cursor_id: str | None = None
+        self._current_step: int | None = None
 
     # ------------------------------------------------------------------
     # helpers
@@ -97,13 +99,28 @@ class StoryController(CommandSet):
 
     def _apply_runtime_envelope(self, envelope: RuntimeEnvelope) -> None:
         payload = envelope.to_dto()
+        cursor_id = payload.get("cursor_id")
+        step = payload.get("step")
+        fragments = payload["fragments"]
+        ux_events = payload.get("ux_events", [])
+        guidance_only = (
+            not fragments
+            and bool(ux_events)
+            and bool(self._current_story_update)
+            and cursor_id == self._current_cursor_id
+            and step == self._current_step
+        )
+
         self._current_metadata = payload.get("metadata", {})
-        self._current_ux_events = payload.get("ux_events", [])
+        self._current_ux_events = ux_events
+        self._current_cursor_id = cursor_id
+        self._current_step = step
         ledger_id_value = self._current_metadata.get("ledger_id")
         if ledger_id_value is not None:
             self._cmd.set_ledger(UUID(str(ledger_id_value)))
-        self._current_story_update = payload["fragments"]
-        self._current_choices = self._load_choices_from_fragments()
+        if not guidance_only:
+            self._current_story_update = fragments
+            self._current_choices = self._load_choices_from_fragments()
 
     @staticmethod
     def _choice_payload(
@@ -309,6 +326,8 @@ class StoryController(CommandSet):
         self._current_choices.clear()
         self._current_ux_events.clear()
         self._current_metadata.clear()
+        self._current_cursor_id = None
+        self._current_step = None
 
         if getattr(result, "status", None) == "error":
             self._cmd.perror(result.message or "Failed to drop story")

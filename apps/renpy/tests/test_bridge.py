@@ -104,6 +104,8 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
                 text="Open the cellar",
                 available=False,
                 unavailable_reason="missing_key",
+                accepts={"kind": "quantity", "min": 1, "max": 3},
+                ui_hints={"hotkey": "2", "emphasis": "warning"},
                 step=0,
             ),
             ContentFragment(content="A later beat.", step=1),
@@ -116,6 +118,19 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
     assert turns[0].choices[0].available is True
     assert turns[0].choices[1].available is False
     assert turns[0].choices[1].unavailable_reason == "missing_key"
+    assert turns[0].choices[1].accepts == {
+        "kind": "quantity",
+        "required": True,
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "cost_previews": [],
+    }
+    assert turns[0].choices[1].ui_hints == {
+        "hotkey": "2",
+        "emphasis": "warning",
+        "cost_previews": [],
+    }
     assert [line.text for line in turns[1].lines] == ["A later beat."]
 
 

@@ -199,13 +199,13 @@ class RenPySessionBridge:
                     available=fragment.available,
                     unavailable_reason=fragment.unavailable_reason,
                     accepts=(
-                        dict(fragment.accepts)
-                        if isinstance(fragment.accepts, dict)
+                        fragment.accepts.model_dump(mode="python", exclude_none=True)
+                        if fragment.accepts is not None
                         else None
                     ),
                     ui_hints=(
-                        dict(fragment.ui_hints)
-                        if isinstance(fragment.ui_hints, dict)
+                        fragment.ui_hints.model_dump(mode="python", exclude_none=True)
+                        if fragment.ui_hints is not None
                         else None
                     ),
                     choice_payload=fragment.activation_payload,
