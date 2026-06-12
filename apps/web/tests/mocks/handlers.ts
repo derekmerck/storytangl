@@ -6,7 +6,6 @@ import {
   crossroadsRuntimeEnvelope,
 } from '@tests/fixtures'
 import {
-  mockActions,
   mockSystemInfo,
   mockUpdatedSecretResponse,
   mockUserSecretResponse,
@@ -21,7 +20,11 @@ const apiBase = (import.meta.env?.VITE_DEFAULT_API_URL ?? 'http://localhost:8000
 
 type UserWorldRequest = { uid?: string }
 type UserSecretRequest = { secret?: string }
-type StoryDoRequest = { edge_id?: unknown; payload?: unknown }
+type StoryDoRequest = {
+  edge_id?: unknown
+  find_edge?: { kind?: unknown; command?: unknown }
+  payload?: unknown
+}
 
 export const handlers = [
   http.get(`${apiBase}/story/update`, () => {
@@ -30,17 +33,16 @@ export const handlers = [
 
   http.post(`${apiBase}/story/do`, async ({ request }) => {
     const body = (await request.json()) as StoryDoRequest | null
-    if (typeof body?.edge_id !== 'string') {
+    const direct = typeof body?.edge_id === 'string'
+    const command =
+      body?.find_edge?.kind === 'command' && typeof body.find_edge.command === 'string'
+    if (!direct && !command) {
       return HttpResponse.json(
-        { error: 'story action payload requires edge_id' },
+        { error: 'story action payload requires edge_id or find_edge' },
         { status: 400 },
       )
     }
     return HttpResponse.json(crossroadsNextRuntimeEnvelope)
-  }),
-
-  http.get(`${apiBase}/story/actions`, () => {
-    return HttpResponse.json(mockActions)
   }),
 
   http.get(`${apiBase}/system/worlds`, () => {

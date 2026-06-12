@@ -13,7 +13,7 @@ import yaml
 
 from tangl.core import BaseFragment
 from tangl.persistence import PersistenceManager
-from tangl.story import InitMode, World
+from tangl.story import InitMode, World, do_find_edges
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.hash_secret import key_for_secret
 from tangl.vm.runtime.ledger import Ledger
@@ -24,6 +24,9 @@ from .diagnostics import diagnostics_from_codec_state, diagnostics_from_compile_
 from .dispatch import do_advertise_info_channels, do_get_story_info
 from .media import resolve_world_media
 from .response import (
+    DirectEdgeRequest,
+    EdgeResolutionRequest,
+    FindEdgeRequest,
     InfoAffordance,
     InfoState,
     JsonValue,
@@ -35,6 +38,7 @@ from .response import (
     SystemInfo,
     UserInfo,
     UserSecret,
+    UxEvent,
     WorldInfo,
 )
 from .service_method import (
@@ -282,6 +286,7 @@ class ServiceManager:
         ledger: Ledger,
         *,
         fragments: list[BaseFragment],
+        ux_events: list[UxEvent] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> RuntimeEnvelope:
         merged_metadata = {
@@ -296,6 +301,7 @@ class ServiceManager:
             cursor_id=ledger.cursor_id,
             step=ledger.step,
             fragments=list(fragments),
+            ux_events=list(ux_events or []),
             last_redirect=ledger.last_redirect,
             redirect_trace=list(ledger.redirect_trace),
             metadata=merged_metadata,
@@ -392,13 +398,12 @@ class ServiceManager:
     def resolve_choice(
         self,
         *,
-        edge_id: UUID,
+        request: EdgeResolutionRequest,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: "UserAuthInfo | None" = None,
-        choice_payload: Any = None,
     ) -> RuntimeEnvelope:
-        """Resolve one choice edge and return the newest runtime envelope."""
+        """Resolve a direct or query-selected edge and return the newest envelope."""
 
         with self.open_session(
             user_id=user_id,
@@ -406,8 +411,68 @@ class ServiceManager:
             write_back=True,
             user_auth=user_auth,
         ) as session:
+            if isinstance(request, FindEdgeRequest):
+                matches = do_find_edges(
+                    session.ledger.cursor,
+                    ctx=self._make_story_info_ctx(session.ledger),
+                    query=request.find_edge.model_dump(mode="python"),
+                )
+                if len(matches) != 1:
+                    command = request.find_edge.command
+                    event = (
+                        UxEvent(
+                            event_type="edge_not_found",
+                            message=f"I couldn't match '{command}' to an available action.",
+                            severity="warning",
+                            details={"command": command},
+                        )
+                        if not matches
+                        else UxEvent(
+                            event_type="edge_ambiguous",
+                            message=f"'{command}' matches more than one action.",
+                            severity="warning",
+                            details={
+                                "command": command,
+                                "candidates": [
+                                    {
+                                        "edge_id": str(candidate.uid),
+                                        "text": candidate.text or candidate.get_label(),
+                                    }
+                                    for candidate in matches
+                                ],
+                            },
+                        )
+                    )
+                    return self._build_runtime_envelope(
+                        session.ledger,
+                        fragments=[],
+                        ux_events=[event],
+                    )
+                edge_id = matches[0].uid
+            else:
+                edge_id = request.edge_id
+
             before_step = session.ledger.step
-            session.ledger.resolve_choice(edge_id, choice_payload=choice_payload)
+            try:
+                session.ledger.resolve_choice(edge_id, choice_payload=request.payload)
+            except ValueError as exc:
+                if isinstance(request, DirectEdgeRequest):
+                    raise
+                return self._build_runtime_envelope(
+                    session.ledger,
+                    fragments=[],
+                    ux_events=[
+                        UxEvent(
+                            event_type="edge_rejected",
+                            message=str(exc),
+                            severity="warning",
+                            details={
+                                "command": request.find_edge.command,
+                                "edge_id": str(edge_id),
+                            },
+                        )
+                    ],
+                )
             fragments = list(session.ledger.get_journal(since_step=max(before_step + 1, 0)))
             return self._build_runtime_envelope(session.ledger, fragments=fragments)
 

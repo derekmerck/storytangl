@@ -4,6 +4,7 @@ from typing import Any
 
 from tangl.core import Selector
 from tangl.persistence import PersistenceManagerFactory
+from tangl.service.response import DirectEdgeRequest
 from tangl.service.service_manager import ServiceManager
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
@@ -71,7 +72,7 @@ def test_story_choice_resolution_flow() -> None:
 
     resolved = manager.resolve_choice(
         user_id=user.uid,
-        edge_id=choice.uid,
+        request=DirectEdgeRequest(edge_id=choice.uid),
     )
 
     assert resolved.cursor_id != old_cursor

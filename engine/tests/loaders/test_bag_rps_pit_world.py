@@ -54,5 +54,9 @@ class TestBagRpsPitWorld:
         ledger.resolve_choice(commit.uid, choice_payload=commit.payload)
 
         assert ledger.cursor.label == "victory"
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "reserve now stands" in content.lower()

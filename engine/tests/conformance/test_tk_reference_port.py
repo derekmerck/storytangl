@@ -65,7 +65,7 @@ def test_tk_plan_maps_render_roles_to_observable_widgets() -> None:
     assert widgets_by_role["attributed"] == "label"
     assert widgets_by_role["media"] == "media_placeholder"
     assert widgets_by_role["fact"] == "label"
-    assert widgets_by_role["user_event"] == "label"
+    assert widgets_by_role["ux_event"] == "label"
 
 
 def test_tk_plan_renders_projected_state_sections_and_values() -> None:
@@ -140,10 +140,11 @@ def test_tk_piece_selector_accepts_top_level_target_zone_ref() -> None:
                     "content": "brass lamp",
                     "zone_ref": "zone",
                 },
-                {
-                    "uid": "choice",
-                    "fragment_type": "choice",
-                    "text": "Take something.",
+                    {
+                        "uid": "choice",
+                        "fragment_type": "choice",
+                        "edge_id": "00000000-0000-4000-8000-000000000001",
+                        "text": "Take something.",
                     "accepts": {"kind": "pieces", "target_zone_ref": "zone"},
                 },
             ],
@@ -175,7 +176,6 @@ def test_tk_place_selector_uses_visible_pieces_from_source_zone() -> None:
 
 def test_tk_submission_payload_shapes_match_accepts_kinds() -> None:
     sandbox_choices = _choices("sandbox_payload.json")
-    command_choices = _choices("command_hints.json")
     compose_choices = _choices("compose_payload.json")
 
     assert PORT.collect_submission(sandbox_choices["Look around."]).payload == {}
@@ -184,9 +184,6 @@ def test_tk_submission_payload_shapes_match_accepts_kinds() -> None:
     }
     assert PORT.collect_submission(sandbox_choices["Offer coins."], 3).payload == {
         "quantity": 3
-    }
-    assert PORT.collect_submission(command_choices["Try a command."], "take lamp").payload == {
-        "text": "take lamp"
     }
     assert PORT.collect_submission(
         compose_choices["Give coins."],
@@ -247,7 +244,7 @@ def test_tk_inspection_harness_loads_every_proposal_without_tkinter() -> None:
 
     assert all(inspection["widgets"] for inspection in inspections)
     assert any(
-        widget["role"] == "interpretation"
+        widget["role"] == "ux_event"
         for inspection in inspections
         for widget in inspection["widgets"]
     )

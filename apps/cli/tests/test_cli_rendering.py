@@ -36,16 +36,19 @@ def test_rich_renderer_exports_envelope_text() -> None:
                     {"key": "permit_expiry", "value": "expired"},
                 ],
             ),
-            SimpleNamespace(
-                fragment_type="user_event",
-                event_type="shift_bell",
-                content="Ten minutes remain.",
-            ),
             {
                 "fragment_type": "piece",
                 "piece_id": "permit-7",
                 "content": "Gate permit",
             },
+        ],
+        ux_events=[
+            {
+                "event_type": "shift_bell",
+                "message": "Ten minutes remain.",
+                "presentation": "interrupt",
+                "severity": "warning",
+            }
         ],
         choices=[
             {

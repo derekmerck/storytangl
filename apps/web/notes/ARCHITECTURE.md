@@ -228,7 +228,7 @@ User clicks action button:
   │
   ├─► StoryFlow.vue catches event
   │     │
-  │     ├─► Calls axios.post('/story/do', {choice_id, payload})
+  │     ├─► Calls axios.post('/story/do', {edge_id, payload})
   │     │
   │     ├─► Receives RuntimeEnvelope
   │     │
@@ -244,14 +244,15 @@ User clicks action button:
         │
         └─► Browser auto-scrolls to new content
 
-Payload-bearing choices follow the same path. `accepts.kind="text"` and
-`raw_command` submit `{text}`, `quantity` submits `{quantity}`, and `pieces`
+Payload-bearing choices follow the same path. `accepts.kind="text"` submits
+`{text}`, `quantity` submits `{quantity}`, and `pieces`
 submits `{piece_ids}`. The backend validates every payload.
 
-Command bars are an affordance over this same path. A command bar submits raw
-text to a reserved `raw_command` choice such as `interpret_command`. Advisory
-grammar hints from `RuntimeEnvelope.metadata.grammar` may improve placeholder,
-preview, or autocomplete behavior, but they do not replace backend resolution.
+Command bars are a shell-level affordance beside choices. They submit
+`{find_edge: {kind: "command", command}}`; advisory grammar hints from
+`RuntimeEnvelope.metadata.grammar` may improve placeholder, preview, or
+autocomplete behavior, but they do not replace backend resolution. Failed
+resolution returns inline, non-replayed `RuntimeEnvelope.ux_events`.
 
 ═══════════════════════════════════════════════════════════════════
                     KEY DESIGN DECISIONS
@@ -270,7 +271,7 @@ preview, or autocomplete behavior, but they do not replace backend resolution.
 ✓ CLI-compatible interaction contract
   - Rich widgets collect the same payloads a CLI can prompt for
   - Piece choices reference visible zones
-  - Natural-language commands fall back to backend interpretation
+  - Natural-language commands use backend-authoritative edge lookup
   - Client-side grammar hints are optional affordances, not rules
 
 ✓ Media role system

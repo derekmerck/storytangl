@@ -115,7 +115,7 @@ describe('StoryFlow', () => {
     expect(srcs.some((src) => src === 'http://localhost:8000/media/world/tangl_world/stranger_booth.svg')).toBe(true)
   })
 
-  it('renders locked choices, freeform choices, pending media, kv, and user events', async () => {
+  it('renders locked choices, freeform choices, pending media, kv, and UX events', async () => {
     const wrapper = mountFlow()
     await flushPromises()
 
@@ -123,7 +123,38 @@ describe('StoryFlow', () => {
     expect(wrapper.find('input').exists()).toBe(true)
     expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('late evening')
-    expect(wrapper.find('[data-testid="user-event"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="interrupt-ux-event"]').exists()).toBe(true)
+  })
+
+  it('renders the command floor and inline UX events without grammar metadata', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({
+          cursor_id: 'cursor-1',
+          step: 1,
+          fragments: [],
+          ux_events: [
+            {
+              event_id: 'event-validation',
+              event_type: 'validation_failed',
+              message: 'Choose at least one piece.',
+              presentation: 'inline',
+              replay: false,
+              severity: 'warning',
+            },
+          ],
+          metadata: {},
+        }),
+      ),
+    )
+
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="command-bar"]').exists()).toBe(true)
+    expect(wrapper.find('input').attributes('placeholder')).toBe('Type a command')
+    expect(wrapper.find('[data-testid="inline-ux-event"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Choose at least one piece.')
   })
 
   it('applies control updates against the fragment registry', async () => {
@@ -171,7 +202,10 @@ describe('StoryFlow', () => {
           edge_id: 'edge-1',
           payload: { offer_silver: 12 },
         })
-        return HttpResponse.json(crossroadsNextRuntimeEnvelope)
+        return HttpResponse.json({
+          ...crossroadsNextRuntimeEnvelope,
+          ux_events: crossroadsRuntimeEnvelope.ux_events,
+        })
       }),
     )
 
@@ -186,10 +220,11 @@ describe('StoryFlow', () => {
     const scenes = wrapper.findAllComponents(StoryBlock)
     expect(scenes.length).toBeGreaterThan(initialCount)
     expect(wrapper.text()).toContain('The stranger slides the folded vellum')
+    expect(wrapper.findAll('[data-testid="interrupt-ux-event"]')).toHaveLength(1)
     expect(wrapper.emitted('storyUpdate')!.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('submits command text through the reserved raw command choice', async () => {
+  it('submits command text through a typed find-edge request', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
         HttpResponse.json(commandHintRuntimeEnvelope),
@@ -197,8 +232,10 @@ describe('StoryFlow', () => {
       http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
         const body = await request.json()
         expect(body).toEqual({
-          edge_id: 'interpret_command',
-          payload: { text: 'take lamp' },
+          find_edge: {
+            kind: 'command',
+            command: 'take lamp',
+          },
         })
         return HttpResponse.json(crossroadsNextRuntimeEnvelope)
       }),
@@ -211,12 +248,9 @@ describe('StoryFlow', () => {
     expect(input.attributes('placeholder')).toBe('e.g. take lamp')
 
     await input.setValue('take lamp')
-    const commandButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Try a command'))
-
-    expect(commandButton).toBeDefined()
-    await commandButton!.trigger('click')
+    const commandButton = wrapper.find('button[aria-label="Submit command"]')
+    expect(commandButton.exists()).toBe(true)
+    await wrapper.find('[data-testid="command-bar"] form').trigger('submit')
     await flushPromises()
 
     expect(wrapper.text()).toContain('The stranger slides the folded vellum')
@@ -255,27 +289,6 @@ describe('StoryFlow', () => {
     expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Traveler hand')
     expect(wrapper.text()).toContain('Rust map card')
-  })
-
-  it('adapts legacy JournalStoryUpdate arrays through a narrow compatibility path', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        HttpResponse.json([
-          {
-            uid: 'legacy-block',
-            text: '<p>Legacy text</p>',
-            actions: [{ uid: 'legacy-choice', text: 'Legacy choice' }],
-          },
-        ]),
-      ),
-    )
-
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('<p>Legacy text</p>')
-    expect(wrapper.html()).not.toContain('<p>Legacy text</p>')
-    expect(wrapper.text()).toContain('Legacy choice')
   })
 
   it('handles API errors gracefully', async () => {

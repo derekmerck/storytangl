@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 
+import CommandBar from './CommandBar.vue'
 import StoryBlock from './StoryBlock.vue'
 import type {
   ControlStoryFragment,
@@ -8,16 +9,14 @@ import type {
   RuntimeEnvelope,
   StoryFragment,
   StorySceneModel,
-  UserEventStoryFragment,
+  UxEvent,
 } from '@/types'
 import { useGlobal } from '@/composables/globals'
 import {
   fragmentRefId,
-  fragmentText,
   isControlFragment,
   isGroupFragment,
   isRecord,
-  isUserEventFragment,
   normalizeEnvelope,
 } from './fragmentUtils'
 
@@ -30,20 +29,26 @@ const emit = defineEmits<{
 
 const fragmentRegistry = ref<Record<string, StoryFragment>>({})
 const scenes = ref<StorySceneModel[]>([])
-const userEvents = ref<UserEventStoryFragment[]>([])
+const inlineEvents = ref<UxEvent[]>([])
+const interruptEvents = ref<UxEvent[]>([])
+const currentMetadata = ref<Record<string, unknown>>({})
 const sceneRefs = ref<InstanceType<typeof StoryBlock>[]>([])
 const sceneCounter = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
 const debugEnabled = computed(() => $debug.value && $verbose.value)
+const commandGrammar = computed(() => {
+  const grammar = currentMetadata.value.grammar
+  return isRecord(grammar) ? grammar : {}
+})
 
 const isSceneGroup = (fragment: StoryFragment): fragment is GroupStoryFragment =>
   isGroupFragment(fragment) && fragment.group_type === 'scene'
 
 const visibleFragmentIds = (fragments: StoryFragment[]): string[] =>
   fragments
-    .filter((fragment) => !isControlFragment(fragment) && !isUserEventFragment(fragment))
+    .filter((fragment) => !isControlFragment(fragment))
     .map((fragment) => fragment.uid)
 
 const applyControlFragment = (
@@ -112,7 +117,7 @@ const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]
 const applyEnvelope = async (envelope: RuntimeEnvelope) => {
   const nextRegistry = { ...fragmentRegistry.value }
   const renderFragments: StoryFragment[] = []
-  const eventFragments: UserEventStoryFragment[] = []
+  const uxEvents = envelope.ux_events ?? []
 
   for (const fragment of envelope.fragments) {
     if (isControlFragment(fragment)) {
@@ -122,14 +127,18 @@ const applyEnvelope = async (envelope: RuntimeEnvelope) => {
 
     nextRegistry[fragment.uid] = fragment
     renderFragments.push(fragment)
-
-    if (isUserEventFragment(fragment)) {
-      eventFragments.push(fragment as UserEventStoryFragment)
-    }
   }
 
   fragmentRegistry.value = nextRegistry
-  userEvents.value.push(...eventFragments)
+  currentMetadata.value = envelope.metadata ?? {}
+  inlineEvents.value = uxEvents.filter((event) => event.presentation === 'inline')
+  const nextInterruptEvents = [
+    ...interruptEvents.value.filter((event) => event.replay),
+    ...uxEvents.filter((event) => event.presentation === 'interrupt'),
+  ]
+  interruptEvents.value = [
+    ...new Map(nextInterruptEvents.map((event) => [event.event_id, event])).values(),
+  ]
 
   const newScenes = buildScenes(envelope, renderFragments)
   if (newScenes.length === 0) {
@@ -171,18 +180,37 @@ const fetchInitialBlocks = async () => {
 
 onMounted(fetchInitialBlocks)
 
-const doAction = async (actionUid: string, payload?: unknown) => {
+const doAction = async (edgeId: string, payload?: unknown) => {
   try {
     loading.value = true
     error.value = null
     const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
-      edge_id: actionUid,
+      edge_id: edgeId,
       payload,
     })
     await handlePayload(response.data, `action-${scenes.value.length + 1}`)
   } catch (err) {
     console.error('Failed to execute action.', err)
     error.value = 'Failed to execute action. Please try again.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const doCommand = async (command: string) => {
+  try {
+    loading.value = true
+    error.value = null
+    const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
+      find_edge: {
+        kind: 'command',
+        command,
+      },
+    })
+    await handlePayload(response.data, `command-${scenes.value.length + 1}`)
+  } catch (err) {
+    console.error('Failed to execute command.', err)
+    error.value = 'Failed to execute command. Please try again.'
   } finally {
     loading.value = false
   }
@@ -211,16 +239,14 @@ const doAction = async (actionUid: string, payload?: unknown) => {
     </v-alert>
 
     <div
-      v-for="event in userEvents"
-      :key="event.uid"
+      v-for="event in interruptEvents"
+      :key="event.event_id"
       class="mb-3"
-      data-testid="user-event"
-      role="status"
-      aria-live="polite"
+      data-testid="interrupt-ux-event"
+      role="alert"
     >
-      <v-alert density="compact" type="info" variant="tonal">
-        <strong v-if="event.event_type">{{ event.event_type }}:</strong>
-        {{ fragmentText(event.content) }}
+      <v-alert :type="event.severity" density="compact" variant="tonal">
+        {{ event.message }}
       </v-alert>
     </div>
 
@@ -233,6 +259,13 @@ const doAction = async (actionUid: string, payload?: unknown) => {
       :metadata="scene.metadata"
       :disabled="loading"
       @doAction="doAction"
+    />
+
+    <CommandBar
+      :grammar="commandGrammar"
+      :events="inlineEvents"
+      :disabled="loading"
+      @submit="doCommand"
     />
 
     <v-card v-if="debugEnabled" class="mt-4">

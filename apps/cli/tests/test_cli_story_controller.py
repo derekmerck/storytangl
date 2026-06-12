@@ -10,11 +10,14 @@ from tangl.cli.rendering import PlainTerminalRenderer
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment
 from tangl.service.response import (
     BadgeListValue,
+    DirectEdgeRequest,
+    FindEdgeRequest,
     KvListValue,
     KvRow,
     ProjectedSection,
     ProjectedState,
     RuntimeEnvelope,
+    UxEvent,
 )
 
 
@@ -112,8 +115,18 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     resolve_calls = [call for call in cli.calls if call[0] == "resolve_choice"]
     assert resolve_calls
     _, params = resolve_calls[-1]
-    assert params["edge_id"] == cli.edge_id
-    assert params["choice_payload"] == {}
+    assert params["request"] == DirectEdgeRequest(edge_id=cli.edge_id, payload={})
+
+
+def test_command_text_submits_find_edge_request(story_controller: StoryController) -> None:
+    story_controller.do_command("go north")
+    cli = story_controller._cmd
+
+    _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
+    request = params["request"]
+
+    assert isinstance(request, FindEdgeRequest)
+    assert request.find_edge.command == "go north"
 
 
 def test_cli_applies_runtime_envelope_dto_projection(
@@ -143,6 +156,42 @@ def test_cli_applies_runtime_envelope_dto_projection(
     assert story_controller._current_story_update[1]["uid"] == str(fragment_uid)
     assert story_controller._current_choices[0].edge_id == edge_id
     assert story_controller._current_choices[0].label == "Go north"
+
+
+def test_cli_preserves_choices_for_same_turn_guidance_envelope(
+    story_controller: StoryController,
+) -> None:
+    cursor_id = uuid4()
+    edge_id = uuid4()
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            cursor_id=cursor_id,
+            step=3,
+            fragments=[
+                ContentFragment(content="start"),
+                ChoiceFragment(edge_id=edge_id, text="Go north"),
+            ],
+        )
+    )
+
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            cursor_id=cursor_id,
+            step=3,
+            fragments=[],
+            ux_events=[
+                UxEvent(
+                    event_type="edge_not_found",
+                    message="I couldn't match that command.",
+                    severity="warning",
+                )
+            ],
+        )
+    )
+
+    assert story_controller._current_story_update[0]["content"] == "start"
+    assert story_controller._current_choices[0].edge_id == edge_id
+    assert story_controller._current_ux_events[0]["event_type"] == "edge_not_found"
 
 
 def test_cli_shows_locked_choices_with_reason(story_controller: StoryController) -> None:
@@ -189,7 +238,7 @@ def test_do_command_submits_quantity_payload(story_controller: StoryController) 
     story_controller.do_do("1 2")
 
     _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
-    assert params["choice_payload"] == {"quantity": 2}
+    assert params["request"].payload == {"quantity": 2}
 
 
 def test_do_command_submits_piece_payload(story_controller: StoryController) -> None:
@@ -214,7 +263,7 @@ def test_do_command_submits_piece_payload(story_controller: StoryController) -> 
     story_controller.do_do("1 permit-7")
 
     _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
-    assert params["choice_payload"] == {"piece_ids": ["permit-7"]}
+    assert params["request"].payload == {"piece_ids": ["permit-7"]}
 
 
 def test_do_command_rejects_invalid_quantity(story_controller: StoryController) -> None:
@@ -265,7 +314,7 @@ def test_do_command_accepts_explicit_compose_payload(
     story_controller.do_do("""1 --payload '{"parts":{"amount":{"quantity":2}}}'""")
 
     _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
-    assert params["choice_payload"] == {"parts": {"amount": {"quantity": 2}}}
+    assert params["request"].payload == {"parts": {"amount": {"quantity": 2}}}
 
 
 def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:
@@ -282,6 +331,10 @@ def test_drop_story_invokes_service_and_clears_context(story_controller: StoryCo
     assert cli.ledger_id is None
     assert not story_controller._current_story_update
     assert not story_controller._current_choices
+    assert not story_controller._current_ux_events
+    assert not story_controller._current_metadata
+    assert story_controller._current_cursor_id is None
+    assert story_controller._current_step is None
     assert cli.outputs[0] == "Story dropped."
     assert cli.outputs[1].startswith("Dropped ledger:")
     assert cli.outputs[2] == "Archived: True"

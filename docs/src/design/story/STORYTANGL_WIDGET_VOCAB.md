@@ -1,6 +1,6 @@
 # StoryTangl Widget Vocabulary
 
-**Version:** v1.5 · supersedes v1.4
+**Version:** v1.6 · supersedes v1.5
 **Layer:** UI Vocabulary (Layer 1 of 3). **Implementation status** across reference clients (Layer 2: web/CLI/Tk), API transport, and engine backend (Layer 3) is tracked in `WIDGET_CONTRACT_RECONCILIATION.md`. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
 **Source of truth (for engine model alignment):**
@@ -18,30 +18,18 @@ vocabulary itself is not.
 > equally valid — they each realize the same widget contract in their own
 > medium.
 
-**v1.5 changes summary (against v1.4).** v1.5 adopts the v1.4 genre-audit
-additions and reconciles them against the current repo implementation. No
-contract breaks; no new top-level vocabulary surfaces:
+**v1.6 changes summary (against v1.5).** v1.6 makes action resolution and
+transient client guidance explicit:
 
-- Keeps the new **§0.8 "Journal as narrative"** sidebar alongside §0.6
-  narrative authoring stance. Codifies the claim that v1.5-conforming envelope
-  streams produce legible narrative transcripts as a consequence of
-  traversal, without authored prose beyond per-location flavor. Elefant
-  Hunt is the worked proof-of-concept.
-- Keeps the §1.5 "**Per-cursor projection of shared state**"
-  paragraph naming the recipe: shared world, per-cursor visibility,
-  same `cursor_id` keyed projection. Resolves an ambiguity that
-  credentials, training, and elefant_hunt all hit.
-- Keeps the §0.9 **"Genre extensions index"** — short pointer table to all
-  `bundles/<name>/EXTENSIONS.md` documents, with one line about what
-  each genre stresses in the vocabulary. Helps readers find prior art.
-- Updates implementation-status wording for the repo-current typed
-  `Accepts` / `UIHints` work: those engine surfaces are implemented;
-  `Blocker`, `InterpretationFragment`, full info-channel typing, and
-  several Tier P2 surfaces remain pending.
-- Aligns the conformance fixture list with the current repository,
-  including `compose_payload.json` and the existing proposal fixtures.
-- Clarifies `place` payloads as carrying `source_zone_ref` when the
-  client selected from a visible source zone.
+- Every `ChoiceFragment` carries the UUID `edge_id` required for direct
+  submission.
+- Exploratory command text uses a typed `find_edge` request rather than a
+  synthetic `raw_command` choice.
+- Transient guidance uses typed `RuntimeEnvelope.ux_events` with explicit
+  presentation and replay policy.
+- `InterpretationFragment`, `UserEventFragment`, and `RawCommandAccepts` are
+  retired. Narrative remains in the journal fragment stream; client guidance
+  does not.
 
 ---
 
@@ -133,7 +121,7 @@ implementations migrating from prior versions update on the schedule in
 | `token` (UI piece) | `piece` | Collides with `tangl.core.token.Token` (singleton wrapper). |
 | `ledger` (UI section type) | *removed* | Subsumed by annotated `kv_list` rows (§2.5). The engine's `tangl.vm.runtime.ledger.Ledger` keeps the name. |
 | `choice_id` (HTTP body) | `edge_id` | Reconciles with `ChoiceFragment.edge_id`. |
-| `interpretation.outcome` / `command_text` | `interpretation.result` / `text` | Spec-final names. |
+| `interpretation` / `user_event` fragments | `RuntimeEnvelope.ux_events` | Transient client guidance is not journal narrative. |
 | `token_ids` / `offer_ids` (commit payload) | `piece_ids` | Follows `piece` rename; offers and pieces share one namespace. |
 | `cost_preview` (singular field) | `cost_previews: list[CostPreview]` | Multi-axis costs are common (money + time + reputation). Length-1 lists handle singular. |
 | `token_offer` fragment type | *removed* | Subsumed by `PieceFragment.realized: bool` (§7.1). |
@@ -299,11 +287,11 @@ class RuntimeEnvelope(InfoModel):
 Each runtime turn produces one envelope **for one cursor** (§1.5). Fields:
 
 - **`cursor_id`** — identifies the journal channel. Stable within a
-  session. Changes when state advances; unchanged across `interpretation`
-  fragments.
+  session. Changes when state advances; unchanged across UX-only responses.
 - **`step`** — monotonic counter, per-channel, incremented per state-
-  changing turn. Unchanged by `interpretation` fragments.
+  changing turn. Unchanged by UX-only responses.
 - **`fragments`** — ordered stream; see §2 for fragment types.
+- **`ux_events`** — transient, typed client guidance; see §6.4.
 - **`last_redirect` / `redirect_trace`** — runtime introspection for the
   ledger's most recent and historical redirects. Author/debug surface
   only; reader clients ignore.
@@ -764,7 +752,7 @@ class KvFragment(BaseFragment, extra="allow"):
 ```python
 class ChoiceFragment(BaseFragment, extra="allow"):
     fragment_type: Literal["choice"] = "choice"
-    edge_id: UUID | None = None
+    edge_id: UUID
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
@@ -779,11 +767,11 @@ remain dictionary-shaped until the next intent pass.
 
 | | |
 |---|---|
-| **Required** | `uid`, `text` |
-| **Optional** | `edge_id` (omitted for `interpret_command` reserved choices); `available` (default `true`); `unavailable_reason`; `blockers[]`; `accepts`; `ui_hints`; `activation_payload` |
+| **Required** | `uid`, `edge_id`, `text` |
+| **Optional** | `available` (default `true`); `unavailable_reason`; `blockers[]`; `accepts`; `ui_hints`; `activation_payload` |
 | **Container rule** | Always emitted within the active `scene` group. Order is presented order; positional hotkey numbering follows order. |
-| **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, place, compose, raw_command}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
-| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices (e.g., `>` for `interpret_command`). Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. ↑/↓ cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target ≥ 44×44 on touch. Locked choices remain focusable for screen reader stability. |
+| **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, place, compose}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
+| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices. Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. Up/down cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target at least 44x44 on touch. Locked choices remain focusable for screen reader stability. |
 | **Fallback** | Unknown `accepts.kind` → plain button posting empty payload, with warning. Unknown `ui_hints.widget` → default widget for `accepts.kind`. |
 
 **Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1) Pay the forty silver.` … `> ` prompt; `(locked: reason)` suffix for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: `menu:` block; `if`-gated for locked; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
@@ -815,32 +803,13 @@ see the aliased forms.
 
 **All ports** — local registry swap by UID; no reflow.
 
-### 2.8 `user_event` — Toast / silent stash
+### 2.8 Non-journal UX events
 
-```python
-class UserEventFragment(BaseFragment, extra="allow"):
-    fragment_type: Literal["user_event"] = "user_event"
-    event_type: str | None = None
-    # `extra="allow"` permits `content` and per-event-type fields
-```
-
-| | |
-|---|---|
-| **Required** | `uid`, `event_type` |
-| **Optional** | `content` (any), per-event-type fields (open via `extra="allow"`) |
-| **Container rule** | Floats above the current shell. Never inserts into scene flow. |
-| **States** | **empty** → skip. **unknown event_type** → stash on user record, no UI. |
-| **A11y** | `role="status" aria-live="polite"`; Esc dismisses. Auto-dismiss 3s; story MAY extend. |
-| **Fallback** | Drop quietly; log to author surface. |
-
-**Port sketches.** Web: bottom toast. CLI: `* <event_type>: <content>` single line. tkinter: transient `Toplevel`. Ren'Py: `notify()`. Godot: `Popup` with autohide.
-
-### 2.9 `interpretation` — Backend command-resolution feedback (Tier P1)
-
-This fragment is Tier P1 — its full type definition lives in §6.4. It is
-listed here for proximity to the other fragment widgets. Clients SHOULD
-render it in scroll order alongside `content` fragments. It does not
-advance the cursor.
+Toasts, command-resolution guidance, validation feedback, and other client
+direction are not fragment widgets. They travel in
+`RuntimeEnvelope.ux_events`; see §6.4. This keeps journal replay narrative and
+lets each event declare whether it is inline or interrupting and whether it
+should survive replay.
 
 ---
 
@@ -1081,9 +1050,9 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
   `ui_hints.drag`, §6.2.1) MUST also offer the two-step click-pick path
   (pick piece, pick target zone). The CLI port renders only the click-
   pick path.
-- A `raw_command` accepts choice with a typeahead grammar overlay MUST
-  also accept plain text submission with no overlay. The CLI port
-  renders only plain text.
+- A command bar with a typeahead grammar overlay MUST also accept plain text
+  submission with no overlay. The CLI port renders only plain text and submits
+  the same typed `find_edge` request.
 - A choice list's positional hotkey numbering (§2.6) is the keyboard
   realization of the same choice list visible as buttons. Ports MAY add
   hotkeys; ports MUST keep the visible buttons reachable by tap/click.
@@ -1097,10 +1066,10 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
 
 ## 6 · Tier P1 — typed contract surfaces
 
-Everything below types fragment interiors without changing the outer
-fragment envelope shape. `Accepts` and `UIHints` are implemented in the
-engine; `Blocker`, `InterpretationFragment`, and several metadata subkeys
-remain the next dictionary-shaped sub-surfaces to promote.
+Everything below types fragment interiors and adjacent envelope surfaces.
+`Accepts`, `UIHints`, direct/find-edge requests, and `UxEvent` are implemented
+in the engine; `Blocker` and several metadata subkeys remain the next
+dictionary-shaped sub-surfaces to promote.
 
 ### 6.1 Typed `Accepts`
 
@@ -1202,18 +1171,15 @@ class ComposeAccepts(BaseModel):
     kind: Literal["compose"] = "compose"
     parts: list[ComposePart]
 
-class RawCommandAccepts(BaseModel):
-    kind: Literal["raw_command"] = "raw_command"
-
 NonComposeAccepts: TypeAlias = Annotated[
     PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts
-    | PlaceAccepts | RawCommandAccepts,
+    | PlaceAccepts,
     Field(discriminator="kind"),
 ]
 
 Accepts: TypeAlias = Annotated[
     PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts
-    | PlaceAccepts | ComposeAccepts | RawCommandAccepts,
+    | PlaceAccepts | ComposeAccepts,
     Field(discriminator="kind"),
 ]
 ComposePart.model_rebuild()
@@ -1234,7 +1200,6 @@ keeps payloads short and matches existing webapp behavior.
 | `pieces` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max`. (Renamed from `tokens` in v1.2; the `select` rename was reverted in v1.2.1.) |
 | `place` | `{ "piece_id": str, "source_zone_ref": str \| null, "target_zone_ref": str \| null, "edge_ref": str \| null }` | Move a single piece from an optional source into a single target. Exactly one of `target_zone_ref` or `edge_ref` is present. |
 | `compose` | `{ "parts": { role: subpayload, ... } }` | Each subpayload follows its part's `accepts.kind`. |
-| `raw_command` | `{ "text": str }` | Reserved for `interpret_command`-shaped choices. |
 
 Concrete `compose` example — "give 2 coins to guard":
 
@@ -1282,9 +1247,8 @@ Concrete `place` (edge variant) — "lay track on the Toledo-Chicago connection"
   client SHOULD evaluate them inline before allowing commit.
 - The backend re-evaluates ALL validators on commit and is
   authoritative.
-- A backend-side validation failure surfaces as an `interpretation`
-  fragment with `result="validation_failed"` (§6.4). Step does not
-  advance.
+- A backend-side validation failure surfaces as an inline, non-replayed
+  `UxEvent` (§6.4). Step does not advance.
 
 ### 6.2 Typed `UIHints`
 
@@ -1332,71 +1296,66 @@ state per §5.1), and a list of UIDs the message references. The
 Decision Legibility Contract requires every UID in `refs` to be
 rendered.
 
-### 6.4 `InterpretationFragment`
+### 6.4 `RuntimeEnvelope.ux_events`
 
 ```python
-InterpretResult = Literal[
-    "ambiguous",
-    "unknown_verb",
-    "unknown_noun",
-    "blocked",
-    "impossible",
-    "validation_failed",
-]
-
-class InterpretationFragment(BaseFragment):
-    fragment_type: Literal["interpretation"] = "interpretation"
-    result: InterpretResult
-    text: str                             # the player's raw input
-    message: str                          # human-readable reason
-    candidates: list[UUID] | None = None  # edge_ids when result="ambiguous"
-    blocked_reason: str | None = None     # for result="blocked"
-    hint: str | None = None               # optional one-line nudge
+class UxEvent(BaseModel):
+    event_id: UUID
+    event_type: str
+    message: str
+    presentation: Literal["inline", "interrupt"] = "inline"
+    replay: bool = False
+    severity: Literal["info", "success", "warning", "error"] = "info"
+    details: dict[str, JsonValue] = Field(default_factory=dict)
 ```
 
 | | |
 |---|---|
-| **Required** | `uid`, `result`, `text`, `message` |
-| **Optional** | `candidates[]` (required when `result="ambiguous"`); `blocked_reason` (used when `result="blocked"`); `hint` |
-| **Container rule** | Flows into the active scene. Accumulates as transcript entries. |
-| **State machine** | **Does NOT advance the cursor.** `step` is unchanged from the prior envelope; choices remain open. |
-| **A11y** | `role="status" aria-live="polite"`. |
-| **Fallback** | A port that doesn't model `interpretation` MAY render `message` as a `content` fragment. |
+| **Required** | `event_id`, `event_type`, `message` |
+| **Optional** | `presentation`; `replay`; `severity`; `details` |
+| **Container rule** | Adjacent to `fragments` on `RuntimeEnvelope`; never inserted into journal flow. |
+| **State machine** | UX-only responses do not advance `step`. `replay=false` events are replaced by the next envelope; replayable events may be retained by the shell. |
+| **A11y** | Inline events use `role="status"`; interrupt events use an appropriate alert/dialog treatment. |
+| **Fallback** | Render `severity` plus `message` as one readable line. |
 
-**Why a dedicated fragment.** Replay/audit parity wants the failure to
-be structured. Ports that render the parser-failure transcript (IF-
-style) benefit from a stable shape. The cost is one fragment type that
-other ports can fall back to prose for.
+Use `presentation="inline"` for command guidance and validation failures that
+belong near the input surface. Use `"interrupt"` for achievements or notices
+that deserve shell-level attention. `details` is structured diagnostic or
+renderer-enrichment data; clients must not need it to understand `message`.
 
-### 6.5 Reserved `interpret_command` edge
+### 6.5 Direct and exploratory edge resolution
 
-When a story bundle authorizes a command bar for the current turn, the
-runtime MUST inject an additional `ChoiceFragment` into the open-choice
-list:
+Concrete choices and exploratory command text use distinct request shapes:
 
-```json
-{
-  "uid": "f-interpret-command",
-  "fragment_type": "choice",
-  "edge_id": "interpret_command",
-  "text": "Try a command.",
-  "available": true,
-  "accepts": { "kind": "raw_command" },
-  "ui_hints": { "hotkey": ">" }
-}
+```python
+class DirectEdgeRequest(BaseModel):
+    edge_id: UUID
+    payload: JsonValue | None = None
+
+class CommandEdgeQuery(BaseModel):
+    kind: Literal["command"] = "command"
+    command: str
+
+class FindEdgeRequest(BaseModel):
+    find_edge: CommandEdgeQuery
+    payload: JsonValue | None = None
+
+EdgeResolutionRequest = DirectEdgeRequest | FindEdgeRequest
 ```
 
-The client's command bar wraps this choice. Submission posts a
-`raw_command` payload (`{ text: "..." }`). The backend either:
+A direct request applies the UUID-addressed open action or fails as a contract
+error. A `find_edge` request asks story policy to select an open action from
+typed query parameters. For `kind="command"`:
 
-- Resolves the text to a real edge, applies it, and returns a normal
-  envelope (cursor advances), OR
-- Returns an `InterpretationFragment` describing the failure mode
-  (cursor unchanged, choices intact).
+- exactly one match is applied and returns the next normal envelope;
+- no match returns the current turn with an inline `edge_not_found` event;
+- multiple matches return the current turn with an inline
+  `edge_ambiguous` event and candidate ids in `details`;
+- a matched but currently rejected action returns an inline `edge_rejected`
+  event.
 
-A port that does not implement a command bar simply ignores the
-`interpret_command` choice (which renders as a button labeled "Try a
-command" with a text input — fine fallback).
+The query protocol is intentionally extensible by discriminator, but v1.6
+defines only `kind="command"`. Clients do not resolve hidden rules locally.
 
 ### 6.6 `metadata.grammar`
 
@@ -1421,7 +1380,6 @@ class GrammarHint(BaseModel):
     nouns: list[GrammarNoun] = Field(default_factory=list)
     placeholder: str | None = None
     examples: list[str] = Field(default_factory=list)
-    resolve_to: str | None = None         # default: "interpret_command"
 ```
 
 **Synthesis.** The grammar hint is a **denormalized projection of the
@@ -1434,20 +1392,16 @@ The Story layer is the natural synthesizer (it knows what is
 narratively visible). The Service layer is responsible for serializing
 it into `metadata.grammar` on egress.
 
-**Absence.** When `metadata.grammar` is absent, the command bar simply
-submits raw text. No preview, no highlighting. Identical to a CLI
-port.
+**Absence.** When `metadata.grammar` is absent, a client may omit the command
+bar or still submit plain command text through `find_edge`. There is no local
+preview or highlighting.
 
 ### 6.7 HTTP API
 
 ```python
 # tangl/service/http/story.py — Tier P1 target
-class ChoiceRequest(BaseModel):
-    edge_id: UUID                        # was: choice_id (deprecated alias)
-    payload: dict[str, Any] | None = None  # validated against Accepts at runtime
-
 @router.post("/story/do", response_model=RuntimeEnvelope)
-def do_story_action(req: ChoiceRequest, ...) -> RuntimeEnvelope: ...
+def do_story_action(req: EdgeResolutionRequest, ...) -> RuntimeEnvelope: ...
 
 @router.get("/story/update", response_model=RuntimeEnvelope)
 def get_story_update(...) -> RuntimeEnvelope: ...
@@ -1460,19 +1414,19 @@ def get_story_info(
 ) -> ProjectedState: ...
 ```
 
-Four changes from the current `openapi.json`:
+Four contract points:
 
-1. **`choice_id` → `edge_id`.** Deprecation: accept both names for one
-   minor version, emit a header warning when `choice_id` is used. Then
-   strict.
+1. **Typed direct/find request union.** Direct choices submit UUID `edge_id`;
+   command bars submit a discriminated `find_edge` query. The shapes are
+   mutually exclusive.
 2. **Typed responses on `/story/do` and `/story/update`** —
    `response_model=RuntimeEnvelope` lets the OpenAPI doc express the
    full contract, which lets `apps/web` regenerate `api.d.ts` cleanly.
 3. **Payload validation by edge.** The backend looks up the choice by
    `edge_id`, retrieves its declared `Accepts.kind`, and validates the
    posted payload against the matching `*Payload` shape (§6.1.1).
-   Failures are surfaced as `InterpretationFragment` with
-   `result="validation_failed"`.
+   Failures that are useful client guidance are surfaced as inline,
+   non-replayed `UxEvent` values.
 4. **`/story/info` accepts an opaque query descriptor.** The
    `InfoAffordance.query` payload (§1.6) is JSON-encoded and passed as
    the `query` parameter; `kind` filters the response to a single info
@@ -1797,10 +1751,10 @@ through the CLI Floor Rule.
 | choice (text/quantity/pieces) | inline form | `> ` prompt | `Entry` / `Spinbox` | `renpy.input` / `LineEdit` |
 | choice (place) | two-step click-pick (drag-drop optional, §5.3) | numbered two-step pick | listbox + button | scene click target |
 | choice (compose) | grouped form | sequenced prompts | nested `Frames` | menu of menus |
-| choice (raw_command) | command bar | `> ` prompt (default) | `Entry` | `renpy.input` |
 | control (update/delete) | re-render target | re-print with marker | re-render cell | re-run statement |
-| user_event | bottom toast | `* type: content` | `Toplevel` | `notify()` / Popup |
-| interpretation | transcript line | inline transcript | `Label` row | log line / chip |
+| find_edge(command) | command bar | `command <text>` | `Entry` | `renpy.input` |
+| ux_event(inline) | input-adjacent status | severity + message | `Label` row | log line / chip |
+| ux_event(interrupt) | toast / dialog | severity + message | `Toplevel` | `notify()` / Popup |
 | projected scalar | tile | `title: value` | large `Label` | stat widget |
 | projected kv_list | rail rows | aligned columns | `Frame` + grid | `VBoxContainer` |
 | projected item_list | roster | `- label (detail)` | `Listbox` + detail | `ItemList` |
@@ -1820,7 +1774,7 @@ their CLI renderings ship in `cli_reference_port.py`.
 ```
 engine/contrib/conformance/
   fixtures/
-    command_hints.json            # raw_command + grammar + interpretation
+    command_hints.json            # grammar + find_edge UX feedback
     compose_payload.json          # compose accepts with quantity + pieces parts
     control_delete.json           # delete control mutation
     crossroads_inn.json           # canonical narrative turn

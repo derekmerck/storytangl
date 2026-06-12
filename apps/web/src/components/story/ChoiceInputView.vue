@@ -38,15 +38,9 @@ type PreparedValidator = Validator & {
   regex?: RegExp
 }
 
-type CommandGrammar = {
-  examples?: unknown
-  placeholder?: unknown
-}
-
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments: Record<string, StoryFragment>
-  metadata?: Record<string, unknown>
   disabled?: boolean
 }>()
 
@@ -83,31 +77,11 @@ const acceptsKind = computed(() => {
 const hasExplicitKind = computed(() => typeof accepts.value.kind === 'string')
 
 const rendersInput = computed(() =>
-  ['text', 'quantity', 'pieces', 'place', 'compose', 'raw_command'].includes(acceptsKind.value),
+  ['text', 'quantity', 'pieces', 'place', 'compose'].includes(acceptsKind.value),
 )
 const inputLabel = computed(() => props.choice.text)
-const commandGrammar = computed<CommandGrammar>(() => {
-  const grammar = props.metadata?.grammar
-  return isRecord(grammar) ? grammar : {}
-})
-const commandExamples = computed(() =>
-  Array.isArray(commandGrammar.value.examples)
-    ? commandGrammar.value.examples.filter(
-        (example): example is string => typeof example === 'string' && example.length > 0,
-      )
-    : [],
-)
-const commandPlaceholder = computed(() => {
-  if (acceptsKind.value !== 'raw_command') {
-    return undefined
-  }
-  return (
-    stringValue(commandGrammar.value.placeholder) ??
-    (commandExamples.value.length > 0 ? `e.g. ${commandExamples.value[0]}` : 'Type a command')
-  )
-})
 const placeholder = computed(() =>
-  stringValue(accepts.value.placeholder) ?? commandPlaceholder.value ?? '',
+  stringValue(accepts.value.placeholder) ?? '',
 )
 const minValue = computed(() => numericValue(accepts.value.min))
 const maxValue = computed(() => numericValue(accepts.value.max))
@@ -406,7 +380,7 @@ const composePayload = (): PayloadState => {
 }
 
 const payloadState = computed<PayloadState>(() => {
-  if (acceptsKind.value === 'text' || acceptsKind.value === 'raw_command') {
+  if (acceptsKind.value === 'text') {
     return textPayload()
   }
   if (acceptsKind.value === 'quantity') {
@@ -428,6 +402,7 @@ const composePartLabel = (role: string): string => role.replace(/_/g, ' ')
 const composePartChoice = (part: ComposePartInput): ChoiceStoryFragment => ({
   uid: `${props.choice.uid}:${part.role}`,
   fragment_type: 'choice',
+  edge_id: props.choice.edge_id,
   text: composePartLabel(part.role),
   accepts: part.accepts,
 })
@@ -513,10 +488,9 @@ watch(
 <template>
   <div v-if="rendersInput" class="choice-input-view" data-testid="choice-input-view">
     <v-text-field
-      v-if="acceptsKind === 'text' || acceptsKind === 'raw_command'"
+      v-if="acceptsKind === 'text'"
       v-model="inputValue"
       class="choice-input"
-      :class="{ 'choice-input--command': acceptsKind === 'raw_command' }"
       density="compact"
       hide-details
       variant="outlined"
@@ -613,7 +587,6 @@ watch(
         <ChoiceInputView
           :choice="composePartChoice(part)"
           :fragments="fragments"
-          :metadata="metadata"
           :disabled="disabled"
           @payload-change="(payload, valid) => handleComposePartPayload(part.role, payload, valid)"
           @commit="emit('commit')"

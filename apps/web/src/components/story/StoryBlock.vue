@@ -3,7 +3,6 @@ import { computed } from 'vue'
 
 import ContentFragmentView from './ContentFragmentView.vue'
 import GroupFragmentView from './GroupFragmentView.vue'
-import InterpretationFragmentView from './InterpretationFragmentView.vue'
 import KvFragmentView from './KvFragmentView.vue'
 import MediaFragmentView from './MediaFragmentView.vue'
 import RollFragmentView from './RollFragmentView.vue'
@@ -15,7 +14,6 @@ import { useGlobal } from '@/composables/globals'
 import {
   isChoiceFragment,
   isGroupFragment,
-  isInterpretationFragment,
   isMediaFragment,
   isPieceFragment,
   isRollFragment,
@@ -29,7 +27,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  doAction: [uid: string, payload?: unknown]
+  doAction: [edgeId: string, payload?: unknown]
 }>()
 
 const { $debug, $verbose } = useGlobal()
@@ -47,14 +45,13 @@ const flowMembers = computed(() =>
     (fragment) =>
       !isChoiceFragment(fragment) &&
       fragment.fragment_type !== 'update' &&
-      fragment.fragment_type !== 'delete' &&
-      fragment.fragment_type !== 'user_event',
+      fragment.fragment_type !== 'delete',
   ),
 )
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 
-const handleAction = (uid: string, payload?: unknown) => {
-  emit('doAction', uid, payload)
+const handleAction = (edgeId: string, payload?: unknown) => {
+  emit('doAction', edgeId, payload)
 }
 </script>
 
@@ -81,11 +78,6 @@ const handleAction = (uid: string, payload?: unknown) => {
 
         <RollFragmentView v-else-if="isRollFragment(fragment)" :fragment="fragment" />
 
-        <InterpretationFragmentView
-          v-else-if="isInterpretationFragment(fragment)"
-          :fragment="fragment"
-        />
-
         <UnknownFragmentFallback v-else :fragment="fragment" />
       </div>
 
@@ -96,7 +88,6 @@ const handleAction = (uid: string, payload?: unknown) => {
             :key="choice.uid"
             :choice="choice"
             :fragments="fragments"
-            :metadata="metadata"
             :disabled="disabled"
             @doAction="handleAction"
           />

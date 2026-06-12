@@ -108,7 +108,11 @@ class TestKimIntegration:
         ledger.resolve_choice(guess.uid, choice_payload=guess.payload)
 
         assert ledger.cursor_id == victory.uid
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "name the missing object correctly" in content.lower()
 
     def test_context_exports_revealed_cues(self) -> None:

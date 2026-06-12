@@ -529,10 +529,12 @@ Representative types include:
 - `GroupFragment`
 - `KvFragment`
 - `ControlFragment`
-- `UserEventFragment`
 - `AttributedFragment`
 - `DialogFragment`
 - `BlockFragment`
+
+Transient client guidance is not a journal fragment. Typed `UxEvent` records
+travel beside the journal stream on `RuntimeEnvelope.ux_events`.
 
 
 ---

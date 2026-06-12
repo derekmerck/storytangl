@@ -9,7 +9,16 @@ import pytest
 from tangl.core import BaseFragment, Selector
 from tangl.journal.fragments import BlockFragment, ChoiceFragment, ContentFragment
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service.response import ProjectedState, RuntimeEnvelope, RuntimeInfo, UserInfo, WorldInfo
+from tangl.service.response import (
+    CommandEdgeQuery,
+    DirectEdgeRequest,
+    FindEdgeRequest,
+    ProjectedState,
+    RuntimeEnvelope,
+    RuntimeInfo,
+    UserInfo,
+    WorldInfo,
+)
 from tangl.service.service_manager import ServiceManager
 from tangl.service.service_method import (
     ServiceAccess,
@@ -155,13 +164,53 @@ def test_story_methods_return_typed_runtime_payloads(
     assert isinstance(ledger, Ledger)
     choice = _first_choice_edge(ledger)
 
-    updated = manager.resolve_choice(user_id=user.uid, edge_id=choice.uid)
+    updated = manager.resolve_choice(
+        user_id=user.uid,
+        request=DirectEdgeRequest(edge_id=choice.uid),
+    )
     assert isinstance(updated, RuntimeEnvelope)
     assert updated.step is not None
     assert updated.step > created.step
 
     projected = manager.get_story_info(user_id=user.uid)
     assert isinstance(projected, ProjectedState)
+
+
+def test_find_edge_request_resolves_command_or_returns_transient_guidance(
+    manager: ServiceManager,
+    user: User,
+) -> None:
+    world = World.from_script_data(script_data=_story_script())
+    created = manager.create_story(
+        user_id=user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc_manager_command_flow",
+    )
+
+    unknown = manager.resolve_choice(
+        user_id=user.uid,
+        request=FindEdgeRequest(
+            find_edge=CommandEdgeQuery(command="dance sideways"),
+        ),
+    )
+
+    assert unknown.step == created.step
+    assert unknown.fragments == []
+    assert unknown.ux_events[0].event_type == "edge_not_found"
+    assert unknown.ux_events[0].presentation == "inline"
+    assert unknown.ux_events[0].replay is False
+
+    resolved = manager.resolve_choice(
+        user_id=user.uid,
+        request=FindEdgeRequest(
+            find_edge=CommandEdgeQuery(command="  CONTINUE  "),
+        ),
+    )
+
+    assert resolved.step > created.step
+    assert resolved.ux_events == []
 
 
 def test_story_envelope_keeps_fragments_independent_from_actions(

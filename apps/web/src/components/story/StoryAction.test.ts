@@ -12,7 +12,6 @@ const vuetify = createVuetify({ components, directives })
 const mountWithVuetify = (props: {
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
-  metadata?: Record<string, unknown>
   disabled?: boolean
 }) =>
   mount(StoryAction, {
@@ -48,6 +47,7 @@ describe('StoryAction', () => {
     const choiceWithIcon: ChoiceStoryFragment = {
       uid: 'action_icon',
       fragment_type: 'choice',
+      edge_id: 'action_icon',
       text: 'Happy choice',
       ui_hints: { icon: 'emoticon-happy' },
     }
@@ -67,6 +67,7 @@ describe('StoryAction', () => {
     const choiceWithPayload: ChoiceStoryFragment = {
       uid: 'action_pb',
       fragment_type: 'choice',
+      edge_id: 'action_pb',
       text: 'Choice',
       payload: { data: 'value' },
     }
@@ -82,6 +83,7 @@ describe('StoryAction', () => {
     const choiceWithPayload: ChoiceStoryFragment = {
       uid: 'action_pb',
       fragment_type: 'choice',
+      edge_id: 'action_pb',
       text: 'Choice',
       payload: { data: 'old' },
     }
@@ -103,6 +105,7 @@ describe('StoryAction', () => {
     const styledChoice: ChoiceStoryFragment = {
       uid: 'action_styled',
       fragment_type: 'choice',
+      edge_id: 'action_styled',
       text: 'Styled',
       style: { color: 'red' },
     }
@@ -117,6 +120,7 @@ describe('StoryAction', () => {
     const lockedChoice: ChoiceStoryFragment = {
       uid: 'action_locked',
       fragment_type: 'choice',
+      edge_id: 'action_locked',
       text: 'Sneak away',
       available: false,
       unavailable_reason: 'Requires stealth',
@@ -137,6 +141,7 @@ describe('StoryAction', () => {
     const blockedChoice: ChoiceStoryFragment = {
       uid: 'action_blocked',
       fragment_type: 'choice',
+      edge_id: 'action_blocked',
       text: 'Sneak away',
       available: false,
       unavailable_reason: 'Requires stealth',
@@ -169,6 +174,7 @@ describe('StoryAction', () => {
     const hintedChoice: ChoiceStoryFragment = {
       uid: 'wait_evening',
       fragment_type: 'choice',
+      edge_id: 'wait_evening',
       text: 'Wait until evening',
       ui_hints: {
         source_kind: 'schedule',
@@ -192,6 +198,7 @@ describe('StoryAction', () => {
     const freeformChoice: ChoiceStoryFragment = {
       uid: 'action_freeform',
       fragment_type: 'choice',
+      edge_id: 'action_freeform',
       text: 'Haggle',
       accepts: {
         payload_type: 'offer_silver',
@@ -215,6 +222,7 @@ describe('StoryAction', () => {
     const pieceChoice: ChoiceStoryFragment = {
       uid: 'action_pieces',
       fragment_type: 'choice',
+      edge_id: 'action_pieces',
       text: 'Play a card',
       accepts: {
         kind: 'pieces',
@@ -249,6 +257,7 @@ describe('StoryAction', () => {
     const freeformChoice: ChoiceStoryFragment = {
       uid: 'action_freeform',
       fragment_type: 'choice',
+      edge_id: 'action_freeform',
       text: 'Haggle',
       accepts: {
         payload_type: 'offer_silver',
@@ -276,6 +285,7 @@ describe('StoryAction', () => {
     const textChoice: ChoiceStoryFragment = {
       uid: 'action_text',
       fragment_type: 'choice',
+      edge_id: 'action_text',
       text: 'Name your sword',
       accepts: {
         kind: 'text',
@@ -294,71 +304,11 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual(['action_text', { text: 'Hope' }])
   })
 
-  it('emits raw command payloads through the reserved interpretation edge', async () => {
-    const commandChoice: ChoiceStoryFragment = {
-      uid: 'action_command',
-      fragment_type: 'choice',
-      edge_id: 'interpret_command',
-      text: 'Try a command.',
-      accepts: { kind: 'raw_command' },
-    }
-
-    const wrapper = mountWithVuetify({
-      choice: commandChoice,
-      metadata: {
-        grammar: {
-          examples: ['take lamp', 'open door'],
-        },
-      },
-    })
-
-    const input = wrapper.find('input')
-    expect(input.attributes('placeholder')).toBe('e.g. take lamp')
-
-    await input.setValue('take lamp')
-    await wrapper.find('button').trigger('click')
-
-    expect(wrapper.emitted('doAction')![0]).toEqual([
-      'interpret_command',
-      { text: 'take lamp' },
-    ])
-  })
-
-  it('submits raw commands when grammar hints are missing or malformed', async () => {
-    const commandChoice: ChoiceStoryFragment = {
-      uid: 'action_command',
-      fragment_type: 'choice',
-      edge_id: 'interpret_command',
-      text: 'Try a command.',
-      accepts: { kind: 'raw_command' },
-    }
-
-    const wrapper = mountWithVuetify({
-      choice: commandChoice,
-      metadata: {
-        grammar: {
-          examples: [12, null],
-          verbs: 'take',
-        },
-      },
-    })
-
-    const input = wrapper.find('input')
-    expect(input.attributes('placeholder')).toBe('Type a command')
-
-    await input.setValue('xyzzy')
-    await input.trigger('keydown.enter')
-
-    expect(wrapper.emitted('doAction')![0]).toEqual([
-      'interpret_command',
-      { text: 'xyzzy' },
-    ])
-  })
-
   it('emits quantity accepts payloads after min/max validation passes', async () => {
     const quantityChoice: ChoiceStoryFragment = {
       uid: 'action_quantity',
       fragment_type: 'choice',
+      edge_id: 'action_quantity',
       text: 'Buy rations',
       accepts: {
         kind: 'quantity',
@@ -386,6 +336,7 @@ describe('StoryAction', () => {
     const quantityChoice: ChoiceStoryFragment = {
       uid: 'action_quantity',
       fragment_type: 'choice',
+      edge_id: 'action_quantity',
       text: 'Buy optional rations',
       accepts: {
         kind: 'quantity',

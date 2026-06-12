@@ -9,8 +9,8 @@ target in `STORYTANGL_WIDGET_VOCAB.md`. In particular:
 - `piece` / `zone` fixtures are current web pressure fixtures and decision-
   legibility examples while engine-side typed fragment support catches up.
 - `kv` fragments use the unified record-shaped `KvRow` contract.
-- `interpretation` uses the v1.5 `result` / `text` / `message` shape while the
-  reference renderers still accept the older fallback field names.
+- command feedback uses typed `RuntimeEnvelope.ux_events`; it never enters the
+  journal fragment registry.
 
 Every future port should be able to load these JSON files and assert observable
 output in its own medium.
@@ -40,8 +40,8 @@ available choice must be renderable in the current scene shell and any
 piece/zone/state references in its decision surfaces must also be renderable.
 `parity.py` is the sibling input-parity harness: available choices must expose
 enough `accepts` shape for a low-capability client to submit a portable payload
-for `pick`, `text`, `quantity`, `raw_command`, `pieces`, `place`, and recursive
-`compose` controls.
+for `pick`, `text`, `quantity`, `pieces`, `place`, and recursive `compose`
+controls.
 `time_parity.py` covers the JSON-visible part of timed presentation parity:
 pending media and roll/ritual fragments need immediate readable fallbacks, and
 advisory timing hints cannot require waiting for presentation time.
@@ -50,9 +50,9 @@ advisory timing hints cannot require waiting for presentation time.
 renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without
 importing engine models or calling the service layer. `cli_reference_port.py`
 then formats that document as plain terminal text, including choice blockers,
-cost previews, typed accepts prompts, command interpretation feedback, and
-unknown-fragment fallbacks, plus info-channel `?` / slash-command fallbacks
-from `metadata.info_affordances`.
+cost previews, typed accepts prompts, command-bar hints, envelope UX events,
+and unknown-fragment fallbacks, plus info-channel `?` / slash-command
+fallbacks from `metadata.info_affordances`.
 
 `tk_reference_port.py` is a tiny desktop-toolkit proof over the same view model.
 Its `--inspect` mode prints the planned widgets and sample submission payloads

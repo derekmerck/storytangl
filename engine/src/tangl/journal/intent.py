@@ -119,17 +119,12 @@ class PlaceAccepts(IntentModel):
     required: bool = True
 
 
-class RawCommandAccepts(IntentModel):
-    kind: Literal["raw_command"] = "raw_command"
-
-
 NonComposeAccepts: TypeAlias = Annotated[
     PickAccepts
     | TextAccepts
     | QuantityAccepts
     | PiecesAccepts
-    | PlaceAccepts
-    | RawCommandAccepts,
+    | PlaceAccepts,
     Field(discriminator="kind"),
 ]
 
@@ -150,8 +145,7 @@ Accepts: TypeAlias = Annotated[
     | QuantityAccepts
     | PiecesAccepts
     | PlaceAccepts
-    | ComposeAccepts
-    | RawCommandAccepts,
+    | ComposeAccepts,
     Field(discriminator="kind"),
 ]
 
@@ -186,7 +180,6 @@ __all__ = [
     "PlaceAccepts",
     "PrimitiveValue",
     "QuantityAccepts",
-    "RawCommandAccepts",
     "RegexValidator",
     "TextAccepts",
     "UIHints",

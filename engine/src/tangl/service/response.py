@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Annotated, Any, Literal, Mapping, Optional, Self, TypeAlias
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import (
     AnyUrl,
@@ -13,6 +13,7 @@ from pydantic import (
     Field,
     JsonValue as PydanticJsonValue,
     SerializeAsAny,
+    StringConstraints,
     ValidationError,
     field_serializer,
     model_validator,
@@ -84,12 +85,30 @@ class RuntimeInfo(InfoModel):
         )
 
 
+JsonValue: TypeAlias = PydanticJsonValue
+
+
+class UxEvent(InfoModel):
+    """Transient client guidance carried beside the journal fragment stream."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    event_id: UUID = Field(default_factory=uuid4)
+    event_type: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    presentation: Literal["inline", "interrupt"] = "inline"
+    replay: bool = False
+    severity: Literal["info", "success", "warning", "error"] = "info"
+    details: dict[str, JsonValue] = Field(default_factory=dict)
+
+
 class RuntimeEnvelope(InfoModel):
     """Ordered-fragment runtime payload for vm/story clients."""
 
     cursor_id: UUID | None = None
     step: int | None = None
     fragments: list[SerializeAsAny[BaseFragment]] = Field(default_factory=list)
+    ux_events: list[UxEvent] = Field(default_factory=list)
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -112,7 +131,37 @@ class RuntimeEnvelope(InfoModel):
         return payload
 
 
-JsonValue: TypeAlias = PydanticJsonValue
+class CommandEdgeQuery(InfoModel):
+    """Find an actionable edge from player-authored command text."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    kind: Literal["command"] = "command"
+    command: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+EdgeQuery: TypeAlias = CommandEdgeQuery
+
+
+class DirectEdgeRequest(InfoModel):
+    """Resolve one already-selected edge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    edge_id: UUID
+    payload: JsonValue | None = None
+
+
+class FindEdgeRequest(InfoModel):
+    """Find and resolve an edge from a typed query."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    find_edge: EdgeQuery
+    payload: JsonValue | None = None
+
+
+EdgeResolutionRequest: TypeAlias = DirectEdgeRequest | FindEdgeRequest
 
 
 class InfoAffordance(InfoModel):
@@ -383,6 +432,11 @@ NativeResponse: TypeAlias = FragmentStream | RuntimeEnvelope | InfoModel | Runti
 __all__ = [
     "AuthoringDiagnostic",
     "BadgeListValue",
+    "CommandEdgeQuery",
+    "DirectEdgeRequest",
+    "EdgeQuery",
+    "EdgeResolutionRequest",
+    "FindEdgeRequest",
     "FragmentStream",
     "InfoAffordance",
     "InfoModel",
@@ -405,6 +459,7 @@ __all__ = [
     "SystemInfo",
     "TableValue",
     "StoryInfoRequest",
+    "UxEvent",
     "UserInfo",
     "UserSecret",
     "WorldInfo",

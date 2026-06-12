@@ -1,7 +1,7 @@
 # Widget Contract Reconciliation
 
 **Status:** living document · updated alongside each spec / engine / UI release
-**Companion to:** `STORYTANGL_WIDGET_VOCAB.md` v1.5
+**Companion to:** `STORYTANGL_WIDGET_VOCAB.md` v1.6
 **Companion to:** `bundles/<name>/EXTENSIONS.md` (Tier P3 genre layers)
 
 This document tracks **implementation status** across the three layers
@@ -46,7 +46,7 @@ entirely and consumes L3 directly via an in-process shim.
 
 ## §A — Tier S surfaces (core contract)
 
-These are the surfaces v1.5 marks Tier S — committed as stable target
+These are the surfaces v1.6 marks Tier S — committed as stable target
 contract. Most are already shipping in the reference UI and engine;
 the negotiation is mostly about typed-shape graduations.
 
@@ -57,9 +57,10 @@ the negotiation is mostly about typed-shape graduations.
 | `MediaFragment` shape | S | done | done | — |
 | `GroupFragment` shape (`scene`, `dialog`, `overlay`, `status_sidecar`) | S | done | done | — |
 | `KvFragment` shape | S | done (`KvRow[]`) | done (`list[KvRow]`) | tuple-row fixtures migrated in typed accepts / KvRow PR |
-| `ChoiceFragment` shape (frame only) | S | done | done | — |
+| `ChoiceFragment` shape (required UUID `edge_id`) | S | done | done | — |
 | `ControlFragment` (`update` / `delete`) | S | done | done | — |
-| `UserEventFragment` | S | done | done | — |
+| `RuntimeEnvelope.ux_events: list[UxEvent]` | S | done (web + CLI + Tk planning floor) | done | — |
+| Typed direct `edge_id` / exploratory `find_edge` requests | S | done (web + CLI) | done (service + REST + remote client) | add more query discriminators only when story policy needs them |
 | `ProjectedState.sections` with five `value_type`s | S | done | done | — |
 | `metadata.info_affordances: list[InfoAffordance]` | S | done (web + CLI `?`/slash floor) | done (typed; gathered through service-info dispatch) | sandbox and credentials fixtures cover advertised channels |
 | `InfoAffordance.query` optional dict (opaque descriptor) | S | done | done | bundles choose descriptor contents; clients hand it back |
@@ -84,12 +85,11 @@ surface is small enough to settle with its immediate neighbors.
 | Surface | Spec tier | Reference UI | Engine backend | Plan |
 |---|---|---|---|---|
 | Typed `PiecesAccepts` (was `tokens`) | P1 | done (kind `pieces` + typed TS shape) | done (`Accepts` union + credentials mechanic-to-service flow) | expand conformance cases only as new widgets land |
-| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts`, `RawCommandAccepts` | P1 | done | done (`Accepts` union; Nim quantity flow) | keep legacy web `payload_type` path as local UI compatibility until fixtures stop using it |
+| Typed `PickAccepts`, `TextAccepts`, `QuantityAccepts` | P1 | done | done (`Accepts` union; Nim quantity flow) | — |
 | Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial (`edge_ref` not rendered) | done (`Accepts` union) | add `edge_ref` fixture when route/network MVP lands |
 | Typed `ComposeAccepts` | P1 | partial (web nested renderer + CLI/Tk inspection fixture) | done (`Accepts` union) | harden layout and add broader part combinations as worlds emit them |
 | Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
 | Typed `Blocker` (replaces dict blockers) | P1 | done (typed + rendered) | untyped | engine PR |
-| Typed `InterpretationFragment` | P1 | done (renders `result` / `text` / `message`) | untyped | engine PR |
 | `cost_previews: list[CostPreview]` (plural) | P1 | done (choice display) | not_started | engine PR |
 | `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
 | HTTP body field `edge_id` | P1 | done | done | — |
@@ -128,9 +128,9 @@ question in the spec).
 
 ## §D — Tier P3 genre extension surfaces
 
-These are advisory genre conventions layered on top of v1.5. They do
+These are advisory genre conventions layered on top of v1.6. They do
 not create new core fragment types, accepts kinds, or value types. A
-generic client remains conforming when it renders the underlying v1.5
+generic client remains conforming when it renders the underlying v1.6
 surfaces and ignores these enrichments.
 
 | Surface | Spec tier | Reference UI | Engine backend | Plan |
@@ -144,7 +144,7 @@ surfaces and ignores these enrichments.
 | `ui_hints.encounter_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional risk badge / suffix; fallback to `ui_hints.emphasis` + prose |
 | `ui_hints.drag` | P3 | docs + v1.5 wireframe | n/a | optional enrichment; click-pick fallback remains required by §5.3 |
 | Genre transcript examples | P3 diagnostic | v1.5 wireframe samples | n/a | add executable transcripts when demo worlds stabilize; diagnostic, not gating |
-| `_common/EXTENSIONS.md` | deferred | n/a | n/a | do not create until a fourth cross-genre pattern is not already covered by core v1.5 |
+| `_common/EXTENSIONS.md` | deferred | n/a | n/a | do not create until a fourth cross-genre pattern is not already covered by core v1.6 |
 
 ---
 
@@ -157,7 +157,7 @@ implements.
 
 | Endpoint | Method | Spec target | Current engine | Plan |
 |---|---|---|---|---|
-| `/story/do` | POST | accepts `ChoiceRequest{edge_id, payload}`; returns `RuntimeEnvelope` | accepts `{edge_id, payload}` | type response |
+| `/story/do` | POST | accepts `EdgeResolutionRequest` direct/find union; returns `RuntimeEnvelope` | done | — |
 | `/story/update` | GET | returns `RuntimeEnvelope` typed | partial | type response |
 | `/story/info` | GET | accepts `kind?`, `kinds?`, and `query?` params (JSON-encoded descriptor); returns `ProjectedState` | done | add bundle-specific providers |
 | `/system/info` | GET | public; rate-limited | done | — |
@@ -187,7 +187,7 @@ graduations and as the regression suite for cross-port parity.
 | `engine/contrib/conformance/time_parity.py` | §5.2 time parity | initial | covers JSON-readable media/roll fallbacks; browser skip timing remains later |
 | `engine/contrib/conformance/test_conformance.py` | pytest harness binding fixtures + ports | not_started | wire into CI |
 | `engine/contrib/conformance/fixtures/*.json` | canonical envelopes per surface | partial (Tier S + current P1 fixtures) | keep promoting proposal fixtures as implementation lands |
-| `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment, and one UUID-shaped v1.5 wireframe interpretation sample; CLI/Tk can inspect them without promotion |
+| `engine/contrib/conformance/proposals/*.json` | forward-compatible proposal envelopes | partial | current set covers carwars garage, piece realization, place accepts, record KvRow, roll fragment, and one UUID-shaped v1.5 wireframe UX-event sample; CLI/Tk can inspect them without promotion |
 | `engine/contrib/conformance/diagnostics/*.json` | backend-emitted service payloads | initial | non-gating proof that `ServiceManager` can emit widget-shaped `RuntimeEnvelope` and `ProjectedState`; promote only after ports/harness agree |
 | webapp Vitest conformance suite | webapp DOM matches expected for each fixture | not_started | written from fixtures; webapp regression mechanism |
 
@@ -198,6 +198,23 @@ graduations and as the regression suite for cross-port parity.
 A short log of what changed across recent spec / UI / engine releases.
 Each entry names which layer moved and what the consequence is for the
 others.
+
+### 2026-06 — spec v1.6 edge resolution and UX events
+
+- Required UUID `edge_id` on every `ChoiceFragment`. **Impact:** malformed
+  action fragments fail at the contract boundary instead of disappearing from
+  client choice caches.
+- Split action submission into typed direct-edge and exploratory `find_edge`
+  requests. **Impact:** command bars no longer masquerade as synthetic journal
+  choices, while ordinary choice payloads remain unchanged.
+- Added typed `RuntimeEnvelope.ux_events` with inline/interrupt presentation
+  and explicit replay policy. **Impact:** command guidance, validation
+  failures, and shell notices no longer pollute journal playback.
+- Retired `RawCommandAccepts`, `InterpretationFragment`, and
+  `UserEventFragment`. **Impact:** one narrative fragment stream remains, with
+  transient UX direction carried beside it.
+- Updated web, CLI, Tk/reference planning, REST, remote-client hydration, and
+  conformance fixtures to the same request and response shapes.
 
 ### 2026-06 — backend fragment-contract audit (L2/L3 update)
 
@@ -278,10 +295,8 @@ others.
 
 ### 2026-05 — webapp v1.5 reference UI reconciliation
 
-- Reference webapp renders `InterpretationFragment` with the spec's
-  `result`, `text`, `message`, `blocked_reason`, `hint`, and `candidates`
-  fields. **Impact:** command-resolution feedback no longer falls through
-  to the unknown-fragment fallback.
+- Reference webapp rendered the v1.5 `InterpretationFragment`; v1.6 supersedes
+  that implementation with input-adjacent `UxEvent` rendering.
 - Reference webapp renders typed `blockers[]` and plural
   `cost_previews[]` as choice decision details. **Impact:** locked choices
   expose more of the decision-legibility contract in the current shell.
@@ -293,9 +308,9 @@ others.
   sends explicit dirty-kind metadata. The tests cover both default status and
   selected affordance kinds.
 - Reference CLI/Tk ports render or inspect blockers, cost previews, typed
-  accepts prompts, and v1.5 interpretation fields. **Impact:** new client
-  ports can compare against portable JSON fixtures and proposal fixtures
-  instead of copying the Vue shell.
+  accepts prompts, and v1.6 UX events. **Impact:** new client ports can compare
+  against portable JSON fixtures and proposal fixtures instead of copying the
+  Vue shell.
 
 ### 2026-05 — engine current (L3 baseline)
 
@@ -340,15 +355,16 @@ This is the **inversion plan** the project committed to: UI leads,
 API + engine chase. Each step's deliverable is a single PR-shaped
 change to the named layer.
 
-**Phase 1 — Stabilize spec (current).**
+**Phase 1 — Stabilize spec.**
 
 - ✅ Spec v1.5 with the v1.4 genre-audit additions reconciled to repo state.
+- ✅ Spec v1.6 direct/find-edge requests and non-journal UX events.
 - ✅ EXTENSIONS.md swept to `pieces`.
 - ✅ Tier P3 extension docs imported and vetted for current demo genres.
 - ✅ This reconciliation doc as the three-layer spine.
 
-**Phase 2 — Reference UI catches up.** Wireframes and webapp align
-to v1.5.
+**Phase 2 — Reference UI catches up.** Wireframes remain v1.5 visual
+references; webapp behavior aligns to v1.6.
 
 - ✅ Wireframes resync: v1.5 bundle is archived under
   `docs/src/design/story/wireframes/v1_5/`, with v1.2/v1.3 treated as
@@ -358,8 +374,8 @@ to v1.5.
   keeping contract conformance and genre flavor separable.
 - Webapp PR sequence:
   1. ✅ `compose` accepts rendering as nested ChoiceInputView.
-  2. ✅ `InterpretationFragment` renderer with the spec's `result` /
-     `text` field names.
+  2. ✅ Command bar submits typed `find_edge` requests and renders inline
+     `UxEvent` feedback.
   3. ✅ `metadata.info_state` behavior pass: use nested `dirty_kinds` /
      `available_kinds` as cache hints once the backend emits them.
   4. Keep `info_affordances` opaque; clients pass `query` descriptors through
@@ -370,7 +386,7 @@ API maps them.
 
 - Engine PR sequence:
   1. Typed `Blocker` model in `tangl/journal/intent.py`.
-  2. Typed `InterpretationFragment` with `result` / `text` fields.
+  2. ✅ Typed direct/find `EdgeResolutionRequest` and `UxEvent`.
   3. Typed `metadata.grammar` model.
   4. HTTP API: type responses on `/story/do` / `/story/update`.
   5. Conformance harness: ✅ initial `legibility.py`; ✅ initial
@@ -389,4 +405,4 @@ not pre-build these.
 
 ---
 
-*End of v0.2.*
+*End of v0.3.*

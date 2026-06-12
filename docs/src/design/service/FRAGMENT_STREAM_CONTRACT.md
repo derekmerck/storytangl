@@ -82,15 +82,13 @@ extension types preserve the same `BaseFragment` shape.
 | `piece` | Targetable piece or object rendered inside a zone. |
 | `kv` | Ordered key-value content for compact state/status surfaces. |
 | `update` / `delete` | Control fragments mutating an earlier registry entry. |
-| `user_event` | User-facing notification or client hint. |
 
 Unknown fragment types are valid extension points. A client that cannot render a
 fragment type must keep the stream alive and show or stash a diagnostic fallback
 rather than failing the whole turn.
 
-Near-term command work may also introduce `interpretation`, a renderable
-feedback fragment for raw command attempts that do not advance the cursor. A
-client without a dedicated renderer may present its message as ordinary content.
+Transient guidance is not a journal fragment. `RuntimeEnvelope.ux_events`
+carries typed inline or interrupt events beside the replayable fragment stream.
 
 ## Choice Fragments
 
@@ -98,7 +96,7 @@ Choices are interaction offers, not generic display buttons.
 
 `ChoiceFragment` carries:
 
-- `edge_id`: the action id to send back to `resolve_choice`
+- `edge_id`: required UUID of the action to send back to `resolve_choice`
 - `text`: user-facing label
 - `available`: whether the action can currently be committed
 - `unavailable_reason`: short human-readable or code-like reason
@@ -122,10 +120,9 @@ Canonical near-term variants:
 | `accepts.kind` | Payload | Meaning |
 | --- | --- | --- |
 | absent or `pick` | `{}` or omitted | The edge id is the whole answer. |
-| `text` | `{text: string}` | Freeform line such as a name, password, note, or command. |
+| `text` | `{text: string}` | Freeform line such as a name, password, or note. |
 | `quantity` | `{quantity: int}` | Integer amount with optional min/max/unit/cost hints. |
 | `pieces` | `{piece_ids: string[]}` | Selection from a visible target zone. |
-| `raw_command` | `{text: string}` | Text submitted to a reserved interpretation edge. |
 
 `compose` may combine these later using role-keyed subpayloads. It should not be
 the first implementation target.
@@ -170,21 +167,35 @@ reachable in the current shell.
 Natural-language command input is backend-authoritative. The client may offer
 affordances, but the backend resolves and validates.
 
-The portable shape is:
+Clients submit one of two typed request shapes:
 
 ```text
-choice:
-  edge_id: interpret_command
-  accepts: {kind: raw_command}
+direct:
+  edge_id: <UUID>
+  payload: <optional choice payload>
 
-commit:
-  choice_id: interpret_command
-  payload: {text: "take lamp"}
+command:
+  find_edge:
+    kind: command
+    command: "take lamp"
+  payload: <optional payload>
 ```
 
-The backend either returns a `RuntimeEnvelope` with an advanced cursor or
-returns the same cursor with a renderable explanation, such as an
-`interpretation` fragment.
+Direct requests execute the selected `ChoiceFragment.edge_id`. Find requests
+ask story policy to match a current action and resolve it atomically in the
+same service session.
+
+An unmatched, ambiguous, or rejected command returns the current cursor and
+step, no new journal fragments, and a typed event:
+
+```text
+ux_events:
+  - event_type: edge_not_found
+    message: "I couldn't match that command."
+    presentation: inline
+    replay: false
+    severity: warning
+```
 
 Advisory grammar hints may help capable clients preview a command, highlight
 pieces, or show completions. Until there is a dedicated envelope field, such
@@ -202,8 +213,22 @@ metadata:
     nouns: ["lamp", "door"]
 ```
 
-Clients may ignore these hints and still submit `{text}` to
-`interpret_command`.
+Clients may ignore these hints and still submit a typed `find_edge` request.
+
+## UX Events
+
+`RuntimeEnvelope.ux_events` is a typed, non-journal side channel:
+
+- `event_id`: stable UUID within the response stream
+- `event_type`: machine-readable event name
+- `message`: required human-readable fallback
+- `presentation`: `inline` or `interrupt`
+- `replay`: whether a client may retain the event during envelope playback
+- `severity`: `info`, `success`, `warning`, or `error`
+- `details`: optional JSON-safe structured context
+
+UX events never participate in the fragment registry and never become journal
+entries. Unknown event types still render through `message`.
 
 ## Decision Legibility
 
@@ -217,12 +242,9 @@ fixtures and future richer interaction widgets.
 
 ## Compatibility Policy
 
-Legacy `JournalStoryUpdate[]` payloads may be adapted at application boundaries
-while old mocks or transports are retired. New tests, fixtures, and widgets must
-target `RuntimeEnvelope.fragments` directly.
-
-A compatibility adapter should be narrow, local, and removable. It should never
-convert canonical fragments back into a unified legacy block shape.
+Clients consume `RuntimeEnvelope` directly. Legacy `JournalStoryUpdate[]`
+conversion is retired; unknown fragment types remain forward-compatible through
+visible fallback rendering.
 
 ## Test Contract
 
@@ -235,12 +257,12 @@ Required fixture behaviors:
 - a realistic `ProjectedState`
 - locked choices with blockers
 - freeform, quantity, and piece payload contracts
-- raw-command payload contracts through reserved interpretation choices
+- typed direct-edge and find-edge request contracts
 - group flattening and dialog grouping
 - unknown fragment fallback
 - pending media placeholders
 - control update/delete
-- user events
+- inline and interrupt UX events with replay policy
 - decision legibility checks for references from open choices
 - CLI-equivalent payload collection examples for every `accepts.kind`
 

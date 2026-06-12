@@ -30,6 +30,7 @@ from .exceptions import (
     ValidationError,
 )
 from .response import (
+    EdgeResolutionRequest,
     JsonValue,
     ProjectedState,
     RuntimeEnvelope,
@@ -37,6 +38,7 @@ from .response import (
     SystemInfo,
     UserInfo,
     UserSecret,
+    UxEvent,
     WorldInfo,
 )
 from .service_manager import ServiceManager, ServiceSession
@@ -243,10 +245,18 @@ class RemoteServiceManager(ServiceManager):
             raise ServiceError("Remote service returned runtime envelope without fragment list")
 
         fragments = [self._decode_fragment(fragment) for fragment in raw_fragments]
+        raw_ux_events = payload.get("ux_events") or []
+        if not isinstance(raw_ux_events, list):
+            raise ServiceError("Remote service returned invalid runtime UX event list")
+        ux_events = [
+            self._decode_model(UxEvent, event, label="runtime UX event")
+            for event in raw_ux_events
+        ]
         envelope_payload = {
             "cursor_id": payload.get("cursor_id"),
             "step": payload.get("step"),
             "fragments": fragments,
+            "ux_events": ux_events,
             "last_redirect": payload.get("last_redirect"),
             "redirect_trace": payload.get("redirect_trace") or [],
             "metadata": dict(payload.get("metadata") or {}),
@@ -392,11 +402,10 @@ class RemoteServiceManager(ServiceManager):
     def resolve_choice(
         self,
         *,
-        edge_id: UUID,
+        request: EdgeResolutionRequest,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: UserAuthInfo | None = None,
-        choice_payload: Any = None,
     ) -> RuntimeEnvelope:
         self._validate_user_auth(user_id=user_id, user_auth=user_auth)
         self._check_bound_user(user_id)
@@ -405,7 +414,7 @@ class RemoteServiceManager(ServiceManager):
             "POST",
             "/story/do",
             auth_required=True,
-            json_body={"edge_id": str(edge_id), "payload": choice_payload},
+            json_body=request.model_dump(mode="json", exclude_none=True),
         )
         return self._decode_runtime_envelope(payload)
 

@@ -475,14 +475,14 @@ fragments: [
   { uid: "f-choice-leave", fragment_type: "choice",
     edge_id: "e-leave", text: "Hit the road.",
     accepts: { kind: "pick" },
-    ui_hints: { hotkey: "4" } },
-
-  { uid: "f-interpret-command", fragment_type: "choice",
-    edge_id: "interpret_command", text: "Try a command.",
-    accepts: { kind: "raw_command" },
-    ui_hints: { hotkey: ">" } }
+    ui_hints: { hotkey: "4" } }
 ]
 ```
+
+The optional command bar is shell-level. Grammar hints may advertise garage
+verbs and visible nouns; submission uses
+`{find_edge: {kind: "command", command: "mount the vulcan"}}`. A failed match
+returns an inline `UxEvent` and does not enter the garage journal.
 
 ### Projected state — the ledger
 

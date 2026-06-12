@@ -32,8 +32,9 @@ only; they are not deployed app/docs assets.
   `cursor_id` and fragment `uid` values, so promote wireframe examples into
   `engine/contrib/conformance/` only after translating ids and preserving
   reference links.
-- One example has been translated as a non-gating proposal fixture:
-  `engine/contrib/conformance/proposals/wireframe_v15_interpretation_samples.json`.
+- One command-feedback example has been translated to the current envelope
+  event contract as a non-gating proposal fixture:
+  `engine/contrib/conformance/proposals/wireframe_v15_ux_event_samples.json`.
 
 The previous v1.3 bundle remains archived under
 `docs/src/design/story/wireframes/v1_3/`.

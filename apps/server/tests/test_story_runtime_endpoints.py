@@ -388,6 +388,49 @@ def test_story_update_preserves_choice_fragment_uid_and_edge_id(
     assert resolved.status_code == 200
 
 
+def test_story_do_accepts_find_edge_command_requests(
+    story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, headers, world_label = story_client
+
+    create = client.post(
+        "story/story/create",
+        params={"world_id": world_label, "init_mode": "EAGER"},
+        headers=headers,
+    )
+    assert create.status_code == 200
+    created = create.json()
+
+    unknown = client.post(
+        "story/do",
+        json={
+            "find_edge": {
+                "kind": "command",
+                "command": "dance sideways",
+            }
+        },
+        headers=headers,
+    )
+    assert unknown.status_code == 200
+    unknown_payload = unknown.json()
+    assert unknown_payload["step"] == created["step"]
+    assert unknown_payload["fragments"] == []
+    assert unknown_payload["ux_events"][0]["event_type"] == "edge_not_found"
+
+    resolved = client.post(
+        "story/do",
+        json={
+            "find_edge": {
+                "kind": "command",
+                "command": "continue",
+            }
+        },
+        headers=headers,
+    )
+    assert resolved.status_code == 200
+    assert resolved.json()["step"] > created["step"]
+
+
 def test_story_update_preserves_choice_payload_contracts(
     payload_story_client: tuple[TestClient, dict[str, str], str],
 ) -> None:

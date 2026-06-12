@@ -8,7 +8,6 @@ import { isRecord } from './fragmentUtils'
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
-  metadata?: Record<string, unknown>
   disabled?: boolean
 }>()
 
@@ -19,8 +18,8 @@ const emit = defineEmits<{
 const payloadValue = ref<unknown>(props.choice.payload)
 const payloadValid = ref(true)
 
-const choiceId = computed(() => props.choice.edge_id ?? props.choice.uid)
-const available = computed(() => props.choice.available !== false && props.choice.active !== false)
+const edgeId = computed(() => props.choice.edge_id)
+const available = computed(() => props.choice.available !== false)
 const busy = computed(() => props.disabled === true)
 const hotkey = computed(() => {
   const value = props.choice.ui_hints?.hotkey
@@ -101,7 +100,7 @@ const hasPayloadInput = computed(() => {
   const kind = 'kind' in accepts ? accepts.kind : undefined
   if (
     typeof kind === 'string' &&
-    ['text', 'quantity', 'pieces', 'place', 'compose', 'raw_command'].includes(kind)
+    ['text', 'quantity', 'pieces', 'place', 'compose'].includes(kind)
   ) {
     return true
   }
@@ -150,7 +149,7 @@ const handleClick = () => {
   if (!canCommit.value) {
     return
   }
-  emit('doAction', choiceId.value, payloadValue.value)
+  emit('doAction', edgeId.value, payloadValue.value)
 }
 </script>
 
@@ -177,7 +176,6 @@ const handleClick = () => {
         v-if="hasPayloadInput"
         :choice="choice"
         :fragments="fragments ?? {}"
-        :metadata="metadata"
         :disabled="!available || busy"
         @payload-change="handlePayloadChange"
         @commit="handleClick"

@@ -31,16 +31,18 @@ class PlainTerminalRenderer:
         *,
         fragments: list[Any],
         choices: list[Any],
+        ux_events: list[Any] | None = None,
         metadata: JsonMapping | None = None,
         title: str = "Story Update",
     ) -> list[Any]:
-        if not fragments:
+        if not fragments and not ux_events:
             return ["No journal entries available."]
 
         lines: list[Any] = [f"{title}:", "-------------------------"]
         for fragment in fragments:
             lines.extend(_plain_fragment_lines(fragment))
 
+        lines.extend(_plain_ux_event_lines(ux_events or []))
         lines.extend(self._choice_lines(choices))
         lines.extend(_plain_info_affordance_lines(metadata))
         return lines
@@ -52,6 +54,7 @@ class PlainTerminalRenderer:
         ledger_id: Any,
         fragments: list[Any],
         choices: list[Any],
+        ux_events: list[Any] | None = None,
         metadata: JsonMapping | None = None,
     ) -> list[Any]:
         lines: list[Any] = [f"\nCreated story: {title}"]
@@ -64,6 +67,7 @@ class PlainTerminalRenderer:
                 lines.extend(_plain_fragment_lines(fragment))
             lines.append("")
 
+        lines.extend(_plain_ux_event_lines(ux_events or []))
         if choices:
             lines.extend(self._choice_lines(choices, no_choices_text="(No choices available)"))
         else:
@@ -102,6 +106,7 @@ class PlainTerminalRenderer:
             title="Diagnostic Envelope",
             fragments=_diagnostic_fragments(),
             choices=_diagnostic_choices(),
+            ux_events=_diagnostic_ux_events(),
             metadata=_diagnostic_metadata(),
         )
         renderables.append("")
@@ -161,16 +166,18 @@ class RichTerminalRenderer(PlainTerminalRenderer):
         *,
         fragments: list[Any],
         choices: list[Any],
+        ux_events: list[Any] | None = None,
         metadata: JsonMapping | None = None,
         title: str = "Story Update",
     ) -> list[Any]:
-        if not fragments:
+        if not fragments and not ux_events:
             return [_rich_text("No journal entries available.", style="dim")]
 
         renderables: list[Any] = [_rich_rule(title)]
         for fragment in fragments:
             renderables.extend(_rich_fragment_renderables(fragment))
 
+        renderables.extend(_rich_ux_events(ux_events or []))
         renderables.append(_rich_choices(choices))
         renderables.extend(_rich_info_affordances(metadata))
         return renderables
@@ -182,6 +189,7 @@ class RichTerminalRenderer(PlainTerminalRenderer):
         ledger_id: Any,
         fragments: list[Any],
         choices: list[Any],
+        ux_events: list[Any] | None = None,
         metadata: JsonMapping | None = None,
     ) -> list[Any]:
         renderables: list[Any] = [_rich_text(f"Created story: {title}", style="bold")]
@@ -191,6 +199,7 @@ class RichTerminalRenderer(PlainTerminalRenderer):
             renderables.append(_rich_rule("Story Begins"))
             for fragment in fragments:
                 renderables.extend(_rich_fragment_renderables(fragment))
+        renderables.extend(_rich_ux_events(ux_events or []))
         renderables.append(_rich_choices(choices, no_choices_text="(No choices available)"))
         renderables.extend(_rich_info_affordances(metadata))
         renderables.append(_rich_text("Use 'do <number>' to make a choice.", style="dim"))
@@ -252,9 +261,6 @@ def _plain_fragment_lines(fragment: Any) -> list[str]:
         content = _read(fragment, "content")
         if isinstance(content, list):
             return _kv_lines(content)
-    if ftype == "user_event":
-        event_type = _read(fragment, "event_type") or "event"
-        return [f"* {event_type}: {_fragment_text(fragment)}"]
     if ftype == "piece":
         piece_id = _read(fragment, "piece_id")
         label = _fragment_text(fragment)
@@ -282,9 +288,6 @@ def _rich_fragment_renderables(fragment: Any) -> list[Any]:
         content = _read(fragment, "content")
         if isinstance(content, list):
             return [_rich_kv_table(content)]
-    if ftype == "user_event":
-        event_type = _read(fragment, "event_type") or "event"
-        return [_rich_text(f"‹ {event_type} › {_fragment_text(fragment)}", style="italic dim")]
     if ftype == "piece":
         piece_id = _read(fragment, "piece_id")
         label = _fragment_text(fragment)
@@ -416,6 +419,40 @@ def _plain_info_affordance_lines(metadata: JsonMapping | None) -> list[str]:
     return ["Info: " + " · ".join(labels)]
 
 
+def _plain_ux_event_lines(events: list[Any]) -> list[str]:
+    lines: list[str] = []
+    for event in events:
+        presentation = _read(event, "presentation", "inline")
+        event_type = _read(event, "event_type", "notice")
+        message = _read(event, "message", "")
+        prefix = "!" if presentation == "interrupt" else ">"
+        lines.append(f"{prefix} {event_type}: {message}")
+    return lines
+
+
+def _rich_ux_events(events: list[Any]) -> list[Any]:
+    styles = {
+        "info": "cyan",
+        "success": "green",
+        "warning": "yellow",
+        "error": "bold red",
+    }
+    renderables: list[Any] = []
+    for event in events:
+        event_type = _read(event, "event_type", "notice")
+        message = _read(event, "message", "")
+        severity = _read(event, "severity", "info")
+        presentation = _read(event, "presentation", "inline")
+        marker = "!" if presentation == "interrupt" else ">"
+        renderables.append(
+            _rich_text(
+                f"{marker} {event_type}: {message}",
+                style=styles.get(str(severity), "cyan"),
+            )
+        )
+    return renderables
+
+
 def _diagnostic_fragments() -> list[JsonMapping]:
     return [
         {
@@ -443,24 +480,38 @@ def _diagnostic_fragments() -> list[JsonMapping]:
             ],
         },
         {
-            "fragment_type": "user_event",
-            "event_type": "shift_bell",
-            "content": "Ten minutes remain in the shift.",
-        },
-        {
             "fragment_type": "mystery_widget",
             "content": "Unknown fragments remain visible as fallback text.",
         },
     ]
 
 
+def _diagnostic_ux_events() -> list[JsonMapping]:
+    return [
+        {
+            "event_type": "shift_bell",
+            "message": "Ten minutes remain in the shift.",
+            "presentation": "interrupt",
+            "replay": False,
+            "severity": "warning",
+        },
+        {
+            "event_type": "edge_not_found",
+            "message": "I couldn't match 'wave permit' to an available action.",
+            "presentation": "inline",
+            "replay": False,
+            "severity": "warning",
+        },
+    ]
+
+
 def _diagnostic_choices() -> list[JsonMapping]:
     return [
-        {"label": "Verify ID against registry", "active": True},
-        {"label": "Deny passage", "active": True},
+        {"label": "Verify ID against registry", "available": True},
+        {"label": "Deny passage", "available": True},
         {
             "label": "Allow passage",
-            "active": False,
+            "available": False,
             "unavailable_reason": "Permit expired",
         },
     ]
@@ -663,8 +714,8 @@ def _choice_input_hint(choice: Any) -> str:
         maximum = accepts.get("max", 1)
         count = str(minimum) if minimum == maximum else f"{minimum}-{maximum}"
         return f"<piece ids: {count}>"
-    if kind in {"text", "raw_command"}:
-        return f"<{str(kind).replace('_', ' ')}>"
+    if kind == "text":
+        return "<text>"
     if kind not in {None, "pick"}:
         return f"<{kind}: --payload JSON>"
     return ""

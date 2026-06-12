@@ -2,8 +2,16 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
+from pydantic import TypeAdapter, ValidationError
+
 from tangl.journal.fragments import ChoiceFragment, ContentFragment
-from tangl.service.response import RuntimeEnvelope
+from tangl.service.response import (
+    CommandEdgeQuery,
+    EdgeResolutionRequest,
+    RuntimeEnvelope,
+    UxEvent,
+)
 
 
 class ExtendedRuntimeEnvelope(RuntimeEnvelope):
@@ -80,3 +88,47 @@ def test_runtime_envelope_to_dto_preserves_public_envelope_fields() -> None:
 
     assert payload["step"] == 0
     assert payload["diagnostic_id"] == "trace-7"
+
+
+def test_runtime_envelope_to_dto_keeps_ux_events_outside_journal_fragments() -> None:
+    envelope = RuntimeEnvelope(
+        fragments=[ContentFragment(content="Start")],
+        ux_events=[
+            UxEvent(
+                event_type="edge_not_found",
+                message="I couldn't match that command.",
+                presentation="inline",
+                replay=False,
+                severity="warning",
+            )
+        ],
+    )
+
+    payload = envelope.to_dto()
+
+    assert len(payload["fragments"]) == 1
+    assert payload["ux_events"][0]["event_type"] == "edge_not_found"
+    assert payload["ux_events"][0]["presentation"] == "inline"
+    assert payload["ux_events"][0]["replay"] is False
+
+
+def test_command_edge_query_normalizes_and_requires_nonblank_text() -> None:
+    assert CommandEdgeQuery(command="  Continue  ").command == "Continue"
+
+    with pytest.raises(ValidationError):
+        CommandEdgeQuery(command="   ")
+
+
+def test_edge_resolution_request_shapes_are_mutually_exclusive() -> None:
+    adapter = TypeAdapter(EdgeResolutionRequest)
+
+    with pytest.raises(ValidationError):
+        adapter.validate_python(
+            {
+                "edge_id": str(uuid4()),
+                "find_edge": {
+                    "kind": "command",
+                    "command": "continue",
+                },
+            }
+        )

@@ -108,7 +108,14 @@ from .analysis import (
     to_dot,
 )
 from .story_graph import StoryGraph
-from .dispatch import on_compose_journal, on_gather_ns, on_journal, story_dispatch
+from .dispatch import (
+    do_find_edges,
+    on_compose_journal,
+    on_find_edges,
+    on_gather_ns,
+    on_journal,
+    story_dispatch,
+)
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 
 # Register story-level journal handlers.
@@ -155,6 +162,7 @@ __all__ = [
     "build_script_report",
     "collapse_linear_chains",
     "cluster_by_scene",
+    "do_find_edges",
     "episode_only_selector",
     "episode_plus_concepts_selector",
     "focus_runtime_window",
@@ -162,6 +170,7 @@ __all__ = [
     "mark_node_styles",
     "mark_runtime_styles",
     "on_compose_journal",
+    "on_find_edges",
     "on_gather_ns",
     "on_journal",
     "project_story_graph",

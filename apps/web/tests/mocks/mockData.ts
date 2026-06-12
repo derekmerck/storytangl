@@ -1,8 +1,4 @@
-import type {
-  JournalAction,
-  WorldInfo,
-  WorldList,
-} from '@/types'
+import type { WorldInfo, WorldList } from '@/types'
 
 export const mockWorldList: WorldList = [
   { key: 'tangl_world', value: 'Tangl World' },
@@ -24,17 +20,6 @@ export const mockWorldInfo: WorldInfo = {
     },
   ],
 }
-
-export const mockActions: JournalAction[] = [
-  {
-    uid: 'mock-action-1',
-    text: 'Take the left path',
-  },
-  {
-    uid: 'mock-action-2',
-    text: 'Take the right path',
-  },
-]
 
 export const mockUserSecretResponse = {
   secret: 'dev-secret-123',
