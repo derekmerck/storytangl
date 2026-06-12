@@ -1,0 +1,11 @@
+  ╭───────────────────────────────────────────────────────────╮
+  │                                                           │
+{version_line}
+  │   ─────────────────────────────────────────────────       │
+  │   a research platform for graph-based                     │
+  │   computational narratology                               │
+  │                                                           │
+  │   type  help  for commands  ·  play <world>  to begin     │
+  │                            ·  ^d  to exit                 │
+  │                                                           │
+  ╰───────────────────────────────────────────────────────────╯

@@ -1,0 +1,109 @@
+{
+  "sections": [
+    {
+      "section_id": "session",
+      "title": "Session",
+      "kind": "stats",
+      "value": {
+        "value_type": "kv_list",
+        "items": [
+          {
+            "key": "Cursor",
+            "value": "start"
+          },
+          {
+            "key": "Step",
+            "value": 1
+          }
+        ]
+      }
+    },
+    {
+      "section_id": "supplies",
+      "title": "Supplies",
+      "kind": "resource",
+      "value": {
+        "value_type": "kv_list",
+        "items": [
+          {
+            "key": "Rations",
+            "value": 2,
+            "max": 6,
+            "hint": "bar"
+          },
+          {
+            "key": "Coin",
+            "value": 14,
+            "unit": "silver"
+          }
+        ]
+      }
+    },
+    {
+      "section_id": "inventory",
+      "title": "Inventory",
+      "kind": "inventory",
+      "value": {
+        "value_type": "item_list",
+        "items": [
+          {
+            "label": "Lantern",
+            "detail": "half-oil",
+            "tags": [
+              "light"
+            ]
+          },
+          {
+            "label": "Road map",
+            "tags": [
+              "route"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "section_id": "watch",
+      "title": "Watch",
+      "kind": "roster",
+      "value": {
+        "value_type": "table",
+        "columns": [
+          "Name",
+          "Role"
+        ],
+        "rows": [
+          [
+            "Mira",
+            "Scout"
+          ],
+          [
+            "Tovin",
+            "Guard"
+          ]
+        ]
+      }
+    },
+    {
+      "section_id": "conditions",
+      "title": "Conditions",
+      "kind": "tags",
+      "value": {
+        "value_type": "badges",
+        "items": [
+          "rain",
+          "night"
+        ]
+      }
+    },
+    {
+      "section_id": "danger",
+      "title": "Danger",
+      "kind": "status",
+      "value": {
+        "value_type": "scalar",
+        "value": "low"
+      }
+    }
+  ]
+}

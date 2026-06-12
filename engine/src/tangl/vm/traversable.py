@@ -44,6 +44,7 @@ from tangl.core import Edge, Graph, HierarchicalNode, Node, Selector
 from tangl.core.bases import BaseModelPlus, HasState
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.type_hints import StringMap
+from .ctx import VmPhaseCtx
 from .resolution_phase import ResolutionPhase
 
 
@@ -51,6 +52,8 @@ __all__ = [
     "TraversableEffect",
     "HasAvailability",
     "HasEffects",
+    "ContainerEntryRule",
+    "HasContainerEntryProjection",
     "TraversableNode",
     "TraversableEdge",
     "AnonymousEdge",
@@ -243,6 +246,65 @@ class HasEffects(BaseModelPlus):
             effect.apply(target_ns, rand=resolved_rand)
         self._sync_target_locals(other, target_ns)
         return target_ns
+
+
+class ContainerEntryRule(BaseModelPlus):
+    """Ordered conditional entry target for a re-entrant container."""
+
+    target_id: UUID
+    """Container member to enter when this rule matches."""
+
+    availability: list[Predicate] = Field(default_factory=list)
+    """Predicates evaluated against the container namespace."""
+
+    label: str | None = None
+    """Optional diagnostic label for authoring and tests."""
+
+    def available_for(
+        self,
+        container: TraversableNode,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> bool:
+        """Return whether this rule matches the current container context."""
+        if not self.availability:
+            return True
+        if ctx is None:
+            return False
+        ns = ctx.get_ns(container)
+        rand = _resolve_rand(rand=None, ctx=ctx)
+        return all(
+            predicate.satisfied_by(ns, rand=rand)
+            for predicate in self.availability
+        )
+
+
+class HasContainerEntryProjection(BaseModelPlus):
+    """Opt-in re-entry policy for traversable containers.
+
+    This mixin carries continuation state so plain ``TraversableNode`` instances
+    do not grow re-entry fields they do not use. Classes that need resumable
+    container behavior should inherit it before ``TraversableNode`` so this
+    ``resolve_entry`` method wins in the MRO.
+    """
+
+    resume_id: Optional[UUID] = None
+    """Remembered continuation target inside the container."""
+
+    entry_rules: list[ContainerEntryRule] = Field(default_factory=list)
+    """Ordered conditional entry rules evaluated when no resume target exists."""
+
+    def resolve_entry(self, *, ctx: VmPhaseCtx | None = None) -> TraversableNode:
+        """Resolve the active entry target for this container."""
+        if self.resume_id is not None:
+            return self._resolve_entry_target(self.resume_id, field_name="resume_id")
+
+        for rule in self.entry_rules:
+            if rule.available_for(self, ctx=ctx):
+                label = rule.label or "entry_rules"
+                return self._resolve_entry_target(rule.target_id, field_name=label)
+
+        return super().resolve_entry(ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -508,25 +570,95 @@ class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
         """
         return self.source_id is not None
 
-    def enter(self) -> AnonymousEdge:
-        """Produce the descent edge from this container to its source member.
+    def _resolve_entry_target(
+        self,
+        target_id: UUID,
+        *,
+        field_name: str,
+    ) -> TraversableNode:
+        """Resolve and validate a container entry target."""
+        target = self.graph.get(target_id)
+        if target is None:
+            raise RuntimeError(
+                f"{self!r} {field_name}={target_id} not found in graph"
+            )
+        if not isinstance(target, TraversableNode):
+            raise TypeError(
+                f"{self!r} {field_name}={target_id} resolved to non-traversable "
+                f"{type(target)!r}"
+            )
+        if not self.has_member(target):
+            raise ValueError(
+                f"{self!r} {field_name} target {target!r} is not a member/child "
+                "of container"
+            )
+        return target
+
+    def resolve_entry(self, *, ctx: VmPhaseCtx | None = None) -> TraversableNode:
+        """Resolve the active entry target for this container.
+
+        Plain containers always enter through ``source_id``. Re-entrant
+        containers opt into richer policy by overriding this method, usually
+        through :class:`HasContainerEntryProjection`.
+        """
+        if not self.is_container:
+            raise ValueError(f"{self!r} is not a container (source_id is None)")
+        if self.source_id is None:
+            raise RuntimeError(f"{self!r} source_id is missing")
+        return self._resolve_entry_target(self.source_id, field_name="source_id")
+
+    def enterable(
+        self,
+        *,
+        ctx: VmPhaseCtx | None = None,
+        ns: Mapping[str, Any] | None = None,
+    ) -> bool:
+        """Return whether this container's active entry is currently available."""
+        if not self.is_container:
+            return self.available(ns=ns, ctx=ctx)
+
+        explicit_ns = ns
+        container_ns = explicit_ns
+        if container_ns is None and ctx is not None:
+            container_ns = ctx.get_ns(self)
+        container_rand = _resolve_rand(rand=None, ctx=ctx)
+        if not HasAvailability.available(
+            self,
+            ns=container_ns,
+            ctx=ctx,
+            rand=container_rand,
+        ):
+            return False
+
+        target = self.resolve_entry(ctx=ctx)
+        target_ctx = ctx.derive(cursor_id=target.uid) if ctx is not None else None
+        target_ns = explicit_ns
+        if target_ns is None and target_ctx is not None:
+            target_ns = target_ctx.get_ns(target)
+        if target.is_container:
+            return target.enterable(ctx=target_ctx, ns=explicit_ns)
+        target_rand = _resolve_rand(rand=None, ctx=target_ctx)
+        return target.available(ns=target_ns, ctx=target_ctx, rand=target_rand)
+
+    def enter(self, *, ctx: VmPhaseCtx | None = None) -> AnonymousEdge:
+        """Produce the descent edge from this container to its active entry.
 
         Called by the system-level prereq handler when the cursor arrives at a
-        container.  The returned edge, when followed by the frame, moves the
-        cursor to the source and runs the full pipeline — which may itself
-        trigger further descent if the source is also a container.
+        container. The returned edge, when followed by the frame, moves the
+        cursor to the resolved entry and runs the full pipeline — which may
+        itself trigger further descent if the entry is also a container.
 
         Raises
         ------
         ValueError
             If this node is not a container (``source_id is None``).
         RuntimeError
-            If the source member cannot be resolved from the graph.
+            If the entry member cannot be resolved from the graph.
 
         Returns
         -------
         AnonymousEdge
-            A lightweight edge from ``self`` to ``self.source``.
+            A lightweight edge from ``self`` to the active entry target.
 
         >>> from tangl.core import Graph
         >>> g = Graph()
@@ -539,14 +671,7 @@ class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
         >>> assert edge.predecessor is scene
         >>> assert edge.entry_phase is None
         """
-        if not self.is_container:
-            raise ValueError(f"{self!r} is not a container (source_id is None)")
-        source = self.source
-        if source is None:
-            raise RuntimeError(
-                f"{self!r} source_id={self.source_id} not found in graph"
-            )
-        return AnonymousEdge(predecessor=self, successor=source)
+        return AnonymousEdge(predecessor=self, successor=self.resolve_entry(ctx=ctx))
 
     def has_forward_progress(
         self,
@@ -759,6 +884,9 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
         if successor_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             successor_ns = ctx.get_ns(successor)
 
+        if isinstance(successor, TraversableNode) and successor.is_container:
+            return successor.enterable(ctx=ctx, ns=ns)
+
         if not hasattr(successor, "available"):
             return True
         return successor.available(ns=successor_ns, ctx=ctx, rand=rand)
@@ -861,8 +989,14 @@ class AnonymousEdge:
         if self.successor is None:
             return False
         rand = _resolve_rand(rand=None, ctx=ctx)
+        explicit_ns = ns
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(self.successor)
+        if (
+            isinstance(self.successor, TraversableNode)
+            and self.successor.is_container
+        ):
+            return self.successor.enterable(ctx=ctx, ns=explicit_ns)
         if not hasattr(self.successor, "available"):
             return True
         return self.successor.available(ns=ns, ctx=ctx, rand=rand)
@@ -896,6 +1030,8 @@ def validate_traversal_contracts(graph: Graph) -> list[str]:
     - ``source_id`` resolves but is not a child/member of the container.
     - ``sink_id`` is set but does not resolve in the graph.
     - ``sink_id`` resolves but is not a child/member of the container.
+    - resumable entry targets resolve to members when their owning container
+      opts into :class:`HasContainerEntryProjection`.
 
     Returns
     -------
@@ -930,6 +1066,30 @@ def validate_traversal_contracts(graph: Graph) -> list[str]:
                 )
             if node.source_id is None:
                 issues.append(f"{node!r}: sink_id is set but source_id is missing")
+
+        if isinstance(node, HasContainerEntryProjection):
+            entry_targets: list[tuple[str, UUID]] = []
+            if node.resume_id is not None:
+                entry_targets.append(("resume_id", node.resume_id))
+            for index, rule in enumerate(node.entry_rules):
+                label = rule.label or f"entry_rules[{index}]"
+                entry_targets.append((label, rule.target_id))
+            for label, target_id in entry_targets:
+                target = graph.get(target_id)
+                if target is None:
+                    issues.append(
+                        f"{node!r}: {label}={target_id} does not resolve in graph"
+                    )
+                elif not isinstance(target, TraversableNode):
+                    issues.append(
+                        f"{node!r}: {label}={target_id} does not resolve to a "
+                        "TraversableNode"
+                    )
+                elif not node.has_member(target):
+                    issues.append(
+                        f"{node!r}: {label} target {target!r} is not a "
+                        "member/child of container"
+                    )
 
     return issues
 

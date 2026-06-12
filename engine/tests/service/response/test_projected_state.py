@@ -5,13 +5,16 @@ import pytest
 from tangl.journal.fragments import PresentationHints
 from tangl.service.response import (
     BadgeListValue,
+    InfoAffordance,
+    InfoState,
     ItemListValue,
     KvListValue,
     ProjectedItem,
-    ProjectedKVItem,
+    KvRow,
     ProjectedSection,
     ProjectedState,
     ScalarValue,
+    StoryInfoRequest,
     TableValue,
 )
 
@@ -25,8 +28,8 @@ def _fixture() -> ProjectedState:
                 kind="stats",
                 value=KvListValue(
                     items=[
-                        ProjectedKVItem(key="Health", value=9),
-                        ProjectedKVItem(key="Gold", value=14),
+                        KvRow(key="Health", value=9),
+                        KvRow(key="Gold", value=14),
                     ]
                 ),
             ),
@@ -98,6 +101,19 @@ def test_projected_state_round_trips_through_model_dump_and_validate() -> None:
     assert restored == state
 
 
+def test_projected_state_to_dto_preserves_value_discriminators() -> None:
+    state = _fixture()
+
+    payload = state.to_dto()
+    restored = ProjectedState.model_validate(payload)
+
+    assert payload["sections"][0]["value"]["value_type"] == "kv_list"
+    assert payload["sections"][1]["hints"]["style_name"] == "sidebar"
+    assert payload["sections"][2]["value"]["value_type"] == "table"
+    assert payload["sections"][4]["value"]["value_type"] == "scalar"
+    assert restored == state
+
+
 def test_projected_state_preserves_section_order() -> None:
     state = _fixture()
 
@@ -140,3 +156,44 @@ def test_table_value_rejects_rows_with_wrong_width() -> None:
             columns=["Quest", "Status"],
             rows=[["Find the key", "active"], ["locked"]],
         )
+
+
+def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
+    affordance = InfoAffordance(
+        kind="map",
+        label="Map",
+        shortcuts=["m"],
+        query={"type": "map", "scope": "known"},
+    )
+    state = InfoState(
+        version=7,
+        dirty_kinds=["map"],
+        available_kinds=["map", "inventory"],
+    )
+
+    assert affordance.model_dump(mode="python") == {
+        "kind": "map",
+        "label": "Map",
+        "shortcuts": ["m"],
+        "query": {"type": "map", "scope": "known"},
+    }
+    assert state.model_dump(mode="python") == {
+        "version": 7,
+        "dirty_kinds": ["map"],
+        "available_kinds": ["map", "inventory"],
+    }
+
+
+def test_story_info_request_gathers_explicit_and_opaque_query_kinds() -> None:
+    request = StoryInfoRequest(
+        kind="status",
+        kinds=["inventory"],
+        query={"kinds": ["location", "presence"], "type": "map"},
+    )
+
+    assert request.requested_kinds() == [
+        "status",
+        "inventory",
+        "location",
+        "presence",
+    ]

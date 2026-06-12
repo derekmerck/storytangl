@@ -4,6 +4,16 @@
 **Status:** ACTIVE DESIGN — `vm.provision.Fanout` and `MenuBlock` planning-time action projection are implemented; refresh policy, call/return menu semantics, and sandbox scheduling layers remain deferred  
 **Relevant layers:** `tangl.story.episode`, `tangl.story.fabula`, `tangl.vm.provision`, `world` / domain schedule facets
 
+Hub fanout is an *open-edge generator* in the sense defined by
+[AFFORDANCE_MODEL.md](../planning/AFFORDANCE_MODEL.md): a hub rule synthesizes many
+dependency-like open edges (menu → all admissible targets) whose bound, traversable
+endpoints project into ordinary `Action` choices. `Fanout` is not a primitive
+alongside `Dependency`/`Affordance` — those are the open-edge *forms* (same shape,
+opposite fixed endpoints); fanout is the cardinality-many rule that generates them.
+Read that document for the open-edge ontology (requirement-bearing edges, the
+bind / provision / project lifecycle, addressed-vs-broadcast intent); this note
+covers the menu-and-sandbox specifics.
+
 See also [SANDBOX_FANOUT_DESIGN.md](../../notes/SANDBOX_FANOUT_DESIGN.md) for the more
 concrete sandbox-location interpretation of this pattern.
 See also [MU_AFFORDANCES.md](../../notes/MU_AFFORDANCES.md) for relationship-bound

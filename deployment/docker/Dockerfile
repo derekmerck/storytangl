@@ -53,14 +53,14 @@ RUN yarn build
 # Stage 5: Runtime image
 FROM python:3.13-slim AS runtime
 LABEL maintainer="tangldev"
-LABEL version="3.7"
+LABEL version="3.8"
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
 # StoryTangl game engine runtime image
-# $ docker run -p 8000:8000 story-tangl:3.7 tangl-serve    # REST server (default)
-# $ docker run -it story-tangl:3.7 tangl-cli               # interactive CLI entry point
+# $ docker run -p 8000:8000 story-tangl:3.8 tangl-serve    # REST server (default)
+# $ docker run -it story-tangl:3.8 tangl-cli               # interactive CLI entry point
 
 WORKDIR /app
 

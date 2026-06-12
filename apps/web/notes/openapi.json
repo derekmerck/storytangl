@@ -241,7 +241,7 @@
     },
     "description": "RESTful endpoints for StoryTangl",
     "title": "StoryTangl",
-    "version": "3.7.2"
+    "version": "3.8"
   },
   "openapi": "3.1.0",
   "paths": {

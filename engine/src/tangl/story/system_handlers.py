@@ -24,6 +24,7 @@ from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    TraversableNode,
     do_compose_journal,
     on_provision,
 )
@@ -220,6 +221,11 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
             return None
         return "missing_successor"
 
+    if isinstance(edge.successor, TraversableNode) and edge.successor.is_container:
+        preview = Resolver.from_ctx(ctx).preview_frontier_node(edge.successor, _ctx=ctx)
+        if not preview.viable:
+            return "missing_dependency"
+
     # Hard unresolved dependencies block choice availability regardless of guard predicates.
     if _hard_unresolved_dependencies(edge=edge):
         return "missing_dependency"
@@ -254,6 +260,13 @@ def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
             if preview_blockers:
                 return preview_blockers
         return [{"type": "edge", "reason": "missing_successor"}]
+
+    if isinstance(edge.successor, TraversableNode) and edge.successor.is_container:
+        preview = Resolver.from_ctx(ctx).preview_frontier_node(edge.successor, _ctx=ctx)
+        if not preview.viable:
+            return _preview_blockers(preview) or [
+                {"type": "provision", "reason": "container_entry_unavailable"}
+            ]
 
     blockers = [_dependency_blocker(dep) for dep in _hard_unresolved_dependencies(edge=edge)]
     if blockers:
@@ -645,8 +658,8 @@ def render_block_choices(*, caller, ctx, **_kw):
                 available=available,
                 unavailable_reason=(None if available else reason),
                 blockers=blockers or None,
-                accepts=(dict(edge.accepts) if isinstance(edge.accepts, dict) else None),
-                ui_hints=(dict(edge.ui_hints) if isinstance(edge.ui_hints, dict) else None),
+                accepts=edge.accepts,
+                ui_hints=edge.ui_hints,
             )
         )
 

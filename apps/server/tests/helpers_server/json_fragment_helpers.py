@@ -6,14 +6,12 @@ def extract_choices_from_fragments(fragments: list[dict]) -> list[dict]:
 
     def _normalize(choice: dict) -> dict:
         normalized = dict(choice)
-        if "edge_id" in normalized:
-            normalized["uid"] = normalized["edge_id"]
-        elif "source_id" in normalized:
-            normalized["uid"] = normalized["source_id"]
-        elif "uid" in normalized:
-            normalized["uid"] = normalized["uid"]
         if "source_label" in normalized and not normalized.get("label"):
             normalized["label"] = normalized["source_label"]
+        if "text" in normalized and not normalized.get("label"):
+            normalized["label"] = normalized["text"]
+        if "content" in normalized and not normalized.get("label"):
+            normalized["label"] = normalized["content"]
         return normalized
 
     for fragment in fragments:

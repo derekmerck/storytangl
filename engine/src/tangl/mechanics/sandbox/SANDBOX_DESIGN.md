@@ -131,11 +131,37 @@ The current v38 architecture already has most of the sandbox substrate:
   which gives generated choices their own activation conditions and mutations.
 - `TraversableEdge.return_phase` supports jump-and-return interactions.
 - Target-node availability expresses entry gating.
+- VM container entry projection lets a sandbox hub, questline, or board-like
+  scope re-enter through a remembered or conditional child without creating a
+  sandbox cursor.
 - Namespace gathering exposes caller, ancestor, role, setting, graph, and world
   locals to predicates and render.
 
 The sandbox package should add reusable rules and schedule/time vocabulary, not
 a second VM.
+
+### Re-entrant Hubs And Board-like Scopes
+
+Sandbox hubs are ordinary traversable containers that happen to project
+location-centered affordances. When a hub needs to resume somewhere other than
+its default source, it should use the VM's `resolve_entry(ctx)` / `enter(ctx)`
+contract rather than a sandbox-specific traversal path. A town hub can resume a
+tavern questline, a castle escape, or a local board-game phase by changing the
+container's continuation target; the VM still follows one cursor through one
+ordinary descent edge at a time.
+
+Board-game and track interactions fit this same model. The board or track can
+be a constrained sandbox-like scope whose active entry is the current phase or
+space. Token positions, score, supplies, dice state, and turn counters remain
+scope-local state or assets, not VM cursors. `HasGame` may wrap that scope when
+the rules want a game facade, but the underlying traversal remains normal VM
+container entry projection.
+
+Dynamic sandbox affordances remain ephemeral. Each projector clears only the
+actions it previously generated for the active owner node, then rebuilds from
+current location, inventory, mobs, schedule, and scope state. This is the same
+refresh pattern used by game move projection: re-entering a hub means
+recomputing the visible frontier, not trusting stale generated edges.
 
 ### Architectural Legitimacy Guardrail
 
@@ -707,6 +733,47 @@ that observer's generic vocabulary to its own mechanics package and keep only
 the sandbox adapter here. The sandbox package should remain the dynamic-hub and
 scoped-time host, not the permanent home for every tick-compatible subsystem.
 
+##### Future Work: Timed Process / Counter Vocabulary
+
+`ChargeFacet` and queueing service completions are probably two projections of a
+smaller shared mechanic: a normalized counter or timed process with a progress
+policy and a completion event.
+
+They should not be unified by making triage service time pretend to be lamp oil.
+`ChargeFacet` is useful story vocabulary for batteries, lamp fuel, oxygen,
+ammunition drip, cooldowns, fatigue, and other resources that deplete or refill.
+Queue service time is better modeled as work in progress that schedules or
+emits a completion. The reusable layer underneath both is closer to:
+
+```text
+normalized counter + consumption/progress predicate + warning/completion policy
+```
+
+Examples:
+
+- lamp charge decreases while lit and emits exhaustion when it reaches zero;
+- queue service completes after a normalized duration and emits
+  `service_complete`;
+- a deadline expires at a normalized turn and emits a failure or warning;
+- a build, research, recovery, or cooldown timer progresses while its enabling
+  conditions hold and emits a completion affordance/event.
+
+The queueing proof currently uses the event-calendar path because DES wants
+next-event advancement: when service starts, it schedules completion at
+`now + service_turns`. The lamp proof currently uses the sandbox tick path
+because visible/offscreen depletion is easiest to reason about one normalized
+tick at a time. A future `TimedProcessFacet`, `CountdownFacet`, or similarly
+named mechanics-level type could expose both adapters:
+
+- sandbox tick adapter: observe each normalized tick and mutate the counter;
+- simulation calendar adapter: schedule the next completion directly;
+- journal/story-info adapter: project warnings, exhaustion, completion, and
+  remaining-time summaries.
+
+That promotion should happen only after one more non-lamp and non-queue use case
+proves the common shape. Until then, keep `ChargeFacet` domain-specific and keep
+queue service completion in the simulation package.
+
 #### Effect-Phase Content Injection
 
 Tick observers may produce journalable facts during UPDATE, before the JOURNAL
@@ -750,14 +817,17 @@ surface. The backend owns world truth, action availability, hidden schedules,
 and mutation. A client receives only the facts the current reader/player is
 allowed to know.
 
-`SandboxStoryInfoProjector` lives in the sandbox package and attaches through
-the existing service `StoryInfoProjector` seam. Service remains generic; sandbox
-worlds opt in by installing the projector on the world. The projector emits
-ordinary `ProjectedState` sections using the existing `kv_list` and `item_list`
-value types. It does not add sandbox widgets or require a SugarCube-like
-interface. A web client may render those sections as a room header, inventory
-panel, time chip, map modal, or roster; a CLI may print them as status lines; an
-ebook compiler may ignore them or fold them into generated prose.
+Sandbox attaches through the service story-info dispatch seam. Service remains
+generic; sandbox handlers advertise and fulfill ordinary channel requests for
+location, time, inventory, local presence, exits, and map state. The older
+`SandboxStoryInfoProjector` remains as a compatibility/convenience wrapper over
+the same disclosed sections for worlds that still install a world projector
+directly. Both paths emit ordinary `ProjectedState` sections using the existing
+`kv_list`, `item_list`, and `table` value types. They do not add sandbox widgets
+or require a SugarCube-like interface. A web client may render those sections as
+a room header, inventory panel, time chip, map modal, or roster; a CLI may print
+them as status lines; an ebook compiler may ignore them or fold them into
+generated prose.
 
 Current disclosed sections are intentionally conservative:
 
@@ -769,6 +839,19 @@ Current disclosed sections are intentionally conservative:
 - visible fixtures and their open/locked state;
 - present visible mobs;
 - visible authored exits.
+
+Explicit story-info channel requests use the same service `get_story_info`
+dispatch task. The dispatch handler is explicit-only so it can coexist with
+worlds that still install `SandboxStoryInfoProjector` as a broad fallback
+projector without duplicating default sections. Status-like channels
+(`location`, `world_time`, `inventory`, `presence`, `exits`, `fixtures`, and
+`local_assets`) return the matching portable section. The `kind="map"` provider
+emits ordinary `ProjectedState` sections (`sandbox_map_summary`,
+`sandbox_map_nodes`, and `sandbox_map_edges`) rather than a sandbox-only widget
+type; clients may also request narrower map sections such as `map_nodes` or
+`map_edges`. The map is still disclosed state: current and known locations,
+visible/known exits, and known blocked or locked state. It must not expose
+secret geography, hidden mobs, raw pathfinding truth, or future schedule state.
 
 Visibility rules filter projected state the same way they filter journal and
 local affordances. Darkness may leave current location, time, and inventory
@@ -920,12 +1003,15 @@ The point is not that the schema is final. The point is to keep an executable
 pressure fixture while negotiating which schema choices are authoring sugar,
 which are generic sandbox traits, and which require world-specific authorities.
 
-One small Adventure-flavored follow-up worth preserving is magic-word
-teleportation, such as `XYZZY`. It is charming, but architecturally it should be
-just another sponsored interaction or parser-facing choice: a scoped/world
-authority recognizes the word, projects the teleport affordance when appropriate,
-and resolves it through ordinary traversal/effects rather than giving parser
-input special semantic power.
+The demo world now also carries a small Adventure authority slice over the
+generic sandbox surface: a treasure asset can be deposited at a location marked
+as a deposit site, location-authored magic-word anchors project `Say XYZZY` as
+ordinary actions, and a first movement hazard rewrites an `up` movement into a
+self-looping blocked climb while the player carries the gold nugget. These are
+intentionally domain-owned policies over normal actions, assets, and journal
+fragments. A later compact-IR compiler can lower `magic_words`, treasure
+scoring, and `movement_hazards` sections into the same surfaces once the schema
+is stable.
 
 `SandboxSliceCompiler` is the current mechanics-level compiler boundary for
 that pressure fixture. It mirrors the broader compiler split in miniature:

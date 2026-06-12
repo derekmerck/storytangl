@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     Field,
     JsonValue as PydanticJsonValue,
+    SerializeAsAny,
     ValidationError,
     field_serializer,
     model_validator,
@@ -19,7 +20,13 @@ from pydantic import (
 
 from tangl.core import BaseFragment
 from tangl.info import __url__
-from tangl.journal.fragments import KvFragment, MediaFragment, PresentationHints
+from tangl.journal.intent import KvRow, PrimitiveValue
+from tangl.journal.fragments import (
+    KvFragment,
+    MediaFragment,
+    PresentationHints,
+    fragment_to_dto,
+)
 from tangl.service.user.user import User
 
 
@@ -82,10 +89,79 @@ class RuntimeEnvelope(InfoModel):
 
     cursor_id: UUID | None = None
     step: int | None = None
-    fragments: list[BaseFragment] = Field(default_factory=list)
+    fragments: list[SerializeAsAny[BaseFragment]] = Field(default_factory=list)
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    def to_dto(self) -> dict[str, Any]:
+        """Return the transport DTO projection for client-facing envelopes."""
+
+        base_payload = self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_none=True,
+            exclude={"fragments"},
+        )
+        payload: dict[str, Any] = {}
+        for field_name in ("cursor_id", "step"):
+            if field_name in base_payload:
+                payload[field_name] = base_payload.pop(field_name)
+        payload["fragments"] = [fragment_to_dto(fragment) for fragment in self.fragments]
+        payload.update(base_payload)
+        return payload
+
+
+JsonValue: TypeAlias = PydanticJsonValue
+
+
+class InfoAffordance(InfoModel):
+    """Advisory story-info channel advertised to clients."""
+
+    kind: str
+    label: str | None = None
+    shortcuts: list[str] = Field(default_factory=list)
+    query: dict[str, JsonValue] | None = None
+
+
+class InfoState(InfoModel):
+    """Lightweight story-info availability marker for one envelope."""
+
+    version: int
+    dirty_kinds: list[str] = Field(default_factory=list)
+    available_kinds: list[str] = Field(default_factory=list)
+
+
+class StoryInfoRequest(InfoModel):
+    """Opaque projected-state request descriptor from a client."""
+
+    kind: str | None = None
+    kinds: list[str] = Field(default_factory=list)
+    query: dict[str, JsonValue] | None = None
+
+    def requested_kinds(self) -> list[str]:
+        """Return requested info kinds in stable first-seen order."""
+        requested: list[str] = []
+
+        def append(value: object) -> None:
+            if not isinstance(value, str) or not value:
+                return
+            if value not in requested:
+                requested.append(value)
+
+        append(self.kind)
+        for kind in self.kinds:
+            append(kind)
+
+        query = self.query or {}
+        query_kinds = query.get("kinds")
+        if isinstance(query_kinds, list):
+            for kind in query_kinds:
+                append(kind)
+
+        query_kind = query.get("kind")
+        append(query_kind)
+        return requested
 
 
 class SystemInfo(InfoModel):
@@ -141,9 +217,6 @@ class WorldInfo(InfoModel):
     author: str | None = None
 
 
-JsonValue: TypeAlias = PydanticJsonValue
-
-
 class AuthoringDiagnostic(InfoModel):
     """Common service-facing shape for authoring integrity diagnostics."""
 
@@ -176,9 +249,6 @@ class WorldSceneList(KvFragment):
     ...
 
 
-PrimitiveValue: TypeAlias = str | int | float | bool
-
-
 class ScalarValue(BaseModel):
     """Single scalar projected-state payload."""
 
@@ -186,18 +256,11 @@ class ScalarValue(BaseModel):
     value: PrimitiveValue
 
 
-class ProjectedKVItem(BaseModel):
-    """One projected key-value pair."""
-
-    key: str
-    value: PrimitiveValue
-
-
 class KvListValue(BaseModel):
     """Ordered key-value payload."""
 
     value_type: Literal["kv_list"] = "kv_list"
-    items: list[ProjectedKVItem]
+    items: list[KvRow]
 
 
 class ProjectedItem(BaseModel):
@@ -263,6 +326,11 @@ class ProjectedState(InfoModel):
 
     sections: list[ProjectedSection] = Field(default_factory=list)
 
+    def to_dto(self) -> dict[str, Any]:
+        """Return the transport DTO projection for projected-state clients."""
+
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
+
 
 def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
     """Best-effort coercion from runtime-like payloads to ``RuntimeInfo``."""
@@ -316,15 +384,18 @@ __all__ = [
     "AuthoringDiagnostic",
     "BadgeListValue",
     "FragmentStream",
+    "InfoAffordance",
     "InfoModel",
+    "InfoState",
     "ItemListValue",
+    "JsonValue",
     "KvListValue",
+    "KvRow",
     "MediaNative",
     "NativeResponse",
     "PreflightReport",
     "PrimitiveValue",
     "ProjectedItem",
-    "ProjectedKVItem",
     "ProjectedSection",
     "ProjectedState",
     "RuntimeEnvelope",
@@ -333,6 +404,7 @@ __all__ = [
     "SectionValue",
     "SystemInfo",
     "TableValue",
+    "StoryInfoRequest",
     "UserInfo",
     "UserSecret",
     "WorldInfo",

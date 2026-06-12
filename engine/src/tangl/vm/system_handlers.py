@@ -82,6 +82,7 @@ from .dispatch import (
 )
 from .resolution_phase import ResolutionPhase
 from .traversal import get_visit_count, is_first_visit, steps_since_last_visit
+from .runtime.causality import CausalityMode
 from .traversable import HasEffects, TraversableNode, TraversableEdge, AnonymousEdge
 
 if TYPE_CHECKING:
@@ -304,7 +305,18 @@ def validate_successor_exists(*, caller, ctx, **kw):
     if successor is None:
         return False
     if hasattr(caller, "available"):
-        return bool(caller.available(ctx=ctx))
+        if not bool(caller.available(ctx=ctx)):
+            return False
+        if isinstance(successor, TraversableNode) and successor.is_container:
+            from .provision import Resolver
+
+            preview = Resolver.from_ctx(ctx).preview_frontier_node(
+                successor,
+                allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
+                _ctx=ctx,
+            )
+            return preview.viable
+        return True
     if hasattr(successor, "available"):
         ns = ctx.get_ns(successor) if ctx is not None and hasattr(ctx, "get_ns") else None
         return bool(successor.available(ns=ns))
@@ -317,11 +329,11 @@ def validate_successor_exists(*, caller, ctx, **kw):
 
 @on_prereqs
 def descend_into_container(*, caller, ctx, **kw):
-    """If the cursor is a container, redirect to its source member.
+    """If the cursor is a container, redirect to its active entry member.
 
     This is the only special traversal logic in the whole system.  Everything
     else is generic pipeline execution.  Container descent chains naturally:
-    if the source is also a container, its own PREREQS will fire
+    if the entry is also a container, its own PREREQS will fire
     ``descend_into_container`` again, descending further.
 
     Priority: EARLY-ish — should fire before triggered edge checks, because
@@ -330,8 +342,13 @@ def descend_into_container(*, caller, ctx, **kw):
     not entries).
     """
     if isinstance(caller, TraversableNode) and caller.is_container:
-        logger.debug("Container descent: %s → %s", caller.get_label(), caller.source.get_label())
-        return caller.enter()
+        edge = caller.enter(ctx=ctx)
+        logger.debug(
+            "Container descent: %s → %s",
+            caller.get_label(),
+            edge.successor.get_label(),
+        )
+        return edge
     return None
 
 

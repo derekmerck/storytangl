@@ -8,17 +8,18 @@ compatibility.
 from __future__ import annotations
 
 from base64 import b64encode
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from tangl.core import BaseFragment, Registry, Selector
+from tangl.journal.intent import Accepts, KvRow, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, StyleClass, StyleDict, StyleId, UnstructuredData
-from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 
 
 class PresentationHints(BaseModel, extra="allow"):
@@ -47,7 +48,7 @@ class ContentFragment(BaseFragment):
     the composing cursor or source of the new composite instead.
     """
 
-    fragment_type: str | Enum = "content"
+    fragment_type: Literal["content"] = "content"
     content: Any = None
     source_id: UUID | None = None
     content_format: str | None = Field(None, alias="format")
@@ -55,11 +56,18 @@ class ContentFragment(BaseFragment):
 
 
 class GroupFragment(BaseFragment, extra="allow"):
-    """Relational overlay tying peer fragments together by identifier."""
+    """Relational overlay tying peer fragments together by identifier.
+
+    ``zone_role`` annotates a ``group_type="zone"`` group with its semantic role
+    (``"packet"``, ``"field"``, ...) for ports that style zones by role. ``hints``
+    carries the same advisory presentation metadata as the other fragments.
+    """
 
     fragment_type: Literal["group"] = "group"
     group_type: str | Enum | None = None
     member_ids: list[UUID] = Field(default_factory=list)
+    zone_role: str | None = None
+    presentation_hints: PresentationHints | None = Field(None, alias="hints")
 
     def members(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
         return [
@@ -69,11 +77,39 @@ class GroupFragment(BaseFragment, extra="allow"):
         ]
 
 
+class PieceFragment(BaseFragment, extra="allow"):
+    """Identified game piece: a tracked object the player can reference, place
+    into a zone, or pick as a choice payload (candidate, document, token, asset).
+
+    A stable ``piece_id`` (and ``uid``) let multi-envelope sequences update the
+    same piece in place as it changes state or moves between zones. ``zone_ref``
+    names the containing ``group_type="zone"`` fragment. ``properties`` carries
+    per-kind structured data (a candidate's declared purpose, a permit's expiry,
+    ...). Python uses ``piece_kind`` because constructor-form persistence reserves
+    ``kind`` for the model class; DTO projection exposes it as contract field
+    ``kind``. Graduates the typed shape tracked as the ``PieceFragment`` row in
+    ``WIDGET_CONTRACT_RECONCILIATION.md``; matches the existing conformance
+    fixture shape.
+    """
+
+    fragment_type: Literal["piece"] = "piece"
+    piece_id: str
+    piece_kind: str = Field(
+        ...,
+        validation_alias=AliasChoices("piece_kind", "kind"),
+        json_schema_extra={"dto": True, "dto_alias": "kind"},
+    )
+    display_state: str | None = None
+    zone_ref: UUID | None = None
+    properties: dict[str, Any] = Field(default_factory=dict)
+    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+
+
 class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
     """Ordered key-value fragment for info-like surfaces."""
 
     fragment_type: Literal["kv"] = "kv"
-    content: OrderedTupleDict = Field(...)
+    content: list[KvRow] = Field(default_factory=list)
 
 
 class ChoiceFragment(BaseFragment, extra="allow"):
@@ -86,8 +122,8 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     active: bool | None = None
     unavailable_reason: str | None = None
     blockers: list[dict[str, Any]] | None = None
-    accepts: dict[str, Any] | None = None
-    ui_hints: dict[str, Any] | None = None
+    accepts: Accepts | None = None
+    ui_hints: UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
 
     @model_validator(mode="before")
@@ -187,7 +223,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     staging_hints: StagingHints | None = None
     media_role: str | None = None
     scope: str | None = "world"
-    fragment_type: str = "media"
+    fragment_type: Literal["media"] = "media"
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:
@@ -219,6 +255,77 @@ class BlockFragment(ContentFragment):
     choices: list[ChoiceFragment] = Field(default_factory=list)
 
 
+_FRAGMENT_DTO_TYPES: dict[str, type[BaseFragment]] = {
+    "attributed": AttributedFragment,
+    "block": BlockFragment,
+    "choice": ChoiceFragment,
+    "content": ContentFragment,
+    "delete": ControlFragment,
+    "dialog": DialogFragment,
+    "group": GroupFragment,
+    "kv": KvFragment,
+    "media": MediaFragment,
+    "piece": PieceFragment,
+    "update": ControlFragment,
+    "user_event": UserEventFragment,
+}
+
+
+def fragment_to_dto(
+    fragment: BaseFragment,
+    *,
+    exclude: set[str] | None = None,
+) -> UnstructuredData:
+    """Return the client DTO projection of a journal fragment.
+
+    DTO projection is distinct from :meth:`unstructure`: it is JSON-safe,
+    keyed by ``fragment_type``, and selected through ``dto_exclude`` field
+    metadata rather than persistence's constructor-form ``kind`` path.
+    """
+
+    exclude_fields = set(fragment._match_fields(dto_exclude=True))
+    if exclude is not None:
+        exclude_fields.update(exclude)
+    payload = fragment.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+        exclude=exclude_fields,
+    )
+    payload.pop("step", None)
+    if payload.get("type") == payload.get("fragment_type"):
+        payload.pop("type")
+    if payload.get("tags") == []:
+        payload.pop("tags")
+    for field_name in fragment._match_fields(dto=True):
+        dto_alias = type(fragment).model_fields[field_name].json_schema_extra["dto_alias"]
+        if field_name in payload:
+            payload[dto_alias] = payload.pop(field_name)
+    return payload
+
+
+def fragment_from_dto(payload: object) -> BaseFragment:
+    """Hydrate a fragment DTO, preserving unknown extension fragments."""
+
+    if not isinstance(payload, Mapping):
+        return BaseFragment(fragment_type="unknown", content=payload)
+
+    raw_fragment = dict(payload)
+    fragment_type = raw_fragment.get("fragment_type")
+    if not isinstance(fragment_type, str) or not fragment_type:
+        return BaseFragment(fragment_type="unknown", content=raw_fragment)
+
+    fragment_model = _FRAGMENT_DTO_TYPES.get(fragment_type)
+    if fragment_model is None:
+        return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
+
+    for field_name in fragment_model._match_fields(dto=True):
+        dto_alias = fragment_model.model_fields[field_name].json_schema_extra["dto_alias"]
+        if dto_alias in raw_fragment:
+            raw_fragment[field_name] = raw_fragment.pop(dto_alias)
+    return fragment_model.model_validate(raw_fragment)
+
+
 __all__ = [
     "AttributedFragment",
     "BlockFragment",
@@ -230,8 +337,13 @@ __all__ = [
     "DialogFragment",
     "GroupFragment",
     "KvFragment",
+    "KvRow",
     "MediaFragment",
+    "PieceFragment",
     "PresentationHints",
     "StagingHints",
+    "UIHints",
     "UserEventFragment",
+    "fragment_from_dto",
+    "fragment_to_dto",
 ]

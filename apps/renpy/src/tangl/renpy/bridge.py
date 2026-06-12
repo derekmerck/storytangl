@@ -109,7 +109,7 @@ class RenPySessionBridge:
 
     def choose(
         self,
-        choice_id: UUID,
+        edge_id: UUID,
         choice_payload: Any | None = None,
     ) -> RuntimeEnvelope:
         """Resolve one adapted choice against the active ledger."""
@@ -120,7 +120,7 @@ class RenPySessionBridge:
         envelope = self.service_manager.resolve_choice(
             user_id=self.user_id,
             ledger_id=self.ledger_id,
-            choice_id=choice_id,
+            edge_id=edge_id,
             choice_payload=choice_payload,
         )
         self._sync_ledger_id(envelope)
@@ -193,17 +193,17 @@ class RenPySessionBridge:
             return
 
         if isinstance(fragment, ChoiceFragment):
-            choice_id = _uuid_or_none(fragment.edge_id)
-            if choice_id is None:
+            edge_id = _uuid_or_none(fragment.edge_id)
+            if edge_id is None:
                 logger.debug("Ignoring choice fragment without edge_id: %r", fragment)
                 return
 
             turn.choices.append(
                 RenPyChoice(
-                    choice_id=choice_id,
+                    edge_id=edge_id,
                     text=_non_empty_text(fragment.text)
                     or _non_empty_text(getattr(fragment, "content", None))
-                    or str(choice_id),
+                    or str(edge_id),
                     available=bool(
                         fragment.active if fragment.active is not None else fragment.available
                     ),

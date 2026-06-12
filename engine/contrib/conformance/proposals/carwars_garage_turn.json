@@ -254,6 +254,6 @@
   "metadata": {
     "fixture": "proposal_carwars_garage_turn",
     "proposal": true,
-    "vocab_version": "1.1"
+    "vocab_version": "1.5"
   }
 }

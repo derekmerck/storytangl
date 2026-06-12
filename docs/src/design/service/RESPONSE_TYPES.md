@@ -35,7 +35,7 @@ metadata.
 
 **Characteristics:**
 - Carries `cursor_id`, `step`, redirect metadata, and service metadata
-- Carries `fragments: list[BaseFragment]`
+- Carries concrete fragment DTOs through a `BaseFragment`-typed stream
 - The client renders fragments directly through a registry/shell model
 - Unknown fragment types are valid extension points and must survive transport
 
@@ -57,6 +57,7 @@ See `FRAGMENT_STREAM_CONTRACT.md` for the detailed client-facing contract.
 **Characteristics:**
 - Read-only (MethodType.READ)
 - Returns structured metadata (not narrative)
+- `ProjectedState.to_dto()` preserves `value_type` discriminators for clients
 - Idempotent queries
 
 ---

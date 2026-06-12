@@ -47,7 +47,7 @@ export const mockUpdatedSecretResponse = {
 }
 
 export const mockSystemInfo = {
-  version: '3.7.0',
+  version: '3.8',
   uptime: '72h',
   status: 'operational',
 }

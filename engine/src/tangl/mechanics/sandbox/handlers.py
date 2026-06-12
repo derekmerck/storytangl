@@ -902,8 +902,10 @@ def _selected_sandbox_time_cost(ctx: VmPhaseCtx) -> SandboxTimeCost | None:
         return None
     if "sandbox" not in (selected_edge.tags or set()):
         return None
-    ui_hints = selected_edge.ui_hints or {}
-    kind = str(ui_hints.get("contribution") or "local_action")
+    ui_hints = selected_edge.ui_hints
+    kind = str(
+        ui_hints.contribution if ui_hints and ui_hints.contribution else "local_action"
+    )
     return SandboxTimeCost(kind=kind)
 
 

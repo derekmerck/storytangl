@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -22,9 +23,32 @@ from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 from tangl.vm.runtime.ledger import Ledger
 
 
-def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
+def _write_story_bundle(
+    root: Path,
+    *,
+    with_projector: bool = False,
+    with_choice_payload_hints: bool = False,
+) -> str:
     world_dir = root / "story_demo"
     world_dir.mkdir()
+    action_lines = [
+        "          - text: Continue",
+        "            successor: end",
+    ]
+    if with_choice_payload_hints:
+        action_lines.extend(
+            [
+                "            accepts:",
+                "              kind: quantity",
+                "              min: 1",
+                "              max: 3",
+                "              unit: ration",
+                "            ui_hints:",
+                "              hotkey: b",
+                "              source_kind: market",
+                "              contribution: purchase",
+            ]
+        )
     (world_dir / "world.yaml").write_text(
         "\n".join(
             [
@@ -48,8 +72,7 @@ def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
                 "      start:",
                 "        content: Start",
                 "        actions:",
-                "          - text: Continue",
-                "            successor: end",
+                *action_lines,
                 "      end:",
                 "        content: End",
             ]
@@ -64,7 +87,7 @@ def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
         (package_dir / "domain.py").write_text(
             "\n".join(
                 [
-                    "from tangl.service import KvListValue, ProjectedKVItem, ProjectedSection, ProjectedState",
+                    "from tangl.service import KvListValue, KvRow, ProjectedSection, ProjectedState",
                     "",
                     "class DemoProjector:",
                     "    def project(self, *, ledger):",
@@ -76,8 +99,8 @@ def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
                     '                    kind="mystery",',
                     "                    value=KvListValue(",
                     "                        items=[",
-                    '                            ProjectedKVItem(key="Mood", value="tense"),',
-                    '                            ProjectedKVItem(key="Step Seen", value=ledger.step),',
+                    '                            KvRow(key="Mood", value="tense"),',
+                    '                            KvRow(key="Step Seen", value=ledger.step),',
                     "                        ]",
                     "                    ),",
                     "                )",
@@ -151,9 +174,44 @@ def _session_value(payload: dict[str, object], key: str) -> object | None:
     return None
 
 
+def _first_choice_fragment(payload: dict[str, object]) -> dict[str, object]:
+    fragments = payload.get("fragments")
+    assert isinstance(fragments, list)
+    for fragment in fragments:
+        if isinstance(fragment, dict) and fragment.get("fragment_type") == "choice":
+            return fragment
+    raise AssertionError(f"No choice fragment found in {fragments}")
+
+
 @pytest.fixture()
 def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str], str]:
     world_label = _write_story_bundle(tmp_path)
+    monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
+
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
+    World.clear_instances()
+    service_manager = get_service_manager()
+    secret = settings.client.secret
+    user_id = uuid_for_secret(secret)
+    user = User(uid=user_id)
+    user.set_secret(secret)
+    service_manager.persistence.save(user)
+
+    client = TestClient(app, base_url="http://test/api/v2/")
+    headers = {"X-API-Key": key_for_secret(secret)}
+    try:
+        yield client, headers, world_label
+    finally:
+        client.close()
+        World.clear_instances()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()
+
+
+@pytest.fixture()
+def payload_story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str], str]:
+    world_label = _write_story_bundle(tmp_path, with_choice_payload_hints=True)
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
     reset_service_state_for_testing()
@@ -254,7 +312,7 @@ def test_story_rest_envelope_flow(
     assert ledger is not None
     start = ledger.cursor
     choice = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
-    choice_id = str(choice.uid)
+    edge_id = str(choice.uid)
 
     update = client.get("story/update", headers=headers)
     assert update.status_code == 200
@@ -274,7 +332,7 @@ def test_story_rest_envelope_flow(
     payload = {"move": "knight", "to": "b6"}
     do = client.post(
         "story/do",
-        json={"choice_id": choice_id, "payload": payload},
+        json={"edge_id": edge_id, "payload": payload},
         headers=headers,
     )
     assert do.status_code == 200
@@ -297,6 +355,70 @@ def test_story_rest_envelope_flow(
     dropped = drop.json()
     assert dropped.get("status") == "ok"
     assert dropped.get("dropped_ledger_id")
+
+
+def test_story_update_preserves_choice_fragment_uid_and_edge_id(
+    story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, headers, world_label = story_client
+
+    create = client.post(
+        "story/story/create",
+        params={"world_id": world_label, "init_mode": "EAGER"},
+        headers=headers,
+    )
+    assert create.status_code == 200
+
+    update = client.get("story/update", headers=headers)
+    assert update.status_code == 200
+    choice = _first_choice_fragment(update.json())
+
+    assert isinstance(choice.get("uid"), str)
+    assert isinstance(choice.get("edge_id"), str)
+    assert choice["uid"] != choice["edge_id"]
+    assert choice["label"] == "Continue"
+    assert "seq" not in choice
+    assert "step" not in choice
+
+    resolved = client.post(
+        "story/do",
+        json={"edge_id": choice["edge_id"]},
+        headers=headers,
+    )
+    assert resolved.status_code == 200
+
+
+def test_story_update_preserves_choice_payload_contracts(
+    payload_story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, headers, world_label = payload_story_client
+
+    create = client.post(
+        "story/story/create",
+        params={"world_id": world_label, "init_mode": "EAGER"},
+        headers=headers,
+    )
+    assert create.status_code == 200
+
+    update = client.get("story/update", headers=headers)
+    assert update.status_code == 200
+    choice = _first_choice_fragment(update.json())
+
+    assert choice["accepts"] == {
+        "kind": "quantity",
+        "required": True,
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "unit": "ration",
+        "cost_previews": [],
+    }
+    assert choice["ui_hints"] == {
+        "hotkey": "b",
+        "source_kind": "market",
+        "contribution": "purchase",
+        "cost_previews": [],
+    }
 
 
 def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(
@@ -331,9 +453,65 @@ def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_u
 
 
 def test_story_info_returns_world_authored_projected_sections(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = projected_story_client
+
+    response = client.get("story/info", headers=headers)
+    assert response.status_code == 200
+    payload = response.json()
+    sections = payload.get("sections")
+    assert isinstance(sections, list)
+    assert sections[0]["section_id"] == "world_state"
+    assert sections[0]["kind"] == "mystery"
+    assert sections[0]["value"]["items"][0]["key"] == "Mood"
+    assert sections[0]["value"]["items"][0]["value"] == "tense"
+
+
+def test_story_info_filters_sections_by_query_and_kind(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = projected_story_client
+
+    filtered = client.get(
+        "story/info",
+        params={"query": '{"kinds":["mystery"]}'},
+        headers=headers,
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["sections"][0]["section_id"] == "world_state"
+
+    empty = client.get("story/info", params={"kind": "map"}, headers=headers)
+    assert empty.status_code == 200
+    assert empty.json()["sections"] == []
+
+
+def test_story_info_rejects_invalid_query_json(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = projected_story_client
+
+    bad_json = client.get(
+        "story/info",
+        params={"query": "{"},
+        headers=headers,
+    )
+    assert bad_json.status_code == 400
+
+    non_object_query = client.get(
+        "story/info",
+        params={"query": '["mystery"]'},
+        headers=headers,
+    )
+    assert non_object_query.status_code == 400
+    assert "JSON object" in non_object_query.json()["detail"]
+
+
+@pytest.fixture()
+def projected_story_client(
     tmp_path: Path,
     monkeypatch,
-) -> None:
+) -> Iterator[tuple[TestClient, dict[str, str]]]:
     world_label = _write_story_bundle(tmp_path, with_projector=True)
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
@@ -357,15 +535,7 @@ def test_story_info_returns_world_authored_projected_sections(
         )
         assert create.status_code == 200
 
-        response = client.get("story/info", headers=headers)
-        assert response.status_code == 200
-        payload = response.json()
-        sections = payload.get("sections")
-        assert isinstance(sections, list)
-        assert sections[0]["section_id"] == "world_state"
-        assert sections[0]["kind"] == "mystery"
-        assert sections[0]["value"]["items"][0]["key"] == "Mood"
-        assert sections[0]["value"]["items"][0]["value"] == "tense"
+        yield client, headers
     finally:
         client.close()
         World.clear_instances()

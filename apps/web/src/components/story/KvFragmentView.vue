@@ -10,9 +10,9 @@ defineProps<{
 
 <template>
   <div class="kv-strip" aria-label="scene status">
-    <span v-for="item in kvItems(fragment)" :key="item[0]" class="kv-pair">
-      <span>{{ item[0] }}</span>
-      <b>{{ fragmentText(item[1]) }}</b>
+    <span v-for="item in kvItems(fragment)" :key="item.key" class="kv-pair">
+      <span>{{ item.key }}</span>
+      <b>{{ fragmentText(item.value) }}</b>
     </span>
   </div>
 </template>

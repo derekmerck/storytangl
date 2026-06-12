@@ -176,7 +176,7 @@ const doAction = async (actionUid: string, payload?: unknown) => {
     loading.value = true
     error.value = null
     const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
-      choice_id: actionUid,
+      edge_id: actionUid,
       payload,
     })
     await handlePayload(response.data, `action-${scenes.value.length + 1}`)

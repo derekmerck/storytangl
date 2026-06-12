@@ -37,7 +37,7 @@ class RenPyLine:
 class RenPyChoice:
     """One StoryTangl choice adapted for a Ren'Py menu."""
 
-    choice_id: UUID
+    edge_id: UUID
     text: str
     available: bool = True
     unavailable_reason: str | None = None

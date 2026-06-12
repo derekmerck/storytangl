@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Iterable
 from uuid import UUID
@@ -9,7 +10,7 @@ from markdown_it import MarkdownIt
 from pydantic import BaseModel, ConfigDict
 
 from tangl.config import get_story_media_dir, get_sys_media_dir, settings
-from tangl.journal.fragments import MediaFragment
+from tangl.journal.fragments import MediaFragment, fragment_to_dto
 from tangl.rest.dependencies_gateway import (
     get_service_manager,
     get_user_locks,
@@ -24,7 +25,7 @@ from tangl.service.media import (
     MediaRenderProfile,
     media_fragment_to_payload,
 )
-from tangl.service.response import RuntimeEnvelope, RuntimeInfo
+from tangl.service.response import JsonValue, RuntimeEnvelope, RuntimeInfo
 from tangl.service.world_registry import resolve_world
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -33,15 +34,10 @@ from tangl.utils.hash_secret import key_for_secret
 class ChoiceRequest(BaseModel):
     """Request payload for resolving a player choice."""
 
-    choice_id: UUID | None = None
+    edge_id: UUID
     payload: Any = None
 
     model_config = ConfigDict(extra="forbid")
-
-    def resolve_choice_id(self) -> UUID:
-        if self.choice_id is not None:
-            return self.choice_id
-        raise ValueError("choice_id must be provided")
 
 
 router = APIRouter(tags=["Story"])
@@ -82,6 +78,32 @@ def _normalize_profile_tokens(render_profile: str | Iterable[str] | None) -> set
 
 def _profile_has(render_profile: str | Iterable[str] | None, token: str) -> bool:
     return token.lower() in _normalize_profile_tokens(render_profile)
+
+
+def _parse_kinds(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _parse_info_query(value: str | None) -> dict[str, JsonValue] | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=_bad_request_detail(exc),
+        ) from exc
+    if parsed is None:
+        return None
+    if not isinstance(parsed, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="story-info query must be a JSON object",
+        )
+    return dict(parsed)
 
 
 def _media_render_profile(render_profile: str | Iterable[str] | None) -> MediaRenderProfile:
@@ -126,10 +148,6 @@ def _normalize_choice_labels_in_fragments(fragments: list[dict[str, Any]]) -> li
 
     def _normalize_choice_data(choice: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(choice)
-        if normalized.get("edge_id"):
-            normalized["uid"] = normalized["edge_id"]
-        if normalized.get("source_id") and "uid" not in normalized:
-            normalized["uid"] = normalized["source_id"]
         if normalized.get("source_label") and not normalized.get("label"):
             normalized["label"] = normalized["source_label"]
         if normalized.get("text") and not normalized.get("label"):
@@ -192,7 +210,7 @@ def _serialize_fragment(
     if isinstance(fragment, MediaFragment):
         return None
     if hasattr(fragment, "model_dump"):
-        return _serialize(fragment.model_dump(mode="python"))
+        return _serialize(fragment_to_dto(fragment))
     if hasattr(fragment, "unstructure"):
         return _serialize(fragment.unstructure())
     return {"fragment_type": "unknown", "content": str(fragment)}
@@ -205,7 +223,8 @@ def _serialize_runtime_envelope(
 ) -> dict[str, Any]:
     profile_tokens = _normalize_profile_tokens(render_profile)
     media_profile = _media_render_profile(profile_tokens)
-    metadata = dict(envelope.metadata or {})
+    envelope_payload = envelope.to_dto()
+    metadata = dict(envelope_payload.get("metadata") or {})
     world_id = str(metadata["world_id"]) if metadata.get("world_id") is not None else None
     story_id = str(metadata["ledger_id"]) if metadata.get("ledger_id") is not None else None
     world_media_root = _resolve_world_media_root(world_id)
@@ -227,12 +246,8 @@ def _serialize_runtime_envelope(
             fragments.append(payload)
 
     payload = {
-        "cursor_id": envelope.cursor_id,
-        "step": envelope.step,
+        **envelope_payload,
         "fragments": _normalize_choice_labels_in_fragments(fragments),
-        "last_redirect": envelope.last_redirect,
-        "redirect_trace": envelope.redirect_trace,
-        "metadata": metadata,
     }
     serialized = _serialize(payload)
     if "html" in profile_tokens:
@@ -369,10 +384,6 @@ async def do_story_action(
     """Resolve a player choice and return the updated runtime envelope."""
 
     user_auth = resolve_user_auth(api_key, service_manager=service_manager)
-    try:
-        choice_id = request.resolve_choice_id()
-    except ValueError as exc:  # pragma: no cover - FastAPI handles validation
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         async with user_locks[user_auth.user_id]:
@@ -382,7 +393,7 @@ async def do_story_action(
                 auth_context=user_auth,
                 user_id=user_auth.user_id,
                 user_auth=user_auth,
-                choice_id=choice_id,
+                edge_id=request.edge_id,
                 choice_payload=request.payload,
             )
     except ValueError as exc:
@@ -398,10 +409,20 @@ async def get_story_info(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
+    kind: str | None = Query(default=None, description="Projected-state channel kind."),
+    kinds: str | None = Query(
+        default=None,
+        description="Comma-separated projected-state channel kinds.",
+    ),
+    query: str | None = Query(
+        default=None,
+        description="JSON-encoded opaque projected-state query descriptor.",
+    ),
 ):
     """Return runtime status details for the active story."""
 
     user_auth = resolve_user_auth(api_key, service_manager=service_manager)
+    parsed_query = _parse_info_query(query)
     try:
         result = _call_service_method(
             service_manager,
@@ -409,11 +430,14 @@ async def get_story_info(
             auth_context=user_auth,
             user_id=user_auth.user_id,
             user_auth=user_auth,
+            kind=kind,
+            kinds=_parse_kinds(kinds),
+            query=parsed_query,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_bad_request_detail(exc)) from exc
 
-    payload = _serialize(result)
+    payload = result.to_dto()
     if _profile_has(render_profile, "html"):
         payload = _transform_text_fields(payload)
     return payload

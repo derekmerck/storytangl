@@ -57,6 +57,12 @@ def _fragment_has_html_content(fragments: list[dict[str, object]]) -> bool:
     return any("<p>" in str(fragment.get("content", "")) for fragment in fragments)
 
 
+def _edge_id(choice: dict[str, object]) -> object:
+    edge_id = choice.get("edge_id")
+    assert edge_id is not None
+    return edge_id
+
+
 def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str, str]]) -> None:
     client, headers = linear_story_client
 
@@ -72,8 +78,8 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     choices = extract_choices_from_fragments(fragments)
     assert choices, "Expected an initial choice to be available"
 
-    first_choice = choices[0].get("uid") or choices[0].get("source_id")
-    resolve_first = client.post("story/do", json={"choice_id": first_choice}, headers=headers)
+    first_choice = _edge_id(choices[0])
+    resolve_first = client.post("story/do", json={"edge_id": first_choice}, headers=headers)
     assert resolve_first.status_code == 200
     first_step = resolve_first.json()["step"]
 
@@ -93,8 +99,8 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     choices_two = extract_choices_from_fragments(fragments_two)
     assert choices_two, "Expected a continuation choice after the middle block"
 
-    second_choice = choices_two[0].get("uid") or choices_two[0].get("source_id")
-    resolve_second = client.post("story/do", json={"choice_id": second_choice}, headers=headers)
+    second_choice = _edge_id(choices_two[0])
+    resolve_second = client.post("story/do", json={"edge_id": second_choice}, headers=headers)
     assert resolve_second.status_code == 200
     second_step = resolve_second.json()["step"]
 
@@ -138,13 +144,12 @@ def test_linear_story_do_supports_html_render_profile(
 
     update = client.get("story/update", headers=headers)
     assert update.status_code == 200
-    first_choice = extract_choices_from_fragments(update.json()["fragments"])[0].get("uid")
-    assert first_choice is not None
+    first_choice = _edge_id(extract_choices_from_fragments(update.json()["fragments"])[0])
 
     resolve = client.post(
         "story/do",
         params={"render_profile": "html"},
-        json={"choice_id": first_choice},
+        json={"edge_id": first_choice},
         headers=headers,
     )
     assert resolve.status_code == 200

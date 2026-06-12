@@ -2,7 +2,7 @@ define narrator = Character(None)
 
 default tangl_bridge = None
 default tangl_envelope = None
-default tangl_choice_id = None
+default tangl_edge_id = None
 default tangl_characters = {}
 
 init -100 python:
@@ -76,7 +76,7 @@ init python:
             return None
 
         return renpy.display_menu(
-            [(choice.text, choice.choice_id) for choice in visible_choices]
+            [(choice.text, choice.edge_id) for choice in visible_choices]
         )
 
 
@@ -93,14 +93,14 @@ label start:
 
 label tangl_loop:
     python:
-        tangl_choice_id = None
+        tangl_edge_id = None
         for tangl_turn in tangl_bridge.build_turns(tangl_envelope.fragments):
-            tangl_choice_id = tangl_play_turn(tangl_turn)
-            if tangl_choice_id is not None:
+            tangl_edge_id = tangl_play_turn(tangl_turn)
+            if tangl_edge_id is not None:
                 break
 
-    if tangl_choice_id is None:
+    if tangl_edge_id is None:
         return
 
-    $ tangl_envelope = tangl_bridge.choose(tangl_choice_id)
+    $ tangl_envelope = tangl_bridge.choose(tangl_edge_id)
     jump tangl_loop

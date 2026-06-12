@@ -7,13 +7,17 @@ from typing import Protocol, cast
 
 from tangl.core import Selector, Token
 from tangl.service.response import (
+    InfoAffordance,
     ItemListValue,
     KvListValue,
     ProjectedItem,
-    ProjectedKVItem,
+    KvRow,
     ProjectedSection,
     ProjectedState,
+    StoryInfoRequest,
+    TableValue,
 )
+from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
 from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
 from tangl.story.concepts.asset import HasAssets
 from tangl.vm.runtime.frame import PhaseCtx
@@ -30,6 +34,19 @@ from .time import current_world_time
 
 
 DEFAULT_PERIOD_LABELS = ("morning", "afternoon", "evening", "night")
+MAP_KIND = "map"
+SANDBOX_INFO_KINDS = {
+    "exits",
+    "fixtures",
+    "inventory",
+    "local_assets",
+    "location",
+    MAP_KIND,
+    "map_edges",
+    "map_nodes",
+    "presence",
+    "world_time",
+}
 
 
 class ProjectedAssetSurface(Protocol):
@@ -59,27 +76,30 @@ class SandboxStoryInfoProjector:
             return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
 
         ctx = PhaseCtx(graph=ledger.graph, cursor_id=cursor.uid)
-        projection = sandbox_projection_state(cursor, ctx)
+        return ProjectedState(sections=self.sections_for(cursor, ctx=ctx))
+
+    def sections_for(
+        self,
+        location: SandboxLocation,
+        *,
+        ctx: PhaseCtx,
+    ) -> list[ProjectedSection]:
+        """Return disclosed sandbox status sections for ``location``."""
+        projection = sandbox_projection_state(location, ctx)
         sections = [
-            self._location_section(cursor, projection_active=projection.active),
-            self._time_section(cursor),
-            self._inventory_section(cursor),
+            self._location_section(location, projection_active=projection.active),
+            self._time_section(location),
+            self._inventory_section(location),
         ]
         if not projection.suppress_location_description:
-            sections.append(self._exits_section(cursor))
+            sections.append(self._exits_section(location))
         if not projection.suppress_asset_affordances:
-            sections.append(self._local_assets_section(cursor))
+            sections.append(self._local_assets_section(location))
         if not projection.suppress_fixture_affordances:
-            sections.append(self._fixtures_section(cursor))
+            sections.append(self._fixtures_section(location))
         if not projection.suppress_location_description:
-            sections.append(self._presence_section(cursor))
-        return ProjectedState(
-            sections=[
-                section
-                for section in sections
-                if not _section_empty(section)
-            ]
-        )
+            sections.append(self._presence_section(location))
+        return [section for section in sections if not _section_empty(section)]
 
     def _location_section(
         self,
@@ -88,10 +108,10 @@ class SandboxStoryInfoProjector:
         projection_active: bool,
     ) -> ProjectedSection:
         items = [
-            ProjectedKVItem(key="Location", value=location.location_name or location.get_label())
+            KvRow(key="Location", value=location.location_name or location.get_label())
         ]
         if projection_active:
-            items.append(ProjectedKVItem(key="Visibility", value="limited"))
+            items.append(KvRow(key="Visibility", value="limited"))
         return ProjectedSection(
             section_id="sandbox_location",
             title="Location",
@@ -102,12 +122,12 @@ class SandboxStoryInfoProjector:
     def _time_section(self, location: SandboxLocation) -> ProjectedSection:
         world_time = current_world_time(location)
         items = [
-            ProjectedKVItem(key="Turn", value=world_time.turn),
-            ProjectedKVItem(
+            KvRow(key="Turn", value=world_time.turn),
+            KvRow(
                 key="Period",
                 value=_period_label(world_time.period, self.period_labels),
             ),
-            ProjectedKVItem(key="Day", value=world_time.day),
+            KvRow(key="Day", value=world_time.day),
         ]
         return ProjectedSection(
             section_id="sandbox_time",
@@ -172,6 +192,319 @@ class SandboxStoryInfoProjector:
         )
 
 
+@on_advertise_info_channels(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def advertise_sandbox_info_channels(
+    *,
+    caller: SandboxLocation,
+    ctx: PhaseCtx,
+    **_kw: object,
+) -> list[InfoAffordance]:
+    """Advertise sandbox story-info channels for the active location."""
+    projection = sandbox_projection_state(caller, ctx)
+    affordances = [
+        InfoAffordance(
+            kind="world_time",
+            label="Watch",
+            shortcuts=["t", "time"],
+            query={"kinds": ["world_time"]},
+        ),
+        InfoAffordance(
+            kind="location",
+            label="Here",
+            shortcuts=["h", "look"],
+            query={"kinds": ["location", "presence"]},
+        ),
+        InfoAffordance(
+            kind="inventory",
+            label="Carrying",
+            shortcuts=["i", "inv"],
+            query={"kinds": ["inventory"]},
+        ),
+        InfoAffordance(
+            kind=MAP_KIND,
+            label="Map",
+            shortcuts=["m", MAP_KIND],
+            query={"kinds": [MAP_KIND], "scope": "known"},
+        ),
+    ]
+    if projection.suppress_location_description:
+        return affordances
+    if not projection.suppress_asset_affordances:
+        affordances.append(
+            InfoAffordance(
+                kind="local_assets",
+                label="Here",
+                shortcuts=["a", "assets"],
+                query={"kinds": ["local_assets"]},
+            )
+        )
+    if not projection.suppress_fixture_affordances:
+        affordances.append(
+            InfoAffordance(
+                kind="fixtures",
+                label="Fixtures",
+                shortcuts=["f"],
+                query={"kinds": ["fixtures"]},
+            )
+        )
+    affordances.append(
+        InfoAffordance(
+            kind="presence",
+            label="Present",
+            shortcuts=["p"],
+            query={"kinds": ["presence"]},
+        )
+    )
+    affordances.append(
+        InfoAffordance(
+            kind="exits",
+            label="Exits",
+            shortcuts=["x"],
+            query={"kinds": ["exits"]},
+        )
+    )
+    return affordances
+
+
+@on_get_story_info(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_map_info(
+    *,
+    caller: SandboxLocation,
+    ctx: PhaseCtx,
+    request: StoryInfoRequest,
+    **_kw: object,
+) -> list[ProjectedSection] | None:
+    """Project requested disclosed sandbox channels for side-panel clients."""
+    requested = set(request.requested_kinds())
+    if not requested:
+        return None
+    if requested.isdisjoint(SANDBOX_INFO_KINDS):
+        return None
+
+    sections: list[ProjectedSection] = []
+    status_sections = SandboxStoryInfoProjector().sections_for(caller, ctx=ctx)
+    sections.extend(
+        section
+        for section in status_sections
+        if _section_matches_requested(section, requested)
+    )
+
+    map_sections = _requested_map_sections(caller, ctx=ctx, requested=requested)
+    sections.extend(map_sections)
+    return sections or None
+
+
+def _requested_map_sections(
+    location: SandboxLocation,
+    *,
+    ctx: PhaseCtx,
+    requested: set[str],
+) -> list[ProjectedSection]:
+    if not _map_requested(requested):
+        return []
+    sections = _map_sections(location, ctx)
+    if MAP_KIND in requested:
+        return sections
+    return [
+        section
+        for section in sections
+        if _section_matches_requested(section, requested)
+    ]
+
+
+def _map_requested(requested: set[str]) -> bool:
+    return not requested.isdisjoint({MAP_KIND, "map_nodes", "map_edges"})
+
+
+def _map_sections(location: SandboxLocation, ctx: PhaseCtx) -> list[ProjectedSection]:
+    nodes = _known_map_locations(location, ctx)
+    edge_rows = _map_edge_rows(location, ctx=ctx, known_locations=nodes)
+    return [
+        ProjectedSection(
+            section_id="sandbox_map_summary",
+            title="Map",
+            kind=MAP_KIND,
+            value=KvListValue(
+                items=[
+                    KvRow(
+                        key="Current",
+                        value=location.location_name or location.get_label(),
+                    ),
+                    KvRow(key="Known locations", value=len(nodes)),
+                    KvRow(key="Known exits", value=len(edge_rows)),
+                ]
+            ),
+        ),
+        ProjectedSection(
+            section_id="sandbox_map_nodes",
+            title="Known Places",
+            kind="map_nodes",
+            value=ItemListValue(
+                items=[_map_node_item(node, current=location) for node in nodes]
+            ),
+        ),
+        ProjectedSection(
+            section_id="sandbox_map_edges",
+            title="Known Paths",
+            kind="map_edges",
+            value=TableValue(
+                columns=["From", "Direction", "To", "State"],
+                rows=edge_rows,
+            ),
+        ),
+    ]
+
+
+def _known_map_locations(
+    location: SandboxLocation,
+    ctx: PhaseCtx,
+) -> list[SandboxLocation]:
+    projection = sandbox_projection_state(location, ctx)
+    known_by_label: dict[str, SandboxLocation] = {location.get_label(): location}
+    for candidate in location.graph.find_all(Selector(has_kind=SandboxLocation)):
+        if not isinstance(candidate, SandboxLocation):
+            continue
+        if candidate.locals.get("_visited"):
+            known_by_label[candidate.get_label()] = candidate
+    if not projection.suppress_location_description:
+        for exit_value in location.links.values():
+            target = _exit_target_location(location, exit_value)
+            if target is not None:
+                known_by_label.setdefault(target.get_label(), target)
+    return sorted(known_by_label.values(), key=lambda node: node.get_label())
+
+
+def _map_edge_rows(
+    location: SandboxLocation,
+    *,
+    ctx: PhaseCtx,
+    known_locations: list[SandboxLocation],
+) -> list[list[str]]:
+    known_labels = {node.get_label() for node in known_locations}
+    projection = sandbox_projection_state(location, ctx)
+    rows: list[list[str]] = []
+    for source in known_locations:
+        source_is_disclosed = source.locals.get("_visited") or (
+            source is location and not projection.suppress_location_description
+        )
+        if not source_is_disclosed:
+            continue
+        for direction, exit_value in sorted(source.links.items()):
+            rows.append(
+                _map_edge_row(
+                    source,
+                    direction=direction,
+                    exit_value=exit_value,
+                    known_labels=known_labels,
+                )
+            )
+    return rows
+
+
+def _map_node_item(
+    location: SandboxLocation,
+    *,
+    current: SandboxLocation,
+) -> ProjectedItem:
+    tags = ["location"]
+    detail: str | None = None
+    if location is current:
+        tags.append("current")
+        detail = "current"
+    elif location.locals.get("_visited"):
+        tags.append("visited")
+        detail = "visited"
+    else:
+        tags.append("adjacent")
+        detail = "nearby"
+    return ProjectedItem(
+        label=location.location_name or location.get_label(),
+        detail=detail,
+        tags=tags,
+    )
+
+
+def _map_edge_row(
+    source: SandboxLocation,
+    *,
+    direction: str,
+    exit_value: str | SandboxExit,
+    known_labels: set[str],
+) -> list[str]:
+    target = _exit_target_location(source, exit_value)
+    target_label = _map_target_label(
+        target=target,
+        target_ref=exit_value.target if isinstance(exit_value, SandboxExit) else exit_value,
+        known_labels=known_labels,
+    )
+    return [
+        source.location_name or source.get_label(),
+        normalize_sandbox_direction(direction),
+        target_label,
+        _map_exit_state(source, exit_value),
+    ]
+
+
+def _exit_target_location(
+    location: SandboxLocation,
+    exit_value: str | SandboxExit,
+) -> SandboxLocation | None:
+    target_ref = exit_value.target if isinstance(exit_value, SandboxExit) else exit_value
+    if target_ref is None:
+        return None
+    target = location.graph.find_one(Selector(label=target_ref))
+    if isinstance(target, SandboxLocation):
+        return target
+    return None
+
+
+def _map_target_label(
+    *,
+    target: SandboxLocation | None,
+    target_ref: str | None,
+    known_labels: set[str],
+) -> str:
+    if target is None:
+        return (target_ref or "unknown").replace("_", " ")
+    if target.get_label() in known_labels:
+        return target.location_name or target.get_label()
+    return "undiscovered"
+
+
+def _map_exit_state(
+    location: SandboxLocation,
+    exit_value: str | SandboxExit,
+) -> str:
+    if isinstance(exit_value, SandboxExit) and exit_value.kind == "message":
+        return "blocked"
+    parts: list[str] = ["open"]
+    if isinstance(exit_value, SandboxExit) and exit_value.through:
+        try:
+            fixture = location.fixture_by_label(exit_value.through)
+        except KeyError:
+            parts.append(f"via {exit_value.through}")
+        else:
+            parts = [_fixture_map_state(fixture)]
+    return ", ".join(parts)
+
+
+def _fixture_map_state(fixture: SandboxFixture) -> str:
+    parts: list[str] = []
+    if fixture.lockable is not None:
+        parts.append("locked" if fixture.locked else "unlocked")
+    if fixture.openable is not None:
+        parts.append("open" if fixture.open else "closed")
+    if not parts:
+        parts.append("open")
+    return ", ".join(parts)
+
+
 def _period_label(period: int, labels: Sequence[str]) -> str:
     if 1 <= period <= len(labels):
         return labels[period - 1]
@@ -185,6 +518,16 @@ def _section_empty(section: ProjectedSection) -> bool:
     if isinstance(value, ItemListValue):
         return not value.items
     return False
+
+
+def _section_matches_requested(
+    section: ProjectedSection,
+    requested: set[str],
+) -> bool:
+    labels = {section.section_id}
+    if section.kind is not None:
+        labels.add(section.kind)
+    return not labels.isdisjoint(requested)
 
 
 def _asset_items(holder: HasAssets | None) -> list[ProjectedItem]:
@@ -292,5 +635,8 @@ def _target_name(location: SandboxLocation, target_ref: str | None) -> str | Non
 
 __all__ = [
     "DEFAULT_PERIOD_LABELS",
+    "MAP_KIND",
     "SandboxStoryInfoProjector",
+    "advertise_sandbox_info_channels",
+    "project_sandbox_map_info",
 ]

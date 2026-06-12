@@ -30,7 +30,7 @@ describe('AppFooter', () => {
   it('displays version and year', () => {
     const wrapper = mountFooter()
 
-    expect(wrapper.text()).toContain('WebTangl v3.7.0')
+    expect(wrapper.text()).toContain('WebTangl v3.8')
     expect(wrapper.text()).toContain(new Date().getFullYear().toString())
   })
 })

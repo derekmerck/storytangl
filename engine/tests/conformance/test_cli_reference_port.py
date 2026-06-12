@@ -6,6 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 
 ROOT = Path(__file__).parents[3]
@@ -36,6 +37,24 @@ def _render(name: str) -> str:
 def _render_proposal(name: str) -> str:
     payload = PORT.load_fixture(PROPOSAL_DIR / name)
     return "\n".join(PORT.render_fixture(payload))
+
+
+def _available_info_affordances(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    metadata = payload.get("metadata")
+    assert isinstance(metadata, dict)
+    affordances = metadata.get("info_affordances")
+    assert isinstance(affordances, list)
+    info_state = metadata.get("info_state")
+    if not isinstance(info_state, dict) or "available_kinds" not in info_state:
+        return [item for item in affordances if isinstance(item, dict)]
+
+    available_kinds = info_state.get("available_kinds")
+    assert isinstance(available_kinds, list)
+    return [
+        item
+        for item in affordances
+        if isinstance(item, dict) and (item.get("kind") or "info") in available_kinds
+    ]
 
 
 def test_cli_reference_port_stays_json_only() -> None:
@@ -78,13 +97,19 @@ def test_cli_reference_renders_story_flow_choices_and_events() -> None:
 
     assert "Rain drums on the thatch." in output
     assert "Stranger [low, confidential]: They say you're headed north." in output
-    assert "1) Pay the forty silver." in output
-    assert "x) Lift the map while he drinks. [locked: Requires Sleight of Hand >= 2]" in output
+    assert "1) Pay the forty silver. [cost: purse -40 silver]" in output
+    assert (
+        "x) Lift the map while he drinks. "
+        "[locked: Requires Sleight of Hand >= 2] "
+        "[blockers: Sleight of Hand 1, need 2.]"
+        in output
+    )
     assert '[event:achievement_progress] {"id": "met_10_strangers", "progress": "7/10"}' in output
 
 
 def test_cli_reference_renders_piece_zone_and_payload_prompts() -> None:
     output = _render("sandbox_payload.json")
+    compose_output = _render("compose_payload.json")
 
     assert "Here:" in output
     assert "- brass lamp [available]" in output
@@ -92,14 +117,88 @@ def test_cli_reference_renders_piece_zone_and_payload_prompts() -> None:
     assert "2) Take something. <select 1 piece from Here>" in output
     assert "3) Name your sword. <text: e.g. Hopebreaker>" in output
     assert "4) Offer coins. <quantity 1-7 coin>" in output
+    assert "1) Give coins. <compose: amount, target>" in compose_output
 
 
 def test_cli_reference_renders_command_hints_as_advisory_prompt() -> None:
     output = _render("command_hints.json")
 
-    assert "[interpretation:impossible]" in output
+    assert "[interpretation:blocked]" in output
     assert "You can't eat the mailbox." in output
+    assert "blocked: The mailbox is fixed to the wall." in output
+    assert "hint: Try opening it instead." in output
     assert ">) Try a command. <command: e.g. take lamp>" in output
+
+
+def test_cli_reference_renders_info_affordances_as_queryable_commands() -> None:
+    sandbox_output = _render("sandbox_info_channels.json")
+    credentials_output = _render("credentials_shift.json")
+
+    assert "Story info:" in sandbox_output
+    assert "? Map: /info map (shortcuts: /m, /map) query=" in sandbox_output
+    assert '"scope": "known"' in sandbox_output
+    assert "? Today's rules: /info rules (shortcuts: /r, /rules)" in credentials_output
+    assert "? Shift progress: /info roster_progress (shortcuts: /p, /shift)" in credentials_output
+    assert "? Findings: /info case_summary (shortcuts: /c, /findings)" in credentials_output
+
+
+def test_cli_reference_makes_every_available_info_affordance_reachable() -> None:
+    for name in ("sandbox_info_channels.json", "credentials_shift.json"):
+        payload = PORT.load_fixture(FIXTURE_DIR / name)
+        document = PORT.render_fixture_document(payload)
+        floor_items = {
+            item.data["kind"]: item
+            for item in document.items
+            if item.role == "info_affordance" and item.data is not None
+        }
+        advertised = _available_info_affordances(payload)
+
+        assert set(floor_items) == {str(item["kind"]) for item in advertised}
+        for affordance in advertised:
+            kind = str(affordance["kind"])
+            item = floor_items[kind]
+            commands = item.data["commands"]
+            assert f"/info {kind}" in commands
+            assert f"/info {kind}" in item.text
+            assert item.data["query"] == affordance.get("query")
+            for shortcut in affordance.get("shortcuts", []):
+                assert f"/{shortcut}" in commands
+                assert f"/{shortcut}" in item.text
+
+
+def test_cli_reference_hides_unavailable_info_affordances() -> None:
+    payload = {
+        "cursor_id": "fixture",
+        "step": 1,
+        "fragments": [
+            {
+                "uid": "scene",
+                "fragment_type": "group",
+                "group_type": "scene",
+                "member_ids": [],
+            }
+        ],
+        "metadata": {
+            "info_affordances": [
+                {"kind": "map", "label": "Map", "shortcuts": ["m"]},
+                {"kind": "inventory", "label": "Carrying", "shortcuts": ["i"]},
+            ],
+            "info_state": {
+                "version": 1,
+                "dirty_kinds": ["map"],
+                "available_kinds": ["map"],
+            },
+        },
+    }
+
+    document = PORT.render_fixture_document(payload)
+    visible_kinds = [
+        item.data["kind"]
+        for item in document.items
+        if item.role == "info_affordance" and item.data is not None
+    ]
+
+    assert visible_kinds == ["map"]
 
 
 def test_cli_reference_renders_projected_state_value_types() -> None:
@@ -158,6 +257,7 @@ def test_cli_reference_can_inspect_proposal_fixtures_without_promoting_them() ->
     garage_output = _render_proposal("carwars_garage_turn.json")
     roll_output = _render_proposal("roll_fragment.json")
     kv_output = _render_proposal("record_kvrow.json")
+    interpretation_output = _render_proposal("wireframe_v15_interpretation_samples.json")
 
     assert "1) Mount a weapon. <place from parts on hand to turret>" in garage_output
     assert "2) Buy from Murph's. <select 0-2 pieces from Murph's wares>" in garage_output
@@ -165,3 +265,5 @@ def test_cli_reference_can_inspect_proposal_fixtures_without_promoting_them() ->
     assert "- Rocket Launcher Mk II [offer, locked: Out of stock until next session.]" in garage_output
     assert "[roll:dice] Driving check: 2d6 rolled 4 + 5 = 9 vs 12 outcome=fail." in roll_output
     assert "Fuel: 6" in kv_output
+    assert '[interpretation:ambiguous] "take key"' in interpretation_output
+    assert "candidates: 00000000-0000-4000-8000-000000017101" in interpretation_output

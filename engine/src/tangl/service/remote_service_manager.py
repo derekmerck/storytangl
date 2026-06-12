@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -14,18 +15,7 @@ import requests
 from pydantic import ValidationError as PydanticValidationError
 
 from tangl.core import BaseFragment
-from tangl.journal.fragments import (
-    AttributedFragment,
-    BlockFragment,
-    ChoiceFragment,
-    ContentFragment,
-    ControlFragment,
-    DialogFragment,
-    GroupFragment,
-    KvFragment,
-    MediaFragment,
-    UserEventFragment,
-)
+from tangl.journal.fragments import fragment_from_dto
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.persistence import PersistenceManager
 from tangl.type_hints import Identifier, UnstructuredData
@@ -40,6 +30,7 @@ from .exceptions import (
     ValidationError,
 )
 from .response import (
+    JsonValue,
     ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
@@ -62,21 +53,6 @@ _STANDARD_RUNTIME_INFO_FIELDS = {
     "step",
     "details",
 }
-_KNOWN_FRAGMENT_TYPES: dict[str, type[BaseFragment]] = {
-    "attributed": AttributedFragment,
-    "block": BlockFragment,
-    "choice": ChoiceFragment,
-    "content": ContentFragment,
-    "delete": ControlFragment,
-    "dialog": DialogFragment,
-    "group": GroupFragment,
-    "kv": KvFragment,
-    "media": MediaFragment,
-    "update": ControlFragment,
-    "user_event": UserEventFragment,
-}
-
-
 class RemoteServiceManager(ServiceManager):
     """Service-manager adapter that fulfills calls through the REST API."""
 
@@ -248,21 +224,12 @@ class RemoteServiceManager(ServiceManager):
             raise ServiceError(f"Remote service returned invalid {label} payload") from exc
 
     def _decode_fragment(self, payload: object) -> BaseFragment:
-        if not isinstance(payload, Mapping):
-            return BaseFragment(fragment_type="unknown", content=payload)
-
-        raw_fragment = dict(payload)
-        fragment_type = raw_fragment.get("fragment_type")
-        if not isinstance(fragment_type, str) or not fragment_type:
-            return BaseFragment(fragment_type="unknown", content=raw_fragment)
-
-        fragment_model = _KNOWN_FRAGMENT_TYPES.get(fragment_type)
-        if fragment_model is None:
-            return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
-
         try:
-            return fragment_model.model_validate(raw_fragment)
+            return fragment_from_dto(payload)
         except PydanticValidationError as exc:
+            fragment_type = (
+                payload.get("fragment_type") if isinstance(payload, Mapping) else "unknown"
+            )
             raise ServiceError(
                 f"Remote service returned invalid {fragment_type} fragment payload",
             ) from exc
@@ -425,7 +392,7 @@ class RemoteServiceManager(ServiceManager):
     def resolve_choice(
         self,
         *,
-        choice_id: UUID,
+        edge_id: UUID,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: UserAuthInfo | None = None,
@@ -438,7 +405,7 @@ class RemoteServiceManager(ServiceManager):
             "POST",
             "/story/do",
             auth_required=True,
-            json_body={"choice_id": str(choice_id), "payload": choice_payload},
+            json_body={"edge_id": str(edge_id), "payload": choice_payload},
         )
         return self._decode_runtime_envelope(payload)
 
@@ -483,11 +450,26 @@ class RemoteServiceManager(ServiceManager):
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: UserAuthInfo | None = None,
+        kind: str | None = None,
+        kinds: list[str] | None = None,
+        query: dict[str, JsonValue] | None = None,
     ) -> ProjectedState:
         self._validate_user_auth(user_id=user_id, user_auth=user_auth)
         self._check_bound_user(user_id)
         _ = ledger_id
-        payload = self._request("GET", "/story/info", auth_required=True)
+        params: dict[str, object] = {}
+        if kind is not None:
+            params["kind"] = kind
+        if kinds:
+            params["kinds"] = ",".join(kinds)
+        if query is not None:
+            params["query"] = json.dumps(query)
+        payload = self._request(
+            "GET",
+            "/story/info",
+            auth_required=True,
+            params=params,
+        )
         return self._decode_model(ProjectedState, payload, label="projected state")
 
     @service_method(

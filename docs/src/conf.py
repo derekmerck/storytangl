@@ -17,7 +17,7 @@ sys.path.insert(0, str(DOCS_EXT))
 project = 'StoryTangl'
 copyright = '2025, tangldev'
 author = 'tangldev'
-release = '3.7'
+release = '3.8'
 
 # -- General configuration ---------------------------------------------------
 

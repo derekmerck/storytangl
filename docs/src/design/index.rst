@@ -24,7 +24,13 @@ See also
    story/STORYTANGL_WIDGET_VOCAB
    story/WIDGET_CONTRACT_RECONCILIATION
    story/WIDGET_WIREFRAMES
+   story/brand/README
+   story/brand/v1_0/USAGE
+   story/GENRE_AUDIT_NOTES
    story/bundles/carwars/EXTENSIONS
+   story/bundles/credentials/EXTENSIONS
+   story/bundles/elefant_hunt/EXTENSIONS
+   story/bundles/training/EXTENSIONS
    story/INTERACTION_VOCABULARY
    story/JOURNAL_COMPOSE_CONTRACT
    story/BEAT_COMPOSITION
@@ -37,6 +43,7 @@ See also
    story/compilers
    story/notes-create_world
 
+   planning/AFFORDANCE_MODEL
    planning/COST_MODEL
    planning/PLANNING_DESIGN
    planning/PROVISIONING
@@ -50,6 +57,7 @@ See also
    traversal/notes-sinks
 
    service/SERVICE_DESIGN
+   service/BACKEND_FRAGMENT_RECONCILIATION
    service/RESPONSE_TYPES
    service/FRAGMENT_STREAM_CONTRACT
 

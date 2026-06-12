@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import ContentFragmentView from './ContentFragmentView.vue'
 import GroupFragmentView from './GroupFragmentView.vue'
+import InterpretationFragmentView from './InterpretationFragmentView.vue'
 import KvFragmentView from './KvFragmentView.vue'
 import MediaFragmentView from './MediaFragmentView.vue'
 import RollFragmentView from './RollFragmentView.vue'
@@ -14,6 +15,7 @@ import { useGlobal } from '@/composables/globals'
 import {
   isChoiceFragment,
   isGroupFragment,
+  isInterpretationFragment,
   isMediaFragment,
   isPieceFragment,
   isRollFragment,
@@ -78,6 +80,11 @@ const handleAction = (uid: string, payload?: unknown) => {
         <PieceFragmentView v-else-if="isPieceFragment(fragment)" :fragment="fragment" />
 
         <RollFragmentView v-else-if="isRollFragment(fragment)" :fragment="fragment" />
+
+        <InterpretationFragmentView
+          v-else-if="isInterpretationFragment(fragment)"
+          :fragment="fragment"
+        />
 
         <UnknownFragmentFallback v-else :fragment="fragment" />
       </div>

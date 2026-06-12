@@ -49,7 +49,7 @@ def _build_game_actions(cursor: HasGame) -> list[Any]:
     from tangl.story import Action
 
     actions: list[Action] = []
-    for move in cursor.game_handler.get_available_moves(cursor.game):
+    for move in cursor.game_handler.get_provisioned_moves(cursor.game):
         actions.append(
             Action(
                 graph=cursor.graph,
@@ -57,6 +57,7 @@ def _build_game_actions(cursor: HasGame) -> list[Any]:
                 successor_id=cursor.uid,
                 label=cursor.game_handler.get_move_label(cursor.game, move),
                 payload={"move": move},
+                accepts=cursor.game_handler.get_move_accepts(cursor.game, move),
                 tags={"dynamic", "fanout", "game"},
             )
         )
@@ -161,15 +162,16 @@ def provision_game_moves(
     """
     Provision self-loop :class:`~tangl.story.episode.action.Action` choices for moves.
 
-    When the game is READY, the handler queries available moves from the
-    game handler and returns one :class:`~tangl.story.episode.action.Action`
-    per move. Each action is a self-loop with the move stored in ``payload``
-    for later processing during :data:`~tangl.vm.resolution_phase.ResolutionPhase.UPDATE`.
+    When the game is READY, the handler queries client-facing provisioned moves
+    from the game handler and returns one
+    :class:`~tangl.story.episode.action.Action` per move. Each action is a
+    self-loop with the move stored in ``payload`` for later processing during
+    :data:`~tangl.vm.resolution_phase.ResolutionPhase.UPDATE`.
 
     Returns
     -------
     list[Action]
-        One action per available move, or an empty list when the game is not
+        One action per provisioned move, or an empty list when the game is not
         accepting player input.
     """
 
@@ -198,7 +200,7 @@ def provision_game_moves(
     if cursor.game.phase != GamePhase.READY:
         return None if runtime_planning else []
 
-    moves = cursor.game_handler.get_available_moves(cursor.game)
+    moves = cursor.game_handler.get_provisioned_moves(cursor.game)
 
     if not moves:
         logger.warning("No available moves at %s despite READY phase", cursor.get_label())
@@ -227,7 +229,8 @@ def process_game_move(
     """
     Apply the player's selected move through the game handler.
 
-    Extracts ``move`` from the selected action payload, forwards it to
+    Extracts ``move`` from the selected action payload, resolves any submitted
+    widget data through the game handler, then forwards the concrete move to
     :meth:`~tangl.mechanics.games.handler.GameHandler.receive_move`, and
     records round/game outcomes in ``cursor.locals`` for downstream JOURNAL
     and CONTEXT phases.
@@ -252,6 +255,7 @@ def process_game_move(
     if move is None:
         logger.warning("Selected edge missing move payload at %s", cursor.get_label())
         return None
+    move = cursor.game_handler.resolve_move_payload(cursor.game, move, payload)
 
     if cursor.game.phase != GamePhase.READY:
         logger.warning(
@@ -328,11 +332,6 @@ def generate_game_journal(
     if not isinstance(cursor, HasGame):
         return []
 
-    last_round = cursor.locals.get("last_round")
-    if not last_round:
-        logger.debug("No last_round available for journal at %s", cursor.get_label())
-        return []
-
     custom_fragments = cursor.game_handler.get_journal_fragments(cursor.game)
     if custom_fragments is not None:
         logger.debug(
@@ -341,6 +340,11 @@ def generate_game_journal(
             cursor.get_label(),
         )
         return custom_fragments
+
+    last_round = cursor.locals.get("last_round")
+    if not last_round:
+        logger.debug("No last_round available for journal at %s", cursor.get_label())
+        return []
 
     fragments: list[ContentFragment] = []
 

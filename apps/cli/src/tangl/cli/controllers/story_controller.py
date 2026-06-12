@@ -1,87 +1,27 @@
 from __future__ import annotations
 
 import argparse
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+import json
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
+
+from tangl.service.response import ProjectedState, RuntimeEnvelope
 
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
 
 
-def _fragment_text(fragment: Any) -> str:
-    for attr in ("content", "text", "label"):
-        value = getattr(fragment, attr, None)
-        if isinstance(value, str) and value.strip():
-            return value.strip().replace("_", " ")
-    return str(fragment)
-
-
-def _projected_section_lines(section: dict[str, Any]) -> list[str]:
-    value = section.get("value")
-    if not isinstance(value, dict):
-        return [str(value)] if value is not None else []
-
-    value_type = value.get("value_type")
-    if value_type == "kv_list":
-        items = value.get("items")
-        if not isinstance(items, list):
-            return []
-        return [
-            f"{item.get('key')}: {item.get('value')}"
-            for item in items
-            if isinstance(item, dict) and item.get("key") is not None
-        ]
-
-    if value_type == "item_list":
-        items = value.get("items")
-        if not isinstance(items, list):
-            return []
-        lines: list[str] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            label = item.get("label")
-            if label is None:
-                continue
-            line = str(label)
-            detail = item.get("detail")
-            tags = item.get("tags")
-            extras: list[str] = []
-            if detail:
-                extras.append(str(detail))
-            if isinstance(tags, list) and tags:
-                extras.append(", ".join(str(tag) for tag in tags))
-            if extras:
-                line = f"{line}: {' | '.join(extras)}"
-            lines.append(line)
-        return lines
-
-    if value_type == "table":
-        columns = value.get("columns")
-        rows = value.get("rows")
-        if not isinstance(columns, list) or not isinstance(rows, list):
-            return []
-        lines = [" | ".join(str(column) for column in columns)]
-        for row in rows:
-            if isinstance(row, list):
-                lines.append(" | ".join(str(cell) for cell in row))
-        return lines
-
-    if value_type == "badges":
-        badges = value.get("items")
-        if isinstance(badges, list) and badges:
-            return [", ".join(str(item) for item in badges)]
-        return []
-
-    if value_type == "scalar":
-        scalar = value.get("value")
-        return [str(scalar)] if scalar is not None else []
-
-    return [str(value)]
+@dataclass(frozen=True)
+class _CachedChoice:
+    edge_id: UUID
+    label: str
+    available: bool
+    unavailable_reason: str | None
+    accepts: dict[str, Any] | None
 
 
 @with_default_category("Story")
@@ -92,8 +32,9 @@ class StoryController(CommandSet):
 
     def __init__(self) -> None:
         super().__init__()
-        self._current_story_update: list[Any] = []
-        self._current_choices: list[SimpleNamespace] = []
+        self._current_story_update: list[dict[str, Any]] = []
+        self._current_choices: list[_CachedChoice] = []
+        self._current_metadata: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # helpers
@@ -108,104 +49,117 @@ class StoryController(CommandSet):
         return True
 
     def _render_current_story_update(self) -> None:
-        if not self._current_story_update:
-            self._cmd.poutput("No journal entries available.")
-            return
+        self._cmd.emit_terminal(
+            self._cmd.terminal_renderer.story_update(
+                fragments=self._current_story_update,
+                choices=self._current_choices,
+                metadata=self._current_metadata,
+            )
+        )
 
-        self._cmd.poutput("Story Update:")
-        self._cmd.poutput("-------------------------")
+    def _load_choices_from_fragments(self) -> list[_CachedChoice]:
+        """Extract actionable choices from the canonical fragment DTO stream."""
+
+        choices: list[_CachedChoice] = []
         for fragment in self._current_story_update:
-            self._cmd.poutput(_fragment_text(fragment))
-
-        if not self._current_choices:
-            self._cmd.poutput("No available choices.")
-            return
-
-        self._cmd.poutput("Choices:")
-        active_index = 1
-        for choice in self._current_choices:
-            label = choice.label or str(choice.uid)
-            is_active = getattr(choice, "active", True)
-            reason = getattr(choice, "unavailable_reason", None)
-            if is_active:
-                self._cmd.poutput(f"{active_index}. {label}")
-                active_index += 1
+            if fragment.get("fragment_type") != "choice":
                 continue
-            reason_text = f" [locked: {reason}]" if reason else " [locked]"
-            self._cmd.poutput(f"x) {label}{reason_text}")
 
-    def _load_choices_from_fragments(self) -> list[SimpleNamespace]:
-        """Extract choices from fragment stream (from blocks or loose)."""
+            edge_id = fragment.get("edge_id")
+            if edge_id is None:
+                continue
 
-        choices: list[SimpleNamespace] = []
-
-        for fragment in self._current_story_update:
-            ftype = getattr(fragment, "fragment_type", None)
-
-            if ftype == "block":
-                embedded = getattr(fragment, "choices", None) or []
-                for choice_frag in embedded:
-                    uid = (
-                        getattr(choice_frag, "edge_id", None)
-                        or getattr(choice_frag, "source_id", None)
-                        or getattr(choice_frag, "uid", None)
-                    )
-                    label = (
-                        getattr(choice_frag, "label", None)
-                        or getattr(choice_frag, "content", "")
-                        or getattr(choice_frag, "text", "")
-                        or getattr(choice_frag, "source_label", "")
-                    )
-                    active = getattr(choice_frag, "active", True)
-                    reason = getattr(choice_frag, "unavailable_reason", None)
-
-                    if uid:
-                        choices.append(
-                            SimpleNamespace(
-                                uid=UUID(str(uid)),
-                                label=label.replace("_", " "),
-                                active=active,
-                                unavailable_reason=reason,
-                            )
-                        )
-
-            elif ftype == "choice":
-                uid = (
-                    getattr(fragment, "edge_id", None)
-                    or getattr(fragment, "source_id", None)
-                    or getattr(fragment, "uid", None)
+            accepts = fragment.get("accepts")
+            choices.append(
+                _CachedChoice(
+                    edge_id=UUID(str(edge_id)),
+                    label=str(fragment.get("text") or "choice"),
+                    available=bool(fragment.get("available", True)),
+                    unavailable_reason=fragment.get("unavailable_reason"),
+                    accepts=dict(accepts) if isinstance(accepts, dict) else None,
                 )
-                label = (
-                    getattr(fragment, "label", None)
-                    or getattr(fragment, "content", "")
-                    or getattr(fragment, "text", "")
-                    or getattr(fragment, "source_label", "")
-                )
-                active = getattr(fragment, "active", True)
-                reason = getattr(fragment, "unavailable_reason", None)
-
-                if uid:
-                    choices.append(
-                        SimpleNamespace(
-                            uid=UUID(str(uid)),
-                            label=label.replace("_", " "),
-                            active=active,
-                            unavailable_reason=reason,
-                        )
-                    )
+            )
 
         return choices
 
     def _call_service(self, method_name: str, **params: Any) -> Any:
         return self._cmd.call_service(method_name, **params)
 
-    def _apply_runtime_envelope(self, envelope: Any) -> None:
-        metadata = getattr(envelope, "metadata", None) or {}
-        ledger_id_value = metadata.get("ledger_id")
+    def _apply_runtime_envelope(self, envelope: RuntimeEnvelope) -> None:
+        payload = envelope.to_dto()
+        self._current_metadata = payload.get("metadata", {})
+        ledger_id_value = self._current_metadata.get("ledger_id")
         if ledger_id_value is not None:
             self._cmd.set_ledger(UUID(str(ledger_id_value)))
-        self._current_story_update = list(getattr(envelope, "fragments", []) or [])
+        self._current_story_update = payload["fragments"]
         self._current_choices = self._load_choices_from_fragments()
+
+    @staticmethod
+    def _choice_payload(
+        choice: _CachedChoice,
+        values: list[str],
+        raw_payload: str | None,
+    ) -> dict[str, Any] | None:
+        """Build one documented choice payload from CLI input."""
+
+        if raw_payload is not None:
+            if values:
+                raise ValueError("Use positional values or --payload, not both.")
+            try:
+                payload = json.loads(raw_payload)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSON payload: {exc.msg}") from exc
+            if not isinstance(payload, dict):
+                raise ValueError("--payload must decode to a JSON object.")
+            return payload
+
+        accepts = choice.accepts
+        kind = accepts.get("kind", "pick") if accepts is not None else "pick"
+        if kind == "pick":
+            if values:
+                raise ValueError("This choice does not accept an input value.")
+            return {}
+
+        if kind in {"text", "raw_command"}:
+            text = " ".join(values).strip()
+            required = kind == "raw_command" or bool(accepts.get("required", True))
+            if required and not text:
+                raise ValueError(f"This choice requires {kind.replace('_', ' ')} input.")
+            return {"text": text}
+
+        if kind == "quantity":
+            if len(values) != 1:
+                raise ValueError("This choice requires one integer quantity.")
+            try:
+                quantity = int(values[0])
+            except ValueError as exc:
+                raise ValueError("Quantity must be an integer.") from exc
+
+            minimum = accepts.get("min")
+            maximum = accepts.get("max")
+            step = accepts.get("step", 1)
+            if isinstance(minimum, int) and quantity < minimum:
+                raise ValueError(f"Quantity must be at least {minimum}.")
+            if isinstance(maximum, int) and quantity > maximum:
+                raise ValueError(f"Quantity must be at most {maximum}.")
+            if isinstance(step, int) and step > 1:
+                origin = minimum if isinstance(minimum, int) else 0
+                if (quantity - origin) % step:
+                    raise ValueError(f"Quantity must advance in steps of {step}.")
+            return {"quantity": quantity}
+
+        if kind == "pieces":
+            minimum = accepts.get("min", 1)
+            maximum = accepts.get("max", 1)
+            if isinstance(minimum, int) and len(values) < minimum:
+                raise ValueError(f"Select at least {minimum} piece(s).")
+            if isinstance(maximum, int) and len(values) > maximum:
+                raise ValueError(f"Select at most {maximum} piece(s).")
+            return {"piece_ids": values}
+
+        raise ValueError(
+            f"{kind} input requires an explicit JSON object via --payload."
+        )
 
     # ------------------------------------------------------------------
     # commands
@@ -224,58 +178,48 @@ class StoryController(CommandSet):
         if args.label:
             kwargs["story_label"] = args.label
 
-        result = self._call_service("create_story", **kwargs)
+        result = cast(RuntimeEnvelope, self._call_service("create_story", **kwargs))
         self._apply_runtime_envelope(result)
 
         title = args.world_id
         ledger_id = self._cmd.ledger_id
 
-        self._cmd.poutput(f"\nCreated story: {title}")
-        if ledger_id is not None:
-            self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
-
-        if self._current_story_update:
-            self._cmd.poutput("--- Story Begins ---")
-            for fragment in self._current_story_update:
-                self._cmd.poutput(_fragment_text(fragment))
-            self._cmd.poutput()
-
-        if self._current_choices:
-            self._cmd.poutput("Choices:")
-            active_index = 1
-            for choice in self._current_choices:
-                label = choice.label or str(choice.uid)
-                if getattr(choice, "active", True):
-                    self._cmd.poutput(f"{active_index}. {label}")
-                    active_index += 1
-                    continue
-                reason = getattr(choice, "unavailable_reason", None)
-                reason_text = f" [locked: {reason}]" if reason else " [locked]"
-                self._cmd.poutput(f"x) {label}{reason_text}")
-        else:
-            self._cmd.poutput("(No choices available)")
-
-        self._cmd.poutput("\nUse 'do <number>' to make a choice.")
+        self._cmd.emit_terminal(
+            self._cmd.terminal_renderer.story_created(
+                title=title,
+                ledger_id=ledger_id,
+                fragments=self._current_story_update,
+                choices=self._current_choices,
+                metadata=self._current_metadata,
+            )
+        )
 
     def do_story(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if not self._require_story_context():
             return
 
-        result = self._call_service("get_story_update", limit=10)
+        result = cast(RuntimeEnvelope, self._call_service("get_story_update", limit=10))
         self._apply_runtime_envelope(result)
         self._render_current_story_update()
 
     choose_parser = argparse.ArgumentParser()
     choose_parser.add_argument("action", type=int, help="Choice number to execute")
+    choose_parser.add_argument(
+        "values",
+        nargs="*",
+        help="Text, quantity, or piece identifiers required by the choice",
+    )
+    choose_parser.add_argument(
+        "--payload",
+        help="Explicit JSON object for place, compose, or extension choices",
+    )
 
     @with_argparser(choose_parser)
     def do_do(self, args: argparse.Namespace) -> None:
         if not self._require_story_context():
             return
 
-        active_choices = [
-            choice for choice in self._current_choices if getattr(choice, "active", True)
-        ]
+        active_choices = [choice for choice in self._current_choices if choice.available]
         if not active_choices:
             self._cmd.poutput("No cached choices. Run `story` to refresh choices first.")
             return
@@ -286,9 +230,19 @@ class StoryController(CommandSet):
             return
 
         choice = active_choices[index - 1]
-        result = self._call_service(
-            "resolve_choice",
-            choice_id=choice.uid,
+        try:
+            choice_payload = self._choice_payload(choice, args.values, args.payload)
+        except ValueError as exc:
+            self._cmd.poutput(str(exc))
+            return
+
+        result = cast(
+            RuntimeEnvelope,
+            self._call_service(
+                "resolve_choice",
+                edge_id=choice.edge_id,
+                choice_payload=choice_payload,
+            ),
         )
         self._apply_runtime_envelope(result)
         self._render_current_story_update()
@@ -318,6 +272,7 @@ class StoryController(CommandSet):
         self._cmd.set_ledger(None)
         self._current_story_update.clear()
         self._current_choices.clear()
+        self._current_metadata.clear()
 
         if getattr(result, "status", None) == "error":
             self._cmd.perror(result.message or "Failed to drop story")
@@ -353,36 +308,5 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        info = self._call_service("get_story_info")
-        if hasattr(info, "model_dump"):
-            payload = info.model_dump()
-        elif isinstance(info, dict):
-            payload = info
-        else:
-            payload = {"info": str(info)}
-
-        sections = payload.get("sections")
-        if isinstance(sections, list):
-            if not sections:
-                self._cmd.poutput("No status data available.")
-                return
-
-            for index, section in enumerate(sections):
-                if not isinstance(section, dict):
-                    self._cmd.poutput(str(section))
-                    continue
-
-                title = section.get("title") or section.get("section_id") or "Section"
-                self._cmd.poutput(f"{title}:")
-                lines = _projected_section_lines(section)
-                if not lines:
-                    self._cmd.poutput("  (No details)")
-                else:
-                    for line in lines:
-                        self._cmd.poutput(f"  {line}")
-                if index < len(sections) - 1:
-                    self._cmd.poutput("")
-            return
-
-        for key, value in payload.items():
-            self._cmd.poutput(f"{key}: {value}")
+        info = cast(ProjectedState, self._call_service("get_story_info"))
+        self._cmd.emit_terminal(self._cmd.terminal_renderer.projected_state(info.to_dto()))

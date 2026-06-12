@@ -87,9 +87,9 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
       uid: 'f-kv-scene',
       fragment_type: 'kv',
       content: [
-        ['time', 'late evening'],
-        ['coin', '63 s'],
-        ['weather', 'rain'],
+        { key: 'time', value: 'late evening' },
+        { key: 'coin', value: '63 s' },
+        { key: 'weather', value: 'rain' },
       ],
       hints: { style_tags: ['status-inline'] },
     },

@@ -7,7 +7,7 @@
 
 # Planning & Provisioning System Design (v3.7)
 
-**Status:** This document reflects the **actual current implementation** as of v3.7.  
+**Status:** Historical v3.7-era reference retained for context.
 **Last Updated:** December 2025  
 **Location:** `engine/src/tangl/vm/provision/` and `engine/src/tangl/vm/dispatch/planning.py`
 
@@ -910,10 +910,12 @@ def test_softlock_with_impossible_requirement():
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 3.7.0 | Nov 2025 | Consolidated from outdated notes. Reflects actual implementation. |
+| 3.7.0 | Nov 2025 | Consolidated from outdated notes. Reflected implementation at the time. |
 
 ---
 
-**Document Status:** ✅ **CURRENT AND ACCURATE**
+**Document Status:** ⚠️ **STALE / HISTORICAL**
 
-This document reflects the actual state of the codebase as of November 2025. All claims about implementation status have been verified against source code.
+This document reflects the v3.7-era planning/provisioning shape as of November 2025.
+Use `engine/src/tangl/vm/VM_DESIGN.md` and
+`engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md` for current architecture.

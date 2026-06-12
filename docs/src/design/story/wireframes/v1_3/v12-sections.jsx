@@ -260,7 +260,7 @@ function cliRenderSandbox(fx) {
 function TierLegend() {
   return (
     <div className="tier-legend" aria-label="tier legend">
-      <span><span className="tier tier-s">S</span> stable in engine v3.7+</span>
+      <span><span className="tier tier-s">S</span> stable in engine v3.8+</span>
       <span><span className="tier tier-p1">P1</span> proposed · next epoch · typed</span>
       <span><span className="tier tier-p2">P2</span> proposed · larger</span>
       <span><span className="tier tier-p3">P3</span> genre extensions (e.g. carwars)</span>

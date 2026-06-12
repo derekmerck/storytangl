@@ -47,7 +47,7 @@ class PickingGame(Game[PickingMove]):
         default_factory=dict,
         json_schema_extra={"reset_field": True},
     )
-    terminal_decision: str | None = Field(
+    committed_decision: str | None = Field(
         default=None,
         json_schema_extra={"reset_field": True},
     )
@@ -96,7 +96,7 @@ class PickingGame(Game[PickingMove]):
                 "picking_inspected_targets": list(self.inspected_targets),
                 "picking_revealed_findings": dict(self.revealed_findings),
                 "picking_num_findings": len(self.revealed_findings),
-                "picking_terminal_decision": self.terminal_decision,
+                "picking_committed_decision": self.committed_decision,
                 "picking_decision_options": self.get_decision_targets(),
             }
         )
@@ -170,17 +170,33 @@ class PickingGameHandler(GameHandler[PickingGameT]):
             "target": player_move.target,
         }
 
-        if player_move.kind == "inspect":
-            game.inspected_targets.append(player_move.target)
-            result = self.resolve_inspection(game, player_move.target, detail)
-        elif player_move.kind == "decide":
-            game.terminal_decision = player_move.target
-            result = self.resolve_decision(game, player_move.target, detail)
-        else:
-            raise ValueError(f"Unknown picking move kind: {player_move.kind}")
+        result = self.resolve_move_kind(player_move.kind, game, player_move, detail)
 
         game.round_detail = detail
         return result
+
+    def resolve_move_kind(
+        self,
+        kind: str,
+        game: PickingGameT,
+        player_move: PickingMove,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        """Dispatch a move by its ``kind``.
+
+        Subclasses register new kinds by overriding this method, handling the
+        new kinds themselves and delegating unknown ones to ``super()``. The
+        base handles the picking kernel's two kinds: ``"inspect"`` and
+        ``"decide"``.
+        """
+
+        if kind == "inspect":
+            game.inspected_targets.append(player_move.target)
+            return self.resolve_inspection(game, player_move.target, detail)
+        if kind == "decide":
+            game.committed_decision = player_move.target
+            return self.resolve_decision(game, player_move.target, detail)
+        raise ValueError(f"Unknown picking move kind: {kind}")
 
     @abstractmethod
     def resolve_inspection(
@@ -215,7 +231,7 @@ class PickingGameHandler(GameHandler[PickingGameT]):
         detail["round_result"] = round_result.value
         detail["inspected_targets"] = list(game.inspected_targets)
         detail["revealed_findings"] = dict(game.revealed_findings)
-        detail["terminal_decision"] = game.terminal_decision
+        detail["committed_decision"] = game.committed_decision
         return detail
 
     def get_journal_fragments(self, game: PickingGameT) -> list[ContentFragment] | None:

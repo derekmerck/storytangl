@@ -234,6 +234,116 @@ describe('StoryStatus', () => {
     expect(wrapper.text()).toContain('2')
   })
 
+  it('skips refreshes when info_state marks the active status kind clean', async () => {
+    const statusHandler = vi.fn(() =>
+      HttpResponse.json({
+        sections: [
+          {
+            section_id: 'turn',
+            title: 'Turn',
+            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
+          },
+        ],
+      }),
+    )
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
+
+    const wrapper = mountStatus({
+      refreshKey: 0,
+      infoState: { ...sandboxInfoState, dirty_kinds: [] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      refreshKey: 1,
+      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: [] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('1')
+  })
+
+  it('refreshes when info_state marks the active status kind dirty', async () => {
+    const statusHandler = vi.fn(() =>
+      HttpResponse.json({
+        sections: [
+          {
+            section_id: 'turn',
+            title: 'Turn',
+            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
+          },
+        ],
+      }),
+    )
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
+
+    const wrapper = mountStatus({
+      refreshKey: 0,
+      infoState: { ...sandboxInfoState, dirty_kinds: [] },
+    })
+    await flushPromises()
+
+    await wrapper.setProps({
+      refreshKey: 1,
+      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: ['status'] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('2')
+  })
+
+  it('uses dirty kinds for the selected info affordance', async () => {
+    const seenKinds: string[] = []
+    const statusHandler = vi.fn(({ request }) => {
+      const kind = new URL(request.url).searchParams.get('kind') ?? 'status'
+      seenKinds.push(kind)
+      return HttpResponse.json({
+        sections: [
+          {
+            section_id: kind,
+            title: kind,
+            value: { value_type: 'scalar', value: `${kind}-${seenKinds.length}` },
+          },
+        ],
+      })
+    })
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
+
+    const wrapper = mountStatus({
+      refreshKey: 0,
+      infoAffordances: sandboxInfoAffordances,
+      infoState: { ...sandboxInfoState, dirty_kinds: [] },
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-info-kind="map"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.setProps({
+      refreshKey: 1,
+      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: ['inventory'] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(2)
+    expect(seenKinds).toEqual(['status', 'map'])
+    expect(wrapper.text()).toContain('map-2')
+
+    await wrapper.setProps({
+      refreshKey: 2,
+      infoState: { ...sandboxInfoState, version: 19, dirty_kinds: ['map'] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(3)
+    expect(seenKinds).toEqual(['status', 'map', 'map'])
+    expect(wrapper.text()).toContain('map-3')
+  })
+
   it('handles empty status payload', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json({})),
