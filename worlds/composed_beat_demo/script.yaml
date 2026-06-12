@@ -1,0 +1,58 @@
+label: composed_beat_demo
+
+metadata:
+  title: "Composed Beat Demo"
+  description: "One scene that exercises every journal contribution channel."
+  start_at: dock.arrival
+
+# Story-scope chunk defaults (data scope). Blocks override these per-node
+# via their own `locals:`; handlers override via gather_ns contributions.
+locals:
+  dock_mood: "The dock lies quiet under a flat grey sky."
+
+scenes:
+  dock:
+    blocks:
+      arrival:
+        kind: "composed_beat_demo.domain.BeatBlock"
+        content: |
+          {dock_mood} {porter_greeting}
+
+          > [!pov] Old Maro
+          > Papers and cargo, friend. In that order.
+        actions:
+          - text: "Tromp up the gangway, boots still muddy"
+            successor: gangway_muddy
+          - text: "Wipe your boots and walk up"
+            successor: gangway_clean
+
+      gangway_muddy:
+        kind: "composed_beat_demo.domain.BeatBlock"
+        reputation_delta: -1
+        content: "{dock_mood} You leave a trail of riverbank halfway up the planks."
+        actions:
+          - text: "Hand over the manifest"
+            successor: declare
+
+      gangway_clean:
+        kind: "composed_beat_demo.domain.BeatBlock"
+        content: "{dock_mood} Your boots knock clean and even on the boards."
+        actions:
+          - text: "Hand over the manifest"
+            successor: declare
+
+      declare:
+        kind: "composed_beat_demo.domain.BeatBlock"
+        incident: "Maro runs a thumb down the manifest and stops. Half these crates are not listed at all."
+        locals:
+          dock_mood: "Up close, the dock is anything but quiet."
+        content: "{dock_mood} You hand over the manifest and wait."
+        actions:
+          - text: "Press on toward the warehouses"
+            successor: fogbound
+
+      fogbound:
+        kind: "composed_beat_demo.domain.BeatBlock"
+        locals:
+          fog_in: true
+        content: "The warehouse row stretches ahead, doors numbered in fading paint."

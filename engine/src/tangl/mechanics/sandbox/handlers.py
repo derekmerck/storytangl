@@ -9,6 +9,7 @@ from typing import Any, Protocol, cast, runtime_checkable
 from tangl.core import Graph, Selector, Token
 from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
+from tangl.journal.compose import replace_first
 from tangl.journal.fragments import ContentFragment
 from tangl.story import Action, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
@@ -2268,26 +2269,12 @@ def compose_sandbox_visibility_journal(*, caller, ctx, fragments, **_kw):
     if not projection_state.journal_text:
         return None
 
-    composed: list[Any] = []
-    replaced = False
-    for fragment in fragments:
-        if (
-            isinstance(fragment, ContentFragment)
-            and fragment.source_id == caller.uid
-            and not replaced
-        ):
-            composed.append(
-                ContentFragment(content=projection_state.journal_text, source_id=caller.uid)
-            )
-            replaced = True
-            continue
-        composed.append(fragment)
-    if not replaced:
-        composed.insert(
-            0,
-            ContentFragment(content=projection_state.journal_text, source_id=caller.uid),
-        )
-    return composed
+    return replace_first(
+        fragments,
+        lambda f: isinstance(f, ContentFragment) and f.source_id == caller.uid,
+        ContentFragment(content=projection_state.journal_text, source_id=caller.uid),
+        insert_missing=True,
+    )
 
 
 @on_compose_journal(

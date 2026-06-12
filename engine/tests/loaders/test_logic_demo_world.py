@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tangl.core import Selector
+from tangl.journal.fragments import ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.story import Action, InitMode
@@ -151,3 +152,51 @@ def test_full_adder_routes_all_input_triples_to_expected_outputs(
         ledger.resolve_choice(_choice_by_text(ledger, cin_choice).uid)
 
         assert ledger.cursor.label == expected_label
+
+
+def _latest_step_content(ledger: Ledger) -> str:
+    journal = ledger.get_journal()
+    latest = max(f.step for f in journal if f.step is not None and f.step >= 0)
+    return " ".join(
+        str(f.content)
+        for f in journal
+        if f.step == latest and isinstance(f, ContentFragment)
+    )
+
+
+def test_logic_skin_switches_prose_over_stable_machine(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The ``logic_skin`` namespace chunk re-voices prose; the machine is unchanged."""
+    _install_story_media_root(monkeypatch, tmp_path)
+    world = _compile_logic_world()
+
+    # shared voice: no skin selected
+    ledger = _make_ledger(world=world, story_label="logic_demo_skin_default")
+    ledger.resolve_choice(_choice_by_text(ledger, "Inspect the parity checker").uid)
+    assert ledger.cursor.label == "parity_first_input"
+    assert "Parity checker: enter the first bit." in _latest_step_content(ledger)
+
+    # loomworks skin via story-graph locals: same topology, different telling
+    ledger = _make_ledger(world=world, story_label="logic_demo_skin_loomworks")
+    ledger.cursor.graph.locals["logic_skin"] = "loomworks"
+    ledger.resolve_choice(_choice_by_text(ledger, "Inspect the parity checker").uid)
+    assert ledger.cursor.label == "parity_first_input"
+    assert "Throw the first shuttle." in _latest_step_content(ledger)
+
+
+def test_logic_skin_is_sparse_overlay_with_shared_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Labels a skin does not cover keep the shared voice."""
+    _install_story_media_root(monkeypatch, tmp_path)
+    world = _compile_logic_world()
+
+    ledger = _make_ledger(world=world, story_label="logic_demo_skin_fallback")
+    ledger.cursor.graph.locals["logic_skin"] = "loomworks"
+    ledger.resolve_choice(_choice_by_text(ledger, "Inspect the half adder").uid)
+
+    assert ledger.cursor.label == "half_adder_pick_a"
+    assert "Half adder: choose the value of input A." in _latest_step_content(ledger)

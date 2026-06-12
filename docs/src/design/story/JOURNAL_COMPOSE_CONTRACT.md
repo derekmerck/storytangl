@@ -10,15 +10,22 @@ rendering begins.
 ## Current Runtime Contract
 
 - `render_journal` handlers produce ordered raw fragments.
-- `compose_journal` receives the merged fragment list in stream order.
+- `compose_journal` handlers run in registry order (dispatch layer, then
+  priority) and **fold**: each handler receives the *current* composed batch
+  in `fragments` — the output of earlier compose handlers, starting from the
+  merged render output in stream order.
 - `compose_journal` operates on normalized fragment values only; raw textlike
   inputs belong in `render_journal`, not this seam.
 - A compose handler may return:
-  - `None`
+  - `None` — the batch passes to the next handler unchanged
   - one `Record` or `BaseFragment`
   - an iterable of `Record` or `BaseFragment`
+- A non-`None` return becomes the input to the next compose handler and, for
+  the last handler that replaced anything, the composed output.
 - Invalid replacement shapes raise `TypeError`.
-- Later compose handlers may inspect earlier compose results on `ctx.results`.
+- Handler results are still mirrored onto `ctx.results` for observability,
+  but chaining no longer requires inspecting them: write each handler against
+  the `fragments` it receives.
 
 ## Reference Transform
 
@@ -31,6 +38,21 @@ rendering begins.
 - Non-eligible fragments pass through unchanged.
 - Richer peer fragments may continue to later service and client layers, which
   remain responsible for capability-specific handling.
+
+## Blessed Stanzas
+
+`tangl.journal.compose` names the recurring composition moves so handlers
+stay short and uniform:
+
+- `replace_first(fragments, match, replacement, insert_missing=False)` —
+  swap the first fragment matching a predicate (visibility substitution).
+- `assemble_slots(fragments, order=..., classify=...)` — reorder a merged
+  batch into named syuzhet slots; `REST_SLOT` places everything unclassified.
+- `beat_overlay(members, beat=..., **metadata)` — emit a `GroupFragment`
+  binding a composed beat for segmentation-aware retrieval.
+
+The worked example for the full gather → enrich → compose pipeline is the
+`composed_beat_demo` world bundle and its loader test.
 
 ## Allowed Transformations
 

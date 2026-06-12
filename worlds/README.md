@@ -19,6 +19,13 @@ See [logic_demo/README.md](logic_demo/README.md) for details.
 **Twine Logic Demo** - The same state-machine idea authored in Twee/Twine and
 decoded through the built-in Twine codec.
 
+### composed_beat_demo/
+**Composed Beat Demo** - Reference walkthrough of journal beat composition:
+chunk overrides, conditional and cross-phase enrichment, and post-merge
+syuzhet assembly.
+
+See [composed_beat_demo/README.md](composed_beat_demo/README.md) for details.
+
 ### adventure_sandbox_slice/
 **Adventure Sandbox Slice** - A compact Colossal Cave-style sandbox mechanics
 demo with location links, inventory, a lamp, a lockable grate, darkness, and a
