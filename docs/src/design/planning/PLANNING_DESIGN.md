@@ -1,9 +1,16 @@
-> **⚠️ Stale document.** This doc references `engine/src/tangl/vm/dispatch/planning.py`,
-> which no longer exists. Planning dispatch is now in `tangl.vm.dispatch` and resolution
-> logic is in `tangl.vm.provision.resolver`. The authoritative architecture docs are
-> `engine/src/tangl/vm/VM_DESIGN.md` (provisioning section) and
-> `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md` (scope matching). This file
-> is retained for historical context only.
+> **⚠️ Stale document — superseded.** This doc teaches v3.7 planning vocabulary
+> and references `engine/src/tangl/vm/dispatch/planning.py`, which no longer
+> exists. **The current planning model is
+> [AFFORDANCE_MODEL.md](AFFORDANCE_MODEL.md)** ("Open Links: Requirement-Bearing
+> Edges and the Planning Matrix", CANONICAL): the open link as the planning
+> primitive, the dependency/affordance duality, the planning matrix, and the
+> filled audit table. Do not use this file's vocabulary in new docs, code, or
+> issues. Implementation references: `engine/src/tangl/vm/VM_DESIGN.md`
+> (provisioning section) and
+> `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md` (scope matching);
+> planning dispatch is now in `tangl.vm.dispatch` and resolution logic in
+> `tangl.vm.provision.resolver`. This file is retained for historical context
+> only.
 
 # Planning & Provisioning System Design (v3.7)
 

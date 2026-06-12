@@ -14,6 +14,13 @@ chapter-like scope of scene-locations that dynamically projects ordinary
 StoryTangl choices from location links, present entities, carried inventory,
 actors, world time, schedules, and local rules.
 
+Stated plainly: **sandbox is a domain client of ordinary Story/VM machinery.**
+In the open-link vocabulary (`docs/src/design/planning/AFFORDANCE_MODEL.md`),
+each sandbox projector is a *dynamic action projection* coordinate in the
+planning matrix, riding the standard pipeline: binding/admission → live
+availability → projection → submission → backend validation → mutation →
+journal output.
+
 The generated choices are normal `Action` edges. They use normal target
 availability, effects, call/return, journal fragments, choice diagnostics,
 ledger history, and replay.
@@ -212,7 +219,10 @@ The important runtime truth is the contribution surface, not the authoring
 category. Entity categories such as location, asset, fixture, actor, companion,
 weather, or debug overlay remain useful authoring vocabulary. At runtime, the
 question is: what does this scoped concept contribute, suppress, or expose for
-the current phase?
+the current phase? The open-link model names this cross-domain pattern the
+**scoped contribution** — a concept visible in the current scope contributes a
+phase-appropriate artifact (action, info affordance, journal fragment,
+modifier, redirect); see `docs/src/design/planning/AFFORDANCE_MODEL.md`.
 
 For now sandbox keeps this as local mechanics code. Promotion candidates, once
 a second non-sandbox consumer appears:
@@ -475,6 +485,13 @@ implementation local and prove that the projection compiles down to ordinary
 StoryTangl actions.
 
 ### Strategy: Sponsored Interactions
+
+Naming note: `SandboxInteraction` — the "sponsored interaction" — is **sandbox
+authoring vocabulary**: authoring sugar that lowers to an ordinary `Action`
+edge. The cross-domain pattern it instantiates is the **scoped contribution**
+(see `docs/src/design/planning/AFFORDANCE_MODEL.md`); the pattern is not owned
+by sandbox, and the term `SandboxInteraction` should not leak into VM/Core or
+other domains.
 
 Build this as a sequence of small slices over the current sandbox work rather
 than by creating a dialogue or encounter subsystem.

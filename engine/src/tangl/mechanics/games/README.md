@@ -117,9 +117,14 @@ action creation, but conceptually it is a special case of fanout:
 - every such edge points back to the same provider node: the game block itself
 
 In other words, a game block's move set can be understood as a **self-fanout of
-traversable edges** rather than a fundamentally separate mechanism. The current
-PLANNING implementation is still appropriate, but this interpretation is useful
-for future unification with provisioning and frozen-shape graph modes.
+traversable edges** rather than a fundamentally separate mechanism. That is the
+conceptual interpretation only: the implementation remains a local
+planning-time projector **by design**, and `HasGame` moves should not be routed
+through `Resolver.resolve_fanout`. The open-link model
+(`docs/src/design/planning/AFFORDANCE_MODEL.md`) records this mechanism in its
+audit table ("Game self-loop moves") as self-fanout — a provider-fixed offer to
+itself, projected as ordinary self-loop `Action`s and cleared by the game's own
+cleanup discriminator.
 
 It is also one concrete instance of the broader **re-entrant provider** pattern
 used by hubs and repeatable activities: the cursor repeatedly re-enters a
