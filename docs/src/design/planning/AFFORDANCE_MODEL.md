@@ -3,10 +3,10 @@
 *(formerly "The Affordance Model" — affordance is one direction of the primitive
 defined here, not the whole of it; see the naming note at the end.)*
 
-**Document Version:** 2.1
+**Document Version:** 2.2
 **Status:** CANONICAL — defines the **open link** as StoryTangl's planning
 primitive and frames `Dependency`, `Affordance`, and `Fanout` against it via a
-feature matrix. Several domain layers (menu fanout, sandbox interactions,
+feature matrix. v2.2 fills in the #255 audit table (issues #255/#268). Several domain layers (menu fanout, sandbox interactions,
 scheduled events) are *coordinates* in this matrix; some have drifted into
 bespoke vocabularies and are noted as convergence debt rather than separate
 concepts. The `OpenLink` base object near the end is a **mental model, not an
@@ -510,6 +510,83 @@ The framing question for any new mechanic:
 > **"Which row of the planning matrix is this?"** — not "what new interaction /
 > event / action mechanism do we need?"
 
+### The audit table (filled)
+
+One row per dynamic-projection mechanism, verified against the code as of
+v2.2. Columns are the guard's list above verbatim, plus three implementation
+columns the guard deliberately omitted (`Source concept`, `Cleanup owner`,
+`Existing tags / hints`), and with `Availability predicates` split into
+**admission/binding predicates** (projection-time — "is the edge emitted this
+phase", e.g. a scheduled event's schedule gate) and **live availability
+predicates** (use-time), per "Availability is after binding" above.
+
+This is classification, not a refactor plan. One logical table, split into two
+physical halves for readability; same rows, same order.
+
+**Part 1 — planning-matrix coordinates**
+
+| Mechanism | Current code path | Source concept | Fixed endpoint | Open endpoint / Requirement | Direction (dependency \| affordance) | Explicitness (static \| dynamic) | Provider state (existing \| latent) | Destination kind (concept \| episode) | Cardinality (one \| many) |
+|---|---|---|---|---|---|---|---|---|---|
+| `Action` destination dependency | `_destination_dependency` / `_preview_destination_viability` (`story/system_handlers.py`); created by `fabula/materializer.py` (`Dependency(label="destination")`); resolved at selection (`vm/runtime/ledger.py`) | Authored choice with unresolved successor ref | The `Action` edge (requester) | Traversable destination node; `hard_requirement=True`, ref/path-shaped | dependency | static | existing or latent (episode-latent; JIT-provision on selection) | episode | one |
+| Menu fanout | `Fanout` wired by materializer (`_wire_menu_fanout_for_block`); `Resolver.resolve_fanout` → dynamic `Affordance` edges; `project_menu_affordances` (`story/system_handlers.py`) | `MenuBlock.menu_items` selector rule | Menu block (receiver) | Each node matching the fanout requirement (e.g. `has_tags`) | receiver-owned fanout (dependency-stance enumeration) | dynamic | existing (latent menu targets deferred; see HUB_FANOUT.md) | episode | many |
+| Sandbox location exits / movement | `project_sandbox_location_links` (`mechanics/sandbox/handlers.py`) | `SandboxLocation.links` authoring data | Location (sponsor) | Neighboring location by ref (`_resolve_location_ref`); message exits self-loop | affordance | dynamic | existing (unresolvable refs skipped, never provisioned) | episode | many |
+| Sandbox sponsored interactions (location / fixture / asset / mob) | `_project_sandbox_interaction` via `project_sandbox_location_interactions`, `_project_fixture_interactions`, `_project_asset_interactions`, mob loop in `project_sandbox_mob_actions` (same file) | `SandboxInteraction` authoring sugar on a scoped sponsor | Sponsoring concept (location / fixture / asset / mob) | Interaction target (`"current"` self-loop or resolved traversable ref) | affordance | dynamic | existing | episode | many |
+| Sandbox built-in verbs (take/drop, open/close, switch, lock/unlock) | Hand-rolled `Action(...)` in `project_sandbox_asset_actions` (+ asset/container helpers, `_project_mob_asset_actions`), `project_sandbox_unlocks`, `project_sandbox_fixture_actions` | Trait/facet declarations (portable, switchable, container, lockable, openable) | Sponsoring asset / fixture / mob, via the location | None materially — self-loop on location; the verb is admitted by facet state | affordance | dynamic | existing | episode (self-loop; the work happens in effects) | many |
+| Sandbox scheduled events | `_scheduled_event_contributions` → `project_sandbox_scheduled_events` → `event.as_interaction()` → `_project_sandbox_interaction`; provider seam `get_sandbox_events` (`_provider_scheduled_events`) | `ScheduledEvent` on scope / location / fixture / mob / asset (incl. carried), or provider-donated | Sponsoring concept (or donating provider) | Event target node; requirement = schedule + presence match | affordance | dynamic | existing sponsors; provider donations lean latent (event not graph-attached until projected) | episode | many |
+| Sandbox wait / time | `project_sandbox_wait`; time advance via `advance_sandbox_time_on_action` + tick pipeline (same file) | Scope/location wait policy (`wait_enabled` / `wait_text` / `wait_turn_delta`) | Location (scope policy) | None — self-loop | affordance | dynamic | existing | episode (self-loop; time cost in payload) | one |
+| Game self-loop moves | `_build_game_actions` via `provision_game_moves` (`mechanics/games/handlers.py`); re-projected after UPDATE in `process_game_move` | `HasGame` handler `get_provisioned_moves` | Game block (self) | None — self-loop per move; requirement = game READY | self-fanout (provider-fixed offer to itself) | dynamic | existing | episode (self-loop) | many |
+| Adventure movement hazards | `_rewrite_movement_hazards` in `project_adventure_world_actions` (`worlds/adventure_sandbox_slice/…/domain.py`) | `AdventureMovementHazard` rule on location (world authority) | Location | Consumes an already-projected movement action, rewrites it to a self-loop | overlay on a projected affordance (blocked/diverted open edge) | dynamic | existing | episode (self-loop presented as attempted movement) | many |
+| Adventure magic words | Anchor loop in `project_adventure_world_actions` (same file) | `AdventureMagicAnchor` — latent command sponsored by location | Location | Anchor target location | affordance | dynamic | existing (the offer is discovery-gated, not provisioned) | episode | many |
+| Adventure treasure deposit / scoring | Deposit loop in `project_adventure_world_actions` + `apply_adventure_world_action` (UPDATE, same file) | Deposit-site flag × carried treasure-trait assets | Location (deposit site) | None — self-loop; transfer + accounting happen in UPDATE | affordance | dynamic | existing | episode (self-loop) | many |
+| Incremental / cycle moves | `project_sandbox_incremental_game_moves` (+ UPDATE handler, tick observer) (`mechanics/sandbox/incremental.py`) | Hosted `HasGame[IncrementalGame]` under sandbox scope | Location (host discovered via scope) | None — self-loop per move; requirement = host READY, non-terminal | affordance (host offers moves through the location) | dynamic | existing | episode (self-loop) | many |
+| Story-info / `InfoAffordance` — **ADJACENT, not a convergence candidate** | `service_info_dispatch` (`service/dispatch.py`) + `mechanics/sandbox/story_info.py`; routed via `/story/info` | Info channels advertised per envelope | Current cursor / ledger | n/a — query channel (kind + opaque query), no graph edge | affordance-like disclosure surface | dynamic | existing | concept (`ProjectedState` sections; never traversed) | many |
+
+**Part 2 — lifecycle, ownership, and drift** (same rows)
+
+| Mechanism | Admission/binding predicates (projection-time) | Live availability predicates (use-time) | Projection target | Cleanup owner | Existing tags / hints | Current duplication / drift | Suggested convergence path |
+|---|---|---|---|---|---|---|---|
+| `Action` destination dependency | None — durable authored edge; resolution is triggered by selection | Viability preview drives `available` + blockers (`missing_successor`, `missing_dependency`, guard) | The authored `Action` itself (availability annotation, not a new edge) | n/a — durable; satisfied in place, never regenerated | No tags; the `Dependency` is labeled `destination` | Choice predates the open-link model: `Action ≅ Dependency[TraversableNode]` with a bolted-on preview path | None now; the clean model is documented above |
+| Menu fanout | Fanout requirement match at resolve; `auto_provision`; not `frozen_shape` | None added (standard `Action` availability) | Ordinary `Action` per bound provider | `_clear_dynamic_menu_actions` — menu `edges_out` + `{dynamic, fanout, menu}`; intermediate `Affordance`s cleared per-fanout via `fanout:<uid>` tag | Tags only `{dynamic, fanout, menu}`; no `ui_hints` provenance | Only consumer of real `Fanout` machinery; provenance-poor next to sandbox | Reference path; extend minimal attribution post-table (synthesis item D) |
+| Sandbox location exits / movement | Link authored; target ref resolves; no manual duplicate edge; `auto_provision`; not frozen | `sandbox_fixture_open(through)` for through-exits | Ordinary movement `Action`; message exits as self-loops | `_clear_dynamic_sandbox_actions(action_kind="movement")` — location `edges_out` + `{dynamic, sandbox, movement}` | Tags `{dynamic, sandbox, movement}`; rich hints via `_sandbox_contribution_hints` (source=`sandbox_link`, contribution, scope, source_label, source_kind, direction, raw_direction, target, through) | The doc's convergence candidate, yet does **not** wear `fanout`; lifecycle provenance rides in `ui_hints` (a presentation channel) | Shared interaction-donor surface when touched; protect IF direction labels (projection difference) |
+| Sandbox sponsored interactions (location / fixture / asset / mob) | Sponsor in scope and visible (darkness suppressions via projection state); target resolves; `once` ⇒ target not yet visited | `interaction.availability` predicates on the edge | Ordinary `Action`; `trigger_phase` from activation; `return_phase=PLANNING` when `return_to_location` | Per-kind `_clear_dynamic_sandbox_actions` (`location` / `fixture` / `asset` / `mob`) | `{dynamic, sandbox, interaction, interaction:<label>, <kind>}` + six-field hints (source, contribution, scope, source_label, source_kind, interaction) + target, possession, … | Parallel `source="sandbox_*"` vocabulary; no `Affordance`/`Fanout` use | Primary candidate for the single interaction-donating provider protocol |
+| Sandbox built-in verbs (take/drop, open/close, switch, lock/unlock) | Facet/trait gates (portable, switchable, container, lockable, openable) + visibility/holder state | Helper predicates (`sandbox_fixture_can_unlock`, `sandbox_mob_can_receive_asset`, `sandbox_asset_container_can_receive`, …) | Self-loop `Action`s; mutation via effect exprs (`sandbox_take_asset`, `_s.unlock_fixture`, …) + `journal_text` | Per-kind `_clear_dynamic_sandbox_actions` (`asset`, `unlock`, `lock`, `fixture`, `mob`) | `{dynamic, sandbox, <kind>, <verb>…}` + full hints (verb, asset, target, key) | Two vocabularies in one module: sponsored interactions route through `_project_sandbox_interaction`, verbs hand-roll `Action(...)` | Characterize against `SandboxInteraction`; keep lowering into traits/facets; sandbox vocabulary stays out of VM/Core |
+| Sandbox scheduled events | `event.matches(world_time, location, actors_present)` — the schedule gate **is** the projection-time binding predicate (see "Availability is after binding"); sponsor visibility gates the gather | Interaction availability from `as_interaction` (usually none) | Ordinary `Action` via `_project_sandbox_interaction` (contribution `event`) | `_clear_dynamic_sandbox_actions(action_kind="event")` | `{dynamic, sandbox, interaction, interaction:<label>, event}` + sponsor hints + event label | Provider surface split: `get_sandbox_events` has no interaction peer; discovery + gating + projection bundled | The doc's named near-term consolidation; split activation from projection in docs/tests first |
+| Sandbox wait / time | `_nearest_wait_enabled` (location overrides scope); `auto_provision`; not frozen | None | One self-loop `Action`; `sandbox_time_cost` payload | `_clear_dynamic_sandbox_actions(action_kind="wait")` | `{dynamic, sandbox, wait}` + hints (source=`sandbox_wait`, source_kind=`scope`) | None beyond being one of the nine parallel clear callers | Fold into shared donor surface when touched |
+| Game self-loop moves | `game.phase == READY` (inline setup during PLANNING); non-terminal for post-UPDATE re-projection | None | Self-loop `Action` per move; payload `{"move": …}`; typed `accepts` | `_clear_dynamic_game_actions` — cursor `edges_out` (`trigger_phase=None`) + `{dynamic, fanout, game}` | Tags only `{dynamic, fanout, game}`; **no** `ui_hints` | **Recorded, not fixed:** wears `fanout` without touching `Resolver.resolve_fanout` — the tag vocabulary lies; provenance-poor | Keep as self-fanout; minimal attribution post-table; do not route through provision fanout |
+| Adventure movement hazards | Hazard rule applies (`carried_asset` gate); only matching-direction movement actions rewritten | None (hazard fires on selection) | Self-loop that presents as **attempted movement** (protected projection difference) | `_clear_adventure_actions` — `{dynamic, sandbox, adventure}`, a world-owned fourth discriminator family. **Overlap:** hazard tags also contain `{dynamic, sandbox, movement}`, so the engine movement clear matches too — benign only because both projectors re-run each PLANNING pass in priority order | `{dynamic, sandbox, adventure, movement, hazard}`; inherits movement hints + source_kind=`world_authority`, contribution=`movement_hazard`, `hazard_outcome` | The one live counter-example to exactly-one-family ownership: overlapping cleanup claims, unguarded by contract | Classify as movement overlay; world-local until a second world needs movement blockers/diverters |
+| Adventure magic words | `requires_discovery` ⇒ word known (scope locals) | None | Command-like `Action` ("Say XYZZY") to the target location | `_clear_adventure_actions` (`{dynamic, sandbox, adventure}`) | `{dynamic, sandbox, adventure, magic_word}` + world-authority hints + word | World-rolled action builder (intentional world authority) | Latent command affordance; revisit when parser affordance bands need the same shape |
+| Adventure treasure deposit / scoring | Deposit site ∧ treasure held ∧ not yet deposited | None | Self-loop deposit `Action`; UPDATE applies asset transfer + score in scope locals | `_clear_adventure_actions` (`{dynamic, sandbox, adventure}`) | `{dynamic, sandbox, adventure, deposit_treasure}` + world-authority hints + asset | Transaction + accounting bundled in world code (deliberate demo policy) | Leave as demo policy; data-drive "transfer ⇒ accounting effect" only if repeated |
+| Incremental / cycle moves | Hosted game discovered via scope; READY ∧ non-terminal | None | Self-loop `Action` per move; zero-duration allocation vs end-cycle time cost; cycles resolve via tick observer | Own `_clear_incremental_actions` — `{dynamic, sandbox, incremental}` (a tenth sandbox-side kind with its own helper) | Tags + hand-built hints (source=`sandbox_incremental_game`, contribution=`resource_allocation`, source_label, source_kind=`game`, move, target) — bypasses `_sandbox_contribution_hints`, so no `scope` field | Fourth copy of the clear-helper stanza; near-duplicate hint vocabulary | Fold into per-kind clear + shared hints helper when touched |
+| Story-info / `InfoAffordance` — **ADJACENT** | Handler registration; channels advertised per envelope | Advisory `InfoState` availability/dirty kinds (client cache hints, not authority) | `InfoAffordance` list + `ProjectedState` sections via `/story/info` | n/a — recomputed per request; no graph residue | Typed DTO fields (kind, label, shortcuts), not edge tags | None — deliberately separate surface: info disclosure authority ≠ choice mutation authority | **None** — adjacent projection surface, explicitly not a convergence candidate |
+
+#### Cleanup ownership is a compound key (and where it bends)
+
+Every projector family removes its own stale actions by the same convention:
+scope to the source node's `edges_out`, then match a discriminator tag set.
+The discriminators in play:
+
+- `{dynamic, fanout, menu}` — `story/system_handlers.py`
+- `{dynamic, fanout, game}` — `mechanics/games/handlers.py`
+- `{dynamic, sandbox, <action_kind>}` — `mechanics/sandbox/handlers.py`, nine
+  per-kind callers: `movement`, `asset`, `unlock`, `lock`, `fixture`, `mob`,
+  `location`, `wait`, `event`
+- `{dynamic, sandbox, incremental}` — `mechanics/sandbox/incremental.py`, own
+  helper
+- `{dynamic, sandbox, adventure}` — world-owned
+  (`adventure_sandbox_slice/domain.py`), own helper; its hazard actions
+  additionally wear `movement` and so match two families (see the hazard row)
+
+The families intentionally share tags (every discriminator contains `dynamic`;
+menu and game also share `fanout`), so the safety property is **not** set
+disjointness — it is **mutual non-subsumption**: no family's discriminator is a
+subset of another's, so no family's cleanup sweep automatically claims another
+family's actions. Non-subsumed by construction, unguarded by contract — except
+where noted. The pairwise non-subsumption of the engine-owned discriminators,
+and the exactly-one-family property of generated actions (observed for every
+engine-owned family), are pinned by an invariant test in
+`engine/tests/mechanics/test_sandbox_architecture.py`; the table rows above are
+the classification it executes.
+
 ---
 
 ## Future Extensions (seams, not commitments)
@@ -556,4 +633,6 @@ issue #255 / CodeRabbit references stable; rename is a pending decision.
   ranks by scope distance / materialization cost / specificity / policy.
 - Convergence is audit-first: classify mechanisms in the matrix before migrating
   code, then converge opportunistically; the sandbox provider surface is the
-  near-term consolidation.
+  near-term consolidation. The audit table is filled as of v2.2; cleanup
+  discriminator non-subsumption and exactly-one-family ownership are pinned by
+  an invariant test.
