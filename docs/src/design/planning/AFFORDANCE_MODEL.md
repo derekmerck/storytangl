@@ -553,7 +553,7 @@ physical halves for readability; same rows, same order.
 | Sandbox scheduled events | `event.matches(world_time, location, actors_present)` — the schedule gate **is** the projection-time binding predicate (see "Availability is after binding"); sponsor visibility gates the gather | Interaction availability from `as_interaction` (usually none) | Ordinary `Action` via `_project_sandbox_interaction` (contribution `event`) | `_clear_dynamic_sandbox_actions(action_kind="event")` | `{dynamic, sandbox, interaction, interaction:<label>, event}` + sponsor hints + event label | Provider surface split: `get_sandbox_events` has no interaction peer; discovery + gating + projection bundled | The doc's named near-term consolidation; split activation from projection in docs/tests first |
 | Sandbox wait / time | `_nearest_wait_enabled` (location overrides scope); `auto_provision`; not frozen | None | One self-loop `Action`; `sandbox_time_cost` payload | `_clear_dynamic_sandbox_actions(action_kind="wait")` | `{dynamic, sandbox, wait}` + hints (source=`sandbox_wait`, source_kind=`scope`) | None beyond being one of the nine parallel clear callers | Fold into shared donor surface when touched |
 | Game self-loop moves | `game.phase == READY` (inline setup during PLANNING); non-terminal for post-UPDATE re-projection | None | Self-loop `Action` per move; payload `{"move": …}`; typed `accepts` | `_clear_dynamic_game_actions` — cursor `edges_out` (`trigger_phase=None`) + `{dynamic, fanout, game}` | Tags only `{dynamic, fanout, game}`; **no** `ui_hints` | **Recorded, not fixed:** wears `fanout` without touching `Resolver.resolve_fanout` — the tag vocabulary lies; provenance-poor | Keep as self-fanout; minimal attribution post-table; do not route through provision fanout |
-| Adventure movement hazards | Hazard rule applies (`carried_asset` gate); only matching-direction movement actions rewritten | None (hazard fires on selection) | Self-loop that presents as **attempted movement** (protected projection difference) | `_clear_adventure_actions` — `{dynamic, sandbox, adventure}`, a world-owned fourth discriminator family. **Overlap:** hazard tags also contain `{dynamic, sandbox, movement}`, so the engine movement clear matches too — benign only because both projectors re-run each PLANNING pass in priority order | `{dynamic, sandbox, adventure, movement, hazard}`; inherits movement hints + source_kind=`world_authority`, contribution=`movement_hazard`, `hazard_outcome` | The one live counter-example to "discriminators are disjoint": overlapping cleanup ownership, unguarded by contract | Classify as movement overlay; world-local until a second world needs movement blockers/diverters |
+| Adventure movement hazards | Hazard rule applies (`carried_asset` gate); only matching-direction movement actions rewritten | None (hazard fires on selection) | Self-loop that presents as **attempted movement** (protected projection difference) | `_clear_adventure_actions` — `{dynamic, sandbox, adventure}`, a world-owned fourth discriminator family. **Overlap:** hazard tags also contain `{dynamic, sandbox, movement}`, so the engine movement clear matches too — benign only because both projectors re-run each PLANNING pass in priority order | `{dynamic, sandbox, adventure, movement, hazard}`; inherits movement hints + source_kind=`world_authority`, contribution=`movement_hazard`, `hazard_outcome` | The one live counter-example to exactly-one-family ownership: overlapping cleanup claims, unguarded by contract | Classify as movement overlay; world-local until a second world needs movement blockers/diverters |
 | Adventure magic words | `requires_discovery` ⇒ word known (scope locals) | None | Command-like `Action` ("Say XYZZY") to the target location | `_clear_adventure_actions` (`{dynamic, sandbox, adventure}`) | `{dynamic, sandbox, adventure, magic_word}` + world-authority hints + word | World-rolled action builder (intentional world authority) | Latent command affordance; revisit when parser affordance bands need the same shape |
 | Adventure treasure deposit / scoring | Deposit site ∧ treasure held ∧ not yet deposited | None | Self-loop deposit `Action`; UPDATE applies asset transfer + score in scope locals | `_clear_adventure_actions` (`{dynamic, sandbox, adventure}`) | `{dynamic, sandbox, adventure, deposit_treasure}` + world-authority hints + asset | Transaction + accounting bundled in world code (deliberate demo policy) | Leave as demo policy; data-drive "transfer ⇒ accounting effect" only if repeated |
 | Incremental / cycle moves | Hosted game discovered via scope; READY ∧ non-terminal | None | Self-loop `Action` per move; zero-duration allocation vs end-cycle time cost; cycles resolve via tick observer | Own `_clear_incremental_actions` — `{dynamic, sandbox, incremental}` (a tenth sandbox-side kind with its own helper) | Tags + hand-built hints (source=`sandbox_incremental_game`, contribution=`resource_allocation`, source_label, source_kind=`game`, move, target) — bypasses `_sandbox_contribution_hints`, so no `scope` field | Fourth copy of the clear-helper stanza; near-duplicate hint vocabulary | Fold into per-kind clear + shared hints helper when touched |
@@ -576,11 +576,16 @@ The discriminators in play:
   (`adventure_sandbox_slice/domain.py`), own helper; its hazard actions
   additionally wear `movement` and so match two families (see the hazard row)
 
-Disjoint by construction, unguarded by contract — except where noted. The
-pairwise disjointness of the engine-owned discriminators, and the
-exactly-one-family property of generated actions, are pinned by an invariant
-test in `engine/tests/mechanics/test_sandbox_architecture.py`; the table rows
-above are the classification it executes.
+The families intentionally share tags (every discriminator contains `dynamic`;
+menu and game also share `fanout`), so the safety property is **not** set
+disjointness — it is **mutual non-subsumption**: no family's discriminator is a
+subset of another's, so no family's cleanup sweep automatically claims another
+family's actions. Non-subsumed by construction, unguarded by contract — except
+where noted. The pairwise non-subsumption of the engine-owned discriminators,
+and the exactly-one-family property of generated actions (observed for every
+engine-owned family), are pinned by an invariant test in
+`engine/tests/mechanics/test_sandbox_architecture.py`; the table rows above are
+the classification it executes.
 
 ---
 
@@ -629,4 +634,5 @@ issue #255 / CodeRabbit references stable; rename is a pending decision.
 - Convergence is audit-first: classify mechanisms in the matrix before migrating
   code, then converge opportunistically; the sandbox provider surface is the
   near-term consolidation. The audit table is filled as of v2.2; cleanup
-  discriminator disjointness is pinned by an invariant test.
+  discriminator non-subsumption and exactly-one-family ownership are pinned by
+  an invariant test.

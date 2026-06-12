@@ -275,9 +275,12 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
 
 # Cleanup-discriminator contract. Each projector family removes its own stale
 # dynamic actions by matching one of these tag sets against its source node's
-# edges_out. Disjointness is what keeps the families from deleting each other's
-# edges; until now it held by convention only. See AFFORDANCE_MODEL.md,
-# "The audit table (filled)".
+# edges_out. The families intentionally share tags (every set contains
+# "dynamic"; menu and game also share "fanout"), so the safety property is NOT
+# set disjointness — it is mutual non-subsumption: no family's discriminator
+# is a subset of another's, so no family's cleanup sweep automatically claims
+# another family's actions. Until now this held by convention only. See
+# AFFORDANCE_MODEL.md, "The audit table (filled)".
 #
 # Engine-owned families only, deliberately: the adventure world's
 # {dynamic, sandbox, adventure} discriminator is excluded because its hazard
@@ -301,8 +304,14 @@ def _matching_families(tags: set[str]) -> set[str]:
     return {name for name, disc in FAMILY_DISCRIMINATORS.items() if disc <= tags}
 
 
-def test_dynamic_action_family_discriminators_are_pairwise_disjoint() -> None:
-    """No family's cleanup discriminator may match another family's actions."""
+def test_dynamic_action_family_discriminators_are_mutually_non_subsuming() -> None:
+    """No family's cleanup discriminator may subsume another's.
+
+    Not set disjointness — families share "dynamic" (and menu/game share
+    "fanout") by design. The contract is a subset antichain: if one
+    discriminator were a subset of another, its cleanup sweep would claim
+    every action of the other family.
+    """
     from itertools import combinations
 
     for (a, disc_a), (b, disc_b) in combinations(FAMILY_DISCRIMINATORS.items(), 2):
@@ -310,8 +319,50 @@ def test_dynamic_action_family_discriminators_are_pairwise_disjoint() -> None:
 
 
 def test_generated_actions_match_exactly_one_family_discriminator() -> None:
-    """A projected dynamic action is owned by exactly one cleanup family."""
+    """A projected dynamic action is owned by exactly one cleanup family.
+
+    Every family in FAMILY_DISCRIMINATORS must be observed, so adding a new
+    family to the dict forces this fixture to generate one of its actions.
+    """
+    from tangl.mechanics.games import (
+        HasGame,
+        IncrementalGame,
+        IncrementalGameHandler,
+        TaskSpec,
+    )
+    from tangl.mechanics.sandbox import LockableFacet, SandboxFixture
+    from tangl.mechanics.sandbox import incremental as _incremental  # registers projector
+    from tangl.story import Block
+
+    assert _incremental.project_sandbox_incremental_game_moves is not None
+
     compiled = SandboxSliceCompiler().compile(ARCHITECTURE_SLICE)
+
+    # Unlock/lock families: one locked fixture (projects unlock) and one
+    # unlocked lockable fixture (projects lock).
+    compiled.locations["cave"].fixtures = [
+        SandboxFixture(label="grate", name="grate", lockable=LockableFacet(key="keys")),
+        SandboxFixture(
+            label="gate", name="gate", lockable=LockableFacet(key="keys", is_locked=False)
+        ),
+    ]
+
+    # Incremental family: host a minimal incremental game under the scope.
+    class _ColonyGame(IncrementalGame):
+        starting_resources: dict[str, int] = {"food": 1}
+        starting_workers: int = 1
+        task_specs: dict[str, TaskSpec] = {"forage": TaskSpec(produces={"food": 2})}
+        upkeep: dict[str, int] = {"food": 1}
+        unlocked_tasks: list[str] = ["forage"]
+
+    class _ColonyBlock(HasGame, Block):
+        _game_class = _ColonyGame
+        _game_handler_class = IncrementalGameHandler
+
+    colony = _ColonyBlock(label="family_colony")
+    compiled.graph.add(colony)
+    compiled.scope.add_child(colony)
+
     seen: set[str] = set()
     for label in ("road", "cave"):
         location = compiled.locations[label]
@@ -355,12 +406,15 @@ def test_generated_actions_match_exactly_one_family_discriminator() -> None:
 
     for node in (menu, game_block):
         for action in node.edges_out(Selector(has_kind=Action)):
-            families = _matching_families(set(action.tags or set()))
-            assert len(families) == 1, (action.get_label(), sorted(action.tags))
+            tags = set(action.tags or set())
+            if "dynamic" not in tags:
+                continue
+            families = _matching_families(tags)
+            assert len(families) == 1, (action.get_label(), sorted(tags))
             seen |= families
 
-    assert {"menu", "game", "sandbox:movement", "sandbox:asset", "sandbox:fixture",
-            "sandbox:mob", "sandbox:location", "sandbox:wait", "sandbox:event"} <= seen
+    missing = set(FAMILY_DISCRIMINATORS) - seen
+    assert not missing, sorted(missing)
 
 
 @pytest.mark.parametrize(
