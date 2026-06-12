@@ -20,6 +20,7 @@ from tangl.journal.fragments import (
     fragment_from_dto,
     fragment_to_dto,
 )
+from tangl.journal.intent import Blocker, CostPreview, UIHints
 
 
 def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
@@ -36,6 +37,60 @@ def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
     assert "seq" not in payload
     assert "step" not in payload
     assert "tags" not in payload
+
+
+def test_choice_blocker_dto_round_trip_preserves_typed_contract() -> None:
+    fragment = ChoiceFragment(
+        edge_id=uuid4(),
+        text="Unlock the door.",
+        available=False,
+        blockers=[
+            Blocker(
+                code="needs_key",
+                message="The brass key is required.",
+                refs=["piece-key"],
+            )
+        ],
+    )
+
+    payload = fragment_to_dto(fragment)
+    restored = fragment_from_dto(payload)
+
+    assert payload["blockers"] == [
+        {
+            "code": "needs_key",
+            "message": "The brass key is required.",
+            "refs": ["piece-key"],
+        }
+    ]
+    assert isinstance(restored, ChoiceFragment)
+    assert restored.blockers is not None
+    assert restored.blockers[0].code == "needs_key"
+
+
+def test_choice_cost_preview_dto_round_trip_preserves_typed_contract() -> None:
+    fragment = ChoiceFragment(
+        edge_id=uuid4(),
+        text="Buy the lamp.",
+        ui_hints=UIHints(
+            cost_previews=[
+                CostPreview(ledger_key="purse", delta=-40, unit="silver"),
+                CostPreview(ledger_key="reputation", delta=1),
+            ]
+        ),
+    )
+
+    payload = fragment_to_dto(fragment)
+    restored = fragment_from_dto(payload)
+
+    assert payload["ui_hints"]["cost_previews"] == [
+        {"ledger_key": "purse", "delta": -40, "unit": "silver"},
+        {"ledger_key": "reputation", "delta": 1},
+    ]
+    assert isinstance(restored, ChoiceFragment)
+    assert restored.ui_hints is not None
+    assert restored.ui_hints.cost_previews[0].ledger_key == "purse"
+    assert restored.ui_hints.cost_previews[1].delta == 1
 
 
 def test_fragment_to_dto_preserves_piece_kind() -> None:

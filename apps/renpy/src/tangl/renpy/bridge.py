@@ -15,6 +15,7 @@ from tangl.journal.fragments import (
     DialogFragment,
     MediaFragment,
 )
+from tangl.journal.intent import PickAccepts, QuantityAccepts
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service.media import (
@@ -192,12 +193,32 @@ class RenPySessionBridge:
             return
 
         if isinstance(fragment, ChoiceFragment):
+            cost_previews = [
+                *(
+                    fragment.ui_hints.cost_previews
+                    if fragment.ui_hints is not None
+                    else []
+                ),
+                *(
+                    fragment.accepts.cost_previews
+                    if isinstance(fragment.accepts, (PickAccepts, QuantityAccepts))
+                    else []
+                ),
+            ]
             turn.choices.append(
                 RenPyChoice(
                     edge_id=fragment.edge_id,
                     text=_non_empty_text(fragment.text) or str(fragment.edge_id),
                     available=fragment.available,
                     unavailable_reason=fragment.unavailable_reason,
+                    blockers=tuple(
+                        blocker.model_dump(mode="python", exclude_none=True)
+                        for blocker in fragment.blockers or []
+                    ),
+                    cost_previews=tuple(
+                        preview.model_dump(mode="python", exclude_none=True)
+                        for preview in cost_previews
+                    ),
                     accepts=(
                         fragment.accepts.model_dump(mode="python", exclude_none=True)
                         if fragment.accepts is not None

@@ -21,13 +21,25 @@
         "max": 3,
         "step": 1,
         "unit": "ration",
-        "cost_previews": []
+        "cost_previews": [
+          {
+            "ledger_key": "supplies",
+            "delta": 1,
+            "unit": "ration"
+          }
+        ]
       },
       "ui_hints": {
         "hotkey": "b",
         "source_kind": "market",
         "contribution": "purchase",
-        "cost_previews": []
+        "cost_previews": [
+          {
+            "ledger_key": "coin",
+            "delta": -2,
+            "unit": "silver"
+          }
+        ]
       }
     },
     {

@@ -856,6 +856,7 @@ class StoryMaterializer:
                 effects=_as_exprs(spec.get("effects")),
                 payload=spec.get("payload"),
                 accepts=spec.get("accepts") or spec.get("payload_schema"),
+                blockers=spec.get("blockers"),
                 ui_hints=(
                     spec.get("ui_hints")
                     or spec.get("ui_hint")

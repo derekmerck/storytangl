@@ -37,6 +37,14 @@ class CostPreview(IntentModel):
     unit: str | None = None
 
 
+class Blocker(IntentModel):
+    """Player-facing explanation for an unavailable choice."""
+
+    code: str
+    message: str
+    refs: list[str] = Field(default_factory=list)
+
+
 class PieceConstraints(IntentModel):
     """Constraints on a ``pieces`` or ``place`` selection."""
 
@@ -167,6 +175,7 @@ class UIHints(IntentModel):
 __all__ = [
     "Accepts",
     "BackendValidator",
+    "Blocker",
     "ComposeAccepts",
     "ComposePart",
     "CostPreview",

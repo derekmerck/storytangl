@@ -20,11 +20,13 @@ from tangl.core import Priority, Record, Selector
 from tangl.prose import DialogHandler
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
+from tangl.journal.intent import Blocker
 from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
     TraversableNode,
+    ViabilityResult,
     do_compose_journal,
     on_provision,
 )
@@ -206,7 +208,7 @@ def _destination_dependency(*, edge: Action) -> Dependency | None:
     return deps[0] if deps else None
 
 
-def _preview_destination_viability(*, edge: Action, ctx):
+def _preview_destination_viability(*, edge: Action, ctx) -> ViabilityResult | None:
     dep = _destination_dependency(edge=edge)
     if dep is None or dep.requirement.satisfied:
         return None
@@ -218,15 +220,29 @@ def _preview_destination_viability(*, edge: Action, ctx):
     return resolver.preview_requirement(dep.requirement, _ctx=ctx)
 
 
-def _preview_blockers(preview) -> list[dict[str, Any]]:
-    blockers: list[dict[str, Any]] = []
-    for blocker in getattr(preview, "blockers", []) or []:
+def _blocker_message(code: str) -> str:
+    messages = {
+        "container_entry_unavailable": "The destination cannot be entered yet.",
+        "guard_failed_or_unavailable": "Requirements are not met.",
+        "immediate_dependency_unresolvable": "A required dependency is unavailable.",
+        "missing_dependency": "A required dependency is unavailable.",
+        "missing_successor": "No destination is currently available.",
+        "no_offers": "No matching option is currently available.",
+    }
+    return messages.get(code, f"{code.replace('_', ' ').capitalize()}.")
+
+
+def _preview_blockers(preview: ViabilityResult) -> list[Blocker]:
+    blockers: list[Blocker] = []
+    for blocker in preview.blockers:
         blockers.append(
-            {
-                "type": "provision",
-                "reason": blocker.reason,
-                "context": dict(blocker.context or {}),
-            }
+            Blocker(
+                code=blocker.reason,
+                message=_blocker_message(blocker.reason),
+                type="provision",
+                reason=blocker.reason,
+                context=dict(blocker.context or {}),
+            )
         )
     return blockers
 
@@ -254,21 +270,43 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     return None
 
 
-def _dependency_blocker(dep: Dependency) -> dict[str, Any]:
-    """Serialize one dependency blocker with standardized resolver diagnostics."""
+def _dependency_blocker(dep: Dependency) -> Blocker:
+    """Project one dependency failure into a player-facing blocker."""
     requirement = dep.requirement
-    return {
-        "type": "dependency",
-        "dependency_id": str(dep.uid),
-        "label": dep.get_label(),
-        "hard_requirement": requirement.hard_requirement,
-        "resolution_reason": requirement.resolution_reason,
-        "resolution_meta": requirement.resolution_meta,
-    }
+    code = requirement.resolution_reason or "missing_dependency"
+    criteria = requirement.model_extra or {}
+    target = (
+        requirement.authored_path
+        or criteria.get("has_identifier")
+        or criteria.get("has_label")
+    )
+    message = (
+        f"{target.replace('_', ' ')} is unavailable."
+        if isinstance(target, str) and target
+        else _blocker_message(code)
+    )
+    return Blocker(
+        code=code,
+        message=message,
+        type="dependency",
+        dependency_id=str(dep.uid),
+        label=dep.get_label(),
+        hard_requirement=requirement.hard_requirement,
+        resolution_reason=requirement.resolution_reason,
+        resolution_meta=requirement.resolution_meta,
+    )
 
 
-def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
+def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
     """Return structured blocker diagnostics for an unavailable choice edge."""
+    if edge.blockers:
+        return [
+            blocker.model_copy(
+                update={"message": _render_text(blocker.message, source=edge, ctx=ctx)}
+            )
+            for blocker in edge.blockers
+        ]
+
     if edge.successor is None:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
         if preview is not None:
@@ -277,13 +315,25 @@ def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
             preview_blockers = _preview_blockers(preview)
             if preview_blockers:
                 return preview_blockers
-        return [{"type": "edge", "reason": "missing_successor"}]
+        return [
+            Blocker(
+                code="missing_successor",
+                message=_blocker_message("missing_successor"),
+                type="edge",
+                reason="missing_successor",
+            )
+        ]
 
     if isinstance(edge.successor, TraversableNode) and edge.successor.is_container:
         preview = Resolver.from_ctx(ctx).preview_frontier_node(edge.successor, _ctx=ctx)
         if not preview.viable:
             return _preview_blockers(preview) or [
-                {"type": "provision", "reason": "container_entry_unavailable"}
+                Blocker(
+                    code="container_entry_unavailable",
+                    message=_blocker_message("container_entry_unavailable"),
+                    type="provision",
+                    reason="container_entry_unavailable",
+                )
             ]
 
     blockers = [_dependency_blocker(dep) for dep in _hard_unresolved_dependencies(edge=edge)]
@@ -291,7 +341,14 @@ def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
         return blockers
 
     if not edge.available(ctx=ctx):
-        return [{"type": "edge", "reason": "guard_failed_or_unavailable"}]
+        return [
+            Blocker(
+                code="guard_failed_or_unavailable",
+                message=_blocker_message("guard_failed_or_unavailable"),
+                type="edge",
+                reason="guard_failed_or_unavailable",
+            )
+        ]
 
     return []
 

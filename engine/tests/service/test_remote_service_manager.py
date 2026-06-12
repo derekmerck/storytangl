@@ -365,7 +365,15 @@ class TestRemoteResponseHydration:
                     "fragment_type": "choice",
                     "edge_id": str(uuid4()),
                     "text": "Buy rations",
-                    "available": True,
+                    "available": False,
+                    "unavailable_reason": "A valid permit is required.",
+                    "blockers": [
+                        {
+                            "code": "needs_permit",
+                            "message": "A valid permit is required.",
+                            "refs": ["permit-status"],
+                        }
+                    ],
                     "accepts": {
                         "kind": "quantity",
                         "required": True,
@@ -373,13 +381,25 @@ class TestRemoteResponseHydration:
                         "max": 3,
                         "step": 1,
                         "unit": "ration",
-                        "cost_previews": [],
+                        "cost_previews": [
+                            {
+                                "ledger_key": "supplies",
+                                "delta": -1,
+                                "unit": "ration",
+                            }
+                        ],
                     },
                     "ui_hints": {
                         "hotkey": "b",
                         "source_kind": "market",
                         "contribution": "purchase",
-                        "cost_previews": [],
+                        "cost_previews": [
+                            {
+                                "ledger_key": "purse",
+                                "delta": -2,
+                                "unit": "coin",
+                            }
+                        ],
                     },
                 }
             ],
@@ -403,6 +423,11 @@ class TestRemoteResponseHydration:
         assert choice.ui_hints is not None
         assert choice.ui_hints.hotkey == "b"
         assert choice.ui_hints.source_kind == "market"
+        assert choice.ui_hints.cost_previews[0].ledger_key == "purse"
+        assert choice.accepts.cost_previews[0].ledger_key == "supplies"
+        assert choice.blockers is not None
+        assert choice.blockers[0].code == "needs_permit"
+        assert choice.blockers[0].refs == ["permit-status"]
 
     def test_story_info_decodes_projected_state_contracts(self) -> None:
         user_id = uuid4()

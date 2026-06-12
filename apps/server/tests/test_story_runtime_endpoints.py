@@ -28,6 +28,7 @@ def _write_story_bundle(
     *,
     with_projector: bool = False,
     with_choice_payload_hints: bool = False,
+    with_choice_blocker: bool = False,
 ) -> str:
     world_dir = root / "story_demo"
     world_dir.mkdir()
@@ -43,10 +44,30 @@ def _write_story_bundle(
                 "              min: 1",
                 "              max: 3",
                 "              unit: ration",
+                "              cost_previews:",
+                "                - ledger_key: supplies",
+                "                  delta: -1",
+                "                  unit: ration",
                 "            ui_hints:",
                 "              hotkey: b",
                 "              source_kind: market",
                 "              contribution: purchase",
+                "              cost_previews:",
+                "                - ledger_key: purse",
+                "                  delta: -2",
+                "                  unit: coin",
+            ]
+        )
+    if with_choice_blocker:
+        action_lines.extend(
+            [
+                "            conditions:",
+                "              - \"False\"",
+                "            blockers:",
+                "              - code: needs_permit",
+                "                message: A valid permit is required.",
+                "                refs:",
+                "                  - permit-status",
             ]
         )
     (world_dir / "world.yaml").write_text(
@@ -211,7 +232,11 @@ def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str
 
 @pytest.fixture()
 def payload_story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str], str]:
-    world_label = _write_story_bundle(tmp_path, with_choice_payload_hints=True)
+    world_label = _write_story_bundle(
+        tmp_path,
+        with_choice_payload_hints=True,
+        with_choice_blocker=True,
+    )
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
     reset_service_state_for_testing()
@@ -454,14 +479,25 @@ def test_story_update_preserves_choice_payload_contracts(
         "max": 3,
         "step": 1,
         "unit": "ration",
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "supplies", "delta": -1, "unit": "ration"},
+        ],
     }
     assert choice["ui_hints"] == {
         "hotkey": "b",
         "source_kind": "market",
         "contribution": "purchase",
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+        ],
     }
+    assert choice["blockers"] == [
+        {
+            "code": "needs_permit",
+            "message": "A valid permit is required.",
+            "refs": ["permit-status"],
+        }
+    ]
 
 
 def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(

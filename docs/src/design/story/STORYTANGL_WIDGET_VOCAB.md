@@ -6,7 +6,7 @@
 **Source of truth (for engine model alignment):**
 - `tangl.journal.fragments` (fragment types, presentation hints)
 - `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
-- `tangl.journal.intent` (typed `Accepts`/`UIHints`; next-pass `Blocker` — see §6)
+- `tangl.journal.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual
@@ -762,8 +762,9 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     activation_payload: Any = Field(None, alias="payload")
 ```
 
-The current engine emits typed `accepts` and `ui_hints`; `blockers`
-remain dictionary-shaped until the next intent pass.
+The current engine emits typed `accepts`, `ui_hints`, and `blockers`. Authored
+blockers pass through actions; generated resolver diagnostics are projected
+into the same player-facing shape at the story journal boundary.
 
 | | |
 |---|---|
@@ -1067,8 +1068,8 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
 ## 6 · Tier P1 — typed contract surfaces
 
 Everything below types fragment interiors and adjacent envelope surfaces.
-`Accepts`, `UIHints`, direct/find-edge requests, and `UxEvent` are implemented
-in the engine; `Blocker` and several metadata subkeys remain the next
+`Accepts`, `UIHints`, `Blocker`, `CostPreview`, direct/find-edge requests, and
+`UxEvent` are implemented in the engine; several metadata subkeys remain
 dictionary-shaped sub-surfaces to promote.
 
 ### 6.1 Typed `Accepts`

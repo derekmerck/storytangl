@@ -65,7 +65,13 @@ def test_backend_widget_diagnostics_validate_as_service_contracts() -> None:
     assert len(choices) == 2
     assert choices[0]["uid"] != choices[0]["edge_id"]
     assert choices[0]["accepts"]["kind"] == "quantity"
+    assert choices[0]["accepts"]["cost_previews"] == [
+        {"ledger_key": "supplies", "delta": 1, "unit": "ration"}
+    ]
     assert choices[0]["ui_hints"]["source_kind"] == "market"
+    assert choices[0]["ui_hints"]["cost_previews"] == [
+        {"ledger_key": "coin", "delta": -2, "unit": "silver"}
+    ]
     assert choices[1]["accepts"]["kind"] == "text"
     assert runtime_payload["metadata"]["info_state"]["available_kinds"] == [
         "inventory",
@@ -78,7 +84,10 @@ def test_backend_widget_diagnostics_render_in_reference_port() -> None:
     projected_output = "\n".join(REFERENCE_PORT.render_fixture(_load_json(PROJECTED_PATH)))
 
     assert "The road forks under cold rain." in runtime_output
-    assert "b) Buy rations. <quantity 1-3 ration>" in runtime_output
+    assert (
+        "b) Buy rations. <quantity 1-3 ration> "
+        "[cost: coin -2 silver; supplies +1 ration]"
+    ) in runtime_output
     assert "n) Name the mule. <text: Buttercup>" in runtime_output
     assert "? Inventory: /info inventory (shortcuts: /i, /inv)" in runtime_output
     assert "Supplies:\n  Rations: 2" in projected_output

@@ -26,6 +26,7 @@ import pytest
 
 from tangl.core import EntityTemplate, Graph, Selector, TemplateRegistry
 from tangl.core.runtime_op import Predicate
+from tangl.journal.intent import Blocker
 from tangl.story.concepts import Actor, Location, Role, Setting
 from tangl.story.episode import Action, Block, Scene
 from tangl.story.fragments import ChoiceFragment, ContentFragment
@@ -131,7 +132,12 @@ class TestAvailableChoices:
             successor_id=end.uid,
             text="Pick",
             accepts={"kind": "text", "validators": [{"kind": "enum", "values": ["a", "b"]}]},
-            ui_hints={"source_kind": "radio"},
+            ui_hints={
+                "source_kind": "radio",
+                "cost_previews": [
+                    {"ledger_key": "time", "delta": -1, "unit": "minute"},
+                ],
+            },
         )
         graph.add(action)
         ctx = _simple_ctx()
@@ -144,6 +150,27 @@ class TestAvailableChoices:
         assert fragments[0].accepts.validators[0].values == ["a", "b"]
         assert fragments[0].ui_hints is not None
         assert fragments[0].ui_hints.source_kind == "radio"
+        assert fragments[0].ui_hints.cost_previews[0].ledger_key == "time"
+        assert fragments[0].ui_hints.cost_previews[0].delta == -1
+
+    def test_authored_blocker_is_forwarded_and_templated_when_locked(self) -> None:
+        _graph, start, _end, action = _graph_with_choice(guard_expr="False")
+        action.blockers = [
+            Blocker(
+                code="needs_key",
+                message="{key_name} is required.",
+                refs=["piece-key"],
+            )
+        ]
+        ctx = _simple_ctx({"key_name": "The brass key"})
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].blockers is not None
+        blocker = fragments[0].blockers[0]
+        assert blocker.code == "needs_key"
+        assert blocker.message == "The brass key is required."
+        assert blocker.refs == ["piece-key"]
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +211,7 @@ class TestPredicateGating:
         fragments = render_block_choices(caller=start, ctx=ctx)
 
         assert fragments and fragments[0].blockers is not None
-        assert any(b["type"] == "edge" for b in fragments[0].blockers)
+        assert any(blocker.type == "edge" for blocker in fragments[0].blockers)
 
     def test_compound_and_predicate_fails_when_any_term_false(self) -> None:
         graph, start, _end, _action = _graph_with_choice(guard_expr="gold > 3 and has_key")
@@ -231,7 +258,9 @@ class TestMissingSuccessor:
 
         assert fragments and fragments[0].available is False
         assert fragments[0].unavailable_reason == "missing_successor"
-        assert fragments[0].blockers == [{"type": "edge", "reason": "missing_successor"}]
+        assert fragments[0].blockers is not None
+        assert fragments[0].blockers[0].code == "missing_successor"
+        assert fragments[0].blockers[0].message == "No destination is currently available."
 
     def test_unresolved_successor_is_available_when_preview_is_viable(self) -> None:
         graph = StoryGraph(label="preview_story")
@@ -295,10 +324,16 @@ class TestDependencyGating:
         fragments = render_block_choices(caller=start, ctx=ctx)
 
         assert fragments
-        dep_blockers = [b for b in (fragments[0].blockers or []) if b.get("type") == "dependency"]
+        dep_blockers = [
+            blocker
+            for blocker in (fragments[0].blockers or [])
+            if blocker.type == "dependency"
+        ]
         assert dep_blockers
-        assert dep_blockers[0]["resolution_reason"] == "no_offers"
-        assert dep_blockers[0]["resolution_meta"] == {"tried": ["template_provisioner"]}
+        assert dep_blockers[0].code == "no_offers"
+        assert dep_blockers[0].message == "key is unavailable."
+        assert dep_blockers[0].resolution_reason == "no_offers"
+        assert dep_blockers[0].resolution_meta == {"tried": ["template_provisioner"]}
 
     def test_satisfied_dependency_does_not_block(self) -> None:
         req = Requirement(has_label="key", hard_requirement=True)

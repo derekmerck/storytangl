@@ -224,7 +224,9 @@ def test_render_block_choice_unavailable_reason_missing_successor() -> None:
     choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
     assert choice.available is False
     assert choice.unavailable_reason == "missing_successor"
-    assert choice.blockers == [{"type": "edge", "reason": "missing_successor"}]
+    assert choice.blockers is not None
+    assert choice.blockers[0].code == "missing_successor"
+    assert choice.blockers[0].message == "No destination is currently available."
 
 
 def test_render_block_choice_missing_successor_uses_preview_blockers_when_dependency_exists() -> None:
@@ -245,7 +247,7 @@ def test_render_block_choice_missing_successor_uses_preview_blockers_when_depend
     assert choice.available is False
     assert choice.unavailable_reason == "missing_successor"
     assert choice.blockers is not None
-    assert choice.blockers[0]["type"] == "provision"
+    assert choice.blockers[0].type == "provision"
 
 
 def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
@@ -266,9 +268,11 @@ def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
     assert choice.available is False
     assert choice.unavailable_reason == "missing_dependency"
     assert choice.blockers is not None
-    assert choice.blockers[0]["type"] == "dependency"
-    assert choice.blockers[0]["resolution_reason"] == "no_offers"
-    assert choice.blockers[0]["resolution_meta"] == {"alternatives": []}
+    assert choice.blockers[0].type == "dependency"
+    assert choice.blockers[0].code == "no_offers"
+    assert choice.blockers[0].message == "key is unavailable."
+    assert choice.blockers[0].resolution_reason == "no_offers"
+    assert choice.blockers[0].resolution_meta == {"alternatives": []}
 
 
 def test_render_block_choice_hard_dependency_blocks_even_when_guard_is_true() -> None:
@@ -318,7 +322,13 @@ def test_render_block_emits_choice_payload_accepts_and_ui_hints() -> None:
             "kind": "text",
             "validators": [{"kind": "enum", "values": ["red", "blue", "green"]}],
         },
-        ui_hints={"source_kind": "select", "contribution": "vuetify"},
+        ui_hints={
+            "source_kind": "select",
+            "contribution": "vuetify",
+            "cost_previews": [
+                {"ledger_key": "purse", "delta": -40, "unit": "silver"},
+            ],
+        },
     )
     graph.add(action)
 
@@ -348,7 +358,9 @@ def test_render_block_emits_choice_payload_accepts_and_ui_hints() -> None:
     assert payload["ui_hints"] == {
         "source_kind": "select",
         "contribution": "vuetify",
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "purse", "delta": -40, "unit": "silver"},
+        ],
     }
 
 

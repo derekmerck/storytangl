@@ -89,8 +89,8 @@ surface is small enough to settle with its immediate neighbors.
 | Typed `PlaceAccepts` (including optional `edge_ref`) | P1 | partial (`edge_ref` not rendered) | done (`Accepts` union) | add `edge_ref` fixture when route/network MVP lands |
 | Typed `ComposeAccepts` | P1 | partial (web nested renderer + CLI/Tk inspection fixture) | done (`Accepts` union) | harden layout and add broader part combinations as worlds emit them |
 | Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
-| Typed `Blocker` (replaces dict blockers) | P1 | done (typed + rendered) | untyped | engine PR |
-| `cost_previews: list[CostPreview]` (plural) | P1 | done (choice display) | not_started | engine PR |
+| Typed `Blocker` (replaces dict blockers) | P1 | done (web + CLI + Tk/Ren'Py preservation) | done (`Blocker` model + authored/generated story projection) | candidate for Tier S graduation |
+| `cost_previews: list[CostPreview]` (plural) | P1 | done (web + CLI/Tk/Ren'Py) | done (typed authoring, service/REST/remote DTO flow) | candidate for Tier S graduation |
 | `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
 | HTTP body field `edge_id` | P1 | done | done | — |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
@@ -215,6 +215,10 @@ others.
   transient UX direction carried beside it.
 - Updated web, CLI, Tk/reference planning, REST, remote-client hydration, and
   conformance fixtures to the same request and response shapes.
+- Added typed journal `Blocker(code, message, refs)` values. **Impact:**
+  authored player-facing explanations survive action materialization, while
+  generated VM resolver diagnostics are normalized at the story/journal
+  boundary without exposing VM blocker objects as the UI contract.
 
 ### 2026-06 — backend fragment-contract audit (L2/L3 update)
 
@@ -314,9 +318,12 @@ others.
 
 ### 2026-05 — engine current (L3 baseline)
 
-- Engine emits typed `Accepts` and `UIHints` models from
-  `tangl.journal.intent`; blockers remain dictionary-shaped pending the
-  next intent pass.
+- Engine emits typed `Accepts`, `UIHints`, and `Blocker` models from
+  `tangl.journal.intent`.
+- Authored fixed action costs use `UIHints.cost_previews`; input-specific
+  previews use the relevant typed `Accepts.cost_previews`. Both survive the
+  service, REST, remote-client, and reference-port paths as signed
+  `CostPreview` values.
 - Engine HTTP body uses `edge_id`.
 - Engine `KvFragment.content`, projected `kv_list` values, web fixtures,
   and conformance fixtures use the unified `KvRow` record shape.
@@ -385,11 +392,12 @@ references; webapp behavior aligns to v1.6.
 API maps them.
 
 - Engine PR sequence:
-  1. Typed `Blocker` model in `tangl/journal/intent.py`.
-  2. ✅ Typed direct/find `EdgeResolutionRequest` and `UxEvent`.
-  3. Typed `metadata.grammar` model.
-  4. HTTP API: type responses on `/story/do` / `/story/update`.
-  5. Conformance harness: ✅ initial `legibility.py`; ✅ initial
+  1. ✅ Typed `Blocker` model in `tangl/journal/intent.py`.
+  2. ✅ Plural typed `CostPreview` authoring and service/client projection.
+  3. ✅ Typed direct/find `EdgeResolutionRequest` and `UxEvent`.
+  4. Typed `metadata.grammar` model.
+  5. HTTP API: type responses on `/story/do` / `/story/update`.
+  6. Conformance harness: ✅ initial `legibility.py`; ✅ initial
      input-parity `parity.py`; ✅ initial `time_parity.py`; ✅ CLI-floor
      info-channel reachability; next add browser timing E2E only after
      promoted surfaces stabilize.

@@ -337,7 +337,7 @@ export interface CostPreview {
 }
 
 export interface Blocker {
-  code?: string | null
+  code: string
   message: string
   refs?: FragmentId[]
   [key: string]: unknown

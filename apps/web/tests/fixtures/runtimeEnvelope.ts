@@ -117,7 +117,11 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
       edge_id: 'e-crossroads-03-bargain',
       text: 'Pay the forty silver.',
       available: true,
-      ui_hints: { hotkey: '1', icon: 'cash' },
+      ui_hints: {
+        hotkey: '1',
+        icon: 'cash',
+        cost_previews: [{ ledger_key: 'purse', delta: -40, unit: 'silver' }],
+      },
     },
     {
       uid: 'f-choice-freeform',
@@ -156,7 +160,11 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
       available: false,
       unavailable_reason: 'Requires Sleight of Hand >= 2',
       blockers: [
-        { kind: 'skill', key: 'sleight_of_hand', need: 2, have: 1 },
+        {
+          code: 'skill_too_low',
+          message: 'Sleight of Hand 1, need 2.',
+          refs: ['pc-you'],
+        },
       ],
       ui_hints: { hotkey: '4', icon: 'hand' },
     },

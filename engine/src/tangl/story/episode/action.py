@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import field_serializer
 
-from tangl.journal.intent import Accepts, UIHints
+from tangl.journal.intent import Accepts, Blocker, UIHints
 from tangl.vm import ResolutionPhase, TraversableEdge
 
 
@@ -25,6 +25,7 @@ class Action(TraversableEdge):
     activation: str | None = None
     payload: Any = None
     accepts: Accepts | None = None
+    blockers: list[Blocker] | None = None
     ui_hints: UIHints | None = None
     journal_text: str | None = None
 

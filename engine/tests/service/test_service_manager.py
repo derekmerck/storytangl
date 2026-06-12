@@ -31,7 +31,11 @@ from tangl.story.episode import Action
 from tangl.vm.runtime.ledger import Ledger
 
 
-def _story_script(*, with_choice_payload_hints: bool = False) -> dict[str, object]:
+def _story_script(
+    *,
+    with_choice_payload_hints: bool = False,
+    with_choice_blocker: bool = False,
+) -> dict[str, object]:
     action: dict[str, object] = {"text": "Continue", "successor": "end"}
     if with_choice_payload_hints:
         action["accepts"] = {
@@ -39,12 +43,27 @@ def _story_script(*, with_choice_payload_hints: bool = False) -> dict[str, objec
             "min": 1,
             "max": 3,
             "unit": "ration",
+            "cost_previews": [
+                {"ledger_key": "supplies", "delta": -1, "unit": "ration"},
+            ],
         }
         action["ui_hints"] = {
             "hotkey": "b",
             "source_kind": "market",
             "contribution": "purchase",
+            "cost_previews": [
+                {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+            ],
         }
+    if with_choice_blocker:
+        action["conditions"] = ["False"]
+        action["blockers"] = [
+            {
+                "code": "needs_permit",
+                "message": "A valid permit is required.",
+                "refs": ["permit-status"],
+            }
+        ]
 
     return {
         "label": "svc_manager_world",
@@ -276,14 +295,47 @@ def test_story_envelope_preserves_choice_payload_contracts(
         "max": 3,
         "step": 1,
         "unit": "ration",
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "supplies", "delta": -1, "unit": "ration"},
+        ],
     }
     assert payload["ui_hints"] == {
         "hotkey": "b",
         "source_kind": "market",
         "contribution": "purchase",
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+        ],
     }
+
+
+def test_story_envelope_preserves_typed_choice_blockers(
+    manager: ServiceManager,
+    user: User,
+) -> None:
+    world = World.from_script_data(script_data=_story_script(with_choice_blocker=True))
+    created = manager.create_story(
+        user_id=user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc_manager_story_blocker_contract",
+    )
+
+    choice = next(fragment for fragment in created.fragments if isinstance(fragment, ChoiceFragment))
+
+    assert choice.available is False
+    assert choice.blockers is not None
+    assert choice.blockers[0].code == "needs_permit"
+    assert choice.blockers[0].message == "A valid permit is required."
+    assert choice.blockers[0].refs == ["permit-status"]
+    assert choice.model_dump(mode="json", exclude_none=True)["blockers"] == [
+        {
+            "code": "needs_permit",
+            "message": "A valid permit is required.",
+            "refs": ["permit-status"],
+        }
+    ]
 
 
 def test_create_story_passes_user_namespace_to_world_override(
