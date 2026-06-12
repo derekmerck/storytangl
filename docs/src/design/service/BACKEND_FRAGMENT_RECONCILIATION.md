@@ -32,6 +32,11 @@ instances. A choice's fragment `uid` identifies the renderable choice fragment;
 its `edge_id` identifies the action to submit back to `resolve_choice`. These
 identities must remain distinct.
 
+`RuntimeEnvelope.ux_events` is a typed side channel for transient client
+guidance. Inline command feedback, validation failures, achievements, and
+shell-level notices do not become journal fragments unless they are genuinely
+part of the narrative record.
+
 ## Responsibility Split
 
 Backend/service responsibilities:
@@ -43,7 +48,10 @@ Backend/service responsibilities:
   availability, and blockers.
 - Populate advisory envelope metadata such as `info_affordances`,
   `info_state`, `world_id`, `ledger_id`, and command grammar hints.
+- Accept the typed direct-edge / exploratory `find_edge` request union.
+- Resolve exploratory queries through Story policy before committing an edge.
 - Validate submitted choice payloads during action resolution.
+- Return typed UX events when an exploratory request cannot advance.
 
 REST responsibilities:
 
@@ -61,12 +69,20 @@ REST must not:
 - rewrite a choice fragment `uid` to equal its `edge_id`;
 - collapse sibling fragments into a `block` payload;
 - require clients to submit fragment `uid` when the contract says `edge_id`;
+- turn exploratory command text into a synthetic choice or journal fragment;
 - create backend semantics from presentation-only hints.
 
 ## Current Status
 
-The service layer already returns Python-native `RuntimeEnvelope` objects for
-story creation, updates, and choice resolution. The first pinned backend
+The service layer returns Python-native `RuntimeEnvelope` objects for story
+creation, updates, and edge resolution. `resolve_choice()` accepts either a
+`DirectEdgeRequest(edge_id=...)` or a
+`FindEdgeRequest(find_edge=CommandEdgeQuery(...))`. Story dispatch owns command
+matching against the current open `Action` surface. A unique match follows the
+ordinary ledger path; no match, ambiguity, or rejection returns the current
+turn with an inline, non-replayed `UxEvent`.
+
+The first pinned backend
 contract test now asserts that a simple story emits sibling content and choice
 fragments, not a legacy block, and that `uid` and `edge_id` stay separate.
 Additional contract tests pin the authored `Action.accepts` and `Action.ui_hints`
@@ -118,11 +134,11 @@ against the current heap and resolved back to the ordinary integer move before
 the round runs. This distinction keeps client action aggregation out of the
 mechanics API and is the intended pattern for future “how many?” interactions.
 
-The REST layer starts from `RuntimeEnvelope.to_dto()` and keeps any remaining
-manual shaping limited to HTTP-adjacent concerns: media profiles, optional
-markdown-to-HTML conversion, and harmless compatibility aliases such as
-`choice.label`. That is acceptable as long as the serializer remains a
-transcription boundary and keeps service semantics intact.
+The REST layer validates the same `EdgeResolutionRequest` union, calls the
+service method directly, and serializes `RuntimeEnvelope.to_dto()`. Any manual
+shaping remains limited to HTTP-adjacent concerns such as media profiles and
+optional markdown-to-HTML conversion. The serializer remains a transcription
+boundary and does not preserve retired request or fragment aliases.
 
 ## Diagnostic Fixtures And Transcripts
 

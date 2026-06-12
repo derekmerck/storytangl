@@ -133,7 +133,7 @@ describe('runtime envelope fixtures', () => {
     expect(kinds.has('quantity')).toBe(true)
     expect(kinds.has('pieces')).toBe(true)
     expect(kinds.has('compose')).toBe(true)
-    expect(kinds.has('raw_command')).toBe(true)
+    expect(commandHintRuntimeEnvelope.ux_events?.[0]?.presentation).toBe('inline')
   })
 
   it('keeps command grammar hints advisory metadata', () => {

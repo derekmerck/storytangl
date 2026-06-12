@@ -47,8 +47,8 @@ The CLI floor is:
 - render prose and visible state as readable text
 - render choices in order, including locked choices and reasons
 - collect `text`, `quantity`, and visible `piece` selections through prompts
-- submit the same `choice_id` plus payload that a rich widget submits
-- optionally submit raw command text to a reserved interpretation choice
+- submit the same UUID `edge_id` plus payload that a rich widget submits
+- optionally submit raw command text through a typed `find_edge` request
 
 Web, Ren'Py, Godot, or tabletop-like clients may render richer controls, but
 those controls are affordances over the same visible fragments. They are not a
@@ -159,7 +159,6 @@ Near-term accepted shapes:
 | `text` | `{text: string}` | line prompt with optional validators |
 | `quantity` | `{quantity: int}` | integer prompt with min/max and reason text |
 | `pieces` | `{piece_ids: string[]}` | numbered entries from a visible target zone |
-| `raw_command` | `{text: string}` | command prompt submitted to interpretation edge |
 
 Later, `compose` can combine those simple parts:
 
@@ -196,16 +195,18 @@ backend validation is authoritative.
 Classic IF-style command input is a second affordance over the visible action
 surface, not a requirement that every client embed a language parser.
 
-The preferred model is backend-authoritative:
+The preferred model is backend-authoritative and keeps exploratory command
+resolution separate from concrete action submission:
 
 1. The runtime emits ordinary visible choices for the turn.
-2. If raw command input is authorized, the runtime also emits a reserved choice
-   such as `edge_id="interpret_command"` with `accepts.kind="raw_command"`.
-3. A client may render that choice as a command bar or as a CLI prompt.
-4. A capable client may use advisory grammar hints for autocomplete, preview,
+2. If raw command input is authorized, envelope metadata advertises advisory
+   grammar hints.
+3. A client may render a command bar or a CLI prompt.
+4. A capable client may use the hints for autocomplete, preview,
    and piece highlighting.
-5. On submit, the backend resolves or rejects the command and returns a normal
-   `RuntimeEnvelope`.
+5. The client submits `{find_edge: {kind: "command", command: "..."}}`.
+6. The backend either resolves exactly one action and applies it, or returns
+   the current envelope with a typed inline `UxEvent`.
 
 Grammar hints are optional and must be treated as denormalized convenience
 metadata derived from the visible turn surface. They must not contain hidden
@@ -222,20 +223,13 @@ metadata:
 ```
 
 Clients can use this for placeholders or autocomplete. A CLI or minimal client
-can ignore it and submit raw text to `interpret_command`.
+can ignore it and submit raw text through the same `find_edge` request.
 
-When a raw command does not advance the story, the backend should return a
-renderable feedback fragment. A future `interpretation` fragment can cover:
-
-- `ambiguous`
-- `unknown_verb`
-- `unknown_noun`
-- `blocked`
-- `impossible`
-- `validation_failed`
-
-A client without a dedicated interpretation renderer can show the message as
-ordinary content.
+When a raw command does not advance the story, the backend returns an inline,
+non-replayed `UxEvent`. The event's type, severity, message, and details can
+distinguish no match, ambiguity, rejection, or payload validation failure.
+Because UX guidance is not narrative output, it lives in
+`RuntimeEnvelope.ux_events` rather than the journal fragment stream.
 
 ### Outcome
 
@@ -297,7 +291,7 @@ Examples:
 
 - A web card UI may render hand zones and selectable pieces.
 - A CLI may render the same zone as a numbered list and collect a piece id.
-- A CLI command prompt may submit raw text to `interpret_command` without local
+- A CLI command prompt may submit a `find_edge` command request without local
   grammar support.
 - A Ren'Py view may show a menu plus a small status panel.
 - A client without zone support may show the unknown group fallback but should
@@ -312,7 +306,7 @@ The vocabulary should cover the current mechanics survey without creating a
 client-side rules runtime:
 
 - Classic sandbox IF: visible location state, exits, inventory, blocked actions,
-  command text, and backend interpretation feedback.
+  command text, and backend UX feedback.
 - Rock-paper-scissors: simultaneous or staged commit, opponent tell, dominance
   relation, round result, best-of-N scoring.
 - Blackjack/21/22: deck, hand zones, hidden dealer state, hit/stand, threshold
@@ -337,10 +331,10 @@ The next web/client work should stay small and contract-driven:
 2. Add `ChoiceInputView` for `pick`, `text`, `quantity`, and `pieces`.
 3. Add canonical fixtures for a quantity interaction and a small sandbox-like
    turn with visible room/inventory zones.
-4. Keep raw command input as a reserved `raw_command` choice that submits
-   `{text}` to the backend; grammar hints are optional presentation metadata.
-5. Add `interpretation` rendering after the backend shape exists; fallback to
-   content is acceptable before then.
+4. Keep raw command input as a typed `find_edge` request, separate from
+   UUID-addressed direct choice submission.
+5. Render failed or ambiguous command resolution from inline, non-replayed
+   `RuntimeEnvelope.ux_events`.
 6. Add `compose` after the simple payload widgets are stable.
 7. Add browser E2E only after payload widgets and command feedback settle enough
    that tests will not cement an interim UI shape.

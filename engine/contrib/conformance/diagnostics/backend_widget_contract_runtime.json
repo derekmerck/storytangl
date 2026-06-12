@@ -11,11 +11,9 @@
     {
       "uid": "a6f1367a-2dcf-549f-badd-4c609b7e284c",
       "fragment_type": "choice",
-      "content": "Buy rations.",
       "edge_id": "2850fcc1-11b5-5333-a32f-c7dad8b8ef79",
       "text": "Buy rations.",
       "available": true,
-      "active": true,
       "accepts": {
         "kind": "quantity",
         "required": true,
@@ -35,11 +33,9 @@
     {
       "uid": "4a8267ad-2196-5311-8e39-825941b0ce4c",
       "fragment_type": "choice",
-      "content": "Name the mule.",
       "edge_id": "82231e85-74af-51b5-81b0-fc8bd7235ac9",
       "text": "Name the mule.",
       "available": true,
-      "active": true,
       "accepts": {
         "kind": "text",
         "required": true,
@@ -54,6 +50,7 @@
       }
     }
   ],
+  "ux_events": [],
   "redirect_trace": [],
   "metadata": {
     "info_affordances": [

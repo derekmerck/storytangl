@@ -472,7 +472,7 @@ class TestLedgerJournal:
     def test_get_journal_filters_non_fragments(self) -> None:
         ledger, _ = _make_ledger("a", "b")
         content = ContentFragment(content="hello", step=0)
-        choice = ChoiceFragment(text="go", step=1)
+        choice = ChoiceFragment(edge_id=uuid4(), text="go", step=1)
         snapshot = Snapshot.from_entity(ledger)
         ledger.output_stream.append(content)
         ledger.output_stream.append(snapshot)
@@ -485,7 +485,7 @@ class TestLedgerJournal:
         ledger, _ = _make_ledger("a", "b")
         f1 = ContentFragment(content="one", step=0)
         f2 = ContentFragment(content="two", step=2)
-        f3 = ChoiceFragment(text="three", step=3)
+        f3 = ChoiceFragment(edge_id=uuid4(), text="three", step=3)
         ledger.output_stream.extend([f1, f2, f3])
 
         assert ledger.get_journal(since_step=2) == [f2, f3]

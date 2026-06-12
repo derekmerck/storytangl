@@ -27,7 +27,7 @@ renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
   MSW is loaded, which keeps `happy-dom` viable for this pass.
 - Story flow now renders `RuntimeEnvelope.fragments` directly through a fragment
   registry, scene shells, and small fragment widgets. The old
-  `JournalStoryUpdate[]` path remains only as a narrow compatibility adapter.
+  `JournalStoryUpdate[]` compatibility adapter has been removed.
 - `zone` and `piece` fragments now have real generic widgets, which gives
   piece-selection choices a visible surface to bind to.
 - The next interaction direction is payload-first: support text, quantity, and
@@ -36,14 +36,12 @@ renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
 - `ChoiceInputView` handles current text, quantity, and piece payload widgets,
   with canonical quantity and sandbox fixtures in
   `apps/web/tests/fixtures/payloadInteractions.ts`.
-- Raw command choices now submit `{text}` through reserved backend
-  interpretation edges, with optional `metadata.grammar` hints used only as UI
-  affordances.
+- The shell-level command bar submits typed `find_edge` requests, with optional
+  `metadata.grammar` hints used only as UI affordances. Inline and interrupt
+  guidance renders from `RuntimeEnvelope.ux_events`.
 
 ## Open Work
 
-- Add `interpretation` rendering once the backend response shape exists; until
-  then, fallback text is acceptable.
 - Add richer command preview/autocomplete once backend grammar hints settle
   beyond examples, verbs, and nouns.
 - Recheck world/system/user metadata assumptions against backend response

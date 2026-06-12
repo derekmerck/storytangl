@@ -94,7 +94,7 @@ class WidgetPlan:
 class Submission:
     """Payload a Tk action would send to the backend."""
 
-    edge_id: str | None
+    edge_id: str
     choice_uid: str | None
     payload: JsonObject
 
@@ -115,8 +115,8 @@ ROLE_WIDGETS: Mapping[str, str] = {
     "zone_label": "labelframe_label",
     "piece": "piece_label",
     "fact": "label",
-    "interpretation": "label",
-    "user_event": "label",
+    "command_bar": "label",
+    "ux_event": "label",
     "projected_section": "labelframe_label",
     "projected_value": "label",
     "empty": "label",
@@ -237,7 +237,7 @@ class TkReferenceApp:
         frame.columnconfigure(1, weight=1)
         if plan.input is None or plan.input.kind == "pick":
             self._button(frame, plan, 0, 0)
-        elif plan.input.kind in {"text", "raw_command"}:
+        elif plan.input.kind == "text":
             self._entry_choice(frame, plan)
         elif plan.input.kind == "quantity":
             self._quantity_choice(frame, plan)
@@ -275,9 +275,6 @@ class TkReferenceApp:
             command=lambda plan=plan, variable=variable: self._submit(plan, variable.get()),
         )
         button.grid(row=0, column=2, sticky="w")
-        if input_plan.kind == "raw_command" and plan.choice and plan.choice.prompt:
-            hint = self.ttk.Label(parent, text=plan.choice.prompt.strip())
-            hint.grid(row=1, column=1, sticky="w", padx=6)
 
     def _quantity_choice(self, parent: object, plan: WidgetPlan) -> None:
         input_plan = cast(InputControlPlan, plan.input)
@@ -343,7 +340,7 @@ class TkReferenceApp:
                 column=0,
                 sticky="w",
             )
-            if part.input.kind in {"text", "raw_command", "quantity"}:
+            if part.input.kind in {"text", "quantity"}:
                 variable = self.tk.StringVar(value=_initial_text_value(part.input))
                 field = self.ttk.Entry(parent, textvariable=variable, state=_tk_state(plan))
                 field.grid(row=row, column=1, sticky="ew", padx=6)
@@ -420,7 +417,7 @@ def _choice_input_plan(
     accepts = choice.accepts or {}
     if kind == "pick":
         return InputControlPlan(kind="pick", widget="button")
-    if kind in {"text", "raw_command"}:
+    if kind == "text":
         return InputControlPlan(kind=kind, widget="entry", payload_key="text")
     if kind == "quantity":
         return InputControlPlan(
@@ -544,7 +541,7 @@ def _selected_piece_ids(value: JsonValue) -> list[str]:
 def _collect_input_payload(input_plan: InputControlPlan | None, value: JsonValue) -> JsonObject:
     if input_plan is None or input_plan.kind == "pick":
         return {}
-    if input_plan.kind in {"text", "raw_command"}:
+    if input_plan.kind == "text":
         if not isinstance(value, str):
             raise ValueError(f"{input_plan.kind} choices require string input")
         return {"text": value}
@@ -583,7 +580,7 @@ def _collect_input_payload(input_plan: InputControlPlan | None, value: JsonValue
 def _sample_submission(plan: WidgetPlan) -> Submission | None:
     if plan.input is None or plan.input.kind == "pick":
         return collect_submission(plan)
-    if plan.input.kind in {"text", "raw_command"}:
+    if plan.input.kind == "text":
         return collect_submission(plan, "sample")
     if plan.input.kind == "quantity":
         return collect_submission(plan, plan.input.minimum or 1)
@@ -603,7 +600,7 @@ def _sample_submission(plan: WidgetPlan) -> Submission | None:
 
 
 def _sample_input_value(input_plan: InputControlPlan) -> JsonValue:
-    if input_plan.kind in {"text", "raw_command"}:
+    if input_plan.kind == "text":
         return "sample"
     if input_plan.kind == "quantity":
         return input_plan.minimum or 1

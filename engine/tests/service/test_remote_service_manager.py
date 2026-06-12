@@ -16,7 +16,14 @@ import requests
 from tangl.core import BaseFragment
 from tangl.journal.fragments import BlockFragment, ChoiceFragment
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service import KvListValue, ProjectedState, TableValue
+from tangl.service import (
+    CommandEdgeQuery,
+    DirectEdgeRequest,
+    FindEdgeRequest,
+    KvListValue,
+    ProjectedState,
+    TableValue,
+)
 from tangl.service.bootstrap import build_service_manager
 from tangl.service.exceptions import AccessDeniedError, InvalidOperationError, ServiceError
 from tangl.service.remote_service_manager import RemoteServiceManager
@@ -93,9 +100,8 @@ def _runtime_envelope_payload() -> dict[str, object]:
                     {
                         "fragment_type": "choice",
                         "edge_id": str(edge_id),
-                        "content": "Continue",
                         "text": "Continue",
-                        "active": True,
+                        "available": True,
                     }
                 ],
             },
@@ -106,6 +112,17 @@ def _runtime_envelope_payload() -> dict[str, object]:
         ],
         "last_redirect": None,
         "redirect_trace": [],
+        "ux_events": [
+            {
+                "event_id": str(uuid4()),
+                "event_type": "edge_not_found",
+                "message": "No available action matched.",
+                "presentation": "inline",
+                "replay": False,
+                "severity": "warning",
+                "details": {"command": "wave"},
+            }
+        ],
         "metadata": {
             "ledger_id": str(uuid4()),
             "world_id": "demo_world",
@@ -270,6 +287,44 @@ class TestRemoteTransportAndAuth:
         with pytest.raises(InvalidOperationError, match="does not support arguments"):
             manager.update_user(user_id=manager._bound_user_id, last_played_dt="2026-01-01")
 
+    def test_resolve_choice_serializes_direct_and_find_edge_requests(self) -> None:
+        user_id = uuid4()
+        edge_id = uuid4()
+        session = RecordingSession(
+            [
+                StubResponse(200, _runtime_envelope_payload()),
+                StubResponse(200, _runtime_envelope_payload()),
+            ]
+        )
+        manager = RemoteServiceManager(
+            "https://example.test/api/v2",
+            api_key="bound-key",
+            session=session,
+        )
+        manager._bound_user_id = user_id
+
+        manager.resolve_choice(
+            user_id=user_id,
+            request=DirectEdgeRequest(edge_id=edge_id, payload={"quantity": 2}),
+        )
+        manager.resolve_choice(
+            user_id=user_id,
+            request=FindEdgeRequest(
+                find_edge=CommandEdgeQuery(command="continue"),
+            ),
+        )
+
+        assert session.calls[0]["json"] == {
+            "edge_id": str(edge_id),
+            "payload": {"quantity": 2},
+        }
+        assert session.calls[1]["json"] == {
+            "find_edge": {
+                "kind": "command",
+                "command": "continue",
+            }
+        }
+
 
 class TestRemoteResponseHydration:
     """Tests for typed response decoding from REST payloads."""
@@ -291,6 +346,9 @@ class TestRemoteResponseHydration:
         assert isinstance(envelope.fragments[1], BaseFragment)
         assert envelope.fragments[1].fragment_type == "mystery"
         assert envelope.fragments[1].content == {"fragment_type": "mystery", "foo": "bar"}
+        assert envelope.ux_events[0].event_type == "edge_not_found"
+        assert envelope.ux_events[0].presentation == "inline"
+        assert envelope.ux_events[0].replay is False
         assert session.calls[0]["params"] == {
             "limit": 5,
             "since_step": 2,

@@ -1,0 +1,89 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000017000",
+  "step": 150,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000017001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000017002",
+        "00000000-0000-4000-8000-000000017006",
+        "00000000-0000-4000-8000-000000017007"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017002",
+      "fragment_type": "content",
+      "content": "Command guidance stays outside the journal while ordinary choices remain available."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017006",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000017101",
+      "text": "Take the brass key.",
+      "available": true,
+      "ui_hints": {"hotkey": "1"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000017007",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000017102",
+      "text": "Take the iron key.",
+      "available": true,
+      "ui_hints": {"hotkey": "2"}
+    }
+  ],
+  "ux_events": [
+    {
+      "event_id": "00000000-0000-4000-8000-000000017003",
+      "event_type": "edge_ambiguous",
+      "message": "Which key: brass or iron?",
+      "presentation": "inline",
+      "replay": false,
+      "severity": "warning",
+      "details": {
+        "command": "take key",
+        "candidates": [
+          {
+            "edge_id": "00000000-0000-4000-8000-000000017101",
+            "text": "Take the brass key."
+          },
+          {
+            "edge_id": "00000000-0000-4000-8000-000000017102",
+            "text": "Take the iron key."
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "00000000-0000-4000-8000-000000017004",
+      "event_type": "edge_rejected",
+      "message": "The hatch is bolted from above.",
+      "presentation": "inline",
+      "replay": false,
+      "severity": "warning",
+      "details": {
+        "command": "climb to attic",
+        "reason": "Locked: no obvious key.",
+        "hint": "Find another way up."
+      }
+    },
+    {
+      "event_id": "00000000-0000-4000-8000-000000017005",
+      "event_type": "edge_not_found",
+      "message": "Nothing here takes flight.",
+      "presentation": "inline",
+      "replay": false,
+      "severity": "warning",
+      "details": {"command": "fly away"}
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_wireframe_v15_ux_event_samples",
+    "proposal": true,
+    "vocab_version": "1.5",
+    "source": "docs/src/design/story/wireframes/v1_5/v15-fixtures-core.js",
+    "source_fixture": "gravel.interp_samples"
+  }
+}

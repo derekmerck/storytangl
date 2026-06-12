@@ -257,10 +257,8 @@ export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
       member_ids: [
         'f-command-prose',
         'z-command-room',
-        'f-command-feedback',
         'f-choice-look',
         'f-choice-take-lamp',
-        'f-choice-interpret-command',
       ],
     },
     {
@@ -299,15 +297,6 @@ export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
       hints: { label_text: 'iron door' },
     },
     {
-      uid: 'f-command-feedback',
-      fragment_type: 'interpretation',
-      result: 'blocked',
-      text: 'eat mailbox',
-      message: "You can't eat the mailbox.",
-      blocked_reason: 'The mailbox is fixed to the wall.',
-      hint: 'Try opening it instead.',
-    },
-    {
       uid: 'f-choice-look',
       fragment_type: 'choice',
       edge_id: 'e-look',
@@ -325,14 +314,19 @@ export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
       accepts: { kind: 'pick' },
       ui_hints: { hotkey: '2' },
     },
+  ],
+  ux_events: [
     {
-      uid: 'f-choice-interpret-command',
-      fragment_type: 'choice',
-      edge_id: 'interpret_command',
-      text: 'Try a command.',
-      available: true,
-      accepts: { kind: 'raw_command' },
-      ui_hints: { hotkey: '>' },
+      event_id: '00000000-0000-4000-8000-000000000031',
+      event_type: 'edge_rejected',
+      message: "You can't eat the mailbox. The mailbox is fixed to the wall.",
+      presentation: 'inline',
+      replay: false,
+      severity: 'warning',
+      details: {
+        command: 'eat mailbox',
+        hint: 'Try opening it instead.',
+      },
     },
   ],
   metadata: {

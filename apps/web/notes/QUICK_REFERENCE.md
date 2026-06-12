@@ -222,14 +222,18 @@ accepts: {
 }
 payload: { piece_ids: ['rust-map-card'] }
 
-// raw command fallback
-accepts: { kind: 'raw_command' }
-payload: { text: 'take lamp' }
+// exploratory command resolution is not a choice payload
+{
+  find_edge: {
+    kind: 'command',
+    command: 'take lamp'
+  }
+}
 ```
 
 Command bars are backend-authoritative. Use grammar hints only for optional
-preview/autocomplete; when in doubt, submit raw text to the reserved
-`interpret_command` choice and render the returned envelope.
+preview/autocomplete; submit raw text with `find_edge` and render any inline
+`ux_events` returned with the envelope.
 
 ```typescript
 metadata: {

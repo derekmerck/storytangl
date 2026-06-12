@@ -45,7 +45,7 @@ EXPECTED_PROPOSALS = {
     "place_accepts.json",
     "record_kvrow.json",
     "roll_fragment.json",
-    "wireframe_v15_interpretation_samples.json",
+    "wireframe_v15_ux_event_samples.json",
 }
 
 
@@ -138,22 +138,15 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
         )
     elif fragment_type == "choice":
         assert isinstance(fragment.get("text"), str)
+        UUID(str(fragment.get("edge_id")))
         accepts = fragment.get("accepts")
         assert accepts is None or isinstance(accepts, dict)
     elif fragment_type in {"update", "delete"}:
         assert isinstance(fragment.get("ref_id") or fragment.get("reference_id"), str)
         if fragment_type == "update":
             assert isinstance(fragment.get("payload"), dict)
-    elif fragment_type == "user_event":
-        assert "content" in fragment
     elif fragment_type == "piece":
         assert isinstance(fragment.get("piece_id"), str)
-    elif fragment_type == "interpretation":
-        assert isinstance(fragment.get("message") or fragment.get("content"), str)
-        result = fragment.get("result")
-        text = fragment.get("text")
-        assert result is None or isinstance(result, str)
-        assert text is None or isinstance(text, str)
     else:
         pytest.fail(f"Fixture uses unexpected fragment type {fragment_type!r}")
 
@@ -209,6 +202,15 @@ def test_runtime_fixtures_have_portable_fragment_shapes(path: Path) -> None:
         assert uid not in seen, f"{path.name} repeats uid {uid}"
         seen.add(uid)
         _assert_fragment_shape(fragment)
+
+    for event in payload.get("ux_events", []):
+        assert isinstance(event, dict)
+        UUID(str(event.get("event_id")))
+        assert isinstance(event.get("event_type"), str)
+        assert isinstance(event.get("message"), str)
+        assert event.get("presentation") in {"inline", "interrupt"}
+        assert isinstance(event.get("replay"), bool)
+        assert event.get("severity") in {"info", "success", "warning", "error"}
 
 
 @pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
@@ -626,17 +628,13 @@ def test_command_hint_fixture_keeps_grammar_advisory() -> None:
     assert isinstance(grammar, dict)
     assert grammar["examples"][0] == "take lamp"
 
-    raw_command_choices = [
-        fragment
+    assert not any(
+        fragment.get("accepts", {}).get("kind") == "raw_command"
         for fragment in payload["fragments"]
-        if (
-            isinstance(fragment, dict)
-            and fragment.get("fragment_type") == "choice"
-            and fragment.get("accepts", {}).get("kind") == "raw_command"
-        )
-    ]
-    assert len(raw_command_choices) == 1
-    assert raw_command_choices[0]["edge_id"] == "interpret_command"
+        if isinstance(fragment, dict) and fragment.get("fragment_type") == "choice"
+    )
+    assert payload["ux_events"][0]["presentation"] == "inline"
+    assert payload["ux_events"][0]["replay"] is False
 
 
 def test_control_update_and_delete_fixtures_apply_to_registry() -> None:

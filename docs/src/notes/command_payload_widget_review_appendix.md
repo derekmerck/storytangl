@@ -3,6 +3,12 @@
 > Status: reference note from the April 2026 UI handoff package.
 > Canonical contract lives in `docs/src/design/story/INTERACTION_VOCABULARY.md`
 > and `docs/src/design/service/FRAGMENT_STREAM_CONTRACT.md`.
+>
+> **Superseded command shape:** the current contract no longer represents raw
+> commands as reserved choices or failures as interpretation fragments. Clients
+> submit typed `find_edge` requests and receive ephemeral
+> `RuntimeEnvelope.ux_events`. The discussion below is retained as design
+> history.
 
 The design review proposed a useful compromise for classic interactive-fiction
 commands: keep the backend authoritative, but let capable clients provide a

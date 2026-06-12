@@ -113,40 +113,17 @@ class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
 
 
 class ChoiceFragment(BaseFragment, extra="allow"):
-    """Choice fragment supporting both current and legacy field shapes."""
+    """Direct, UUID-backed action offered to a client."""
 
     fragment_type: Literal["choice"] = "choice"
-    edge_id: UUID | None = None
+    edge_id: UUID
     text: str = ""
     available: bool = True
-    active: bool | None = None
     unavailable_reason: str | None = None
     blockers: list[dict[str, Any]] | None = None
     accepts: Accepts | None = None
     ui_hints: UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_fields(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-
-        payload = dict(data)
-        content = payload.get("content")
-        text = payload.get("text")
-        active = payload.get("active")
-
-        if not text and isinstance(content, str):
-            payload["text"] = content
-        if content is None and isinstance(payload.get("text"), str):
-            payload["content"] = payload["text"]
-        if "available" not in payload and active is not None:
-            payload["available"] = bool(active)
-        if "active" not in payload:
-            payload["active"] = bool(payload.get("available", True))
-
-        return payload
 
 
 ControlFragmentType = Literal["update", "delete"]
@@ -168,13 +145,6 @@ class ControlFragment(BaseFragment, extra="allow"):
 
     def reference(self, registry: Registry[BaseFragment]) -> BaseFragment:
         return registry.find_one(Selector.from_identifier(self.reference_id))
-
-
-class UserEventFragment(BaseFragment, extra="allow"):
-    """User-facing event fragment for notifications or client hints."""
-
-    fragment_type: Literal["user_event"] = "user_event"
-    event_type: str | None = None
 
 
 ShapeName = Literal["landscape", "portrait", "square", "avatar", "banner", "bg"]
@@ -267,7 +237,6 @@ _FRAGMENT_DTO_TYPES: dict[str, type[BaseFragment]] = {
     "media": MediaFragment,
     "piece": PieceFragment,
     "update": ControlFragment,
-    "user_event": UserEventFragment,
 }
 
 
@@ -343,7 +312,6 @@ __all__ = [
     "PresentationHints",
     "StagingHints",
     "UIHints",
-    "UserEventFragment",
     "fragment_from_dto",
     "fragment_to_dto",
 ]

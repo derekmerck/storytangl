@@ -8,7 +8,13 @@ from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
-from tangl.service.response import ProjectedState, RuntimeEnvelope
+from tangl.service.response import (
+    CommandEdgeQuery,
+    DirectEdgeRequest,
+    FindEdgeRequest,
+    ProjectedState,
+    RuntimeEnvelope,
+)
 
 
 if TYPE_CHECKING:
@@ -34,6 +40,7 @@ class StoryController(CommandSet):
         super().__init__()
         self._current_story_update: list[dict[str, Any]] = []
         self._current_choices: list[_CachedChoice] = []
+        self._current_ux_events: list[dict[str, Any]] = []
         self._current_metadata: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
@@ -53,6 +60,7 @@ class StoryController(CommandSet):
             self._cmd.terminal_renderer.story_update(
                 fragments=self._current_story_update,
                 choices=self._current_choices,
+                ux_events=self._current_ux_events,
                 metadata=self._current_metadata,
             )
         )
@@ -61,13 +69,15 @@ class StoryController(CommandSet):
         """Extract actionable choices from the canonical fragment DTO stream."""
 
         choices: list[_CachedChoice] = []
-        for fragment in self._current_story_update:
+        for index, fragment in enumerate(self._current_story_update):
             if fragment.get("fragment_type") != "choice":
                 continue
 
             edge_id = fragment.get("edge_id")
             if edge_id is None:
-                continue
+                raise ValueError(
+                    f"Choice fragment at index {index} is missing required edge_id: {fragment!r}"
+                )
 
             accepts = fragment.get("accepts")
             choices.append(
@@ -88,6 +98,7 @@ class StoryController(CommandSet):
     def _apply_runtime_envelope(self, envelope: RuntimeEnvelope) -> None:
         payload = envelope.to_dto()
         self._current_metadata = payload.get("metadata", {})
+        self._current_ux_events = payload.get("ux_events", [])
         ledger_id_value = self._current_metadata.get("ledger_id")
         if ledger_id_value is not None:
             self._cmd.set_ledger(UUID(str(ledger_id_value)))
@@ -120,11 +131,11 @@ class StoryController(CommandSet):
                 raise ValueError("This choice does not accept an input value.")
             return {}
 
-        if kind in {"text", "raw_command"}:
+        if kind == "text":
             text = " ".join(values).strip()
-            required = kind == "raw_command" or bool(accepts.get("required", True))
+            required = bool(accepts.get("required", True))
             if required and not text:
-                raise ValueError(f"This choice requires {kind.replace('_', ' ')} input.")
+                raise ValueError("This choice requires text input.")
             return {"text": text}
 
         if kind == "quantity":
@@ -190,6 +201,7 @@ class StoryController(CommandSet):
                 ledger_id=ledger_id,
                 fragments=self._current_story_update,
                 choices=self._current_choices,
+                ux_events=self._current_ux_events,
                 metadata=self._current_metadata,
             )
         )
@@ -240,8 +252,31 @@ class StoryController(CommandSet):
             RuntimeEnvelope,
             self._call_service(
                 "resolve_choice",
-                edge_id=choice.edge_id,
-                choice_payload=choice_payload,
+                request=DirectEdgeRequest(
+                    edge_id=choice.edge_id,
+                    payload=choice_payload,
+                ),
+            ),
+        )
+        self._apply_runtime_envelope(result)
+        self._render_current_story_update()
+
+    command_parser = argparse.ArgumentParser()
+    command_parser.add_argument("text", nargs="+", help="Natural-language story command")
+
+    @with_argparser(command_parser)
+    def do_command(self, args: argparse.Namespace) -> None:
+        """Find and resolve a story action from command text."""
+        if not self._require_story_context():
+            return
+
+        result = cast(
+            RuntimeEnvelope,
+            self._call_service(
+                "resolve_choice",
+                request=FindEdgeRequest(
+                    find_edge=CommandEdgeQuery(command=" ".join(args.text)),
+                ),
             ),
         )
         self._apply_runtime_envelope(result)
@@ -272,6 +307,7 @@ class StoryController(CommandSet):
         self._cmd.set_ledger(None)
         self._current_story_update.clear()
         self._current_choices.clear()
+        self._current_ux_events.clear()
         self._current_metadata.clear()
 
         if getattr(result, "status", None) == "error":

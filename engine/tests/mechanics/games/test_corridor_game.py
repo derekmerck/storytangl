@@ -123,7 +123,11 @@ class TestCorridorIntegration:
         ledger.resolve_choice(hold.uid, choice_payload=hold.payload)
 
         assert ledger.cursor_id == victory.uid
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "close the corridor" in content.lower()
 
     def test_context_exports_target_and_scores(self) -> None:

@@ -7,7 +7,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from markdown_it import MarkdownIt
-from pydantic import BaseModel, ConfigDict
 
 from tangl.config import get_story_media_dir, get_sys_media_dir, settings
 from tangl.journal.fragments import MediaFragment, fragment_to_dto
@@ -17,7 +16,7 @@ from tangl.rest.dependencies_gateway import (
     require_service_access,
     resolve_user_auth,
 )
-from tangl.service import ServiceManager, UserAuthInfo
+from tangl.service import EdgeResolutionRequest, ServiceManager, UserAuthInfo
 from tangl.service.exceptions import AccessDeniedError, AuthMismatchError
 from tangl.service.media import (
     MediaContentProfile,
@@ -29,15 +28,6 @@ from tangl.service.response import JsonValue, RuntimeEnvelope, RuntimeInfo
 from tangl.service.world_registry import resolve_world
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
-
-
-class ChoiceRequest(BaseModel):
-    """Request payload for resolving a player choice."""
-
-    edge_id: UUID
-    payload: Any = None
-
-    model_config = ConfigDict(extra="forbid")
 
 
 router = APIRouter(tags=["Story"])
@@ -373,7 +363,7 @@ async def get_story_update(
 
 @router.post("/do")
 async def do_story_action(
-    request: ChoiceRequest = Body(...),
+    request: EdgeResolutionRequest = Body(...),
     service_manager: ServiceManager = Depends(get_service_manager),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
@@ -393,8 +383,7 @@ async def do_story_action(
                 auth_context=user_auth,
                 user_id=user_auth.user_id,
                 user_auth=user_auth,
-                edge_id=request.edge_id,
-                choice_payload=request.payload,
+                request=request,
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_bad_request_detail(exc)) from exc

@@ -156,24 +156,6 @@ export interface DialogBlock extends StyledJournalItem {
 }
 
 /**
- * Core story fragment delivered to the client when the narrative advances.
- */
-export interface JournalStoryUpdate extends StyledJournalItem {
-  title?: string
-  actions?: JournalAction[]
-  dialog?: DialogBlock[]
-}
-
-/**
- * Interactive choice presented to the reader.
- */
-export interface JournalAction extends StyledJournalItem {
-  text: string
-  payload?: string
-  passback?: unknown
-}
-
-/**
  * Generic key/value item displayed in status panels.
  */
 export interface JournalKVItem {
@@ -258,7 +240,6 @@ export interface InfoState {
   available_kinds?: string[]
 }
 
-export type JournalEntry = JournalStoryUpdate[]
 export type StoryStatus = ProjectedState
 export type WorldSceneList = JournalKVItem[]
 export type WorldList = JournalKVItem[]
@@ -436,10 +417,6 @@ export interface PlaceAccepts {
   required?: boolean
 }
 
-export interface RawCommandAccepts {
-  kind: 'raw_command'
-}
-
 export interface LegacyPayloadAccepts {
   input: string
   payload_type?: string | null
@@ -454,7 +431,7 @@ export interface LegacyPayloadAccepts {
 
 export interface ComposePart {
   role: string
-  accepts: PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts | PlaceAccepts | RawCommandAccepts
+  accepts: PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts | PlaceAccepts
 }
 
 export interface ComposeAccepts {
@@ -469,7 +446,6 @@ export type ChoiceAccepts =
   | PiecesAccepts
   | PlaceAccepts
   | ComposeAccepts
-  | RawCommandAccepts
   | LegacyPayloadAccepts
 
 export interface ChoiceUIHints {
@@ -487,10 +463,9 @@ export interface ChoiceUIHints {
 
 export interface ChoiceStoryFragment extends BaseStoryFragment {
   fragment_type: 'choice'
-  edge_id?: FragmentId | null
+  edge_id: FragmentId
   text: string
   available?: boolean
-  active?: boolean | null
   unavailable_reason?: string | null
   blockers?: Blocker[] | null
   accepts?: ChoiceAccepts | null
@@ -507,12 +482,6 @@ export interface ControlStoryFragment extends BaseStoryFragment {
   payload?: Record<string, unknown> | null
 }
 
-export interface UserEventStoryFragment extends BaseStoryFragment {
-  fragment_type: 'user_event'
-  event_type?: string | null
-  content?: unknown
-}
-
 export interface RollStoryFragment extends BaseStoryFragment {
   fragment_type: 'roll'
   label?: string | null
@@ -524,16 +493,6 @@ export interface RollStoryFragment extends BaseStoryFragment {
   ritual_hints?: Record<string, unknown> | null
 }
 
-export interface InterpretationStoryFragment extends BaseStoryFragment {
-  fragment_type: 'interpretation'
-  result?: string | null
-  text?: string | null
-  message?: string | null
-  candidates?: FragmentId[] | null
-  blocked_reason?: string | null
-  hint?: string | null
-}
-
 export type StoryFragment =
   | ContentStoryFragment
   | AttributedStoryFragment
@@ -543,15 +502,24 @@ export type StoryFragment =
   | KvStoryFragment
   | ChoiceStoryFragment
   | ControlStoryFragment
-  | UserEventStoryFragment
   | RollStoryFragment
-  | InterpretationStoryFragment
   | BaseStoryFragment
+
+export interface UxEvent {
+  event_id: string
+  event_type: string
+  message: string
+  presentation: 'inline' | 'interrupt'
+  replay: boolean
+  severity: 'info' | 'success' | 'warning' | 'error'
+  details?: Record<string, unknown>
+}
 
 export interface RuntimeEnvelope {
   cursor_id?: string | null
   step?: number | null
   fragments: StoryFragment[]
+  ux_events?: UxEvent[]
   last_redirect?: Record<string, unknown> | null
   redirect_trace?: Array<Record<string, unknown>>
   metadata?: Record<string, unknown>

@@ -126,7 +126,11 @@ class TestNimIntegration:
         ledger.resolve_choice(take.uid, choice_payload={"quantity": 1})
 
         assert ledger.cursor_id == victory.uid
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "heap collapses" in content.lower()
 
     def test_context_exports_next_take_hint(self) -> None:

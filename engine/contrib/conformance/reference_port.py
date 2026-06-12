@@ -31,7 +31,7 @@ class ChoiceControl:
     """A client-neutral choice control description."""
 
     uid: str | None
-    edge_id: str | None
+    edge_id: str
     label: str
     available: bool
     hotkey: str
@@ -170,6 +170,7 @@ def _render_runtime_document(envelope: JsonObject, registry: FragmentRegistry) -
 
     items = [_item("title", _runtime_title(envelope))]
     items.extend(_render_info_affordances(envelope))
+    items.extend(_render_command_affordance(envelope))
     visited: set[str] = set()
     if not scenes:
         items.append(_item("empty", "(no scene)"))
@@ -191,6 +192,7 @@ def _render_runtime_document(envelope: JsonObject, registry: FragmentRegistry) -
         fragment_type = _text(fragment, "fragment_type")
         if uid not in visited and fragment_type != "group":
             items.extend(_render_fragment(uid, registry, envelope, 0, visited))
+    items.extend(_render_ux_events(envelope))
     return RenderDocument("runtime_envelope", tuple(items))
 
 
@@ -243,6 +245,41 @@ def _render_info_affordances(envelope: JsonObject) -> list[RenderItem]:
     items = [_item("info_label", "Story info:")]
     for affordance in visible_affordances:
         items.append(_info_affordance_item(affordance))
+    return items
+
+
+def _render_command_affordance(envelope: JsonObject) -> list[RenderItem]:
+    metadata = _object(envelope.get("metadata"))
+    grammar = _object(metadata.get("grammar")) if metadata else None
+    if grammar is None:
+        return []
+    examples = _string_list(grammar.get("examples"))
+    hint = f" e.g. {examples[0]}" if examples else ""
+    return [
+        _item(
+            "command_bar",
+            f"> Command:{hint}",
+            data={"find_edge": {"kind": "command", "command": "<text>"}},
+        )
+    ]
+
+
+def _render_ux_events(envelope: JsonObject) -> list[RenderItem]:
+    items: list[RenderItem] = []
+    for event in _object_list(envelope.get("ux_events")):
+        event_id = _text(event, "event_id")
+        event_type = _text(event, "event_type") or "notice"
+        message = _text(event, "message") or ""
+        presentation = _text(event, "presentation") or "inline"
+        severity = _text(event, "severity") or "info"
+        items.append(
+            _item(
+                "ux_event",
+                f"[{presentation}:{severity}:{event_type}] {message}",
+                ref_id=event_id,
+                data=event,
+            )
+        )
     return items
 
 
@@ -336,13 +373,8 @@ def _render_fragment(
                 data=_piece_data(fragment),
             )
         ]
-    if fragment_type == "interpretation":
-        text = _render_interpretation(fragment)
-        return [_item("interpretation", text, indent=indent, ref_id=uid)]
     if fragment_type == "roll":
         return [_item("roll", _render_roll(fragment), indent=indent, ref_id=uid)]
-    if fragment_type == "user_event":
-        return [_item("user_event", _render_user_event(fragment), indent=indent, ref_id=uid)]
 
     label = _text(fragment, "label", "content", "text") or fragment_type
     return [_item("fallback", f"[unsupported {fragment_type}] {label}", indent, uid)]
@@ -436,6 +468,9 @@ def _render_choice(
     indent: int,
 ) -> RenderItem:
     uid = _text(fragment, "uid")
+    edge_id = _text(fragment, "edge_id")
+    if edge_id is None:
+        raise ValueError(f"Choice fragment {uid or '<unknown>'} is missing edge_id")
     label = _text(fragment, "text", "label", "content") or uid or "Choice"
     available = fragment.get("available") is not False
     hotkey = _choice_hotkey(fragment) if available else "x"
@@ -454,7 +489,7 @@ def _render_choice(
 
     choice = ChoiceControl(
         uid=uid,
-        edge_id=_text(fragment, "edge_id"),
+        edge_id=edge_id,
         label=label,
         available=available,
         hotkey=hotkey,
@@ -527,12 +562,6 @@ def _accepts_prompt(
     kind = _text(accepts, "kind")
     if not kind or kind == "pick":
         return ""
-
-    if kind == "raw_command":
-        examples = _grammar_examples(envelope)
-        if examples:
-            return f" <command: e.g. {examples[0]}>"
-        return " <command>"
 
     if kind == "text":
         placeholder = _text(accepts, "placeholder")
@@ -616,26 +645,6 @@ def _piece_data(fragment: JsonObject) -> JsonObject:
     return data
 
 
-def _render_interpretation(fragment: JsonObject) -> str:
-    result = _text(fragment, "result", "outcome") or "interpretation"
-    command_text = _text(fragment, "text", "command_text")
-    message = _text(fragment, "message", "content") or ""
-    blocked_reason = _text(fragment, "blocked_reason")
-    hint = _text(fragment, "hint")
-    candidates = _string_list(fragment.get("candidates"))
-    prefix = f"[interpretation:{result}]"
-    if command_text:
-        prefix = f'{prefix} "{command_text}"'
-    details = [
-        message,
-        f"blocked: {blocked_reason}" if blocked_reason else None,
-        f"hint: {hint}" if hint else None,
-        f"candidates: {', '.join(candidates)}" if candidates else None,
-    ]
-    suffix = " ".join(detail for detail in details if detail)
-    return f"{prefix} {suffix}".rstrip()
-
-
 def _render_roll(fragment: JsonObject) -> str:
     label = _text(fragment, "label") or "Roll"
     kind = _text(fragment, "kind") or "roll"
@@ -662,12 +671,6 @@ def _roll_input_summary(inputs: JsonObject | None) -> str:
         target_text = f" vs {target}" if isinstance(target, int) else ""
         return f"{dice} rolled {rolled_text}{modifier_text} = {total}{target_text}"
     return json.dumps(inputs, sort_keys=True)
-
-
-def _render_user_event(fragment: JsonObject) -> str:
-    event_type = _text(fragment, "event_type") or "user_event"
-    content = fragment.get("content")
-    return f"[event:{event_type}] {json.dumps(content, sort_keys=True)}"
 
 
 def _render_section_value(value: JsonObject, ref_id: str | None) -> list[RenderItem]:

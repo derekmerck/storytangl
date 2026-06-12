@@ -62,5 +62,9 @@ class TestBlackjackParlourWorld:
         ledger.resolve_choice(stand.uid, choice_payload=stand.payload)
 
         assert ledger.cursor.label == "victory"
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "dealer reveals" in content.lower()

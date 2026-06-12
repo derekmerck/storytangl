@@ -13,7 +13,7 @@ from tangl.journal.fragments import (
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.renpy import RenPySessionBridge
-from tangl.service import RuntimeEnvelope, RuntimeInfo
+from tangl.service import DirectEdgeRequest, RuntimeEnvelope, RuntimeInfo
 
 
 class FakeServiceManager:
@@ -36,17 +36,15 @@ class FakeServiceManager:
     def resolve_choice(
         self,
         *,
-        edge_id: UUID,
+        request: DirectEdgeRequest,
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
-        choice_payload: object = None,
     ) -> RuntimeEnvelope:
         self.resolve_choice_calls.append(
             {
-                "edge_id": edge_id,
+                "request": request,
                 "user_id": user_id,
                 "ledger_id": ledger_id,
-                "choice_payload": choice_payload,
             }
         )
         return RuntimeEnvelope(
@@ -85,10 +83,9 @@ def test_bridge_syncs_user_and_ledger_ids_and_passes_choice_payload() -> None:
 
     assert service_manager.resolve_choice_calls == [
         {
-            "edge_id": edge_id,
+            "request": DirectEdgeRequest(edge_id=edge_id, payload=payload),
             "user_id": service_manager.user_id,
             "ledger_id": service_manager.ledger_id,
-            "choice_payload": payload,
         }
     ]
 

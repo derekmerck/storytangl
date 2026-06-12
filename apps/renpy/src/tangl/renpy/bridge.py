@@ -23,7 +23,7 @@ from tangl.service.media import (
     MediaRenderProfile,
     media_fragment_to_payload,
 )
-from tangl.service.response import RuntimeEnvelope, RuntimeInfo
+from tangl.service.response import DirectEdgeRequest, RuntimeEnvelope, RuntimeInfo
 from tangl.service.service_manager import ServiceManager
 from tangl.utils.sanitize_str import sanitize_str
 
@@ -120,8 +120,7 @@ class RenPySessionBridge:
         envelope = self.service_manager.resolve_choice(
             user_id=self.user_id,
             ledger_id=self.ledger_id,
-            edge_id=edge_id,
-            choice_payload=choice_payload,
+            request=DirectEdgeRequest(edge_id=edge_id, payload=choice_payload),
         )
         self._sync_ledger_id(envelope)
         return envelope
@@ -193,20 +192,11 @@ class RenPySessionBridge:
             return
 
         if isinstance(fragment, ChoiceFragment):
-            edge_id = _uuid_or_none(fragment.edge_id)
-            if edge_id is None:
-                logger.debug("Ignoring choice fragment without edge_id: %r", fragment)
-                return
-
             turn.choices.append(
                 RenPyChoice(
-                    edge_id=edge_id,
-                    text=_non_empty_text(fragment.text)
-                    or _non_empty_text(getattr(fragment, "content", None))
-                    or str(edge_id),
-                    available=bool(
-                        fragment.active if fragment.active is not None else fragment.available
-                    ),
+                    edge_id=fragment.edge_id,
+                    text=_non_empty_text(fragment.text) or str(fragment.edge_id),
+                    available=fragment.available,
                     unavailable_reason=fragment.unavailable_reason,
                     accepts=(
                         dict(fragment.accepts)

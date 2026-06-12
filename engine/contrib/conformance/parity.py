@@ -27,7 +27,6 @@ SUPPORTED_ACCEPTS_KINDS = {
     "pick",
     "text",
     "quantity",
-    "raw_command",
     "pieces",
     "place",
     "compose",
@@ -201,7 +200,7 @@ def _check_accepts(
             )
         ]
 
-    if kind in {"pick", "text", "raw_command"}:
+    if kind in {"pick", "text"}:
         return []
     if kind == "quantity":
         return _check_quantity(accepts, choice_uid, accepts_path, step_index)

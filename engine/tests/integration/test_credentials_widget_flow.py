@@ -14,6 +14,7 @@ from tangl.journal.fragments import (
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.persistence import PersistenceManagerFactory
+from tangl.service.response import DirectEdgeRequest
 from tangl.service.service_manager import ServiceManager
 from tangl.service.user.user import User
 from tangl.story import Action, InitMode
@@ -53,7 +54,9 @@ def test_credentials_packet_reaches_service_envelope_as_typed_widgets() -> None:
 
     entered = manager.resolve_choice(
         user_id=user.uid,
-        edge_id=_action(ledger, "Work the scheduled shift").uid,
+        request=DirectEdgeRequest(
+            edge_id=_action(ledger, "Work the scheduled shift").uid,
+        ),
     )
 
     pieces = [
@@ -120,8 +123,10 @@ def test_credentials_packet_reaches_service_envelope_as_typed_widgets() -> None:
     )
     inspected = manager.resolve_choice(
         user_id=user.uid,
-        edge_id=inspect_choice.edge_id,
-        choice_payload={"piece_ids": [passport.piece_id]},
+        request=DirectEdgeRequest(
+            edge_id=inspect_choice.edge_id,
+            payload={"piece_ids": [passport.piece_id]},
+        ),
     )
 
     assert any(

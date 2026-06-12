@@ -57,5 +57,9 @@ class TestKimTrayWorld:
         ledger.resolve_choice(guess.uid, choice_payload=guess.payload)
 
         assert ledger.cursor.label == "victory"
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "name the missing object correctly" in content.lower()

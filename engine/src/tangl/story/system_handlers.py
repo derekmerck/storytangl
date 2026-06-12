@@ -31,10 +31,28 @@ from tangl.vm import (
 
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
 
-from .dispatch import on_compose_journal, on_gather_ns, on_journal
+from .dispatch import on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
 
 logger = logging.getLogger(__name__)
+
+
+def _command_key(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
+@on_find_edges(wants_caller_kind=Block, wants_exact_kind=False)
+def find_edges_by_command(*, caller: Block, ctx, query, **_kw):
+    """Match normalized command text against the current action vocabulary."""
+    if query.get("kind") != "command":
+        return None
+
+    key = _command_key(query["command"])
+    return [
+        edge
+        for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None))
+        if key in {_command_key(edge.text or ""), _command_key(edge.get_label())}
+    ] or None
 
 
 @on_gather_ns

@@ -60,5 +60,9 @@ class TestIncrementalYardWorld:
         ledger.resolve_choice(build.uid, choice_payload=build.payload)
 
         assert ledger.cursor.label == "victory"
-        content = " ".join(getattr(fragment, "content", "") for fragment in ledger.get_journal())
+        content = " ".join(
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(fragment.content, str)
+        )
         assert "you build signal_fire" in content.lower()
