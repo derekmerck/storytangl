@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from tangl.config import settings
 from tangl.core import Selector
 from tangl.rest.app import app
+from tangl.rest.api_server import app as api_app
 from tangl.rest.dependencies import reset_service_state_for_testing
 from tangl.rest.dependencies_gateway import (
     get_service_manager,
@@ -498,6 +499,34 @@ def test_story_update_preserves_choice_payload_contracts(
             "refs": ["permit-status"],
         }
     ]
+    grammar = update.json()["metadata"]["grammar"]
+    assert grammar["examples"] == ["Continue"]
+    assert grammar["verbs"] == [
+        {
+            "verb": "continue",
+            "aliases": [],
+            "frames": ["Continue"],
+        }
+    ]
+
+
+def test_story_runtime_endpoints_publish_envelope_payload_schema() -> None:
+    schema = api_app.openapi()
+
+    for path, method in (
+        ("/story/story/create", "post"),
+        ("/story/update", "get"),
+        ("/story/do", "post"),
+    ):
+        response_schema = schema["paths"][path][method]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        assert response_schema["$ref"].endswith("/RuntimeEnvelopePayload")
+
+    payload_schema = schema["components"]["schemas"]["RuntimeEnvelopePayload"]
+    assert payload_schema["properties"]["fragments"]["items"]["type"] == "object"
+    metadata_ref = payload_schema["properties"]["metadata"]["$ref"]
+    assert metadata_ref.endswith("/RuntimeMetadata")
 
 
 def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(

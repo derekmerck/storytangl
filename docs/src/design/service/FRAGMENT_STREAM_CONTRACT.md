@@ -52,6 +52,12 @@ bookkeeping selected by `dto_exclude` field metadata. A fragment's `uid` is also
 a stable reference target within the envelope and across later update/delete
 control fragments.
 
+FastAPI advertises the resulting outer shape as `RuntimeEnvelopePayload`.
+That schema types cursor, UX-event, redirect, and reserved metadata surfaces
+while leaving `fragments` as independent JSON records. It must not rehydrate
+DTO fragments through `BaseFragment`, because doing so would restore internal
+stream bookkeeping fields omitted by `fragment_to_dto()`.
+
 ## Fragment Registry Model
 
 Clients should treat each envelope as a fragment event batch:
@@ -209,8 +215,20 @@ The first supported hint shape is intentionally small:
 metadata:
   grammar:
     examples: ["take lamp", "open door"]
-    verbs: ["take", "open"]
-    nouns: ["lamp", "door"]
+    verbs:
+      - verb: take
+        aliases: [get]
+        frames: ["take {noun}"]
+      - verb: open
+        aliases: []
+        frames: ["open {noun}"]
+    nouns:
+      - noun: lamp
+        aliases: [lantern]
+        piece_ids: [lamp]
+      - noun: door
+        aliases: []
+        piece_ids: [iron-door]
 ```
 
 Clients may ignore these hints and still submit a typed `find_edge` request.

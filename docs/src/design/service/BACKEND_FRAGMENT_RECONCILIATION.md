@@ -145,6 +145,22 @@ shaping remains limited to HTTP-adjacent concerns such as media profiles and
 optional markdown-to-HTML conversion. The serializer remains a transcription
 boundary and does not preserve retired request or fragment aliases.
 
+Story create, update, and action endpoints publish
+`RuntimeEnvelopePayload` as their FastAPI response model. This is an outer DTO
+schema for `RuntimeEnvelope.to_dto()` output, not a second fragment hierarchy:
+`fragments` remains a list of independent JSON records. Using the engine
+`RuntimeEnvelope` model directly as the REST response model would rehydrate
+fragments as `BaseFragment` and restore internal `seq`, `step`, and `tags`
+defaults, so the transport schema deliberately avoids that shape drift.
+
+`RuntimeEnvelope.metadata.grammar` is a reserved typed sub-key rather than a
+second command model. The service synthesizes `GrammarHint` values from the
+current visible fragment surface: choice text supplies exact examples and verb
+frames, while visible pieces supply noun-to-piece mappings. This projection is
+advisory; command resolution still uses the Story-owned `find_edges` dispatch,
+and raw command submission remains valid when grammar metadata is absent or
+ignored.
+
 ## Diagnostic Fixtures And Transcripts
 
 `engine/contrib/conformance/backend_widget_demo.py` now generates the first

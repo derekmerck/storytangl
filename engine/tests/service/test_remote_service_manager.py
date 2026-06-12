@@ -403,7 +403,19 @@ class TestRemoteResponseHydration:
                     },
                 }
             ],
-            "metadata": {},
+            "metadata": {
+                "grammar": {
+                    "verbs": [
+                        {
+                            "verb": "buy",
+                            "aliases": [],
+                            "frames": ["Buy rations"],
+                        }
+                    ],
+                    "nouns": [],
+                    "examples": ["Buy rations"],
+                }
+            },
         }
         session = RecordingSession([StubResponse(200, payload)])
         manager = RemoteServiceManager(
@@ -428,6 +440,7 @@ class TestRemoteResponseHydration:
         assert choice.blockers is not None
         assert choice.blockers[0].code == "needs_permit"
         assert choice.blockers[0].refs == ["permit-status"]
+        assert envelope.metadata["grammar"].verbs[0].verb == "buy"
 
     def test_story_info_decodes_projected_state_contracts(self) -> None:
         user_id = uuid4()

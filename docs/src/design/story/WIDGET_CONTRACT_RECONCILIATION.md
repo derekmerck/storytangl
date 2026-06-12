@@ -91,7 +91,7 @@ surface is small enough to settle with its immediate neighbors.
 | Typed `UIHints` | P1 | partial (documented + ad-hoc keys) | done (`UIHints`, extra-allow) | tighten named fields when more worlds use them |
 | Typed `Blocker` (replaces dict blockers) | P1 | done (web + CLI + Tk/Ren'Py preservation) | done (`Blocker` model + authored/generated story projection) | candidate for Tier S graduation |
 | `cost_previews: list[CostPreview]` (plural) | P1 | done (web + CLI/Tk/Ren'Py) | done (typed authoring, service/REST/remote DTO flow) | candidate for Tier S graduation |
-| `metadata.grammar` typed sub-key | P1 | done | partial (string-keyed dict) | engine PR for `GrammarHint` Pydantic model |
+| `metadata.grammar` typed sub-key | P1 | done (typed Vue command affordance + CLI reference floor) | done (`GrammarHint` hydration + visible-fragment synthesis) | candidate for Tier S graduation |
 | HTTP body field `edge_id` | P1 | done | done | — |
 | §1.5 Cursors and journal channels (per-channel envelopes) | P1 | n/a (single cursor) | n/a (single cursor) | wait for MVP author needing multi-cursor (Discord-bot bundle, Lost Worlds gamebook) |
 
@@ -324,6 +324,10 @@ others.
   previews use the relevant typed `Accepts.cost_previews`. Both survive the
   service, REST, remote-client, and reference-port paths as signed
   `CostPreview` values.
+- `RuntimeEnvelope.metadata.grammar` hydrates as a typed `GrammarHint`.
+  Service envelopes synthesize exact examples and verb frames from current
+  visible choices, plus noun-to-piece mappings from visible pieces. Raw
+  `find_edge` remains authoritative when hints are absent or ignored.
 - Engine HTTP body uses `edge_id`.
 - Engine `KvFragment.content`, projected `kv_list` values, web fixtures,
   and conformance fixtures use the unified `KvRow` record shape.
@@ -395,8 +399,9 @@ API maps them.
   1. ✅ Typed `Blocker` model in `tangl/journal/intent.py`.
   2. ✅ Plural typed `CostPreview` authoring and service/client projection.
   3. ✅ Typed direct/find `EdgeResolutionRequest` and `UxEvent`.
-  4. Typed `metadata.grammar` model.
-  5. HTTP API: type responses on `/story/do` / `/story/update`.
+  4. ✅ Typed `metadata.grammar` model and visible-surface synthesis.
+  5. ✅ HTTP API: `RuntimeEnvelopePayload` response schemas on story create,
+     `/story/do`, and `/story/update` without rehydrating fragment bookkeeping.
   6. Conformance harness: ✅ initial `legibility.py`; ✅ initial
      input-parity `parity.py`; ✅ initial `time_parity.py`; ✅ CLI-floor
      info-channel reachability; next add browser timing E2E only after

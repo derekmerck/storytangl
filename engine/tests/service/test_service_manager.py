@@ -220,6 +220,9 @@ def test_find_edge_request_resolves_command_or_returns_transient_guidance(
     assert unknown.ux_events[0].event_type == "edge_not_found"
     assert unknown.ux_events[0].presentation == "inline"
     assert unknown.ux_events[0].replay is False
+    assert unknown.metadata["grammar"].examples == ["Continue"]
+    assert unknown.metadata["grammar"].verbs[0].verb == "continue"
+    assert unknown.metadata["grammar"].verbs[0].frames == ["Continue"]
 
     resolved = manager.resolve_choice(
         user_id=user.uid,
@@ -307,6 +310,7 @@ def test_story_envelope_preserves_choice_payload_contracts(
             {"ledger_key": "purse", "delta": -2, "unit": "coin"},
         ],
     }
+    assert created.metadata["grammar"].examples == ["Continue"]
 
 
 def test_story_envelope_preserves_typed_choice_blockers(

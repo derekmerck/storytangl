@@ -6,7 +6,9 @@ import StoryBlock from './StoryBlock.vue'
 import type {
   ControlStoryFragment,
   GroupStoryFragment,
+  GrammarHint,
   RuntimeEnvelope,
+  RuntimeMetadata,
   StoryFragment,
   StorySceneModel,
   UxEvent,
@@ -31,17 +33,14 @@ const fragmentRegistry = ref<Record<string, StoryFragment>>({})
 const scenes = ref<StorySceneModel[]>([])
 const inlineEvents = ref<UxEvent[]>([])
 const interruptEvents = ref<UxEvent[]>([])
-const currentMetadata = ref<Record<string, unknown>>({})
+const currentMetadata = ref<RuntimeMetadata>({})
 const sceneRefs = ref<InstanceType<typeof StoryBlock>[]>([])
 const sceneCounter = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
 const debugEnabled = computed(() => $debug.value && $verbose.value)
-const commandGrammar = computed(() => {
-  const grammar = currentMetadata.value.grammar
-  return isRecord(grammar) ? grammar : {}
-})
+const commandGrammar = computed<GrammarHint>(() => currentMetadata.value.grammar ?? {})
 
 const isSceneGroup = (fragment: StoryFragment): fragment is GroupStoryFragment =>
   isGroupFragment(fragment) && fragment.group_type === 'scene'

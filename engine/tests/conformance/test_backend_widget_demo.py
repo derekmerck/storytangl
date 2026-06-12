@@ -73,6 +73,22 @@ def test_backend_widget_diagnostics_validate_as_service_contracts() -> None:
         {"ledger_key": "coin", "delta": -2, "unit": "silver"}
     ]
     assert choices[1]["accepts"]["kind"] == "text"
+    assert runtime_payload["metadata"]["grammar"]["examples"] == [
+        "Buy rations.",
+        "Name the mule.",
+    ]
+    assert runtime_payload["metadata"]["grammar"]["verbs"] == [
+        {
+            "verb": "buy",
+            "aliases": [],
+            "frames": ["Buy rations."],
+        },
+        {
+            "verb": "name",
+            "aliases": [],
+            "frames": ["Name the mule."],
+        },
+    ]
     assert runtime_payload["metadata"]["info_state"]["available_kinds"] == [
         "inventory",
         "map",

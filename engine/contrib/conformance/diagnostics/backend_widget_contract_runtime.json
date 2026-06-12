@@ -104,6 +104,29 @@
         "map"
       ]
     },
+    "grammar": {
+      "verbs": [
+        {
+          "verb": "buy",
+          "aliases": [],
+          "frames": [
+            "Buy rations."
+          ]
+        },
+        {
+          "verb": "name",
+          "aliases": [],
+          "frames": [
+            "Name the mule."
+          ]
+        }
+      ],
+      "nouns": [],
+      "examples": [
+        "Buy rations.",
+        "Name the mule."
+      ]
+    },
     "world_id": "widget_contract_demo",
     "ledger_id": "c59747d5-53a8-5617-9a4f-4aaeda16adc8"
   }

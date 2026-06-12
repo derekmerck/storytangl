@@ -333,8 +333,15 @@ export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
     fixture: 'command_hints',
     grammar: {
       examples: ['take lamp', 'open door', 'look around'],
-      verbs: ['take', 'open', 'look'],
-      nouns: ['lamp', 'door'],
+      verbs: [
+        { verb: 'take', aliases: ['get'], frames: ['take {noun}'] },
+        { verb: 'open', aliases: [], frames: ['open {noun}'] },
+        { verb: 'look', aliases: ['l'], frames: ['look around', 'look at {noun}'] },
+      ],
+      nouns: [
+        { noun: 'lamp', aliases: ['lantern'], piece_ids: ['lamp'] },
+        { noun: 'door', aliases: [], piece_ids: ['iron-door'] },
+      ],
     },
   },
 }

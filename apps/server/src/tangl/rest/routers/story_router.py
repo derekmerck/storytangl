@@ -24,7 +24,12 @@ from tangl.service.media import (
     MediaRenderProfile,
     media_fragment_to_payload,
 )
-from tangl.service.response import JsonValue, RuntimeEnvelope, RuntimeInfo
+from tangl.service.response import (
+    JsonValue,
+    RuntimeEnvelope,
+    RuntimeEnvelopePayload,
+    RuntimeInfo,
+)
 from tangl.service.world_registry import resolve_world
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -118,8 +123,6 @@ def _media_render_profile(render_profile: str | Iterable[str] | None) -> MediaRe
 
 
 def _transform_text_fields(value: Any) -> Any:
-    if isinstance(value, str):
-        return _MARKDOWN.render(value)
     if isinstance(value, list):
         return [_transform_text_fields(item) for item in value]
     if isinstance(value, dict):
@@ -293,7 +296,11 @@ def _call_service_method(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@router.post("/story/create")
+@router.post(
+    "/story/create",
+    response_model=RuntimeEnvelopePayload,
+    response_model_exclude_none=True,
+)
 async def create_story(
     world_id: str = Query(..., description="World template to instantiate"),
     story_label: str | None = Query(None, description="Optional story label"),
@@ -329,7 +336,11 @@ async def create_story(
     return _serialize_runtime_envelope(envelope, render_profile=render_profile)
 
 
-@router.get("/update")
+@router.get(
+    "/update",
+    response_model=RuntimeEnvelopePayload,
+    response_model_exclude_none=True,
+)
 async def get_story_update(
     service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(
@@ -361,7 +372,11 @@ async def get_story_update(
     return _serialize_runtime_envelope(result, render_profile=render_profile)
 
 
-@router.post("/do")
+@router.post(
+    "/do",
+    response_model=RuntimeEnvelopePayload,
+    response_model_exclude_none=True,
+)
 async def do_story_action(
     request: EdgeResolutionRequest = Body(...),
     service_manager: ServiceManager = Depends(get_service_manager),
