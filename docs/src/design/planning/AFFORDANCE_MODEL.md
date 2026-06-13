@@ -14,6 +14,13 @@ immediate refactor** — do not build it yet.
 **Relevant layers:** `tangl.core` (Selector/Edge), `tangl.vm.provision`,
 `tangl.story.episode`, `tangl.mechanics.sandbox`
 
+```{storytangl-topic}
+:topics: open_link
+:facets: overview, design
+:relation: defines
+:related: provisioning, traversal, sandbox
+```
+
 See also:
 [glossary.md](../glossary.md) ("Open Links and Projection") for the shared
 vocabulary table these terms anchor,

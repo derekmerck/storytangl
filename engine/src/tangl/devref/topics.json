@@ -2,50 +2,113 @@
   {
     "topic_id": "entity",
     "display_name": "Entity",
-    "aliases": ["entities", "tangl.core.Entity", "tangl.core.entity.Entity"],
+    "aliases": [
+      "entities",
+      "tangl.core.Entity",
+      "tangl.core.entity.Entity"
+    ],
     "layer": "core",
     "short_description": "Universal graph-managed base type with value-based equality and structuring hooks.",
-    "related_topic_ids": ["selector", "registry", "graph", "singleton", "template"]
+    "related_topic_ids": [
+      "selector",
+      "registry",
+      "graph",
+      "singleton",
+      "template"
+    ]
   },
   {
     "topic_id": "selector",
     "display_name": "Selector",
-    "aliases": ["selection", "selectors", "tangl.core.Selector", "tangl.core.selector.Selector"],
+    "aliases": [
+      "selection",
+      "selectors",
+      "tangl.core.Selector",
+      "tangl.core.selector.Selector"
+    ],
     "layer": "core",
     "short_description": "Composable predicate used for typed entity lookup across registries and graphs.",
-    "related_topic_ids": ["entity", "registry", "graph", "dispatch"]
+    "related_topic_ids": [
+      "entity",
+      "registry",
+      "graph",
+      "dispatch"
+    ]
   },
   {
     "topic_id": "registry",
     "display_name": "Registry",
-    "aliases": ["registries", "RegistryAware", "tangl.core.Registry", "tangl.core.registry.Registry"],
+    "aliases": [
+      "registries",
+      "RegistryAware",
+      "tangl.core.Registry",
+      "tangl.core.registry.Registry"
+    ],
     "layer": "core",
     "short_description": "Indexed ownership container and lookup surface for entities.",
-    "related_topic_ids": ["entity", "selector", "graph", "dispatch"]
+    "related_topic_ids": [
+      "entity",
+      "selector",
+      "graph",
+      "dispatch"
+    ]
   },
   {
     "topic_id": "graph",
     "display_name": "Graph",
-    "aliases": ["graphs", "node", "edge", "subgraph", "HierarchicalNode", "tangl.core.Graph"],
+    "aliases": [
+      "graphs",
+      "node",
+      "edge",
+      "subgraph",
+      "HierarchicalNode",
+      "tangl.core.Graph"
+    ],
     "layer": "core",
     "short_description": "Topology-aware registry for nodes, edges, hierarchical groups, and graph traversal shape.",
-    "related_topic_ids": ["entity", "registry", "factory", "template", "traversal"]
+    "related_topic_ids": [
+      "entity",
+      "registry",
+      "factory",
+      "template",
+      "traversal"
+    ]
   },
   {
     "topic_id": "singleton",
     "display_name": "Singleton",
-    "aliases": ["singletons", "singleton tokens", "InstanceInheritance", "tangl.core.Singleton"],
+    "aliases": [
+      "singletons",
+      "singleton tokens",
+      "InstanceInheritance",
+      "tangl.core.Singleton"
+    ],
     "layer": "core",
     "short_description": "Identity-by-label entity pattern used for durable references and token delegates.",
-    "related_topic_ids": ["entity", "token", "template", "factory"]
+    "related_topic_ids": [
+      "entity",
+      "token",
+      "template",
+      "factory"
+    ]
   },
   {
     "topic_id": "token",
     "display_name": "Token",
-    "aliases": ["tokens", "TokenCatalog", "tangl.core.Token", "singleton token"],
+    "aliases": [
+      "tokens",
+      "TokenCatalog",
+      "tangl.core.Token",
+      "singleton token"
+    ],
     "layer": "core",
     "short_description": "Mutable graph node wrapper around immutable singleton referents.",
-    "related_topic_ids": ["singleton", "entity", "graph", "provisioning"]
+    "related_topic_ids": [
+      "singleton",
+      "entity",
+      "graph",
+      "provisioning"
+    ]
   },
   {
     "topic_id": "dispatch",
@@ -59,87 +122,201 @@
     ],
     "layer": "core",
     "short_description": "Canonical behavior registration and hook execution mechanism across core and VM.",
-    "related_topic_ids": ["selector", "registry", "phase_ctx", "frame", "ledger"]
+    "related_topic_ids": [
+      "selector",
+      "registry",
+      "phase_ctx",
+      "frame",
+      "ledger"
+    ]
   },
   {
     "topic_id": "factory",
     "display_name": "Factory",
-    "aliases": ["GraphFactory", "TraversableGraphFactory", "factories", "factory templates"],
+    "aliases": [
+      "GraphFactory",
+      "TraversableGraphFactory",
+      "factories",
+      "factory templates"
+    ],
     "layer": "core",
     "short_description": "Deterministic graph materialization authority attached to built graphs.",
-    "related_topic_ids": ["graph", "template", "dispatch", "traversal", "ledger"]
+    "related_topic_ids": [
+      "graph",
+      "template",
+      "dispatch",
+      "traversal",
+      "ledger"
+    ]
   },
   {
     "topic_id": "template",
     "display_name": "Template",
-    "aliases": ["EntityTemplate", "TemplateRegistry", "templates", "materialize"],
+    "aliases": [
+      "EntityTemplate",
+      "TemplateRegistry",
+      "templates",
+      "materialize"
+    ],
     "layer": "core",
     "short_description": "Canonical authored-data-to-runtime-entity path for graph materialization.",
-    "related_topic_ids": ["entity", "graph", "factory", "provisioning"]
+    "related_topic_ids": [
+      "entity",
+      "graph",
+      "factory",
+      "provisioning"
+    ]
   },
   {
     "topic_id": "runtime_op",
     "display_name": "RuntimeOp",
-    "aliases": ["runtime ops", "Predicate", "Effect", "runtime expressions"],
+    "aliases": [
+      "runtime ops",
+      "Predicate",
+      "Effect",
+      "runtime expressions"
+    ],
     "layer": "core",
     "short_description": "Safe expression primitives used by higher layers for predicates and effects.",
-    "related_topic_ids": ["dispatch", "traversal", "phase_ctx"]
+    "related_topic_ids": [
+      "dispatch",
+      "traversal",
+      "phase_ctx"
+    ]
   },
   {
     "topic_id": "phase_ctx",
     "display_name": "PhaseCtx",
-    "aliases": ["phase ctx", "phase context", "VmPhaseCtx", "tangl.vm.runtime.frame.PhaseCtx"],
+    "aliases": [
+      "phase ctx",
+      "phase context",
+      "VmPhaseCtx",
+      "tangl.vm.runtime.frame.PhaseCtx"
+    ],
     "layer": "vm",
     "short_description": "Per-hop execution context for phase dispatch, namespace gathering, and authority lookup.",
-    "related_topic_ids": ["frame", "ledger", "dispatch", "provisioning", "traversal"]
+    "related_topic_ids": [
+      "frame",
+      "ledger",
+      "dispatch",
+      "provisioning",
+      "traversal"
+    ]
   },
   {
     "topic_id": "frame",
     "display_name": "Frame",
-    "aliases": ["frames", "follow_edge", "resolve_choice", "tangl.vm.runtime.frame.Frame"],
+    "aliases": [
+      "frames",
+      "follow_edge",
+      "resolve_choice",
+      "tangl.vm.runtime.frame.Frame"
+    ],
     "layer": "vm",
     "short_description": "One choice-resolution driver for phase execution and redirect chaining.",
-    "related_topic_ids": ["phase_ctx", "ledger", "dispatch", "traversal", "resolution_phase"]
+    "related_topic_ids": [
+      "phase_ctx",
+      "ledger",
+      "dispatch",
+      "traversal",
+      "resolution_phase"
+    ]
   },
   {
     "topic_id": "ledger",
     "display_name": "Ledger",
-    "aliases": ["ledgers", "cursor", "journal", "call stack", "tangl.vm.runtime.ledger.Ledger"],
+    "aliases": [
+      "ledgers",
+      "cursor",
+      "journal",
+      "call stack",
+      "tangl.vm.runtime.ledger.Ledger"
+    ],
     "layer": "vm",
     "short_description": "Persistent runtime state holder for cursor position, history, journal, and replay artifacts.",
-    "related_topic_ids": ["frame", "phase_ctx", "replay", "traversal", "resolution_phase"]
+    "related_topic_ids": [
+      "frame",
+      "phase_ctx",
+      "replay",
+      "traversal",
+      "resolution_phase"
+    ]
   },
   {
     "topic_id": "resolution_phase",
     "display_name": "ResolutionPhase",
-    "aliases": ["phases", "phase bus", "VALIDATE", "PLANNING", "UPDATE", "JOURNAL"],
+    "aliases": [
+      "phases",
+      "phase bus",
+      "VALIDATE",
+      "PLANNING",
+      "UPDATE",
+      "JOURNAL"
+    ],
     "layer": "vm",
     "short_description": "Causal phase ordering that structures validation, planning, updates, journal output, and finalization.",
-    "related_topic_ids": ["frame", "ledger", "dispatch", "traversal"]
+    "related_topic_ids": [
+      "frame",
+      "ledger",
+      "dispatch",
+      "traversal"
+    ]
   },
   {
     "topic_id": "traversal",
     "display_name": "Traversal",
-    "aliases": ["TraversableNode", "TraversableEdge", "graph traversal", "entry resolution"],
+    "aliases": [
+      "TraversableNode",
+      "TraversableEdge",
+      "graph traversal",
+      "entry resolution"
+    ],
     "layer": "vm",
     "short_description": "Cursor movement contracts, hierarchical traversal, and traversal metadata over graphs.",
-    "related_topic_ids": ["graph", "frame", "ledger", "factory", "resolution_phase"]
+    "related_topic_ids": [
+      "graph",
+      "frame",
+      "ledger",
+      "factory",
+      "resolution_phase"
+    ]
   },
   {
     "topic_id": "provisioning",
     "display_name": "Provisioning",
-    "aliases": ["Resolver", "Requirement", "Dependency", "ProvisionOffer", "planning"],
+    "aliases": [
+      "Resolver",
+      "Requirement",
+      "Dependency",
+      "ProvisionOffer",
+      "planning"
+    ],
     "layer": "vm",
     "short_description": "Frontier dependency satisfaction and scope-aware offer resolution during planning.",
-    "related_topic_ids": ["phase_ctx", "frame", "factory", "template", "token"]
+    "related_topic_ids": [
+      "phase_ctx",
+      "frame",
+      "factory",
+      "template",
+      "token"
+    ]
   },
   {
     "topic_id": "replay",
     "display_name": "Replay",
-    "aliases": ["Patch", "Event", "StepRecord", "DiffReplayEngine"],
+    "aliases": [
+      "Patch",
+      "Event",
+      "StepRecord",
+      "DiffReplayEngine"
+    ],
     "layer": "vm",
     "short_description": "Replay and rollback artifacts used to describe deterministic runtime evolution.",
-    "related_topic_ids": ["ledger", "frame", "resolution_phase"]
+    "related_topic_ids": [
+      "ledger",
+      "frame",
+      "resolution_phase"
+    ]
   },
   {
     "topic_id": "journal",
@@ -154,6 +331,196 @@
     ],
     "layer": "journal",
     "short_description": "Narrative output module and fragment surface emitted during the JOURNAL phase.",
-    "related_topic_ids": ["ledger", "resolution_phase", "dispatch", "replay"]
+    "related_topic_ids": [
+      "ledger",
+      "resolution_phase",
+      "dispatch",
+      "replay"
+    ]
+  },
+  {
+    "topic_id": "open_link",
+    "display_name": "Open Link",
+    "aliases": [
+      "affordance",
+      "dependency",
+      "fanout",
+      "open edge",
+      "requirement-bearing edge",
+      "AFFORDANCE_MODEL"
+    ],
+    "layer": "vm",
+    "short_description": "Requirement-bearing open edge: the planning primitive unifying Dependency/Affordance/Fanout as coordinates in one matrix.",
+    "related_topic_ids": [
+      "provisioning",
+      "traversal",
+      "journal",
+      "sandbox"
+    ]
+  },
+  {
+    "topic_id": "assembly",
+    "display_name": "Assembly",
+    "aliases": [
+      "slot",
+      "slots",
+      "SlottedContainer",
+      "loadout",
+      "outfit manager",
+      "BudgetTracker",
+      "slotted component"
+    ],
+    "layer": "mechanics",
+    "short_description": "Slotted component assignment with budgets, occupancy, and validation; the shared instrument behind outfit/vehicle/credential-packet/automaton managers.",
+    "related_topic_ids": [
+      "presence",
+      "credentials",
+      "token"
+    ]
+  },
+  {
+    "topic_id": "presence",
+    "display_name": "Presence",
+    "aliases": [
+      "wearable",
+      "ornament",
+      "look",
+      "body-attachment",
+      "coverage mask",
+      "BodyPart",
+      "BodyRegion"
+    ],
+    "layer": "mechanics",
+    "short_description": "Actor appearance: outfit/ornament/look projection over body slots with coverage/visibility masks.",
+    "related_topic_ids": [
+      "assembly",
+      "media"
+    ]
+  },
+  {
+    "topic_id": "sandbox",
+    "display_name": "Sandbox",
+    "aliases": [
+      "IF",
+      "interactive fiction",
+      "location",
+      "fixture",
+      "mob",
+      "scheduled event",
+      "SandboxInteraction"
+    ],
+    "layer": "mechanics",
+    "short_description": "Domain client compiling IF locations/fixtures/mobs/scheduled-events into ordinary Story/VM primitives.",
+    "related_topic_ids": [
+      "open_link",
+      "traversal",
+      "journal"
+    ]
+  },
+  {
+    "topic_id": "credentials",
+    "display_name": "Credentials",
+    "aliases": [
+      "picking",
+      "inspection",
+      "packet",
+      "PickingGame",
+      "document check",
+      "disposition"
+    ],
+    "layer": "mechanics",
+    "short_description": "Staged picking/inspection game: visible evidence vs hidden truth, mediation moves, disposition/penalty policy.",
+    "related_topic_ids": [
+      "assembly",
+      "dispatch"
+    ]
+  },
+  {
+    "topic_id": "media",
+    "display_name": "Media",
+    "aliases": [
+      "media affordance",
+      "media requirement",
+      "MediaDep",
+      "media resource",
+      "media synthesis"
+    ],
+    "layer": "media",
+    "short_description": "Media dependency/resource model and media-as-affordance attachment (pre-decided media bound on first sighting).",
+    "related_topic_ids": [
+      "open_link",
+      "presence"
+    ]
+  },
+  {
+    "topic_id": "authoring_validation",
+    "display_name": "Authoring Validation",
+    "aliases": [
+      "preflight",
+      "diagnostics",
+      "codec loss",
+      "AuthoringDiagnostic",
+      "compile issues",
+      "finishability"
+    ],
+    "layer": "service",
+    "short_description": "Authoring/runtime validation: codec-loss, compile, and provisioning diagnostics surfaced through preflight + concrete validators.",
+    "related_topic_ids": [
+      "provisioning",
+      "codec"
+    ]
+  },
+  {
+    "topic_id": "widget",
+    "display_name": "Widget Vocabulary",
+    "aliases": [
+      "projection",
+      "fragment DTO",
+      "accepts",
+      "ui_hints",
+      "ChoiceFragment",
+      "projected state",
+      "Blocker"
+    ],
+    "layer": "service",
+    "short_description": "Backend-authored widget vocabulary: fragments, accepts, ui_hints, blockers, and projected state rendered by clients.",
+    "related_topic_ids": [
+      "journal",
+      "frame"
+    ]
+  },
+  {
+    "topic_id": "codec",
+    "display_name": "Codec / Interop",
+    "aliases": [
+      "twine",
+      "twee",
+      "import",
+      "export",
+      "round-trip",
+      "LossRecord",
+      "graph codec"
+    ],
+    "layer": "loaders",
+    "short_description": "World import/export codecs (Twine/Twee, graph formats) with loss-record preservation and round-trip fidelity.",
+    "related_topic_ids": [
+      "authoring_validation"
+    ]
+  },
+  {
+    "topic_id": "demographics",
+    "display_name": "Demographics",
+    "aliases": [
+      "namebank",
+      "sampler",
+      "nationality",
+      "DemographicSampler",
+      "culture catalog"
+    ],
+    "layer": "mechanics",
+    "short_description": "Standalone catalog/sampler for names/regions/cultures built on Singleton catalogs; world-extensible.",
+    "related_topic_ids": [
+      "singleton"
+    ]
   }
 ]
