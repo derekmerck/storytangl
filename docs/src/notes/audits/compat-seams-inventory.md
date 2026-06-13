@@ -67,14 +67,14 @@ fragments.
   (`apps/web/src/components/story/StoryAction.vue`), not the normalized `label`.
 
 **Sunset condition.** Confirm the canonical `ChoiceFragment` projection (the
-#271 DTO) always populates `label` at projection time — or that every reader
+`#271` DTO) always populates `label` at projection time — or that every reader
 falls back on its own (the web client already renders `text`). Then delete
 `_normalize_choice_labels_in_fragments` (def + call at `story_router.py:240`)
 and drop the `_normalize` wrapper inside `extract_choices_from_fragments`.
 
-**#275 note.** PR #275 (typed blocker contract) also touches `story_router.py`
+**`#275` note.** PR #275 (typed blocker contract) also touches `story_router.py`
 and `ui_hints` (`cost_previews`). This inventory does not modify the router; if
-#275 lands first, this entry's line numbers shift but the seam is unchanged.
+`#275` lands first, this entry's line numbers shift but the seam is unchanged.
 
 ---
 

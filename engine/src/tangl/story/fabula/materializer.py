@@ -1111,6 +1111,11 @@ class StoryMaterializer:
                 successor_id=provider.uid,
                 text=MenuBlock.action_text_for(provider),
                 tags={"dynamic", "fanout", "menu"},
+                # Same minimal cleanup-attribution token as the lazy
+                # project_menu_affordances path (synthesis item D), so menu
+                # actions are equally cleanup-explainable whether they were
+                # eager-built (frozen shape) here or planning-projected.
+                ui_hints={"source": "menu_fanout"},
             )
 
     @staticmethod
