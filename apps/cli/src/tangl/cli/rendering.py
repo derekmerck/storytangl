@@ -129,13 +129,19 @@ class PlainTerminalRenderer:
             label = _choice_label(choice)
             if _choice_active(choice):
                 hint = _choice_input_hint(choice)
-                lines.append(f"{active_index}. {label}{f' {hint}' if hint else ''}")
+                lines.append(
+                    f"{active_index}. {label}{f' {hint}' if hint else ''}"
+                    f"{_choice_cost_suffix(choice)}"
+                )
                 active_index += 1
                 continue
 
             reason = _read(choice, "unavailable_reason")
             reason_text = f" [locked: {reason}]" if reason else " [locked]"
-            lines.append(f"x) {label}{reason_text}")
+            lines.append(
+                f"x) {label}{reason_text}{_choice_blocker_suffix(choice)}"
+                f"{_choice_cost_suffix(choice)}"
+            )
         return lines
 
 
@@ -323,12 +329,23 @@ def _rich_choices(choices: list[Any], *, no_choices_text: str = "No available ch
     for choice in choices:
         label = _choice_label(choice)
         if _choice_active(choice):
-            table.add_row(str(active_index), label, _choice_input_hint(choice))
+            details = " · ".join(
+                detail
+                for detail in (_choice_input_hint(choice), _choice_cost_text(choice))
+                if detail
+            )
+            table.add_row(str(active_index), label, details)
             active_index += 1
             continue
 
         reason = _read(choice, "unavailable_reason")
         state = f"locked: {reason}" if reason else "locked"
+        blockers = _choice_blocker_messages(choice)
+        if blockers:
+            state = f"{state}; blockers: {'; '.join(blockers)}"
+        costs = _choice_cost_text(choice)
+        if costs:
+            state = f"{state}; {costs}"
         table.add_row("x", Text(label, style="dim"), Text(state, style="yellow"))
     return table
 
@@ -507,7 +524,13 @@ def _diagnostic_ux_events() -> list[JsonMapping]:
 
 def _diagnostic_choices() -> list[JsonMapping]:
     return [
-        {"label": "Verify ID against registry", "available": True},
+        {
+            "label": "Verify ID against registry",
+            "available": True,
+            "cost_previews": (
+                {"ledger_key": "time", "delta": -1, "unit": "minute"},
+            ),
+        },
         {"label": "Deny passage", "available": True},
         {
             "label": "Allow passage",
@@ -693,6 +716,45 @@ def _choice_active(choice: Any) -> bool:
     if available is not None:
         return bool(available)
     return bool(_read(choice, "active", True))
+
+
+def _choice_blocker_messages(choice: Any) -> list[str]:
+    blockers = _read(choice, "blockers", ()) or ()
+    if not isinstance(blockers, (list, tuple)):
+        return []
+    return [
+        str(_read(blocker, "message") or _read(blocker, "code"))
+        for blocker in blockers
+        if _read(blocker, "message") or _read(blocker, "code")
+    ]
+
+
+def _choice_blocker_suffix(choice: Any) -> str:
+    messages = _choice_blocker_messages(choice)
+    return f" [blockers: {'; '.join(messages)}]" if messages else ""
+
+
+def _choice_cost_text(choice: Any) -> str:
+    previews = _read(choice, "cost_previews", ()) or ()
+    if not isinstance(previews, (list, tuple)):
+        return ""
+
+    labels: list[str] = []
+    for preview in previews:
+        ledger_key = _read(preview, "ledger_key")
+        delta = _read(preview, "delta")
+        if not isinstance(ledger_key, str) or not isinstance(delta, (int, float)):
+            continue
+        sign = "+" if delta > 0 else ""
+        unit = _read(preview, "unit")
+        unit_text = f" {unit}" if isinstance(unit, str) and unit else ""
+        labels.append(f"{ledger_key.replace('_', ' ')} {sign}{delta}{unit_text}")
+    return f"cost: {'; '.join(labels)}" if labels else ""
+
+
+def _choice_cost_suffix(choice: Any) -> str:
+    text = _choice_cost_text(choice)
+    return f" [{text}]" if text else ""
 
 
 def _choice_input_hint(choice: Any) -> str:

@@ -15,6 +15,7 @@ from pydantic import (
     SerializeAsAny,
     StringConstraints,
     ValidationError,
+    field_validator,
     field_serializer,
     model_validator,
 )
@@ -102,6 +103,59 @@ class UxEvent(InfoModel):
     details: dict[str, JsonValue] = Field(default_factory=dict)
 
 
+class GrammarVerb(InfoModel):
+    """One visible command verb and its advisory completion frames."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    verb: str
+    aliases: list[str] = Field(default_factory=list)
+    frames: list[str] | None = None
+
+
+class GrammarNoun(InfoModel):
+    """One visible command noun and the pieces it may denote."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    noun: str
+    aliases: list[str] = Field(default_factory=list)
+    piece_ids: list[str] = Field(default_factory=list)
+
+
+class GrammarHint(InfoModel):
+    """Advisory command vocabulary projected from the visible turn surface."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    verbs: list[GrammarVerb] = Field(default_factory=list)
+    nouns: list[GrammarNoun] = Field(default_factory=list)
+    placeholder: str | None = None
+    examples: list[str] = Field(default_factory=list)
+
+
+class RuntimeMetadata(InfoModel):
+    """Typed reserved envelope metadata with open extension fields."""
+
+    model_config = ConfigDict(extra="allow")
+
+    grammar: GrammarHint | None = None
+
+
+class RuntimeEnvelopePayload(InfoModel):
+    """Transport schema for :meth:`RuntimeEnvelope.to_dto` output."""
+
+    model_config = ConfigDict(extra="allow")
+
+    cursor_id: UUID | None = None
+    step: int | None = None
+    fragments: list[dict[str, JsonValue]] = Field(default_factory=list)
+    ux_events: list[UxEvent] = Field(default_factory=list)
+    last_redirect: dict[str, JsonValue] | None = None
+    redirect_trace: list[dict[str, JsonValue]] = Field(default_factory=list)
+    metadata: RuntimeMetadata = Field(default_factory=RuntimeMetadata)
+
+
 class RuntimeEnvelope(InfoModel):
     """Ordered-fragment runtime payload for vm/story clients."""
 
@@ -112,6 +166,16 @@ class RuntimeEnvelope(InfoModel):
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata")
+    @classmethod
+    def _hydrate_reserved_metadata(cls, metadata: dict[str, Any]) -> dict[str, Any]:
+        if "grammar" not in metadata:
+            return metadata
+        return {
+            **metadata,
+            "grammar": GrammarHint.model_validate(metadata["grammar"]),
+        }
 
     def to_dto(self) -> dict[str, Any]:
         """Return the transport DTO projection for client-facing envelopes."""
@@ -438,6 +502,9 @@ __all__ = [
     "EdgeResolutionRequest",
     "FindEdgeRequest",
     "FragmentStream",
+    "GrammarHint",
+    "GrammarNoun",
+    "GrammarVerb",
     "InfoAffordance",
     "InfoModel",
     "InfoState",
@@ -453,7 +520,9 @@ __all__ = [
     "ProjectedSection",
     "ProjectedState",
     "RuntimeEnvelope",
+    "RuntimeEnvelopePayload",
     "RuntimeInfo",
+    "RuntimeMetadata",
     "ScalarValue",
     "SectionValue",
     "SystemInfo",

@@ -85,11 +85,16 @@ turn with an inline, non-replayed `UxEvent`.
 The first pinned backend
 contract test now asserts that a simple story emits sibling content and choice
 fragments, not a legacy block, and that `uid` and `edge_id` stay separate.
-Additional contract tests pin the authored `Action.accepts` and `Action.ui_hints`
-path through service envelopes and REST JSON. These are UI-facing intent
-contracts, even when the engine's internal vocabulary also uses fields named
-`kind`; any future service adapter that maps UI intent onto engine mechanics
-should be explicit and narrow rather than handled by the REST serializer.
+Additional contract tests pin authored `Action.accepts`, `Action.ui_hints`,
+plural typed `CostPreview` values, and typed player-facing `Action.blockers`
+through service envelopes, REST JSON, and remote Python-client hydration.
+Fixed action costs belong in `UIHints.cost_previews`; input-specific previews
+belong on the relevant `Accepts` variant. Internal VM provisioning blockers are
+projected into journal `Blocker` values at the story boundary rather than
+exposed directly. These are UI-facing intent contracts, even when the engine's
+internal vocabulary also uses fields named `kind`; any future service adapter
+that maps UI intent onto engine mechanics should be explicit and narrow rather
+than handled by the REST serializer.
 `RuntimeEnvelope.to_dto()` projects fragments through the journal fragment DTO
 pathway, preserving concrete fragment subclass fields while omitting
 transport-only stream bookkeeping. In-process Python clients, diagnostic
@@ -140,6 +145,24 @@ shaping remains limited to HTTP-adjacent concerns such as media profiles and
 optional markdown-to-HTML conversion. The serializer remains a transcription
 boundary and does not preserve retired request or fragment aliases.
 
+Story create, update, and action endpoints publish
+`RuntimeEnvelopePayload` as their FastAPI response model. This is an outer DTO
+schema for `RuntimeEnvelope.to_dto()` output, not a second fragment hierarchy:
+`fragments` remains a list of independent JSON records. Using the engine
+`RuntimeEnvelope` model directly as the REST response model would rehydrate
+fragments as `BaseFragment` and restore internal `seq`, `step`, and `tags`
+defaults, so the transport schema deliberately avoids that shape drift.
+
+`RuntimeEnvelope.metadata.grammar` is a reserved typed sub-key rather than a
+second command model. The service synthesizes `GrammarHint` values from the
+current visible fragment surface: choice text supplies exact examples and verb
+frames, while visible pieces supply noun-to-piece mappings. This projection is
+an intentionally modest auto-derived floor: it does not infer aliases,
+templated frames, or placeholders. Worlds may override it with authored grammar
+metadata. The projection is advisory; command resolution still uses the
+Story-owned `find_edges` dispatch, and raw command submission remains valid
+when grammar metadata is absent or ignored.
+
 ## Diagnostic Fixtures And Transcripts
 
 `engine/contrib/conformance/backend_widget_demo.py` now generates the first
@@ -150,9 +173,9 @@ backend-emitted diagnostic payloads:
 
 These are not canonical conformance fixtures yet. They prove that the current
 service layer can emit a real widget-shaped `RuntimeEnvelope` and
-`ProjectedState` covering content, typed choices, `accepts`, `ui_hints`,
-`metadata.info_affordances`, `metadata.info_state`, and generic projected-state
-values.
+`ProjectedState` covering content, typed choices, blockers, plural cost
+previews, `accepts`, `ui_hints`, `metadata.info_affordances`,
+`metadata.info_state`, and generic projected-state values.
 
 Diagnostic transcripts should be generated only after backend output can be
 captured as a real `RuntimeEnvelope` stream. The durable source of truth should

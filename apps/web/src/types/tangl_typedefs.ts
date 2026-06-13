@@ -337,7 +337,7 @@ export interface CostPreview {
 }
 
 export interface Blocker {
-  code?: string | null
+  code: string
   message: string
   refs?: FragmentId[]
   [key: string]: unknown
@@ -515,6 +515,30 @@ export interface UxEvent {
   details?: Record<string, unknown>
 }
 
+export interface GrammarVerb {
+  verb: string
+  aliases?: string[]
+  frames?: string[] | null
+}
+
+export interface GrammarNoun {
+  noun: string
+  aliases?: string[]
+  piece_ids?: FragmentId[]
+}
+
+export interface GrammarHint {
+  verbs?: GrammarVerb[]
+  nouns?: GrammarNoun[]
+  placeholder?: string | null
+  examples?: string[]
+}
+
+export interface RuntimeMetadata {
+  grammar?: GrammarHint
+  [key: string]: unknown
+}
+
 export interface RuntimeEnvelope {
   cursor_id?: string | null
   step?: number | null
@@ -522,7 +546,7 @@ export interface RuntimeEnvelope {
   ux_events?: UxEvent[]
   last_redirect?: Record<string, unknown> | null
   redirect_trace?: Array<Record<string, unknown>>
-  metadata?: Record<string, unknown>
+  metadata?: RuntimeMetadata
 }
 
 export interface StorySceneModel {

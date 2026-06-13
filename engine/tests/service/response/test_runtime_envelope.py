@@ -9,7 +9,9 @@ from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.service.response import (
     CommandEdgeQuery,
     EdgeResolutionRequest,
+    GrammarHint,
     RuntimeEnvelope,
+    RuntimeEnvelopePayload,
     UxEvent,
 )
 
@@ -77,6 +79,25 @@ def test_runtime_envelope_to_dto_uses_fragment_dto_projection() -> None:
     assert "tags" not in choice
 
 
+def test_runtime_envelope_payload_validates_dto_without_restoring_bookkeeping() -> None:
+    envelope = RuntimeEnvelope(
+        fragments=[
+            ContentFragment(content="Start", step=1),
+            ChoiceFragment(edge_id=uuid4(), text="Continue", step=1),
+        ],
+    )
+
+    payload = RuntimeEnvelopePayload.model_validate(envelope.to_dto()).model_dump(
+        mode="json",
+        exclude_none=True,
+    )
+
+    assert payload["fragments"][0]["content"] == "Start"
+    assert "seq" not in payload["fragments"][0]
+    assert "tags" not in payload["fragments"][0]
+    assert "step" not in payload["fragments"][0]
+
+
 def test_runtime_envelope_to_dto_preserves_public_envelope_fields() -> None:
     envelope = ExtendedRuntimeEnvelope(
         step=0,
@@ -110,6 +131,49 @@ def test_runtime_envelope_to_dto_keeps_ux_events_outside_journal_fragments() -> 
     assert payload["ux_events"][0]["event_type"] == "edge_not_found"
     assert payload["ux_events"][0]["presentation"] == "inline"
     assert payload["ux_events"][0]["replay"] is False
+
+
+def test_runtime_envelope_hydrates_typed_grammar_metadata() -> None:
+    envelope = RuntimeEnvelope(
+        fragments=[],
+        metadata={
+            "fixture": "command_hints",
+            "grammar": {
+                "verbs": [
+                    {
+                        "verb": "take",
+                        "aliases": ["get"],
+                        "frames": ["Take the brass lamp."],
+                    }
+                ],
+                "nouns": [
+                    {
+                        "noun": "brass lamp",
+                        "aliases": ["lamp"],
+                        "piece_ids": ["lamp"],
+                    }
+                ],
+                "placeholder": "Try: take lamp",
+                "examples": ["Take the brass lamp."],
+            },
+        },
+    )
+
+    grammar = envelope.metadata["grammar"]
+    assert isinstance(grammar, GrammarHint)
+    assert grammar.verbs[0].verb == "take"
+    assert grammar.nouns[0].piece_ids == ["lamp"]
+    assert envelope.to_dto()["metadata"]["grammar"]["examples"] == [
+        "Take the brass lamp."
+    ]
+
+
+def test_runtime_envelope_rejects_invalid_grammar_metadata() -> None:
+    with pytest.raises(ValidationError):
+        RuntimeEnvelope(
+            fragments=[],
+            metadata={"grammar": {"verbs": ["take"]}},
+        )
 
 
 def test_command_edge_query_normalizes_and_requires_nonblank_text() -> None:

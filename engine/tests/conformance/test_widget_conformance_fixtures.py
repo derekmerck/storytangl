@@ -627,6 +627,8 @@ def test_command_hint_fixture_keeps_grammar_advisory() -> None:
 
     assert isinstance(grammar, dict)
     assert grammar["examples"][0] == "take lamp"
+    assert grammar["verbs"][0]["verb"] == "take"
+    assert grammar["nouns"][0]["piece_ids"] == ["lamp"]
 
     assert not any(
         fragment.get("accepts", {}).get("kind") == "raw_command"

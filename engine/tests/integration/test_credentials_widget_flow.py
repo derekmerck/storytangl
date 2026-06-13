@@ -87,6 +87,12 @@ def test_credentials_packet_reaches_service_envelope_as_typed_widgets() -> None:
     assert inspect_choice.accepts.kind == "pieces"
     assert inspect_choice.accepts.constraints is not None
     assert inspect_choice.accepts.constraints.target_zone_ref == str(packet.uid)
+    grammar = entered.metadata["grammar"]
+    assert "Inspect a document" in grammar.examples
+    assert all(
+        any(document.piece_id in noun.piece_ids for noun in grammar.nouns)
+        for document in documents
+    )
 
     dto = entered.to_dto()
     piece_payloads = [

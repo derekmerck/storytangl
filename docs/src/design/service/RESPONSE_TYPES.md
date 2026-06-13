@@ -28,6 +28,10 @@ metadata.
 
 **Return type:** `RuntimeEnvelope`
 
+**REST response schema:** `RuntimeEnvelopePayload`, the JSON DTO envelope
+returned by `RuntimeEnvelope.to_dto()`. Its fragment entries stay open JSON
+records so response validation does not reintroduce engine bookkeeping.
+
 **Examples:**
 - `create_story()` - creates a ledger and returns the initial envelope
 - `resolve_choice()` - advances the story and returns new fragments

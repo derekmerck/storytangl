@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import type { UxEvent } from '@/types'
-
-type CommandGrammar = {
-  examples?: unknown
-  placeholder?: unknown
-}
+import type { GrammarHint, UxEvent } from '@/types'
 
 const props = defineProps<{
-  grammar: CommandGrammar
+  grammar: GrammarHint
   events?: UxEvent[]
   disabled?: boolean
 }>()
@@ -20,14 +15,10 @@ const emit = defineEmits<{
 
 const command = ref('')
 const examples = computed(() =>
-  Array.isArray(props.grammar.examples)
-    ? props.grammar.examples.filter(
-        (example): example is string => typeof example === 'string' && example.length > 0,
-      )
-    : [],
+  (props.grammar.examples ?? []).filter((example) => example.length > 0),
 )
 const placeholder = computed(() => {
-  if (typeof props.grammar.placeholder === 'string' && props.grammar.placeholder) {
+  if (props.grammar.placeholder) {
     return props.grammar.placeholder
   }
   return examples.value.length > 0 ? `e.g. ${examples.value[0]}` : 'Type a command'

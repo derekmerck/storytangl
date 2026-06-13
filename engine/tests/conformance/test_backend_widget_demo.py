@@ -19,6 +19,19 @@ REFERENCE_PATH = CONFORMANCE_DIR / "reference_port.py"
 DIAGNOSTIC_DIR = CONFORMANCE_DIR / "diagnostics"
 RUNTIME_PATH = DIAGNOSTIC_DIR / "backend_widget_contract_runtime.json"
 PROJECTED_PATH = DIAGNOSTIC_DIR / "backend_widget_contract_projected_state.json"
+INTERNAL_FRAGMENT_KEYS = {
+    "availability",
+    "effects",
+    "graph",
+    "locals",
+    "predecessor_id",
+    "registry",
+    "return_phase",
+    "seq",
+    "successor_id",
+    "tags",
+    "trigger_phase",
+}
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
@@ -43,6 +56,17 @@ def _load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _assert_no_internal_fragment_keys(value: Any, *, path: str = "fragments") -> None:
+    if isinstance(value, dict):
+        leaked = INTERNAL_FRAGMENT_KEYS.intersection(value)
+        assert not leaked, f"{path} leaks internal keys: {sorted(leaked)}"
+        for key, item in value.items():
+            _assert_no_internal_fragment_keys(item, path=f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _assert_no_internal_fragment_keys(item, path=f"{path}[{index}]")
+
+
 def test_backend_widget_diagnostics_match_generator() -> None:
     runtime_payload, projected_payload = BACKEND_DEMO.build_demo_payloads()
 
@@ -65,12 +89,42 @@ def test_backend_widget_diagnostics_validate_as_service_contracts() -> None:
     assert len(choices) == 2
     assert choices[0]["uid"] != choices[0]["edge_id"]
     assert choices[0]["accepts"]["kind"] == "quantity"
+    assert choices[0]["accepts"]["cost_previews"] == [
+        {"ledger_key": "supplies", "delta": 1, "unit": "ration"}
+    ]
     assert choices[0]["ui_hints"]["source_kind"] == "market"
+    assert choices[0]["ui_hints"]["cost_previews"] == [
+        {"ledger_key": "coin", "delta": -2, "unit": "silver"}
+    ]
     assert choices[1]["accepts"]["kind"] == "text"
+    assert runtime_payload["metadata"]["grammar"]["examples"] == [
+        "Buy rations.",
+        "Name the mule.",
+    ]
+    assert runtime_payload["metadata"]["grammar"]["verbs"] == [
+        {
+            "verb": "buy",
+            "aliases": [],
+            "frames": ["Buy rations."],
+        },
+        {
+            "verb": "name",
+            "aliases": [],
+            "frames": ["Name the mule."],
+        },
+    ]
     assert runtime_payload["metadata"]["info_state"]["available_kinds"] == [
         "inventory",
         "map",
     ]
+
+
+def test_backend_widget_runtime_fragments_do_not_leak_internal_fields() -> None:
+    generated_payload, _ = BACKEND_DEMO.build_demo_payloads()
+    saved_payload = _load_json(RUNTIME_PATH)
+
+    _assert_no_internal_fragment_keys(generated_payload["fragments"])
+    _assert_no_internal_fragment_keys(saved_payload["fragments"])
 
 
 def test_backend_widget_diagnostics_render_in_reference_port() -> None:
@@ -78,7 +132,10 @@ def test_backend_widget_diagnostics_render_in_reference_port() -> None:
     projected_output = "\n".join(REFERENCE_PORT.render_fixture(_load_json(PROJECTED_PATH)))
 
     assert "The road forks under cold rain." in runtime_output
-    assert "b) Buy rations. <quantity 1-3 ration>" in runtime_output
+    assert (
+        "b) Buy rations. <quantity 1-3 ration> "
+        "[cost: coin -2 silver; supplies +1 ration]"
+    ) in runtime_output
     assert "n) Name the mule. <text: Buttercup>" in runtime_output
     assert "? Inventory: /info inventory (shortcuts: /i, /inv)" in runtime_output
     assert "Supplies:\n  Rations: 2" in projected_output

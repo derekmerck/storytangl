@@ -129,11 +129,25 @@ def _script_data() -> dict[str, object]:
                                     "min": 1,
                                     "max": 3,
                                     "unit": "ration",
+                                    "cost_previews": [
+                                        {
+                                            "ledger_key": "supplies",
+                                            "delta": 1,
+                                            "unit": "ration",
+                                        }
+                                    ],
                                 },
                                 "ui_hints": {
                                     "hotkey": "b",
                                     "source_kind": "market",
                                     "contribution": "purchase",
+                                    "cost_previews": [
+                                        {
+                                            "ledger_key": "coin",
+                                            "delta": -2,
+                                            "unit": "silver",
+                                        }
+                                    ],
                                 },
                             },
                             {

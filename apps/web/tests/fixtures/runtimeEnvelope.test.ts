@@ -139,11 +139,13 @@ describe('runtime envelope fixtures', () => {
   it('keeps command grammar hints advisory metadata', () => {
     const grammar = commandHintRuntimeEnvelope.metadata?.grammar
 
-    expect(isRecord(grammar)).toBe(true)
-    if (!isRecord(grammar)) {
-      throw new Error('command grammar fixture must be an object')
+    expect(grammar).toBeDefined()
+    if (!grammar) {
+      throw new Error('command grammar fixture is required')
     }
     expect(Array.isArray(grammar.examples)).toBe(true)
     expect(grammar.examples).toContain('take lamp')
+    expect(grammar.verbs?.[0]?.verb).toBe('take')
+    expect(grammar.nouns?.[0]?.piece_ids).toContain('lamp')
   })
 })

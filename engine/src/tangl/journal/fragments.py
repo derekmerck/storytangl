@@ -16,7 +16,7 @@ from uuid import UUID
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from tangl.core import BaseFragment, Registry, Selector
-from tangl.journal.intent import Accepts, KvRow, UIHints
+from tangl.journal.intent import Accepts, Blocker, KvRow, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, StyleClass, StyleDict, StyleId, UnstructuredData
@@ -120,7 +120,7 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
-    blockers: list[dict[str, Any]] | None = None
+    blockers: list[Blocker] | None = None
     accepts: Accepts | None = None
     ui_hints: UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
@@ -298,6 +298,7 @@ def fragment_from_dto(payload: object) -> BaseFragment:
 __all__ = [
     "AttributedFragment",
     "BlockFragment",
+    "Blocker",
     "ChoiceFragment",
     "ContentFragment",
     "ContentFormatType",

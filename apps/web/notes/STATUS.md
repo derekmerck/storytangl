@@ -42,8 +42,8 @@ renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
 
 ## Open Work
 
-- Add richer command preview/autocomplete once backend grammar hints settle
-  beyond examples, verbs, and nouns.
+- Add richer command preview/autocomplete from typed grammar verbs, frames,
+  nouns, and aliases when that interaction becomes a priority.
 - Recheck world/system/user metadata assumptions against backend response
   models.
 - Audit loading states, error display, mobile layout, and accessibility.

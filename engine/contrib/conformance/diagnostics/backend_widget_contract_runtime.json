@@ -21,13 +21,25 @@
         "max": 3,
         "step": 1,
         "unit": "ration",
-        "cost_previews": []
+        "cost_previews": [
+          {
+            "ledger_key": "supplies",
+            "delta": 1,
+            "unit": "ration"
+          }
+        ]
       },
       "ui_hints": {
         "hotkey": "b",
         "source_kind": "market",
         "contribution": "purchase",
-        "cost_previews": []
+        "cost_previews": [
+          {
+            "ledger_key": "coin",
+            "delta": -2,
+            "unit": "silver"
+          }
+        ]
       }
     },
     {
@@ -90,6 +102,29 @@
       "available_kinds": [
         "inventory",
         "map"
+      ]
+    },
+    "grammar": {
+      "verbs": [
+        {
+          "verb": "buy",
+          "aliases": [],
+          "frames": [
+            "Buy rations."
+          ]
+        },
+        {
+          "verb": "name",
+          "aliases": [],
+          "frames": [
+            "Name the mule."
+          ]
+        }
+      ],
+      "nouns": [],
+      "examples": [
+        "Buy rations.",
+        "Name the mule."
       ]
     },
     "world_id": "widget_contract_demo",

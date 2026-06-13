@@ -55,11 +55,20 @@ def test_rich_renderer_exports_envelope_text() -> None:
                 "label": "Verify ID",
                 "available": True,
                 "accepts": {"kind": "pieces", "min": 1, "max": 1},
+                "cost_previews": (
+                    {"ledger_key": "time", "delta": -1, "unit": "minute"},
+                ),
             },
             SimpleNamespace(
                 label="Allow passage",
                 active=False,
                 unavailable_reason="Permit expired",
+                blockers=(
+                    {
+                        "code": "permit_expired",
+                        "message": "The permit expired yesterday.",
+                    },
+                ),
             ),
         ],
         metadata={
@@ -82,8 +91,11 @@ def test_rich_renderer_exports_envelope_text() -> None:
     assert "[permit-7] Gate permit" in transcript
     assert "Verify ID" in transcript
     assert "piece ids: 1" in transcript
+    assert "cost: time -1 minute" in transcript
     assert "Allow passage" in transcript
     assert "Permit expired" in transcript
+    assert "cost: time -1 minute" in transcript
+    assert "The permit expired yesterday." in " ".join(transcript.split())
     assert "/m Map" in transcript
     assert "Inventory" not in transcript
 

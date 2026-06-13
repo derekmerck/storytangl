@@ -137,7 +137,7 @@ RuntimeEnvelope {
   cursor_id?: string | null
   step?: number | null
   fragments: StoryFragment[]
-  metadata?: Record<string, unknown>
+  metadata?: RuntimeMetadata
 }
 
 StoryFragment {
@@ -239,8 +239,14 @@ preview/autocomplete; submit raw text with `find_edge` and render any inline
 metadata: {
   grammar: {
     examples: ['take lamp', 'open door'],
-    verbs: ['take', 'open'],
-    nouns: ['lamp', 'door']
+    verbs: [
+      { verb: 'take', aliases: ['get'], frames: ['take {noun}'] },
+      { verb: 'open', aliases: [], frames: ['open {noun}'] }
+    ],
+    nouns: [
+      { noun: 'lamp', aliases: ['lantern'], piece_ids: ['lamp'] },
+      { noun: 'door', aliases: [], piece_ids: ['iron-door'] }
+    ]
   }
 }
 ```

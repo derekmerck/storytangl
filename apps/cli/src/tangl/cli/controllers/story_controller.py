@@ -28,6 +28,8 @@ class _CachedChoice:
     available: bool
     unavailable_reason: str | None
     accepts: dict[str, Any] | None
+    blockers: tuple[dict[str, Any], ...]
+    cost_previews: tuple[dict[str, Any], ...]
 
 
 @with_default_category("Story")
@@ -82,6 +84,19 @@ class StoryController(CommandSet):
                 )
 
             accepts = fragment.get("accepts")
+            blockers = fragment.get("blockers")
+            ui_hints = fragment.get("ui_hints")
+            cost_previews: list[dict[str, Any]] = []
+            for source in (ui_hints, accepts):
+                if not isinstance(source, dict):
+                    continue
+                previews = source.get("cost_previews")
+                if isinstance(previews, list):
+                    cost_previews.extend(
+                        dict(preview)
+                        for preview in previews
+                        if isinstance(preview, dict)
+                    )
             choices.append(
                 _CachedChoice(
                     edge_id=UUID(str(edge_id)),
@@ -89,6 +104,14 @@ class StoryController(CommandSet):
                     available=bool(fragment.get("available", True)),
                     unavailable_reason=fragment.get("unavailable_reason"),
                     accepts=dict(accepts) if isinstance(accepts, dict) else None,
+                    blockers=tuple(
+                        dict(blocker)
+                        for blocker in blockers
+                        if isinstance(blocker, dict)
+                    )
+                    if isinstance(blockers, list)
+                    else (),
+                    cost_previews=tuple(cost_previews),
                 )
             )
 

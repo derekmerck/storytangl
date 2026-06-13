@@ -10,6 +10,7 @@ from tangl.journal.fragments import (
     DialogFragment,
     MediaFragment,
 )
+from tangl.journal.intent import Blocker, CostPreview, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.renpy import RenPySessionBridge
@@ -104,8 +105,28 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
                 text="Open the cellar",
                 available=False,
                 unavailable_reason="missing_key",
-                accepts={"kind": "quantity", "min": 1, "max": 3},
-                ui_hints={"hotkey": "2", "emphasis": "warning"},
+                blockers=[
+                    Blocker(
+                        code="missing_key",
+                        message="The brass key is required.",
+                        refs=["piece-key"],
+                    )
+                ],
+                accepts={
+                    "kind": "quantity",
+                    "min": 1,
+                    "max": 3,
+                    "cost_previews": [
+                        {"ledger_key": "supplies", "delta": 1, "unit": "ration"},
+                    ],
+                },
+                ui_hints=UIHints(
+                    hotkey="2",
+                    emphasis="warning",
+                    cost_previews=[
+                        CostPreview(ledger_key="purse", delta=-2, unit="coin"),
+                    ],
+                ),
                 step=0,
             ),
             ContentFragment(content="A later beat.", step=1),
@@ -118,18 +139,33 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
     assert turns[0].choices[0].available is True
     assert turns[0].choices[1].available is False
     assert turns[0].choices[1].unavailable_reason == "missing_key"
+    assert turns[0].choices[1].blockers == (
+        {
+            "code": "missing_key",
+            "message": "The brass key is required.",
+            "refs": ["piece-key"],
+        },
+    )
+    assert turns[0].choices[1].cost_previews == (
+        {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+        {"ledger_key": "supplies", "delta": 1, "unit": "ration"},
+    )
     assert turns[0].choices[1].accepts == {
         "kind": "quantity",
         "required": True,
         "min": 1,
         "max": 3,
         "step": 1,
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "supplies", "delta": 1, "unit": "ration"},
+        ],
     }
     assert turns[0].choices[1].ui_hints == {
         "hotkey": "2",
         "emphasis": "warning",
-        "cost_previews": [],
+        "cost_previews": [
+            {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+        ],
     }
     assert [line.text for line in turns[1].lines] == ["A later beat."]
 

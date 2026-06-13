@@ -132,6 +132,8 @@ def test_linear_story_update_supports_html_render_profile(
     assert update.status_code == 200
     payload = update.json()
     assert _fragment_has_html_content(payload["fragments"])
+    assert "<" not in payload["cursor_id"]
+    assert payload["metadata"]["world_id"] == "the_path"
 
 
 def test_linear_story_do_supports_html_render_profile(
@@ -155,3 +157,5 @@ def test_linear_story_do_supports_html_render_profile(
     assert resolve.status_code == 200
     payload = resolve.json()
     assert _fragment_has_html_content(payload["fragments"])
+    assert "<" not in payload["cursor_id"]
+    assert payload["metadata"]["world_id"] == "the_path"

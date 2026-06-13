@@ -12,6 +12,7 @@ from uuid import UUID
 import yaml
 
 from tangl.core import BaseFragment
+from tangl.journal.fragments import ChoiceFragment, PieceFragment
 from tangl.persistence import PersistenceManager
 from tangl.story import InitMode, World, do_find_edges
 from tangl.type_hints import Identifier, UnstructuredData
@@ -27,6 +28,9 @@ from .response import (
     DirectEdgeRequest,
     EdgeResolutionRequest,
     FindEdgeRequest,
+    GrammarHint,
+    GrammarNoun,
+    GrammarVerb,
     InfoAffordance,
     InfoState,
     JsonValue,
@@ -77,6 +81,51 @@ class ServiceSession:
     user: User | None
     ledger: Ledger
     frame: Any
+
+
+def _grammar_hint_from_fragments(fragments: list[BaseFragment]) -> GrammarHint | None:
+    """Project advisory command metadata from visible choices and pieces."""
+
+    examples: list[str] = []
+    verbs: dict[str, GrammarVerb] = {}
+    nouns: dict[str, GrammarNoun] = {}
+
+    for fragment in fragments:
+        if isinstance(fragment, ChoiceFragment):
+            example = fragment.text.strip()
+            if not example:
+                continue
+            if example not in examples:
+                examples.append(example)
+
+            verb = example.split(maxsplit=1)[0].strip(".,!?;:").casefold()
+            if not verb:
+                continue
+            if verb not in verbs:
+                verbs[verb] = GrammarVerb(verb=verb, frames=[])
+            grammar_verb = verbs[verb]
+            if grammar_verb.frames is not None and example not in grammar_verb.frames:
+                grammar_verb.frames.append(example)
+
+        if isinstance(fragment, PieceFragment):
+            noun = (
+                fragment.content.strip()
+                if isinstance(fragment.content, str) and fragment.content.strip()
+                else fragment.piece_id
+            )
+            if noun not in nouns:
+                nouns[noun] = GrammarNoun(noun=noun)
+            grammar_noun = nouns[noun]
+            if fragment.piece_id not in grammar_noun.piece_ids:
+                grammar_noun.piece_ids.append(fragment.piece_id)
+
+    if not examples and not nouns:
+        return None
+    return GrammarHint(
+        verbs=list(verbs.values()),
+        nouns=list(nouns.values()),
+        examples=examples,
+    )
 
 
 class ServiceManager:
@@ -289,8 +338,11 @@ class ServiceManager:
         ux_events: list[UxEvent] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> RuntimeEnvelope:
+        current_fragments = list(ledger.get_journal(since_step=ledger.step))
+        grammar = _grammar_hint_from_fragments(current_fragments)
         merged_metadata = {
             **ServiceManager._story_info_metadata(ledger),
+            **({"grammar": grammar} if grammar is not None else {}),
             **dict(metadata or {}),
         }
         world_id = ServiceManager._resolve_world_id(ledger)

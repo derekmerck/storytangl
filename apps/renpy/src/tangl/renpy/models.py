@@ -41,6 +41,8 @@ class RenPyChoice:
     text: str
     available: bool = True
     unavailable_reason: str | None = None
+    blockers: tuple[dict[str, Any], ...] = ()
+    cost_previews: tuple[dict[str, Any], ...] = ()
     accepts: dict[str, Any] | None = None
     ui_hints: dict[str, Any] | None = None
     choice_payload: Any = None
@@ -54,4 +56,3 @@ class RenPyTurn:
     media_ops: list[RenPyMediaOp] = field(default_factory=list)
     lines: list[RenPyLine] = field(default_factory=list)
     choices: list[RenPyChoice] = field(default_factory=list)
-

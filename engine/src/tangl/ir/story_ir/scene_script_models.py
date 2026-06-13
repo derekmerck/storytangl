@@ -10,7 +10,7 @@ from pydantic import Field, model_validator, ConfigDict, field_validator
 from tangl.core import Entity
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.media_ir.media_script_model import MediaItemScript
-from tangl.journal.intent import Accepts
+from tangl.journal.intent import Accepts, Blocker, UIHints
 from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
 from .actor_script_models import RoleScript
 from .location_script_models import SettingScript
@@ -163,11 +163,14 @@ class ActionScript(BaseScriptItem):
             "Optional typed payload acceptance contract for client-side input generation."
         ),
     )
-    ui_hints: dict[str, Any] | None = Field(
+    blockers: list[Blocker] | None = Field(
+        None,
+        description="Optional player-facing explanations shown when the action is unavailable.",
+    )
+    ui_hints: UIHints | None = Field(
         None,
         description=(
-            "Optional client/renderer hint metadata for payload UI selection "
-            "(for example widget, max_length, framework hints)."
+            "Optional typed advisory metadata for client choice presentation."
         ),
     )
 

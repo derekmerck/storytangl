@@ -8,6 +8,7 @@ import pytest
 from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment
+from tangl.journal.intent import Blocker, CostPreview, UIHints
 from tangl.service.response import (
     BadgeListValue,
     DirectEdgeRequest,
@@ -204,10 +205,21 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
                     text="Open vault",
                     available=False,
                     unavailable_reason="Requires keycard",
+                    blockers=[
+                        Blocker(
+                            code="needs_keycard",
+                            message="The security keycard is required.",
+                        )
+                    ],
                 ),
                 ChoiceFragment(
                     edge_id=uuid4(),
                     text="Go north",
+                    ui_hints=UIHints(
+                        cost_previews=[
+                            CostPreview(ledger_key="time", delta=-1, unit="minute"),
+                        ]
+                    ),
                 ),
             ]
         )
@@ -217,8 +229,49 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
     story_controller._render_current_story_update()
 
     output = "\n".join(cli.outputs)
-    assert "1. Go north" in output
-    assert "x) Open vault [locked: Requires keycard]" in output
+    assert "1. Go north [cost: time -1 minute]" in output
+    assert (
+        "x) Open vault [locked: Requires keycard] "
+        "[blockers: The security keycard is required.]"
+        in output
+    )
+
+
+def test_cli_combines_action_and_input_cost_previews(
+    story_controller: StoryController,
+) -> None:
+    cli = story_controller._cmd
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                ChoiceFragment(
+                    edge_id=cli.edge_id,
+                    text="Buy rations",
+                    accepts={
+                        "kind": "quantity",
+                        "min": 1,
+                        "max": 3,
+                        "cost_previews": [
+                            {"ledger_key": "supplies", "delta": 1, "unit": "ration"},
+                        ],
+                    },
+                    ui_hints={
+                        "cost_previews": [
+                            {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+                        ],
+                    },
+                )
+            ]
+        )
+    )
+
+    cli.outputs.clear()
+    story_controller._render_current_story_update()
+
+    assert (
+        "1. Buy rations <quantity 1-3> "
+        "[cost: purse -2 coin; supplies +1 ration]"
+    ) in "\n".join(cli.outputs)
 
 
 def test_do_command_submits_quantity_payload(story_controller: StoryController) -> None:

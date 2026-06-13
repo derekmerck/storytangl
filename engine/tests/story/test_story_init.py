@@ -347,6 +347,9 @@ def test_action_payload_is_materialized_from_script() -> None:
     script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["ui_hints"] = {
         "source_kind": "radio",
         "contribution": "wx",
+        "cost_previews": [
+            {"ledger_key": "purse", "delta": -2, "unit": "coin"},
+        ],
     }
 
     world = World.from_script_data(script_data=script)
@@ -361,6 +364,8 @@ def test_action_payload_is_materialized_from_script() -> None:
     assert action.ui_hints is not None
     assert action.ui_hints.source_kind == "radio"
     assert action.ui_hints.contribution == "wx"
+    assert action.ui_hints.cost_previews[0].ledger_key == "purse"
+    assert action.ui_hints.cost_previews[0].delta == -2
 
 
 def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
