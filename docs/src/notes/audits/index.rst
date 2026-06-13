@@ -8,3 +8,4 @@ Documentation audits and gap reviews used to drive targeted cleanup work.
 
    core38-doc-audit
    vm38-doc-audit
+   compat-seams-inventory
