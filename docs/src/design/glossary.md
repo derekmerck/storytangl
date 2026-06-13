@@ -10,6 +10,12 @@ use these terms, they mean *exactly* what's defined here.
 
 ## Core Graph Primitives
 
+```{storytangl-topic}
+:topics: entity, registry, graph
+:relation: documents
+:facets: overview
+```
+
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
 | **Entity** | managed object | Base data structure with identity, labels, tags, and comparison semantics | `core.entity.Entity` |
@@ -20,6 +26,12 @@ use these terms, they mean *exactly* what's defined here.
 | **Graph** | program | Registry of nodes, edges, and subgraphs with membership and ancestry | `core.graph.Graph` |
 
 ## Narrative Architecture
+
+```{storytangl-topic}
+:topics: traversal, journal
+:relation: documents
+:facets: overview
+```
 
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
@@ -36,6 +48,12 @@ use these terms, they mean *exactly* what's defined here.
 
 ## Execution Model
 
+```{storytangl-topic}
+:topics: frame, phase_ctx, ledger, resolution_phase, replay
+:relation: documents
+:facets: overview
+```
+
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
 | **Frame** | stack frame | Runtime context for a single traversal step: cursor, namespace, phase state | `vm.Frame` |
@@ -49,6 +67,12 @@ use these terms, they mean *exactly* what's defined here.
 
 ## Provisioning
 
+```{storytangl-topic}
+:topics: provisioning
+:relation: documents
+:facets: overview
+```
+
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
 | **Requirement** | package.json line | Declarative specification of what a dependency edge needs | `ProvisionRequirement` |
@@ -61,6 +85,12 @@ use these terms, they mean *exactly* what's defined here.
 | **Narrative credit** | foreshadowing | Concept introduced in journal before any structural need requires it | Namespace-published, no dependency yet |
 
 ## Open Links and Projection
+
+```{storytangl-topic}
+:topics: open_link
+:relation: documents
+:facets: overview
+```
 
 > Canonical model: [Open Links: Requirement-Bearing Edges and the Planning
 > Matrix](planning/AFFORDANCE_MODEL.md). The entries below are the shared
@@ -91,6 +121,12 @@ that distinction.
 
 ## Dispatch and Behavior
 
+```{storytangl-topic}
+:topics: dispatch
+:relation: documents
+:facets: overview
+```
+
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
 | **Behavior** | plugin | Callable registered for a specific task at a specific priority | `core.behavior.Behavior` |
@@ -102,6 +138,12 @@ that distinction.
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
 
 ## Content and Presentation
+
+```{storytangl-topic}
+:topics: journal, widget
+:relation: documents
+:facets: overview
+```
 
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
@@ -115,6 +157,12 @@ that distinction.
 | **Staging hints** | CSS-like metadata | Rendering suggestions (orientation, placement, z-index) for media fragments | `StagingHints` |
 
 ## Templates and Compilation
+
+```{storytangl-topic}
+:topics: template, factory, codec
+:relation: documents
+:facets: overview
+```
 
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
