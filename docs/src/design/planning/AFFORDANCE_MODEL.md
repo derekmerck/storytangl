@@ -18,7 +18,7 @@ immediate refactor** — do not build it yet.
 :topics: open_link
 :facets: overview, design
 :relation: defines
-:related: provisioning, traversal, sandbox
+:related: provisioning, traversal, sandbox, journal
 ```
 
 See also:

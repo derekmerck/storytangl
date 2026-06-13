@@ -89,7 +89,8 @@
       "entity",
       "token",
       "template",
-      "factory"
+      "factory",
+      "demographics"
     ]
   },
   {
@@ -107,7 +108,8 @@
       "singleton",
       "entity",
       "graph",
-      "provisioning"
+      "provisioning",
+      "assembly"
     ]
   },
   {
@@ -127,7 +129,8 @@
       "registry",
       "phase_ctx",
       "frame",
-      "ledger"
+      "ledger",
+      "credentials"
     ]
   },
   {
@@ -219,7 +222,8 @@
       "ledger",
       "dispatch",
       "traversal",
-      "resolution_phase"
+      "resolution_phase",
+      "widget"
     ]
   },
   {
@@ -278,7 +282,9 @@
       "frame",
       "ledger",
       "factory",
-      "resolution_phase"
+      "resolution_phase",
+      "open_link",
+      "sandbox"
     ]
   },
   {
@@ -298,7 +304,9 @@
       "frame",
       "factory",
       "template",
-      "token"
+      "token",
+      "open_link",
+      "authoring_validation"
     ]
   },
   {
@@ -335,7 +343,10 @@
       "ledger",
       "resolution_phase",
       "dispatch",
-      "replay"
+      "replay",
+      "open_link",
+      "sandbox",
+      "widget"
     ]
   },
   {
@@ -394,14 +405,14 @@
     "short_description": "Actor appearance: outfit/ornament/look projection over body slots with coverage/visibility masks.",
     "related_topic_ids": [
       "assembly",
-      "media"
+      "media",
+      "open_link"
     ]
   },
   {
     "topic_id": "sandbox",
     "display_name": "Sandbox",
     "aliases": [
-      "IF",
       "interactive fiction",
       "location",
       "fixture",

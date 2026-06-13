@@ -4,7 +4,7 @@
 :topics: presence, assembly
 :facets: overview, design
 :relation: defines
-:related: media, open_link
+:related: media, open_link, credentials, token
 ```
 
 **Status:** DESIGN — assessment, not an implementation plan. The question is how to
