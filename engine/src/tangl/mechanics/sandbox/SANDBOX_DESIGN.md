@@ -17,9 +17,10 @@ actors, world time, schedules, and local rules.
 Stated plainly: **sandbox is a domain client of ordinary Story/VM machinery.**
 In the open-link vocabulary (`docs/src/design/planning/AFFORDANCE_MODEL.md`),
 each sandbox projector is a *dynamic action projection* coordinate in the
-planning matrix, riding the standard pipeline: binding/admission → live
-availability → projection → submission → backend validation → mutation →
-journal output.
+planning matrix, riding the standard pipeline: binding/admission → projection →
+live availability → submission → backend validation → mutation → journal output
+(use-time availability is filtered after projection, never folded into
+binding).
 
 The generated choices are normal `Action` edges. They use normal target
 availability, effects, call/return, journal fragments, choice diagnostics,

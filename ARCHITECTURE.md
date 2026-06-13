@@ -326,8 +326,9 @@ link** — fixed endpoint + `Requirement` for the open endpoint + policy — is 
 planning primitive, and every dynamic mechanism is a coordinate in its planning
 matrix. That doc also owns the dynamic-action-projection vocabulary, the filled
 audit table, and the pipeline ordering used across design docs:
-binding/admission → live availability → projection → submission → backend
-validation → mutation → journal output.
+binding/admission → projection → live availability → submission → backend
+validation → mutation → journal output (use-time availability is filtered
+*after* projection, never folded into binding).
 
 - **Requirement** — a `Selector` with provision policy and authored-path
   metadata

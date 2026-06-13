@@ -68,11 +68,13 @@ use these terms, they mean *exactly* what's defined here.
 > filled audit table.
 
 The canonical pipeline ordering, used consistently across design docs:
-**binding/admission → live availability → projection → submission → backend
+**binding/admission → projection → live availability → submission → backend
 validation → mutation → journal output**. Binding answers "can this
-relationship be formed?"; live availability answers "can this bound
-relationship be used now?" — the model doc's "Availability is after binding"
-section is the source of truth for that distinction.
+relationship be formed?"; projection turns a bound link into the `Action` that
+carries its predicates; live availability — a use-time filter applied *after*
+binding and projection — answers "can this bound relationship be used now?" The
+model doc's "Availability is after binding" section is the source of truth for
+that distinction.
 
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
