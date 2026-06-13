@@ -59,6 +59,13 @@ def _build_game_actions(cursor: HasGame) -> list[Any]:
                 payload={"move": move},
                 accepts=cursor.game_handler.get_move_accepts(cursor.game, move),
                 tags={"dynamic", "fanout", "game"},
+                # Minimal cleanup-attribution token (synthesis item D): names the
+                # projecting family in the same channel sandbox already uses, so
+                # game moves are as cleanup-explainable as sandbox interactions.
+                # "game_self_loop" (not "game_fanout") to avoid echoing the
+                # recorded fanout-tag drift; lifecycle/diagnostic only, tags
+                # remain the cleanup authority.
+                ui_hints={"source": "game_self_loop"},
             )
         )
     return actions
