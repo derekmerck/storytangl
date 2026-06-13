@@ -205,7 +205,7 @@ class TestPredicateGating:
         assert fragments and fragments[0].unavailable_reason == "guard_failed_or_unavailable"
 
     def test_failing_predicate_emits_portable_blocker(self) -> None:
-        graph, start, _end, _action = _graph_with_choice(guard_expr="False")
+        _graph, start, _end, _action = _graph_with_choice(guard_expr="False")
         ctx = _simple_ctx()
 
         fragments = render_block_choices(caller=start, ctx=ctx)

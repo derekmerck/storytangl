@@ -429,6 +429,8 @@ class TestRemoteResponseHydration:
 
         choice = envelope.fragments[0]
         assert isinstance(choice, ChoiceFragment)
+        assert choice.available is False
+        assert choice.unavailable_reason == "A valid permit is required."
         assert choice.accepts is not None
         assert choice.accepts.kind == "quantity"
         assert choice.accepts.unit == "ration"
