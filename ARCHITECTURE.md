@@ -319,13 +319,25 @@ Creates `Frame` instances to execute one resolution cycle.
 ### Provisioning (`vm/provision/`)
 
 The system that resolves "what does this node need?" into concrete graph
-entities.
+entities. The conceptual model is canonical in
+[docs/src/design/planning/AFFORDANCE_MODEL.md](docs/src/design/planning/AFFORDANCE_MODEL.md)
+("Open Links: Requirement-Bearing Edges and the Planning Matrix"): the **open
+link** — fixed endpoint + `Requirement` for the open endpoint + policy — is the
+planning primitive, and every dynamic mechanism is a coordinate in its planning
+matrix. That doc also owns the dynamic-action-projection vocabulary, the filled
+audit table, and the pipeline ordering used across design docs:
+binding/admission → projection → live availability → submission → backend
+validation → mutation → journal output (use-time availability is filtered
+*after* projection, never folded into binding).
 
 - **Requirement** — a `Selector` with provision policy and authored-path
   metadata
-- **Dependency** — an edge carrying a requirement
-- **Affordance** — optional resource attachment
-- **Fanout** — an edge that dynamically generates child edges
+- **Dependency** — an open link with the requester fixed and the provider
+  endpoint open (addressed pull; a hard dependency blocks until bound)
+- **Affordance** — the same open-link object with the provider fixed and the
+  context endpoint open (broadcast offer; no taker means no failure)
+- **Fanout** — a cardinality/rule-generation mode that produces many open
+  links; not a third peer of dependency/affordance
 - **Provisioners** — strategies that generate `ProvisionOffer`s:
   Find, Template, Token, InlineTemplate, Stub, UpdateClone
 - **Resolver** — gather offers → filter → rank → bind

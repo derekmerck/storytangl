@@ -4,6 +4,15 @@
 **Scope:** vm/provision, core/template, story prereq handlers
 **Date:** 2026-03-20
 
+**See also:** `docs/src/design/planning/AFFORDANCE_MODEL.md` — the canonical
+open-link planning model (the open link as planning primitive, the
+dependency/affordance duality, the planning matrix, and the filled audit
+table). This document is the provisioning-side refinement of that model's
+binding step: it specifies how an open link's **target placement context** is
+matched. The request context / target context split below is the concrete form
+of "binding answers whether the relationship can be formed" — live availability
+remains a separate, use-time question.
+
 ---
 
 ## Problem Statement
@@ -486,7 +495,10 @@ otherwise → path.
 
 Affordances are standing offers (persistent available actions, role
 bindings, namespace entries) that are conditionally active based on
-game state. They are **not** a separate resolution system. They
+game state. Canonically, an affordance is the provider-fixed direction
+of the open link (see `docs/src/design/planning/AFFORDANCE_MODEL.md`);
+this section sketches only the deferred resolver integration. They are
+**not** a separate resolution system. They
 integrate into the existing resolver as an early-running provisioner
 that yields offers at cost ≤ 0:
 

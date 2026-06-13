@@ -470,6 +470,13 @@ re-executes fragments to reconstruct any point-in-time state.
 The frontier constraint satisfaction system. Provisioning answers: "what entities does
 the cursor need in its scope, and how do we find or create them?"
 
+The conceptual vocabulary — the **open link** as the planning primitive, the
+dependency/affordance duality (same object, opposite fixed endpoints), fanout as a
+cardinality/rule-generation mode, the planning matrix, and the distinction between
+admission (projection-time) and live availability (use-time) — is canonical in
+`docs/src/design/planning/AFFORDANCE_MODEL.md`. This section documents the VM
+implementation surface of that model.
+
 #### Requirement and Dependency
 
 `Requirement` is a `Selector` with provision metadata. Because it inherits Selector, a
@@ -652,10 +659,18 @@ own active entry.
 
 **Dynamic frontier refresh.** Domain packages that project dynamic choices during
 PLANNING must treat those edges as ephemeral affordances. Before rebuilding, a provider
-clears only the previous dynamic edges it generated for that owner node, using tags or
-provenance narrow enough not to delete another provider's work. Re-entering a hub,
-game, or sandbox location therefore recomputes the local frontier from current state
-instead of relying on stale generated paths.
+clears only the previous dynamic edges it generated for that owner node. This is
+**cleanup ownership**, a compound key: scope to the owner node's `edges_out`, then
+match a discriminator tag set. Discriminators across projector families are mutually
+non-subsuming (a subset antichain — families intentionally share tags such as
+`dynamic`), not set-disjoint; the per-family discriminators and the contract are
+documented in the audit table of `docs/src/design/planning/AFFORDANCE_MODEL.md` and
+pinned by invariant tests in `engine/tests/mechanics/test_sandbox_architecture.py`.
+Re-entering a hub, game, or sandbox location therefore recomputes the local frontier
+from current state instead of relying on stale generated paths. The pattern itself —
+phase-local creation of ordinary `Action`s from a scoped source, with explicit
+admission, payload, availability, projection, and cleanup — is named **dynamic action
+projection** in that doc.
 
 
 ---

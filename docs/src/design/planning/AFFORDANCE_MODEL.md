@@ -15,6 +15,8 @@ immediate refactor** — do not build it yet.
 `tangl.story.episode`, `tangl.mechanics.sandbox`
 
 See also:
+[glossary.md](../glossary.md) ("Open Links and Projection") for the shared
+vocabulary table these terms anchor,
 [PROVISIONING.md](PROVISIONING.md) for how open endpoints are bound,
 [HUB_FANOUT.md](../story/HUB_FANOUT.md) and
 [SANDBOX_FANOUT_DESIGN.md](../../notes/SANDBOX_FANOUT_DESIGN.md) for the

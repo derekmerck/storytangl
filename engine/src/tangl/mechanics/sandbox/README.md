@@ -4,16 +4,19 @@
 `tangl.mechanics.sandbox` is the incubating family for dynamic scene-location
 hubs.
 
-The package does not introduce a second interaction model. Sandbox locations
-generate ordinary StoryTangl `Action` choices from scoped state such as location
-links, present entities, inventory, world time, and schedules.
+The package does not introduce a second interaction model. Sandbox is a
+**domain client of ordinary Story/VM machinery**: sandbox locations generate
+ordinary StoryTangl `Action` choices from scoped state such as location links,
+present entities, inventory, world time, and schedules.
 
 Sandbox is a specialized instance of a broader StoryTangl pattern: scoped
 containers publish facts, children pull on those facts through dependencies and
 phase handlers, and the runtime renders the result as namespace entries,
-journal fragments, choices, effects, or projection filters. In this package the
-facts are location-centered: exits, assets, fixtures, light, schedules, and
-presence.
+journal fragments, choices, effects, or projection filters. The open-link model
+(`docs/src/design/planning/AFFORDANCE_MODEL.md`) names this pattern the
+**scoped contribution** and names the projector shape **dynamic action
+projection**. In this package the facts are location-centered: exits, assets,
+fixtures, light, schedules, and presence.
 
 Current first-pass surface:
 
@@ -36,9 +39,11 @@ Current first-pass surface:
   consumption mechanics, but not part of sandbox's core identity.
 - `SandboxMob`: a graph-backed actor-like concept with stable location and
   mutable state that can project affordances when present.
-- `SandboxInteraction`: a sponsored local choice that lowers to an ordinary
-  `Action` with target, activation, optional call/return, availability,
-  effects, selected-action journal text, and provenance hints.
+- `SandboxInteraction`: sandbox authoring vocabulary (a "sponsored
+  interaction") for a scoped local choice that lowers to an ordinary `Action`
+  with target, activation, optional call/return, availability, effects,
+  selected-action journal text, and provenance hints. The cross-domain pattern
+  it instantiates is the *scoped contribution*.
 - `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
   trait-bearing sandbox facts into a runtime `StoryGraph` for pressure tests.
 - `SandboxVisibilityRule` / `SandboxProjectionState`: a small projection filter
@@ -195,8 +200,9 @@ Sponsored interactions are the first shared local-choice surface. A
 optional call/return, availability, effects, selected-action journal text, and
 provenance hints. Present mobs and active locations can sponsor these
 interactions, as can present/carried assets and reachable fixtures. This is a
-sandbox instance of a broader StoryTangl pattern: a concept that is in scope can
-sponsor a choice without owning a separate runtime.
+sandbox instance of a broader StoryTangl pattern — the scoped contribution: a
+concept that is in scope can sponsor a choice without owning a separate
+runtime.
 
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,

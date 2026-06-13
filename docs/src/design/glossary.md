@@ -60,6 +60,35 @@ use these terms, they mean *exactly* what's defined here.
 | **Narrative debt** | technical debt | Provisioned concept not yet introduced to the reader via journal | Bound dependency with no journal coverage |
 | **Narrative credit** | foreshadowing | Concept introduced in journal before any structural need requires it | Namespace-published, no dependency yet |
 
+## Open Links and Projection
+
+> Canonical model: [Open Links: Requirement-Bearing Edges and the Planning
+> Matrix](planning/AFFORDANCE_MODEL.md). The entries below are the shared
+> vocabulary; the model doc owns the definitions, the planning matrix, and the
+> filled audit table.
+
+The canonical pipeline ordering, used consistently across design docs:
+**binding/admission → projection → live availability → submission → backend
+validation → mutation → journal output**. Binding answers "can this
+relationship be formed?"; projection turns a bound link into the `Action` that
+carries its predicates; live availability — a use-time filter applied *after*
+binding and projection — answers "can this bound relationship be used now?" The
+model doc's "Availability is after binding" section is the source of truth for
+that distinction.
+
+| Term | Metaphor | Definition | Implementation |
+|------|----------|------------|----------------|
+| **Open link** | binding site | The planning primitive: a relationship represented before both endpoints are known — fixed endpoint + `Requirement` (open endpoint) + policy. Not a broken edge; the basic unit of work in the provisioner | `Edge + HasRequirement` (`vm.provision.requirement`) |
+| **Dependency** | addressed pull | Open link with the requester fixed and the provider endpoint open. A hard dependency is consumer-side pressure: if it cannot bind, the frontier blocks and provisioning is driven to make a provider exist | `vm.provision.Dependency` |
+| **Affordance** | broadcast offer | The same open-link object with the provider fixed and the context endpoint open. Provider-side availability: if no taker, nothing is offered and nothing fails | `vm.provision.Affordance` |
+| **Fanout** | edge generator | A cardinality/rule-generation mode that produces many open links — not a third peer of dependency/affordance | `vm.provision.Fanout` + `Resolver.resolve_fanout` |
+| **Scoped contribution** | open mic | Cross-domain pattern: a concept visible in the current scope contributes a phase-appropriate artifact (action, info affordance, journal fragment, modifier, redirect) | Pattern, not a class; sandbox's `SandboxInteraction` is its sandbox authoring form |
+| **Dynamic action projection** | JIT menu build | Phase-local creation of ordinary `Action` edges from a scoped source coordinate, with explicit admission, payload, availability, projection, and cleanup. A named pattern, deliberately not one shared implementation | `project_menu_affordances`, `_project_sandbox_interaction`, game move provisioning, … |
+| **Self-fanout** | REPL loop | A re-entrant game block re-projecting its currently available moves as self-loop actions until a terminal state routes outward. Conceptual coordinate; implemented as a local projector by design | `HasGame` move provisioning (`mechanics/games/handlers.py`) |
+| **Cleanup ownership** | tag-scoped GC | Which projector may delete a generated action: a compound key of source-node scoping (the owner's `edges_out`) plus a discriminator tag set. The tag contract is **mutual non-subsumption** — a subset antichain — not set disjointness, since families intentionally share tags like `dynamic` | Audit table in the model doc; invariant tests in `engine/tests/mechanics/test_sandbox_architecture.py` |
+| **Interaction request** | form submission | Conceptual name for the client-to-backend submission of a backend-issued interaction id plus collected payload. The wire field remains `edge_id`; renaming it is deferred pending a concrete client/compat need | `DirectEdgeRequest(edge_id, payload)` via `resolve_choice` |
+| **Projection provenance** | audit stamp | Additive, non-authoritative lifecycle metadata recording which projector emitted a generated edge and why. Diagnostic only — never legality authority | Discriminator tags; sandbox source fields currently ride in `ui_hints` (normalization tracked in issue #268) |
+
 ## Dispatch and Behavior
 
 | Term | Metaphor | Definition | Implementation |
