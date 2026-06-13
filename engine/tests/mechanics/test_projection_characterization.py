@@ -195,7 +195,7 @@ def _effect_exprs(action: Action) -> list[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _menu_script() -> dict:
+def _menu_script() -> dict[str, Any]:
     return {
         "label": "menu_characterization",
         "metadata": {"start_at": "lab.start"},
@@ -234,7 +234,7 @@ def _menu_script() -> dict:
     }
 
 
-def _enter_menu_hub():
+def _enter_menu_hub() -> tuple[Graph, Block]:
     result = World.from_script_data(script_data=_menu_script()).create_story(
         "menu_characterization",
         init_mode=InitMode.EAGER,
@@ -252,7 +252,7 @@ def test_menu_fanout_action_shape() -> None:
     the provenance-poor one: tags only, no ``ui_hints``, no payload, and a
     positional (index-derived) label instead of a source-derived one.
     """
-    graph, hub = _enter_menu_hub()
+    _, hub = _enter_menu_hub()
 
     actions = _dynamic_actions(hub, "dynamic", "fanout", "menu")
 
@@ -391,7 +391,7 @@ def test_sandbox_mob_interaction_call_and_return_shape() -> None:
 def test_sandbox_interaction_cleanup_is_scoped_to_owning_family() -> None:
     """Audit-table row: "Sandbox sponsored interactions (location / fixture / asset / mob)".
 
-    Cleanup ownership is a compound key: source node ``edges_out`` × the
+    Cleanup ownership is a compound key: source node ``edges_out`` x the
     ``{dynamic, sandbox, fixture}`` discriminator. Removing the sponsoring
     fixture and re-running only the fixture projector clears its actions and
     leaves every other family's edges untouched (same uids).
