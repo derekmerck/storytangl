@@ -204,14 +204,18 @@ class TestPredicateGating:
 
         assert fragments and fragments[0].unavailable_reason == "guard_failed_or_unavailable"
 
-    def test_failing_predicate_blocker_type_is_edge(self) -> None:
+    def test_failing_predicate_emits_portable_blocker(self) -> None:
         graph, start, _end, _action = _graph_with_choice(guard_expr="False")
         ctx = _simple_ctx()
 
         fragments = render_block_choices(caller=start, ctx=ctx)
 
         assert fragments and fragments[0].blockers is not None
-        assert any(blocker.type == "edge" for blocker in fragments[0].blockers)
+        assert fragments[0].blockers[0].model_dump(exclude_none=True) == {
+            "code": "guard_failed_or_unavailable",
+            "message": "Requirements are not met.",
+            "refs": [],
+        }
 
     def test_compound_and_predicate_fails_when_any_term_false(self) -> None:
         graph, start, _end, _action = _graph_with_choice(guard_expr="gold > 3 and has_key")
@@ -314,7 +318,7 @@ class TestDependencyGating:
         assert fragments and fragments[0].available is False
         assert fragments[0].unavailable_reason == "missing_dependency"
 
-    def test_dependency_blocker_carries_resolution_metadata(self) -> None:
+    def test_dependency_blocker_projects_portable_fields(self) -> None:
         req = Requirement(has_label="key", hard_requirement=True)
         req.resolution_reason = "no_offers"
         req.resolution_meta = {"tried": ["template_provisioner"]}
@@ -324,16 +328,12 @@ class TestDependencyGating:
         fragments = render_block_choices(caller=start, ctx=ctx)
 
         assert fragments
-        dep_blockers = [
-            blocker
-            for blocker in (fragments[0].blockers or [])
-            if blocker.type == "dependency"
-        ]
-        assert dep_blockers
-        assert dep_blockers[0].code == "no_offers"
-        assert dep_blockers[0].message == "key is unavailable."
-        assert dep_blockers[0].resolution_reason == "no_offers"
-        assert dep_blockers[0].resolution_meta == {"tried": ["template_provisioner"]}
+        assert fragments[0].blockers is not None
+        assert fragments[0].blockers[0].model_dump(exclude_none=True) == {
+            "code": "no_offers",
+            "message": "No matching option is currently available.",
+            "refs": [],
+        }
 
     def test_satisfied_dependency_does_not_block(self) -> None:
         req = Requirement(has_label="key", hard_requirement=True)

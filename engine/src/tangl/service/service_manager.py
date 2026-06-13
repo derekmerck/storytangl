@@ -101,7 +101,9 @@ def _grammar_hint_from_fragments(fragments: list[BaseFragment]) -> GrammarHint |
             verb = example.split(maxsplit=1)[0].strip(".,!?;:").casefold()
             if not verb:
                 continue
-            grammar_verb = verbs.setdefault(verb, GrammarVerb(verb=verb, frames=[]))
+            if verb not in verbs:
+                verbs[verb] = GrammarVerb(verb=verb, frames=[])
+            grammar_verb = verbs[verb]
             if grammar_verb.frames is not None and example not in grammar_verb.frames:
                 grammar_verb.frames.append(example)
 
@@ -111,7 +113,9 @@ def _grammar_hint_from_fragments(fragments: list[BaseFragment]) -> GrammarHint |
                 if isinstance(fragment.content, str) and fragment.content.strip()
                 else fragment.piece_id
             )
-            grammar_noun = nouns.setdefault(noun, GrammarNoun(noun=noun))
+            if noun not in nouns:
+                nouns[noun] = GrammarNoun(noun=noun)
+            grammar_noun = nouns[noun]
             if fragment.piece_id not in grammar_noun.piece_ids:
                 grammar_noun.piece_ids.append(fragment.piece_id)
 

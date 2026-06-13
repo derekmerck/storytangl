@@ -212,6 +212,12 @@ Grammar hints are optional and must be treated as denormalized convenience
 metadata derived from the visible turn surface. They must not contain hidden
 verbs, nouns, aliases, or targets.
 
+The service-provided fallback is deliberately mechanical: it uses each visible
+choice label as an exact example and frame, takes the first word as the verb,
+and maps visible piece labels to piece ids. It leaves aliases and placeholders
+empty. Authored world metadata may provide richer aliases, templated frames,
+and placeholders without changing command authority.
+
 The first web-client hint shape is deliberately advisory:
 
 ```text

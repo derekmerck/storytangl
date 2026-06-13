@@ -232,6 +232,10 @@ metadata:
 ```
 
 Clients may ignore these hints and still submit a typed `find_edge` request.
+When the service derives this metadata automatically, visible choice labels
+become exact examples and frames, their first words become verbs, and visible
+piece labels become noun mappings. Aliases and placeholders are authored
+enrichments, not inferred guarantees.
 
 ## UX Events
 

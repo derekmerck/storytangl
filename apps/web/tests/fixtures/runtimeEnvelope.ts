@@ -89,6 +89,7 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
       content: [
         { key: 'time', value: 'late evening' },
         { key: 'coin', value: '63 s' },
+        { key: 'sleight of hand', value: 1 },
         { key: 'weather', value: 'rain' },
       ],
       hints: { style_tags: ['status-inline'] },
@@ -163,7 +164,7 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
         {
           code: 'skill_too_low',
           message: 'Sleight of Hand 1, need 2.',
-          refs: ['pc-you'],
+          refs: ['f-kv-scene'],
         },
       ],
       ui_hints: { hotkey: '4', icon: 'hand' },

@@ -157,9 +157,11 @@ defaults, so the transport schema deliberately avoids that shape drift.
 second command model. The service synthesizes `GrammarHint` values from the
 current visible fragment surface: choice text supplies exact examples and verb
 frames, while visible pieces supply noun-to-piece mappings. This projection is
-advisory; command resolution still uses the Story-owned `find_edges` dispatch,
-and raw command submission remains valid when grammar metadata is absent or
-ignored.
+an intentionally modest auto-derived floor: it does not infer aliases,
+templated frames, or placeholders. Worlds may override it with authored grammar
+metadata. The projection is advisory; command resolution still uses the
+Story-owned `find_edges` dispatch, and raw command submission remains valid
+when grammar metadata is absent or ignored.
 
 ## Diagnostic Fixtures And Transcripts
 

@@ -19,6 +19,19 @@ REFERENCE_PATH = CONFORMANCE_DIR / "reference_port.py"
 DIAGNOSTIC_DIR = CONFORMANCE_DIR / "diagnostics"
 RUNTIME_PATH = DIAGNOSTIC_DIR / "backend_widget_contract_runtime.json"
 PROJECTED_PATH = DIAGNOSTIC_DIR / "backend_widget_contract_projected_state.json"
+INTERNAL_FRAGMENT_KEYS = {
+    "availability",
+    "effects",
+    "graph",
+    "locals",
+    "predecessor_id",
+    "registry",
+    "return_phase",
+    "seq",
+    "successor_id",
+    "tags",
+    "trigger_phase",
+}
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
@@ -41,6 +54,17 @@ def _load_json(path: Path) -> dict[str, Any]:
         payload = json.load(payload_file)
     assert isinstance(payload, dict)
     return payload
+
+
+def _assert_no_internal_fragment_keys(value: Any, *, path: str = "fragments") -> None:
+    if isinstance(value, dict):
+        leaked = INTERNAL_FRAGMENT_KEYS.intersection(value)
+        assert not leaked, f"{path} leaks internal keys: {sorted(leaked)}"
+        for key, item in value.items():
+            _assert_no_internal_fragment_keys(item, path=f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _assert_no_internal_fragment_keys(item, path=f"{path}[{index}]")
 
 
 def test_backend_widget_diagnostics_match_generator() -> None:
@@ -93,6 +117,14 @@ def test_backend_widget_diagnostics_validate_as_service_contracts() -> None:
         "inventory",
         "map",
     ]
+
+
+def test_backend_widget_runtime_fragments_do_not_leak_internal_fields() -> None:
+    generated_payload, _ = BACKEND_DEMO.build_demo_payloads()
+    saved_payload = _load_json(RUNTIME_PATH)
+
+    _assert_no_internal_fragment_keys(generated_payload["fragments"])
+    _assert_no_internal_fragment_keys(saved_payload["fragments"])
 
 
 def test_backend_widget_diagnostics_render_in_reference_port() -> None:

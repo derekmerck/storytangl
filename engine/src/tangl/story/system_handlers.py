@@ -239,9 +239,6 @@ def _preview_blockers(preview: ViabilityResult) -> list[Blocker]:
             Blocker(
                 code=blocker.reason,
                 message=_blocker_message(blocker.reason),
-                type="provision",
-                reason=blocker.reason,
-                context=dict(blocker.context or {}),
             )
         )
     return blockers
@@ -274,26 +271,14 @@ def _dependency_blocker(dep: Dependency) -> Blocker:
     """Project one dependency failure into a player-facing blocker."""
     requirement = dep.requirement
     code = requirement.resolution_reason or "missing_dependency"
-    criteria = requirement.model_extra or {}
-    target = (
-        requirement.authored_path
-        or criteria.get("has_identifier")
-        or criteria.get("has_label")
-    )
     message = (
-        f"{target.replace('_', ' ')} is unavailable."
-        if isinstance(target, str) and target
+        f"{dep.label.replace('_', ' ')} is unavailable."
+        if dep.label
         else _blocker_message(code)
     )
     return Blocker(
         code=code,
         message=message,
-        type="dependency",
-        dependency_id=str(dep.uid),
-        label=dep.get_label(),
-        hard_requirement=requirement.hard_requirement,
-        resolution_reason=requirement.resolution_reason,
-        resolution_meta=requirement.resolution_meta,
     )
 
 
@@ -319,8 +304,6 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
             Blocker(
                 code="missing_successor",
                 message=_blocker_message("missing_successor"),
-                type="edge",
-                reason="missing_successor",
             )
         ]
 
@@ -331,8 +314,6 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
                 Blocker(
                     code="container_entry_unavailable",
                     message=_blocker_message("container_entry_unavailable"),
-                    type="provision",
-                    reason="container_entry_unavailable",
                 )
             ]
 
@@ -345,8 +326,6 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
             Blocker(
                 code="guard_failed_or_unavailable",
                 message=_blocker_message("guard_failed_or_unavailable"),
-                type="edge",
-                reason="guard_failed_or_unavailable",
             )
         ]
 

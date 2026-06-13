@@ -247,7 +247,11 @@ def test_render_block_choice_missing_successor_uses_preview_blockers_when_depend
     assert choice.available is False
     assert choice.unavailable_reason == "missing_successor"
     assert choice.blockers is not None
-    assert choice.blockers[0].type == "provision"
+    assert choice.blockers[0].model_dump(exclude_none=True) == {
+        "code": "no_template",
+        "message": "No template.",
+        "refs": [],
+    }
 
 
 def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
@@ -268,11 +272,9 @@ def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
     assert choice.available is False
     assert choice.unavailable_reason == "missing_dependency"
     assert choice.blockers is not None
-    assert choice.blockers[0].type == "dependency"
     assert choice.blockers[0].code == "no_offers"
-    assert choice.blockers[0].message == "key is unavailable."
-    assert choice.blockers[0].resolution_reason == "no_offers"
-    assert choice.blockers[0].resolution_meta == {"alternatives": []}
+    assert choice.blockers[0].message == "No matching option is currently available."
+    assert choice.blockers[0].model_extra == {}
 
 
 def test_render_block_choice_hard_dependency_blocks_even_when_guard_is_true() -> None:

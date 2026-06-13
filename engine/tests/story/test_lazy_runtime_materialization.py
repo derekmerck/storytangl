@@ -289,10 +289,11 @@ def test_preview_blocks_missing_container_hard_dep_without_side_effects() -> Non
 
     assert choice.available is False
     assert choice.blockers is not None
-    assert choice.blockers[0].type == "provision"
-    assert choice.blockers[0].code == "immediate_dependency_unresolvable"
-    assert choice.blockers[0].reason == "immediate_dependency_unresolvable"
-    assert choice.blockers[0].context["target_ctx"] == "scene2"
+    assert choice.blockers[0].model_dump(exclude_none=True) == {
+        "code": "immediate_dependency_unresolvable",
+        "message": "A required dependency is unavailable.",
+        "refs": [],
+    }
 
     assert {item.uid for item in graph.values()} == before_item_ids
     assert {edge.uid for edge in graph.edges} == before_edge_ids
