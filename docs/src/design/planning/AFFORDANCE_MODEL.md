@@ -589,6 +589,52 @@ engine-owned family), are pinned by an invariant test in
 `engine/tests/mechanics/test_sandbox_architecture.py`; the table rows above are
 the classification it executes.
 
+#### Lifecycle metadata vs presentation hints in `ui_hints` (synthesis item D)
+
+The "Existing tags / hints" column shows the sandbox families carry a rich field
+set inside `ui_hints`. Those fields are not all the same *kind* of thing.
+Classifying them against "who generated this edge / who owns its cleanup?"
+(**lifecycle**) vs "how should a renderer display it?" (**presentation**):
+
+| `ui_hints` field | Emitted by | Classification |
+|---|---|---|
+| `source` (`sandbox_fixture`, `sandbox_link`, …) | base (`_sandbox_contribution_hints`) | **Lifecycle** — names the projecting family; the cleanup-owner answer |
+| `scope` | base | **Lifecycle** — which scope sponsors/owns the edge |
+| `source_label` (`altar`, `guide`, …) | base (optional) | **Lifecycle** — which concept instance generated it (a renderer *may* echo it) |
+| `interaction` / `verb` / `asset` / `key` / `target` / `through` / `mob` / `fixture` / `move` / `word` / `hazard_outcome` / `possession` | per-call extras | **Lifecycle** — identifies the source coordinate this edge was projected from |
+| `contribution` (`movement`, `event`, `resource_allocation`, …) | base | **Conflated** — reads as the projection reason (lifecycle) yet Reviewer 3 marks it advisory display |
+| `source_kind` (`fixture`, `mob`, `scope`, `world_authority`, …) | base (optional) | **Conflated** — advisory display per Reviewer 3, yet also encodes the sponsor's lifecycle kind |
+| `direction` / `raw_direction` | link extras | **Presentation** — IF compass labels; a protected projection difference, display-only |
+
+**The core tension:** the unambiguously-lifecycle fields `source` and `scope`
+ride inside `ui_hints`, whose model docstring (`UIHints`,
+`journal/intent.py`) declares it *"Advisory renderer hints for choices"* — a
+**presentation channel**. Cleanup ownership is lifecycle and should not hide in a
+presentation channel. Menu and game projectors, by contrast, historically
+carried *no* `ui_hints` at all; their only attribution was the discriminator tag
+set (the compound-key cleanup contract above).
+
+**Minimal pass (item D, this iteration):** rather than build the proper
+separation, the menu and game projectors gain the single unambiguously-lifecycle
+token — `source` — in the **same `ui_hints` channel** sandbox already uses, so
+all three families are equally cleanup-explainable
+(`{"source": "menu_fanout"}`, `{"source": "game_self_loop"}`). One token,
+additive, ignorable by existing consumers; tags are untouched, so the
+compound-key contract and its exactly-one-family invariant are unaffected. The
+characterization tests in `test_projection_characterization.py` pin the new
+shape.
+
+**Deferred convergence debt (do *not* build here):** proper separation would
+thread a dedicated lifecycle/provenance channel through `Action` +
+`ChoiceFragment` + the wire DTO, distinct from `UIHints`. That is the
+"general provenance/receipt shape for phase outputs" promotion candidate already
+named in `engine/src/tangl/mechanics/sandbox/SANDBOX_DESIGN.md`
+("General Contribution Pattern"), gated on a second non-sandbox consumer — not
+on this pass. The `source_kind` / `contribution` conflation and the game
+`fanout`-tag drift are likewise *recorded, not fixed* here; each needs its own
+approved migration that updates this table and the matching characterization
+test together.
+
 ---
 
 ## Future Extensions (seams, not commitments)

@@ -199,6 +199,13 @@ def test_frozen_shape_eager_init_prebuilds_menu_actions() -> None:
         "archive",
         "Secret project",
     }
+    # Eager-built menu actions carry the same item-D cleanup-attribution token
+    # as the lazy projection path, so provenance does not depend on init mode.
+    assert all(
+        (action.ui_hints.model_dump() if action.ui_hints else {}).get("source")
+        == "menu_fanout"
+        for action in actions
+    )
 
 
 def test_frozen_shape_menu_does_not_refresh_during_planning() -> None:

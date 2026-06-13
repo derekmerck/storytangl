@@ -155,6 +155,11 @@ def project_menu_affordances(*, caller, ctx, **_kw):
             successor_id=provider.uid,
             text=MenuBlock.action_text_for(provider),
             tags={"dynamic", "fanout", "menu"},
+            # Minimal cleanup-attribution token (synthesis item D): names the
+            # projecting family in the same channel sandbox already uses, so
+            # menu actions are as cleanup-explainable as sandbox interactions.
+            # Lifecycle/diagnostic only; tags remain the cleanup authority.
+            ui_hints={"source": "menu_fanout"},
         )
     return None
 

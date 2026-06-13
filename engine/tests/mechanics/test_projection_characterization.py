@@ -13,10 +13,10 @@ These tests RECORD the current differences between the projector families.
 They must NOT be read as a uniformity contract: where families differ (game
 actions wear the ``fanout`` tag without touching fanout machinery; sandbox
 carries six-plus provenance-ish fields in ``ui_hints`` while menu and game
-carry none; incremental's hand-rolled hints bypass
-``_sandbox_contribution_hints`` and so lack ``scope``), the difference is the
-pinned expectation. A future convergence PR must consciously update both the
-audit table and the matching test here.
+carry only the single ``source`` lifecycle token added by synthesis item D;
+incremental's hand-rolled hints bypass ``_sandbox_contribution_hints`` and so
+lack ``scope``), the difference is the pinned expectation. A future convergence
+PR must consciously update both the audit table and the matching test here.
 
 Cleanup vocabulary: the per-family discriminator tag sets are **mutually
 non-subsuming** (a subset antichain — families intentionally share tags like
@@ -248,9 +248,11 @@ def _enter_menu_hub() -> tuple[Graph, Block]:
 def test_menu_fanout_action_shape() -> None:
     """Audit-table row: "Menu fanout".
 
-    The reference path — the only consumer of real ``Fanout`` machinery — and
-    the provenance-poor one: tags only, no ``ui_hints``, no payload, and a
-    positional (index-derived) label instead of a source-derived one.
+    The reference path — the only consumer of real ``Fanout`` machinery. Since
+    synthesis item D it carries the single ``source`` lifecycle token (the
+    minimal cleanup-attribution added so menu is as explainable as sandbox),
+    but still no other hints, no payload, and a positional (index-derived)
+    label instead of a source-derived one.
     """
     _, hub = _enter_menu_hub()
 
@@ -260,9 +262,10 @@ def test_menu_fanout_action_shape() -> None:
     assert {action.text for action in actions} == {"Listen to Aria", "Brew tea"}
     for action in actions:
         assert action.tags == {"dynamic", "fanout", "menu"}
-        # Recorded difference: no provenance hints at all, unlike sandbox
-        # families which carry six-plus provenance-ish fields in ui_hints.
-        assert action.ui_hints is None
+        # Item D minimal attribution: one lifecycle token, in the same channel
+        # sandbox uses, naming the projecting family — and nothing else. Still
+        # far poorer than sandbox's six-plus provenance-ish fields.
+        assert _hints(action) == {"source": "menu_fanout"}
         assert action.payload is None
         assert action.accepts is None
         assert _availability_exprs(action) == []
@@ -554,7 +557,9 @@ def test_game_self_loop_move_action_shape() -> None:
     touching ``Resolver.resolve_fanout`` — the tag vocabulary lies (see the
     audit table's drift column). Also recorded: the display text lives in
     ``label`` (``text`` stays empty), inverting the sandbox families' machine
-    label + display ``text`` split, and there are no ``ui_hints`` at all.
+    label + display ``text`` split. Since synthesis item D the only ``ui_hints``
+    is the single ``source`` lifecycle token (``game_self_loop``, deliberately
+    not ``game_fanout`` so it does not echo the fanout-tag lie).
     """
     graph, block = _rps_block()
 
@@ -568,7 +573,7 @@ def test_game_self_loop_move_action_shape() -> None:
     for action in actions:
         assert action.text == ""
         assert action.tags == {"dynamic", "fanout", "game"}
-        assert action.ui_hints is None
+        assert _hints(action) == {"source": "game_self_loop"}
         assert action.accepts is None  # RPS declares no client input contract
         assert _availability_exprs(action) == []
         assert _effect_exprs(action) == []

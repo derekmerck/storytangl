@@ -228,7 +228,10 @@ modifier, redirect); see `docs/src/design/planning/AFFORDANCE_MODEL.md`.
 For now sandbox keeps this as local mechanics code. Promotion candidates, once
 a second non-sandbox consumer appears:
 
-- a general provenance/receipt shape for phase outputs;
+- a general provenance/receipt shape for phase outputs — sandbox today rides its
+  provenance in `ui_hints` (a presentation channel); see the lifecycle-vs-
+  presentation classification of those fields under "The audit table (filled)"
+  in `docs/src/design/planning/AFFORDANCE_MODEL.md` (synthesis item D);
 - story-level projection filters over journal and choices;
 - a broader scoped contribution provider that can return actions, journal
   fragments, suppressions, or schedules.
