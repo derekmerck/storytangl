@@ -63,6 +63,15 @@ class RoleScript(BaseScriptItem):
         description="Provisioning policy such as ``EXISTING`` or ``CREATE``.",
     )
 
+    grants: Optional[dict[str, Any]] = Field(
+        None,
+        description=(
+            "Provider-bound grants (mu-affordance, phase 1): scalar overlays plus "
+            "reserved ``tags``/``priority`` keys, projected onto the bound provider "
+            "while the role binding is active. See RoleGrant."
+        ),
+    )
+
     assets: list[AssetsScript] = None     # assets associated with the role, titles, gold badge for sherif
 
     @model_validator(mode="after")

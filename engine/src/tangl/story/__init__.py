@@ -59,6 +59,7 @@ from .concepts import (
     Location,
     Player,
     Role,
+    RoleGrant,
     Setting,
     get_narrator_key,
 )
@@ -148,6 +149,7 @@ __all__ = [
     "ResolutionError",
     "ResolutionFailureReason",
     "Role",
+    "RoleGrant",
     "Scene",
     "Setting",
     "StoryCompiler",

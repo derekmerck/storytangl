@@ -955,12 +955,16 @@ class StoryMaterializer:
                 requirement_kwargs["is_qualified"] = self._is_qualified_path(identifier)
 
             requirement = Requirement(**requirement_kwargs)
-            dep = dependency_kind(
-                registry=state.graph,
-                label=label,
-                predecessor_id=source.uid,
-                requirement=requirement,
-            )
+            dep_kwargs: dict[str, Any] = {
+                "registry": state.graph,
+                "label": label,
+                "predecessor_id": source.uid,
+                "requirement": requirement,
+            }
+            grants = spec.get("grants")
+            if grants is not None and "grants" in getattr(dependency_kind, "model_fields", {}):
+                dep_kwargs["grants"] = grants
+            dep = dependency_kind(**dep_kwargs)
 
             if identifier:
                 candidate = self._find_runtime_entity(
