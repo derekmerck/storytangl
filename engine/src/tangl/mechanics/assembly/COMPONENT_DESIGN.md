@@ -7,13 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.5
+**Document Version:** 0.6
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
-#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer).*
+#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's.*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -43,6 +43,40 @@ RoleGrant and SandboxVisibility only sample. It is also the unification the
 `PRESENCE_ASSEMBLY_DESIGN.md` brief asked for: the "common instrument" (slots +
 budgets + occupancy + grants) is exactly a `SlottedContainer` of facet-bundles.
 
+## Division of labour: donated concepts vs context-bound facets
+
+There are two ways a scoped source contributes capability — a **sharp functional line and
+a blurry semantic one**, as with most StoryTangl distinctions:
+
+- A **graph-level open-link** (`Dependency` / `Affordance`) donates an entire **concept**
+  that joins the namespace as a graph entity — a role donates an `Actor`, a setting a
+  `Location`. Full graph identity; a first-class namespace participant.
+- A **facet** donates a behaviour **signal** *through* its holder/parent concept —
+  entity-like but **not a graph item** — conditionally giving / hiding / changing a
+  specific behaviour when an active handler chooses to gather it. Context identity, no
+  graph registration.
+
+The line is **functionally sharp** (graph entity vs context-bound value) but
+**semantically blurry**: the same capability can be expressed either way. `light` could
+be a fully-realized concept; a `role`/`setting` could be implemented as a grant. Which
+side a capability sits on is the **author's prerogative** — where they balance capability
+resolution between full concepts and context-bound signals.
+
+This **resolves the sibling-vs-coordinate question**: a facet is the *context-identity
+coordinate* of the open-link primitive (graph-identity ↔ context-identity is the axis),
+**not a rival ontology** — implemented as a lightweight value object only because
+context-bound things don't need graph machinery. The retrofit pass therefore promotes a
+*coordinate of the open-link family*, never a second primitive; there may be no new core
+*type* at all, just a projection mode.
+
+And facets are, at bottom, a **vocabulary convention** — a shared shorthand for "a scoped
+source is signalling that an optional feature is available," so handlers need not each
+reinvent the gather. A handler MAY honour the convention via the shared gather (cheap
+default) **or** roll a bespoke manager when its fold is non-trivial (`OutfitManager`
+coverage masks). Both are legitimate; the convention is a convenience, not a mandate.
+This is the final reason it is **not a second dispatch system**: a facet is a *named data
+shape*, and the work is always the existing handler's.
+
 ## Build order (and what is deliberately deferred)
 
 1. **#287 merges** — `RoleGrant`, the clean degenerate facet, lands as-is.
@@ -54,16 +88,19 @@ budgets + occupancy + grants) is exactly a `SlottedContainer` of facet-bundles.
    the bar to (a) promote the primitive to core, (b) resolve the `Facet` name, and
    (c) decide sibling-vs-coordinate against the open-link primitive.
 
-Deferring (3 calls that do **not** belong in this pass):
-- **Core promotion** — premature until the retrofit proves the shape across consumers.
+Deferring (2 calls that do **not** belong in this pass):
+- **Core promotion** — premature until the retrofit proves the shape across consumers;
+  and per *Division of labour* it is a coordinate/projection of the open-link primitive,
+  so promotion likely adds a projection mode, not a new core type.
 - **The `Facet` name** — sandbox already spends "Facet" on typed capability classes
   (`LightSourceFacet`, …) across ~13 files. This pass keeps the generalized term
   **internal**; the *authoring surface* is `component` / `grant` / `requirement`, so
   nothing user-facing collides and the sandbox classes are untouched. Reconcile when
   they actually meet, in the retrofit pass.
-- **Sibling vs coordinate** — is a facet a new type, or the open-link `Requirement`
-  with a `context-identity` (no graph identity) coordinate? Building components
-  concretely *shows* the shape; decide with evidence, not speculatively.
+
+*Resolved (no longer deferred):* **sibling vs coordinate** — a facet is the
+context-identity *coordinate* of the open-link primitive, not a rival type (see
+*Division of labour*).
 
 ## Two string discriminators: `channel` (relevance) + `facet_type` (behaviour)
 
