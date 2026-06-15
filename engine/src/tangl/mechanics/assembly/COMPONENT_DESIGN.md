@@ -7,13 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.7
+**Document Version:** 0.8
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
-#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's. v0.7: staged implementation plan with the abstract shape-board acceptance demo (slot keying + connector polarity, giver description donation, additive/multiplicative/subtractive changer folds + target, discrete/continuous budgets) — the four stages each real consumer reskins.*
+#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's. v0.7: staged implementation plan with the abstract shape-board acceptance demo (slot keying + connector polarity, giver description donation, additive/multiplicative/subtractive changer folds + target, discrete/continuous budgets) — the four stages each real consumer reskins. v0.8: adopt the v3.2 Associating/Connection bilateral-association substrate (admission/mutual-consent + on-associate/on-disassociate hooks) as the slotting mechanism — the facet model is the *what*, association is the *when/whether*; the N-party transaction generalization (trades, shops-as-assembly) is the same primitive, deferred.*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -325,6 +325,47 @@ take a position on each; they are the substance of the implementation:
   dead condition — a `WorldCompiler` diagnostic beside the dangling-ref checks. This is
   another concrete validator for the authoring-validation umbrella (#286), not core.
 
+## Association: the slotting substrate (v3.2 prior art), and the transaction it generalizes
+
+Slotting a component is a **bilateral association**, and v3.2 already built the mechanism
+worth adopting — `scratch/legacy/core/core-32/graph_handlers/associating.py` +
+`connection.py`:
+
+- **`Associating`** — `on_can_associate` / `on_can_disassociate` (admission/approval
+  pipelines) + `on_associate` / `on_disassociate` (side-effect hooks). `can_associate_with`
+  runs the admission pipeline on **both** parties with inverse relationships (mutual
+  consent: the holder approves the component *and* the component approves the host);
+  `associate_with` = validate → mutual-consent preflight → fire `on_associate` on both.
+  **Preflight → atomic → postflight, bilaterally.**
+- **`Connection(gender, shape)`** — `connection_gender` (must be opposite) +
+  `connection_shape` (must match), checked by `_check_is_compatible` on `on_can_associate`,
+  plus `_check_is_not_in_use`. This **is** the shape-board Stage-1 keying: a star *plug*
+  (one gender) seats only in a star *socket* (the complement) of the same shape, when free.
+
+The facet model says *what* is donated; the association model says *when* and *whether*:
+- **Slot keying / admission `hider`s (#194)** = `on_can_associate` handlers
+  (`_check_is_compatible` for shape + connector polarity; budget / color / availability
+  register alongside).
+- **"Slotting publishes facets" / unslotting withdraws** = the `on_associate` /
+  `on_disassociate` hooks — donation *on associate*, withdrawal *on disassociate*.
+- **Eviction** ("remove the existing thing in that slot") = an `on_associate` pre-step.
+
+Build Stage 1 on this — adopt the v3.2 `Associating`/`Connection` shape rather than
+reinventing slot admission. (`OutfitManager`'s add/remove dispatch hooks *are* this.)
+
+### The transaction generalization (deferred — note, don't build)
+
+The same **preflight → atomic → postflight** shape is *every* transaction: buying,
+selling, trading concepts/assets. A trade is an association where both parties donate
+(goods ↔ payment) under mutual admission — so a **shop becomes a functional definition
+over a type of assembly** (preflight: buyer can pay, seller agrees, item available →
+atomic exchange → postflight: inventories settle), not bespoke code injected into shops,
+owners, and inventories. That is the natural endpoint and **more than this pass needs**:
+adopt the bilateral association substrate now (slotting requires it anyway); defer the
+N-party / goods-for-goods infrastructure and shops-as-assembly until the basic component
+shape is proven. When it comes it is the *same* primitive generalized, not a parallel
+system — because slotting was built on association from the start.
+
 ## Implementation plan & the shape-board acceptance demo
 
 An **abstract** demo isolates the mechanism from domain semantics while exercising exactly
@@ -344,9 +385,8 @@ Staged so each step is a working slice with the board as the growing test:
 **Stage 1 — slot-keyed assignment (the skeleton).** `Facet` value object; `Component` =
 concept + facets; `SlottedContainer` assignment. **Keying:** a slot admits a component
 by a compatibility key (shape) *and* connector polarity (a star *plug* seats in a star
-*socket*; two sockets don't mate) — modelled as the slot's admission `hider` ("reject
-unless `component.key == slot.key` and polarities are complementary"). This is #194 made
-concrete. *Test:* star plug seats in the star socket; rejected from the circle socket;
+*socket*; two sockets don't mate) — modelled on the v3.2 `Connection` admission (`on_can_associate` / `_check_is_compatible`:
+opposite connector polarity, matching shape, not-in-use). This is #194 made concrete. *Test:* star plug seats in the star socket; rejected from the circle socket;
 two star sockets don't mate.
 
 **Stage 2 — `giver` description donation.** A seated component donates a `prose`/`ns`
