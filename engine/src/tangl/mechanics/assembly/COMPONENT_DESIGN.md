@@ -7,9 +7,11 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.1
+**Document Version:** 0.2
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
+*v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
+(giver/changer/hider); trinary mapped onto the open-link duality.*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -26,8 +28,9 @@ only) are each *one pole on one channel* — edge cases. A **component** (a slot
 outfit/vehicle/credential-packet/automaton part, a sword, a lantern) exercises the
 whole model at once:
 
-- it **imposes requirements** (slot compatibility = a restriction it carries) **and
-  offers grants** (capability: light, +combat, a title) — **both poles on one carrier**;
+- it **imposes restrictions** (slot compatibility = a `hider`), **offers grants** (a
+  `giver`: light, a permit), **and modifies** (a `changer`: `+combat`, a title) — all
+  three behaviours, **both open-link poles, on one carrier**;
 - a slotted holder **accumulates** grants from many components — forcing **per-subject
   merge**, not phase-1's scope-wide convenience view;
 - two components contending for a slot force **restriction conflict resolution** and
@@ -60,47 +63,88 @@ Deferring (3 calls that do **not** belong in this pass):
   with a `context-identity` (no graph identity) coordinate? Building components
   concretely *shows* the shape; decide with evidence, not speculatively.
 
-## The facet is a string discriminator, not a subclass
+## Two string discriminators: `channel` (relevance) + `facet_type` (behaviour)
 
-A facet's "type" is a **discriminator string**, exactly like `fragment_type` on
-`BaseFragment` — **not** a Python subclass.
-
-```text
-# NOT this:
-class NavigationFacet(Facet): ...   ;  isinstance(x, NavigationFacet)
-
-# this:
-Facet(facet="nav_grant", ...)       ;  facet.facet == "nav_grant"
-```
+A facet's "type" is **data, not a Python subclass** — `fragment_type`-style strings,
+never `class NavigationFacet(Facet)` + `isinstance`. There are **two** discriminators,
+because they answer different questions:
 
 ```text
 Facet  — scoped contribution candidate; no graph identity; carried by a concept
-  facet      : discriminator string, convention "{channel}_{polarity}"
-               e.g. ns_grant | choice_grant | choice_restriction | nav_grant
-                  | challenge_grant | prose_grant | ...
-  when       : Predicate over the gathered ns   (activation; reuses core runtime_op)
-  applies_to : Selector for the caller/subject/target it acts on
-  payload    : grant data, or restriction (suppress + optional replacement)
-  influence  : weight for precedence / stacking / passive-check
-  provenance : source_id, subject_id  (context identity, not graph identity)
+  channel     : str   — relevance selector: WHEN/WHERE it applies, i.e. which pipeline
+                        may adopt it.    ns | choice | nav | prose | challenge | ...
+  facet_type  : giver | changer | hider — BEHAVIOUR class; same encoding, different
+                        consumption:  giver = add a contribution, changer = modify an
+                        existing one, hider = remove / suppress / replace one
+  when        : Predicate over the gathered ns     (activation; reuses core runtime_op)
+  applies_to  : Selector for the concept / choice / target it acts on
+  payload     : the offered value, the modifier, or the suppression (+replacement)
+  influence   : weight for precedence / stacking / passive-check
+  provenance  : source_id, subject_id   (context identity, not graph identity)
 ```
 
-Why a string and not a subclass:
-- **Keeps the primitive small** — a tag cannot grow methods, so a facet stays a value
-  (discovery / provenance / activation), never a mini-handler. (PR-review rule #3.)
-- **Data-driven, not type-driven dispatch** — the v0.3 "flip": the facet self-describes
-  its relevance as data, so a consumer selects on the *facet's* value, never on the
-  carrier's class. One `Facet`, many discriminators; channels grow without a subclass
-  explosion.
-- **Precedent** — this is how `fragment_type` already works.
+- **`channel`** is "just a selector for when it applies" — a choice handler gathers
+  `channel="choice"`, an ns handler gathers `channel="ns"`. The relevance axis.
+- **`facet_type`** is the behaviour axis. The three are *encoded the same way* (one
+  value object) but *consumed differently*: a gather collects a channel's facets and the
+  handler dispatches the fold by `facet_type` — **giver** appends/unions, **changer**
+  applies a modifier (decorate a title, `+1` a check), **hider** tombstones (suppress /
+  block / replace, with provenance). This is exactly why they are two fields and not one
+  `"choice_grant"` string: a consumer wants *"this channel, all three behaviours"* and
+  folds each behaviour differently.
 
-`RoleGrant` is the degenerate case: `RoleGrant ≡ Facet(facet="ns_grant")`.
+Both stay strings (not subclasses): keeps the primitive small (a tag can't grow methods
+— PR-review rule #3), is the data-driven-not-type-driven dispatch the v0.3 doc argued
+for, and matches the `fragment_type` precedent. One `Facet`, many `(channel,
+facet_type)` coordinates; channels and behaviours grow without a class explosion.
 
-**One open call:** single `facet` string vs separate `channel` + `effect(polarity)`
-fields. The `{channel}_{polarity}` convention lets a handler match a channel-prefix or
-a small set, which covers "this channel, either polarity." Start single (smallest
-thing that works); split into two fields only if independent cross-channel/cross-
-polarity querying becomes common.
+`RoleGrant` is the degenerate case: `RoleGrant ≡ Facet(channel="ns", facet_type="giver")`.
+
+### How the trinary sits on the open-link duality
+
+The two axes are orthogonal and it pays off here: `facet_type` maps onto the
+`AFFORDANCE_MODEL.md` duality **plus its one exception** —
+
+- **giver ≈ affordance** — offers a contribution ("here is more");
+- **hider ≈ dependency** — imposes a restriction the consumer didn't author ("you may
+  not, unless"). A restriction is a dependency contributed from an indirect source.
+- **changer = the non-dual one** — the v0.3 "Transform escape hatch", now first-class
+  because it is encoded the same way. The graph-level open-link has no analog (edges
+  don't *modify values*).
+
+So two of the three behaviours *are* the open-link primitive at context-identity scale;
+only `changer` is genuinely new. That is the sharper answer to the sibling-vs-coordinate
+question the retrofit pass must settle.
+
+> **`changer` vs the positional transform.** `changer` cleanly covers *value* modifiers
+> (decorate a title, `+1` a stat) — commutative-ish folds. The sharp edge is the
+> *positional* bag transform from #192 (split journal fragment 1 → 1+4, insert 2,3),
+> which operates on the assembled *sequence*, is non-commutative, and shares #192's
+> tombstoning question. Model it as a `changer` whose payload is a sequence operation,
+> but keep its ordering/determinism rules explicit — it is the corner of `changer` that
+> needs care.
+
+### Worked matrix — Stormbringer
+
+The whole Elric loop is a list of facets on one carrier, with no imperative script in
+the scenes where the beats fire:
+
+| channel | facet_type | when | applies_to | payload |
+|---|---|---|---|---|
+| nav | giver | `drawn` | self / scene | `light` affordance (the blade glows) |
+| choice | hider | `drawn and not fed` | `tag:peaceful` | suppress peaceful-tagged choices |
+| choice | giver | `sheathed` | self | offer `draw_sword` |
+| choice | giver | `drawn` | self | offer `sheathe_sword` (itself `tag:peaceful`) |
+| choice | giver | `drawn and not fed and <restricted nearby>` | self | offer `feed_self` / `feed_other` |
+
+The trap is **emergent**: the `sheathe_sword` offer is itself `tag:peaceful`, so the
+`hider` suppresses it — you **cannot sheathe until you feed**. `feed_*` is a plain
+`giver` whose *action effect* sets `fed=true`; that flips the `hider`'s `when` false,
+lifting the restriction until the next draw resets `fed`. There is **no "un-hider"
+primitive** — the restriction lapses because its activation predicate lapses, which is
+exactly the derived-not-mutated invariant. (A `changer` appears in the fuller bundle:
+the `ns` title decorate *Bill … and His Hungry Blade*; `+combat` would be a `challenge`
+`changer`.)
 
 ## Component = concept + facet bundle
 
@@ -108,10 +152,11 @@ A **Component** is a concept (or a token over a component type) that carries
 `facets: list[Facet]`, optional typed capability/state, and is assigned into a
 `SlottedContainer` slot.
 
-- **Slot compatibility / requirement** = a `*_restriction` facet the component imposes
-  on its slot or holder (this is #194 slot-dependency validation).
-- **Capability grant** (light, +combat, a title, a permit) = a `*_grant` facet
-  (a credential-packet's permit, a robot part's capability, a lantern's light).
+- **Slot compatibility / requirement** = a `hider` facet (on a slot/admission channel)
+  the component imposes on its slot or holder (this is #194 slot-dependency validation).
+- **Capability grant** (light, +combat, a title, a permit) = a `giver` facet
+  (a credential-packet's permit, a robot part's capability, a lantern's light); a
+  modifier like `+combat` is a `changer`.
 - **Conditional enablement** = a facet `when` predicate (#195).
 - **Default loadout** = component materialization on opt-in (#196).
 - **Slotting publishes** the component's facets into the holder's scope (publish-once);
@@ -126,11 +171,12 @@ component purpose + conditional challenge effects).
 ## Consumer model: phase-handler gathers, opt-in
 
 Each phase handler that wants to honour facets registers a **gather** that sifts the
-in-scope namespace for facets whose discriminator is phase-relevant — e.g. the choice
-projector gathers `choice_grant` + `choice_restriction`; the ns handler gathers
-`ns_grant`; a challenge resolver gathers `challenge_grant`. The gather collects,
-filters by discriminator + `when` + `applies_to`, and hands the survivors to the
-handler; **the handler owns the fold** (override / decorate / stack / union / gate).
+in-scope namespace for facets in its `channel` — the choice projector gathers
+`channel="choice"` (givers, changers, and hiders alike); the ns handler gathers
+`channel="ns"`; a challenge resolver gathers `channel="challenge"`. The gather collects,
+filters by `channel` + `when` + `applies_to`, and hands the survivors to the handler,
+which **dispatches the fold by `facet_type`** (giver → append/union, changer → apply
+modifier, hider → tombstone) and owns the specific combination rule.
 
 - **Opt-in by construction** — a world author opts into a mechanic by publishing the
   facets. No facets of a discriminator → that gather finds nothing → zero cost. A
@@ -172,23 +218,23 @@ take a position on each; they are the substance of the implementation:
 
 ## Worked demo
 
-A Stormbringer-style component (or, smaller, a lantern + sword in a slotted inventory):
-a single component carrying `nav_grant`(light), `challenge_grant`(+combat),
-`ns_grant`(title, decorate fold), `choice_grant`(add: cut_self),
-`choice_restriction`(suppress tag:commerce when `drawn and not fed`) — exercising both
-poles, per-subject merge (the holder accumulates), tombstoned restrictions, and
-stateful activation, end-to-end, with no imperative script in the scenes where the
-beats fire.
+The Stormbringer matrix above is the end-to-end demo: one carrier whose facets span
+`giver`/`hider` across `nav` and `choice`, a `changer` on `ns`/`challenge`, per-subject
+merge (the holder accumulates), tombstoned restrictions, and stateful activation — with
+no imperative script in the scenes where the beats fire. A smaller first cut is a
+lantern (a `nav` `giver` of `light`, withdrawn at `ChargeFacet → 0`) plus a sword in a
+slotted inventory, which already exercises giver + hider + per-subject merge without the
+full feed loop.
 
 ## Acceptance
 
-- A `Facet` value object with a `facet` string discriminator + `when`/`applies_to`/
-  payload/provenance, co-located (not core).
+- A `Facet` value object with `channel` + `facet_type` (giver/changer/hider) string
+  discriminators + `when`/`applies_to`/payload/provenance, co-located (not core).
 - A `Component` = concept + `facets` bundle, assignable into a `SlottedContainer`;
   slotting publishes facets, unslotting withdraws them.
-- One gather + handler pair for each of: `ns_grant` (reuse #141's path),
-  `choice_restriction` (the forced new one), and one non-ns `*_grant`
-  (challenge or nav).
+- One gather + handler pair for each of: `channel="ns"` giver (reuse #141's path),
+  `channel="choice"` hider (the forced new restriction path), and one non-ns giver or
+  changer (`nav` or `challenge`).
 - The three positions (conflict / per-subject / tombstone) implemented and tested.
 - The worked demo passing end-to-end.
 - `#194/#195/#196` satisfied through this model, with their issues updated to point here.
