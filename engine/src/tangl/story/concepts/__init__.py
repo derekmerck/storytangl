@@ -26,7 +26,7 @@ from .asset import AssetType, AssetWallet, CountableAsset, HasAssets
 from .location import Location
 from .narrator_knowledge import EntityKnowledge, HasNarratorKnowledge, get_narrator_key
 from .player import Player
-from .role import Role
+from .role import Role, RoleGrant
 from .setting import Setting
 
 __all__ = [
@@ -40,6 +40,7 @@ __all__ = [
     "Location",
     "Player",
     "Role",
+    "RoleGrant",
     "Setting",
     "get_narrator_key",
 ]
