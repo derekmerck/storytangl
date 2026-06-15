@@ -132,6 +132,13 @@ Facet  — microconcept value object, no graph identity, carried by a concept
 Phase-1 `RoleGrant` is the degenerate case:
 `RoleGrant ≡ Facet(channel=ns, effect=affordance)`.
 
+> **Refinement:** `mechanics/assembly/COMPONENT_DESIGN.md` splits `effect` into a
+> behaviour discriminator `facet_type` — **giver** (≈ affordance) · **hider**
+> (≈ dependency) · **changer** (the first-class home for the `transform` escape
+> hatch: value modifiers like the title decorate or `+combat`). `giver`/`hider`
+> are the open-link duality at context-identity scale; `changer` is the genuinely
+> new one. That doc is the authoritative facet vocabulary going forward.
+
 ### Combine semantics are per-consumer
 
 The adapter collects and filters; **the consumer chooses the fold**. Do not
@@ -318,7 +325,7 @@ deliberately rather than colliding.
 
 ## Phased Strategy
 
-### Phase 1 — affordance grants on bindings (DONE, `#141`)
+### Phase 1 — affordance grants on bindings (DONE — `#141`, merged in `#287`)
 
 `RoleGrant` + `ns`-channel projection from active role bindings. The degenerate
 facet; the first conformance consumer.
