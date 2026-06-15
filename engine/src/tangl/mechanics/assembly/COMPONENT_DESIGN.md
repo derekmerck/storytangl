@@ -7,13 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.4
+**Document Version:** 0.5
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
-#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system.*
+#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer).*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -122,9 +122,11 @@ question the retrofit pass must settle.
 > (decorate a title, `+1` a stat) — commutative-ish folds. The sharp edge is the
 > *positional* bag transform from #192 (split journal fragment 1 → 1+4, insert 2,3),
 > which operates on the assembled *sequence*, is non-commutative, and shares #192's
-> tombstoning question. Model it as a `changer` whose payload is a sequence operation,
-> but keep its ordering/determinism rules explicit — it is the corner of `changer` that
-> needs care.
+> tombstoning question. Per the conflict-resolution convergence (position 2), it is a
+> **specialized-manager** case — the journal-compose consumer owns that non-commutative
+> sequence fold; the general layer only discovers and activates it. So `changer`'s
+> generic fold stays commutative (value modifiers); the positional rewrite is not a
+> generic `changer` fold at all.
 
 ### Worked matrix — Stormbringer
 
@@ -238,29 +240,34 @@ take a position on each; they are the substance of the implementation:
    giver→changer→hider fold + settle-before-phase, from the *Evaluation order* section
    above. This is the load-bearing one — light-lifts-dark and offer-then-hide both
    depend on it — and its acyclicity check is shared with #286.
-2. **Conflict resolution — reuse the open-link arbitration; do NOT build a 2nd dispatch
-   system.** Three `changer`s on `sword.color` (blue/green/red) must not resolve by
-   pickup order (non-deterministic, breaks replay) nor by a global authored priority
-   ladder (that *is* the second dispatch system PR-review #1 forbids). Escape: the
-   open-link model already defines arbitration — **scope distance → specificity →
-   influence → stable content hash** (`AFFORDANCE_MODEL.md`) — and `RoleGrant` phase-1
-   already uses "nearer-scope overrides, then priority." Apply it to the fold. Layered
-   so the common cases never reach a number:
-   - **Prefer commutative folds** (tags union, modifiers sum, light boolean-OR, vetoes
-     most-restrictive-wins) — order-independent, so *not a conflict at all*. Override is
-     the rare non-commutative case.
-   - **Non-commutative override resolves by scope distance** — the held sword's enchant
-     (inventory scope) beats an ambient one (world scope) structurally, no authored
-     number. Deterministic every replay.
-   - **A genuine same-scope, same-influence tie is a compile-time conflict**, flagged by
-     the produces/consumes analysis (position 1 / #286): "`sword.color` set by
-     `blue_grant` and `green_grant`, same scope/influence, overlapping `when` —
-     disambiguate." The engine **guarantees determinism but never invents semantics**;
-     a real blue-vs-green ambiguity is the author's to resolve.
+2. **Conflict resolution — commutative-fold-or-flag; delegate non-commutative semantics
+   to a specialized manager.** The general mechanism deliberately does *not* try to
+   resolve arbitrary collisions — that road rebuilds the 2nd dispatch system PR-review #1
+   forbids. It does three things and stops:
+   - **Commutative folds are the bread and butter** — tags union, modifiers sum, light
+     boolean-OR, vetoes most-restrictive-wins. Order-independent ⇒ no conflict. A
+     `giver`/`changer` that respects its channel's commutative fold never collides.
+   - **Scope distance is the cheap default tiebreak** where a natural ordering exists —
+     `RoleGrant` already does "nearer-scope overrides." Free, structural, replay-stable.
+   - **A genuine non-commutative / non-associative collision is an authoring error,
+     flagged at compile time** off the produces/consumes graph (position 1 / #286):
+     "`sword.color` set by `blue_grant` and `green_grant`, same scope, incompatible,
+     overlapping `when` — disambiguate." The engine **guarantees determinism but never
+     invents semantics** — it never silently picks blue over green.
 
-   So `influence` survives only as the last explicit knob for the genuinely-rare
-   same-scope case — never the first reach, never a silent pickup-order decision. Hider
-   vetoes record the deciding facet in the tombstone (position 4).
+   **Non-commutative *semantics* belong to a specialized channel manager, not the general
+   fold.** Outfit inner-layer visibility is computed by `OutfitManager` through coverage
+   masks — an order-sensitive, domain-specific fold that *consumes* the relevant facets
+   rather than being resolved by the generic mechanism. That is the prototype: the
+   general layer discovers + activates + commutatively-folds + flags; a registered
+   manager owns any non-commutative fold for its channel. ("Share discovery, not the
+   fold" at its endpoint — the general layer never owns a non-commutative fold.)
+
+   **Deferred (backburner):** CSS-like specificity / `!important` overrides — a global
+   "curse turns sword blue `!important`" beating a local "magic sword is red," mirroring
+   the template-specificity work. It slots cleanly into the arbitration order after scope
+   distance when wanted, with no architecture change to add later. Not now: settle the
+   simple commutative parts first.
 3. **Per-subject merge.** The holder-scoped accumulation ("what does Bill currently
    contribute?", "what modifies *this* challenge?", "what restricts *this* choice?")
    is the principled primitive; phase-1's scope-wide `grants`/`grant_tags` view stays
