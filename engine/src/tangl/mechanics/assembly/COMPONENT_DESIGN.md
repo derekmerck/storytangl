@@ -7,11 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.2
+**Document Version:** 0.3
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
-(giver/changer/hider); trinary mapped onto the open-link duality.*
+(giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
+order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
+#286 coverage analysis; the recursive light↔dark case.*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -146,6 +148,47 @@ exactly the derived-not-mutated invariant. (A `changer` appears in the fuller bu
 the `ns` title decorate *Bill … and His Hungry Blade*; `+combat` would be a `challenge`
 `changer`.)
 
+## Evaluation order: the produces/consumes DAG
+
+Facets are **recursive**: a light source (oil lamp / flashlight / Stormbringer) is a
+`giver` of `lit`; `dark` is a default `hider` that suppresses navigation `when not lit`;
+so a giver's output gates a hider. Three ordering layers, only one of which needs a sort:
+
+1. **Authored state** (`drawn`, `fed`, `has_oil`) — read directly by `when`, changed by
+   action effects *between* passes. No intra-pass ordering; it is just current state.
+2. **Within-channel fold order** — `giver → changer → hider` within one channel pass.
+   You cannot suppress the `sheathe` offer before a giver has offered it; hiders filter
+   what givers/changers materialized.
+3. **Cross-facet data dependency** — a `light` giver produces derived `lit`; the `dark`
+   hider consumes it in `when = not lit`. Light must fold before dark in the *same* pass.
+   This is the topological layer.
+
+**The dependency edges are implicit — derive, don't author them.** Facets condition on
+published properties/tags, not on named other-facets (the generalization of the old
+badge-state topo-sort: badges named other badges; facets name *tags*). Each facet
+**produces** the tags/properties its payload publishes and **consumes** the tags its
+`when`/`applies_to` read. Build that produces→consumes graph, **topological-sort** it,
+and fold forward; within one topo level apply layer-2 order (giver → changer → hider).
+
+**One analysis, two payoffs.** The produces/consumes graph is the *same* structure as
+the #286 coverage check: "conditions on `require_light` but nothing produces `light`"
+(a dead/unsolvable condition) and "`light → dark → light`" (no valid topo-order, a
+cycle) are both read off it. So acyclicity/solvability is a **compile-time
+`WorldCompiler` check**, beside the dangling-ref checks — not a runtime concern. Cycles
+are an author error for now; defer any runtime fixpoint iteration unless genuine
+feedback loops are ever wanted.
+
+**Interleaving with VM phases.** Facets relevant to a phase **settle to a fixpoint
+before that phase's handler consumes them** — `lit` is folded into the derived ns before
+nav provisioning reads the frontier, so you never "leave provision with all nav
+restricted." Because facets are **derived, never mutated**, forward-only fold in
+topo-order is automatically **replay-deterministic** (same graph, same order, every
+replay) — no extra machinery needed for fabula-invariance.
+
+> Contract: **produces/consumes DAG → topo-sort → fold each level giver→changer→hider →
+> settle before the consuming phase.** Acyclicity checked at compile time, reusing the
+> coverage analysis (#286).
+
 ## Component = concept + facet bundle
 
 A **Component** is a concept (or a token over a component type) that carries
@@ -186,21 +229,25 @@ modifier, hider → tombstone) and owns the specific combination rule.
   render). The shared abstraction is discovery + provenance + activation, never a
   universal `apply()`.
 
-## The three positions components force (the point of choosing them)
+## The four positions components force (the point of choosing them)
 
 Components confront the hard parts immediately — a feature, not a cost. This spec must
 take a position on each; they are the substance of the implementation:
 
-1. **Restriction conflict resolution.** Two components' `*_restriction` facets on one
-   slot/choice. Selector-targeted vetoes do **not** OR like `SandboxVisibilityRule`'s
-   three fixed booleans. Proposed default: a veto is sufficient (most-restrictive
-   wins) unless a higher-`influence` grant explicitly lifts it; record the deciding
-   facet in the tombstone. Settle here.
-2. **Per-subject merge.** The holder-scoped accumulation ("what does Bill currently
+1. **Evaluation order** (the recursion). The produces/consumes DAG + topo-sort + the
+   giver→changer→hider fold + settle-before-phase, from the *Evaluation order* section
+   above. This is the load-bearing one — light-lifts-dark and offer-then-hide both
+   depend on it — and its acyclicity check is shared with #286.
+2. **Restriction conflict resolution.** Two `hider` facets on one slot/choice.
+   Selector-targeted vetoes do **not** OR like `SandboxVisibilityRule`'s three fixed
+   booleans. Proposed default: a veto is sufficient (most-restrictive wins) unless a
+   higher-`influence` giver/changer explicitly lifts it; record the deciding facet in
+   the tombstone.
+3. **Per-subject merge.** The holder-scoped accumulation ("what does Bill currently
    contribute?", "what modifies *this* challenge?", "what restricts *this* choice?")
    is the principled primitive; phase-1's scope-wide `grants`/`grant_tags` view stays
    as a compatibility projection over it.
-3. **Tombstones.** A restriction outcome is `hidden | blocked | replaced |
+4. **Tombstones.** A restriction outcome is `hidden | blocked | replaced |
    diagnostic`, not a boolean — provenance-bearing (which facet, what replacement),
    replay-stable, reversible when `when` lapses. `SandboxProjectionState` is the
    existing prototype.
@@ -235,6 +282,9 @@ full feed loop.
 - One gather + handler pair for each of: `channel="ns"` giver (reuse #141's path),
   `channel="choice"` hider (the forced new restriction path), and one non-ns giver or
   changer (`nav` or `challenge`).
+- The produces/consumes DAG + topo-sort evaluation, with the recursive light↔dark case
+  passing, and a `WorldCompiler` acyclicity/coverage check (shared with #286) that flags
+  a deliberately-cyclic fixture.
 - The three positions (conflict / per-subject / tombstone) implemented and tested.
 - The worked demo passing end-to-end.
 - `#194/#195/#196` satisfied through this model, with their issues updated to point here.
