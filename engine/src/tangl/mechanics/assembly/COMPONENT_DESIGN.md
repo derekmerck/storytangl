@@ -7,13 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.8
+**Document Version:** 0.9
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
-#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's. v0.7: staged implementation plan with the abstract shape-board acceptance demo (slot keying + connector polarity, giver description donation, additive/multiplicative/subtractive changer folds + target, discrete/continuous budgets) — the four stages each real consumer reskins. v0.8: adopt the v3.2 Associating/Connection bilateral-association substrate (admission/mutual-consent + on-associate/on-disassociate hooks) as the slotting mechanism — the facet model is the *what*, association is the *when/whether*; the N-party transaction generalization (trades, shops-as-assembly) is the same primitive, deferred.*
+#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's. v0.7: staged implementation plan with the abstract shape-board acceptance demo (slot keying + connector polarity, giver description donation, additive/multiplicative/subtractive changer folds + target, discrete/continuous budgets) — the four stages each real consumer reskins. v0.8: adopt the v3.2 Associating/Connection bilateral-association substrate (admission/mutual-consent + on-associate/on-disassociate hooks) as the slotting mechanism — the facet model is the *what*, association is the *when/whether*; the N-party transaction generalization (trades, shops-as-assembly) is the same primitive, deferred. v0.9 (PR #288 review): anchor the facet gather/fold to the existing dispatch (PhaseCtx, on_gather_ns, BehaviorRegistry.chain_execute_all) — no new pipeline; scope the compile-time collision flag to the new per-subject fold (RoleGrant's grants/grant_tags merge unchanged).*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -267,6 +267,12 @@ modifier, hider → tombstone) and owns the specific combination rule.
   *existing* phase handlers (ns gather, choice projection, provisioning, journal
   render). The shared abstraction is discovery + provenance + activation, never a
   universal `apply()`.
+- **Anchored to the existing dispatch infrastructure** — the gather is an
+  `@on_gather_ns`-style hook running under `PhaseCtx`, and the fold dispatches through
+  `BehaviorRegistry.chain_execute_all` over the ordinary `on_*` / `do_*` pattern
+  (`core/behavior.py`). There is **no new pipeline**: a facet gather registers on the
+  same registry as every other handler. Naming it explicitly here is the guardrail
+  against drifting into a parallel dispatcher.
 
 ## The four positions components force (the point of choosing them)
 
@@ -291,6 +297,11 @@ take a position on each; they are the substance of the implementation:
      "`sword.color` set by `blue_grant` and `green_grant`, same scope, incompatible,
      overlapping `when` — disambiguate." The engine **guarantees determinism but never
      invents semantics** — it never silently picks blue over green.
+
+   *Scope:* this compile-time flag applies only to the **new per-subject facet fold**.
+   Phase-1 `RoleGrant`'s existing scope-wide `grants` / `grant_tags` view keeps its
+   current deterministic merge (nearer-scope overrides, then `priority`) **unchanged** —
+   those overlaps are resolved, not flagged.
 
    **Non-commutative *semantics* belong to a specialized channel manager, not the general
    fold.** Outfit inner-layer visibility is computed by `OutfitManager` through coverage
