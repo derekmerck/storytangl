@@ -203,11 +203,18 @@ def contribute_roles(*, caller, ctx, **_kw):
             if label:
                 contributions[f"{label}_role"] = role
                 role_edges[label] = role
-                grant = role.grants
-                if provider is not None and grant is not None and not grant.is_empty:
-                    role_grants[label] = grant
-                else:
-                    role_grants.pop(label, None)
+                # Only a *bound* role owns its label's grant, mirroring how an
+                # unbound nearer role does not shadow the parent's provider symbol
+                # (``provide_role_symbols`` returns nothing when unbound). A nearer
+                # bound role with no grant clears the parent's; an unbound nearer
+                # role is an empty slot — the parent's provider and grant show
+                # through unchanged.
+                if provider is not None:
+                    grant = role.grants
+                    if grant is not None and not grant.is_empty:
+                        role_grants[label] = grant
+                    else:
+                        role_grants.pop(label, None)
 
     if roles:
         contributions["roles"] = roles

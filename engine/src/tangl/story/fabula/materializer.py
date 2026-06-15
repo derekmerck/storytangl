@@ -962,7 +962,12 @@ class StoryMaterializer:
                 "requirement": requirement,
             }
             grants = spec.get("grants")
-            if grants is not None and "grants" in getattr(dependency_kind, "model_fields", {}):
+            if grants is not None:
+                if "grants" not in dependency_kind.model_fields:
+                    raise ValueError(
+                        f"{dependency_kind.__name__} dependency {label!r} does not "
+                        f"support grants"
+                    )
                 dep_kwargs["grants"] = grants
             dep = dependency_kind(**dep_kwargs)
 

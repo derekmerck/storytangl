@@ -153,8 +153,7 @@ def test_grant_follows_swapped_provider() -> None:
     assert ns_b["boss"] is actor_b
     assert ns_b["boss_title"] == "boss"
     # Nothing was stamped onto the provider itself.
-    assert "title" not in actor_a.tags
-    assert not getattr(actor_a, "locals", {})
+    assert "title" not in actor_a.get_ns()
 
 
 def test_grant_disappears_when_binding_cleared() -> None:
@@ -264,6 +263,29 @@ def test_nearer_scope_role_without_grant_clears_parent_grant() -> None:
     assert "boss_title" not in ns
     assert "role_grants" not in ns
     assert "grants" not in ns
+
+
+def test_nearer_scope_unbound_role_inherits_parent_provider_and_grant() -> None:
+    # A nearer role that is *unbound* is an empty slot, not an override: the
+    # parent's bound provider and its grant show through, mirroring provider-symbol
+    # inheritance. (Contrast the bound case above, where the nearer binding does
+    # override and clear.)
+    graph, scene, block = _build_scene_with_block()
+    scene_actor = Actor(label="scene_boss", name="Scene Boss")
+    graph.add(scene_actor)
+
+    scene_role = _role("boss", scene, grants={"title": "scene-boss"})
+    block_role = _role("boss", block)  # nearer, unbound slot
+    graph.add(scene_role)
+    graph.add(block_role)
+    scene_role.set_provider(scene_actor)
+
+    ns = _gather(graph, block)
+
+    assert ns["boss"] is scene_actor
+    assert ns["boss_title"] == "scene-boss"
+    assert ns["role_grants"]["boss"].locals == {"title": "scene-boss"}
+    assert ns["grants"]["title"] == "scene-boss"
 
 
 # ---------------------------------------------------------------------------
