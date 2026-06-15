@@ -1,7 +1,12 @@
 # Facets: Mu-Affordances and Mu-Dependencies
 
 **Document Version:** 0.3
-**Status:** DESIGN NOTE - vocabulary and implementation direction
+**Status:** DESIGN NOTE — originating vision, prior art, and phasing. **The current,
+detailed model lives in `engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md`**
+(channel/facet_type discriminators, the four forced positions, produces/consumes
+evaluation order, conflict resolution, the v3.2 association substrate, and the staged
+build plan). This note keeps the *why* and prior art; consult COMPONENT_DESIGN for the
+*what/how*. The two recombine as the driving applications settle the shape.
 **Prior art:** issue `#113`, issue `#141`, `engine/src/tangl/story/concepts/role.py`
 (phase-1 grants), `engine/src/tangl/mechanics/sandbox/visibility.py` (restrictions),
 `engine/src/tangl/prose/mu_block.py`, `scratch/mechanics/badge/badge.py`
