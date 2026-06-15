@@ -7,13 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.3
+**Document Version:** 0.4
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
-#286 coverage analysis; the recursive light↔dark case.*
+#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system.*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -238,11 +238,29 @@ take a position on each; they are the substance of the implementation:
    giver→changer→hider fold + settle-before-phase, from the *Evaluation order* section
    above. This is the load-bearing one — light-lifts-dark and offer-then-hide both
    depend on it — and its acyclicity check is shared with #286.
-2. **Restriction conflict resolution.** Two `hider` facets on one slot/choice.
-   Selector-targeted vetoes do **not** OR like `SandboxVisibilityRule`'s three fixed
-   booleans. Proposed default: a veto is sufficient (most-restrictive wins) unless a
-   higher-`influence` giver/changer explicitly lifts it; record the deciding facet in
-   the tombstone.
+2. **Conflict resolution — reuse the open-link arbitration; do NOT build a 2nd dispatch
+   system.** Three `changer`s on `sword.color` (blue/green/red) must not resolve by
+   pickup order (non-deterministic, breaks replay) nor by a global authored priority
+   ladder (that *is* the second dispatch system PR-review #1 forbids). Escape: the
+   open-link model already defines arbitration — **scope distance → specificity →
+   influence → stable content hash** (`AFFORDANCE_MODEL.md`) — and `RoleGrant` phase-1
+   already uses "nearer-scope overrides, then priority." Apply it to the fold. Layered
+   so the common cases never reach a number:
+   - **Prefer commutative folds** (tags union, modifiers sum, light boolean-OR, vetoes
+     most-restrictive-wins) — order-independent, so *not a conflict at all*. Override is
+     the rare non-commutative case.
+   - **Non-commutative override resolves by scope distance** — the held sword's enchant
+     (inventory scope) beats an ambient one (world scope) structurally, no authored
+     number. Deterministic every replay.
+   - **A genuine same-scope, same-influence tie is a compile-time conflict**, flagged by
+     the produces/consumes analysis (position 1 / #286): "`sword.color` set by
+     `blue_grant` and `green_grant`, same scope/influence, overlapping `when` —
+     disambiguate." The engine **guarantees determinism but never invents semantics**;
+     a real blue-vs-green ambiguity is the author's to resolve.
+
+   So `influence` survives only as the last explicit knob for the genuinely-rare
+   same-scope case — never the first reach, never a silent pickup-order decision. Hider
+   vetoes record the deciding facet in the tombstone (position 4).
 3. **Per-subject merge.** The holder-scoped accumulation ("what does Bill currently
    contribute?", "what modifies *this* challenge?", "what restricts *this* choice?")
    is the principled primitive; phase-1's scope-wide `grants`/`grant_tags` view stays
