@@ -85,8 +85,8 @@ shape*, and the work is always the existing handler's.
 3. **Build the component mechanic** as the forcing second consumer (this doc).
 4. **Next pass — retrofit** `RoleGrant` + `SandboxVisibilityRule` + the sandbox
    capability classes onto the same tooling. *Then* there are ≥3 consumers, which is
-   the bar to (a) promote the primitive to core, (b) resolve the `Facet` name, and
-   (c) decide sibling-vs-coordinate against the open-link primitive.
+   the bar to (a) promote the primitive to core (as an open-link projection mode, per
+   *Division of labour*), and (b) resolve the `Facet` name.
 
 Deferring (2 calls that do **not** belong in this pass):
 - **Core promotion** — premature until the retrofit proves the shape across consumers;
