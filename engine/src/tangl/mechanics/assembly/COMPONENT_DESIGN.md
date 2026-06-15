@@ -7,13 +7,13 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.6
+**Document Version:** 0.7
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
-#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's.*
+#286 coverage analysis; the recursive light↔dark case. v0.4: conflict resolution reuses the open-link arbitration (scope distance → specificity → influence → hash) with genuine same-scope ties as a compile error — not a 2nd dispatch system. v0.5: convergence — the general mechanism does commutative-fold + scope-tiebreak + compile-flag and stops; non-commutative semantics are delegated to a specialized channel manager (OutfitManager coverage masks = the prototype); CSS-like !important arbitration is backburnered. This also resolves the positional-transform corner (a specialized journal-compose fold, not a generic changer). v0.6: division-of-labour framing — donated concepts (graph identity) vs context-bound facets (context identity) is one axis of the open-link primitive, author's-prerogative which side a capability sits on; this RESOLVES sibling-vs-coordinate (coordinate, not a rival type). Facets are a vocabulary convention, not a mechanism — handlers consume via shared gather or bespoke manager; the work is always the existing handler's. v0.7: staged implementation plan with the abstract shape-board acceptance demo (slot keying + connector polarity, giver description donation, additive/multiplicative/subtractive changer folds + target, discrete/continuous budgets) — the four stages each real consumer reskins.*
 **Builds on:** `docs/src/notes/MU_AFFORDANCES.md` (the Facet model), this package's
 `PRESENCE_ASSEMBLY_DESIGN.md` neighbour (the slotted instrument), and
 `docs/src/design/planning/AFFORDANCE_MODEL.md` (the open-link duality this mirrors).
@@ -325,29 +325,63 @@ take a position on each; they are the substance of the implementation:
   dead condition — a `WorldCompiler` diagnostic beside the dangling-ref checks. This is
   another concrete validator for the authoring-validation umbrella (#286), not core.
 
-## Worked demo
+## Implementation plan & the shape-board acceptance demo
 
-The Stormbringer matrix above is the end-to-end demo: one carrier whose facets span
-`giver`/`hider` across `nav` and `choice`, a `changer` on `ns`/`challenge`, per-subject
-merge (the holder accumulates), tombstoned restrictions, and stateful activation — with
-no imperative script in the scenes where the beats fire. A smaller first cut is a
-lantern (a `nav` `giver` of `light`, withdrawn at `ChargeFacet → 0`) plus a sword in a
-slotted inventory, which already exercises giver + hider + per-subject merge without the
-full feed loop.
+An **abstract** demo isolates the mechanism from domain semantics while exercising exactly
+what outfits / vehicles / robots / game-boards will need. A **shape board** has star,
+circle, and square slots; star/circle/square **plugs** seat only in their matching
+socket, each donating to the board's description and folding a number when seated. Each
+of the real consumers is a variant of this: outfits add a Stage-2 coverage manager,
+vehicles lean on Stage-4 budgets, robots use Stage-1 keying + Stage-3 capability folds,
+game-boards use the Stage-3 target.
+
+> *Terminology guard:* the board's **connector polarity** (plug vs socket / male vs
+> female) is a *slot-compatibility* attribute, distinct from `facet_type`'s behaviour
+> axis (giver/changer/hider). Two different "polarities"; keep them separate in code.
+
+Staged so each step is a working slice with the board as the growing test:
+
+**Stage 1 — slot-keyed assignment (the skeleton).** `Facet` value object; `Component` =
+concept + facets; `SlottedContainer` assignment. **Keying:** a slot admits a component
+by a compatibility key (shape) *and* connector polarity (a star *plug* seats in a star
+*socket*; two sockets don't mate) — modelled as the slot's admission `hider` ("reject
+unless `component.key == slot.key` and polarities are complementary"). This is #194 made
+concrete. *Test:* star plug seats in the star socket; rejected from the circle socket;
+two star sockets don't mate.
+
+**Stage 2 — `giver` description donation.** A seated component donates a `prose`/`ns`
+`giver` describing its slot-state; the board folds them (commutative, ordered) into
+*"A board with a filled star-shaped slot and empty circular and square slots."* *Test:*
+description tracks fill state as components seat/unseat — derived, never mutated.
+
+**Stage 3 — `changer` numeric folds + a target check.** `challenge`/value `changer`s
+with different commutative folds: **star = additive (`+`), circle = multiplicative
+(`×`), square = subtractive (`−`)**. Per-subject accumulation: the board accumulates its
+seated components' changers; a validator checks "hit exactly *N* with the right three
+shapes." *Test:* `{star +3, circle ×2, square −1}` computes the expected value
+deterministically; the target validator passes/fails; replay-stable. (This is where
+fold-order matters — the produces/consumes topo-order + commutativity keep it
+well-defined; a non-commutative mix would be a Stage-3 compile flag.)
+
+**Stage 4 — budgets (discrete & continuous).** `BudgetTracker` (`assembly/budget.py`): a
+slot/board has capacity; seating consumes it (discrete count, or continuous
+weight/power); over-budget seating is rejected by an admission `hider`. *Test:* a
+3-slot discrete board and a continuous weight budget both gate seating.
+
+Small steps, clean idea each time: every consumer (outfit / vehicle / robot / board) is
+these four stages with a domain skin, not a new mechanism.
 
 ## Acceptance
 
-- A `Facet` value object with `channel` + `facet_type` (giver/changer/hider) string
-  discriminators + `when`/`applies_to`/payload/provenance, co-located (not core).
-- A `Component` = concept + `facets` bundle, assignable into a `SlottedContainer`;
-  slotting publishes facets, unslotting withdraws them.
-- One gather + handler pair for each of: `channel="ns"` giver (reuse #141's path),
-  `channel="choice"` hider (the forced new restriction path), and one non-ns giver or
-  changer (`nav` or `challenge`).
-- The produces/consumes DAG + topo-sort evaluation, with the recursive light↔dark case
-  passing, and a `WorldCompiler` acyclicity/coverage check (shared with #286) that flags
-  a deliberately-cyclic fixture.
-- The three positions (conflict / per-subject / tombstone) implemented and tested.
-- The worked demo passing end-to-end.
-- `#194/#195/#196` satisfied through this model, with their issues updated to point here.
-- Name, core promotion, and sibling-vs-coordinate explicitly left to the retrofit pass.
+- A `Facet` value object (`channel` + `facet_type` strings + `when`/`applies_to`/payload/
+  provenance), co-located (not core); `Component` = concept + `facets`, assignable into a
+  `SlottedContainer` (slotting publishes facets, unslotting withdraws them).
+- One gather + handler pair for each of `channel="ns"` giver (reuse #141), `channel="choice"`
+  hider (the forced restriction path), and one non-ns giver/changer.
+- The produces/consumes DAG + topo-sort, with the light↔dark case passing and a
+  `WorldCompiler` acyclicity/coverage check (shared with #286) flagging a cyclic fixture.
+- The four forced positions (evaluation order / conflict / per-subject / tombstone) tested.
+- **The shape-board demo passing through all four stages** (keying+polarity, description,
+  additive/multiplicative/subtractive folds + target, discrete+continuous budgets).
+- `#194/#195/#196` satisfied through this model; their issues updated to point here.
+- Name, core promotion, and sibling-vs-coordinate left to the retrofit pass.
