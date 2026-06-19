@@ -64,9 +64,9 @@ class OutfitManager(SlottedContainer[Wearable]):
     def describe_items(self) -> list[str]:
         """Return concise wearable labels suitable for prose or prompt adapters."""
         return [
-            component.render_desc()
+            desc
             for component in self.components()
-            if component.render_desc()
+            if (desc := component.render_desc())
         ]
 
     def describe(self) -> str:
@@ -79,7 +79,7 @@ class OutfitManager(SlottedContainer[Wearable]):
         for component in self.components():
             if component.state != WearableState.ON:
                 continue
-            for region in sorted(component.covers, key=lambda region: region.name):
+            for region in component.covers:
                 mask |= region.to_part_mask()
         return mask
 
