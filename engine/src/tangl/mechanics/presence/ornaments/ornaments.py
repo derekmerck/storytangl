@@ -11,7 +11,8 @@ to each actor's body.
 
 from __future__ import annotations
 from collections import defaultdict
-from typing import Any
+
+from collections.abc import Sequence
 
 from pydantic import Field
 
@@ -21,6 +22,8 @@ from tangl.core import Entity, Node
 from tangl.lang.helpers import oxford_join
 from tangl.lang.body_parts import BodyPart, BodyRegion
 from .enums import OrnamentType
+
+CoveredRegion = BodyRegion | BodyPart | str
 
 
 class Ornament(Entity):
@@ -91,9 +94,12 @@ class Ornamentation(Node):
 
     collection: list[Ornament] = Field(default_factory=list)
 
-    def by_part_type(self, covered_regions: list[Any] = None) -> dict[tuple[OrnamentType, BodyPart], list[Ornament]]:
+    @staticmethod
+    def _covered_mask(
+        covered_regions: Sequence[CoveredRegion] | None = None,
+        covered_mask: BodyPart = BodyPart.NONE,
+    ) -> BodyPart:
         covered_regions = covered_regions or []
-        covered_mask = BodyPart.NONE
         for region in covered_regions:
             if isinstance(region, BodyRegion):
                 covered_mask |= region.to_part_mask()
@@ -107,7 +113,15 @@ class Ornamentation(Node):
                 resolved_part = BodyPart._missing_(region)
                 if isinstance(resolved_part, BodyPart):
                     covered_mask |= resolved_part
+        return covered_mask
 
+    def by_part_type(
+        self,
+        covered_regions: Sequence[CoveredRegion] | None = None,
+        *,
+        covered_mask: BodyPart = BodyPart.NONE,
+    ) -> dict[tuple[OrnamentType, BodyPart], list[Ornament]]:
+        covered_mask = self._covered_mask(covered_regions or [], covered_mask)
         res = defaultdict(list)
         for ornament in self.collection:
             if covered_mask and bool(ornament.body_part & covered_mask):
@@ -126,10 +140,15 @@ class Ornamentation(Node):
     # def __bool__(self):
     #     return len(self.ornaments) > 0
 
-    def describe_items(self, *, possessive: str = "their") -> list[str]:
+    def describe_items(
+        self,
+        *,
+        possessive: str = "their",
+        covered_regions: Sequence[CoveredRegion] | None = None,
+        covered_mask: BodyPart = BodyPart.NONE,
+    ) -> list[str]:
         """Return concise ornament phrases suitable for appearance summaries."""
-        covered_regions: list[Any] = []
-        grouped = self.by_part_type(covered_regions)
+        grouped = self.by_part_type(covered_regions, covered_mask=covered_mask)
 
         items: list[str] = []
         for (ornament_type, body_part), ornaments in sorted(
@@ -146,13 +165,34 @@ class Ornamentation(Node):
             )
         return items
 
-    def describe_summary(self, *, possessive: str = "their") -> str:
+    def describe_summary(
+        self,
+        *,
+        possessive: str = "their",
+        covered_regions: Sequence[CoveredRegion] | None = None,
+        covered_mask: BodyPart = BodyPart.NONE,
+    ) -> str:
         """Return a compact joined ornament summary without sentence framing."""
-        return oxford_join(self.describe_items(possessive=possessive))
+        return oxford_join(
+            self.describe_items(
+                possessive=possessive,
+                covered_regions=covered_regions,
+                covered_mask=covered_mask,
+            )
+        )
 
     # @on_render.register()
-    def describe(self) -> dict[str, str]:
-        summary = self.describe_summary(possessive="their")
+    def describe(
+        self,
+        *,
+        covered_regions: Sequence[CoveredRegion] | None = None,
+        covered_mask: BodyPart = BodyPart.NONE,
+    ) -> dict[str, str]:
+        summary = self.describe_summary(
+            possessive="their",
+            covered_regions=covered_regions,
+            covered_mask=covered_mask,
+        )
         if not summary:
             return {"ornaments": ""}
         return {"ornaments": f"They have {summary}."}
