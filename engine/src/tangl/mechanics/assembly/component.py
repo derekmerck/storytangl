@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ class ComponentFacet(BaseModel):
 
     channel: str
     facet_type: str
-    payload: Any = None
+    payload: object | None = None
     source_id: str | None = None
     subject_id: str | None = None
 

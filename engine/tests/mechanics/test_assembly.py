@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import pytest
 from pydantic import Field
@@ -10,6 +10,7 @@ from tangl.core import Entity
 from tangl.mechanics.assembly import (
     Component,
     ComponentFacet,
+    ConnectorPolarity,
     HasSlottedContainer,
     Slot,
     SlotGroup,
@@ -112,6 +113,22 @@ class DefaultLoadoutContainer(SlottedContainer[TestComponent]):
     }
 
 
+class OutOfOrderDefaultLoadoutContainer(SlottedContainer[TestComponent]):
+    slots: ClassVar[dict[str, Slot]] = {
+        "powerplant": Slot.for_tags(
+            "powerplant",
+            tags={"powerplant"},
+            prerequisite_slots=["chassis"],
+            default_factory=lambda: TestComponent(label="starter-motor", tags={"powerplant"}),
+        ),
+        "chassis": Slot.for_tags(
+            "chassis",
+            tags={"chassis"},
+            default_factory=lambda: TestComponent(label="starter-frame", tags={"chassis"}),
+        ),
+    }
+
+
 class ShapeComponent(Component):
     weight_cost: float = 0.0
 
@@ -206,8 +223,8 @@ def component_beta() -> TestComponent:
 def shape_plug(
     shape: str,
     *,
-    polarity: str = "plug",
-    challenge_op: str | None = None,
+    polarity: ConnectorPolarity = "plug",
+    challenge_op: Literal["add", "multiply", "subtract"] | None = None,
     challenge_value: float | None = None,
     weight_cost: float = 0.0,
 ) -> ShapeComponent:
@@ -481,6 +498,19 @@ def test_materialize_defaults_skips_disabled_slots_and_keeps_existing_assignment
     assert container.get_slot("chassis") == [custom_frame]
     assert container.get_slot("powerplant")[0].label == "starter-motor"
     assert container.get_slot("turret") == []
+
+
+def test_materialize_defaults_handles_out_of_order_prerequisite_defaults() -> None:
+    container = OutOfOrderDefaultLoadoutContainer()
+
+    materialized = container.materialize_defaults()
+
+    assert [component.label for component in materialized] == [
+        "starter-frame",
+        "starter-motor",
+    ]
+    assert container.get_slot("chassis")[0].label == "starter-frame"
+    assert container.get_slot("powerplant")[0].label == "starter-motor"
 
 
 def test_shape_board_star_plug_seats_in_star_socket() -> None:

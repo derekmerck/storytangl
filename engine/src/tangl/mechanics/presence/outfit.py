@@ -33,8 +33,8 @@ class OutfitManager(SlottedContainer[Wearable]):
             name=f"{region.name.lower()}_{layer.value}",
             selection_criteria={
                 "predicate": (
-                    lambda wearable, r=region, l=layer.value: (
-                        r in wearable.covers and wearable.layer.value <= l
+                    lambda wearable, r=region, layer_value=layer.value: (
+                        r in wearable.covers and wearable.layer.value <= layer_value
                     )
                 )
             },
@@ -79,6 +79,8 @@ class OutfitManager(SlottedContainer[Wearable]):
         for component in self.components():
             if component.state != WearableState.ON:
                 continue
+            if component.layer < WearableLayer.INNER:
+                continue
             for region in component.covers:
                 mask |= region.to_part_mask()
         return mask
@@ -88,6 +90,8 @@ class OutfitManager(SlottedContainer[Wearable]):
         regions: set[BodyRegion] = set()
         for component in self.components():
             if component.state != WearableState.ON:
+                continue
+            if component.layer < WearableLayer.INNER:
                 continue
             regions.update(component.covers)
         return sorted(regions, key=lambda region: region.name)
@@ -108,7 +112,7 @@ class OutfitManager(SlottedContainer[Wearable]):
             for idx, item in enumerate(items_here[:-1]):
                 if item.state == WearableState.OPEN:
                     covering_item = items_here[idx + 1]
-                    if covering_item.state == WearableState.CLOSED:
+                    if covering_item.state == WearableState.ON:
                         errors.append(
                             f"{item.label} is open but covered by closed {covering_item.label}"
                         )

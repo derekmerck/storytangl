@@ -106,7 +106,7 @@ class SlottedContainer(BaseModel, Generic[CT]):
     def fold_giver_payloads(
         self: "SlottedContainer[FacetComponentT]",
         channel: str,
-    ) -> list[Any]:
+    ) -> list[object | None]:
         """Return payloads from active ``giver`` facets on one channel."""
 
         return [
@@ -117,18 +117,32 @@ class SlottedContainer(BaseModel, Generic[CT]):
     def materialize_defaults(self) -> list[CT]:
         """Opt-in population of enabled empty slots that declare defaults."""
 
+        pending = [
+            slot_name
+            for slot_name, slot in self.slots.items()
+            if slot.default_factory is not None and not self.assignments.get(slot_name)
+        ]
         materialized: list[CT] = []
-        for slot_name, slot in self.slots.items():
-            if self.assignments.get(slot_name):
-                continue
-            if slot.default_factory is None:
-                continue
-            if not self.is_slot_enabled(slot_name):
-                continue
+        while pending:
+            progressed = False
+            for slot_name in list(pending):
+                slot = self.slots[slot_name]
+                if self.assignments.get(slot_name) or not self.is_slot_enabled(slot_name):
+                    pending.remove(slot_name)
+                    continue
+                if any(
+                    not self.assignments.get(prerequisite)
+                    for prerequisite in slot.prerequisite_slots
+                ):
+                    continue
 
-            component = cast(CT, slot.default_factory())
-            self.assign(slot_name, component)
-            materialized.append(component)
+                component = cast(CT, slot.default_factory())
+                self.assign(slot_name, component)
+                materialized.append(component)
+                pending.remove(slot_name)
+                progressed = True
+            if not progressed:
+                break
         return materialized
 
     def get_aggregate(self, name: str, default: float = 0.0) -> float:
