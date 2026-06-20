@@ -547,6 +547,16 @@ class TestLedgerJournal:
             f2,
         ]
 
+    def test_get_slice_excludes_unstamped_fragments_from_bounded_ranges(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        unstamped = ContentFragment(content="legacy")
+        current = ContentFragment(content="current", step=2)
+        ledger.output_stream.extend([unstamped, current])
+
+        assert ledger.get_slice() == [unstamped, current]
+        assert ledger.get_slice(since_step=0, until_step=0) == [unstamped]
+        assert ledger.get_slice(since_step=2, until_step=3) == [current]
+
     def test_get_current_update_uses_resolution_watermark(self) -> None:
         ledger, _ = _make_ledger("a", "b")
         f1 = ContentFragment(content="previous", step=1)

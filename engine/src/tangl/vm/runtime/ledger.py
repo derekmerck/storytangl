@@ -518,7 +518,10 @@ class Ledger(Entity):
             if fragment is None:
                 continue
             step = self._fragment_step(fragment)
-            if step >= 0:
+            if step < 0:
+                if until_step is not None and until_step > 0:
+                    continue
+            else:
                 if step < since_step:
                     continue
                 if until_step is not None and step >= until_step:
@@ -634,11 +637,12 @@ class Ledger(Entity):
         start_step: int,
         marker_types: list[str],
     ) -> int:
+        marker_type_set = set(marker_types)
         candidates = [
             self._fragment_step(marker)
-            for marker_type in marker_types
-            for marker in self.markers(marker_type=marker_type)
-            if self._fragment_step(marker) > start_step
+            for marker in self.markers()
+            if getattr(marker, "marker_type", None) in marker_type_set
+            and self._fragment_step(marker) > start_step
         ]
         if candidates:
             return min(candidates)
