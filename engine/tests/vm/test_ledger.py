@@ -562,12 +562,13 @@ class TestLedgerJournal:
         f1 = ContentFragment(content="previous", step=1)
         f2 = ContentFragment(content="current one", step=2)
         f3 = ChoiceFragment(edge_id=uuid4(), text="current two", step=3)
+        live_choice = ChoiceFragment(edge_id=uuid4(), text="live affordance")
         f4 = ContentFragment(content="future", step=4)
-        ledger.output_stream.extend([f1, f2, f3, f4])
+        ledger.output_stream.extend([f1, f2, f3, live_choice, f4])
         ledger.current_update_start_step = 2
         ledger.cursor_steps = 3
 
-        assert ledger.get_current_update() == [f2, f3]
+        assert ledger.get_current_update() == [f2, f3, live_choice]
 
     def test_marker_slice_runs_from_marker_to_next_logical_marker(self) -> None:
         ledger, _ = _make_ledger("a", "b")

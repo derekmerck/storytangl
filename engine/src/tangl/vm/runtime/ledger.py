@@ -558,12 +558,26 @@ class Ledger(Entity):
         limit: int = 0,
     ) -> list[BaseFragment]:
         """Return fragments produced by the most recent successful choice resolution."""
-        return self.get_slice(
+        fragments = self.get_slice(
             since_step=self.current_update_start_step,
             until_step=max(self.cursor_steps + 1, 0),
             selector=selector,
-            limit=limit,
         )
+        fragment_ids = {fragment.uid for fragment in fragments}
+        live_fragments = [
+            fragment
+            for fragment in self.get_slice(
+                since_step=self.current_update_start_step,
+                selector=selector,
+            )
+            if self._fragment_step(fragment) < 0 and fragment.uid not in fragment_ids
+        ]
+        fragments.extend(live_fragments)
+
+        if limit > 0 and len(fragments) > limit:
+            fragments = fragments[-limit:]
+
+        return fragments
 
     def markers(
         self,
