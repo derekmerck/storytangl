@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 from tangl.core import Entity, Selector
 
+from .component import Component, ConnectorPolarity
+
 
 class Slot(BaseModel):
     """Slot(name: str, selection_criteria: dict[str, Any], max_count: int = 1, required: bool = False)
@@ -32,6 +34,11 @@ class Slot(BaseModel):
     selection_criteria: dict[str, Any] = Field(default_factory=dict)
     max_count: int = 1
     required: bool = False
+    connector_shape: str | None = None
+    connector_polarity: ConnectorPolarity | None = None
+    prerequisite_slots: list[str] = Field(default_factory=list)
+    enablement_criteria: dict[str, Any] = Field(default_factory=dict)
+    default_factory: Callable[[], Entity] | None = Field(default=None, exclude=True)
 
     def selects_for(self, component: Entity) -> tuple[bool, str]:
         """Return whether ``component`` satisfies the slot's criteria.
@@ -48,13 +55,36 @@ class Slot(BaseModel):
             a human-readable explanation.
         """
 
-        try:
-            selector = Selector(**self.selection_criteria)
-            if selector.matches(component):
-                return True, ""
+        selector = Selector(**self.selection_criteria)
+        if not selector.matches(component):
             return False, f"Component doesn't match criteria: {self.selection_criteria}"
-        except Exception as exc:  # pragma: no cover - defensive logging
-            return False, f"Error matching: {exc}"
+
+        return self._selects_connector_for(component)
+
+    def _selects_connector_for(self, component: Entity) -> tuple[bool, str]:
+        if self.connector_shape is None and self.connector_polarity is None:
+            return True, ""
+
+        if not isinstance(component, Component):
+            return False, "Component has no assembly connector"
+
+        if self.connector_shape is not None and component.connector_shape != self.connector_shape:
+            return (
+                False,
+                f"Connector shape mismatch: {component.connector_shape} != {self.connector_shape}",
+            )
+
+        if self.connector_polarity is not None:
+            if component.connector_polarity is None:
+                return False, "Component has no connector polarity"
+
+            if component.connector_polarity == self.connector_polarity:
+                return (
+                    False,
+                    f"Connector polarity mismatch: both are {self.connector_polarity}",
+                )
+
+        return True, ""
 
     @classmethod
     def for_type(

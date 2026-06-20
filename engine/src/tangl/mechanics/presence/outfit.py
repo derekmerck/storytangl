@@ -10,10 +10,10 @@ facets such as `look`. It belongs in the `presence` family rather than behind an
 from __future__ import annotations
 
 from tangl.lang.helpers import oxford_join
-from tangl.lang.body_parts import BodyRegion
+from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.assembly import Slot, SlottedContainer
 from tangl.mechanics.presence.wearable import Wearable
-from tangl.mechanics.presence.wearable.enums import WearableLayer
+from tangl.mechanics.presence.wearable.enums import WearableLayer, WearableState
 
 
 class OutfitManager(SlottedContainer[Wearable]):
@@ -33,7 +33,9 @@ class OutfitManager(SlottedContainer[Wearable]):
             name=f"{region.name.lower()}_{layer.value}",
             selection_criteria={
                 "predicate": (
-                    lambda wearable, r=region, l=layer.value: r in wearable.covers and wearable.layer.value <= l
+                    lambda wearable, r=region, layer_value=layer.value: (
+                        r in wearable.covers and wearable.layer.value <= layer_value
+                    )
                 )
             },
             max_count=3,
@@ -61,11 +63,38 @@ class OutfitManager(SlottedContainer[Wearable]):
 
     def describe_items(self) -> list[str]:
         """Return concise wearable labels suitable for prose or prompt adapters."""
-        return [component.render_desc() for component in self.components() if component.render_desc()]
+        return [
+            desc
+            for component in self.components()
+            if (desc := component.render_desc())
+        ]
 
     def describe(self) -> str:
         """Return a compact phrase describing the current outfit."""
         return oxford_join(self.describe_items())
+
+    def covered_mask(self) -> BodyPart:
+        """Return the fine body-part mask covered by currently worn components."""
+        mask = BodyPart.NONE
+        for component in self.components():
+            if component.state != WearableState.ON:
+                continue
+            if component.layer < WearableLayer.INNER:
+                continue
+            for region in component.covers:
+                mask |= region.to_part_mask()
+        return mask
+
+    def covered_regions(self) -> list[BodyRegion]:
+        """Return coarse regions overlapped by currently worn components."""
+        regions: set[BodyRegion] = set()
+        for component in self.components():
+            if component.state != WearableState.ON:
+                continue
+            if component.layer < WearableLayer.INNER:
+                continue
+            regions.update(component.covers)
+        return sorted(regions, key=lambda region: region.name)
 
     def _validate_custom(self) -> list[str]:
         errors: list[str] = []
@@ -75,13 +104,15 @@ class OutfitManager(SlottedContainer[Wearable]):
             errors.append(f"Need 3+ uniform pieces (have {uniform_count})")
 
         for region in BodyRegion:
-            items_here = [component for component in self.components() if region in component.covers]
+            items_here = [
+                component for component in self.components() if region in component.covers
+            ]
             items_here.sort(key=lambda wearable: wearable.layer.value)
 
             for idx, item in enumerate(items_here[:-1]):
-                if getattr(item, "state", None) and item.state.name == "OPEN":
+                if item.state == WearableState.OPEN:
                     covering_item = items_here[idx + 1]
-                    if getattr(covering_item, "state", None) and covering_item.state.name == "CLOSED":
+                    if covering_item.state == WearableState.ON:
                         errors.append(
                             f"{item.label} is open but covered by closed {covering_item.label}"
                         )

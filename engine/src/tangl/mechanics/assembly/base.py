@@ -3,16 +3,18 @@ from __future__ import annotations
 from collections import defaultdict
 from enum import Enum
 from numbers import Real
-from typing import Any, ClassVar, Generic, Optional, Protocol, TypeVar
+from typing import Any, ClassVar, Generic, Optional, Protocol, TypeVar, cast
 
 from pydantic import BaseModel, Field, model_validator
 
-from tangl.core import Entity
+from tangl.core import Entity, Selector
 from tangl.type_hints import Tag
 from .budget import BudgetTracker
+from .component import Component, ComponentFacet
 from .slot import Slot, SlotGroup
 
 CT = TypeVar("CT", bound=Entity)
+FacetComponentT = TypeVar("FacetComponentT", bound=Component)
 
 
 class HasResourceCost(Protocol):
@@ -53,7 +55,7 @@ class SlottedContainer(BaseModel, Generic[CT]):
     def assign(self, slot_name: str, component: CT) -> None:
         can_assign, reason = self.can_assign(slot_name, component)
         if not can_assign:
-            raise ValueError(f"Cannot assign {getattr(component, 'label', component)!r} to {slot_name}: {reason}")
+            raise ValueError(f"Cannot assign {component.label!r} to {slot_name}: {reason}")
 
         self.assignments[slot_name].append(component)
 
@@ -77,6 +79,71 @@ class SlottedContainer(BaseModel, Generic[CT]):
         for components in self.assignments.values():
             result.extend(components)
         return result
+
+    def component_facets(
+        self: "SlottedContainer[FacetComponentT]",
+        *,
+        channel: str | None = None,
+        facet_type: str | None = None,
+    ) -> list[ComponentFacet]:
+        """Discover matching facets from currently assigned components."""
+
+        facets: list[ComponentFacet] = []
+        slot_names = list(self.slots)
+        slot_names.extend(name for name in self.assignments if name not in self.slots)
+        for slot_name in slot_names:
+            components = self.assignments.get(slot_name, [])
+            for component in components:
+                facets.extend(
+                    component.component_facets(
+                        channel=channel,
+                        facet_type=facet_type,
+                        subject_id=slot_name,
+                    )
+                )
+        return facets
+
+    def fold_giver_payloads(
+        self: "SlottedContainer[FacetComponentT]",
+        channel: str,
+    ) -> list[object | None]:
+        """Return payloads from active ``giver`` facets on one channel."""
+
+        return [
+            facet.payload
+            for facet in self.component_facets(channel=channel, facet_type="giver")
+        ]
+
+    def materialize_defaults(self) -> list[CT]:
+        """Opt-in population of enabled empty slots that declare defaults."""
+
+        pending = [
+            slot_name
+            for slot_name, slot in self.slots.items()
+            if slot.default_factory is not None and not self.assignments.get(slot_name)
+        ]
+        materialized: list[CT] = []
+        while pending:
+            progressed = False
+            for slot_name in list(pending):
+                slot = self.slots[slot_name]
+                if self.assignments.get(slot_name) or not self.is_slot_enabled(slot_name):
+                    pending.remove(slot_name)
+                    continue
+                if any(
+                    not self.assignments.get(prerequisite)
+                    for prerequisite in slot.prerequisite_slots
+                ):
+                    continue
+
+                component = cast(CT, slot.default_factory())
+                self.assign(slot_name, component)
+                materialized.append(component)
+                pending.remove(slot_name)
+                progressed = True
+            if not progressed:
+                break
+        return materialized
 
     def get_aggregate(self, name: str, default: float = 0.0) -> float:
         """Sum one direct numeric attribute across assigned components.
@@ -154,9 +221,20 @@ class SlottedContainer(BaseModel, Generic[CT]):
             return False, f"No such slot: {slot_name}"
 
         slot = self.slots[slot_name]
+        if not self.is_slot_enabled(slot_name):
+            return False, f"Slot disabled: {slot_name}"
+
         selects, reason = slot.selects_for(component)
         if not selects:
             return False, reason
+
+        missing_prerequisites = [
+            prerequisite
+            for prerequisite in slot.prerequisite_slots
+            if not self.assignments.get(prerequisite)
+        ]
+        if missing_prerequisites:
+            return False, f"Missing prerequisite slots: {', '.join(missing_prerequisites)}"
 
         current_count = len(self.assignments.get(slot_name, []))
         if current_count >= slot.max_count:
@@ -170,12 +248,32 @@ class SlottedContainer(BaseModel, Generic[CT]):
 
         return True, ""
 
+    def is_slot_enabled(self, slot_name: str) -> bool:
+        if slot_name not in self.slots:
+            raise KeyError(f"No such slot: {slot_name}")
+
+        slot = self.slots[slot_name]
+        if not slot.enablement_criteria:
+            return True
+        if self.owner is None:
+            return False
+        return Selector(**slot.enablement_criteria).matches(self.owner)
+
     def validate(self) -> list[str]:
         errors: list[str] = []
 
         for slot_name, slot in self.slots.items():
-            if slot.required and not self.assignments.get(slot_name):
+            enabled = self.is_slot_enabled(slot_name)
+            if not enabled and self.assignments.get(slot_name):
+                errors.append(f"Disabled slot occupied: {slot_name}")
+            if enabled and slot.required and not self.assignments.get(slot_name):
                 errors.append(f"Required slot empty: {slot_name}")
+            if enabled and self.assignments.get(slot_name):
+                for prerequisite in slot.prerequisite_slots:
+                    if not self.assignments.get(prerequisite):
+                        errors.append(
+                            f"Slot '{slot_name}' missing prerequisite slot: {prerequisite}"
+                        )
 
         for group in self.slot_groups:
             total = sum(len(self.assignments.get(name, [])) for name in group.slot_names)
