@@ -598,6 +598,26 @@ class TestLedgerJournal:
             selector=presentation,
         ) == [f1, f2]
 
+    def test_marker_slice_starts_at_marker_position_within_same_step(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        before = ContentFragment(content="before bookmark", step=2)
+        after = ContentFragment(content="after bookmark", step=2)
+        next_section = JournalMarkerFragment(
+            marker_type="bookmark",
+            marker_name="next",
+            step=2,
+        )
+        excluded = ContentFragment(content="after next bookmark", step=2)
+        ledger.cursor_steps = 2
+        ledger.output_stream.append(before)
+        marker = ledger.set_bookmark("here")
+        ledger.output_stream.extend([after, next_section, excluded])
+
+        presentation = Selector(predicate=lambda fragment: fragment.fragment_type != "marker")
+
+        assert marker.step == before.step == after.step
+        assert ledger.get_marked_slice("here", selector=presentation) == [after]
+
     def test_set_bookmark_appends_named_marker(self) -> None:
         ledger, _ = _make_ledger("a", "b")
 

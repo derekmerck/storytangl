@@ -645,23 +645,6 @@ class Ledger(Entity):
             None,
         )
 
-    def _next_marker_step(
-        self,
-        *,
-        start_step: int,
-        marker_types: list[str],
-    ) -> int:
-        marker_type_set = set(marker_types)
-        candidates = [
-            self._fragment_step(marker)
-            for marker in self.markers()
-            if getattr(marker, "marker_type", None) in marker_type_set
-            and self._fragment_step(marker) > start_step
-        ]
-        if candidates:
-            return min(candidates)
-        return max(self.cursor_steps + 1, 0)
-
     def get_marked_slice(
         self,
         name_or_index: str | int = "latest",
@@ -675,16 +658,39 @@ class Ledger(Entity):
         marker = self.find_marker(name_or_index, marker_type=marker_type)
         if marker is None:
             raise KeyError(f"Marker {name_or_index!r}@{marker_type} not found")
-        start_step = self._fragment_step(marker)
-        return self.get_slice(
-            since_step=start_step,
-            until_step=self._next_marker_step(
-                start_step=start_step,
-                marker_types=stop_marker_types or [marker_type],
+        marker_type_set = set(stop_marker_types or [marker_type])
+        stream = [
+            (index, fragment)
+            for index, record in enumerate(self.output_stream.values())
+            if (fragment := self._coerce_fragment_record(record)) is not None
+        ]
+        start_index = next(index for index, fragment in stream if fragment.uid == marker.uid)
+        stop_index = next(
+            (
+                index
+                for index, fragment in stream
+                if index > start_index
+                and self._is_marker(fragment)
+                and getattr(fragment, "marker_type", None) in marker_type_set
             ),
-            selector=selector,
-            limit=limit,
+            len(stream),
         )
+        until_step = max(self.cursor_steps + 1, 0)
+        fragments: list[BaseFragment] = []
+        for index, fragment in stream:
+            if index < start_index or index >= stop_index:
+                continue
+            step = self._fragment_step(fragment)
+            if step < 0 or step >= until_step:
+                continue
+            if selector is not None and not selector.matches(fragment):
+                continue
+            fragments.append(fragment)
+
+        if limit > 0 and len(fragments) > limit:
+            fragments = fragments[-limit:]
+
+        return fragments
 
     def unstructure(self) -> UnstructuredData:
         """Serialize ledger state to plain data for persistence."""
