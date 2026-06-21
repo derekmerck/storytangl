@@ -105,6 +105,7 @@ class Ledger(Entity):
     call_stack_ids: list[UUID] = Field(default_factory=list)
     last_redirect: dict | None = None
     redirect_trace: list[dict] = Field(default_factory=list)
+    current_update_start_step: int = 0
 
     def _call_stack(self) -> list[TraversableEdge]:
         """Resolve call stack UIDs to edge objects (introspection only)."""
@@ -185,6 +186,7 @@ class Ledger(Entity):
         self.call_stack_ids = []
         self.last_redirect = None
         self.redirect_trace = []
+        self.current_update_start_step = 0
         self.causality_mode = CausalityMode.CLEAN
         self.causality_break_reason = None
         self.causality_break_step_id = None
@@ -310,6 +312,10 @@ class Ledger(Entity):
             self.output_stream.append(delta)
             delta_id = delta.uid
 
+        marker = self._section_marker_for_trace(trace)
+        if marker is not None:
+            self.output_stream.append(marker)
+
         self.output_stream.append(
             StepRecord(
                 step=trace.step,
@@ -322,6 +328,26 @@ class Ledger(Entity):
                 call_stack_ids=list(trace.call_stack_ids),
                 algorithm_id=self.replay_algorithm_id,
             )
+        )
+
+    def _section_marker_for_trace(self, trace: StepTrace) -> BaseFragment | None:
+        """Return an auto section marker for committed container-entry hops."""
+        cursor = self.graph.get(trace.cursor_id)
+        if not isinstance(cursor, TraversableNode) or not cursor.is_container:
+            return None
+        section_type = cursor.locals.get("section_type")
+        if not section_type:
+            return None
+        marker_name = cursor.locals.get("section_name") or cursor.label or str(cursor.uid)
+        path = cursor.locals.get("section_path") or marker_name
+        return BaseFragment(
+            fragment_type="marker",
+            content=marker_name,
+            marker_type=str(section_type),
+            marker_name=str(marker_name),
+            path=str(path),
+            source_id=cursor.uid,
+            step=trace.step,
         )
 
     @staticmethod
@@ -425,12 +451,14 @@ class Ledger(Entity):
 
     def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
         """Resolve a player choice and sync frame results into ledger state."""
+        update_start_step = max(self.cursor_steps + 1, 0)
         edge = self._require_choice_edge(edge_id)
         self._provision_selected_destination(edge)
 
         frame = self.get_frame()
         self._run_frame_choice(frame=frame, edge=edge, choice_payload=choice_payload)
         self._commit_frame_choice(frame=frame)
+        self.current_update_start_step = update_start_step
 
     @staticmethod
     def _coerce_fragment_record(record: Any) -> BaseFragment | None:
@@ -446,23 +474,218 @@ class Ledger(Entity):
             "fragment_type": str(fragment_type),
             "step": step,
         }
-        for key in ("content", "text", "source_id", "edge_id", "available", "unavailable_reason"):
+        for key in (
+            "content",
+            "text",
+            "source_id",
+            "edge_id",
+            "available",
+            "unavailable_reason",
+            "marker_type",
+            "marker_name",
+            "path",
+        ):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
         return BaseFragment(**payload)
 
-    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[BaseFragment]:
-        """Return output fragments in chronological order, optionally filtered."""
+    @staticmethod
+    def _fragment_step(fragment: BaseFragment) -> int:
+        raw_step = getattr(fragment, "step", -1)
+        return -1 if raw_step is None else int(raw_step)
+
+    @staticmethod
+    def _is_marker(fragment: BaseFragment, marker_type: str | None = None) -> bool:
+        if str(fragment.fragment_type) != "marker":
+            return False
+        if marker_type is None:
+            return True
+        return getattr(fragment, "marker_type", None) == marker_type
+
+    def get_slice(
+        self,
+        *,
+        since_step: int = 0,
+        until_step: int | None = None,
+        selector: Selector | None = None,
+        limit: int = 0,
+    ) -> list[BaseFragment]:
+        """Return output fragments in the half-open step span ``[since, until)``."""
         fragments: list[BaseFragment] = []
 
         for record in self.output_stream.values():
             fragment = self._coerce_fragment_record(record)
             if fragment is None:
                 continue
-            raw_step = getattr(fragment, "step", -1)
-            step = -1 if raw_step is None else int(raw_step)
-            if step >= since_step or step < 0:
-                fragments.append(fragment)
+            step = self._fragment_step(fragment)
+            if step < 0:
+                if until_step is not None and until_step > 0:
+                    continue
+            else:
+                if step < since_step:
+                    continue
+                if until_step is not None and step >= until_step:
+                    continue
+            if selector is not None and not selector.matches(fragment):
+                continue
+            fragments.append(fragment)
+
+        if limit > 0 and len(fragments) > limit:
+            fragments = fragments[-limit:]
+
+        return fragments
+
+    def get_journal(
+        self,
+        *,
+        since_step: int = 0,
+        until_step: int | None = None,
+        selector: Selector | None = None,
+        limit: int = 0,
+    ) -> list[BaseFragment]:
+        """Return journal fragments; compatibility wrapper for :meth:`get_slice`."""
+        return self.get_slice(
+            since_step=since_step,
+            until_step=until_step,
+            selector=selector,
+            limit=limit,
+        )
+
+    def get_current_update(
+        self,
+        *,
+        selector: Selector | None = None,
+        limit: int = 0,
+    ) -> list[BaseFragment]:
+        """Return fragments produced by the most recent successful choice resolution."""
+        fragments = self.get_slice(
+            since_step=self.current_update_start_step,
+            until_step=max(self.cursor_steps + 1, 0),
+            selector=selector,
+        )
+        fragment_ids = {fragment.uid for fragment in fragments}
+        live_fragments = [
+            fragment
+            for fragment in self.get_slice(
+                since_step=self.current_update_start_step,
+                selector=selector,
+            )
+            if self._fragment_step(fragment) < 0 and fragment.uid not in fragment_ids
+        ]
+        fragments.extend(live_fragments)
+
+        if limit > 0 and len(fragments) > limit:
+            fragments = fragments[-limit:]
+
+        return fragments
+
+    def markers(
+        self,
+        *,
+        marker_type: str | None = None,
+        marker_name: str | None = None,
+    ) -> list[BaseFragment]:
+        """Return stream marker fragments in chronological order."""
+        result = [
+            fragment
+            for fragment in self.get_slice()
+            if self._is_marker(fragment, marker_type=marker_type)
+        ]
+        if marker_name is not None:
+            result = [
+                fragment
+                for fragment in result
+                if getattr(fragment, "marker_name", None) == marker_name
+            ]
+        return result
+
+    def set_bookmark(
+        self,
+        name: str,
+        *,
+        step: int | None = None,
+        overwrite: bool = False,
+    ) -> BaseFragment:
+        """Append a named bookmark marker at ``step`` or the current ledger step."""
+        if not overwrite and self.find_marker(name, marker_type="bookmark") is not None:
+            raise KeyError(f"Bookmark already exists: {name}")
+        marker = BaseFragment(
+            fragment_type="marker",
+            content=name,
+            marker_type="bookmark",
+            marker_name=name,
+            step=max(self.cursor_steps, 0) if step is None else step,
+        )
+        self.output_stream.append(marker)
+        return marker
+
+    def find_marker(
+        self,
+        name_or_index: str | int = "latest",
+        *,
+        marker_type: str = "bookmark",
+    ) -> BaseFragment | None:
+        """Find a marker by name, index, or ``latest`` within one marker type."""
+        markers = self.markers(marker_type=marker_type)
+        if not markers:
+            return None
+        if isinstance(name_or_index, int):
+            try:
+                return markers[name_or_index]
+            except IndexError:
+                return None
+        if name_or_index == "latest":
+            return markers[-1]
+        return next(
+            (
+                marker
+                for marker in reversed(markers)
+                if getattr(marker, "marker_name", None) == name_or_index
+            ),
+            None,
+        )
+
+    def get_marked_slice(
+        self,
+        name_or_index: str | int = "latest",
+        *,
+        marker_type: str = "bookmark",
+        stop_marker_types: list[str] | None = None,
+        selector: Selector | None = None,
+        limit: int = 0,
+    ) -> list[BaseFragment]:
+        """Return a slice from one marker to the next logical marker/current step."""
+        marker = self.find_marker(name_or_index, marker_type=marker_type)
+        if marker is None:
+            raise KeyError(f"Marker {name_or_index!r}@{marker_type} not found")
+        marker_type_set = set(stop_marker_types or [marker_type])
+        stream = [
+            (index, fragment)
+            for index, record in enumerate(self.output_stream.values())
+            if (fragment := self._coerce_fragment_record(record)) is not None
+        ]
+        start_index = next(index for index, fragment in stream if fragment.uid == marker.uid)
+        stop_index = next(
+            (
+                index
+                for index, fragment in stream
+                if index > start_index
+                and self._is_marker(fragment)
+                and getattr(fragment, "marker_type", None) in marker_type_set
+            ),
+            len(stream),
+        )
+        until_step = max(self.cursor_steps + 1, 0)
+        fragments: list[BaseFragment] = []
+        for index, fragment in stream:
+            if index < start_index or index >= stop_index:
+                continue
+            step = self._fragment_step(fragment)
+            if step < 0 or step >= until_step:
+                continue
+            if selector is not None and not selector.matches(fragment):
+                continue
+            fragments.append(fragment)
 
         if limit > 0 and len(fragments) > limit:
             fragments = fragments[-limit:]
@@ -479,6 +702,7 @@ class Ledger(Entity):
             "cursor_steps": self.cursor_steps,
             "choice_steps": self.choice_steps,
             "reentrant_steps": self.reentrant_steps,
+            "current_update_start_step": self.current_update_start_step,
             "call_stack_ids": list(self.call_stack_ids),
             "last_redirect": self.last_redirect,
             "redirect_trace": self.redirect_trace,
@@ -526,6 +750,7 @@ class Ledger(Entity):
             cursor_steps=data.get("cursor_steps", -1),
             choice_steps=data.get("choice_steps", -1),
             reentrant_steps=data.get("reentrant_steps", -1),
+            current_update_start_step=data.get("current_update_start_step", 0),
             call_stack_ids=[_coerce_uuid(uid) for uid in data.get("call_stack_ids", [])],
             last_redirect=data.get("last_redirect"),
             redirect_trace=list(data.get("redirect_trace", [])),

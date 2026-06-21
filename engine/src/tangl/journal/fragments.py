@@ -77,6 +77,20 @@ class GroupFragment(BaseFragment, extra="allow"):
         ]
 
 
+class JournalMarkerFragment(BaseFragment, extra="allow"):
+    """Point marker used to compute journal slices at read time.
+
+    Markers are stored in the same stream as presentation fragments so replay,
+    persistence, and provenance stay unified. They mark a start point; spans are
+    computed by :class:`tangl.vm.runtime.ledger.Ledger`.
+    """
+
+    fragment_type: Literal["marker"] = "marker"
+    marker_type: str
+    marker_name: str | None = None
+    path: str | None = None
+
+
 class PieceFragment(BaseFragment, extra="allow"):
     """Identified game piece: a tracked object the player can reference, place
     into a zone, or pick as a choice payload (candidate, document, token, asset).
@@ -234,6 +248,7 @@ _FRAGMENT_DTO_TYPES: dict[str, type[BaseFragment]] = {
     "dialog": DialogFragment,
     "group": GroupFragment,
     "kv": KvFragment,
+    "marker": JournalMarkerFragment,
     "media": MediaFragment,
     "piece": PieceFragment,
     "update": ControlFragment,
@@ -306,6 +321,7 @@ __all__ = [
     "ControlFragmentType",
     "DialogFragment",
     "GroupFragment",
+    "JournalMarkerFragment",
     "KvFragment",
     "KvRow",
     "MediaFragment",

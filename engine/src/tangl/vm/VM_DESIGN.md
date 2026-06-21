@@ -464,6 +464,17 @@ construct Frames directly.
 `OrderedRegistry` across all frames. Replay slices this registry by step range and
 re-executes fragments to reconstruct any point-in-time state.
 
+**Journal retrieval is one bounded slice primitive.** `Ledger.get_slice()` returns
+fragments in the half-open step span `[since_step, until_step)`, with optional
+`Selector` filtering; `get_journal()` is compatibility sugar over that primitive.
+Higher-level reads compute bounds and then call the same primitive: `get_current_update()`
+uses the most recent resolution watermark, bookmarks resolve to a marker step, and
+section-style reads run from one marker to the next compatible marker or the current
+step. Section/book/scene names are data, not VM enums. A container may opt into automatic
+section markers by setting `locals["section_type"]` plus optional `section_name` and
+`section_path`; the ledger writes those markers as ordinary stream fragments when the
+container-entry hop commits. Markers are points, spans are computed views.
+
 
 ### Provisioning (`provision/`)
 

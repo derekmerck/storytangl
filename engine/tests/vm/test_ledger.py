@@ -19,7 +19,7 @@ from uuid import uuid4
 import pytest
 
 from tangl.core import EntityTemplate, Graph, Selector, Snapshot, TemplateRegistry
-from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment, JournalMarkerFragment
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.media.media_data_type import MediaDataType
 from tangl.vm import TraversableGraphFactory
@@ -314,6 +314,14 @@ class TestLedgerResolveChoice:
         ledger.resolve_choice(edge.uid)
         assert ledger.choice_steps == initial_choice + 1
 
+    def test_resolve_records_current_update_start_step(self) -> None:
+        ledger, [a, _b] = _make_ledger("a", "b")
+        edge = list(a.edges_out())[0]
+
+        ledger.resolve_choice(edge.uid)
+
+        assert ledger.current_update_start_step == 1
+
     def test_resolve_choice_forwards_choice_payload_to_frame(self, monkeypatch) -> None:
         ledger, [a, b] = _make_ledger("a", "b")
         edge = list(a.edges_out())[0]
@@ -413,6 +421,39 @@ class TestLedgerResolveChoice:
 
         assert ledger.cursor_history == [root.uid, container.uid, entry.uid]
 
+    def test_section_marked_container_entry_appends_marker_fragment(self) -> None:
+        g = Graph()
+        root = _node(g, label="root")
+        scene = _node(
+            g,
+            label="scene",
+            locals={
+                "section_type": "scene",
+                "section_name": "opening",
+                "section_path": "book_1.scene_1",
+            },
+        )
+        entry = _node(g, label="entry")
+        scene.add_child(entry)
+        scene.source_id = entry.uid
+        _edge(g, predecessor_id=root.uid, successor_id=scene.uid)
+
+        import tangl.vm.system_handlers as sh
+        on_prereqs(sh.descend_into_container)
+
+        ledger = Ledger(graph=g, cursor_id=root.uid)
+        edge = list(root.edges_out())[0]
+        ledger.resolve_choice(edge.uid)
+
+        marker = ledger.find_marker("opening", marker_type="scene")
+        assert marker is not None
+        assert marker.content == "opening"
+        assert marker.path == "book_1.scene_1"
+        assert marker.source_id == scene.uid
+        assert ledger.get_marked_slice("opening", marker_type="scene") == [
+            marker,
+        ]
+
     def test_reentrant_steps_increments_on_self_loop_hops(self) -> None:
         ledger, [a, _b] = _make_ledger("a", "b")
 
@@ -490,6 +531,104 @@ class TestLedgerJournal:
 
         assert ledger.get_journal(since_step=2) == [f2, f3]
         assert ledger.get_journal(limit=2) == [f2, f3]
+
+    def test_get_slice_applies_half_open_step_bounds_and_selector(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        f1 = ContentFragment(content="one", step=1)
+        f2 = ContentFragment(content="two", step=2)
+        f3 = ChoiceFragment(edge_id=uuid4(), text="three", step=3)
+        ledger.output_stream.extend([f1, f2, f3])
+
+        content_only = Selector(predicate=lambda fragment: fragment.fragment_type == "content")
+
+        assert ledger.get_slice(since_step=1, until_step=3, selector=content_only) == [f1, f2]
+        assert ledger.get_journal(since_step=1, until_step=3, selector=content_only) == [
+            f1,
+            f2,
+        ]
+
+    def test_get_slice_excludes_unstamped_fragments_from_bounded_ranges(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        unstamped = ContentFragment(content="legacy")
+        current = ContentFragment(content="current", step=2)
+        ledger.output_stream.extend([unstamped, current])
+
+        assert ledger.get_slice() == [unstamped, current]
+        assert ledger.get_slice(since_step=0, until_step=0) == [unstamped]
+        assert ledger.get_slice(since_step=2, until_step=3) == [current]
+
+    def test_get_current_update_uses_resolution_watermark(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        f1 = ContentFragment(content="previous", step=1)
+        f2 = ContentFragment(content="current one", step=2)
+        f3 = ChoiceFragment(edge_id=uuid4(), text="current two", step=3)
+        live_choice = ChoiceFragment(edge_id=uuid4(), text="live affordance")
+        f4 = ContentFragment(content="future", step=4)
+        ledger.output_stream.extend([f1, f2, f3, live_choice, f4])
+        ledger.current_update_start_step = 2
+        ledger.cursor_steps = 3
+
+        assert ledger.get_current_update() == [f2, f3, live_choice]
+
+    def test_marker_slice_runs_from_marker_to_next_logical_marker(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        scene_start = JournalMarkerFragment(
+            marker_type="scene",
+            marker_name="scene_1",
+            step=1,
+        )
+        f1 = ContentFragment(content="scene prose", step=1)
+        f2 = ContentFragment(content="scene choice", step=2)
+        next_book = JournalMarkerFragment(
+            marker_type="book",
+            marker_name="book_2",
+            step=3,
+        )
+        f3 = ContentFragment(content="next book", step=3)
+        ledger.output_stream.extend([scene_start, f1, f2, next_book, f3])
+        ledger.cursor_steps = 3
+
+        presentation = Selector(predicate=lambda fragment: fragment.fragment_type != "marker")
+
+        assert ledger.find_marker("scene_1", marker_type="scene") is scene_start
+        assert ledger.get_marked_slice(
+            "scene_1",
+            marker_type="scene",
+            stop_marker_types=["scene", "book"],
+            selector=presentation,
+        ) == [f1, f2]
+
+    def test_marker_slice_starts_at_marker_position_within_same_step(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        before = ContentFragment(content="before bookmark", step=2)
+        after = ContentFragment(content="after bookmark", step=2)
+        next_section = JournalMarkerFragment(
+            marker_type="bookmark",
+            marker_name="next",
+            step=2,
+        )
+        excluded = ContentFragment(content="after next bookmark", step=2)
+        ledger.cursor_steps = 2
+        ledger.output_stream.append(before)
+        marker = ledger.set_bookmark("here")
+        ledger.output_stream.extend([after, next_section, excluded])
+
+        presentation = Selector(predicate=lambda fragment: fragment.fragment_type != "marker")
+
+        assert marker.step == before.step == after.step
+        assert ledger.get_marked_slice("here", selector=presentation) == [after]
+
+    def test_set_bookmark_appends_named_marker(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+
+        bookmark = ledger.set_bookmark("intro", step=2)
+
+        assert bookmark.fragment_type == "marker"
+        assert bookmark.marker_type == "bookmark"
+        assert bookmark.marker_name == "intro"
+        assert ledger.find_marker("intro") is bookmark
+        with pytest.raises(KeyError, match="Bookmark already exists"):
+            ledger.set_bookmark("intro")
 
     def test_get_journal_preserves_base_media_fragments(self) -> None:
         ledger, _ = _make_ledger("a", "b")

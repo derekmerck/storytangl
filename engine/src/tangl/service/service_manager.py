@@ -504,7 +504,6 @@ class ServiceManager:
             else:
                 edge_id = request.edge_id
 
-            before_step = session.ledger.step
             try:
                 session.ledger.resolve_choice(edge_id, choice_payload=request.payload)
             except ValueError as exc:
@@ -525,7 +524,7 @@ class ServiceManager:
                         )
                     ],
                 )
-            fragments = list(session.ledger.get_journal(since_step=max(before_step + 1, 0)))
+            fragments = list(session.ledger.get_current_update())
             return self._build_runtime_envelope(session.ledger, fragments=fragments)
 
     @service_method(
