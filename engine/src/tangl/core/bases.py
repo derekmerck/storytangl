@@ -349,7 +349,10 @@ class Unstructurable(BaseModelPlus):
             for option in args:
                 if option is type(None):
                     continue
-                return cls._structure_unstructurable_value(value, option, _ctx=_ctx)
+                try:
+                    return cls._structure_unstructurable_value(value, option, _ctx=_ctx)
+                except (TypeError, ValueError):
+                    continue
             return value
 
         if origin in (dict,):

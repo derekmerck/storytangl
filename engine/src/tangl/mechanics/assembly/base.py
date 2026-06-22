@@ -359,10 +359,20 @@ class ComponentManager(SlottedContainer[CT]):
         registry = self._owner_registry()
         if registry is None:
             return
-        if getattr(component, "registry", None) is not registry:
+        component_registry = getattr(component, "registry", None)
+        registered_component = registry.get(component.uid)
+        if component_registry is None:
+            if registered_component is not None and registered_component is not component:
+                raise ValueError("Assigned component UID is already registered to another item")
+            registry.add(component)
+            return
+        if component_registry is not registry:
             raise ValueError("Assigned component must belong to the owner's registry")
-        if registry.get(component.uid) is not component:
-            raise ValueError("Assigned component must be registered before assignment")
+        if registered_component is None:
+            registry.add(component)
+            return
+        if registered_component is not component:
+            raise ValueError("Assigned component UID is already registered to another item")
 
     def _add_to_slot(self, slot_name: str, component: CT) -> None:
         self._validate_component_registry(component)
@@ -376,6 +386,8 @@ class ComponentManager(SlottedContainer[CT]):
         component_ids.remove(component.uid)
         if not component_ids:
             self.assignment_ids.pop(slot_name, None)
+        if not any(component.uid in ids for ids in self.assignment_ids.values()):
+            self._component_cache.pop(component.uid, None)
         return True
 
     def unstructure(self) -> UnstructuredData:

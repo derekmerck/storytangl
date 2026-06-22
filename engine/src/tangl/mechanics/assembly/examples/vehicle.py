@@ -178,6 +178,8 @@ class VehicleLoadout(ComponentManager[VehicleComponent]):
         except Exception:
             for old_component in replaced:
                 self._add_to_slot(slot_name, old_component)
+            if self.budgets:
+                self.budgets.recalculate(self.all_components())
             raise
 
     def total_weight(self) -> float:

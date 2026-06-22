@@ -250,6 +250,21 @@ class TestUnstructurable:
         assert restored.unique_items == {first}
         assert isinstance(restored.by_key["second"], SpecialEmbedded)
 
+    def test_marked_union_field_tries_later_options_without_kind(self) -> None:
+        class Left(Unstructurable):
+            value: int
+
+        class Right(Unstructurable):
+            name: str
+
+        class Holder(Unstructurable):
+            child: Left | Right = Field(json_schema_extra={"unstructurable": True})
+
+        restored = Holder.structure({"kind": Holder, "child": {"name": "kept"}})
+
+        assert isinstance(restored.child, Right)
+        assert restored.child.name == "kept"
+
     def test_unstructurable_marker_is_independent_from_include(self) -> None:
         class Embedded(Unstructurable):
             value: int = 0
