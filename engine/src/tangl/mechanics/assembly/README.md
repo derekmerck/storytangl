@@ -9,9 +9,11 @@ Key pieces:
 - `Slot` / `SlotGroup`: selection criteria and aggregate constraints.
 - `SlottedContainer`: generic container that enforces slot rules and optional resource budgets.
 - `HasSlottedContainer`: mixin for embedding a container on an entity (facet-style).
+- `ComponentManager`: owner-bound manager that persists graph-member assignments by id.
+- `Connector` / `ConnectionGroupManager`: endpoint components and id-backed pairings.
 - `BudgetTracker`: helper for tracking resource usage (power, weight, etc.).
 
-See `examples/vehicle.py` for usage patterns.
+See `examples/vehicle.py` and `examples/connectors.py` for usage patterns.
 
 Aggregate helpers operate over the container's current `all_components()`
 result exactly as-is.
@@ -25,3 +27,8 @@ capabilities = vehicle.vehicle_loadout.get_aggregate_tags("capabilities")
 `OutfitManager` has been promoted out of `assembly.examples` into
 `tangl.mechanics.presence.outfit` because active presence mechanics depend on it
 as a real family surface rather than a demo.
+
+Connector association is the first bilateral proof: `can_connect()` and
+`can_disconnect()` are pure checks, while `connect()` and `disconnect()` commit
+id-backed relationship state. Author-facing `on_associate` hooks are reserved
+for a later update-phase layer.

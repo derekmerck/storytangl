@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from tangl.core import Entity, Selector
 
-from .component import Component, ConnectorPolarity
+from .component import Connector, ConnectorPolarity
 
 
 class Slot(BaseModel):
@@ -65,7 +65,7 @@ class Slot(BaseModel):
         if self.connector_shape is None and self.connector_polarity is None:
             return True, ""
 
-        if not isinstance(component, Component):
+        if not isinstance(component, Connector):
             return False, "Component has no assembly connector"
 
         if self.connector_shape is not None and component.connector_shape != self.connector_shape:
