@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import Enum
+from inspect import isclass
 from numbers import Real
 from typing import Any, ClassVar, Generic, Optional, Protocol, TypeVar, cast
+from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from tangl.core import Entity, Selector
-from tangl.type_hints import Tag
+from tangl.type_hints import Tag, UnstructuredData
 from .budget import BudgetTracker
 from .component import Component, ComponentFacet
 from .slot import Slot, SlotGroup
@@ -40,6 +42,27 @@ class SlottedContainer(BaseModel, Generic[CT]):
     budgets: Optional[BudgetTracker] = None
     owner: Any = Field(default=None, exclude=True)
 
+    def _slot_names(self) -> list[str]:
+        return list(self.assignments)
+
+    def _slot_components(self, slot_name: str) -> list[CT]:
+        return self.assignments.get(slot_name, [])
+
+    def _has_slot_components(self, slot_name: str) -> bool:
+        return bool(self._slot_components(slot_name))
+
+    def _slot_count(self, slot_name: str) -> int:
+        return len(self._slot_components(slot_name))
+
+    def _add_to_slot(self, slot_name: str, component: CT) -> None:
+        self.assignments[slot_name].append(component)
+
+    def _remove_from_slot(self, slot_name: str, component: CT) -> bool:
+        if component not in self.assignments.get(slot_name, []):
+            return False
+        self.assignments[slot_name].remove(component)
+        return True
+
     @model_validator(mode="after")
     def _initialize_budgets(self) -> "SlottedContainer[CT]":
         if self.tracked_resources and not self.budgets:
@@ -57,27 +80,23 @@ class SlottedContainer(BaseModel, Generic[CT]):
         if not can_assign:
             raise ValueError(f"Cannot assign {component.label!r} to {slot_name}: {reason}")
 
-        self.assignments[slot_name].append(component)
+        self._add_to_slot(slot_name, component)
 
         if self.budgets:
             self.budgets.recalculate(self.all_components())
 
     def unassign(self, slot_name: str, component: CT) -> None:
-        if slot_name not in self.assignments:
-            return
-
-        if component in self.assignments[slot_name]:
-            self.assignments[slot_name].remove(component)
+        if self._remove_from_slot(slot_name, component):
             if self.budgets:
                 self.budgets.recalculate(self.all_components())
 
     def get_slot(self, slot_name: str) -> list[CT]:
-        return self.assignments.get(slot_name, [])
+        return self._slot_components(slot_name)
 
     def all_components(self) -> list[CT]:
         result: list[CT] = []
-        for components in self.assignments.values():
-            result.extend(components)
+        for slot_name in self._slot_names():
+            result.extend(self._slot_components(slot_name))
         return result
 
     def component_facets(
@@ -90,9 +109,9 @@ class SlottedContainer(BaseModel, Generic[CT]):
 
         facets: list[ComponentFacet] = []
         slot_names = list(self.slots)
-        slot_names.extend(name for name in self.assignments if name not in self.slots)
+        slot_names.extend(name for name in self._slot_names() if name not in self.slots)
         for slot_name in slot_names:
-            components = self.assignments.get(slot_name, [])
+            components = self._slot_components(slot_name)
             for component in components:
                 facets.extend(
                     component.component_facets(
@@ -120,18 +139,18 @@ class SlottedContainer(BaseModel, Generic[CT]):
         pending = [
             slot_name
             for slot_name, slot in self.slots.items()
-            if slot.default_factory is not None and not self.assignments.get(slot_name)
+            if slot.default_factory is not None and not self._has_slot_components(slot_name)
         ]
         materialized: list[CT] = []
         while pending:
             progressed = False
             for slot_name in list(pending):
                 slot = self.slots[slot_name]
-                if self.assignments.get(slot_name) or not self.is_slot_enabled(slot_name):
+                if self._has_slot_components(slot_name) or not self.is_slot_enabled(slot_name):
                     pending.remove(slot_name)
                     continue
                 if any(
-                    not self.assignments.get(prerequisite)
+                    not self._has_slot_components(prerequisite)
                     for prerequisite in slot.prerequisite_slots
                 ):
                     continue
@@ -231,12 +250,12 @@ class SlottedContainer(BaseModel, Generic[CT]):
         missing_prerequisites = [
             prerequisite
             for prerequisite in slot.prerequisite_slots
-            if not self.assignments.get(prerequisite)
+            if not self._has_slot_components(prerequisite)
         ]
         if missing_prerequisites:
             return False, f"Missing prerequisite slots: {', '.join(missing_prerequisites)}"
 
-        current_count = len(self.assignments.get(slot_name, []))
+        current_count = self._slot_count(slot_name)
         if current_count >= slot.max_count:
             return False, f"Slot full ({current_count}/{slot.max_count})"
 
@@ -264,19 +283,19 @@ class SlottedContainer(BaseModel, Generic[CT]):
 
         for slot_name, slot in self.slots.items():
             enabled = self.is_slot_enabled(slot_name)
-            if not enabled and self.assignments.get(slot_name):
+            if not enabled and self._has_slot_components(slot_name):
                 errors.append(f"Disabled slot occupied: {slot_name}")
-            if enabled and slot.required and not self.assignments.get(slot_name):
+            if enabled and slot.required and not self._has_slot_components(slot_name):
                 errors.append(f"Required slot empty: {slot_name}")
-            if enabled and self.assignments.get(slot_name):
+            if enabled and self._has_slot_components(slot_name):
                 for prerequisite in slot.prerequisite_slots:
-                    if not self.assignments.get(prerequisite):
+                    if not self._has_slot_components(prerequisite):
                         errors.append(
                             f"Slot '{slot_name}' missing prerequisite slot: {prerequisite}"
                         )
 
         for group in self.slot_groups:
-            total = sum(len(self.assignments.get(name, [])) for name in group.slot_names)
+            total = sum(self._slot_count(name) for name in group.slot_names)
             if group.min_total is not None and total < group.min_total:
                 errors.append(f"Group '{group.name}': {total} < {group.min_total} (min)")
             if group.max_total is not None and total > group.max_total:
@@ -294,6 +313,87 @@ class SlottedContainer(BaseModel, Generic[CT]):
     @property
     def is_valid(self) -> bool:
         return len(self.validate()) == 0
+
+
+class ComponentManager(SlottedContainer[CT]):
+    """Owner-bound slotted manager that persists graph-member assignments by UUID."""
+
+    assignment_ids: dict[str, list[UUID]] = Field(default_factory=dict)
+    _component_cache: dict[UUID, CT] = PrivateAttr(default_factory=dict)
+
+    def bind_owner(self, owner: Any) -> "ComponentManager[CT]":
+        self.owner = owner
+        return self
+
+    def _slot_names(self) -> list[str]:
+        return list(self.assignment_ids)
+
+    def _owner_registry(self):
+        if self.owner is None:
+            return None
+        return getattr(self.owner, "registry", None)
+
+    def _resolve_component(self, component_id: UUID) -> CT:
+        registry = self._owner_registry()
+        if registry is not None:
+            component = registry.get(component_id)
+            if component is not None:
+                return cast(CT, component)
+        if component_id in self._component_cache:
+            return self._component_cache[component_id]
+        raise KeyError(f"Component {component_id} is not available through the owner registry")
+
+    def _slot_components(self, slot_name: str) -> list[CT]:
+        return [
+            self._resolve_component(component_id)
+            for component_id in self.assignment_ids.get(slot_name, [])
+        ]
+
+    def _has_slot_components(self, slot_name: str) -> bool:
+        return bool(self.assignment_ids.get(slot_name))
+
+    def _slot_count(self, slot_name: str) -> int:
+        return len(self.assignment_ids.get(slot_name, []))
+
+    def _validate_component_registry(self, component: CT) -> None:
+        registry = self._owner_registry()
+        if registry is None:
+            return
+        if getattr(component, "registry", None) is not registry:
+            raise ValueError("Assigned component must belong to the owner's registry")
+        if registry.get(component.uid) is not component:
+            raise ValueError("Assigned component must be registered before assignment")
+
+    def _add_to_slot(self, slot_name: str, component: CT) -> None:
+        self._validate_component_registry(component)
+        self.assignment_ids.setdefault(slot_name, []).append(component.uid)
+        self._component_cache[component.uid] = component
+
+    def _remove_from_slot(self, slot_name: str, component: CT) -> bool:
+        component_ids = self.assignment_ids.get(slot_name)
+        if not component_ids or component.uid not in component_ids:
+            return False
+        component_ids.remove(component.uid)
+        if not component_ids:
+            self.assignment_ids.pop(slot_name, None)
+        return True
+
+    def unstructure(self) -> UnstructuredData:
+        data: UnstructuredData = {"kind": self.__class__}
+        if self.assignment_ids:
+            data["assignment_ids"] = self.assignment_ids
+        if self.budgets is not None:
+            data["budgets"] = self.budgets.model_dump(exclude_defaults=True)
+        return data
+
+    @classmethod
+    def structure(cls, data: UnstructuredData, _ctx: Any = None) -> "ComponentManager[CT]":
+        _ = _ctx
+        payload = dict(data)
+        cls_ = payload.pop("kind", cls)
+        if not isclass(cls_):
+            raise TypeError(f"Expected {cls_} to be a class")
+        return cls_(**payload)
 
 
 class HasSlottedContainer:

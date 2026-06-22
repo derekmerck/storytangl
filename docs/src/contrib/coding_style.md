@@ -41,6 +41,26 @@ presentation (renderers, web/UI)
 ## 4) Data model & serialization
 - Pydantic v2 models for entities and records.
 - `Entity.structure(data)` is the factory; `unstructure()` emits a minimal, portable dict (class tag + uid).
+- `model_dump()` is not the persistence contract. Use it for DTOs, schemas, and
+  local Pydantic views; do not use it as proof that runtime graph state
+  round-trips.
+- Treat field inclusion and recursive structuring as orthogonal. A field marker
+  like `include=True` controls whether a mutated/default field is emitted; a
+  marker like `unstructurable=True` should control whether nested values are
+  recursively converted through `unstructure()` / `structure()`.
+- This is the generic form of existing explicit paths such as
+  `Registry.members` and `EntityTemplate.payload`: raw Pydantic dumping skips
+  the field, and constructor-form logic walks the contained values.
+- Anything that stores or derives pointers to other entities must unstructure
+  those links explicitly, usually as ids, and restore live objects through the
+  owning registry/graph during `structure()`.
+- Do not auto-embed arbitrary `Entity`-typed fields. If a nested value is a
+  real graph member, persist a reference. If it is an owner-bound manager or
+  value object, mark the field for constructor-form recursion.
+- Keep recursive constructor-form handling narrow. The legacy automorphic
+  experiments in `scratch/legacy/core/core-23/structuring/` are explicit
+  non-goals: no self-casting, no self-templating, no misnamed-child inference,
+  and no broad object-self-shaping pipeline.
 - No implicit IO in models; persistence belongs to ledger/service.
 
 ## 4a) Type purity on attributes
@@ -110,6 +130,10 @@ presentation (renderers, web/UI)
 
 ## 13) Tests (contracts > mechanics)
 - Round-trip `structure/unstructure` for composites.
+- For any manager/component/sub-entity-like object that holds graph references,
+  test a populated sample graph through `Graph.unstructure()` /
+  `Graph.structure()`, then assert restored ids, membership, and dereferenced
+  objects. A passing `model_dump()` / `model_validate()` test is not sufficient.
 - Phase reducers return the documented shape.
 - Provisioning policies enforce required fields.
 - Event canonicalization removes redundant updates; replay reproduces state.

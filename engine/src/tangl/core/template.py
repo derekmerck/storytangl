@@ -178,8 +178,12 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
     # template to be used within a scope, or once per scope.  That should be captured in
     # metadata.
 
-    payload: ET = Field(..., exclude=True)
-    # Excluded from pydantic model_dump; unstructure/structure handles payload explicitly.
+    payload: ET = Field(
+        ...,
+        exclude=True,
+        json_schema_extra={"unstructurable": True},
+    )
+    # Excluded from pydantic model_dump; generic unstructurable recursion handles payload.
     admission_scope: str | None = None
     # Optional target-context scope gate for provisioning admission.
 
@@ -258,22 +262,6 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         else:
             updates.pop('uid', None)  # exact copy, discard any override uid
         return self.payload.evolve(**updates)
-
-    def unstructure(self) -> UnstructuredData:
-        """Serialize template record data plus explicitly serialized payload."""
-        data = super().unstructure()
-        # TODO: could use field annotation introspection to discover members and
-        #       payload include nested entities and automatically structure/unstructure
-        #       them recursively
-        data['payload'] = self.payload.unstructure()
-        return data
-
-    @classmethod
-    def structure(cls, data: UnstructuredData, _ctx=None) -> Self:
-        """Structure template record data plus structured payload."""
-        data = dict(data)
-        data['payload'] = Entity.structure(data['payload'], _ctx=_ctx)
-        return super().structure(data)
 
     def decompile(self, generify = True) -> UnstructuredData:
         """Return author-facing payload script data.

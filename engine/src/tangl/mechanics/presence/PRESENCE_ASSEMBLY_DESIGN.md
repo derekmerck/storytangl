@@ -7,17 +7,31 @@
 :related: media, open_link, credentials, token
 ```
 
-**Status:** DESIGN — assessment, not an implementation plan. The question is how to
-avoid a family of parallel systems that all look like "components attached to a
-body/vehicle/entity, with slots, visibility, constraints, and projections."
+**Status:** DESIGN + FIRST IMPLEMENTATION SLICE. The question is how to avoid a family
+of parallel systems that all look like "components attached to a body/vehicle/entity,
+with slots, visibility, constraints, and projections."
 
 > Issue tracking: see the "Presence / body-attachment unification" issue and the
 > assembly-core issues (#131 umbrella → #194/#195/#196). This doc holds the *what
 > and why*; the issues hold the *where-next*.
 
+## Implementation status
+
+`OutfitManager` now uses the assembly-layer `ComponentManager` path: it is still
+embedded on `HasOutfit`, but its assigned wearables are graph members stored by UUID
+and dereferenced through the owning actor's registry. `HasOutfit.outfit` opts into
+constructor-form persistence with `json_schema_extra={"include": True,
+"unstructurable": True}`, so mutated outfit state survives graph round-trips without
+making the outfit manager a graph item.
+
+This resolves the first serialization identity bug for outfits. The body-attachment
+generalization below remains the design target for ornaments, injuries, cybernetics,
+robot parts, vehicles, and credential packets.
+
 ## Current shape
 
-- `OutfitManager` is already a real `SlottedContainer[Wearable]`.
+- `OutfitManager` is a real `ComponentManager[Wearable]` using the shared
+  `SlottedContainer` slot, validation, budget, and facet APIs.
 - `WearableType` is an `AssetType`; `Wearable` is a token wrapper over that type.
 - `Ornamentation` is still a plain `Node` with `collection: list[Ornament]`.
 - `Ornament` is an `Entity` with `body_part: BodyPart`, `ornament_type: OrnamentType`, `text: str`.

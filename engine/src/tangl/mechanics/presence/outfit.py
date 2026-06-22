@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from tangl.lang.helpers import oxford_join
 from tangl.lang.body_parts import BodyPart, BodyRegion
-from tangl.mechanics.assembly import Slot, SlottedContainer
+from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.presence.wearable import Wearable
 from tangl.mechanics.presence.wearable.enums import WearableLayer, WearableState
 
 
-class OutfitManager(SlottedContainer[Wearable]):
+class OutfitManager(ComponentManager[Wearable]):
     """Manage wearable items across body regions and clothing layers.
 
     Key Features

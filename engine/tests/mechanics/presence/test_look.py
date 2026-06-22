@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from tangl.core import Graph, Selector
 from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.presence.look import (
     BodyPhenotype,
@@ -135,6 +136,57 @@ class TestDirectPresenceFacets:
         assert payload.description == "a dragon tattoo on their left arm"
         assert payload.items == ["a dragon tattoo on their left arm"]
         assert payload.media_role == "avatar_im"
+
+
+class TestOutfitSerialization:
+    """Graph-backed outfit manager persistence contract."""
+
+    def test_graph_roundtrip_preserves_outfit_assignments_by_graph_id(self) -> None:
+        shirt_type = WearableType(
+            label="roundtrip_shirt",
+            noun="shirt",
+            covers={BodyRegion.TOP},
+            layer=WearableLayer.OUTER,
+        )
+        coat_type = WearableType(
+            label="roundtrip_coat",
+            noun="coat",
+            covers={BodyRegion.TOP},
+            layer=WearableLayer.OVER,
+        )
+        graph = Graph()
+        actor = graph.add_node(kind=DemoOutfitActor, label="guide")
+        shirt = graph.add_node(
+            kind=Wearable,
+            label="guide-shirt",
+            token_from=shirt_type.label,
+        )
+        coat = graph.add_node(
+            kind=Wearable,
+            label="guide-coat",
+            token_from=coat_type.label,
+        )
+
+        actor.outfit.assign("top_60", shirt)
+        actor.outfit.assign("top_80", coat)
+
+        actor_data = actor.unstructure()
+        graph_data = graph.unstructure()
+        restored = Graph.structure(graph_data)
+        restored_actor = restored.find_one(Selector(label="guide"))
+        restored_shirt = restored.find_one(Selector(label="guide-shirt"))
+        restored_coat = restored.find_one(Selector(label="guide-coat"))
+
+        assert actor_data["outfit"]["assignment_ids"] == {
+            "top_60": [shirt.uid],
+            "top_80": [coat.uid],
+        }
+        assert restored_actor.outfit.owner is restored_actor
+        assert restored_actor.outfit.get_slot("top_60") == [restored_shirt]
+        assert restored_actor.outfit.get_slot("top_80") == [restored_coat]
+        assert restored_actor.outfit.describe_items() == ["shirt", "coat"]
+        assert sum(1 for item in restored.members.values() if item.uid == shirt.uid) == 1
+        assert sum(1 for item in restored.members.values() if item.uid == coat.uid) == 1
 
 
 class TestLookDescription:
