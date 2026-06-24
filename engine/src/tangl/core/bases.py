@@ -96,13 +96,26 @@ from __future__ import annotations
 from abc import abstractmethod
 from copy import deepcopy
 from functools import total_ordering
-from inspect import isclass
+from inspect import isclass, signature
 import logging
 import time
-from typing import Any, Callable, ClassVar, Optional, Self, Type
+from types import UnionType
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Optional,
+    Self,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+)
 from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator
+from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 from shortuuid import ShortUUID
 
 from tangl.type_hints import Identifier, Label, StringMap, Tag, UnstructuredData, Hash
@@ -246,6 +259,10 @@ class Unstructurable(BaseModelPlus):
       objects (including live Type references).
     - Wire-safe flattening (JSON/YAML safe primitives) is handled by the persistence
       service layer.
+    - Pydantic ``model_dump()`` is not a substitute for this constructor form.
+      It does not know StoryTangl's graph-reference conventions and can silently
+      deep-dump live entity pointers or omit mutated default managers. Runtime
+      graph state must prove itself through ``unstructure()`` / ``structure()``.
     - `evolve()` preserves ``uid`` by default; pass ``uid=uuid4()`` for a new identity.
     - `evolve()` uses ``deepcopy`` internally; for entities with large mutable state,
       consider field-level cloning if performance becomes a hotspot.
@@ -257,6 +274,19 @@ class Unstructurable(BaseModelPlus):
       was only mutated in place and never reassigned (so ``exclude_unset``
       cannot drop them). Still-default/empty values remain elided, so this does
       not chum snapshots with nulls or defaults.
+    - Recursive constructor-form handling is a separate concern from inclusion.
+      The field marker ``json_schema_extra={"unstructurable": True}`` means
+      "walk this embedded value through its own
+      ``unstructure()`` / ``structure()`` hooks." Full graph entities should not
+      be recursively embedded by default; they should be referenced by id unless
+      a field deliberately opts into embedded constructor-form semantics.
+      This generalizes explicit constructor-form handling for fields like
+      ``EntityTemplate.payload``; ``Registry.members`` keeps its bespoke path so
+      ``Registry.add()`` can preserve ownership-binding guardrails.
+      It should not revive the old automorphic structuring experiments from
+      ``scratch/legacy/core/core-23/structuring/``: no self-casting from data,
+      self-templating, property-name child inference, or object-self-shaping
+      pipeline belongs in the core constructor-form path.
     - Set ``guard_unstructure = True`` for classes that should refuse constructor-form
       export because they carry non-serializable behavior.
 
@@ -279,14 +309,140 @@ class Unstructurable(BaseModelPlus):
     """
 
     @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
+    def structure(cls, data: UnstructuredData, _ctx: Any = None) -> Self:
         data = dict(data)
         cls_ = data.pop('kind', cls)
-        if not isclass(cls_):
-            raise TypeError(f"Expected {cls_} to be a class")
+        if not isclass(cls_) or not issubclass(cls_, cls):
+            raise TypeError(f"Expected a subclass of {cls.__name__}, got {cls_!r}")
+        if hasattr(cls_, "_match_fields"):
+            for name in cls_._match_fields(unstructurable=True):
+                if name not in data:
+                    continue
+                field_info = cls_.model_fields[name]
+                data[name] = cls._structure_unstructurable_value(
+                    data[name],
+                    field_info.annotation,
+                    _ctx=_ctx,
+                )
         return cls_(**data)
 
     guard_unstructure: ClassVar[bool] = False
+
+    @classmethod
+    def _structure_unstructurable_value(
+        cls,
+        value: Any,
+        annotation: Any = Any,
+        *,
+        _ctx: Any = None,
+    ) -> Any:
+        """Structure a marked embedded value using annotation or explicit ``kind``."""
+        if value is None:
+            return None
+
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+
+        if origin in (Union, UnionType):
+            if value is None:
+                return None
+            for option in args:
+                if option is type(None):
+                    continue
+                try:
+                    return cls._structure_unstructurable_value(value, option, _ctx=_ctx)
+                except (TypeError, ValueError):
+                    continue
+            return value
+
+        if origin in (dict,):
+            value_type = args[1] if len(args) == 2 else Any
+            return {
+                key: cls._structure_unstructurable_value(item, value_type, _ctx=_ctx)
+                for key, item in value.items()
+            }
+
+        if origin in (list, set, frozenset):
+            value_type = args[0] if args else Any
+            structured = [
+                cls._structure_unstructurable_value(item, value_type, _ctx=_ctx)
+                for item in value
+            ]
+            return origin(structured)
+
+        if origin is tuple:
+            if len(args) == 2 and args[1] is Ellipsis:
+                return tuple(
+                    cls._structure_unstructurable_value(item, args[0], _ctx=_ctx)
+                    for item in value
+                )
+            return tuple(
+                cls._structure_unstructurable_value(
+                    item,
+                    args[index] if index < len(args) else Any,
+                    _ctx=_ctx,
+                )
+                for index, item in enumerate(value)
+            )
+
+        if isinstance(value, dict):
+            cls_hint = value.get("kind", annotation)
+            if isclass(cls_hint) and hasattr(cls_hint, "structure"):
+                if "_ctx" in signature(cls_hint.structure).parameters:
+                    return cls_hint.structure(value, _ctx=_ctx)
+                return cls_hint.structure(value)
+            if isclass(annotation):
+                return annotation(**value)
+
+        return value
+
+    @classmethod
+    def _unstructure_unstructurable_value(cls, value: Any) -> Any:
+        """Unstructure a marked embedded value without falling back to model_dump."""
+        unstructure = getattr(value, "unstructure", None)
+        if callable(unstructure):
+            return unstructure()
+        if isinstance(value, dict):
+            return {
+                key: cls._unstructure_unstructurable_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._unstructure_unstructurable_value(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(cls._unstructure_unstructurable_value(item) for item in value)
+        if isinstance(value, set):
+            return [cls._unstructure_unstructurable_value(item) for item in value]
+        if isinstance(value, frozenset):
+            return [cls._unstructure_unstructurable_value(item) for item in value]
+        return value
+
+    @staticmethod
+    def _field_default(field_info: FieldInfo) -> Any:
+        if field_info.default_factory is not None:
+            return field_info.default_factory()
+        return field_info.default
+
+    def _should_unstructure_field(
+        self,
+        name: str,
+        field_info: FieldInfo,
+        value: Any,
+    ) -> bool:
+        if field_info.is_required():
+            return True
+        if name in self.model_fields_set:
+            return True
+        extra = field_info.json_schema_extra or {}
+        if extra.get("include") is not True:
+            return False
+
+        default = self._field_default(field_info)
+        if default is PydanticUndefined:
+            return True
+        return self._unstructure_unstructurable_value(value) != (
+            self._unstructure_unstructurable_value(default)
+        )
 
     def unstructure(self) -> UnstructuredData:
         """Return constructor-form data.
@@ -303,12 +459,17 @@ class Unstructurable(BaseModelPlus):
             )
 
         exclude_fields = set(self._match_fields(exclude=True))
+        unstructurable_fields = set(self._match_fields(unstructurable=True))
         data = self.model_dump(
-            exclude=exclude_fields,
+            exclude=exclude_fields | unstructurable_fields,
             exclude_unset=True,
             exclude_defaults=True,
         )
-        include_fields = set(self._match_fields(include=True)) - exclude_fields
+        include_fields = (
+            set(self._match_fields(include=True))
+            - exclude_fields
+            - unstructurable_fields
+        )
         if include_fields:
             # Persist non-default values of opted-in fields even when they were
             # only mutated in place (exclude_unset would otherwise drop them);
@@ -317,6 +478,11 @@ class Unstructurable(BaseModelPlus):
             data.update(
                 self.model_dump(include=include_fields, exclude_defaults=True)
             )
+        for name in unstructurable_fields:
+            field_info = type(self).model_fields[name]
+            value = getattr(self, name)
+            if self._should_unstructure_field(name, field_info, value):
+                data[name] = self._unstructure_unstructurable_value(value)
         if 'uid' not in data and hasattr(self, 'uid'):
             data['uid'] = getattr(self, 'uid')
         data['kind'] = self.__class__

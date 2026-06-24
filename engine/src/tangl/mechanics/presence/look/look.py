@@ -363,12 +363,14 @@ class HasSimpleLook(Entity):
 class HasOutfit(Entity):
     """Direct facet exposing outfit state and outfit-driven adapters."""
 
-    outfit: OutfitManager = Field(default_factory=OutfitManager)
+    outfit: OutfitManager = Field(
+        default_factory=OutfitManager,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
     @model_validator(mode="after")
     def _bind_outfit_owner(self) -> "HasOutfit":
-        if self.outfit.owner is None:
-            self.outfit.owner = self
+        self.outfit.bind_owner(self)
         return self
 
     def describe_outfit(self) -> str:

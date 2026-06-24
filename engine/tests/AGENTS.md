@@ -34,6 +34,26 @@ Each test module should comprehensively cover its concept:
 - ✅ **Serialization** - Roundtrip testing (unstructure/structure, pickle)
 - ✅ **Integration** - How the concept interacts with related concepts
 
+For graph/runtime data, serialization tests mean constructor-form
+`unstructure()` / `structure()` round-trips, not `model_dump()` snapshots.
+`model_dump()` can prove a DTO or local Pydantic view, but it does not prove
+that entity references, embedded managers, graph membership, or mutated default
+fields survive persistence. Any new manager/component/sub-entity-like type that
+stores or resolves other entities must include a sample graph round-trip with
+populated data and assert that the restored graph has the same ids, membership,
+and dereferenced objects without inline duplicates.
+
+When a field is explicitly marked for embedded constructor-form recursion
+(for example `json_schema_extra={"unstructurable": True}`), tests should prove
+both sides of the marker:
+
+- the parent includes the field when mutated in place, when also marked
+  `include=True`;
+- the nested object is recursively unstructured/structured through its own
+  constructor-form hooks;
+- graph members inside that nested object are still references, not inline
+  duplicate entities.
+
 ### 3. Conciseness and Parsimony
 
 - **Eliminate duplication** - No `test_foo`, `test_foo2`, `test_foo3`
@@ -399,6 +419,24 @@ def test_entity_unstructure_structure_roundtrip(self):
     restored = Entity.structure(data)
     assert isinstance(restored, Person)
     assert restored == original
+```
+
+For relationship-bearing types, build the whole owner graph:
+
+```python
+def test_owner_manager_roundtrips_referenced_members():
+    graph = Graph()
+    owner = graph.add_node(kind=OwnerWithManager, label="owner")
+    component = graph.add_node(kind=ManagedComponent, label="component")
+    owner.manager.assign("slot", component)
+
+    restored = Graph.structure(graph.unstructure())
+    restored_owner = restored.find_node(Selector(label="owner"))
+    restored_component = restored.find_node(Selector(label="component"))
+
+    assert restored_owner.manager.get_slot("slot") == [restored_component]
+    assert restored_owner.manager.get_slot("slot")[0].uid == component.uid
+    assert len([item for item in restored.members.values() if item.uid == component.uid]) == 1
 ```
 
 ### Testing Collections

@@ -194,6 +194,125 @@ class TestUnstructurable:
         right = Demo(value=2)
         assert left.value_hash() != right.value_hash()
 
+    def test_marked_scalar_field_round_trips_with_kind(self) -> None:
+        class Embedded(Unstructurable):
+            value: int
+
+        class SpecialEmbedded(Embedded):
+            name: str
+
+        class Holder(Unstructurable):
+            child: Embedded = Field(json_schema_extra={"unstructurable": True})
+
+        holder = Holder(child=SpecialEmbedded(value=3, name="kept"))
+        data = holder.unstructure()
+        restored = Holder.structure(data)
+
+        assert data["child"]["kind"] is SpecialEmbedded
+        assert isinstance(restored.child, SpecialEmbedded)
+        assert restored.child.name == "kept"
+
+    def test_structure_rejects_kind_outside_declared_hierarchy(self) -> None:
+        class Embedded(Unstructurable):
+            value: int
+
+        class Other(Unstructurable):
+            value: int
+
+        with pytest.raises(TypeError, match="Expected a subclass"):
+            Embedded.structure({"kind": Other, "value": 1})
+
+    def test_marked_collection_fields_round_trip_with_kind(self) -> None:
+        class Embedded(Unstructurable):
+            model_config = ConfigDict(frozen=True)
+
+            value: int
+
+        class SpecialEmbedded(Embedded):
+            label: str
+
+        class Holder(Unstructurable):
+            items: list[Embedded] = Field(
+                default_factory=list,
+                json_schema_extra={"include": True, "unstructurable": True},
+            )
+            unique_items: set[Embedded] = Field(
+                default_factory=set,
+                json_schema_extra={"include": True, "unstructurable": True},
+            )
+            by_key: dict[str, Embedded] = Field(
+                default_factory=dict,
+                json_schema_extra={"include": True, "unstructurable": True},
+            )
+
+        first = Embedded(value=1)
+        second = SpecialEmbedded(value=2, label="two")
+        holder = Holder()
+        holder.items.append(second)
+        holder.unique_items.add(first)
+        holder.by_key["second"] = second
+
+        data = holder.unstructure()
+        restored = Holder.structure(data)
+
+        assert isinstance(restored.items[0], SpecialEmbedded)
+        assert restored.items[0].label == "two"
+        assert restored.unique_items == {first}
+        assert isinstance(restored.by_key["second"], SpecialEmbedded)
+
+    def test_marked_union_field_tries_later_options_without_kind(self) -> None:
+        class Left(Unstructurable):
+            value: int
+
+        class Right(Unstructurable):
+            name: str
+
+        class Holder(Unstructurable):
+            child: Left | Right = Field(json_schema_extra={"unstructurable": True})
+
+        restored = Holder.structure({"kind": Holder, "child": {"name": "kept"}})
+
+        assert isinstance(restored.child, Right)
+        assert restored.child.name == "kept"
+
+    def test_unstructurable_marker_is_independent_from_include(self) -> None:
+        class Embedded(Unstructurable):
+            value: int = 0
+
+        class Holder(Unstructurable):
+            recursive: Embedded = Field(
+                default_factory=Embedded,
+                json_schema_extra={"include": True, "unstructurable": True},
+            )
+            ordinary: Embedded = Field(
+                default_factory=Embedded,
+                json_schema_extra={"include": True},
+            )
+
+        holder = Holder()
+        holder.recursive.value = 1
+        holder.ordinary.value = 1
+
+        data = holder.unstructure()
+
+        assert data["recursive"]["kind"] is Embedded
+        assert data["ordinary"] == {"value": 1}
+
+    def test_unstructurable_marker_does_not_emit_mutated_default_without_include(self) -> None:
+        class Embedded(Unstructurable):
+            value: int = 0
+
+        class Holder(Unstructurable):
+            recursive: Embedded = Field(
+                default_factory=Embedded,
+                json_schema_extra={"unstructurable": True},
+            )
+
+        holder = Holder()
+        holder.recursive.value = 1
+
+        assert "recursive" not in holder.unstructure()
+
 
 class TestHasContent:
     """Content-hash trait tests."""

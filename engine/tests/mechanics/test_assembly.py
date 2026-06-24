@@ -6,10 +6,11 @@ from typing import ClassVar, Literal
 import pytest
 from pydantic import Field
 
-from tangl.core import Entity
+from tangl.core import Entity, Graph, Node
 from tangl.mechanics.assembly import (
     Component,
     ComponentFacet,
+    ComponentManager,
     ConnectorPolarity,
     HasSlottedContainer,
     Slot,
@@ -53,6 +54,12 @@ class TestContainer(SlottedContainer[TestComponent]):
         if any(component.label == "forbidden" for component in self.all_components()):
             errors.append("Forbidden component present")
         return errors
+
+
+class TestComponentManager(ComponentManager[TestComponent]):
+    slots: ClassVar[dict[str, Slot]] = {
+        "alpha": Slot.for_type("alpha", TestComponent, max_count=2),
+    }
 
 
 class TestHost(HasSlottedContainer, Entity):
@@ -293,6 +300,36 @@ def test_budget_check(component_alpha: TestComponent) -> None:
     container.assign("alpha", component_alpha)
     with pytest.raises(ValueError):
         container.assign("beta", TestComponent(label="power_hungry", tags={"beta"}, power_cost=2.0))
+
+
+def test_component_manager_registers_fresh_component_with_owner_registry() -> None:
+    graph = Graph()
+    owner = Node(label="owner")
+    graph.add(owner)
+    manager = TestComponentManager(owner=owner)
+    component = TestComponent(label="part")
+
+    manager.assign("alpha", component)
+
+    assert graph.get(component.uid) is component
+    assert manager.assignment_ids == {"alpha": [component.uid]}
+    assert manager.get_slot("alpha") == [component]
+
+
+def test_component_manager_unassigns_transient_cache_entry() -> None:
+    manager = TestComponentManager()
+    component = TestComponent(label="part")
+
+    manager.assign("alpha", component)
+    manager.unassign("alpha", component)
+
+    assert manager.assignment_ids == {}
+    assert component.uid not in manager._component_cache
+
+
+def test_component_manager_structure_rejects_unrelated_kind() -> None:
+    with pytest.raises(TypeError, match="Expected a subclass"):
+        TestComponentManager.structure({"kind": TestComponent})
 
 
 def test_custom_validation(component_alpha: TestComponent) -> None:

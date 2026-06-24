@@ -7,6 +7,7 @@ from typing import Iterator
 import pytest
 from pydantic import ValidationError
 
+from tangl.core.dispatch import on_create
 from tangl.core.entity import Entity
 from tangl.core.selector import Selector
 from tangl.core.template import (
@@ -193,6 +194,13 @@ class TestEntityTemplateCompileDecompileSerialization:
     def test_compile_from_dict(self) -> None:
         templ = EntityTemplate.compile({"label": "scene-a", "kind": Scene})
         assert isinstance(templ.payload, Scene)
+
+    def test_compile_forwards_ctx_to_payload_create_hooks(self, null_ctx) -> None:
+        on_create(func=lambda *, data, **_: {"label": "mutated"})
+
+        templ = EntityTemplate.compile({"label": "scene-a", "kind": Scene}, _ctx=null_ctx)
+
+        assert templ.payload.label == "mutated"
 
     def test_decompile_strips_uid_and_seq(self) -> None:
         templ = EntityTemplate(payload=Scene(label="scene-a"))

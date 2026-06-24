@@ -170,6 +170,27 @@ full type map and rationale.**
 - **One template → entity path.** `EntityTemplate.materialize()` is the core
   shape-instantiation path. Higher layers may add policy or post-
   materialization behavior, but they should not bypass the template system.
+- **One constructor-form persistence path.** Graph/runtime objects round-trip
+  through `unstructure()` / `structure()`. `EntityTemplate.materialize()` and
+  service DTO projection may wrap that path for their own workflows, but raw
+  `model_dump()` / `model_validate()` is not a persistence contract and is not
+  proof that graph-owned state survives. Any type that points at another entity
+  must persist an explicit reference form (usually ids) and restore live
+  pointers through the owning registry/graph.
+- **Embedded constructor-form fields must opt in explicitly.** Field
+  `include=True` only says "persist this field even if it was mutated in
+  place." A separate marker such as `unstructurable=True` should mean "this field
+  contains constructor-form-capable value objects; recursively call
+  `unstructure()` / `structure()` here." Do not infer recursive graph embedding
+  from `Entity`-like types by default: full graph items should usually be
+  referenced by id, while embedded managers/value objects opt into
+  constructor-form recursion. This generalizes the existing one-off pattern in
+  `Registry.members` and `EntityTemplate.payload`: fields excluded from raw
+  Pydantic dumping but deliberately walked through constructor form.
+  It must stay much smaller than the legacy automorphic structuring experiments
+  under `scratch/legacy/core/core-23/structuring/`: no data-driven self-casting,
+  no opportunistic template/default lookup, no child-field inference from
+  property names, and no broad "make the object shape itself" pipeline.
 - **Import direction is a strict DAG.** `core ← vm ← story ← service`.
   No cycles, no upward imports, no conditional cross-layer imports.
 - **Every entity in the runtime graph is an Entity subclass.** If something
@@ -249,6 +270,9 @@ StoryTangl uses Git LFS for `.png` and `.jpg` files.
 ## Miscellaneous
 - No try/except around imports. Declare dependencies in `pyproject.toml`.
 - `Path` objects over raw strings for filesystem paths.
-- Use `model_dump`/`model_validate`, not manual dict munging.
+- Use `model_dump`/`model_validate` only for local Pydantic snapshots, DTOs, or
+  schema-bound data. For persistence, graph round-trips, materialization inputs,
+  and anything with entity references, use the blessed `unstructure()` /
+  `structure()` path instead of overriding or relying on `model_dump()`.
 - If updating an implementation detailed in a `_DESIGN.md` doc, update the
   doc's status section so it does not go stale.

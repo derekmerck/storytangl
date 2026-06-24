@@ -95,4 +95,4 @@ class Entity(Unstructurable, HasIdentity, HasNamespace):
             from .dispatch import do_create
 
             data = do_create(data=data, ctx=_ctx)
-        return super().structure(data)
+        return super().structure(data, _ctx=_ctx)

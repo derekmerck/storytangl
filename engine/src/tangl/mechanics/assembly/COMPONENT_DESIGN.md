@@ -7,7 +7,7 @@
 :related: presence, credentials, sandbox
 ```
 
-**Document Version:** 0.9
+**Document Version:** 1.0
 **Status:** DESIGN — the bridge spec that routes the assembly/component work
 *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
@@ -20,6 +20,39 @@ order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with
 **Prior art:** `concepts/role.py` `RoleGrant` (#141, the degenerate affordance facet),
 `mechanics/sandbox/visibility.py` `SandboxVisibilityRule` (the degenerate restriction),
 `mechanics/assembly/base.py` `SlottedContainer`.
+
+---
+
+## Implementation Status: Owner-Bound Managers
+
+The assembly layer now has two storage identities that share the same slot,
+validation, budget, and facet-discovery APIs:
+
+- `SlottedContainer[CT]` is the direct in-memory instrument used by demos, tests, and
+  non-graph consumers. It stores component objects in its slots.
+- `ComponentManager[CT]` is the owner-bound graph-aware specialization. It is embedded
+  on a full graph member, persists with that owner, stores slot membership as component
+  UUIDs, and dereferences those UUIDs through the owner's registry. Its `owner` pointer
+  and transient construction cache are not constructor-form data.
+
+This is the intended middle between "full graph member" and "plain Pydantic blob":
+components remain full graph members when they need graph identity; embedded managers
+serialize by value but hold graph members by reference.
+
+`OutfitManager` is the first concrete manager on this path. A `HasOutfit` actor now
+round-trips through `Graph.unstructure()` / `Graph.structure()` with outfit assignments
+preserved as restored wearable graph members, not inline duplicates.
+
+The neutral vehicle example is the second proof consumer. `Vehicle` embeds a
+`VehicleLoadout`, while chassis, powerplant, suspension, and tire parts are
+`VehicleComponent` graph tokens over `VehicleComponentType` singleton definitions.
+The example exercises named single-occupancy slots, replacement-on-assign, required
+slot validation, total price/weight validation, and a simple weight-to-powerplant
+constraint without importing CarWars-specific semantics into the generic layer.
+
+Follow-up retrofit targets remain open: credential packets, domain vehicle managers
+such as CarWars adapters, robot assemblies, and any world-specific full-graph outfit
+manager such as a future `SharedOutfit` / `FashionShowActor` demo.
 
 ---
 
