@@ -39,6 +39,16 @@ class ConnectionGroupManager(ComponentManager[Connector]):
             connectors.extend(self.get_slot(slot_name))
         return connectors
 
+    def _has_required_slot_assignments(self) -> bool:
+        return all(
+            self._has_slot_components(slot_name)
+            for slot_name in self._required_slot_names()
+        )
+
+    def _drop_unassigned_cache(self, connector_id: UUID) -> None:
+        if not any(connector_id in ids for ids in self.assignment_ids.values()):
+            self._component_cache.pop(connector_id, None)
+
     def is_connected(self, connector: Connector) -> bool:
         return connector.uid in self.connection_ids
 
@@ -121,11 +131,15 @@ class ConnectionGroupManager(ComponentManager[Connector]):
             raise ValueError(f"Cannot disconnect {first.label!r} from {second.label!r}")
         self.connection_ids.pop(first.uid, None)
         second_manager.connection_ids.pop(second.uid, None)
+        self._drop_unassigned_cache(second.uid)
+        second_manager._drop_unassigned_cache(first.uid)
 
     def _find_group_pairings(
         self,
         other_manager: "ConnectionGroupManager",
     ) -> list[tuple[Connector, Connector]]:
+        if not self._has_required_slot_assignments():
+            return []
         pairings: list[tuple[Connector, Connector]] = []
         used_remote: set[UUID] = set()
         for connector in self.required_connectors():
@@ -151,6 +165,8 @@ class ConnectionGroupManager(ComponentManager[Connector]):
         return pairings
 
     def can_connect_group(self, other_manager: "ConnectionGroupManager") -> bool:
+        if not self._has_required_slot_assignments():
+            return False
         unconnected_required = [
             connector
             for connector in self.required_connectors()
@@ -164,6 +180,8 @@ class ConnectionGroupManager(ComponentManager[Connector]):
         self,
         other_manager: "ConnectionGroupManager",
     ) -> list[tuple[Connector, Connector]]:
+        if not self._has_required_slot_assignments():
+            raise ValueError("Connection group cannot satisfy all required connectors")
         pairings = self._find_group_pairings(other_manager)
         unconnected_required = [
             connector
@@ -178,6 +196,8 @@ class ConnectionGroupManager(ComponentManager[Connector]):
 
     @property
     def is_complete(self) -> bool:
+        if not self._has_required_slot_assignments():
+            return False
         return all(self.is_connected(connector) for connector in self.required_connectors())
 
     def unstructure(self) -> UnstructuredData:

@@ -146,6 +146,25 @@ def test_connector_group_roundtrip_preserves_pair_ids() -> None:
     assert restored_pc.connections.is_complete
 
 
+def test_disconnect_drops_remote_cache_entries() -> None:
+    pc = ConnectedDevice(label="pc")
+    cable = ConnectedDevice(label="cable")
+    pc_power = pc.add_connector("power", endpoint("pc-power-socket", "power", "socket"))
+    cable_power = cable.add_connector("power", endpoint("cable-power-plug", "power", "plug"))
+
+    pc.connections.connect(pc_power, cable_power, other_manager=cable.connections)
+
+    assert cable_power.uid in pc.connections._component_cache
+    assert pc_power.uid in cable.connections._component_cache
+
+    pc.connections.disconnect(pc_power, cable_power, other_manager=cable.connections)
+
+    assert pc_power.uid in pc.connections._component_cache
+    assert cable_power.uid not in pc.connections._component_cache
+    assert cable_power.uid in cable.connections._component_cache
+    assert pc_power.uid not in cable.connections._component_cache
+
+
 def test_pc_like_connection_group_completes_against_matching_cable_bundle() -> None:
     pc = build_pc()
     cable_bundle = build_pc_cable_bundle()
@@ -164,6 +183,20 @@ def test_pc_like_connection_group_rejects_incomplete_cable_bundle() -> None:
     cable_bundle = ConnectedDevice(label="incomplete-cable-bundle")
     cable_bundle.add_connector("power", connector("cable-power-plug", "power", "plug"))
 
+    assert not pc.connections.can_connect_group(cable_bundle.connections)
+
+    with pytest.raises(ValueError):
+        pc.connections.connect_group(cable_bundle.connections)
+
+
+def test_required_connection_slots_must_have_connectors() -> None:
+    pc = ConnectedDevice(
+        label="pc",
+        connections=DeviceConnectionGroup(required_connection_slots={"power"}),
+    )
+    cable_bundle = build_pc_cable_bundle()
+
+    assert not pc.connections.is_complete
     assert not pc.connections.can_connect_group(cable_bundle.connections)
 
     with pytest.raises(ValueError):
