@@ -323,6 +323,11 @@ class ComponentManager(SlottedContainer[CT]):
 
     def bind_owner(self, owner: Any) -> "ComponentManager[CT]":
         self.owner = owner
+        for component_ids in self.assignment_ids.values():
+            for component_id in component_ids:
+                component = self._component_cache.get(component_id)
+                if component is not None:
+                    self._validate_component_registry(component)
         return self
 
     def _slot_names(self) -> list[str]:

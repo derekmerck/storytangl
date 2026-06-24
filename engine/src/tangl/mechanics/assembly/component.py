@@ -44,11 +44,9 @@ class ComponentFacet(BaseModel):
 
 
 class Component(Entity):
-    """Assembly component that carries facets and optional connector metadata."""
+    """Assembly component that carries facets."""
 
     facets: list[ComponentFacet] = Field(default_factory=list)
-    connector_shape: str | None = None
-    connector_polarity: ConnectorPolarity | None = None
 
     def component_facets(
         self,
@@ -65,3 +63,10 @@ class Component(Entity):
             for facet in self.facets
             if facet.matches(channel=channel, facet_type=facet_type)
         ]
+
+
+class Connector(Component):
+    """Assembly component endpoint that can associate with a compatible endpoint."""
+
+    connector_shape: str
+    connector_polarity: ConnectorPolarity

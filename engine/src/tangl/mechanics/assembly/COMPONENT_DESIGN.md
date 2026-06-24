@@ -50,9 +50,34 @@ The example exercises named single-occupancy slots, replacement-on-assign, requi
 slot validation, total price/weight validation, and a simple weight-to-powerplant
 constraint without importing CarWars-specific semantics into the generic layer.
 
+Connector association is the third proof consumer and the first bilateral one.
+`Connector` specializes `Component` with shape/polarity endpoint metadata, while
+`ConnectionGroupManager` stores assigned connectors and committed pairings by UUID.
+Its `can_connect()` / `can_disconnect()` methods are pure checks; `connect()` /
+`disconnect()` are committed id-backed relationship mutations. Group matching is
+deliberately deterministic first-fit for now, enough to show simple plug/socket
+pairs and PC-like cable bundles without promoting a general transaction engine yet.
+
 Follow-up retrofit targets remain open: credential packets, domain vehicle managers
 such as CarWars adapters, robot assemblies, and any world-specific full-graph outfit
 manager such as a future `SharedOutfit` / `FashionShowActor` demo.
+
+---
+
+## Association v0 Vocabulary
+
+Assembly now treats membership and connection as small association specializations:
+
+- `can_associate` / `can_disassociate` are pure availability checks. They must be safe
+  to call repeatedly during planning, projection, and UI discovery.
+- `associate` / `disassociate` are committed relationship mutations. In this package
+  today those are exposed as domain verbs: assign/unassign and connect/disconnect.
+- `on_associate` / `on_disassociate` are reserved future update-phase hooks for
+  bookkeeping, world reactions, and journal fragments after a mutation has committed.
+
+This is intentionally smaller than the legacy `Associating` handler pipeline. It keeps
+the vocabulary aligned with future roles, credentials, shops, and trades without adding
+a broad transaction framework before connectors and compliance prove the shared shape.
 
 ---
 

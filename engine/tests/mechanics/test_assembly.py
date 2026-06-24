@@ -11,6 +11,7 @@ from tangl.mechanics.assembly import (
     Component,
     ComponentFacet,
     ComponentManager,
+    Connector,
     ConnectorPolarity,
     HasSlottedContainer,
     Slot,
@@ -136,7 +137,7 @@ class OutOfOrderDefaultLoadoutContainer(SlottedContainer[TestComponent]):
     }
 
 
-class ShapeComponent(Component):
+class ShapeComponent(Connector):
     weight_cost: float = 0.0
 
     def get_cost(self, resource: str) -> float:
