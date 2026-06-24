@@ -15,6 +15,7 @@ from tangl.mechanics.assembly.examples.connectors import (
     build_pc_cable_bundle,
     connector,
 )
+from tangl.persistence.serializers import JsonSerializationHandler
 
 
 class ConnectionGroup(ConnectionGroupManager):
@@ -106,6 +107,38 @@ def test_connector_group_registers_assigned_connectors_with_owner_graph() -> Non
     assert owner.connections.get_slot("usb") == [plug]
 
 
+def test_prebuilt_connection_group_registers_connectors_when_owner_enters_graph() -> None:
+    graph = Graph()
+    pc = build_pc()
+
+    graph.add(pc)
+    restored = Graph.structure(graph.unstructure())
+    restored_pc = restored.find_one(Selector(label="pc"))
+    restored_power = restored.find_one(Selector(label="pc-power-socket"))
+
+    assert restored_power is not None
+    assert restored_pc.connections.owner is restored_pc
+    assert restored_pc.connections.get_slot("power") == [restored_power]
+
+
+def test_connector_group_rejects_connections_across_owner_registries() -> None:
+    first_graph = Graph()
+    second_graph = Graph()
+    pc = first_graph.add_node(kind=ConnectedDevice, label="pc")
+    cable = second_graph.add_node(kind=ConnectedDevice, label="cable")
+    pc_power = pc.add_connector("power", endpoint("pc-power-socket", "power", "socket"))
+    cable_power = cable.add_connector("power", endpoint("cable-power-plug", "power", "plug"))
+
+    assert not pc.connections.can_connect(
+        pc_power,
+        cable_power,
+        other_manager=cable.connections,
+    )
+
+    with pytest.raises(ValueError):
+        pc.connections.connect(pc_power, cable_power, other_manager=cable.connections)
+
+
 def test_connector_group_roundtrip_preserves_pair_ids() -> None:
     graph = Graph()
     pc = graph.add_node(
@@ -144,6 +177,29 @@ def test_connector_group_roundtrip_preserves_pair_ids() -> None:
     assert restored_pc.connections.connected_to(restored_pc_power) is restored_cable_power
     assert restored_cable.connections.connected_to(restored_cable_power) is restored_pc_power
     assert restored_pc.connections.is_complete
+
+
+def test_connection_ids_are_json_safe_constructor_form() -> None:
+    group = ConnectionGroup()
+    plug = endpoint("power-plug", "power", "plug")
+    socket = endpoint("power-socket", "power", "socket")
+
+    group.assign("a", plug)
+    group.assign("b", socket)
+    group.connect(plug, socket)
+
+    data = group.unstructure()
+    JsonSerializationHandler.serialize(data)
+    restored = ConnectionGroup.structure(data)
+
+    assert data["connection_ids"] == {
+        str(plug.uid): str(socket.uid),
+        str(socket.uid): str(plug.uid),
+    }
+    assert restored.connection_ids == {
+        plug.uid: socket.uid,
+        socket.uid: plug.uid,
+    }
 
 
 def test_disconnect_drops_remote_cache_entries() -> None:

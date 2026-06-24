@@ -80,7 +80,8 @@ class ConnectionGroupManager(ComponentManager[Connector]):
     ) -> bool:
         second_manager = other_manager or self
         return (
-            self._compatible(first, second)
+            self._owner_registry() is second_manager._owner_registry()
+            and self._compatible(first, second)
             and not self.is_connected(first)
             and not second_manager.is_connected(second)
         )
@@ -142,13 +143,14 @@ class ConnectionGroupManager(ComponentManager[Connector]):
             return []
         pairings: list[tuple[Connector, Connector]] = []
         used_remote: set[UUID] = set()
+        remote_connectors = other_manager._connectors_in_order()
         for connector in self.required_connectors():
             if self.is_connected(connector):
                 continue
             match = next(
                 (
                     candidate
-                    for candidate in other_manager._connectors_in_order()
+                    for candidate in remote_connectors
                     if candidate.uid not in used_remote
                     and self.can_connect(
                         connector,
@@ -203,7 +205,10 @@ class ConnectionGroupManager(ComponentManager[Connector]):
     def unstructure(self) -> UnstructuredData:
         data = super().unstructure()
         if self.connection_ids:
-            data["connection_ids"] = self.connection_ids
+            data["connection_ids"] = {
+                str(source_id): str(target_id)
+                for source_id, target_id in self.connection_ids.items()
+            }
         if self.required_connection_slots:
             data["required_connection_slots"] = sorted(self.required_connection_slots)
         return data

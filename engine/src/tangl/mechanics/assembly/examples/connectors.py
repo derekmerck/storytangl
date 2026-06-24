@@ -4,7 +4,7 @@ from typing import ClassVar
 
 from pydantic import Field, model_validator
 
-from tangl.core import Node
+from tangl.core import Node, Registry
 from tangl.mechanics.assembly import ConnectionGroupManager, Connector, ConnectorPolarity, Slot
 
 
@@ -33,6 +33,10 @@ class ConnectedDevice(Node):
     def _bind_connection_owner(self) -> "ConnectedDevice":
         self.connections.bind_owner(self)
         return self
+
+    def bind_registry(self, registry: Registry | None) -> None:
+        super().bind_registry(registry)
+        self.connections.bind_owner(self)
 
     def add_connector(self, slot_name: str, connector: Connector) -> Connector:
         self.connections.assign(slot_name, connector)
