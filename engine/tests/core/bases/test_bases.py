@@ -212,6 +212,16 @@ class TestUnstructurable:
         assert isinstance(restored.child, SpecialEmbedded)
         assert restored.child.name == "kept"
 
+    def test_structure_rejects_kind_outside_declared_hierarchy(self) -> None:
+        class Embedded(Unstructurable):
+            value: int
+
+        class Other(Unstructurable):
+            value: int
+
+        with pytest.raises(TypeError, match="Expected a subclass"):
+            Embedded.structure({"kind": Other, "value": 1})
+
     def test_marked_collection_fields_round_trip_with_kind(self) -> None:
         class Embedded(Unstructurable):
             model_config = ConfigDict(frozen=True)

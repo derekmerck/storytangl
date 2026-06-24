@@ -327,6 +327,11 @@ def test_component_manager_unassigns_transient_cache_entry() -> None:
     assert component.uid not in manager._component_cache
 
 
+def test_component_manager_structure_rejects_unrelated_kind() -> None:
+    with pytest.raises(TypeError, match="Expected a subclass"):
+        TestComponentManager.structure({"kind": TestComponent})
+
+
 def test_custom_validation(component_alpha: TestComponent) -> None:
     container = TestContainer(owner=TestHost(label="owner"))
     forbidden = TestComponent(label="forbidden", tags={"alpha"})

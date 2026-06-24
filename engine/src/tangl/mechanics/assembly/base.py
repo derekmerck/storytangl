@@ -403,8 +403,8 @@ class ComponentManager(SlottedContainer[CT]):
         _ = _ctx
         payload = dict(data)
         cls_ = payload.pop("kind", cls)
-        if not isclass(cls_):
-            raise TypeError(f"Expected {cls_} to be a class")
+        if not isclass(cls_) or not issubclass(cls_, cls):
+            raise TypeError(f"Expected a subclass of {cls.__name__}, got {cls_!r}")
         return cls_(**payload)
 
 

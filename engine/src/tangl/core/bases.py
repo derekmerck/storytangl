@@ -312,8 +312,8 @@ class Unstructurable(BaseModelPlus):
     def structure(cls, data: UnstructuredData, _ctx: Any = None) -> Self:
         data = dict(data)
         cls_ = data.pop('kind', cls)
-        if not isclass(cls_):
-            raise TypeError(f"Expected {cls_} to be a class")
+        if not isclass(cls_) or not issubclass(cls_, cls):
+            raise TypeError(f"Expected a subclass of {cls.__name__}, got {cls_!r}")
         if hasattr(cls_, "_match_fields"):
             for name in cls_._match_fields(unstructurable=True):
                 if name not in data:

@@ -265,11 +265,11 @@ class VehicleLoadout(ComponentManager[VehicleComponent]):
 
         if powerplant is not None:
             owner = self.owner
-            heavy_threshold = getattr(owner, "heavy_weight_threshold", 1200.0)
+            heavy_threshold = owner.heavy_weight_threshold
             required_power = (
-                getattr(owner, "heavy_power_required", 90.0)
+                owner.heavy_power_required
                 if total_weight > heavy_threshold
-                else getattr(owner, "light_power_required", 40.0)
+                else owner.light_power_required
             )
             if powerplant.power_output < required_power:
                 errors.append(
@@ -278,7 +278,7 @@ class VehicleLoadout(ComponentManager[VehicleComponent]):
                 )
 
         owner = self.owner
-        max_price = getattr(owner, "max_price", None)
+        max_price = owner.max_price
         if max_price is not None and total_price > max_price:
             errors.append(f"Price exceeds budget: {total_price:.1f} > {max_price:.1f}")
 
