@@ -264,26 +264,28 @@ class CredentialCase(BaseModelPlus):
         )
 
     def get_region(self) -> Region:
-        return self.to_packet_manager().get_region()
+        return self.region
 
     def get_purpose(self) -> Indication:
-        return self.to_packet_manager().get_purpose()
+        return self.purpose
 
     def id_status(self) -> CredentialStatus | None:
         """Status of the bearer id, or ``None`` if no id was presented."""
 
-        return self.to_packet_manager().id_status()
+        return self.id_card.status if self.id_card is not None else None
 
     def credential_for(self, indication: Indication) -> CredentialToken | None:
         """The presented credential satisfying ``indication``, if any."""
 
-        return self.to_packet_manager().credential_for(indication)
+        return next((c for c in self.packet if c.indication is indication), None)
 
     def get_contraband(self) -> list[ContrabandItem]:
-        return self.to_packet_manager().get_contraband()
+        return list(self.possessions)
 
     def all_credentials(self) -> list[CredentialToken]:
-        return self.to_packet_manager().all_credentials()
+        if self.id_card is None:
+            return list(self.packet)
+        return [self.id_card, *self.packet]
 
 
 class CredentialCaseResult(BaseModelPlus):
