@@ -9,7 +9,9 @@ scorer + soft time budget + per-rule-set scoring config (configurable
 contraband tier (per-se crime, no rescue, per-rule-set) LANDED 2026-06-05; Phase C
 whitelist/blacklist override (data flags clamping `expected_disposition`; overt vs
 shadow = the tax toggle) LANDED 2026-06-06; B.3 (declines axis) + the malfeasance
-layer (bribe/plant/invalidate) designed below as overlays  
+layer (bribe/plant/invalidate) designed below as overlays; credential-packet
+manager adapter LANDED 2026-06-25 as a compatibility bridge toward assembly-style
+credential packets
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -273,6 +275,23 @@ Five properties keep Phases A/B/C as extensions rather than entangled rewrites:
    later), reset on setup, exported via `to_namespace`.
 5. **Consequences route through namespace + authored POSTREQS edges** in YAML, not
    hardcoded branches.
+
+### Packet-manager compatibility bridge (2026-06-25)
+
+`CredentialCase` still owns the v1 narrative presentation and compatibility
+fields, but the structured packet surface now projects through
+`CredentialPacketManager`. `derive_disposition` accepts the manager protocol
+(`get_region`, `get_purpose`, `id_status`, `credential_for`, `get_contraband`,
+`all_credentials`) instead of reaching through case fields. This is deliberately
+a no-behavior-change adapter: the game, roster factory, mediation flow, and
+`credential_gate` data can keep passing `CredentialCase`, while future work can
+promote the packet itself into the common assembly/manager vocabulary.
+
+The bridge is intentionally narrower than the outfit/vehicle managers for now.
+Credential tokens and contraband items remain value objects, not graph members,
+so there is no id-backed graph membership to restore yet. The next retrofit
+should decide whether credentials become graph-token components, remain embedded
+packet values, or support both by authoring style.
 
 ---
 

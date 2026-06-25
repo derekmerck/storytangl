@@ -6,6 +6,7 @@ from tangl.mechanics.games import (
     ContrabandItem,
     CredentialCase,
     CredentialDisposition,
+    CredentialPacketManager,
     CredentialStatus,
     CredentialToken,
     CredentialsGame,
@@ -49,6 +50,51 @@ def _permit(indication: IND, status: S = S.VALID, holder_matches: bool = True) -
 
 def _derive(case: CredentialCase) -> CredentialDisposition:
     return derive_disposition(case, LOCAL_RULES)
+
+
+class TestPacketManagerAdapter:
+    def test_case_projects_the_same_discovery_surface(self) -> None:
+        id_card = _id(S.VALID)
+        work_permit = _permit(IND.WORK)
+        weapon = ContrabandItem(indication=IND.WEAPON, concealed=False)
+        case = CredentialCase(
+            region=Region.FOREIGN_EAST,
+            purpose=IND.WORK,
+            id_card=id_card,
+            packet=[work_permit],
+            possessions=[weapon],
+        )
+        packet = case.to_packet_manager()
+
+        assert packet.get_region() is case.get_region()
+        assert packet.get_purpose() is case.get_purpose()
+        assert packet.id_status() is case.id_status()
+        assert packet.credential_for(IND.WORK) == case.credential_for(IND.WORK)
+        assert packet.get_contraband() == case.get_contraband()
+        assert packet.all_credentials() == case.all_credentials()
+
+    def test_derive_disposition_accepts_packet_manager(self) -> None:
+        case = CredentialCase(
+            purpose=IND.WORK,
+            id_card=_id(S.VALID),
+            packet=[_permit(IND.WORK, S.FORGED)],
+        )
+
+        assert derive_disposition(case.to_packet_manager(), LOCAL_RULES) is D.ARREST
+        assert derive_disposition(case.to_packet_manager(), LOCAL_RULES) is _derive(case)
+
+    def test_derive_disposition_uses_only_the_packet_protocol(self) -> None:
+        packet = CredentialPacketManager(
+            purpose=IND.WORK,
+            id_card=_id(S.VALID),
+            credentials=[_permit(IND.WORK, S.MISSING_SEAL)],
+        )
+
+        assert derive_disposition(packet, LOCAL_RULES) is D.DENY
+        assert (
+            derive_disposition(packet, LOCAL_RULES, {IND.WORK.value: "cleared"})
+            is D.PASS
+        )
 
 
 class TestAnonymousAndId:
