@@ -1,6 +1,8 @@
 # Credential Mechanic — Design Note
 
-**Status:** PLANNED (design precedes code; this doc stakes the intended shape)
+**Status:** PLANNED (design precedes code; this doc stakes the intended shape);
+game-layer packet-manager adapter landed 2026-06-25 as a compatibility bridge,
+not the full global mechanic extraction.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
@@ -311,6 +313,22 @@ worth naming, not worth gating the media work on.
 ---
 
 ## 7 · Staged plan (media spec is the forcing function)
+
+### Compatibility step already landed
+
+The live game package now exposes `CredentialPacketManager`, a value-object
+packet adapter that carries region, purpose, id card, credentials, and
+possessions behind the same discovery surface used by disposition derivation.
+`CredentialCase` projects to that manager, so the current roster/game/demo data
+keeps working while the core logic no longer depends on the case's flat fields.
+
+This is not yet the global credential mechanic described above: no credential
+tokens have been promoted to graph members, no document/media projection has
+landed, and `credential_gate` remains the reference consumer rather than a
+retrofit target. It does establish the retirement path for the current game-local
+implementation: future packets should either embed value credentials deliberately
+or store graph-token credentials by id through the same owner-bound manager
+pattern used by outfits, vehicles, and connector groups.
 
 0. **(Media-layer prerequisite, separate track.)** A minimal **RIT registry +
    composition-strategy** surface, replacing the legacy `svg_forge`/`raster_forge`

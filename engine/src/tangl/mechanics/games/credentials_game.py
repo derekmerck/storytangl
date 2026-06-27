@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 from pydantic import Field
 
@@ -94,6 +94,108 @@ class CredentialDisposition(Enum):
 CredentialsMove = PickingMove
 
 
+class CredentialPacketProtocol(Protocol):
+    """Discovery surface used by disposition derivation.
+
+    Why
+    ---
+    Disposition rules should depend on what a packet can answer, not on how a
+    candidate case stores its fields.
+
+    Key Features
+    ------------
+    - exposes declared region and purpose
+    - exposes bearer-id status and credentials by indication
+    - exposes contraband and all presented credentials for severity checks
+
+    API
+    ---
+    Implement the methods below; callers should not inspect concrete storage.
+
+    Notes
+    -----
+    This is the compatibility seam between the v1 ``CredentialCase`` shape and
+    future credential-packet managers.
+
+    See also
+    --------
+    ``CredentialPacketManager`` and ``derive_disposition``.
+    """
+
+    def get_region(self) -> Region: ...
+
+    def get_purpose(self) -> Indication: ...
+
+    def id_status(self) -> CredentialStatus | None: ...
+
+    def credential_for(self, indication: Indication) -> CredentialToken | None: ...
+
+    def get_contraband(self) -> list[ContrabandItem]: ...
+
+    def all_credentials(self) -> list[CredentialToken]: ...
+
+
+class CredentialPacketManager(BaseModelPlus):
+    """A candidate's credential packet, separated from case presentation.
+
+    Why
+    ---
+    Credentials need the same owner-bound manager vocabulary as outfits and
+    vehicles, but the live game still carries flat packet fields on
+    ``CredentialCase``.
+
+    Key Features
+    ------------
+    - carries declared region, purpose, bearer id, credentials, and possessions
+    - exposes the packet discovery API used by disposition derivation
+    - stays value-object based; no graph-token migration is implied
+
+    API
+    ---
+    Use ``get_region``, ``get_purpose``, ``id_status``, ``credential_for``,
+    ``get_contraband``, and ``all_credentials``.
+
+    Notes
+    -----
+    ``CredentialCase.to_packet_manager`` is the compatibility bridge for current
+    game data.
+
+    See also
+    --------
+    ``CredentialPacketProtocol`` and ``CredentialCase``.
+    """
+
+    region: Region = Region.LOCAL
+    purpose: Indication = Indication.TRAVEL
+    id_card: CredentialToken | None = None
+    credentials: list[CredentialToken] = Field(default_factory=list)
+    possessions: list[ContrabandItem] = Field(default_factory=list)
+
+    def get_region(self) -> Region:
+        return self.region
+
+    def get_purpose(self) -> Indication:
+        return self.purpose
+
+    def id_status(self) -> CredentialStatus | None:
+        """Status of the bearer id, or ``None`` if no id was presented."""
+
+        return self.id_card.status if self.id_card is not None else None
+
+    def credential_for(self, indication: Indication) -> CredentialToken | None:
+        """The presented credential satisfying ``indication``, if any."""
+
+        return next((c for c in self.credentials if c.indication is indication), None)
+
+    def get_contraband(self) -> list[ContrabandItem]:
+        return list(self.possessions)
+
+    def all_credentials(self) -> list[CredentialToken]:
+        if self.id_card is None:
+            return list(self.credentials)
+        return [self.id_card, *self.credentials]
+
+
 class CredentialCase(BaseModelPlus):
     """One candidate, with an opaque credential packet behind a discovery API.
 
@@ -152,6 +254,15 @@ class CredentialCase(BaseModelPlus):
     # The only surface the game loop and derive_disposition may use to ask the
     # packet about its content, declared intent, and validity.
 
+    def to_packet_manager(self) -> CredentialPacketManager:
+        return CredentialPacketManager(
+            region=self.region,
+            purpose=self.purpose,
+            id_card=self.id_card,
+            credentials=list(self.packet),
+            possessions=list(self.possessions),
+        )
+
     def get_region(self) -> Region:
         return self.region
 
@@ -170,6 +281,11 @@ class CredentialCase(BaseModelPlus):
 
     def get_contraband(self) -> list[ContrabandItem]:
         return list(self.possessions)
+
+    def all_credentials(self) -> list[CredentialToken]:
+        if self.id_card is None:
+            return list(self.packet)
+        return [self.id_card, *self.packet]
 
 
 class CredentialCaseResult(BaseModelPlus):
@@ -349,10 +465,10 @@ def _assess_credential(
 
 
 def _assess_id(
-    case: CredentialCase,
+    packet: CredentialPacketProtocol,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
-    status = case.id_status()
+    status = packet.id_status()
     if status is None:
         return CredentialDisposition.DENY  # missing id -> produce it (mitigatable)
     if status.is_valid:
@@ -366,7 +482,7 @@ def _assess_id(
 
 
 def _assess_requirement(
-    case: CredentialCase,
+    packet: CredentialPacketProtocol,
     indication: Indication,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
@@ -375,12 +491,12 @@ def _assess_requirement(
 
     worst = CredentialDisposition.PASS
     if level.requires_permit:
-        permit = case.credential_for(indication)
+        permit = packet.credential_for(indication)
         worst = _worse(worst, _assess_credential(permit, finding_status))
         if permit is not None and not permit.holder_matches:
             worst = _worse(worst, CredentialDisposition.ARREST)  # permit/id mismatch
     if level.requires_id:
-        worst = _worse(worst, _assess_id(case, finding_status))
+        worst = _worse(worst, _assess_id(packet, finding_status))
     return worst
 
 
@@ -399,7 +515,7 @@ def _contraband_class(level: RestrictionLevel) -> str:
 
 
 def _assess_contraband(
-    case: CredentialCase,
+    packet: CredentialPacketProtocol,
     item: ContrabandItem,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
@@ -433,7 +549,7 @@ def _assess_contraband(
         if cls == ContrabandClass.FORBIDDEN:
             return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
         if cls == ContrabandClass.CREDENTIALED:
-            return _assess_requirement(case, item.indication, level, fs)
+            return _assess_requirement(packet, item.indication, level, fs)
         return CredentialDisposition.PASS  # declaration-only, declared -> allow
 
     # Concealed and not disclosed: concealment is the violation.
@@ -442,13 +558,13 @@ def _assess_contraband(
     if cls == ContrabandClass.DECLARATION_ONLY:
         return CredentialDisposition.DENY  # concealed declarable goods
     # credentialed (permit and/or id required), concealed:
-    if _assess_requirement(case, item.indication, level, fs) is CredentialDisposition.PASS:
+    if _assess_requirement(packet, item.indication, level, fs) is CredentialDisposition.PASS:
         return CredentialDisposition.DENY  # had a valid credential but concealed it (Q1)
     return CredentialDisposition.ARREST  # smuggling un-credentialed goods
 
 
 def derive_disposition(
-    case: CredentialCase,
+    packet: CredentialPacketProtocol,
     restrictions: Restrictions,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
@@ -461,10 +577,10 @@ def derive_disposition(
     instead of DENY.
     """
 
-    region = case.get_region()
+    region = packet.get_region()
     worst = CredentialDisposition.PASS
 
-    purpose = case.get_purpose()
+    purpose = packet.get_purpose()
     level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
     if level is RestrictionLevel.CRIMINAL:
         # The stated purpose is itself a crime (RestrictionLevel is shared by
@@ -473,18 +589,18 @@ def derive_disposition(
     elif level is RestrictionLevel.FORBIDDEN:
         worst = _worse(worst, CredentialDisposition.DENY)  # purpose not allowed
     else:
-        worst = _worse(worst, _assess_requirement(case, purpose, level, finding_status))
+        worst = _worse(worst, _assess_requirement(packet, purpose, level, finding_status))
 
-    for item in case.get_contraband():
+    for item in packet.get_contraband():
         level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
-        worst = _worse(worst, _assess_contraband(case, item, level, finding_status))
+        worst = _worse(worst, _assess_contraband(packet, item, level, finding_status))
 
     # Presenting a forged / fake document is a crime in itself, regardless of
     # whether the document was required -- handing over a fake id unasked still
     # arrests. (A merely *invalid* document -- expired, unsealed -- with nothing
     # to back is moot, since its status is not a crime.)
-    for token in (case.id_card, *case.packet):
-        if token is not None and token.status.is_crime:
+    for token in packet.all_credentials():
+        if token.status.is_crime:
             worst = _worse(worst, CredentialDisposition.ARREST)
 
     return worst
