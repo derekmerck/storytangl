@@ -2,8 +2,8 @@
 
 ```{storytangl-topic}
 :topics: association, transaction, provision
-:facets: design, vocabulary
-:relation: unifies
+:facets: design, notes
+:relation: defines
 :related: assembly, assets, provisioning, credentials
 ```
 
