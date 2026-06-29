@@ -104,6 +104,11 @@ can:
 A higher-level trade manager can later compare aggregate values and actor
 biases before delegating to the transaction manager.
 
+See `../../../mechanics/TRANSACTION_OFFER_DESIGN.md` for the shared
+spec/offer/commitment/receipt vocabulary that generalizes this manager across
+provisioning, shops, services, assembly assignment, and future relationship
+writeback.
+
 ## Future Core Hooks
 
 Core currently observes link changes with `on_link` and `on_unlink`. Asset

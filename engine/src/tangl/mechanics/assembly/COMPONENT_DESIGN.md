@@ -78,6 +78,8 @@ Assembly now treats membership and connection as small association specializatio
 This is intentionally smaller than the legacy `Associating` handler pipeline. It keeps
 the vocabulary aligned with future roles, credentials, shops, and trades without adding
 a broad transaction framework before connectors and compliance prove the shared shape.
+The broader offer/commitment vocabulary is captured in
+`../TRANSACTION_OFFER_DESIGN.md`.
 
 ---
 

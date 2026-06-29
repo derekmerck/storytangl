@@ -26,6 +26,10 @@ Within each family, the preferred design lens is:
 - **Writeback**: explicit consequence application
 - **Facade**: thin `HasX` author-facing mixins or helpers
 
+See `TRANSACTION_OFFER_DESIGN.md` for the cross-family vocabulary that unifies
+provisioning offers, association checks, asset transfers, shops, services, and
+writeback receipts.
+
 ## Review Lens
 
 When reviewing or reviving a mechanic family, describe it with these four questions:
