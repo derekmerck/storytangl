@@ -223,6 +223,80 @@ state change under current rules.
 
 ---
 
+## Binding A Mechanic
+
+A transaction-aware mechanic should stay a thin adapter around its own domain
+rules. The recommended shape is:
+
+```text
+typed move payload
+  -> domain spec
+  -> one or more validated offers
+  -> accept selected offer during update
+  -> receipt feeds round notes / fragments / audit metadata
+```
+
+Keep the binding point obvious:
+
+1. Resolve submitted widget/payload ids into live domain objects.
+2. Validate the move envelope and construct a plain spec.
+3. Build a `TransactionOffer` from ordered commitments.
+4. Call `offer.can_accept()` while still in validation/preflight.
+5. Call `offer.accept()` only in the committed update path.
+6. Use the returned `TransactionReceipt` for notes and projection hints.
+
+Core commitments cover common legs:
+
+- `CountableTransferCommitment` for fungible wallet/resource transfer;
+- `RegistryAddCommitment` for explicit graph/token materialization;
+- `ComponentAssignmentCommitment` for owner-bound assembly slots;
+- `CallbackCommitment` for domain-local state changes that do not deserve a
+  core vocabulary yet.
+
+`CallbackCommitment` is the escape hatch for a world or mechanic package to bind
+local state without hiding it outside the transaction contract. Use it for small,
+named, rollback-capable legs such as:
+
+- remove a selected part from a shop inventory;
+- return a replaced component to an inventory;
+- mark a service provider's daily capacity as used;
+- mutate local repair/reload/recharge state;
+- add mechanic-specific receipt detail for UI fragments.
+
+Do not use a callback commitment as a pile of unstructured work. If the same
+callback shape appears in a second mechanic, promote it into a named commitment.
+
+### CarWars Garage / Salvage Mapping
+
+The current CarWars vehicle bay hand-rolls a useful target pattern:
+
+```text
+install(piece_id, target_slot)
+  -> resolve inventory piece
+  -> resolve loadout slot
+  -> debit cash/time, or zero cash for salvage
+  -> remove piece from inventory
+  -> assign component to vehicle loadout
+  -> return replaced component to inventory
+  -> update fragments from receipt and loadout state
+```
+
+That should bind to transactions as:
+
+- `CountableTransferCommitment(player, garage, "cash", price)` when price is
+  nonzero;
+- another countable commitment or a local wallet leg for elapsed time;
+- `CallbackCommitment("remove from inventory", ...)` for the selected part;
+- `ComponentAssignmentCommitment(vehicle.loadout, slot, part, allow_replace=True)`;
+- `CallbackCommitment("return replaced part", ...)` when a domain wants the
+  replaced component in inventory rather than simply unassigned.
+
+Garage, shop, and salvage should differ mainly in policy functions that compute
+price, time, inventory source, and presentation labels. The transaction shape is
+the same.
+
+---
+
 ## First Implementation Slice
 
 The first implementation is deliberately smaller than a general shop engine.
@@ -238,10 +312,13 @@ Landed proof:
    commits.
 5. `ComponentAssignmentCommitment` proves owner-bound component manager
    assignment, replacement, post-assignment validation, and rollback.
-6. The neutral vehicle garage test buys and installs a component, then proves
+6. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
+   service, and presentation-specific state that still needs transaction
+   preflight/rollback.
+7. The neutral vehicle garage test buys and installs a component, then proves
    the resulting graph/loadout state survives `Graph.unstructure()` /
    `Graph.structure()`.
-7. Rejection before mutation and mid-commit rollback are both covered.
+8. Rejection before mutation and mid-commit rollback are both covered.
 
 Still recommended for the next consumer-facing slice:
 
@@ -250,7 +327,6 @@ Still recommended for the next consumer-facing slice:
 2. Add commitment legs only when a real consumer forces them:
    - discrete token move between holders;
    - catalog-backed token creation with stock/capacity;
-   - replacement return to inventory;
    - service/stat mutation;
    - graph link/unlink.
 3. Test aggregate insufficient funds, unavailable catalog/provider capacity,

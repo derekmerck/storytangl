@@ -15,6 +15,7 @@ from tangl.mechanics.assembly.examples.vehicle import (
     VehiclePartType,
 )
 from tangl.mechanics.transaction import (
+    CallbackCommitment,
     ComponentAssignmentCommitment,
     CountableTransferCommitment,
     RegistryAddCommitment,
@@ -208,6 +209,69 @@ def test_component_assignment_allow_replace_works_for_base_manager() -> None:
     offer.accept()
 
     assert loadout.get_slot("tires") == [slicks]
+
+
+def test_callback_commitment_binds_domain_local_inventory_moves() -> None:
+    graph = Graph()
+    vehicle = graph.add_node(kind=Vehicle, label="car")
+    inventory = [part("slicks")]
+    tires = inventory[0]
+
+    def remove_from_inventory() -> dict[str, object]:
+        inventory.remove(tires)
+        return {"kind": "inventory_remove", "item_id": tires.uid}
+
+    offer = TransactionOffer(
+        label="install inventory tires",
+        commitments=[
+            CallbackCommitment(
+                "remove from inventory",
+                apply=remove_from_inventory,
+                can_apply=lambda: tires in inventory,
+                undo=lambda: inventory.append(tires),
+            ),
+            ComponentAssignmentCommitment(vehicle.loadout, "tires", tires),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert inventory == []
+    assert vehicle.loadout.get_slot("tires") == [tires]
+    assert receipt.details[0]["kind"] == "inventory_remove"
+
+
+def test_callback_commitment_rolls_back_domain_local_inventory_moves() -> None:
+    graph = Graph()
+    vehicle = graph.add_node(kind=Vehicle, label="car", max_price=50)
+    inventory = [part("truck_chassis")]
+    chassis = inventory[0]
+    install_baseline(vehicle.loadout)
+
+    offer = TransactionOffer(
+        label="failed inventory install",
+        commitments=[
+            CallbackCommitment(
+                "remove from inventory",
+                apply=lambda: inventory.remove(chassis),
+                can_apply=lambda: chassis in inventory,
+                undo=lambda: inventory.append(chassis),
+            ),
+            ComponentAssignmentCommitment(
+                vehicle.loadout,
+                "chassis",
+                chassis,
+                validate_after=True,
+                allow_replace=True,
+            ),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="Price exceeds budget"):
+        offer.accept()
+
+    assert inventory == [chassis]
+    assert vehicle.loadout.get_slot("chassis")[0].token_from == "mini_chassis"
 
 
 def test_transaction_offer_buys_installs_and_round_trips_vehicle_component() -> None:

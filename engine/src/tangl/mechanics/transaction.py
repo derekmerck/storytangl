@@ -65,6 +65,44 @@ class TransactionHandler(Protocol[SpecT]):
 
 
 @dataclass
+class CallbackCommitment:
+    """Domain-local commitment backed by explicit preflight, apply, and undo callbacks."""
+
+    label: str
+    apply: Callable[[], object | None]
+    can_apply: Callable[[], TransactionCheck | bool] | None = None
+    undo: Callable[[], None] | None = None
+    _committed: bool = False
+
+    def can_commit(self) -> TransactionCheck:
+        if self.can_apply is None:
+            return TransactionCheck.accept()
+        result = self.can_apply()
+        if isinstance(result, bool):
+            return (
+                TransactionCheck.accept()
+                if result
+                else TransactionCheck.reject("rejected")
+            )
+        return result
+
+    def commit(self) -> object | None:
+        check = self.can_commit()
+        if not check.accepted:
+            raise ValueError(check.reason or f"{self.label} rejected")
+        detail = self.apply()
+        self._committed = True
+        return detail
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        if self.undo is not None:
+            self.undo()
+        self._committed = False
+
+
+@dataclass
 class TransactionOffer:
     """Ephemeral, preflighted promise to apply ordered commitments.
 
@@ -376,6 +414,7 @@ class ComponentAssignmentCommitment:
 
 
 __all__ = [
+    "CallbackCommitment",
     "ComponentAssignmentCommitment",
     "CountableHolder",
     "CountableTransferCommitment",
