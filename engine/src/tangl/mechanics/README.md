@@ -30,6 +30,11 @@ See `TRANSACTION_OFFER_DESIGN.md` for the cross-family vocabulary that unifies
 provisioning offers, association checks, asset transfers, shops, services, and
 writeback receipts.
 
+The first runtime helper for that vocabulary lives in `transaction.py`. It is
+deliberately small: an ephemeral `TransactionOffer` validates, accepts, and
+receipts a list of commitments while domain mechanics keep their own policy and
+author-facing words.
+
 ## Review Lens
 
 When reviewing or reviving a mechanic family, describe it with these four questions:
@@ -55,6 +60,9 @@ are using it systematically.
   story-capable mechanic family.
 - **Assembly**: constrained slot-and-budget optimization kernel used by higher-level
   authored loadouts.
+- **Transaction offers**: cross-family writeback helper for preflighted,
+  multi-leg mutations such as shop purchases, service exchanges, asset movement,
+  and component assignment. It is not a shop engine or inventory model by itself.
 - **Demographics**: profile and naming facet, currently being modernized toward a
   cleaner v38-facing surface.
 - **Presence / Wearable** and **Presence / Ornaments**: reusable presence/runtime
