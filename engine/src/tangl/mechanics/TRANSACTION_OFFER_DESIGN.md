@@ -7,8 +7,10 @@
 :related: assembly, assets, provisioning, credentials
 ```
 
-**Status:** DESIGN NOTE — vocabulary alignment for future implementation, not a
-landed transaction engine.
+**Status:** FIRST HELPER LANDED — `tangl.mechanics.transaction` provides an
+ephemeral `TransactionOffer`, ordered rollback-capable commitments, plain
+preflight/receipt data, and a neutral vehicle garage proof. This is still not a
+full shop engine or global transaction arbiter.
 **Scope:** the common offer/accept/writeback shape shared by provisioning,
 association, shops, trades, services, component install flows, and future
 credential/chopshop compliance.
@@ -223,24 +225,37 @@ state change under current rules.
 
 ## First Implementation Slice
 
-The first implementation should be deliberately smaller than a general shop
-engine.
+The first implementation is deliberately smaller than a general shop engine.
 
-Recommended proof:
+Landed proof:
 
-1. Add a small transaction-offer helper with plain result/receipt types and an
-   ordered commitment protocol.
-2. Implement only the commitment legs forced by a neutral demo:
-   - wallet debit;
-   - optional wallet credit;
-   - existing token move or simple catalog token creation;
-   - component assignment to an owner-bound manager;
-   - replacement return;
-   - reverse-order rollback.
-3. Add a neutral shop/garage example over the existing vehicle component manager.
-4. Test valid purchase/install, aggregate insufficient funds, incompatible slot,
-   provider missing capacity, and mid-commit rollback.
-5. Keep transaction offers ephemeral; persist only resulting state and receipts.
+1. `TransactionOffer` stays ephemeral and `guard_unstructure = True`, matching
+   the same callback/live-object boundary as `ProvisionOffer`.
+2. `TransactionCheck` and `TransactionReceipt` are plain data.
+3. `CountableTransferCommitment` proves bilateral wallet debit/credit checks.
+4. `RegistryAddCommitment` proves explicit shape change during accepted
+   writeback: a prepared graph item can enter the registry only when the offer
+   commits.
+5. `ComponentAssignmentCommitment` proves owner-bound component manager
+   assignment, replacement, post-assignment validation, and rollback.
+6. The neutral vehicle garage test buys and installs a component, then proves
+   the resulting graph/loadout state survives `Graph.unstructure()` /
+   `Graph.structure()`.
+7. Rejection before mutation and mid-commit rollback are both covered.
+
+Still recommended for the next consumer-facing slice:
+
+1. Add a neutral shop/garage example module or world-facing fixture over the
+   existing vehicle component manager.
+2. Add commitment legs only when a real consumer forces them:
+   - discrete token move between holders;
+   - catalog-backed token creation with stock/capacity;
+   - replacement return to inventory;
+   - service/stat mutation;
+   - graph link/unlink.
+3. Test aggregate insufficient funds, unavailable catalog/provider capacity,
+   incompatible install targets, and multi-offer/batch selection.
+4. Keep transaction offers ephemeral; persist only resulting state and receipts.
 
 Out of scope for the first slice:
 
