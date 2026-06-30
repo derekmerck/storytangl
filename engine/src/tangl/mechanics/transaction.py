@@ -35,6 +35,10 @@ class TransactionReceipt(BaseModelPlus):
     details: list[object] = Field(default_factory=list)
 
 
+class TransactionRollbackError(RuntimeError):
+    """Raised when rollback fails while recovering from a commit error."""
+
+
 class TransactionCommitment(Protocol):
     """One ordered, rollback-capable writeback leg inside a transaction offer."""
 
@@ -94,9 +98,22 @@ class TransactionOffer:
                 detail = commitment.commit()
                 if detail is not None:
                     details.append(detail)
-        except Exception:
+        except Exception as exc:
+            rollback_errors: list[tuple[str, Exception]] = []
             for commitment in reversed(applied):
-                commitment.rollback()
+                try:
+                    commitment.rollback()
+                except Exception as rollback_error:
+                    rollback_errors.append((commitment.label, rollback_error))
+            if rollback_errors:
+                labels = ", ".join(label for label, _ in rollback_errors)
+                error = TransactionRollbackError(
+                    f"transaction rollback failed for: {labels}"
+                )
+                error.add_note(f"original commit error: {exc!r}")
+                for label, rollback_error in rollback_errors:
+                    error.add_note(f"{label}: {rollback_error!r}")
+                raise error from exc
             raise
 
         return TransactionReceipt(
@@ -159,8 +176,14 @@ class CountableTransferCommitment:
         self.giver.spend_countable(self.asset_label, self.amount)
         try:
             self.receiver.gain_countable(self.asset_label, self.amount)
-        except Exception:
-            self.giver.gain_countable(self.asset_label, self.amount)
+        except Exception as exc:
+            try:
+                self.giver.gain_countable(self.asset_label, self.amount)
+            except Exception as rollback_error:
+                error = TransactionRollbackError("countable transfer rollback failed")
+                error.add_note(f"original receive error: {exc!r}")
+                error.add_note(f"refund error: {rollback_error!r}")
+                raise error from exc
             raise
         self._committed = True
         return {
@@ -227,21 +250,72 @@ class ComponentAssignmentCommitment:
     allow_replace: bool = False
     _previous: list[Entity] = field(default_factory=list)
     _committed: bool = False
+    _registered_by_assignment: Entity | None = field(default=None, repr=False)
+    _resolved: Entity | None = field(default=None, repr=False)
 
     def _component(self) -> Entity:
-        if callable(self.component):
-            return self.component()
-        return self.component
+        if self._resolved is None:
+            self._resolved = (
+                self.component()
+                if callable(self.component)
+                else self.component
+            )
+        return self._resolved
+
+    def _can_replace(self, component: Entity) -> TransactionCheck:
+        if not self.allow_replace:
+            return TransactionCheck.reject("replacement disabled")
+        if self.slot_name not in self.manager.slots:
+            return TransactionCheck.reject(f"No such slot: {self.slot_name}")
+
+        slot = self.manager.slots[self.slot_name]
+        replaced = self.manager.get_slot(self.slot_name)
+        if slot.max_count != 1 or not replaced:
+            return TransactionCheck.reject("replacement requires one occupied single slot")
+        if not self.manager.is_slot_enabled(self.slot_name):
+            return TransactionCheck.reject(f"Slot disabled: {self.slot_name}")
+
+        selects, reason = slot.selects_for(component)
+        if not selects:
+            return TransactionCheck.reject(reason)
+
+        missing_prerequisites = [
+            prerequisite
+            for prerequisite in slot.prerequisite_slots
+            if not self.manager._has_slot_components(prerequisite)
+        ]
+        if missing_prerequisites:
+            return TransactionCheck.reject(
+                f"Missing prerequisite slots: {', '.join(missing_prerequisites)}"
+            )
+
+        if self.manager.budgets and hasattr(component, "get_cost"):
+            current = [
+                item
+                for item in self.manager.all_components()
+                if item not in replaced
+            ]
+            current.append(component)
+            for name, budget in self.manager.budgets.budgets.items():
+                total = 0.0
+                for item in current:
+                    if hasattr(item, "get_cost"):
+                        total += float(getattr(item, "get_cost")(name))
+                if total > budget.capacity:
+                    return TransactionCheck.reject(
+                        f"Insufficient {name}: need {total}, have {budget.capacity}"
+                    )
+
+        return TransactionCheck.accept()
 
     def can_commit(self) -> TransactionCheck:
         component = self._component()
         can_assign, reason = self.manager.can_assign(self.slot_name, component)
         if can_assign:
             return TransactionCheck.accept()
-        if self.allow_replace and reason.startswith("Slot full"):
-            slot = self.manager.slots.get(self.slot_name)
-            if slot is not None and slot.max_count == 1 and self.manager.get_slot(self.slot_name):
-                return TransactionCheck.accept()
+        replace_check = self._can_replace(component)
+        if replace_check.accepted:
+            return replace_check
         return TransactionCheck.reject(reason)
 
     def commit(self) -> Mapping[str, object]:
@@ -251,8 +325,27 @@ class ComponentAssignmentCommitment:
 
         component = self._component()
         self._previous = list(self.manager.get_slot(self.slot_name))
-        self.manager.assign(self.slot_name, component)
+        component_registry = getattr(component, "registry", None)
+        slot = self.manager.slots[self.slot_name]
+        replacing = self.allow_replace and slot.max_count == 1 and bool(self._previous)
+        if replacing:
+            for item in self._previous:
+                self.manager.unassign(self.slot_name, item)
+        try:
+            self.manager.assign(self.slot_name, component)
+        except Exception:
+            if replacing:
+                for item in self._previous:
+                    self.manager.assign(self.slot_name, item)
+            raise
         self._committed = True
+        owner_registry = self.manager._owner_registry()
+        if (
+            component_registry is None
+            and owner_registry is not None
+            and owner_registry.get(component.uid) is component
+        ):
+            self._registered_by_assignment = component
 
         if self.validate_after:
             errors = self.manager.validate()
@@ -274,6 +367,10 @@ class ComponentAssignmentCommitment:
             self.manager.unassign(self.slot_name, item)
         for item in self._previous:
             self.manager.assign(self.slot_name, item)
+        owner_registry = self.manager._owner_registry()
+        if self._registered_by_assignment is not None and owner_registry is not None:
+            owner_registry.remove(self._registered_by_assignment.uid)
+        self._registered_by_assignment = None
         self._previous = []
         self._committed = False
 
@@ -288,4 +385,5 @@ __all__ = [
     "TransactionHandler",
     "TransactionOffer",
     "TransactionReceipt",
+    "TransactionRollbackError",
 ]

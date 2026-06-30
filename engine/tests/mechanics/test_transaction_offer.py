@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from tangl.core import Graph, Node, Selector
+from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.assembly.examples.vehicle import (
     Vehicle,
     VehicleComponent,
     VehicleLoadout,
+    VehiclePartType,
 )
 from tangl.mechanics.transaction import (
     ComponentAssignmentCommitment,
@@ -16,6 +20,7 @@ from tangl.mechanics.transaction import (
     RegistryAddCommitment,
     TransactionCheck,
     TransactionOffer,
+    TransactionRollbackError,
 )
 from tangl.story.concepts.asset import HasAssets
 
@@ -37,6 +42,39 @@ class FailingCommitment:
 
     def rollback(self) -> None:
         return None
+
+
+class TrackingCommitment:
+    """Commitment test double that records rollback attempts."""
+
+    def __init__(self, label: str, *, fail_rollback: bool = False) -> None:
+        self.label = label
+        self.fail_rollback = fail_rollback
+        self.rolled_back = False
+
+    def can_commit(self) -> TransactionCheck:
+        return TransactionCheck.accept()
+
+    def commit(self) -> None:
+        return None
+
+    def rollback(self) -> None:
+        self.rolled_back = True
+        if self.fail_rollback:
+            raise RuntimeError(f"{self.label} rollback failed")
+
+
+class BasicVehicleLoadout(ComponentManager[VehicleComponent]):
+    """Single-slot manager without VehicleLoadout's replacement override."""
+
+    slots: ClassVar[dict[str, Slot]] = {
+        "tires": Slot.for_predicate(
+            "tires",
+            lambda component: (
+                getattr(component, "part_type", None) is VehiclePartType.TIRES
+            ),
+        ),
+    }
 
 
 def part(label: str) -> VehicleComponent:
@@ -104,6 +142,74 @@ def test_transaction_offer_rolls_back_applied_commitments_after_late_failure() -
     assert graph.get(tires.uid) is None
 
 
+def test_transaction_offer_attempts_all_rollbacks_before_reporting_failure() -> None:
+    first = TrackingCommitment("first")
+    second = TrackingCommitment("second", fail_rollback=True)
+    offer = TransactionOffer(
+        label="rollback failure",
+        commitments=[
+            first,
+            second,
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(TransactionRollbackError, match="second"):
+        offer.accept()
+
+    assert first.rolled_back
+    assert second.rolled_back
+
+
+def test_component_assignment_callable_supplier_resolves_once() -> None:
+    graph = Graph()
+    vehicle = graph.add_node(kind=Vehicle, label="car")
+    created: list[VehicleComponent] = []
+
+    def make_tires() -> VehicleComponent:
+        component = part("slicks")
+        created.append(component)
+        return component
+
+    offer = TransactionOffer(
+        label="install generated tires",
+        commitments=[
+            ComponentAssignmentCommitment(vehicle.loadout, "tires", make_tires),
+        ],
+    )
+
+    assert offer.can_accept().accepted
+    offer.accept()
+
+    assert len(created) == 1
+    assert vehicle.loadout.get_slot("tires") == [created[0]]
+    assert graph.get(created[0].uid) is created[0]
+
+
+def test_component_assignment_allow_replace_works_for_base_manager() -> None:
+    loadout = BasicVehicleLoadout()
+    cheap_tires = part("cheap_tires")
+    slicks = part("slicks")
+    loadout.assign("tires", cheap_tires)
+
+    offer = TransactionOffer(
+        label="replace base-manager tires",
+        commitments=[
+            ComponentAssignmentCommitment(
+                loadout,
+                "tires",
+                slicks,
+                allow_replace=True,
+            ),
+        ],
+    )
+
+    assert offer.can_accept().accepted
+    offer.accept()
+
+    assert loadout.get_slot("tires") == [slicks]
+
+
 def test_transaction_offer_buys_installs_and_round_trips_vehicle_component() -> None:
     graph = Graph()
     buyer = graph.add_node(kind=GarageActor, label="buyer")
@@ -163,7 +269,6 @@ def test_transaction_offer_rolls_back_component_assignment_validation_failure() 
         label="buy too expensive chassis",
         commitments=[
             CountableTransferCommitment(buyer, shop, "cash", 1600),
-            RegistryAddCommitment(graph, truck_chassis),
             ComponentAssignmentCommitment(
                 vehicle.loadout,
                 "chassis",
