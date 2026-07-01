@@ -61,10 +61,27 @@ class _TemplateIndex:
             matches.append(templ)
 
     def template_hash(self, templ: EntityTemplate) -> Hash:
-        return self.hash_by_uid[templ.uid]
+        templ_hash = self.hash_by_uid.get(templ.uid)
+        if templ_hash is None:
+            templ_hash = templ.content_hash()
+            self.hash_by_uid[templ.uid] = templ_hash
+            self._index_identifier(templ_hash, templ)
+        return templ_hash
 
     def parent_template(self, templ: EntityTemplate) -> TemplateGroup | None:
-        return self.parent_by_child_uid.get(templ.uid)
+        parent = self.parent_by_child_uid.get(templ.uid)
+        if parent is not None:
+            return parent
+
+        registry = templ.registry
+        if registry is None:
+            return None
+        parent = registry.find_one(Selector(has_kind=TemplateGroup, has_member=templ))
+        if not isinstance(parent, TemplateGroup):
+            return None
+        self.parent_by_child_uid[templ.uid] = parent
+        self.template_hash(parent)
+        return parent
 
     def template_depth(self, templ: EntityTemplate) -> int:
         depth = 0
@@ -101,11 +118,13 @@ class _TemplateIndex:
     def remember_materialized(self, templ: EntityTemplate, item: GraphItem) -> None:
         self.materialized_by_hash[self.template_hash(templ)].append(item)
 
-    def parent_graph_item(self, templ: EntityTemplate) -> GraphItem | None:
+    def parent_graph_item(self, templ: EntityTemplate, *, graph: Graph) -> GraphItem | None:
         parent = self.parent_template(templ)
         if parent is None:
             return None
         matches = self.materialized_by_hash.get(self.template_hash(parent), [])
+        if not matches:
+            matches = list(graph.find_all(Selector(templ_hash=self.template_hash(parent))))
         if not matches:
             return None
         return _resolve_single_match(
@@ -329,7 +348,7 @@ class GraphFactory(Singleton):
                 graph.add(group)
                 template_index.remember_materialized(templ, group)
 
-                parent = template_index.parent_graph_item(templ)
+                parent = template_index.parent_graph_item(templ, graph=graph)
                 if parent:
                     _attach_to_parent(parent, group)
 
@@ -339,7 +358,7 @@ class GraphFactory(Singleton):
                 graph.add(node)
                 template_index.remember_materialized(templ, node)
 
-                parent = template_index.parent_graph_item(templ)
+                parent = template_index.parent_graph_item(templ, graph=graph)
                 if parent:
                     _attach_to_parent(parent, node)
 

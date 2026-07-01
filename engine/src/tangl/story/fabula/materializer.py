@@ -6,7 +6,7 @@ from uuid import UUID
 
 from tangl.core import EntityTemplate, GraphFactory, GraphItem, Selector, TemplateRegistry
 from tangl.media.media_creators.media_spec import MediaSpec
-from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
+from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
 from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.runtime.frame import PhaseCtx
@@ -808,26 +808,24 @@ class StoryMaterializer:
         state: _MaterializationState,
     ) -> None:
         world = state.graph.world
-        resources = getattr(world, "resources", None) if world is not None else None
-        get_rit = getattr(resources, "get_rit", None)
-        if not callable(get_rit):
+        if world is None:
             return
 
-        candidate = get_rit(media_id)
-        if not isinstance(candidate, MediaRIT):
+        candidate = world.resources.get_rit(media_id)
+        if candidate is None:
             return
 
         ctx = self._make_prelink_ctx(
             state=state,
             cursor_id=dep.predecessor_id,
         )
-        provider = MediaInventoryProvisioner._graph_local_copy(candidate, _ctx=ctx)
+        provider = MediaInventoryProvisioner.graph_local_copy(candidate, _ctx=ctx)
         if not dep.satisfied_by(provider):
             return
 
         if provider.registry is not state.graph:
             state.graph.add(provider)
-        dep.set_provider(provider)
+        dep.set_provider(provider, _ctx=ctx)
         if dep.requirement.resolution_reason is None:
             dep.requirement.resolution_reason = "direct_media_id"
 
