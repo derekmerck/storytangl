@@ -476,6 +476,36 @@ def test_value_delta_commitment_preflights_cumulative_same_target_deltas() -> No
     assert vehicle.hp == 7
 
 
+def test_value_delta_commitment_requires_key_for_multiple_unkeyed_deltas() -> None:
+    vehicle = RepairTarget(hp=7, max_hp=10)
+
+    offer = TransactionOffer(
+        label="ambiguous scalar repair",
+        commitments=[
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=2,
+                max_value=vehicle.max_hp,
+            ),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=2,
+                max_value=vehicle.max_hp,
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == (
+        "mutate value: multiple unkeyed value deltas require planning_key"
+    )
+    assert vehicle.hp == 7
+
+
 def test_mapping_delta_commitment_rolls_back_resource_mutations() -> None:
     station = {"fuel": 20}
     vehicle = {"fuel": 2}

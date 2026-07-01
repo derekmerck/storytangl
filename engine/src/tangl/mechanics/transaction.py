@@ -119,6 +119,7 @@ class TransactionOffer:
 
     def can_accept(self) -> TransactionCheck:
         planned_deltas: dict[object, Number] = {}
+        unkeyed_value_delta_seen = False
         for commitment in self.commitments:
             if isinstance(
                 commitment,
@@ -128,6 +129,17 @@ class TransactionOffer:
                     StatDeltaCommitment,
                 ),
             ):
+                if (
+                    isinstance(commitment, ValueDeltaCommitment)
+                    and commitment.planning_key is None
+                ):
+                    if unkeyed_value_delta_seen:
+                        prefix = f"{commitment.label}: " if commitment.label else ""
+                        return TransactionCheck.reject(
+                            prefix
+                            + "multiple unkeyed value deltas require planning_key"
+                        )
+                    unkeyed_value_delta_seen = True
                 check = commitment.can_commit_with_plan(planned_deltas)
             else:
                 check = commitment.can_commit()
@@ -299,7 +311,7 @@ class ValueDeltaCommitment:
     def _plan_key(self) -> object:
         if self.planning_key is not None:
             return self.planning_key
-        return ("value_delta", id(self.get_value), id(self.set_value))
+        return ("value_delta", id(self))
 
     def can_commit(self) -> TransactionCheck:
         return _check_delta(

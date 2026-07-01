@@ -252,6 +252,12 @@ still rechecks each commitment against live state immediately before mutation;
 that closes the normal time-of-check/time-of-use gap without making offers
 durable locks.
 
+Mapping and stat deltas have natural planning keys (`mapping + key`, `stats +
+stat_name`). Generic value deltas use callbacks, so callers must provide
+`planning_key` when an offer contains multiple scalar callback deltas. Without
+that explicit identity, `can_accept()` rejects the ambiguous plan instead of
+guessing which callbacks target the same field.
+
 Core commitments cover common legs:
 
 - `CountableTransferCommitment` for fungible wallet/resource transfer;
