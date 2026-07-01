@@ -414,6 +414,32 @@ def test_value_delta_commitment_rejects_over_repair_before_mutation() -> None:
     assert vehicle.hp == 8
 
 
+def test_value_delta_commitment_rolls_back_repair_service_state() -> None:
+    vehicle = RepairTarget(hp=3, max_hp=10)
+    service = {"repair_capacity": 10}
+
+    offer = TransactionOffer(
+        label="repair then fail",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -5),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=5,
+                max_value=vehicle.max_hp,
+                detail_label="vehicle.hp",
+            ),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert service["repair_capacity"] == 10
+    assert vehicle.hp == 3
+
+
 def test_mapping_delta_commitment_rolls_back_resource_mutations() -> None:
     station = {"fuel": 20}
     vehicle = {"fuel": 2}
@@ -477,3 +503,49 @@ def test_stat_delta_commitment_mutates_progression_stat() -> None:
     assert clinic["healing_capacity"] == 10
     assert patient["health"].fv == 60.0
     assert receipt.details[1]["kind"] == "stat_delta"
+
+
+def test_stat_delta_commitment_rolls_back_after_late_failure() -> None:
+    patient = {"health": Stat(fv=50.0)}
+    clinic = {"healing_capacity": 20}
+
+    offer = TransactionOffer(
+        label="heal then fail",
+        commitments=[
+            MappingDeltaCommitment(clinic, "healing_capacity", -10),
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                min_value=0.0,
+                max_value=100.0,
+            ),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert clinic["healing_capacity"] == 20
+    assert patient["health"].fv == 50.0
+
+
+def test_stat_delta_commitment_rejects_missing_stat_before_mutation() -> None:
+    patient = {"health": Stat(fv=50.0)}
+    clinic = {"healing_capacity": 20}
+
+    offer = TransactionOffer(
+        label="heal missing stat",
+        commitments=[
+            MappingDeltaCommitment(clinic, "healing_capacity", -10),
+            StatDeltaCommitment(patient, "morale", 10.0),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate stat: missing stat: morale"
+    assert clinic["healing_capacity"] == 20
+    assert patient["health"].fv == 50.0

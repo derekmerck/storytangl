@@ -263,6 +263,12 @@ def _check_delta(
     return TransactionCheck.accept()
 
 
+def _is_zero(value: Number) -> bool:
+    if isinstance(value, float):
+        return abs(value) < 1e-9
+    return value == 0
+
+
 @dataclass
 class ValueDeltaCommitment:
     """Apply one bounded numeric delta through explicit getter/setter callbacks."""
@@ -272,10 +278,10 @@ class ValueDeltaCommitment:
     delta: Number
     label: str = "mutate value"
     detail_label: str | None = None
-    min_value: Number | None = 0
+    min_value: Number | None = None
     max_value: Number | None = None
-    _previous: Number | None = None
-    _committed: bool = False
+    _previous: Number = field(default=0, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
 
     def can_commit(self) -> TransactionCheck:
         return _check_delta(
@@ -286,10 +292,15 @@ class ValueDeltaCommitment:
         )
 
     def commit(self) -> Mapping[str, object]:
-        check = self.can_commit()
+        current = self.get_value()
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
         if not check.accepted:
             raise ValueError(check.reason or "value delta rejected")
-        current = self.get_value()
         next_value = current + self.delta
         self.set_value(next_value)
         self._previous = current
@@ -305,9 +316,8 @@ class ValueDeltaCommitment:
     def rollback(self) -> None:
         if not self._committed:
             return
-        if self._previous is not None:
-            self.set_value(self._previous)
-        self._previous = None
+        self.set_value(self._previous)
+        self._previous = 0
         self._committed = False
 
 
@@ -323,9 +333,9 @@ class MappingDeltaCommitment:
     max_value: Number | None = None
     default: Number = 0
     drop_zero: bool = False
-    _previous: Number | None = None
-    _had_previous: bool = False
-    _committed: bool = False
+    _previous: Number = field(default=0, init=False, repr=False)
+    _had_previous: bool = field(default=False, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
 
     def can_commit(self) -> TransactionCheck:
         return _check_delta(
@@ -336,13 +346,18 @@ class MappingDeltaCommitment:
         )
 
     def commit(self) -> Mapping[str, object]:
-        check = self.can_commit()
-        if not check.accepted:
-            raise ValueError(check.reason or "mapping delta rejected")
         self._had_previous = self.key in self.values
         current = self.values.get(self.key, self.default)
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if not check.accepted:
+            raise ValueError(check.reason or "mapping delta rejected")
         next_value = current + self.delta
-        if self.drop_zero and next_value == 0:
+        if self.drop_zero and _is_zero(next_value):
             self.values.pop(self.key, None)
         else:
             self.values[self.key] = next_value
@@ -359,11 +374,11 @@ class MappingDeltaCommitment:
     def rollback(self) -> None:
         if not self._committed:
             return
-        if self._had_previous and self._previous is not None:
+        if self._had_previous:
             self.values[self.key] = self._previous
         else:
             self.values.pop(self.key, None)
-        self._previous = None
+        self._previous = 0
         self._had_previous = False
         self._committed = False
 
@@ -378,8 +393,8 @@ class StatDeltaCommitment:
     label: str = "mutate stat"
     min_value: float | None = None
     max_value: float | None = None
-    _previous: float | None = None
-    _committed: bool = False
+    _previous: float = field(default=0.0, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
 
     def can_commit(self) -> TransactionCheck:
         if self.stat_name not in self.stats:
@@ -392,11 +407,18 @@ class StatDeltaCommitment:
         )
 
     def commit(self) -> Mapping[str, object]:
-        check = self.can_commit()
-        if not check.accepted:
-            raise ValueError(check.reason or "stat delta rejected")
+        if self.stat_name not in self.stats:
+            raise ValueError(f"missing stat: {self.stat_name}")
         stat = self.stats[self.stat_name]
         current = stat.fv
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if not check.accepted:
+            raise ValueError(check.reason or "stat delta rejected")
         next_value = current + self.delta
         stat.fv = next_value
         self._previous = current
@@ -412,9 +434,8 @@ class StatDeltaCommitment:
     def rollback(self) -> None:
         if not self._committed:
             return
-        if self._previous is not None:
-            self.stats[self.stat_name].fv = self._previous
-        self._previous = None
+        self.stats[self.stat_name].fv = self._previous
+        self._previous = 0.0
         self._committed = False
 
 
