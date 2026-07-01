@@ -245,9 +245,27 @@ Keep the binding point obvious:
 5. Call `offer.accept()` only in the committed update path.
 6. Use the returned `TransactionReceipt` for notes and projection hints.
 
+`TransactionOffer.can_accept()` evaluates built-in value/mapping/stat delta
+commitments cumulatively, so repeated changes to the same resource are checked
+as one planned total before the offer is presented as acceptable. `accept()`
+still rechecks each commitment against live state immediately before mutation;
+that closes the normal time-of-check/time-of-use gap without making offers
+durable locks.
+
+Mapping and stat deltas have natural planning keys (`mapping + key`, `stats +
+stat_name`). Generic value deltas use callbacks, so callers must provide
+`planning_key` when an offer contains multiple scalar callback deltas. Without
+that explicit identity, `can_accept()` rejects the ambiguous plan instead of
+guessing which callbacks target the same field.
+
 Core commitments cover common legs:
 
 - `CountableTransferCommitment` for fungible wallet/resource transfer;
+- `ValueDeltaCommitment` for bounded scalar state reached through explicit
+  getter/setter callbacks;
+- `MappingDeltaCommitment` for simple resource pools such as fuel, ammo,
+  repair capacity, service capacity, or HP maps;
+- `StatDeltaCommitment` for progression/stat-like values that expose `fv`;
 - `RegistryAddCommitment` for explicit graph/token materialization;
 - `ComponentAssignmentCommitment` for owner-bound assembly slots;
 - `CallbackCommitment` for domain-local state changes that do not deserve a
@@ -265,6 +283,9 @@ named, rollback-capable legs such as:
 
 Do not use a callback commitment as a pile of unstructured work. If the same
 callback shape appears in a second mechanic, promote it into a named commitment.
+The first promoted examples are the value/mapping/stat delta commitments above:
+they cover repair, refuel, reload, healing, and provider-capacity debits without
+turning services into a separate core mechanic.
 
 ### CarWars Garage / Salvage Mapping
 
@@ -307,18 +328,21 @@ Landed proof:
    the same callback/live-object boundary as `ProvisionOffer`.
 2. `TransactionCheck` and `TransactionReceipt` are plain data.
 3. `CountableTransferCommitment` proves bilateral wallet debit/credit checks.
-4. `RegistryAddCommitment` proves explicit shape change during accepted
+4. `ValueDeltaCommitment`, `MappingDeltaCommitment`, and `StatDeltaCommitment`
+   prove service/fungible/stat mutation legs such as repair, refuel, reload, and
+   healing.
+5. `RegistryAddCommitment` proves explicit shape change during accepted
    writeback: a prepared graph item can enter the registry only when the offer
    commits.
-5. `ComponentAssignmentCommitment` proves owner-bound component manager
+6. `ComponentAssignmentCommitment` proves owner-bound component manager
    assignment, replacement, post-assignment validation, and rollback.
-6. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
+7. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
    service, and presentation-specific state that still needs transaction
    preflight/rollback.
-7. The neutral vehicle garage test buys and installs a component, then proves
+8. The neutral vehicle garage test buys and installs a component, then proves
    the resulting graph/loadout state survives `Graph.unstructure()` /
    `Graph.structure()`.
-8. Rejection before mutation and mid-commit rollback are both covered.
+9. Rejection before mutation and mid-commit rollback are both covered.
 
 Still recommended for the next consumer-facing slice:
 
@@ -327,7 +351,6 @@ Still recommended for the next consumer-facing slice:
 2. Add commitment legs only when a real consumer forces them:
    - discrete token move between holders;
    - catalog-backed token creation with stock/capacity;
-   - service/stat mutation;
    - graph link/unlink.
 3. Test aggregate insufficient funds, unavailable catalog/provider capacity,
    incompatible install targets, and multi-offer/batch selection.

@@ -14,14 +14,18 @@ from tangl.mechanics.assembly.examples.vehicle import (
     VehicleLoadout,
     VehiclePartType,
 )
+from tangl.mechanics.progression import Stat
 from tangl.mechanics.transaction import (
     CallbackCommitment,
     ComponentAssignmentCommitment,
     CountableTransferCommitment,
+    MappingDeltaCommitment,
     RegistryAddCommitment,
+    StatDeltaCommitment,
     TransactionCheck,
     TransactionOffer,
     TransactionRollbackError,
+    ValueDeltaCommitment,
 )
 from tangl.story.concepts.asset import HasAssets
 
@@ -76,6 +80,12 @@ class BasicVehicleLoadout(ComponentManager[VehicleComponent]):
             ),
         ),
     }
+
+
+class RepairTarget:
+    def __init__(self, hp: int, max_hp: int) -> None:
+        self.hp = hp
+        self.max_hp = max_hp
 
 
 def part(label: str) -> VehicleComponent:
@@ -350,3 +360,304 @@ def test_transaction_offer_rolls_back_component_assignment_validation_failure() 
     assert shop.wallet["cash"] == 0
     assert graph.get(truck_chassis.uid) is None
     assert vehicle.loadout.get_slot("chassis")[0].token_from == "mini_chassis"
+
+
+def test_value_delta_commitment_binds_repair_service_state() -> None:
+    vehicle = RepairTarget(hp=3, max_hp=10)
+    service = {"repair_capacity": 10}
+
+    offer = TransactionOffer(
+        label="repair vehicle",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -5),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=5,
+                max_value=vehicle.max_hp,
+                detail_label="vehicle.hp",
+            ),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert service["repair_capacity"] == 5
+    assert vehicle.hp == 8
+    assert receipt.details[0]["kind"] == "mapping_delta"
+    assert receipt.details[1]["label"] == "vehicle.hp"
+
+
+def test_value_delta_commitment_rejects_over_repair_before_mutation() -> None:
+    vehicle = RepairTarget(hp=8, max_hp=10)
+    service = {"repair_capacity": 10}
+
+    offer = TransactionOffer(
+        label="over repair vehicle",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -5),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=5,
+                max_value=vehicle.max_hp,
+                detail_label="vehicle.hp",
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate value: value above maximum: 13 > 10"
+    assert service["repair_capacity"] == 10
+    assert vehicle.hp == 8
+
+
+def test_value_delta_commitment_rolls_back_repair_service_state() -> None:
+    vehicle = RepairTarget(hp=3, max_hp=10)
+    service = {"repair_capacity": 10}
+
+    offer = TransactionOffer(
+        label="repair then fail",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -5),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=5,
+                max_value=vehicle.max_hp,
+                detail_label="vehicle.hp",
+            ),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert service["repair_capacity"] == 10
+    assert vehicle.hp == 3
+
+
+def test_value_delta_commitment_preflights_cumulative_same_target_deltas() -> None:
+    vehicle = RepairTarget(hp=7, max_hp=10)
+
+    def get_hp() -> int:
+        return vehicle.hp
+
+    def set_hp(value: int | float) -> None:
+        vehicle.hp = int(value)
+
+    offer = TransactionOffer(
+        label="over repair in pieces",
+        commitments=[
+            ValueDeltaCommitment(
+                get_value=get_hp,
+                set_value=set_hp,
+                delta=2,
+                max_value=vehicle.max_hp,
+                planning_key=("vehicle", id(vehicle), "hp"),
+            ),
+            ValueDeltaCommitment(
+                get_value=get_hp,
+                set_value=set_hp,
+                delta=2,
+                max_value=vehicle.max_hp,
+                planning_key=("vehicle", id(vehicle), "hp"),
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate value: value above maximum: 11 > 10"
+    assert vehicle.hp == 7
+
+
+def test_value_delta_commitment_requires_key_for_multiple_unkeyed_deltas() -> None:
+    vehicle = RepairTarget(hp=7, max_hp=10)
+
+    offer = TransactionOffer(
+        label="ambiguous scalar repair",
+        commitments=[
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=2,
+                max_value=vehicle.max_hp,
+            ),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=2,
+                max_value=vehicle.max_hp,
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == (
+        "mutate value: multiple unkeyed value deltas require planning_key"
+    )
+    assert vehicle.hp == 7
+
+
+def test_mapping_delta_commitment_rolls_back_resource_mutations() -> None:
+    station = {"fuel": 20}
+    vehicle = {"fuel": 2}
+
+    offer = TransactionOffer(
+        label="refuel then fail",
+        commitments=[
+            MappingDeltaCommitment(station, "fuel", -8),
+            MappingDeltaCommitment(vehicle, "fuel", 8, max_value=10),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert station["fuel"] == 20
+    assert vehicle["fuel"] == 2
+
+
+def test_mapping_delta_commitment_preflights_cumulative_same_key_deltas() -> None:
+    service = {"repair_capacity": 5}
+
+    offer = TransactionOffer(
+        label="overspend repair capacity",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -4),
+            MappingDeltaCommitment(service, "repair_capacity", -4),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate mapping value: value below minimum: -3 < 0"
+    assert service["repair_capacity"] == 5
+
+
+def test_mapping_delta_commitment_can_drop_zero_and_restore_missing_key() -> None:
+    ammo = {"rockets": 2}
+    station: dict[str, int] = {}
+
+    offer = TransactionOffer(
+        label="reload rockets",
+        commitments=[
+            MappingDeltaCommitment(ammo, "rockets", -2, drop_zero=True),
+            MappingDeltaCommitment(station, "spent_rockets", 2),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert ammo == {"rockets": 2}
+    assert station == {}
+
+
+def test_stat_delta_commitment_mutates_progression_stat() -> None:
+    patient = {"health": Stat(fv=50.0)}
+    clinic = {"healing_capacity": 20}
+
+    offer = TransactionOffer(
+        label="heal patient",
+        commitments=[
+            MappingDeltaCommitment(clinic, "healing_capacity", -10),
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                min_value=0.0,
+                max_value=100.0,
+            ),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert clinic["healing_capacity"] == 10
+    assert patient["health"].fv == 60.0
+    assert receipt.details[1]["kind"] == "stat_delta"
+
+
+def test_stat_delta_commitment_rolls_back_after_late_failure() -> None:
+    patient = {"health": Stat(fv=50.0)}
+    clinic = {"healing_capacity": 20}
+
+    offer = TransactionOffer(
+        label="heal then fail",
+        commitments=[
+            MappingDeltaCommitment(clinic, "healing_capacity", -10),
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                min_value=0.0,
+                max_value=100.0,
+            ),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert clinic["healing_capacity"] == 20
+    assert patient["health"].fv == 50.0
+
+
+def test_stat_delta_commitment_preflights_cumulative_same_stat_deltas() -> None:
+    patient = {"health": Stat(fv=85.0)}
+
+    offer = TransactionOffer(
+        label="over heal in pieces",
+        commitments=[
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                max_value=100.0,
+            ),
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                max_value=100.0,
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate stat: value above maximum: 105.0 > 100.0"
+    assert patient["health"].fv == 85.0
+
+
+def test_stat_delta_commitment_rejects_missing_stat_before_mutation() -> None:
+    patient = {"health": Stat(fv=50.0)}
+    clinic = {"healing_capacity": 20}
+
+    offer = TransactionOffer(
+        label="heal missing stat",
+        commitments=[
+            MappingDeltaCommitment(clinic, "healing_capacity", -10),
+            StatDeltaCommitment(patient, "morale", 10.0),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate stat: missing stat: morale"
+    assert clinic["healing_capacity"] == 20
+    assert patient["health"].fv == 50.0

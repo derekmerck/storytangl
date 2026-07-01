@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import ClassVar, Protocol, TypeVar
 
@@ -55,6 +55,8 @@ class TransactionCommitment(Protocol):
 
 
 SpecT = TypeVar("SpecT")
+Number = int | float
+_PLAN_MISSING = object()
 
 
 class TransactionHandler(Protocol[SpecT]):
@@ -116,8 +118,31 @@ class TransactionOffer:
     guard_unstructure: ClassVar[bool] = True
 
     def can_accept(self) -> TransactionCheck:
+        planned_deltas: dict[object, Number] = {}
+        unkeyed_value_delta_seen = False
         for commitment in self.commitments:
-            check = commitment.can_commit()
+            if isinstance(
+                commitment,
+                (
+                    ValueDeltaCommitment,
+                    MappingDeltaCommitment,
+                    StatDeltaCommitment,
+                ),
+            ):
+                if (
+                    isinstance(commitment, ValueDeltaCommitment)
+                    and commitment.planning_key is None
+                ):
+                    if unkeyed_value_delta_seen:
+                        prefix = f"{commitment.label}: " if commitment.label else ""
+                        return TransactionCheck.reject(
+                            prefix
+                            + "multiple unkeyed value deltas require planning_key"
+                        )
+                    unkeyed_value_delta_seen = True
+                check = commitment.can_commit_with_plan(planned_deltas)
+            else:
+                check = commitment.can_commit()
             if not check.accepted:
                 prefix = f"{commitment.label}: " if commitment.label else ""
                 return TransactionCheck.reject(prefix + (check.reason or "rejected"))
@@ -187,6 +212,12 @@ class CountableHolder(Protocol):
         ...
 
 
+class StatLike(Protocol):
+    """Minimal stat surface for transaction-backed stat deltas."""
+
+    fv: float
+
+
 @dataclass
 class CountableTransferCommitment:
     """Transfer one fungible asset count between two holders."""
@@ -235,6 +266,277 @@ class CountableTransferCommitment:
             return
         self.receiver.spend_countable(self.asset_label, self.amount)
         self.giver.gain_countable(self.asset_label, self.amount)
+        self._committed = False
+
+
+def _check_delta(
+    current: Number,
+    delta: Number,
+    min_value: Number | None,
+    max_value: Number | None,
+) -> TransactionCheck:
+    next_value = current + delta
+    if min_value is not None and next_value < min_value:
+        return TransactionCheck.reject(
+            f"value below minimum: {next_value} < {min_value}"
+        )
+    if max_value is not None and next_value > max_value:
+        return TransactionCheck.reject(
+            f"value above maximum: {next_value} > {max_value}"
+        )
+    return TransactionCheck.accept()
+
+
+def _is_zero(value: Number) -> bool:
+    if isinstance(value, float):
+        return abs(value) < 1e-9
+    return value == 0
+
+
+@dataclass
+class ValueDeltaCommitment:
+    """Apply one bounded numeric delta through explicit getter/setter callbacks."""
+
+    get_value: Callable[[], Number]
+    set_value: Callable[[Number], None]
+    delta: Number
+    label: str = "mutate value"
+    detail_label: str | None = None
+    min_value: Number | None = None
+    max_value: Number | None = None
+    planning_key: object | None = None
+    _previous: Number = field(default=0, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
+
+    def _plan_key(self) -> object:
+        if self.planning_key is not None:
+            return self.planning_key
+        return ("value_delta", id(self))
+
+    def can_commit(self) -> TransactionCheck:
+        return _check_delta(
+            self.get_value(),
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+
+    def can_commit_with_plan(
+        self,
+        planned_deltas: MutableMapping[object, Number],
+    ) -> TransactionCheck:
+        key = self._plan_key()
+        planned_current = planned_deltas.get(key, _PLAN_MISSING)
+        current = (
+            self.get_value()
+            if planned_current is _PLAN_MISSING
+            else planned_current
+        )
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if check.accepted:
+            planned_deltas[key] = current + self.delta
+        return check
+
+    def commit(self) -> Mapping[str, object]:
+        current = self.get_value()
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if not check.accepted:
+            raise ValueError(check.reason or "value delta rejected")
+        next_value = current + self.delta
+        self.set_value(next_value)
+        self._previous = current
+        self._committed = True
+        return {
+            "kind": "value_delta",
+            "label": self.detail_label or self.label,
+            "delta": self.delta,
+            "previous_value": current,
+            "value": next_value,
+        }
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        self.set_value(self._previous)
+        self._previous = 0
+        self._committed = False
+
+
+@dataclass
+class MappingDeltaCommitment:
+    """Apply one bounded numeric delta to a mutable resource mapping."""
+
+    values: MutableMapping[str, Number]
+    key: str
+    delta: Number
+    label: str = "mutate mapping value"
+    min_value: Number | None = 0
+    max_value: Number | None = None
+    default: Number = 0
+    drop_zero: bool = False
+    _previous: Number = field(default=0, init=False, repr=False)
+    _had_previous: bool = field(default=False, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
+
+    def _plan_key(self) -> object:
+        return ("mapping_delta", id(self.values), self.key)
+
+    def can_commit(self) -> TransactionCheck:
+        return _check_delta(
+            self.values.get(self.key, self.default),
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+
+    def can_commit_with_plan(
+        self,
+        planned_deltas: MutableMapping[object, Number],
+    ) -> TransactionCheck:
+        key = self._plan_key()
+        planned_current = planned_deltas.get(key, _PLAN_MISSING)
+        current = (
+            self.values.get(self.key, self.default)
+            if planned_current is _PLAN_MISSING
+            else planned_current
+        )
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if check.accepted:
+            planned_deltas[key] = current + self.delta
+        return check
+
+    def commit(self) -> Mapping[str, object]:
+        self._had_previous = self.key in self.values
+        current = self.values.get(self.key, self.default)
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if not check.accepted:
+            raise ValueError(check.reason or "mapping delta rejected")
+        next_value = current + self.delta
+        if self.drop_zero and _is_zero(next_value):
+            self.values.pop(self.key, None)
+        else:
+            self.values[self.key] = next_value
+        self._previous = current
+        self._committed = True
+        return {
+            "kind": "mapping_delta",
+            "key": self.key,
+            "delta": self.delta,
+            "previous_value": current,
+            "value": next_value,
+        }
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        if self._had_previous:
+            self.values[self.key] = self._previous
+        else:
+            self.values.pop(self.key, None)
+        self._previous = 0
+        self._had_previous = False
+        self._committed = False
+
+
+@dataclass
+class StatDeltaCommitment:
+    """Apply one bounded delta to a stat-like value in a stat mapping."""
+
+    stats: MutableMapping[str, StatLike]
+    stat_name: str
+    delta: float
+    label: str = "mutate stat"
+    min_value: float | None = None
+    max_value: float | None = None
+    _previous: float = field(default=0.0, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
+
+    def _plan_key(self) -> object:
+        return ("stat_delta", id(self.stats), self.stat_name)
+
+    def can_commit(self) -> TransactionCheck:
+        if self.stat_name not in self.stats:
+            return TransactionCheck.reject(f"missing stat: {self.stat_name}")
+        return _check_delta(
+            self.stats[self.stat_name].fv,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+
+    def can_commit_with_plan(
+        self,
+        planned_deltas: MutableMapping[object, Number],
+    ) -> TransactionCheck:
+        if self.stat_name not in self.stats:
+            return TransactionCheck.reject(f"missing stat: {self.stat_name}")
+        key = self._plan_key()
+        planned_current = planned_deltas.get(key, _PLAN_MISSING)
+        current = (
+            self.stats[self.stat_name].fv
+            if planned_current is _PLAN_MISSING
+            else planned_current
+        )
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if check.accepted:
+            planned_deltas[key] = current + self.delta
+        return check
+
+    def commit(self) -> Mapping[str, object]:
+        if self.stat_name not in self.stats:
+            raise ValueError(f"missing stat: {self.stat_name}")
+        stat = self.stats[self.stat_name]
+        current = stat.fv
+        check = _check_delta(
+            current,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+        if not check.accepted:
+            raise ValueError(check.reason or "stat delta rejected")
+        next_value = current + self.delta
+        stat.fv = next_value
+        self._previous = current
+        self._committed = True
+        return {
+            "kind": "stat_delta",
+            "stat": self.stat_name,
+            "delta": self.delta,
+            "previous_value": current,
+            "value": next_value,
+        }
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        self.stats[self.stat_name].fv = self._previous
+        self._previous = 0.0
         self._committed = False
 
 
@@ -418,11 +720,15 @@ __all__ = [
     "ComponentAssignmentCommitment",
     "CountableHolder",
     "CountableTransferCommitment",
+    "MappingDeltaCommitment",
     "RegistryAddCommitment",
+    "StatDeltaCommitment",
+    "StatLike",
     "TransactionCheck",
     "TransactionCommitment",
     "TransactionHandler",
     "TransactionOffer",
     "TransactionReceipt",
     "TransactionRollbackError",
+    "ValueDeltaCommitment",
 ]
