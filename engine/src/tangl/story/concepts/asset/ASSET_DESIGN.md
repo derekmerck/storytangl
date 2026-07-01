@@ -94,8 +94,14 @@ storage itself.
 ## Transaction Model
 
 `AssetTransactionManager` validates a complete transfer before mutating wallets
-or holder asset maps. Once the graph relationship model exists, the same manager
-can:
+or holder asset maps. It remains the story-level convenience for the current
+holder surface. The cross-family `tangl.mechanics.transaction` helper now carries
+the shared spec/offer/commitment/receipt shape for broader shops, services,
+assembly assignment, and mixed writeback.
+
+Once the graph relationship model exists, asset transfers should bind to that
+offer/commitment helper rather than grow a parallel trade framework. The asset
+side can then:
 
 - move discrete asset tokens by updating holding/ownership links;
 - debit and credit `AssetWallet` counts;
@@ -132,9 +138,10 @@ experiments, not a complete inventory system.
   `can_receive_*`) directly. A later relationship framework should generalize
   this into preflight/acceptance rules that assets, connections, attachments,
   and other mutable associations can share.
-- `AssetTransactionManager` does not yet batch mixed discrete and fungible
-  changes atomically. The trade manager should build on a batched transaction
-  plan that validates every leg before mutating anything.
+- `AssetTransactionManager` is not yet adapted to `TransactionOffer` for mixed
+  discrete, fungible, and service operations. The generic helper exists; the
+  remaining work is to express holder-map and future holding-edge changes as
+  commitments that validate every leg before mutating anything.
 - `HasAssets` nominates `inv` and `assets` into local namespaces, but there is
   no story-level `Player`/avatar concept yet. Sandbox currently uses
   `SandboxScope.player_assets` as the explicit player stand-in; promote a real

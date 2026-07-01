@@ -56,7 +56,14 @@ Connector association is the third proof consumer and the first bilateral one.
 Its `can_connect()` / `can_disconnect()` methods are pure checks; `connect()` /
 `disconnect()` are committed id-backed relationship mutations. Group matching is
 deliberately deterministic first-fit for now, enough to show simple plug/socket
-pairs and PC-like cable bundles without promoting a general transaction engine yet.
+pairs and PC-like cable bundles while keeping connector compatibility local to assembly.
+
+Transaction offers are now the first writeback layer adjacent to these managers.
+`tangl.mechanics.transaction` supplies ephemeral offers, commitments, rollback
+checks, and receipts for cases where association also costs, creates, moves, or
+mutates something else. A vehicle garage proof uses component assignment as one
+commitment inside a multi-leg offer, while the manager still owns slot legality
+and persisted identity.
 
 Follow-up retrofit targets remain open: credential packets, domain vehicle managers
 such as CarWars adapters, robot assemblies, and any world-specific full-graph outfit
@@ -76,10 +83,11 @@ Assembly now treats membership and connection as small association specializatio
   bookkeeping, world reactions, and journal fragments after a mutation has committed.
 
 This is intentionally smaller than the legacy `Associating` handler pipeline. It keeps
-the vocabulary aligned with future roles, credentials, shops, and trades without adding
-a broad transaction framework before connectors and compliance prove the shared shape.
-The broader offer/commitment vocabulary is captured in
-`../TRANSACTION_OFFER_DESIGN.md`.
+the vocabulary aligned with future roles, credentials, shops, and trades while leaving
+multi-party writeback to the broader offer/commitment helper in
+`../TRANSACTION_OFFER_DESIGN.md`. Assembly association answers the local question
+"may this member or endpoint bind here?"; transaction offers answer the update-phase
+question "which checked mutations commit together?"
 
 ---
 
