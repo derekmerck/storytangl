@@ -481,6 +481,9 @@ def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
 
     assert len(media_deps) == 1
     assert media_deps[0].provider is not None
+    assert media_deps[0].provider.registry is result.graph
+    assert media_deps[0].resolution_reason == "direct_media_id"
+    assert media_deps[0].provider.path == asset
     assert start.media[0].get("dependency_id") == media_deps[0].uid
     assert "dependency_id" not in start.media[1]
     assert "dependency_id" not in start.media[2]
