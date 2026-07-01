@@ -811,7 +811,11 @@ class StoryMaterializer:
         if world is None:
             return
 
-        candidate = world.resources.get_rit(media_id)
+        resources = world.resources
+        if resources is None:
+            return
+
+        candidate = resources.get_rit(media_id)
         if candidate is None:
             return
 
