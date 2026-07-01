@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -801,8 +800,8 @@ class StoryMaterializer:
             spec["dependency_id"] = dep.uid
             spec.setdefault("fallback_text", self._coerce_str(spec.get("text")))
 
-    @staticmethod
     def _prelink_named_inventory_media(
+        self,
         *,
         dep: MediaDep,
         media_id: str,
@@ -818,10 +817,11 @@ class StoryMaterializer:
         if not isinstance(candidate, MediaRIT):
             return
 
-        provider = MediaInventoryProvisioner._graph_local_copy(
-            candidate,
-            _ctx=SimpleNamespace(graph=state.graph),
+        ctx = self._make_prelink_ctx(
+            state=state,
+            cursor_id=dep.predecessor_id,
         )
+        provider = MediaInventoryProvisioner._graph_local_copy(candidate, _ctx=ctx)
         if not dep.satisfied_by(provider):
             return
 

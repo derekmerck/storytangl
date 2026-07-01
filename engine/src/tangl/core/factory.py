@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import Iterator
+from uuid import UUID
 
 from pydantic import Field
+
+from tangl.type_hints import Hash, Identifier
 
 from .registry import HierarchicalGroup
 from .singleton import Singleton
@@ -35,23 +38,29 @@ class _TemplateIndex:
 
     def __init__(self, templates: Iterable[EntityTemplate]) -> None:
         self.templates = list(templates)
-        self.by_identifier: dict[object, list[EntityTemplate]] = defaultdict(list)
-        self.hash_by_uid: dict[object, bytes] = {}
-        self.parent_by_child_uid: dict[object, TemplateGroup] = {}
-        self.materialized_by_hash: dict[bytes, list[GraphItem]] = defaultdict(list)
+        self.by_identifier: dict[Identifier, list[EntityTemplate]] = defaultdict(list)
+        self.hash_by_uid: dict[UUID, Hash] = {}
+        self.parent_by_child_uid: dict[UUID, TemplateGroup] = {}
+        self.materialized_by_hash: dict[Hash, list[GraphItem]] = defaultdict(list)
 
         for templ in self.templates:
             templ_hash = templ.content_hash()
             self.hash_by_uid[templ.uid] = templ_hash
+            self._index_identifier(templ_hash, templ)
             for identifier in templ.get_identifiers():
-                self.by_identifier[identifier].append(templ)
+                self._index_identifier(identifier, templ)
 
         for templ in self.templates:
             if isinstance(templ, TemplateGroup):
                 for member_id in templ.member_ids:
                     self.parent_by_child_uid.setdefault(member_id, templ)
 
-    def template_hash(self, templ: EntityTemplate) -> bytes:
+    def _index_identifier(self, identifier: Identifier, templ: EntityTemplate) -> None:
+        matches = self.by_identifier[identifier]
+        if templ not in matches:
+            matches.append(templ)
+
+    def template_hash(self, templ: EntityTemplate) -> Hash:
         return self.hash_by_uid[templ.uid]
 
     def parent_template(self, templ: EntityTemplate) -> TemplateGroup | None:
@@ -59,7 +68,7 @@ class _TemplateIndex:
 
     def template_depth(self, templ: EntityTemplate) -> int:
         depth = 0
-        seen: set[object] = set()
+        seen: set[UUID] = set()
         parent = self.parent_template(templ)
         while parent is not None:
             if parent.uid in seen:
@@ -107,7 +116,7 @@ class _TemplateIndex:
     def resolve_template(
         self,
         *,
-        identifier: object,
+        identifier: Identifier,
         kind: type[GraphItem],
         description: str,
     ) -> EntityTemplate:
@@ -237,32 +246,20 @@ class GraphFactory(Singleton):
         self,
         *,
         edge: Edge,
-        templs: TemplateRegistry,
-        graph: Graph,
-        template_index: _TemplateIndex | None = None,
+        template_index: _TemplateIndex,
     ) -> Node:
         predecessor_ref = self._resolve_edge_ref(edge, "predecessor_ref")
-        if template_index is not None:
-            ref_templ = template_index.resolve_template(
-                identifier=predecessor_ref,
-                kind=Node,
-                description=(
-                    f"predecessor template {predecessor_ref!r} "
-                    f"for edge {edge.get_label()!r}"
-                ),
-            )
-            return template_index.resolve_materialized_node(
-                templ=ref_templ,
-                description=f"materialized predecessor for edge {edge.get_label()!r}",
-            )
-
-        ref_templ = _resolve_single_match(
-            list(templs.find_all(Selector(has_kind=Node, has_identifier=predecessor_ref))),
-            f"predecessor template {predecessor_ref!r} for edge {edge.get_label()!r}",
+        ref_templ = template_index.resolve_template(
+            identifier=predecessor_ref,
+            kind=Node,
+            description=(
+                f"predecessor template {predecessor_ref!r} "
+                f"for edge {edge.get_label()!r}"
+            ),
         )
-        return _resolve_single_match(
-            list(graph.find_nodes(Selector(templ_hash=ref_templ.content_hash()))),
-            f"materialized predecessor for edge {edge.get_label()!r}",
+        return template_index.resolve_materialized_node(
+            templ=ref_templ,
+            description=f"materialized predecessor for edge {edge.get_label()!r}",
         )
 
     def _resolve_successor(
@@ -351,8 +348,6 @@ class GraphFactory(Singleton):
                 edge: Edge = templ.materialize()
                 predecessor = self._resolve_predecessor(
                     edge=edge,
-                    templs=templs,
-                    graph=graph,
                     template_index=template_index,
                 )
                 successor = self._resolve_successor(
