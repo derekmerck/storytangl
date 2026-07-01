@@ -440,6 +440,42 @@ def test_value_delta_commitment_rolls_back_repair_service_state() -> None:
     assert vehicle.hp == 3
 
 
+def test_value_delta_commitment_preflights_cumulative_same_target_deltas() -> None:
+    vehicle = RepairTarget(hp=7, max_hp=10)
+
+    def get_hp() -> int:
+        return vehicle.hp
+
+    def set_hp(value: int | float) -> None:
+        vehicle.hp = int(value)
+
+    offer = TransactionOffer(
+        label="over repair in pieces",
+        commitments=[
+            ValueDeltaCommitment(
+                get_value=get_hp,
+                set_value=set_hp,
+                delta=2,
+                max_value=vehicle.max_hp,
+                planning_key=("vehicle", id(vehicle), "hp"),
+            ),
+            ValueDeltaCommitment(
+                get_value=get_hp,
+                set_value=set_hp,
+                delta=2,
+                max_value=vehicle.max_hp,
+                planning_key=("vehicle", id(vehicle), "hp"),
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate value: value above maximum: 11 > 10"
+    assert vehicle.hp == 7
+
+
 def test_mapping_delta_commitment_rolls_back_resource_mutations() -> None:
     station = {"fuel": 20}
     vehicle = {"fuel": 2}
@@ -458,6 +494,24 @@ def test_mapping_delta_commitment_rolls_back_resource_mutations() -> None:
 
     assert station["fuel"] == 20
     assert vehicle["fuel"] == 2
+
+
+def test_mapping_delta_commitment_preflights_cumulative_same_key_deltas() -> None:
+    service = {"repair_capacity": 5}
+
+    offer = TransactionOffer(
+        label="overspend repair capacity",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -4),
+            MappingDeltaCommitment(service, "repair_capacity", -4),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate mapping value: value below minimum: -3 < 0"
+    assert service["repair_capacity"] == 5
 
 
 def test_mapping_delta_commitment_can_drop_zero_and_restore_missing_key() -> None:
@@ -529,6 +583,34 @@ def test_stat_delta_commitment_rolls_back_after_late_failure() -> None:
 
     assert clinic["healing_capacity"] == 20
     assert patient["health"].fv == 50.0
+
+
+def test_stat_delta_commitment_preflights_cumulative_same_stat_deltas() -> None:
+    patient = {"health": Stat(fv=85.0)}
+
+    offer = TransactionOffer(
+        label="over heal in pieces",
+        commitments=[
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                max_value=100.0,
+            ),
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                max_value=100.0,
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate stat: value above maximum: 105.0 > 100.0"
+    assert patient["health"].fv == 85.0
 
 
 def test_stat_delta_commitment_rejects_missing_stat_before_mutation() -> None:

@@ -245,6 +245,13 @@ Keep the binding point obvious:
 5. Call `offer.accept()` only in the committed update path.
 6. Use the returned `TransactionReceipt` for notes and projection hints.
 
+`TransactionOffer.can_accept()` evaluates built-in value/mapping/stat delta
+commitments cumulatively, so repeated changes to the same resource are checked
+as one planned total before the offer is presented as acceptable. `accept()`
+still rechecks each commitment against live state immediately before mutation;
+that closes the normal time-of-check/time-of-use gap without making offers
+durable locks.
+
 Core commitments cover common legs:
 
 - `CountableTransferCommitment` for fungible wallet/resource transfer;
