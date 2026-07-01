@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import ClassVar, Protocol, TypeVar
 
@@ -55,6 +55,7 @@ class TransactionCommitment(Protocol):
 
 
 SpecT = TypeVar("SpecT")
+Number = int | float
 
 
 class TransactionHandler(Protocol[SpecT]):
@@ -187,6 +188,12 @@ class CountableHolder(Protocol):
         ...
 
 
+class StatLike(Protocol):
+    """Minimal stat surface for transaction-backed stat deltas."""
+
+    fv: float
+
+
 @dataclass
 class CountableTransferCommitment:
     """Transfer one fungible asset count between two holders."""
@@ -235,6 +242,179 @@ class CountableTransferCommitment:
             return
         self.receiver.spend_countable(self.asset_label, self.amount)
         self.giver.gain_countable(self.asset_label, self.amount)
+        self._committed = False
+
+
+def _check_delta(
+    current: Number,
+    delta: Number,
+    min_value: Number | None,
+    max_value: Number | None,
+) -> TransactionCheck:
+    next_value = current + delta
+    if min_value is not None and next_value < min_value:
+        return TransactionCheck.reject(
+            f"value below minimum: {next_value} < {min_value}"
+        )
+    if max_value is not None and next_value > max_value:
+        return TransactionCheck.reject(
+            f"value above maximum: {next_value} > {max_value}"
+        )
+    return TransactionCheck.accept()
+
+
+@dataclass
+class ValueDeltaCommitment:
+    """Apply one bounded numeric delta through explicit getter/setter callbacks."""
+
+    get_value: Callable[[], Number]
+    set_value: Callable[[Number], None]
+    delta: Number
+    label: str = "mutate value"
+    detail_label: str | None = None
+    min_value: Number | None = 0
+    max_value: Number | None = None
+    _previous: Number | None = None
+    _committed: bool = False
+
+    def can_commit(self) -> TransactionCheck:
+        return _check_delta(
+            self.get_value(),
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+
+    def commit(self) -> Mapping[str, object]:
+        check = self.can_commit()
+        if not check.accepted:
+            raise ValueError(check.reason or "value delta rejected")
+        current = self.get_value()
+        next_value = current + self.delta
+        self.set_value(next_value)
+        self._previous = current
+        self._committed = True
+        return {
+            "kind": "value_delta",
+            "label": self.detail_label or self.label,
+            "delta": self.delta,
+            "previous_value": current,
+            "value": next_value,
+        }
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        if self._previous is not None:
+            self.set_value(self._previous)
+        self._previous = None
+        self._committed = False
+
+
+@dataclass
+class MappingDeltaCommitment:
+    """Apply one bounded numeric delta to a mutable resource mapping."""
+
+    values: MutableMapping[str, Number]
+    key: str
+    delta: Number
+    label: str = "mutate mapping value"
+    min_value: Number | None = 0
+    max_value: Number | None = None
+    default: Number = 0
+    drop_zero: bool = False
+    _previous: Number | None = None
+    _had_previous: bool = False
+    _committed: bool = False
+
+    def can_commit(self) -> TransactionCheck:
+        return _check_delta(
+            self.values.get(self.key, self.default),
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+
+    def commit(self) -> Mapping[str, object]:
+        check = self.can_commit()
+        if not check.accepted:
+            raise ValueError(check.reason or "mapping delta rejected")
+        self._had_previous = self.key in self.values
+        current = self.values.get(self.key, self.default)
+        next_value = current + self.delta
+        if self.drop_zero and next_value == 0:
+            self.values.pop(self.key, None)
+        else:
+            self.values[self.key] = next_value
+        self._previous = current
+        self._committed = True
+        return {
+            "kind": "mapping_delta",
+            "key": self.key,
+            "delta": self.delta,
+            "previous_value": current,
+            "value": next_value,
+        }
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        if self._had_previous and self._previous is not None:
+            self.values[self.key] = self._previous
+        else:
+            self.values.pop(self.key, None)
+        self._previous = None
+        self._had_previous = False
+        self._committed = False
+
+
+@dataclass
+class StatDeltaCommitment:
+    """Apply one bounded delta to a stat-like value in a stat mapping."""
+
+    stats: MutableMapping[str, StatLike]
+    stat_name: str
+    delta: float
+    label: str = "mutate stat"
+    min_value: float | None = None
+    max_value: float | None = None
+    _previous: float | None = None
+    _committed: bool = False
+
+    def can_commit(self) -> TransactionCheck:
+        if self.stat_name not in self.stats:
+            return TransactionCheck.reject(f"missing stat: {self.stat_name}")
+        return _check_delta(
+            self.stats[self.stat_name].fv,
+            self.delta,
+            self.min_value,
+            self.max_value,
+        )
+
+    def commit(self) -> Mapping[str, object]:
+        check = self.can_commit()
+        if not check.accepted:
+            raise ValueError(check.reason or "stat delta rejected")
+        stat = self.stats[self.stat_name]
+        current = stat.fv
+        next_value = current + self.delta
+        stat.fv = next_value
+        self._previous = current
+        self._committed = True
+        return {
+            "kind": "stat_delta",
+            "stat": self.stat_name,
+            "delta": self.delta,
+            "previous_value": current,
+            "value": next_value,
+        }
+
+    def rollback(self) -> None:
+        if not self._committed:
+            return
+        if self._previous is not None:
+            self.stats[self.stat_name].fv = self._previous
+        self._previous = None
         self._committed = False
 
 
@@ -418,11 +598,15 @@ __all__ = [
     "ComponentAssignmentCommitment",
     "CountableHolder",
     "CountableTransferCommitment",
+    "MappingDeltaCommitment",
     "RegistryAddCommitment",
+    "StatDeltaCommitment",
+    "StatLike",
     "TransactionCheck",
     "TransactionCommitment",
     "TransactionHandler",
     "TransactionOffer",
     "TransactionReceipt",
     "TransactionRollbackError",
+    "ValueDeltaCommitment",
 ]

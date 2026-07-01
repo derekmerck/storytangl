@@ -14,14 +14,18 @@ from tangl.mechanics.assembly.examples.vehicle import (
     VehicleLoadout,
     VehiclePartType,
 )
+from tangl.mechanics.progression import Stat
 from tangl.mechanics.transaction import (
     CallbackCommitment,
     ComponentAssignmentCommitment,
     CountableTransferCommitment,
+    MappingDeltaCommitment,
     RegistryAddCommitment,
+    StatDeltaCommitment,
     TransactionCheck,
     TransactionOffer,
     TransactionRollbackError,
+    ValueDeltaCommitment,
 )
 from tangl.story.concepts.asset import HasAssets
 
@@ -76,6 +80,12 @@ class BasicVehicleLoadout(ComponentManager[VehicleComponent]):
             ),
         ),
     }
+
+
+class RepairTarget:
+    def __init__(self, hp: int, max_hp: int) -> None:
+        self.hp = hp
+        self.max_hp = max_hp
 
 
 def part(label: str) -> VehicleComponent:
@@ -350,3 +360,120 @@ def test_transaction_offer_rolls_back_component_assignment_validation_failure() 
     assert shop.wallet["cash"] == 0
     assert graph.get(truck_chassis.uid) is None
     assert vehicle.loadout.get_slot("chassis")[0].token_from == "mini_chassis"
+
+
+def test_value_delta_commitment_binds_repair_service_state() -> None:
+    vehicle = RepairTarget(hp=3, max_hp=10)
+    service = {"repair_capacity": 10}
+
+    offer = TransactionOffer(
+        label="repair vehicle",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -5),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=5,
+                max_value=vehicle.max_hp,
+                detail_label="vehicle.hp",
+            ),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert service["repair_capacity"] == 5
+    assert vehicle.hp == 8
+    assert receipt.details[0]["kind"] == "mapping_delta"
+    assert receipt.details[1]["label"] == "vehicle.hp"
+
+
+def test_value_delta_commitment_rejects_over_repair_before_mutation() -> None:
+    vehicle = RepairTarget(hp=8, max_hp=10)
+    service = {"repair_capacity": 10}
+
+    offer = TransactionOffer(
+        label="over repair vehicle",
+        commitments=[
+            MappingDeltaCommitment(service, "repair_capacity", -5),
+            ValueDeltaCommitment(
+                get_value=lambda: vehicle.hp,
+                set_value=lambda value: setattr(vehicle, "hp", int(value)),
+                delta=5,
+                max_value=vehicle.max_hp,
+                detail_label="vehicle.hp",
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate value: value above maximum: 13 > 10"
+    assert service["repair_capacity"] == 10
+    assert vehicle.hp == 8
+
+
+def test_mapping_delta_commitment_rolls_back_resource_mutations() -> None:
+    station = {"fuel": 20}
+    vehicle = {"fuel": 2}
+
+    offer = TransactionOffer(
+        label="refuel then fail",
+        commitments=[
+            MappingDeltaCommitment(station, "fuel", -8),
+            MappingDeltaCommitment(vehicle, "fuel", 8, max_value=10),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert station["fuel"] == 20
+    assert vehicle["fuel"] == 2
+
+
+def test_mapping_delta_commitment_can_drop_zero_and_restore_missing_key() -> None:
+    ammo = {"rockets": 2}
+    station: dict[str, int] = {}
+
+    offer = TransactionOffer(
+        label="reload rockets",
+        commitments=[
+            MappingDeltaCommitment(ammo, "rockets", -2, drop_zero=True),
+            MappingDeltaCommitment(station, "spent_rockets", 2),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert ammo == {"rockets": 2}
+    assert station == {}
+
+
+def test_stat_delta_commitment_mutates_progression_stat() -> None:
+    patient = {"health": Stat(fv=50.0)}
+    clinic = {"healing_capacity": 20}
+
+    offer = TransactionOffer(
+        label="heal patient",
+        commitments=[
+            MappingDeltaCommitment(clinic, "healing_capacity", -10),
+            StatDeltaCommitment(
+                patient,
+                "health",
+                10.0,
+                min_value=0.0,
+                max_value=100.0,
+            ),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert clinic["healing_capacity"] == 10
+    assert patient["health"].fv == 60.0
+    assert receipt.details[1]["kind"] == "stat_delta"
