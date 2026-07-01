@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable
 from typing import Iterator
 
@@ -14,25 +15,6 @@ from .template import TemplateRegistry, EntityTemplate, TemplateGroup
 from .token import TokenCatalog
 
 
-# pseudo-graph-item helpers for template hierarchy
-def _parent_templ(templ: EntityTemplate) -> TemplateGroup | None:
-    registry = templ.registry
-    if registry is None:
-        return None
-    return registry.find_one(Selector(has_member=templ))
-
-
-def _ancestor_templs(templ: EntityTemplate) -> Iterator[TemplateGroup]:
-    parent = _parent_templ(templ)
-    while parent:
-        yield parent
-        parent = _parent_templ(parent)
-
-
-def _template_depth(templ: EntityTemplate) -> int:
-    return len(list(_ancestor_templs(templ)))
-
-
 def _resolve_single_match[T](matches: list[T], description: str) -> T:
     if not matches:
         raise ValueError(f"{description} did not resolve")
@@ -41,33 +23,117 @@ def _resolve_single_match[T](matches: list[T], description: str) -> T:
     return matches[0]
 
 
-def _get_parent_by_templ(
-    templ_hash: bytes,
-    templs: TemplateRegistry,
-    graph: Graph,
-) -> GraphItem | None:
-    ref_templ = _resolve_single_match(
-        list(templs.find_all(Selector(has_identifier=templ_hash))),
-        f"template {templ_hash!r}",
-    )
-    ref_templ_parent = _parent_templ(ref_templ)
-    if ref_templ_parent is None:
-        return None
-    ref_templ_parent_hash = ref_templ_parent.content_hash()
-    matches = list(graph.find_all(Selector(templ_hash=ref_templ_parent_hash)))
-    if not matches:
-        return None
-    return _resolve_single_match(
-        matches,
-        f"parent graph item for template {ref_templ_parent.get_label()!r}",
-    )
-
-
 def _attach_to_parent(parent: GraphItem, child: GraphItem) -> None:
     if isinstance(parent, (Subgraph, HierarchicalGroup)):
         parent.add_member(child)
         return
     raise TypeError(f"Parent {parent.__class__.__name__} does not support child membership")
+
+
+class _TemplateIndex:
+    """Per-materialization lookup cache for immutable template providers."""
+
+    def __init__(self, templates: Iterable[EntityTemplate]) -> None:
+        self.templates = list(templates)
+        self.by_identifier: dict[object, list[EntityTemplate]] = defaultdict(list)
+        self.hash_by_uid: dict[object, bytes] = {}
+        self.parent_by_child_uid: dict[object, TemplateGroup] = {}
+        self.materialized_by_hash: dict[bytes, list[GraphItem]] = defaultdict(list)
+
+        for templ in self.templates:
+            templ_hash = templ.content_hash()
+            self.hash_by_uid[templ.uid] = templ_hash
+            for identifier in templ.get_identifiers():
+                self.by_identifier[identifier].append(templ)
+
+        for templ in self.templates:
+            if isinstance(templ, TemplateGroup):
+                for member_id in templ.member_ids:
+                    self.parent_by_child_uid.setdefault(member_id, templ)
+
+    def template_hash(self, templ: EntityTemplate) -> bytes:
+        return self.hash_by_uid[templ.uid]
+
+    def parent_template(self, templ: EntityTemplate) -> TemplateGroup | None:
+        return self.parent_by_child_uid.get(templ.uid)
+
+    def template_depth(self, templ: EntityTemplate) -> int:
+        depth = 0
+        seen: set[object] = set()
+        parent = self.parent_template(templ)
+        while parent is not None:
+            if parent.uid in seen:
+                raise ValueError(f"template hierarchy cycle at {parent.get_label()!r}")
+            seen.add(parent.uid)
+            depth += 1
+            parent = self.parent_template(parent)
+        return depth
+
+    def graph_groups(self) -> list[TemplateGroup]:
+        return sorted(
+            (
+                templ
+                for templ in self.templates
+                if isinstance(templ, TemplateGroup) and templ.has_payload_kind(GraphItem)
+            ),
+            key=self.template_depth,
+        )
+
+    def node_templates(self) -> Iterator[EntityTemplate]:
+        return (
+            templ
+            for templ in self.templates
+            if not isinstance(templ, TemplateGroup) and templ.has_kind(Node)
+        )
+
+    def edge_templates(self) -> Iterator[EntityTemplate]:
+        return (templ for templ in self.templates if templ.has_kind(Edge))
+
+    def remember_materialized(self, templ: EntityTemplate, item: GraphItem) -> None:
+        self.materialized_by_hash[self.template_hash(templ)].append(item)
+
+    def parent_graph_item(self, templ: EntityTemplate) -> GraphItem | None:
+        parent = self.parent_template(templ)
+        if parent is None:
+            return None
+        matches = self.materialized_by_hash.get(self.template_hash(parent), [])
+        if not matches:
+            return None
+        return _resolve_single_match(
+            matches,
+            f"parent graph item for template {parent.get_label()!r}",
+        )
+
+    def resolve_template(
+        self,
+        *,
+        identifier: object,
+        kind: type[GraphItem],
+        description: str,
+    ) -> EntityTemplate:
+        return _resolve_single_match(
+            [
+                templ
+                for templ in self.by_identifier.get(identifier, [])
+                if templ.has_kind(kind)
+            ],
+            description,
+        )
+
+    def resolve_materialized_node(
+        self,
+        *,
+        templ: EntityTemplate,
+        description: str,
+    ) -> Node:
+        return _resolve_single_match(
+            [
+                item
+                for item in self.materialized_by_hash[self.template_hash(templ)]
+                if isinstance(item, Node)
+            ],
+            description,
+        )
 
 
 class GraphFactory(Singleton):
@@ -173,8 +239,23 @@ class GraphFactory(Singleton):
         edge: Edge,
         templs: TemplateRegistry,
         graph: Graph,
+        template_index: _TemplateIndex | None = None,
     ) -> Node:
         predecessor_ref = self._resolve_edge_ref(edge, "predecessor_ref")
+        if template_index is not None:
+            ref_templ = template_index.resolve_template(
+                identifier=predecessor_ref,
+                kind=Node,
+                description=(
+                    f"predecessor template {predecessor_ref!r} "
+                    f"for edge {edge.get_label()!r}"
+                ),
+            )
+            return template_index.resolve_materialized_node(
+                templ=ref_templ,
+                description=f"materialized predecessor for edge {edge.get_label()!r}",
+            )
+
         ref_templ = _resolve_single_match(
             list(templs.find_all(Selector(has_kind=Node, has_identifier=predecessor_ref))),
             f"predecessor template {predecessor_ref!r} for edge {edge.get_label()!r}",
@@ -235,41 +316,45 @@ class GraphFactory(Singleton):
             graph = self.graph_type(**kwargs)
         graph.bind_factory(self)
 
-        templ_regs = list(template_groups) if template_groups is not None else self._provide_templates()
+        templ_regs = (
+            list(template_groups)
+            if template_groups is not None
+            else self._provide_templates()
+        )
+        template_indexes = [
+            (templs, _TemplateIndex(templs.find_all()))
+            for templs in templ_regs
+        ]
 
-        for templs in templ_regs:
-            for templ in templs.find_all(
-                Selector(
-                    predicate=lambda templ: isinstance(templ, TemplateGroup)
-                    and templ.has_payload_kind(GraphItem),
-                ),
-                sort_key=_template_depth,
-            ):
+        for _templs, template_index in template_indexes:
+            for templ in template_index.graph_groups():
                 group: GraphItem = templ.materialize()
                 graph.add(group)
+                template_index.remember_materialized(templ, group)
 
-                parent = _get_parent_by_templ(group.templ_hash, templs, graph)
+                parent = template_index.parent_graph_item(templ)
                 if parent:
                     _attach_to_parent(parent, group)
 
-        for templs in templ_regs:
-            for templ in templs.find_all(
-                Selector(
-                    predicate=lambda templ: not isinstance(templ, TemplateGroup),
-                    has_kind=Node,
-                )
-            ):
+        for _templs, template_index in template_indexes:
+            for templ in template_index.node_templates():
                 node: Node = templ.materialize()
                 graph.add(node)
+                template_index.remember_materialized(templ, node)
 
-                parent = _get_parent_by_templ(node.templ_hash, templs, graph)
+                parent = template_index.parent_graph_item(templ)
                 if parent:
                     _attach_to_parent(parent, node)
 
-        for templs in templ_regs:
-            for templ in templs.find_all(Selector(has_kind=Edge)):
+        for templs, template_index in template_indexes:
+            for templ in template_index.edge_templates():
                 edge: Edge = templ.materialize()
-                predecessor = self._resolve_predecessor(edge=edge, templs=templs, graph=graph)
+                predecessor = self._resolve_predecessor(
+                    edge=edge,
+                    templs=templs,
+                    graph=graph,
+                    template_index=template_index,
+                )
                 successor = self._resolve_successor(
                     edge=edge,
                     predecessor=predecessor,
