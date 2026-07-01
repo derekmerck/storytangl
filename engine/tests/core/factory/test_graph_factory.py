@@ -28,6 +28,26 @@ class GraphFactoryTestDouble(GraphFactory):
     """Test-local singleton subclass used to isolate factory instances."""
 
 
+class _TemplateSubset:
+    """Minimal read-only template subset for materialization tests."""
+
+    def __init__(self, registry: TemplateRegistry, selected_labels: set[str]) -> None:
+        self.registry = registry
+        self.selected_labels = selected_labels
+
+    def find_all(self, selector: Selector | None = None, *, sort_key=None):
+        values = [
+            value
+            for value in self.registry.values()
+            if getattr(value, "label", None) in self.selected_labels
+        ]
+        if selector is not None:
+            values = list(selector.filter(values))
+        if sort_key is not None:
+            values = sorted(values, key=sort_key)
+        return values
+
+
 @pytest.fixture(autouse=True)
 def clear_factories() -> None:
     GraphFactoryTestDouble.clear_instances()
@@ -108,6 +128,33 @@ class TestGraphFactoryMaterialize:
 
         assert restored.factory is factory
         assert restored.get_authorities() == [factory.dispatch]
+
+    def test_materialize_child_subset_attaches_to_existing_parent(self) -> None:
+        template_registry = TemplateRegistry(label="seeded_parent_templates")
+        root = _template_group(registry=template_registry, label="root")
+        start = _node_template(registry=template_registry, label="root.start")
+        root.add_child(start)
+
+        factory = GraphFactoryTestDouble(label="seeded_parent_factory", templates=template_registry)
+        graph = factory.materialize_graph(
+            template_groups=[
+                _TemplateSubset(template_registry, selected_labels={"root"}),
+            ]
+        )
+        root_group = graph.find_node(Selector(label="root"))
+
+        factory.materialize_graph(
+            graph=graph,
+            template_groups=[
+                _TemplateSubset(template_registry, selected_labels={"root.start"}),
+            ],
+        )
+        start_node = graph.find_node(Selector(label="start"))
+
+        assert root_group is not None
+        assert start_node is not None
+        assert list(root_group.members()) == [start_node]
+        assert start_node.has_path("root.start")
 
     def test_predecessor_binding_uses_template_provenance(self) -> None:
         template_registry = TemplateRegistry(label="edge_templates")
