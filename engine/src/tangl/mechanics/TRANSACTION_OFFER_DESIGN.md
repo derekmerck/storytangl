@@ -260,9 +260,12 @@ guessing which callbacks target the same field.
 
 Core commitments cover common legs:
 
-- `CountableTransferCommitment` for fungible wallet/resource transfer;
+- `CountableTransferCommitment` for real bilateral fungible transfer between
+  two holders that both have meaningful give/receive policy;
 - `ValueDeltaCommitment` for bounded scalar state reached through explicit
-  getter/setter callbacks;
+  getter/setter callbacks. Prefer this for local scalar costs such as cash,
+  time, HP, or service capacity when the receiver is only a conceptual sink.
+  Debit-style costs should pass an explicit lower bound such as `min_value=0`;
 - `MappingDeltaCommitment` for simple resource pools such as fuel, ammo,
   repair capacity, service capacity, or HP maps;
 - `StatDeltaCommitment` for progression/stat-like values that expose `fv`;
@@ -304,13 +307,34 @@ install(piece_id, target_slot)
 
 That should bind to transactions as:
 
-- `CountableTransferCommitment(player, garage, "cash", price)` when price is
-  nonzero;
-- another countable commitment or a local wallet leg for elapsed time;
+- `ValueDeltaCommitment` for local scalar costs such as `cash -= price` or
+  `time_minutes += minutes`, especially when the garage is a conceptual sink
+  rather than a real wallet holder. For spendable resources, set the domain
+  bound explicitly, e.g. `min_value=0` for cash;
+- `CountableTransferCommitment(player, garage, "cash", price)` only when both
+  sides are real holders with meaningful bilateral wallet policy;
 - `CallbackCommitment("remove from inventory", ...)` for the selected part;
 - `ComponentAssignmentCommitment(vehicle.loadout, slot, part, allow_replace=True)`;
 - `CallbackCommitment("return replaced part", ...)` when a domain wants the
   replaced component in inventory rather than simply unassigned.
+
+For scalar service flows, wrap `ValueDeltaCommitment` in a tiny domain helper
+that supplies explicit planning keys. Prefer a graph `uid` when the target has
+one; otherwise pass a domain-local identity such as `"player"` or `"active_car"`.
+
+```python
+def value_commitment(obj, field_name, delta, *, owner_key=None, **kwargs):
+    key = owner_key or getattr(obj, "uid", None)
+    if key is None:
+        raise ValueError("owner_key is required when obj has no uid")
+    return ValueDeltaCommitment(
+        get_value=lambda: getattr(obj, field_name),
+        set_value=lambda value: setattr(obj, field_name, value),
+        delta=delta,
+        planning_key=(type(obj).__name__, key, field_name),
+        **kwargs,
+    )
+```
 
 Garage, shop, and salvage should differ mainly in policy functions that compute
 price, time, inventory source, and presentation labels. The transaction shape is
