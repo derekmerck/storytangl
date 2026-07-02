@@ -385,7 +385,8 @@ class MediaInventoryProvisioner:
     inventories: list[MediaInventory]
 
     @staticmethod
-    def _graph_local_copy(candidate: MediaRIT, *, _ctx: Any = None) -> MediaRIT:
+    def graph_local_copy(candidate: MediaRIT, *, _ctx: Any = None) -> MediaRIT:
+        """Return ``candidate`` or a graph-local clone suitable for dependency binding."""
         graph = getattr(_ctx, "graph", None)
         if graph is candidate.registry:
             return candidate
@@ -405,6 +406,10 @@ class MediaInventoryProvisioner:
         provider.bind_registry(None)
         return provider
 
+    @staticmethod
+    def _graph_local_copy(candidate: MediaRIT, *, _ctx: Any = None) -> MediaRIT:
+        return MediaInventoryProvisioner.graph_local_copy(candidate, _ctx=_ctx)
+
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
         if not self.inventories:
             return
@@ -417,7 +422,7 @@ class MediaInventoryProvisioner:
                 priority=Priority.NORMAL,
                 distance_from_caller=0,
                 candidate=candidate,
-                callback=lambda *_, _candidate=candidate, **kw: self._graph_local_copy(
+                callback=lambda *_, _candidate=candidate, **kw: self.graph_local_copy(
                     _candidate,
                     _ctx=kw.get("_ctx"),
                 ),

@@ -7,6 +7,7 @@ from uuid import UUID
 from tangl.core import EntityTemplate, GraphFactory, GraphItem, Selector, TemplateRegistry
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
+from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
 from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.provision.materialization import resolve_story_materialize_hook
@@ -795,8 +796,42 @@ class StoryMaterializer:
                 scope=self._coerce_str(spec.get("scope")),
                 hard=bool(spec.get("hard", False)),
             )
+            self._prelink_named_inventory_media(dep=dep, media_id=media_id, state=state)
             spec["dependency_id"] = dep.uid
             spec.setdefault("fallback_text", self._coerce_str(spec.get("text")))
+
+    def _prelink_named_inventory_media(
+        self,
+        *,
+        dep: MediaDep,
+        media_id: str,
+        state: _MaterializationState,
+    ) -> None:
+        world = state.graph.world
+        if world is None:
+            return
+
+        resources = world.resources
+        if resources is None:
+            return
+
+        candidate = resources.get_rit(media_id)
+        if candidate is None:
+            return
+
+        ctx = self._make_prelink_ctx(
+            state=state,
+            cursor_id=dep.predecessor_id,
+        )
+        provider = MediaInventoryProvisioner.graph_local_copy(candidate, _ctx=ctx)
+        if not dep.satisfied_by(provider):
+            return
+
+        if provider.registry is not state.graph:
+            state.graph.add(provider)
+        dep.set_provider(provider, _ctx=ctx)
+        if dep.requirement.resolution_reason is None:
+            dep.requirement.resolution_reason = "direct_media_id"
 
     def _wire_actions_for_block(
         self,
@@ -999,6 +1034,8 @@ class StoryMaterializer:
         state: _MaterializationState,
     ) -> None:
         for dep in dependencies:
+            if dep.provider is not None and dep.satisfied:
+                continue
             ctx = self._make_prelink_ctx(state=state, cursor_id=dep.predecessor_id)
             resolver = Resolver.from_ctx(ctx)
             was_satisfied = dep.satisfied

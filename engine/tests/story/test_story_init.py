@@ -481,9 +481,31 @@ def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
 
     assert len(media_deps) == 1
     assert media_deps[0].provider is not None
+    assert media_deps[0].provider.registry is result.graph
+    assert media_deps[0].resolution_reason == "direct_media_id"
+    assert media_deps[0].requirement.resolved_cursor_id == start.uid
+    assert media_deps[0].requirement.resolved_step == 0
+    assert media_deps[0].provider.path == asset
     assert start.media[0].get("dependency_id") == media_deps[0].uid
     assert "dependency_id" not in start.media[1]
     assert "dependency_id" not in start.media[2]
+
+
+def test_story_materializer_allows_inventory_media_without_resource_manager() -> None:
+    script = _base_script()
+    script["scenes"]["intro"]["blocks"]["start"]["media"] = [
+        {"name": "missing.svg", "text": "Missing"},
+    ]
+
+    world = World.from_script_data(script_data=script)
+    result = world.create_story("media_story_without_resources", init_mode=InitMode.EAGER)
+
+    start = next(node for node in Selector(has_kind=Block, label="start").filter(result.graph.values()))
+    media_deps = [edge for edge in start.edges_out() if isinstance(edge, MediaDep)]
+
+    assert len(media_deps) == 1
+    assert media_deps[0].provider is None
+    assert start.media[0].get("dependency_id") == media_deps[0].uid
 
 
 def test_service_manager_create_story_with_world_param() -> None:
