@@ -6,7 +6,7 @@ from typing import ClassVar, Protocol, TypeVar
 
 from pydantic import Field
 
-from tangl.core import Entity, Registry
+from tangl.core import Entity, Registry, Token
 from tangl.core.bases import BaseModelPlus
 
 from .assembly import ComponentManager
@@ -212,6 +212,36 @@ class CountableHolder(Protocol):
         ...
 
 
+class AssetHolder(Protocol):
+    """Minimal discrete-asset holder surface for move/create commitments."""
+
+    def get_asset(self, label: str) -> Entity | None:
+        ...
+
+    def get_asset_key(self, asset: Entity | str) -> str | None:
+        ...
+
+    def can_give_asset(
+        self,
+        asset: Entity,
+        receiver: object | None = None,
+    ) -> bool:
+        ...
+
+    def can_receive_asset(
+        self,
+        asset: Entity,
+        giver: object | None = None,
+    ) -> bool:
+        ...
+
+    def add_asset(self, asset: Entity, *, label: str | None = None) -> None:
+        ...
+
+    def remove_asset(self, asset: Entity | str) -> Entity:
+        ...
+
+
 class StatLike(Protocol):
     """Minimal stat surface for transaction-backed stat deltas."""
 
@@ -266,6 +296,178 @@ class CountableTransferCommitment:
             return
         self.receiver.spend_countable(self.asset_label, self.amount)
         self.giver.gain_countable(self.asset_label, self.amount)
+        self._committed = False
+
+
+def _asset_holder_key(asset: Entity, label: str | None = None) -> str | None:
+    if label is not None:
+        return label
+    key = asset.get_label()
+    if key:
+        return key
+    if isinstance(asset, Token) and asset.token_from:
+        return asset.token_from
+    return None
+
+
+def _receiver_key_available(
+    receiver: AssetHolder,
+    asset: Entity,
+    label: str | None,
+) -> TransactionCheck:
+    key = _asset_holder_key(asset, label)
+    if key is None:
+        return TransactionCheck.accept()
+    existing = receiver.get_asset(key)
+    if existing is not None and existing is not asset:
+        return TransactionCheck.reject("receiver already holds asset key")
+    return TransactionCheck.accept()
+
+
+AssetRef = Entity | str
+
+
+@dataclass
+class AssetMoveCommitment:
+    """Move one existing discrete graph asset between holder-like objects."""
+
+    giver: AssetHolder
+    receiver: AssetHolder
+    asset: AssetRef
+    label: str = "move asset"
+    receiver_label: str | None = None
+    _moved: Entity | None = field(default=None, init=False, repr=False)
+    _giver_label: str | None = field(default=None, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
+
+    def _asset(self) -> Entity | None:
+        if isinstance(self.asset, str):
+            return self.giver.get_asset(self.asset)
+        return self.asset
+
+    def can_commit(self) -> TransactionCheck:
+        asset = self._asset()
+        if asset is None:
+            return TransactionCheck.reject("giver does not hold asset")
+        if not self.giver.can_give_asset(asset, self.receiver):
+            return TransactionCheck.reject("giver cannot give asset")
+        if not self.receiver.can_receive_asset(asset, self.giver):
+            return TransactionCheck.reject("receiver cannot receive asset")
+        return _receiver_key_available(self.receiver, asset, self.receiver_label)
+
+    def commit(self) -> Mapping[str, object]:
+        check = self.can_commit()
+        if not check.accepted:
+            raise ValueError(check.reason or "asset move rejected")
+        asset = self._asset()
+        if asset is None:
+            raise ValueError("giver does not hold asset")
+        giver_label = self.giver.get_asset_key(self.asset)
+        moved = self.giver.remove_asset(giver_label if giver_label is not None else asset)
+        try:
+            self.receiver.add_asset(moved, label=self.receiver_label)
+        except Exception:
+            self.giver.add_asset(moved, label=giver_label)
+            raise
+        self._moved = moved
+        self._giver_label = giver_label
+        self._committed = True
+        return {
+            "kind": "asset_move",
+            "asset_id": moved.uid,
+            "asset_label": moved.get_label(),
+        }
+
+    def rollback(self) -> None:
+        if not self._committed or self._moved is None:
+            return
+        moved = self.receiver.remove_asset(self._moved)
+        self.giver.add_asset(moved, label=self._giver_label)
+        self._moved = None
+        self._giver_label = None
+        self._committed = False
+
+
+AssetSupplier = Callable[[], Entity]
+
+
+@dataclass
+class CatalogAssetCommitment:
+    """Create one discrete graph asset from a supplier and add it to a holder."""
+
+    receiver: AssetHolder
+    supplier: AssetSupplier
+    registry: Registry | None = None
+    label: str = "create catalog asset"
+    receiver_label: str | None = None
+    preview: Entity | None = None
+    can_create: Callable[[], TransactionCheck | bool] | None = None
+    _created: Entity | None = field(default=None, init=False, repr=False)
+    _registered: bool = field(default=False, init=False, repr=False)
+    _committed: bool = field(default=False, init=False, repr=False)
+
+    def can_commit(self) -> TransactionCheck:
+        if self.can_create is not None:
+            result = self.can_create()
+            if isinstance(result, bool):
+                if not result:
+                    return TransactionCheck.reject("catalog cannot create asset")
+            elif not result.accepted:
+                return result
+        if self.preview is not None:
+            if (
+                self.registry is not None
+                and self.registry.get(self.preview.uid) is not None
+            ):
+                return TransactionCheck.reject("registry already contains item uid")
+            if not self.receiver.can_receive_asset(self.preview, None):
+                return TransactionCheck.reject("receiver cannot receive asset")
+            return _receiver_key_available(
+                self.receiver,
+                self.preview,
+                self.receiver_label,
+            )
+        return TransactionCheck.accept()
+
+    def commit(self) -> Mapping[str, object]:
+        check = self.can_commit()
+        if not check.accepted:
+            raise ValueError(check.reason or "catalog asset creation rejected")
+        item = self.supplier()
+        if self.registry is not None and self.registry.get(item.uid) is not None:
+            raise ValueError("registry already contains item uid")
+        if not self.receiver.can_receive_asset(item, None):
+            raise ValueError("receiver cannot receive asset")
+        key_check = _receiver_key_available(self.receiver, item, self.receiver_label)
+        if not key_check.accepted:
+            raise ValueError(key_check.reason or "receiver cannot receive asset")
+
+        if self.registry is not None:
+            self.registry.add(item)
+            self._registered = True
+        try:
+            self.receiver.add_asset(item, label=self.receiver_label)
+        except Exception:
+            if self._registered and self.registry is not None:
+                self.registry.remove(item.uid)
+                self._registered = False
+            raise
+        self._created = item
+        self._committed = True
+        return {
+            "kind": "catalog_asset",
+            "asset_id": item.uid,
+            "asset_label": item.get_label(),
+        }
+
+    def rollback(self) -> None:
+        if not self._committed or self._created is None:
+            return
+        self.receiver.remove_asset(self._created)
+        if self._registered and self.registry is not None:
+            self.registry.remove(self._created.uid)
+        self._created = None
+        self._registered = False
         self._committed = False
 
 
@@ -716,7 +918,10 @@ class ComponentAssignmentCommitment:
 
 
 __all__ = [
+    "AssetHolder",
+    "AssetMoveCommitment",
     "CallbackCommitment",
+    "CatalogAssetCommitment",
     "ComponentAssignmentCommitment",
     "CountableHolder",
     "CountableTransferCommitment",

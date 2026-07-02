@@ -37,6 +37,16 @@ class HasAssets(HasNamespace):
                 return asset
         return None
 
+    def get_asset_key(self, asset: Token | str) -> str | None:
+        """Return the holder key currently used for an asset."""
+        resolved = self.get_asset(asset) if isinstance(asset, str) else asset
+        if resolved is None:
+            return None
+        for label, item in self.assets.items():
+            if item is resolved:
+                return label
+        return None
+
     def has_asset(self, asset: Token | str) -> bool:
         """Return whether this holder currently has the asset."""
         if isinstance(asset, str):
