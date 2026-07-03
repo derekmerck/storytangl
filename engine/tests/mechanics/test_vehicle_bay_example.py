@@ -133,6 +133,39 @@ def test_vehicle_bay_installs_inventory_component() -> None:
     }
 
 
+def test_vehicle_bay_stale_inventory_install_offer_returns_commit_time_replacement() -> None:
+    bay = VehicleBay(cash=1000)
+    bay.vehicle.loadout.assign("chassis", component("truck_chassis"))
+    bay.vehicle.loadout.assign("powerplant", component("big_powerplant"))
+    bay.vehicle.loadout.assign("suspension", component("cheap_suspension"))
+    bay.vehicle.loadout.assign("tires", component("cheap_tires"))
+    cheap_tires = bay.vehicle.loadout.get_slot("tires")[0]
+    bay.inventory.add_asset(component("slicks"))
+    bay.inventory.add_asset(component("all_terrain"))
+
+    slicks_offer = build_inventory_install_offer(
+        bay,
+        component_key="slicks",
+        slot_name="tires",
+        price=0,
+    )
+    all_terrain_offer = build_inventory_install_offer(
+        bay,
+        component_key="all_terrain",
+        slot_name="tires",
+        price=0,
+    )
+
+    all_terrain_offer.accept()
+    all_terrain = bay.vehicle.loadout.get_slot("tires")[0]
+    slicks_offer.accept()
+
+    assert bay.vehicle.loadout.get_slot("tires")[0].token_from == "slicks"
+    assert bay.inventory.get_asset("all_terrain") is all_terrain
+    assert bay.inventory.get_asset("cheap_tires") is cheap_tires
+    assert not bay.inventory.has_asset("slicks")
+
+
 def test_vehicle_bay_failed_inventory_install_keeps_cash_inventory_and_loadout() -> None:
     bay = VehicleBay(cash=1000)
     install_baseline(bay)
@@ -213,6 +246,33 @@ def test_vehicle_bay_catalog_purchase_rejects_unavailable_stock_before_creation(
     assert created == []
     assert bay.cash == 1000
     assert not bay.inventory.has_asset("slicks")
+
+
+def test_vehicle_bay_catalog_purchase_rejects_duplicate_key_before_creation() -> None:
+    bay = VehicleBay(cash=1000)
+    bay.inventory.add_asset(component("slicks"))
+    stock = {"slicks": 1}
+    created = []
+
+    def make_slicks():
+        created.append(component("slicks"))
+        return created[-1]
+
+    offer = build_catalog_purchase_offer(
+        bay,
+        label="slicks",
+        price=350,
+        supplier=make_slicks,
+        stock=stock,
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "create catalog asset: receiver already holds asset key"
+    assert created == []
+    assert bay.cash == 1000
+    assert stock == {"slicks": 1}
 
 
 def test_vehicle_bay_catalog_purchase_rolls_back_stock_and_inventory() -> None:
@@ -333,11 +393,16 @@ def test_catalog_install_commitment_rolls_back_assignment_validation_failure() -
     bay = VehicleBay(vehicle=vehicle, cash=1000)
     install_baseline(bay)
     starting_tires = list(bay.vehicle.loadout.get_slot("tires"))
+    created = []
+
+    def make_truck_chassis():
+        created.append(component("truck_chassis"))
+        return created[-1]
 
     commitment = CatalogInstallCommitment(
         bay.vehicle.loadout,
         "tires",
-        supplier=lambda: component("truck_chassis"),
+        supplier=make_truck_chassis,
         preview=component("truck_chassis"),
         label="create invalid tires",
     )
@@ -347,3 +412,32 @@ def test_catalog_install_commitment_rolls_back_assignment_validation_failure() -
 
     assert bay.vehicle.loadout.get_slot("tires") == starting_tires
     assert len(graph.members) == 5
+    assert created == []
+
+
+def test_catalog_install_commitment_rejects_supplier_preview_mismatch_without_graph_leak() -> None:
+    graph = Graph()
+    vehicle = graph.add_node(label="demo-car", kind=Vehicle)
+    bay = VehicleBay(vehicle=vehicle, cash=1000)
+    install_baseline(bay)
+    starting_tires = list(bay.vehicle.loadout.get_slot("tires"))
+    created = []
+
+    def make_truck_chassis():
+        created.append(component("truck_chassis"))
+        return created[-1]
+
+    commitment = CatalogInstallCommitment(
+        bay.vehicle.loadout,
+        "tires",
+        supplier=make_truck_chassis,
+        preview=component("slicks"),
+        label="create mismatched tires",
+    )
+
+    assert commitment.can_commit().accepted
+    with pytest.raises(ValueError, match="catalog supplier did not match preview"):
+        commitment.commit()
+
+    assert bay.vehicle.loadout.get_slot("tires") == starting_tires
+    assert graph.get(created[0].uid) is None

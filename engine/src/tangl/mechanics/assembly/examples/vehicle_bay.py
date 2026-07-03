@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import ClassVar
-from uuid import UUID
 
 from pydantic import Field
 
@@ -17,6 +16,7 @@ from tangl.mechanics.transaction import (
     ComponentAssignmentCommitment,
     MappingDeltaCommitment,
     TransactionCheck,
+    TransactionCommitment,
     TransactionOffer,
     ValueDeltaCommitment,
 )
@@ -156,11 +156,11 @@ def build_service_offer(
     value_label: str | None = None,
     min_value: int | None = 0,
     max_value: int | None = None,
-    extra_commitments: Iterable[object] = (),
+    extra_commitments: Iterable[TransactionCommitment] = (),
 ) -> TransactionOffer:
     """Build a service transaction over cash, time, and one scalar state field."""
 
-    commitments: list[object] = []
+    commitments: list[TransactionCommitment] = []
     commitments.extend(_cost_commitments(bay, cash_cost=cash_cost, time_minutes=time_minutes))
     commitments.append(
         value_field_commitment(
@@ -183,7 +183,7 @@ def build_inventory_install_offer(
     slot_name: str,
     price: int = 0,
     install_time: int = INSTALL_TIME_MINUTES,
-    extra_commitments: Iterable[object] = (),
+    extra_commitments: Iterable[TransactionCommitment] = (),
 ) -> TransactionOffer:
     """Build a transaction that installs one already-held inventory component."""
 
@@ -191,9 +191,10 @@ def build_inventory_install_offer(
     part = bay.inventory.get_asset(component_key)
     if part is None:
         raise ValueError(f"Vehicle inventory item not found: {component_key}")
-    before = _components_by_id(bay.vehicle.loadout.all_components())
-    commitments: list[object] = []
+    commitments: list[TransactionCommitment] = []
+    replacement_capture = _replacement_return_commitments(bay, slot_name)
     commitments.extend(_cost_commitments(bay, cash_cost=price, time_minutes=install_time))
+    commitments.append(replacement_capture[0])
     commitments.extend(
         [
             AssetMoveCommitment(
@@ -212,7 +213,7 @@ def build_inventory_install_offer(
             ),
         ],
     )
-    commitments.append(_return_replaced_components_commitment(bay, before))
+    commitments.append(replacement_capture[1])
     commitments.extend(extra_commitments)
     return TransactionOffer(label=f"install {part.get_label()}", commitments=commitments)
 
@@ -225,11 +226,12 @@ def build_catalog_purchase_offer(
     supplier: Callable[[], VehicleComponent] | None = None,
     registry: Registry | None = None,
     stock: MutableMapping[str, int] | None = None,
-    extra_commitments: Iterable[object] = (),
+    extra_commitments: Iterable[TransactionCommitment] = (),
 ) -> TransactionOffer:
     """Build a transaction that buys one catalog component into inventory."""
 
-    commitments: list[object] = []
+    preview = component(label)
+    commitments: list[TransactionCommitment] = []
     commitments.extend(_cost_commitments(bay, cash_cost=price, time_minutes=0))
     if stock is not None:
         commitments.append(
@@ -247,6 +249,7 @@ def build_catalog_purchase_offer(
             supplier or (lambda: component(label)),
             registry=registry,
             receiver_label=label,
+            preview=preview,
         ),
     )
     commitments.extend(extra_commitments)
@@ -275,21 +278,32 @@ class CatalogInstallCommitment:
         compare=False,
     )
 
-    def can_commit(self) -> TransactionCheck:
+    def _assignment_check(self, item: VehicleComponent) -> TransactionCheck:
         return ComponentAssignmentCommitment(
             self.manager,
             self.slot_name,
-            self.preview,
+            item,
             label=self.label,
             allow_replace=self.allow_replace,
             validate_after=self.validate_after,
         ).can_commit()
+
+    def _supplier_matches_preview(self, item: VehicleComponent) -> bool:
+        return item.token_from == self.preview.token_from
+
+    def can_commit(self) -> TransactionCheck:
+        return self._assignment_check(self.preview)
 
     def commit(self) -> Mapping[str, object]:
         check = self.can_commit()
         if not check.accepted:
             raise ValueError(check.reason or "catalog install rejected")
         item = self.supplier()
+        if not self._supplier_matches_preview(item):
+            raise ValueError("catalog supplier did not match preview")
+        item_check = self._assignment_check(item)
+        if not item_check.accepted:
+            raise ValueError(item_check.reason or "catalog install rejected")
         assignment = ComponentAssignmentCommitment(
             self.manager,
             self.slot_name,
@@ -318,14 +332,15 @@ def build_catalog_install_offer(
     install_time: int = INSTALL_TIME_MINUTES,
     supplier: Callable[[], VehicleComponent] | None = None,
     preview: VehicleComponent | None = None,
-    extra_commitments: Iterable[object] = (),
+    extra_commitments: Iterable[TransactionCommitment] = (),
 ) -> TransactionOffer:
     """Build a transaction that creates a catalog part and installs it directly."""
 
     preview_part = preview or component(label)
-    before = _components_by_id(bay.vehicle.loadout.all_components())
-    commitments: list[object] = []
+    commitments: list[TransactionCommitment] = []
+    replacement_capture = _replacement_return_commitments(bay, slot_name)
     commitments.extend(_cost_commitments(bay, cash_cost=price, time_minutes=install_time))
+    commitments.append(replacement_capture[0])
     commitments.append(
         CatalogInstallCommitment(
             bay.vehicle.loadout,
@@ -335,25 +350,25 @@ def build_catalog_install_offer(
             label="create and assign vehicle part",
         ),
     )
-    commitments.append(_return_replaced_components_commitment(bay, before))
+    commitments.append(replacement_capture[1])
     commitments.extend(extra_commitments)
     return TransactionOffer(label=f"buy and install {label}", commitments=commitments)
 
 
-def _components_by_id(components: Iterable[VehicleComponent]) -> dict[UUID, VehicleComponent]:
-    return {item.uid: item for item in components}
-
-
-def _return_replaced_components_commitment(
+def _replacement_return_commitments(
     bay: VehicleBay,
-    before: Mapping[UUID, VehicleComponent],
-) -> CallbackCommitment:
+    slot_name: str,
+) -> tuple[TransactionCommitment, TransactionCommitment]:
+    before: list[VehicleComponent] = []
     returned: list[VehicleComponent] = []
 
+    def capture() -> None:
+        before[:] = list(bay.vehicle.loadout.get_slot(slot_name))
+
     def apply() -> Mapping[str, object]:
-        after = {item.uid for item in bay.vehicle.loadout.all_components()}
+        after = {item.uid for item in bay.vehicle.loadout.get_slot(slot_name)}
         returned[:] = sorted(
-            (item for uid, item in before.items() if uid not in after),
+            (item for item in before if item.uid not in after),
             key=lambda item: item.get_label(),
         )
         for item in returned:
@@ -370,10 +385,17 @@ def _return_replaced_components_commitment(
                 bay.inventory.remove_asset(item)
         returned.clear()
 
-    return CallbackCommitment(
-        "return replaced parts to inventory",
-        apply=apply,
-        undo=undo,
+    return (
+        CallbackCommitment(
+            "capture replaced parts",
+            apply=capture,
+            undo=before.clear,
+        ),
+        CallbackCommitment(
+            "return replaced parts to inventory",
+            apply=apply,
+            undo=undo,
+        ),
     )
 
 
@@ -420,15 +442,15 @@ def _value_planning_key(obj: object, field_name: str) -> tuple[str, object, str]
 
 
 __all__ = [
-    "CatalogInstallCommitment",
-    "INSTALL_TIME_MINUTES",
-    "SERVICE_TIME_MINUTES",
-    "VehicleBay",
-    "VehiclePartInventory",
     "build_catalog_install_offer",
     "build_catalog_purchase_offer",
     "build_inventory_install_offer",
     "build_service_offer",
+    "CatalogInstallCommitment",
     "component",
+    "INSTALL_TIME_MINUTES",
+    "SERVICE_TIME_MINUTES",
     "value_field_commitment",
+    "VehicleBay",
+    "VehiclePartInventory",
 ]
