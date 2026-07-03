@@ -119,6 +119,7 @@ class TransactionOffer:
 
     def can_accept(self) -> TransactionCheck:
         planned_deltas: dict[object, Number] = {}
+        planned_assets: dict[object, Entity] = {}
         unkeyed_value_delta_seen = False
         for commitment in self.commitments:
             if isinstance(
@@ -141,6 +142,8 @@ class TransactionOffer:
                         )
                     unkeyed_value_delta_seen = True
                 check = commitment.can_commit_with_plan(planned_deltas)
+            elif isinstance(commitment, AssetMoveCommitment):
+                check = commitment.can_commit_with_plan(planned_assets)
             else:
                 check = commitment.can_commit()
             if not check.accepted:
@@ -355,6 +358,37 @@ class AssetMoveCommitment:
             return TransactionCheck.reject("receiver cannot receive asset")
         return _receiver_key_available(self.receiver, asset, self.receiver_label)
 
+    def can_commit_with_plan(
+        self,
+        planned_assets: MutableMapping[object, Entity],
+    ) -> TransactionCheck:
+        check = self.can_commit()
+        if not check.accepted:
+            return check
+        asset = self._asset()
+        if asset is None:
+            return TransactionCheck.reject("giver does not hold asset")
+
+        move_key = ("asset_move", id(self.giver), asset.uid)
+        if move_key in planned_assets:
+            return TransactionCheck.reject("asset already planned for move")
+
+        receiver_key = _asset_holder_key(asset, self.receiver_label)
+        receive_key = (
+            None
+            if receiver_key is None
+            else ("asset_receive", id(self.receiver), receiver_key)
+        )
+        if receive_key is not None:
+            planned_asset = planned_assets.get(receive_key)
+            if planned_asset is not None and planned_asset is not asset:
+                return TransactionCheck.reject("receiver already planned for asset key")
+
+        planned_assets[move_key] = asset
+        if receive_key is not None:
+            planned_assets[receive_key] = asset
+        return TransactionCheck.accept()
+
     def commit(self) -> Mapping[str, object]:
         check = self.can_commit()
         if not check.accepted:
@@ -362,8 +396,8 @@ class AssetMoveCommitment:
         asset = self._asset()
         if asset is None:
             raise ValueError("giver does not hold asset")
-        giver_label = self.giver.get_asset_key(self.asset)
-        moved = self.giver.remove_asset(giver_label if giver_label is not None else asset)
+        giver_label = self.giver.get_asset_key(asset)
+        moved = self.giver.remove_asset(asset)
         try:
             self.receiver.add_asset(moved, label=self.receiver_label)
         except Exception:

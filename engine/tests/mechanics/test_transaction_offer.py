@@ -366,6 +366,59 @@ def test_asset_move_commitment_rejects_receiver_policy_before_mutation() -> None
     assert not receiver.has_asset("medkit")
 
 
+def test_asset_move_commitment_rejects_duplicate_planned_move() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    first_receiver = graph.add_node(kind=GarageActor, label="first buyer")
+    second_receiver = graph.add_node(kind=GarageActor, label="second buyer")
+    medkit = shop_token("medkit")
+    giver.add_asset(medkit)
+
+    offer = TransactionOffer(
+        label="sell one medkit twice",
+        commitments=[
+            AssetMoveCommitment(giver, first_receiver, "medkit"),
+            AssetMoveCommitment(giver, second_receiver, "medkit"),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "move asset: asset already planned for move"
+    with pytest.raises(ValueError, match="asset already planned for move"):
+        offer.accept()
+    assert giver.has_asset("medkit")
+    assert not first_receiver.has_asset("medkit")
+    assert not second_receiver.has_asset("medkit")
+
+
+def test_asset_move_commitment_rejects_duplicate_planned_receiver_key() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    receiver = graph.add_node(kind=GarageActor, label="buyer")
+    medkit = shop_token("medkit")
+    permit = shop_token("permit")
+    giver.add_asset(medkit)
+    giver.add_asset(permit)
+
+    offer = TransactionOffer(
+        label="sell two items into one slot",
+        commitments=[
+            AssetMoveCommitment(giver, receiver, "medkit", receiver_label="promo"),
+            AssetMoveCommitment(giver, receiver, "permit", receiver_label="promo"),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "move asset: receiver already planned for asset key"
+    assert giver.has_asset("medkit")
+    assert giver.has_asset("permit")
+    assert not receiver.has_asset("promo")
+
+
 def test_asset_move_commitment_rolls_back_after_late_failure() -> None:
     graph = Graph()
     giver = graph.add_node(kind=GarageActor, label="shop")
