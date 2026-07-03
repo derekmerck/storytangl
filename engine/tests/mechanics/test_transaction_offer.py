@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import ClassVar
 
 import pytest
+from pydantic import Field
 
-from tangl.core import Graph, Node, Selector
+from tangl.core import Graph, Node, Selector, Token
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.assembly.examples.vehicle import (
     Vehicle,
@@ -16,7 +17,9 @@ from tangl.mechanics.assembly.examples.vehicle import (
 )
 from tangl.mechanics.progression import Stat
 from tangl.mechanics.transaction import (
+    AssetMoveCommitment,
     CallbackCommitment,
+    CatalogAssetCommitment,
     ComponentAssignmentCommitment,
     CountableTransferCommitment,
     MappingDeltaCommitment,
@@ -27,11 +30,25 @@ from tangl.mechanics.transaction import (
     TransactionRollbackError,
     ValueDeltaCommitment,
 )
-from tangl.story.concepts.asset import HasAssets
+from tangl.story.concepts.asset import AssetType, HasAssets
 
 
 class GarageActor(HasAssets, Node):
     """Graph actor with a fungible wallet for transaction proof tests."""
+
+
+class ShopItemType(AssetType):
+    """Small tokenizable asset type for transaction proof tests."""
+
+
+class SelectiveGarageActor(GarageActor):
+    """Graph actor that can restrict which discrete assets it receives."""
+
+    accepted_assets: set[str] = Field(default_factory=set)
+
+    def can_receive_asset(self, asset: Token, giver: HasAssets | None = None) -> bool:
+        _ = giver
+        return not self.accepted_assets or asset.token_from in self.accepted_assets
 
 
 class FailingCommitment:
@@ -90,6 +107,18 @@ class RepairTarget:
 
 def part(label: str) -> VehicleComponent:
     return VehicleComponent(token_from=label, label=label)
+
+
+@pytest.fixture(autouse=True)
+def _clear_shop_item_types() -> None:
+    ShopItemType.clear_instances()
+    yield
+    ShopItemType.clear_instances()
+
+
+def shop_token(label: str, *, token_label: str | None = None) -> Token:
+    ShopItemType(label=label)
+    return Token[ShopItemType](token_from=label, label=token_label or label)
 
 
 def install_baseline(loadout: VehicleLoadout) -> None:
@@ -282,6 +311,222 @@ def test_callback_commitment_rolls_back_domain_local_inventory_moves() -> None:
 
     assert inventory == [chassis]
     assert vehicle.loadout.get_slot("chassis")[0].token_from == "mini_chassis"
+
+
+def test_asset_move_commitment_moves_existing_token_between_holders() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    receiver = graph.add_node(
+        kind=SelectiveGarageActor,
+        label="buyer",
+        accepted_assets={"medkit"},
+    )
+    medkit = shop_token("medkit")
+    graph.add(medkit)
+    giver.add_asset(medkit)
+
+    offer = TransactionOffer(
+        label="buy held medkit",
+        commitments=[
+            AssetMoveCommitment(giver, receiver, "medkit"),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert not giver.has_asset("medkit")
+    assert receiver.has_asset("medkit")
+    assert receipt.details[0]["kind"] == "asset_move"
+    assert receipt.details[0]["asset_id"] == medkit.uid
+
+
+def test_asset_move_commitment_rejects_receiver_policy_before_mutation() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    receiver = graph.add_node(
+        kind=SelectiveGarageActor,
+        label="buyer",
+        accepted_assets={"permit"},
+    )
+    medkit = shop_token("medkit")
+    giver.add_asset(medkit)
+
+    offer = TransactionOffer(
+        label="buy rejected medkit",
+        commitments=[
+            AssetMoveCommitment(giver, receiver, "medkit"),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "move asset: receiver cannot receive asset"
+    assert giver.has_asset("medkit")
+    assert not receiver.has_asset("medkit")
+
+
+def test_asset_move_commitment_rejects_duplicate_planned_move() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    first_receiver = graph.add_node(kind=GarageActor, label="first buyer")
+    second_receiver = graph.add_node(kind=GarageActor, label="second buyer")
+    medkit = shop_token("medkit")
+    giver.add_asset(medkit)
+
+    offer = TransactionOffer(
+        label="sell one medkit twice",
+        commitments=[
+            AssetMoveCommitment(giver, first_receiver, "medkit"),
+            AssetMoveCommitment(giver, second_receiver, "medkit"),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "move asset: asset already planned for move"
+    with pytest.raises(ValueError, match="asset already planned for move"):
+        offer.accept()
+    assert giver.has_asset("medkit")
+    assert not first_receiver.has_asset("medkit")
+    assert not second_receiver.has_asset("medkit")
+
+
+def test_asset_move_commitment_rejects_duplicate_planned_receiver_key() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    receiver = graph.add_node(kind=GarageActor, label="buyer")
+    medkit = shop_token("medkit")
+    permit = shop_token("permit")
+    giver.add_asset(medkit)
+    giver.add_asset(permit)
+
+    offer = TransactionOffer(
+        label="sell two items into one slot",
+        commitments=[
+            AssetMoveCommitment(giver, receiver, "medkit", receiver_label="promo"),
+            AssetMoveCommitment(giver, receiver, "permit", receiver_label="promo"),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "move asset: receiver already planned for asset key"
+    assert giver.has_asset("medkit")
+    assert giver.has_asset("permit")
+    assert not receiver.has_asset("promo")
+
+
+def test_asset_move_commitment_rolls_back_after_late_failure() -> None:
+    graph = Graph()
+    giver = graph.add_node(kind=GarageActor, label="shop")
+    receiver = graph.add_node(kind=GarageActor, label="buyer")
+    medkit = shop_token("medkit")
+    giver.add_asset(medkit, label="sale-bin")
+
+    offer = TransactionOffer(
+        label="buy then fail",
+        commitments=[
+            AssetMoveCommitment(giver, receiver, "medkit"),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert giver.has_asset("medkit")
+    assert giver.get_asset_key("medkit") == "sale-bin"
+    assert not receiver.has_asset("medkit")
+
+
+def test_catalog_asset_commitment_creates_registers_and_holds_token_on_accept() -> None:
+    graph = Graph()
+    buyer = graph.add_node(kind=GarageActor, label="buyer")
+    created: list[Token] = []
+    ShopItemType(label="medkit")
+
+    def make_medkit() -> Token:
+        token = Token[ShopItemType](token_from="medkit", label="catalog_medkit")
+        created.append(token)
+        return token
+
+    offer = TransactionOffer(
+        label="buy catalog medkit",
+        commitments=[
+            CatalogAssetCommitment(buyer, make_medkit, registry=graph),
+        ],
+    )
+
+    assert offer.can_accept().accepted
+    assert created == []
+    receipt = offer.accept()
+
+    medkit = created[0]
+    assert buyer.has_asset("medkit")
+    assert graph.get(medkit.uid) is medkit
+    assert receipt.details[0]["kind"] == "catalog_asset"
+
+
+def test_catalog_asset_commitment_rejects_unavailable_stock_before_creation() -> None:
+    graph = Graph()
+    buyer = graph.add_node(kind=GarageActor, label="buyer")
+    stock = {"medkit": 0}
+    created: list[Token] = []
+    ShopItemType(label="medkit")
+
+    def make_medkit() -> Token:
+        token = Token[ShopItemType](token_from="medkit", label="catalog_medkit")
+        created.append(token)
+        return token
+
+    offer = TransactionOffer(
+        label="buy unavailable medkit",
+        commitments=[
+            MappingDeltaCommitment(stock, "medkit", -1),
+            CatalogAssetCommitment(buyer, make_medkit, registry=graph),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "mutate mapping value: value below minimum: -1 < 0"
+    assert created == []
+    assert stock == {"medkit": 0}
+    assert not buyer.has_asset("medkit")
+
+
+def test_catalog_asset_commitment_rolls_back_stock_holder_and_registry() -> None:
+    graph = Graph()
+    buyer = graph.add_node(kind=GarageActor, label="buyer")
+    stock = {"medkit": 1}
+    created: list[Token] = []
+    ShopItemType(label="medkit")
+
+    def make_medkit() -> Token:
+        token = Token[ShopItemType](token_from="medkit", label="catalog_medkit")
+        created.append(token)
+        return token
+
+    offer = TransactionOffer(
+        label="buy catalog medkit then fail",
+        commitments=[
+            MappingDeltaCommitment(stock, "medkit", -1),
+            CatalogAssetCommitment(buyer, make_medkit, registry=graph),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    medkit = created[0]
+    assert stock == {"medkit": 1}
+    assert not buyer.has_asset("medkit")
+    assert graph.get(medkit.uid) is None
 
 
 def test_transaction_offer_buys_installs_and_round_trips_vehicle_component() -> None:

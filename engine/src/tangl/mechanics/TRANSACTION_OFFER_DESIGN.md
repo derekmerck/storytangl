@@ -269,6 +269,10 @@ Core commitments cover common legs:
 - `MappingDeltaCommitment` for simple resource pools such as fuel, ammo,
   repair capacity, service capacity, or HP maps;
 - `StatDeltaCommitment` for progression/stat-like values that expose `fv`;
+- `AssetMoveCommitment` for moving one existing discrete graph asset/token
+  between holder-like objects;
+- `CatalogAssetCommitment` for creating one catalog-backed graph asset/token
+  during offer acceptance, optionally registering it with a graph/registry;
 - `RegistryAddCommitment` for explicit graph/token materialization;
 - `ComponentAssignmentCommitment` for owner-bound assembly slots;
 - `CallbackCommitment` for domain-local state changes that do not deserve a
@@ -355,26 +359,28 @@ Landed proof:
 4. `ValueDeltaCommitment`, `MappingDeltaCommitment`, and `StatDeltaCommitment`
    prove service/fungible/stat mutation legs such as repair, refuel, reload, and
    healing.
-5. `RegistryAddCommitment` proves explicit shape change during accepted
+5. `AssetMoveCommitment` proves existing discrete graph-token movement between
+   holder-like objects with policy checks and rollback.
+6. `CatalogAssetCommitment` proves catalog-backed token creation during accepted
+   writeback, with optional graph registration and rollback.
+7. `RegistryAddCommitment` proves explicit shape change during accepted
    writeback: a prepared graph item can enter the registry only when the offer
    commits.
-6. `ComponentAssignmentCommitment` proves owner-bound component manager
+8. `ComponentAssignmentCommitment` proves owner-bound component manager
    assignment, replacement, post-assignment validation, and rollback.
-7. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
+9. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
    service, and presentation-specific state that still needs transaction
    preflight/rollback.
-8. The neutral vehicle garage test buys and installs a component, then proves
+10. The neutral vehicle garage test buys and installs a component, then proves
    the resulting graph/loadout state survives `Graph.unstructure()` /
    `Graph.structure()`.
-9. Rejection before mutation and mid-commit rollback are both covered.
+11. Rejection before mutation and mid-commit rollback are both covered.
 
 Still recommended for the next consumer-facing slice:
 
 1. Add a neutral shop/garage example module or world-facing fixture over the
    existing vehicle component manager.
 2. Add commitment legs only when a real consumer forces them:
-   - discrete token move between holders;
-   - catalog-backed token creation with stock/capacity;
    - graph link/unlink.
 3. Test aggregate insufficient funds, unavailable catalog/provider capacity,
    incompatible install targets, and multi-offer/batch selection.

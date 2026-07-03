@@ -97,7 +97,8 @@ storage itself.
 or holder asset maps. It remains the story-level convenience for the current
 holder surface. The cross-family `tangl.mechanics.transaction` helper now carries
 the shared spec/offer/commitment/receipt shape for broader shops, services,
-assembly assignment, and mixed writeback.
+assembly assignment, holder-local asset movement, catalog-backed token creation,
+and mixed writeback.
 
 Once the graph relationship model exists, asset transfers should bind to that
 offer/commitment helper rather than grow a parallel trade framework. The asset
@@ -138,10 +139,10 @@ experiments, not a complete inventory system.
   `can_receive_*`) directly. A later relationship framework should generalize
   this into preflight/acceptance rules that assets, connections, attachments,
   and other mutable associations can share.
-- `AssetTransactionManager` is not yet adapted to `TransactionOffer` for mixed
-  discrete, fungible, and service operations. The generic helper exists; the
-  remaining work is to express holder-map and future holding-edge changes as
-  commitments that validate every leg before mutating anything.
+- Existing holder-map asset moves and catalog-backed token creation can now be
+  expressed with `AssetMoveCommitment` and `CatalogAssetCommitment`. The
+  remaining work is to express future holding-edge changes with equivalent
+  commitments once graph-backed ownership replaces holder-local maps.
 - `HasAssets` nominates `inv` and `assets` into local namespaces, but there is
   no story-level `Player`/avatar concept yet. Sandbox currently uses
   `SandboxScope.player_assets` as the explicit player stand-in; promote a real
