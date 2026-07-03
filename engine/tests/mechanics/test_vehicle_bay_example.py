@@ -109,6 +109,7 @@ def test_vehicle_bay_service_offer_rolls_back_after_late_failure() -> None:
 def test_vehicle_bay_installs_inventory_component() -> None:
     bay = VehicleBay(cash=1000)
     install_baseline(bay)
+    old_tires = bay.vehicle.loadout.get_slot("tires")[0]
     bay.inventory.add_asset(component("slicks"))
 
     offer = build_inventory_install_offer(
@@ -122,10 +123,12 @@ def test_vehicle_bay_installs_inventory_component() -> None:
     assert bay.cash == 650
     assert bay.time_minutes == INSTALL_TIME_MINUTES
     assert not bay.inventory.has_asset("slicks")
+    assert bay.inventory.get_asset("cheap_tires") is old_tires
     assert bay.vehicle.loadout.get_slot("tires")[0].token_from == "slicks"
     assert {detail["kind"] for detail in receipt.details} >= {
         "asset_move",
         "component_assignment",
+        "inventory_return",
         "value_delta",
     }
 
@@ -154,6 +157,7 @@ def test_vehicle_bay_failed_inventory_install_keeps_cash_inventory_and_loadout()
 def test_vehicle_bay_catalog_purchase_creates_graph_component_on_accept() -> None:
     graph = Graph()
     bay = VehicleBay(cash=1000)
+    stock = {"slicks": 1}
     created = []
 
     def make_slicks():
@@ -167,7 +171,7 @@ def test_vehicle_bay_catalog_purchase_creates_graph_component_on_accept() -> Non
         price=350,
         supplier=make_slicks,
         registry=graph,
-        stock={"slicks": 1},
+        stock=stock,
     )
 
     assert offer.can_accept().accepted
@@ -176,10 +180,12 @@ def test_vehicle_bay_catalog_purchase_creates_graph_component_on_accept() -> Non
 
     slicks = created[0]
     assert bay.cash == 650
+    assert stock == {"slicks": 0}
     assert bay.inventory.get_asset("slicks") is slicks
     assert graph.get(slicks.uid) is slicks
     assert {detail["kind"] for detail in receipt.details} == {
         "catalog_asset",
+        "mapping_delta",
         "value_delta",
     }
 
@@ -203,10 +209,46 @@ def test_vehicle_bay_catalog_purchase_rejects_unavailable_stock_before_creation(
     check = offer.can_accept()
 
     assert not check.accepted
-    assert check.reason == "create catalog asset: catalog item unavailable"
+    assert check.reason == "decrement catalog stock: value below minimum: -1 < 0"
     assert created == []
     assert bay.cash == 1000
     assert not bay.inventory.has_asset("slicks")
+
+
+def test_vehicle_bay_catalog_purchase_rolls_back_stock_and_inventory() -> None:
+    graph = Graph()
+    bay = VehicleBay(cash=1000)
+    stock = {"slicks": 1}
+    created = []
+
+    def make_slicks():
+        item = component("slicks")
+        created.append(item)
+        return item
+
+    def fail_after_purchase() -> None:
+        raise RuntimeError("late purchase failure")
+
+    offer = build_catalog_purchase_offer(
+        bay,
+        label="slicks",
+        price=350,
+        supplier=make_slicks,
+        registry=graph,
+        stock=stock,
+        extra_commitments=[
+            CallbackCommitment("fail after purchase", apply=fail_after_purchase),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late purchase failure"):
+        offer.accept()
+
+    slicks = created[0]
+    assert bay.cash == 1000
+    assert stock == {"slicks": 1}
+    assert not bay.inventory.has_asset("slicks")
+    assert graph.get(slicks.uid) is None
 
 
 def test_vehicle_bay_catalog_install_creates_installs_and_round_trips_component() -> None:
@@ -214,6 +256,7 @@ def test_vehicle_bay_catalog_install_creates_installs_and_round_trips_component(
     vehicle = graph.add_node(label="demo-car", kind=Vehicle)
     bay = VehicleBay(vehicle=vehicle, cash=1000)
     install_baseline(bay)
+    old_tires = bay.vehicle.loadout.get_slot("tires")[0]
     created = []
 
     def make_slicks():
@@ -241,6 +284,7 @@ def test_vehicle_bay_catalog_install_creates_installs_and_round_trips_component(
     assert bay.cash == 650
     assert bay.time_minutes == INSTALL_TIME_MINUTES
     assert graph.get(slicks.uid) is slicks
+    assert bay.inventory.get_asset("cheap_tires") is old_tires
     assert bay.vehicle.loadout.get_slot("tires") == [slicks]
     assert restored_vehicle.loadout.get_slot("tires") == [restored_slicks]
 
@@ -279,6 +323,7 @@ def test_vehicle_bay_catalog_install_rolls_back_after_late_failure() -> None:
     assert bay.cash == 1000
     assert bay.time_minutes == 0
     assert bay.vehicle.loadout.get_slot("tires") == starting_tires
+    assert not bay.inventory.has_asset("cheap_tires")
     assert graph.get(slicks.uid) is None
 
 

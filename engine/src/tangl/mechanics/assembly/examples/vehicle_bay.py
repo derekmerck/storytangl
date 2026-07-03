@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import ClassVar
+from uuid import UUID
 
 from pydantic import Field
 
@@ -11,8 +12,10 @@ from tangl.core.bases import BaseModelPlus
 from tangl.mechanics.assembly import ComponentManager
 from tangl.mechanics.transaction import (
     AssetMoveCommitment,
+    CallbackCommitment,
     CatalogAssetCommitment,
     ComponentAssignmentCommitment,
+    MappingDeltaCommitment,
     TransactionCheck,
     TransactionOffer,
     ValueDeltaCommitment,
@@ -188,6 +191,7 @@ def build_inventory_install_offer(
     part = bay.inventory.get_asset(component_key)
     if part is None:
         raise ValueError(f"Vehicle inventory item not found: {component_key}")
+    before = _components_by_id(bay.vehicle.loadout.all_components())
     commitments: list[object] = []
     commitments.extend(_cost_commitments(bay, cash_cost=price, time_minutes=install_time))
     commitments.extend(
@@ -208,6 +212,7 @@ def build_inventory_install_offer(
             ),
         ],
     )
+    commitments.append(_return_replaced_components_commitment(bay, before))
     commitments.extend(extra_commitments)
     return TransactionOffer(label=f"install {part.get_label()}", commitments=commitments)
 
@@ -219,30 +224,36 @@ def build_catalog_purchase_offer(
     price: int,
     supplier: Callable[[], VehicleComponent] | None = None,
     registry: Registry | None = None,
-    stock: Mapping[str, int] | None = None,
+    stock: MutableMapping[str, int] | None = None,
+    extra_commitments: Iterable[object] = (),
 ) -> TransactionOffer:
     """Build a transaction that buys one catalog component into inventory."""
 
-    can_create = None
+    commitments: list[object] = []
+    commitments.extend(_cost_commitments(bay, cash_cost=price, time_minutes=0))
     if stock is not None:
-
-        def can_create() -> TransactionCheck:
-            if stock.get(label, 0) <= 0:
-                return TransactionCheck.reject("catalog item unavailable")
-            return TransactionCheck.accept()
+        commitments.append(
+            MappingDeltaCommitment(
+                stock,
+                label,
+                -1,
+                label="decrement catalog stock",
+                min_value=0,
+            ),
+        )
+    commitments.append(
+        CatalogAssetCommitment(
+            bay.inventory,
+            supplier or (lambda: component(label)),
+            registry=registry,
+            receiver_label=label,
+        ),
+    )
+    commitments.extend(extra_commitments)
 
     return TransactionOffer(
         label=f"buy {label}",
-        commitments=[
-            *_cost_commitments(bay, cash_cost=price, time_minutes=0),
-            CatalogAssetCommitment(
-                bay.inventory,
-                supplier or (lambda: component(label)),
-                registry=registry,
-                receiver_label=label,
-                can_create=can_create,
-            ),
-        ],
+        commitments=commitments,
     )
 
 
@@ -257,7 +268,12 @@ class CatalogInstallCommitment:
     label: str = "catalog install"
     allow_replace: bool = True
     validate_after: bool = True
-    _assignment: ComponentAssignmentCommitment | None = field(default=None, init=False)
+    _assignment: ComponentAssignmentCommitment | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def can_commit(self) -> TransactionCheck:
         return ComponentAssignmentCommitment(
@@ -307,6 +323,7 @@ def build_catalog_install_offer(
     """Build a transaction that creates a catalog part and installs it directly."""
 
     preview_part = preview or component(label)
+    before = _components_by_id(bay.vehicle.loadout.all_components())
     commitments: list[object] = []
     commitments.extend(_cost_commitments(bay, cash_cost=price, time_minutes=install_time))
     commitments.append(
@@ -318,8 +335,46 @@ def build_catalog_install_offer(
             label="create and assign vehicle part",
         ),
     )
+    commitments.append(_return_replaced_components_commitment(bay, before))
     commitments.extend(extra_commitments)
     return TransactionOffer(label=f"buy and install {label}", commitments=commitments)
+
+
+def _components_by_id(components: Iterable[VehicleComponent]) -> dict[UUID, VehicleComponent]:
+    return {item.uid: item for item in components}
+
+
+def _return_replaced_components_commitment(
+    bay: VehicleBay,
+    before: Mapping[UUID, VehicleComponent],
+) -> CallbackCommitment:
+    returned: list[VehicleComponent] = []
+
+    def apply() -> Mapping[str, object]:
+        after = {item.uid for item in bay.vehicle.loadout.all_components()}
+        returned[:] = sorted(
+            (item for uid, item in before.items() if uid not in after),
+            key=lambda item: item.get_label(),
+        )
+        for item in returned:
+            bay.inventory.add_asset(item)
+        return {
+            "kind": "inventory_return",
+            "component_ids": [item.uid for item in returned],
+            "component_labels": [item.get_label() for item in returned],
+        }
+
+    def undo() -> None:
+        for item in returned:
+            if bay.inventory.has_asset(item):
+                bay.inventory.remove_asset(item)
+        returned.clear()
+
+    return CallbackCommitment(
+        "return replaced parts to inventory",
+        apply=apply,
+        undo=undo,
+    )
 
 
 def _cost_commitments(
