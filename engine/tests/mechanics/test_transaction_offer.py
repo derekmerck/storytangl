@@ -22,6 +22,7 @@ from tangl.mechanics.transaction import (
     CatalogAssetCommitment,
     ComponentAssignmentCommitment,
     CountableTransferCommitment,
+    ListAssetHolder,
     MappingDeltaCommitment,
     RegistryAddCommitment,
     StatDeltaCommitment,
@@ -440,6 +441,137 @@ def test_asset_move_commitment_rolls_back_after_late_failure() -> None:
     assert giver.has_asset("medkit")
     assert giver.get_asset_key("medkit") == "sale-bin"
     assert not receiver.has_asset("medkit")
+
+
+def test_list_asset_holder_moves_tokens_and_restores_order_on_rollback() -> None:
+    ShopItemType(label="medkit")
+    ShopItemType(label="permit")
+    medkit = Token[ShopItemType](token_from="medkit", label="medkit")
+    permit = Token[ShopItemType](token_from="permit", label="permit")
+    source_items = [medkit, permit]
+    receiver_items: list[Token] = []
+    source = ListAssetHolder(source_items)
+    receiver = ListAssetHolder(receiver_items)
+    source.add_asset(medkit, label="front-bin")
+
+    offer = TransactionOffer(
+        label="move then fail",
+        commitments=[
+            AssetMoveCommitment(
+                source,
+                receiver,
+                "front-bin",
+                receiver_label="new-arrival",
+            ),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert source_items == [medkit, permit]
+    assert receiver_items == []
+    assert source.get_asset_key(medkit) == "front-bin"
+
+
+def test_list_asset_holder_accepts_catalog_asset_without_losing_order() -> None:
+    graph = Graph()
+    ShopItemType(label="medkit")
+    ShopItemType(label="permit")
+    permit = Token[ShopItemType](token_from="permit", label="permit")
+    items: list[Token] = [permit]
+    holder = ListAssetHolder(items)
+    created: list[Token] = []
+
+    def make_medkit() -> Token:
+        token = Token[ShopItemType](token_from="medkit", label="medkit")
+        created.append(token)
+        return token
+
+    offer = TransactionOffer(
+        label="buy catalog medkit",
+        commitments=[
+            CatalogAssetCommitment(
+                holder,
+                make_medkit,
+                registry=graph,
+                preview=Token[ShopItemType](token_from="medkit", label="medkit"),
+            ),
+        ],
+    )
+
+    receipt = offer.accept()
+
+    assert items == [permit, created[0]]
+    assert holder.has_asset("medkit")
+    assert graph.get(created[0].uid) is created[0]
+    assert receipt.details[0]["kind"] == "catalog_asset"
+
+
+def test_list_asset_holder_rejects_duplicate_catalog_key_before_creation() -> None:
+    ShopItemType(label="medkit")
+    medkit = Token[ShopItemType](token_from="medkit", label="medkit")
+    holder = ListAssetHolder([medkit])
+    created: list[Token] = []
+
+    def make_medkit() -> Token:
+        token = Token[ShopItemType](token_from="medkit", label="medkit")
+        created.append(token)
+        return token
+
+    offer = TransactionOffer(
+        label="buy duplicate medkit",
+        commitments=[
+            CatalogAssetCommitment(
+                holder,
+                make_medkit,
+                preview=Token[ShopItemType](token_from="medkit", label="medkit"),
+            ),
+        ],
+    )
+
+    check = offer.can_accept()
+
+    assert not check.accepted
+    assert check.reason == "create catalog asset: receiver already holds asset key"
+    assert created == []
+    assert holder.has_asset(medkit)
+
+
+def test_list_asset_holder_rolls_back_catalog_asset_and_registry() -> None:
+    graph = Graph()
+    ShopItemType(label="medkit")
+    ShopItemType(label="permit")
+    permit = Token[ShopItemType](token_from="permit", label="permit")
+    items: list[Token] = [permit]
+    holder = ListAssetHolder(items)
+    created: list[Token] = []
+
+    def make_medkit() -> Token:
+        token = Token[ShopItemType](token_from="medkit", label="medkit")
+        created.append(token)
+        return token
+
+    offer = TransactionOffer(
+        label="buy catalog medkit then fail",
+        commitments=[
+            CatalogAssetCommitment(
+                holder,
+                make_medkit,
+                registry=graph,
+                preview=Token[ShopItemType](token_from="medkit", label="medkit"),
+            ),
+            FailingCommitment(),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        offer.accept()
+
+    assert items == [permit]
+    assert not holder.has_asset("medkit")
+    assert graph.get(created[0].uid) is None
 
 
 def test_catalog_asset_commitment_creates_registers_and_holds_token_on_accept() -> None:
