@@ -475,6 +475,16 @@ def test_list_asset_holder_moves_tokens_and_restores_order_on_rollback() -> None
     assert source.get_asset_key(medkit) == "front-bin"
 
 
+def test_list_asset_holder_rejects_empty_runtime_lookup_key() -> None:
+    asset = Node()
+    holder = ListAssetHolder([asset])
+
+    assert holder.get_asset("") is None
+    assert holder.get_asset(None) is None  # type: ignore[arg-type]
+    assert holder.get_asset(asset.get_label()) is asset
+    assert holder.has_asset(asset)
+
+
 def test_list_asset_holder_accepts_catalog_asset_without_losing_order() -> None:
     graph = Graph()
     ShopItemType(label="medkit")

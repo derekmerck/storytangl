@@ -275,6 +275,8 @@ class ListAssetHolder:
         return None
 
     def get_asset(self, label: str) -> Entity | None:
+        if not label:
+            return None
         for item in self.items:
             if label == self._local_label(item):
                 return item
