@@ -374,16 +374,20 @@ Landed proof:
 10. The neutral vehicle garage test buys and installs a component, then proves
    the resulting graph/loadout state survives `Graph.unstructure()` /
    `Graph.structure()`.
-11. Rejection before mutation and mid-commit rollback are both covered.
+11. The neutral vehicle bay example (`assembly/examples/vehicle_bay.py`) lifts
+    the CarWars-shaped service/shop pattern into generic helpers: scalar service
+    offers, staged inventory install offers, catalog purchase offers, and a
+    catalog buy+install proof that creates and assigns the same component during
+    accepted writeback.
+12. Rejection before mutation and mid-commit rollback are both covered.
 
-Still recommended for the next consumer-facing slice:
+Still recommended for the next consumer-facing slices:
 
-1. Add a neutral shop/garage example module or world-facing fixture over the
-   existing vehicle component manager.
-2. Add commitment legs only when a real consumer forces them:
+1. Add commitment legs only when a real consumer forces them:
    - graph link/unlink.
-3. Test aggregate insufficient funds, unavailable catalog/provider capacity,
-   incompatible install targets, and multi-offer/batch selection.
+2. Test multi-offer/batch selection over the neutral bay fixture.
+3. Replace holder-local asset maps with graph-backed holding/ownership
+   relations when a relationship-backed inventory slice is prioritized.
 4. Keep transaction offers ephemeral; persist only resulting state and receipts.
 
 Out of scope for the first slice:
