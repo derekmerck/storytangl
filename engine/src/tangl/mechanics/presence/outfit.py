@@ -9,11 +9,27 @@ facets such as `look`. It belongs in the `presence` family rather than behind an
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
+from pydantic import Field, model_validator
+
+from tangl.core import Entity, contribute_ns
 from tangl.lang.helpers import oxford_join
 from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.presence.wearable import Wearable
 from tangl.mechanics.presence.wearable.enums import WearableLayer, WearableState
+from tangl.mechanics.transaction import (
+    AssetMoveCommitment,
+    ComponentAssignmentCommitment,
+    ComponentSlotAssetHolder,
+    ListAssetHolder,
+    TransactionCommitment,
+    TransactionOffer,
+)
+
+
+WARDROBE_SLOT = "stored"
 
 
 class OutfitManager(ComponentManager[Wearable]):
@@ -120,4 +136,115 @@ class OutfitManager(ComponentManager[Wearable]):
         return errors
 
 
-__all__ = ["OutfitManager"]
+class WardrobeManager(ComponentManager[Wearable]):
+    """Owner-bound storage for wearable graph members not currently worn."""
+
+    slots = {
+        WARDROBE_SLOT: Slot.for_type(
+            WARDROBE_SLOT,
+            Wearable,
+            max_count=1000,
+        )
+    }
+
+    def holder(self) -> ComponentSlotAssetHolder:
+        """Return the transaction holder view over stored wearables."""
+        return ComponentSlotAssetHolder(self, WARDROBE_SLOT)
+
+    def components(self) -> list[Wearable]:
+        """Return a stable list of stored wearables."""
+        result = list(self.get_slot(WARDROBE_SLOT))
+        result.sort(
+            key=lambda wearable: (
+                wearable.label or "",
+                wearable.noun or "",
+            )
+        )
+        return result
+
+    def describe_items(self) -> list[str]:
+        """Return concise labels for stored wearables."""
+        return [
+            desc
+            for component in self.components()
+            if (desc := component.render_desc())
+        ]
+
+    def describe(self) -> str:
+        """Return a compact phrase describing the current wardrobe."""
+        return oxford_join(self.describe_items())
+
+
+class HasWardrobe(Entity):
+    """Direct facet exposing inactive wearable storage."""
+
+    wardrobe: WardrobeManager = Field(
+        default_factory=WardrobeManager,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+
+    @model_validator(mode="after")
+    def _bind_wardrobe_owner(self) -> "HasWardrobe":
+        self.wardrobe.bind_owner(self)
+        return self
+
+    def describe_wardrobe(self) -> str:
+        """Return a compact phrase describing stored wearables."""
+        return self.wardrobe.describe()
+
+    @contribute_ns
+    def provide_wardrobe_symbols(self) -> dict[str, object]:
+        """Publish direct wardrobe symbols into the entity-local namespace."""
+        return {
+            "wardrobe": self.wardrobe,
+            "wardrobe_description": self.describe_wardrobe(),
+            "wardrobe_tokens": self.wardrobe.describe_items(),
+        }
+
+
+def build_wardrobe_dress_offer(
+    *,
+    wardrobe: WardrobeManager,
+    outfit: OutfitManager,
+    wearable_key: str,
+    slot_name: str,
+    label: str | None = None,
+    extra_commitments: Iterable[TransactionCommitment] = (),
+) -> TransactionOffer:
+    """Build a transaction that moves one stored wearable onto an outfit slot."""
+
+    holder = wardrobe.holder()
+    wearable = holder.get_asset(wearable_key)
+    if wearable is None:
+        raise ValueError(f"Wardrobe item not found: {wearable_key}")
+
+    worn = ListAssetHolder([])
+    commitments: list[TransactionCommitment] = [
+        AssetMoveCommitment(
+            holder,
+            worn,
+            wearable,
+            label="remove selected wearable from wardrobe",
+        ),
+        ComponentAssignmentCommitment(
+            outfit,
+            slot_name,
+            wearable,
+            label="assign wearable to outfit",
+            validate_after=True,
+        ),
+    ]
+    commitments.extend(extra_commitments)
+    return TransactionOffer(
+        label=label or f"wear {wearable.get_label()}",
+        commitments=commitments,
+    )
+
+
+__all__ = [
+    "HasWardrobe",
+    "OutfitManager",
+    "WARDROBE_SLOT",
+    "WardrobeManager",
+    "build_wardrobe_dress_offer",
+]

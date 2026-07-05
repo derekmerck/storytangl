@@ -24,6 +24,13 @@ constructor-form persistence with `json_schema_extra={"include": True,
 "unstructurable": True}`, so mutated outfit state survives graph round-trips without
 making the outfit manager a graph item.
 
+`WardrobeManager` applies the same identity rule to inactive clothing storage. It is
+embedded on `HasWardrobe`, persists by constructor-form recursion, stores wearable
+UUIDs in a single broad storage slot, and can expose that slot through the transaction
+layer's component-slot holder adapter. A dressing offer moves one stored wearable out
+of the wardrobe and assigns it into the active outfit; the outfit manager still owns
+body-region/layer legality and validation.
+
 This resolves the first serialization identity bug for outfits. The body-attachment
 generalization below remains the design target for ornaments, injuries, cybernetics,
 robot parts, vehicles, and credential packets.
@@ -32,6 +39,8 @@ robot parts, vehicles, and credential packets.
 
 - `OutfitManager` is a real `ComponentManager[Wearable]` using the shared
   `SlottedContainer` slot, validation, budget, and facet APIs.
+- `WardrobeManager` is a storage-side `ComponentManager[Wearable]` for graph-member
+  wearables not currently assigned to the active outfit.
 - `WearableType` is an `AssetType`; `Wearable` is a token wrapper over that type.
 - `Ornamentation` is still a plain `Node` with `collection: list[Ornament]`.
 - `Ornament` is an `Entity` with `body_part: BodyPart`, `ornament_type: OrnamentType`, `text: str`.
