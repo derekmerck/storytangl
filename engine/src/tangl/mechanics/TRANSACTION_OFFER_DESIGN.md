@@ -271,6 +271,9 @@ Core commitments cover common legs:
 - `StatDeltaCommitment` for progression/stat-like values that expose `fv`;
 - `AssetMoveCommitment` for moving one existing discrete graph asset/token
   between holder-like objects;
+- `ListAssetHolder` as a thin adapter over an ordered `list[Entity]` when a
+  world wants to keep list order for UI/projection but still expose the
+  `AssetHolder` protocol to transaction commitments;
 - `CatalogAssetCommitment` for creating one catalog-backed graph asset/token
   during offer acceptance, optionally registering it with a graph/registry;
 - `RegistryAddCommitment` for explicit graph/token materialization;
@@ -317,7 +320,10 @@ That should bind to transactions as:
   bound explicitly, e.g. `min_value=0` for cash;
 - `CountableTransferCommitment(player, garage, "cash", price)` only when both
   sides are real holders with meaningful bilateral wallet policy;
-- `CallbackCommitment("remove from inventory", ...)` for the selected part;
+- `AssetMoveCommitment(ListAssetHolder(inventory), installed_holder, part)` for
+  the selected part when the inventory is an ordered list. The adapter is not an
+  ownership model; it is the transaction-facing API over the domain collection
+  and restores holder-local labels and list position during rollback;
 - `ComponentAssignmentCommitment(vehicle.loadout, slot, part, allow_replace=True)`;
 - `CallbackCommitment("return replaced part", ...)` when a domain wants the
   replaced component in inventory rather than simply unassigned.
@@ -361,25 +367,28 @@ Landed proof:
    healing.
 5. `AssetMoveCommitment` proves existing discrete graph-token movement between
    holder-like objects with policy checks and rollback.
-6. `CatalogAssetCommitment` proves catalog-backed token creation during accepted
+6. `ListAssetHolder` proves ordered-list inventories can participate in the
+   same discrete asset transaction protocol without becoming a new ownership
+   model.
+7. `CatalogAssetCommitment` proves catalog-backed token creation during accepted
    writeback, with optional graph registration and rollback.
-7. `RegistryAddCommitment` proves explicit shape change during accepted
+8. `RegistryAddCommitment` proves explicit shape change during accepted
    writeback: a prepared graph item can enter the registry only when the offer
    commits.
-8. `ComponentAssignmentCommitment` proves owner-bound component manager
+9. `ComponentAssignmentCommitment` proves owner-bound component manager
    assignment, replacement, post-assignment validation, and rollback.
-9. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
+10. `CallbackCommitment` marks the domain-local plug-in spot for inventory,
    service, and presentation-specific state that still needs transaction
    preflight/rollback.
-10. The neutral vehicle garage test buys and installs a component, then proves
+11. The neutral vehicle garage test buys and installs a component, then proves
    the resulting graph/loadout state survives `Graph.unstructure()` /
    `Graph.structure()`.
-11. The neutral vehicle bay example (`assembly/examples/vehicle_bay.py`) lifts
+12. The neutral vehicle bay example (`assembly/examples/vehicle_bay.py`) lifts
     the CarWars-shaped service/shop pattern into generic helpers: scalar service
     offers, staged inventory install offers, catalog purchase offers, and a
     catalog buy+install proof that creates and assigns the same component during
     accepted writeback.
-12. Rejection before mutation and mid-commit rollback are both covered.
+13. Rejection before mutation and mid-commit rollback are both covered.
 
 Still recommended for the next consumer-facing slices:
 
