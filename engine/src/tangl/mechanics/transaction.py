@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import ClassVar, Protocol, TypeVar
+from uuid import UUID
 
 from pydantic import Field
 
@@ -256,8 +257,8 @@ class ListAssetHolder:
     """
 
     items: list[Entity]
-    _labels_by_uid: dict[object, str] = field(default_factory=dict)
-    _removed_indices_by_uid: dict[object, int] = field(default_factory=dict)
+    _labels_by_uid: ClassVar[dict[UUID, str]] = {}
+    _removed_indices_by_uid: dict[UUID, int] = field(default_factory=dict)
 
     def _item_key(self, item: Entity, label: str | None = None) -> str:
         key = _asset_holder_key(item, label)

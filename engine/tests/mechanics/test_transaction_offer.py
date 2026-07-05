@@ -485,6 +485,21 @@ def test_list_asset_holder_rejects_empty_runtime_lookup_key() -> None:
     assert holder.has_asset(asset)
 
 
+def test_list_asset_holder_shares_local_labels_across_wrappers() -> None:
+    ShopItemType(label="medkit")
+    ShopItemType(label="permit")
+    medkit = Token[ShopItemType](token_from="medkit", label="medkit")
+    permit = Token[ShopItemType](token_from="permit", label="permit")
+    items = [medkit]
+
+    ListAssetHolder(items).add_asset(medkit, label="promo")
+    second_wrapper = ListAssetHolder(items)
+
+    assert second_wrapper.get_asset("promo") is medkit
+    with pytest.raises(ValueError, match="already contains key: promo"):
+        second_wrapper.add_asset(permit, label="promo")
+
+
 def test_list_asset_holder_accepts_catalog_asset_without_losing_order() -> None:
     graph = Graph()
     ShopItemType(label="medkit")
