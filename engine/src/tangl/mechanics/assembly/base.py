@@ -320,6 +320,7 @@ class ComponentManager(SlottedContainer[CT]):
 
     assignment_ids: dict[str, list[UUID]] = Field(default_factory=dict)
     _component_cache: dict[UUID, CT] = PrivateAttr(default_factory=dict)
+    _holder_labels: dict[str, dict[UUID, str]] = PrivateAttr(default_factory=dict)
 
     def bind_owner(self, owner: Any) -> "ComponentManager[CT]":
         self.owner = owner

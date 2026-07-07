@@ -15,6 +15,7 @@ from tangl.lang.body_parts import BodyRegion
 from tangl.mechanics.presence.outfit import (
     HasWardrobe,
     WARDROBE_SLOT,
+    WardrobeManager,
     build_wardrobe_dress_offer,
 )
 from tangl.mechanics.presence.look import HasOutfit
@@ -73,6 +74,20 @@ class TestWardrobeStorage:
         assert namespace["wardrobe"] is actor.wardrobe
         assert namespace["wardrobe_description"] == "shirt"
         assert namespace["wardrobe_tokens"] == ["shirt"]
+
+    def test_holder_labels_are_shared_across_fresh_wardrobe_views(self) -> None:
+        shirt_type = wearable_type("wardrobe_labeled_shirt", "shirt")
+        coat_type = wearable_type("wardrobe_labeled_coat", "coat")
+        manager = WardrobeManager()
+        shirt = Wearable(label="guide-shirt", token_from=shirt_type.label)
+        coat = Wearable(label="guide-coat", token_from=coat_type.label)
+
+        manager.holder().add_asset(shirt, label="favorite")
+        fresh_holder = manager.holder()
+
+        assert fresh_holder.get_asset("favorite") is shirt
+        with pytest.raises(ValueError, match="already contains key"):
+            fresh_holder.add_asset(coat, label="favorite")
 
     def test_graph_roundtrip_preserves_wardrobe_and_outfit_assignments_by_id(self) -> None:
         shirt_type = wearable_type("wardrobe_roundtrip_shirt", "shirt")

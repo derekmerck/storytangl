@@ -348,7 +348,6 @@ class ComponentSlotAssetHolder:
 
     manager: ComponentManager
     slot_name: str
-    _labels_by_uid: dict[UUID, str] = field(default_factory=dict)
     _removed_indices_by_uid: dict[UUID, int] = field(default_factory=dict)
 
     def _item_key(self, item: Entity, label: str | None = None) -> str:
@@ -358,10 +357,13 @@ class ComponentSlotAssetHolder:
         return key
 
     def _local_label(self, item: Entity) -> str | None:
-        return self._labels_by_uid.get(item.uid)
+        return self._slot_labels().get(item.uid)
 
     def _slot_ids(self) -> list[UUID]:
         return self.manager.assignment_ids.setdefault(self.slot_name, [])
+
+    def _slot_labels(self) -> dict[UUID, str]:
+        return self.manager._holder_labels.setdefault(self.slot_name, {})
 
     def _index_of(self, asset: Entity) -> int | None:
         for index, item in enumerate(self.manager.get_slot(self.slot_name)):
@@ -372,8 +374,9 @@ class ComponentSlotAssetHolder:
     def get_asset(self, label: str) -> Entity | None:
         if not label:
             return None
+        slot_labels = self._slot_labels()
         for item in self.manager.get_slot(self.slot_name):
-            if label == self._local_label(item):
+            if label == slot_labels.get(item.uid):
                 return item
             if label == item.get_label():
                 return item
@@ -423,7 +426,7 @@ class ComponentSlotAssetHolder:
                 slot_ids.remove(asset.uid)
                 slot_ids.insert(min(index, len(slot_ids)), asset.uid)
         if label is not None:
-            self._labels_by_uid[asset.uid] = label
+            self._slot_labels()[asset.uid] = label
 
     def remove_asset(self, asset: Entity | str) -> Entity:
         resolved = self.get_asset(asset) if isinstance(asset, str) else asset
@@ -435,7 +438,7 @@ class ComponentSlotAssetHolder:
             raise KeyError(f"Unknown component slot holder item: {key}")
         self._removed_indices_by_uid[resolved.uid] = index
         self.manager.unassign(self.slot_name, resolved)
-        self._labels_by_uid.pop(resolved.uid, None)
+        self._slot_labels().pop(resolved.uid, None)
         return resolved
 
     def has_asset(self, asset: Entity | str) -> bool:
