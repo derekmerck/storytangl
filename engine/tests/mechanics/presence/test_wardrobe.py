@@ -89,6 +89,16 @@ class TestWardrobeStorage:
         with pytest.raises(ValueError, match="already contains key"):
             fresh_holder.add_asset(coat, label="favorite")
 
+    def test_direct_unassign_clears_holder_label(self) -> None:
+        shirt_type = wearable_type("wardrobe_unassign_shirt", "shirt")
+        manager = WardrobeManager()
+        shirt = Wearable(label="guide-shirt", token_from=shirt_type.label)
+
+        manager.holder().add_asset(shirt, label="favorite")
+        manager.unassign(WARDROBE_SLOT, shirt)
+
+        assert manager._holder_labels.get(WARDROBE_SLOT) == {}
+
     def test_graph_roundtrip_preserves_wardrobe_and_outfit_assignments_by_id(self) -> None:
         shirt_type = wearable_type("wardrobe_roundtrip_shirt", "shirt")
         coat_type = wearable_type(
@@ -135,6 +145,17 @@ class TestWardrobeStorage:
 class TestWardrobeDressing:
     """Tests for transaction-backed dressing from wardrobe storage."""
 
+    def test_build_dress_offer_raises_for_unknown_wardrobe_item(self) -> None:
+        actor = WardrobeActor(label="guide")
+
+        with pytest.raises(ValueError, match="Wardrobe item not found"):
+            build_wardrobe_dress_offer(
+                wardrobe=actor.wardrobe,
+                outfit=actor.outfit,
+                wearable_key="missing-item",
+                slot_name="top_60",
+            )
+
     def test_dress_offer_moves_wearable_from_wardrobe_to_outfit(self) -> None:
         shirt_type = wearable_type("wardrobe_dress_shirt", "shirt")
         graph = Graph()
@@ -160,6 +181,21 @@ class TestWardrobeDressing:
         assert actor.wardrobe.get_slot(WARDROBE_SLOT) == []
         assert actor.outfit.get_slot("top_60") == [shirt]
         assert actor.describe_outfit() == "shirt"
+
+    def test_wardrobe_holder_rejects_cross_registry_wearable_during_preflight(
+        self,
+    ) -> None:
+        shirt_type = wearable_type("wardrobe_foreign_shirt", "shirt")
+        actor_graph = Graph()
+        foreign_graph = Graph()
+        actor = actor_graph.add_node(kind=WardrobeActor, label="guide")
+        shirt = foreign_graph.add_node(
+            kind=Wearable,
+            label="foreign-shirt",
+            token_from=shirt_type.label,
+        )
+
+        assert not actor.wardrobe.holder().can_receive_asset(shirt)
 
     def test_dress_offer_rejects_slot_incompatible_wearable(self) -> None:
         pants_type = wearable_type(

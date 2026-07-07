@@ -344,7 +344,11 @@ class ListAssetHolder:
 
 @dataclass
 class ComponentSlotAssetHolder:
-    """Expose one component-manager slot as a transaction asset holder."""
+    """Expose one component-manager slot as a transaction asset holder.
+
+    Holder labels are live transaction aliases, not constructor-form state.
+    Persist durable item identity through the manager's component UUIDs.
+    """
 
     manager: ComponentManager
     slot_name: str
@@ -409,6 +413,9 @@ class ComponentSlotAssetHolder:
         _ = giver
         if self.has_asset(asset):
             return True
+        can_accept_registry, _reason = self.manager.can_accept_component_registry(asset)
+        if not can_accept_registry:
+            return False
         can_assign, _reason = self.manager.can_assign(self.slot_name, asset)
         return can_assign
 
@@ -423,6 +430,8 @@ class ComponentSlotAssetHolder:
             index = self._removed_indices_by_uid.pop(asset.uid, None)
             if index is not None:
                 slot_ids = self._slot_ids()
+                if asset.uid not in slot_ids:
+                    raise ValueError("Component slot assignment did not record asset UID")
                 slot_ids.remove(asset.uid)
                 slot_ids.insert(min(index, len(slot_ids)), asset.uid)
         if label is not None:

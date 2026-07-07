@@ -218,6 +218,8 @@ def build_wardrobe_dress_offer(
     if wearable is None:
         raise ValueError(f"Wardrobe item not found: {wearable_key}")
 
+    # Move first, then assign, so ComponentAssignmentCommitment can run
+    # outfit-wide validation and rollback the wardrobe move if it fails.
     worn = ListAssetHolder([])
     commitments: list[TransactionCommitment] = [
         AssetMoveCommitment(
@@ -242,9 +244,9 @@ def build_wardrobe_dress_offer(
 
 
 __all__ = [
+    "WARDROBE_SLOT",
     "HasWardrobe",
     "OutfitManager",
-    "WARDROBE_SLOT",
     "WardrobeManager",
     "build_wardrobe_dress_offer",
 ]
