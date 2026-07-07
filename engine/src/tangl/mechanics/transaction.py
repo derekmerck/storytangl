@@ -342,6 +342,123 @@ class ListAssetHolder:
         return any(item is asset for item in self.items)
 
 
+@dataclass
+class ComponentSlotAssetHolder:
+    """Expose one component-manager slot as a transaction asset holder.
+
+    Holder labels are live transaction aliases, not constructor-form state.
+    Persist durable item identity through the manager's component UUIDs.
+    """
+
+    manager: ComponentManager
+    slot_name: str
+    _removed_indices_by_uid: dict[UUID, int] = field(default_factory=dict)
+
+    def _item_key(self, item: Entity, label: str | None = None) -> str:
+        key = _asset_holder_key(item, label)
+        if key is None:
+            raise ValueError("Component slot holder item requires a label")
+        return key
+
+    def _local_label(self, item: Entity) -> str | None:
+        return self._slot_labels().get(item.uid)
+
+    def _slot_ids(self) -> list[UUID]:
+        return self.manager.assignment_ids.setdefault(self.slot_name, [])
+
+    def _slot_labels(self) -> dict[UUID, str]:
+        return self.manager._holder_labels.setdefault(self.slot_name, {})
+
+    def _index_of(self, asset: Entity) -> int | None:
+        for index, item in enumerate(self.manager.get_slot(self.slot_name)):
+            if item is asset:
+                return index
+        return None
+
+    def get_asset(self, label: str) -> Entity | None:
+        if not label:
+            return None
+        slot_labels = self._slot_labels()
+        for item in self.manager.get_slot(self.slot_name):
+            if label == slot_labels.get(item.uid):
+                return item
+            if label == item.get_label():
+                return item
+            if isinstance(item, Token) and label == item.token_from:
+                return item
+        return None
+
+    def get_asset_key(self, asset: Entity | str) -> str | None:
+        resolved = self.get_asset(asset) if isinstance(asset, str) else asset
+        if resolved is None or not self.has_asset(resolved):
+            return None
+        local = self._local_label(resolved)
+        if local is not None:
+            return local
+        return _asset_holder_key(resolved)
+
+    def can_give_asset(
+        self,
+        asset: Entity,
+        receiver: object | None = None,
+    ) -> bool:
+        _ = receiver
+        return self.has_asset(asset)
+
+    def can_receive_asset(
+        self,
+        asset: Entity,
+        giver: object | None = None,
+    ) -> bool:
+        _ = giver
+        if self.has_asset(asset):
+            return True
+        can_accept_registry, _reason = self.manager.can_accept_component_registry(asset)
+        if not can_accept_registry:
+            return False
+        can_assign, _reason = self.manager.can_assign(self.slot_name, asset)
+        return can_assign
+
+    def add_asset(self, asset: Entity, *, label: str | None = None) -> None:
+        key = self._item_key(asset, label)
+        existing = self.get_asset(key)
+        if existing is not None and existing is not asset:
+            raise ValueError(f"Component slot holder already contains key: {key}")
+
+        if self._index_of(asset) is None:
+            self.manager.assign(self.slot_name, asset)
+            index = self._removed_indices_by_uid.pop(asset.uid, None)
+            if index is not None:
+                slot_ids = self._slot_ids()
+                if asset.uid not in slot_ids:
+                    raise ValueError("Component slot assignment did not record asset UID")
+                slot_ids.remove(asset.uid)
+                slot_ids.insert(min(index, len(slot_ids)), asset.uid)
+        if label is not None:
+            self._slot_labels()[asset.uid] = label
+
+    def remove_asset(self, asset: Entity | str) -> Entity:
+        resolved = self.get_asset(asset) if isinstance(asset, str) else asset
+        if resolved is None:
+            raise KeyError(asset)
+        index = self._index_of(resolved)
+        if index is None:
+            key = resolved.get_label() or repr(resolved)
+            raise KeyError(f"Unknown component slot holder item: {key}")
+        self._removed_indices_by_uid[resolved.uid] = index
+        self.manager.unassign(self.slot_name, resolved)
+        self._slot_labels().pop(resolved.uid, None)
+        return resolved
+
+    def has_asset(self, asset: Entity | str) -> bool:
+        if isinstance(asset, str):
+            return self.get_asset(asset) is not None
+        return any(item is asset for item in self.manager.get_slot(self.slot_name))
+
+    def all_items(self) -> list[Entity]:
+        return list(self.manager.get_slot(self.slot_name))
+
+
 class StatLike(Protocol):
     """Minimal stat surface for transaction-backed stat deltas."""
 
@@ -1054,6 +1171,7 @@ __all__ = [
     "CallbackCommitment",
     "CatalogAssetCommitment",
     "ComponentAssignmentCommitment",
+    "ComponentSlotAssetHolder",
     "CountableHolder",
     "CountableTransferCommitment",
     "ListAssetHolder",
