@@ -10,6 +10,9 @@ with carrier/bearer binding — that the credentials checkpoint **game**
 - `tangl.mechanics.games.CREDENTIALS_LOOP_DESIGN.md` — the *game* layer (roster
   shift, restriction map, disposition derivation, mediation). This note is its
   global-mechanic counterpart; the game points *up* to here.
+- `CREDENTIAL_ASSEMBLY_RETROFIT.md` — the migration plan for turning the current
+  game-layer packet-manager bridge into the shared assembly/component-manager
+  pattern.
 - `tangl.media.MEDIA_DESIGN.md` — the spec→adapt→create→provision pipeline this
   builds on.
 - `tangl.mechanics.presence` (`look/look.py`) — the bearer-portrait projection
