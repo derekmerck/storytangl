@@ -126,12 +126,12 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
     def unstructure(self) -> UnstructuredData:
         data = super().unstructure()
         if self.region is not Region.LOCAL:
-            data["region"] = self.region
+            data["region"] = self.region.value
         if self.purpose is not Indication.TRAVEL:
-            data["purpose"] = self.purpose
+            data["purpose"] = self.purpose.value
         if self.possessions:
             data["possessions"] = [
-                possession.model_dump(exclude_defaults=True)
+                possession.model_dump(mode="json", exclude_defaults=True)
                 for possession in self.possessions
             ]
         return data

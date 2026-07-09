@@ -32,6 +32,8 @@ from tangl.mechanics.games.credentials_game import (
     CredentialsGameHandler,
     derive_disposition,
 )
+from tangl.mechanics.games.credentials_roster import ScenarioOffer
+from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.story import Block
 
 D = CredentialDisposition
@@ -187,6 +189,26 @@ def test_packet_manager_keeps_contraband_value_shaped_for_now() -> None:
     assert derive_disposition(manager, LOCAL_RULES) is D.DENY
 
 
+def test_packet_manager_custom_unstructure_is_json_safe() -> None:
+    manager = AssemblyCredentialPacketManager(
+        region=Region.FOREIGN_EAST,
+        purpose=IND.WORK,
+        possessions=[ContrabandItem(indication=IND.DRUGS)],
+    )
+
+    payload = JsonSerializationHandler.deserialize(
+        JsonSerializationHandler.serialize(manager.unstructure())
+    )
+    restored = AssemblyCredentialPacketManager.structure(payload)
+
+    assert payload["region"] == Region.FOREIGN_EAST.value
+    assert payload["purpose"] == IND.WORK.value
+    assert payload["possessions"] == [{"indication": IND.DRUGS.value}]
+    assert restored.get_region() is Region.FOREIGN_EAST
+    assert restored.get_purpose() is IND.WORK
+    assert restored.get_contraband() == [ContrabandItem(indication=IND.DRUGS)]
+
+
 def test_packet_manager_graph_roundtrip_preserves_credential_assignments_by_id() -> None:
     id_definition = credential_definition(
         "roundtrip_id",
@@ -270,3 +292,48 @@ def test_has_game_block_binds_roster_packet_manager_to_graph_owner() -> None:
     assert restored_manager.owner is block
     assert restored_manager.get_slot(CREDENTIAL_ID_SLOT) == [id_card]
     assert restored_manager.get_slot(CREDENTIAL_PACKET_SLOT) == [work_permit]
+
+
+def test_has_game_model_validate_binds_roster_packet_manager_to_restored_owner() -> None:
+    manager = AssemblyCredentialPacketManager(purpose=IND.WORK)
+    block = CredentialsBlock(label="checkpoint")
+    block._game = CredentialsGame(
+        roster=[CredentialCase(candidate_name="Mara", packet_manager=manager)],
+        restriction_map=LOCAL_RULES,
+    )
+
+    restored = CredentialsBlock.model_validate(block.model_dump())
+    restored_manager = restored.game.roster[0].packet_manager
+
+    assert restored_manager is not None
+    assert restored_manager.owner is restored
+
+
+def test_has_game_binds_pinned_offer_packet_manager_before_materialization() -> None:
+    id_definition = credential_definition(
+        "pinned_id",
+        IND.TRAVEL,
+        document_kind="id",
+    )
+    graph = Graph()
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+    id_card = graph.add_node(
+        kind=CredentialComponent,
+        label="pinned-id",
+        token_from=id_definition.label,
+    )
+    manager = AssemblyCredentialPacketManager(purpose=IND.TRAVEL)
+    manager.assign(CREDENTIAL_ID_SLOT, id_card)
+    pinned_case = CredentialCase(candidate_name="Pinned", packet_manager=manager)
+    block._game = CredentialsGame(
+        offers=[ScenarioOffer(candidate_name="Pinned", pinned_case=pinned_case)],
+        restriction_map=LOCAL_RULES,
+    )
+
+    active_case = block.game.active_case
+    restored_manager = active_case.packet_manager
+
+    assert active_case is pinned_case
+    assert restored_manager is manager
+    assert restored_manager.owner is block
+    assert restored_manager.get_slot(CREDENTIAL_ID_SLOT) == [id_card]

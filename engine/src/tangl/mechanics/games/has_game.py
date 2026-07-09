@@ -94,9 +94,7 @@ class HasGame:
 
         if self._game is None:
             return
-        bind_component_managers = getattr(self._game, "bind_component_managers", None)
-        if callable(bind_component_managers):
-            bind_component_managers(self)
+        self._game.bind_component_managers(self)
 
     @classmethod
     def create_game_block(

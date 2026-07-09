@@ -127,6 +127,11 @@ class Game(Entity, Generic[Move]):
         default=None,
         json_schema_extra={"reset_field": True}
     )
+
+    def bind_component_managers(self, owner: object) -> None:
+        """Bind embedded component managers to their graph owner, if any."""
+
+        _ = owner
     
     # ─────────────────────────────────────────────────────────────────────
     # State accessors

@@ -419,6 +419,15 @@ class ComponentManager(SlottedContainer[CT]):
         _ = _ctx
         payload = dict(data)
         cls_ = payload.pop("kind", cls)
+        if isinstance(cls_, str):
+            if cls_ in {
+                cls.__name__,
+                cls.__qualname__,
+                f"{cls.__module__}.{cls.__name__}",
+            }:
+                cls_ = cls
+            else:
+                cls_ = Entity.dereference_cls_name(cls_) or cls_
         if not isclass(cls_) or not issubclass(cls_, cls):
             raise TypeError(f"Expected a subclass of {cls.__name__}, got {cls_!r}")
         return cls_(**payload)

@@ -14,10 +14,10 @@ existing disposition protocol. Factory/materialization, move facets, expression
 narrative, contraband graph identity, and status decomposition remain future
 slices.
 
-**Assumption:** the owner-bound manager and wardrobe transaction work has landed:
-`ComponentManager` stores graph-member assignments by UUID, embedded managers
-serialize with their owner, and component-manager slots can participate in
-transaction offers through a holder adapter.
+**Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
+storage and offer semantics this retrofit relies on: `ComponentManager` stores
+graph-member assignments by UUID, embedded managers serialize with their owner, and
+component-manager slots can participate in transaction offers through a holder adapter.
 
 **Related docs:**
 

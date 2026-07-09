@@ -16,7 +16,7 @@ import uuid
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, Protocol
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 if TYPE_CHECKING:
     from .credentials_roster import ScenarioOffer
@@ -713,14 +713,19 @@ class CredentialsGame(PickingGame):
         default_factory=list,
         json_schema_extra={"reset_field": True},
     )
+    _component_manager_owner: object | None = PrivateAttr(default=None)
 
     def bind_component_managers(self, owner: object) -> None:
         """Bind assembly packet managers in already materialized cases to ``owner``."""
 
+        self._component_manager_owner = owner
         for case in self.roster:
             case.bind_packet_manager_owner(owner)
         for case in self.materialized:
             case.bind_packet_manager_owner(owner)
+        for offer in self.offers:
+            if offer.pinned_case is not None:
+                offer.pinned_case.bind_packet_manager_owner(owner)
 
     # ----- active case access ----------------------------------------------
     def _total_cases(self) -> int:
@@ -737,7 +742,10 @@ class CredentialsGame(PickingGame):
 
         while len(self.materialized) <= self.case_index:
             offer = self.offers[len(self.materialized)]
-            self.materialized.append(materialize(offer, self.restriction_map))
+            case = materialize(offer, self.restriction_map)
+            if self._component_manager_owner is not None:
+                case.bind_packet_manager_owner(self._component_manager_owner)
+            self.materialized.append(case)
         return self.materialized[self.case_index]
 
     @property

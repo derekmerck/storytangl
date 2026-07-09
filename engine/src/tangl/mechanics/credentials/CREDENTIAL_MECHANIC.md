@@ -319,21 +319,23 @@ worth naming, not worth gating the media work on.
 
 ### Assembly compatibility step already landed
 
-The shared credentials package now owns the credential domain vocabulary and an
-assembly-backed packet path. The live game package still exposes its
-value-object `CredentialPacketManager` adapter, but `CredentialCase` can now also
-carry `tangl.mechanics.credentials.CredentialPacketManager`, an owner-bound
-manager over graph credential components. Both paths answer the same discovery
-surface used by disposition derivation, so the current roster/game/demo data
-keeps working while graph-backed packet identity can be adopted incrementally.
+The shared credentials package now owns the credential domain vocabulary and the
+canonical assembly-backed packet path. The live game package still exposes its
+value-object `CredentialPacketManager` compatibility adapter, while `CredentialCase`
+can now also carry `tangl.mechanics.credentials.CredentialPacketManager`, an
+owner-bound manager over graph credential components. During the transition both paths
+answer the same discovery surface used by disposition derivation, so the current
+roster/game/demo data keeps working while graph-backed packet identity is adopted
+incrementally.
 
 This is still not the full credential mechanic described above: document/media
 projection has not landed, presence-snapshot holder binding is not implemented,
 contraband remains value-shaped, and `credential_gate` remains the reference
 consumer rather than a retrofit target. It does establish the retirement path for
-the current game-local implementation: future packets should either embed value
-credentials deliberately or store graph-token credentials by id through the same
-owner-bound manager pattern used by outfits, vehicles, and connector groups.
+the current game-local implementation: future canonical packets should store
+graph-token credentials by id through the same owner-bound manager pattern used by
+outfits, vehicles, and connector groups, while value credentials remain a deliberate
+compatibility or lightweight-data choice.
 
 0. **(Media-layer prerequisite, separate track.)** A minimal **RIT registry +
    composition-strategy** surface, replacing the legacy `svg_forge`/`raster_forge`
