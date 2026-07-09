@@ -317,21 +317,23 @@ worth naming, not worth gating the media work on.
 
 ## 7 · Staged plan (media spec is the forcing function)
 
-### Compatibility step already landed
+### Assembly compatibility step already landed
 
-The live game package now exposes `CredentialPacketManager`, a value-object
-packet adapter that carries region, purpose, id card, credentials, and
-possessions behind the same discovery surface used by disposition derivation.
-`CredentialCase` projects to that manager, so the current roster/game/demo data
-keeps working while the core logic no longer depends on the case's flat fields.
+The shared credentials package now owns the credential domain vocabulary and an
+assembly-backed packet path. The live game package still exposes its
+value-object `CredentialPacketManager` adapter, but `CredentialCase` can now also
+carry `tangl.mechanics.credentials.CredentialPacketManager`, an owner-bound
+manager over graph credential components. Both paths answer the same discovery
+surface used by disposition derivation, so the current roster/game/demo data
+keeps working while graph-backed packet identity can be adopted incrementally.
 
-This is not yet the global credential mechanic described above: no credential
-tokens have been promoted to graph members, no document/media projection has
-landed, and `credential_gate` remains the reference consumer rather than a
-retrofit target. It does establish the retirement path for the current game-local
-implementation: future packets should either embed value credentials deliberately
-or store graph-token credentials by id through the same owner-bound manager
-pattern used by outfits, vehicles, and connector groups.
+This is still not the full credential mechanic described above: document/media
+projection has not landed, presence-snapshot holder binding is not implemented,
+contraband remains value-shaped, and `credential_gate` remains the reference
+consumer rather than a retrofit target. It does establish the retirement path for
+the current game-local implementation: future packets should either embed value
+credentials deliberately or store graph-token credentials by id through the same
+owner-bound manager pattern used by outfits, vehicles, and connector groups.
 
 0. **(Media-layer prerequisite, separate track.)** A minimal **RIT registry +
    composition-strategy** surface, replacing the legacy `svg_forge`/`raster_forge`
@@ -343,9 +345,10 @@ pattern used by outfits, vehicles, and connector groups.
    and calls presence's `adapt_look_media_spec(media_role="id_photo")` for the
    bearer portrait. The genuine *second consumer* of the credential primitives and
    the *simplest consumer* of the composition framework.
-2. **Extract primitives** (`Credential`, `Document`, carrier binding) from
-   `games/credentials_enums.py` into `tangl.mechanics.credentials` — justified by
-   that second consumer, not on spec.
+2. **Extract primitives** (`Credential`, `Document`, carrier binding) into
+   `tangl.mechanics.credentials` — partially landed for the current enum/value
+   vocabulary and assembly packet proof. Carrier binding still waits on the
+   presence-snapshot surface.
 3. **Re-point the game** at the promoted primitives; the game adds its overrides
    (regions, seals, permits).
 4. **Default assets** land alongside (1) so the projection is provable from day

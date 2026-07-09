@@ -7,9 +7,12 @@
 :related: component, provision, vm, media
 ```
 
-**Status:** DESIGN / REVIEW DRAFT. This note proposes the migration path from the
-current credentials-game packet adapter to the shared assembly/component-manager
-framework. It is intentionally a plan, not an implementation slice.
+**Status:** PARTIALLY IMPLEMENTED. The first retrofit slice landed the global
+credentials domain import surface, graph-backed credential components, an
+owner-bound assembly packet manager, and a `CredentialCase` bridge behind the
+existing disposition protocol. Factory/materialization, move facets, expression
+narrative, contraband graph identity, and status decomposition remain future
+slices.
 
 **Assumption:** the owner-bound manager and wardrobe transaction work has landed:
 `ComponentManager` stores graph-member assignments by UUID, embedded managers
@@ -41,10 +44,24 @@ newer assembly pattern:
 - credentials today: packet-shaped value object over embedded `CredentialToken`
   values.
 
-The retrofit should make credentials another assembly specialization without losing
-the existing game semantics: credential instances are tokens, the packet is an
+The retrofit makes credentials another assembly specialization without losing the
+existing game semantics: credential instances are tokens, the packet is an
 owner-bound manager, and disposition derivation reads the packet through the same
 small protocol it already uses.
+
+Current implementation checkpoint:
+
+- `tangl.mechanics.credentials.domain` owns the credential enums/value types, while
+  `tangl.mechanics.games.credentials_enums` remains a compatibility re-export.
+- `CredentialDefinition` / `CredentialComponent` provide graph credential tokens
+  that project to the legacy `CredentialToken` value shape.
+- `tangl.mechanics.credentials.CredentialPacketManager` is the assembly-backed
+  manager. The older `tangl.mechanics.games.CredentialPacketManager` remains the
+  value-object adapter for flat legacy cases.
+- `CredentialCase.packet_manager` is optional; when present, case discovery methods
+  delegate to it. Otherwise the legacy flat fields remain authoritative.
+- `HasGame.game` asks hosted games to bind embedded component managers to the block
+  when the game exposes `bind_component_managers(owner)`.
 
 ---
 
@@ -259,7 +276,7 @@ receipt data.
 
 ### Phase 0: Characterize Current Contracts
 
-Add or confirm tests around the current protocol:
+Status: landed. Tests confirm the current protocol:
 
 - `derive_disposition()` accepts both `CredentialCase` and `CredentialPacketManager`;
 - `CredentialCase.to_packet_manager()` preserves region, purpose, id status,
@@ -267,28 +284,33 @@ Add or confirm tests around the current protocol:
 - generated cases still derive to their sampled target disposition;
 - `credential_gate` widget flow remains unchanged.
 
-No model changes in this phase.
+No gameplay model changes were required.
 
 ### Phase 1: Move Domain Types To Global Credentials Package
 
-Create global mechanics types under `tangl.mechanics.credentials` and re-export from
-the game layer during the transition:
+Status: landed as the global import surface under `tangl.mechanics.credentials`, with
+game-layer compatibility re-exports during the transition:
 
 - `Region`, `Indication`, `RestrictionLevel`, `Restrictions`;
 - `CredentialStatus`, `FailureMode`, `FailureClass`;
 - `CredentialToken` compatibility type, if still needed;
-- `CredentialPacketProtocol`.
+- `CredentialPacketProtocol` remains game-local until the game loop is no longer the
+  only protocol consumer.
 
 Goal: break the assumption that credentials are a game-only vocabulary.
 
 ### Phase 2: Add Graph Credential Components
 
-Introduce graph-member credential components without changing the game loop:
+Status: landed without changing the game loop:
 
-- `CredentialType` / definition singleton;
-- `CredentialComponent(Component)` or token wrapper with equivalent facet API;
-- fields equivalent to current `CredentialToken`;
-- helper constructors to convert current value tokens into graph components.
+- `CredentialDefinition` definition singleton;
+- `CredentialComponent` graph token wrapper;
+- fields equivalent to current `CredentialToken` for indication, status,
+  `requires_id`, and holder-match compatibility.
+
+Presence snapshots and derived holder matching are intentionally not implemented in
+this slice. `holder_matches` remains compatibility state until the presence binding
+surface exists.
 
 Acceptance:
 
@@ -298,8 +320,8 @@ Acceptance:
 
 ### Phase 3: Add Owner-Bound Credential Packet Manager
 
-Implement `CredentialPacketManager(ComponentManager[CredentialComponent])` in the
-global credentials package.
+Status: landed as `tangl.mechanics.credentials.CredentialPacketManager`, distinct from
+the legacy value-object adapter exported by `tangl.mechanics.games`.
 
 The manager should:
 
@@ -318,8 +340,8 @@ Acceptance:
 
 ### Phase 4: Bridge `CredentialCase`
 
-Allow `CredentialCase` to carry the new manager while retaining flat fields as
-compatibility inputs.
+Status: landed. `CredentialCase` can carry the new manager while retaining flat fields
+as compatibility inputs.
 
 Recommended temporary shape:
 
@@ -339,7 +361,10 @@ Acceptance:
 
 - current tests remain green;
 - packet-manager identity is stable across repeated property/protocol access;
-- no behavior change in `credential_gate`.
+- no behavior change in `credential_gate`;
+- graph round-trip is proven for normal graph owners with embedded packet managers;
+- `HasGame` binds roster/materialized packet managers to the live block owner on game
+  access, without changing the broader `HasGame` private-game persistence path.
 
 ### Phase 5: Retrofit Factory And Roster Materialization
 

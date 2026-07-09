@@ -32,6 +32,9 @@ from tangl.journal.fragments import (
     PieceFragment,
     PresentationHints,
 )
+from tangl.mechanics.credentials.assembly import (
+    CredentialPacketManager as AssemblyCredentialPacketManager,
+)
 
 from .credentials_enums import (
     DEFAULT_RESTRICTIONS,
@@ -241,6 +244,10 @@ class CredentialCase(BaseModelPlus):
     id_card: CredentialToken | None = None
     packet: list[CredentialToken] = Field(default_factory=list)
     possessions: list[ContrabandItem] = Field(default_factory=list)
+    packet_manager: AssemblyCredentialPacketManager | None = Field(
+        default=None,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
     # Authored override; None means "derive from the rules".
     correct_disposition: CredentialDisposition | None = None
@@ -254,7 +261,15 @@ class CredentialCase(BaseModelPlus):
     # The only surface the game loop and derive_disposition may use to ask the
     # packet about its content, declared intent, and validity.
 
-    def to_packet_manager(self) -> CredentialPacketManager:
+    def bind_packet_manager_owner(self, owner: object) -> None:
+        """Bind any owned assembly packet manager to its graph registry anchor."""
+
+        if self.packet_manager is not None:
+            self.packet_manager.bind_owner(owner)
+
+    def to_packet_manager(self) -> CredentialPacketProtocol:
+        if self.packet_manager is not None:
+            return self.packet_manager
         return CredentialPacketManager(
             region=self.region,
             purpose=self.purpose,
@@ -264,25 +279,37 @@ class CredentialCase(BaseModelPlus):
         )
 
     def get_region(self) -> Region:
+        if self.packet_manager is not None:
+            return self.packet_manager.get_region()
         return self.region
 
     def get_purpose(self) -> Indication:
+        if self.packet_manager is not None:
+            return self.packet_manager.get_purpose()
         return self.purpose
 
     def id_status(self) -> CredentialStatus | None:
         """Status of the bearer id, or ``None`` if no id was presented."""
 
+        if self.packet_manager is not None:
+            return self.packet_manager.id_status()
         return self.id_card.status if self.id_card is not None else None
 
     def credential_for(self, indication: Indication) -> CredentialToken | None:
         """The presented credential satisfying ``indication``, if any."""
 
+        if self.packet_manager is not None:
+            return self.packet_manager.credential_for(indication)
         return next((c for c in self.packet if c.indication is indication), None)
 
     def get_contraband(self) -> list[ContrabandItem]:
+        if self.packet_manager is not None:
+            return self.packet_manager.get_contraband()
         return list(self.possessions)
 
     def all_credentials(self) -> list[CredentialToken]:
+        if self.packet_manager is not None:
+            return self.packet_manager.all_credentials()
         if self.id_card is None:
             return list(self.packet)
         return [self.id_card, *self.packet]
@@ -686,6 +713,14 @@ class CredentialsGame(PickingGame):
         default_factory=list,
         json_schema_extra={"reset_field": True},
     )
+
+    def bind_component_managers(self, owner: object) -> None:
+        """Bind assembly packet managers in already materialized cases to ``owner``."""
+
+        for case in self.roster:
+            case.bind_packet_manager_owner(owner)
+        for case in self.materialized:
+            case.bind_packet_manager_owner(owner)
 
     # ----- active case access ----------------------------------------------
     def _total_cases(self) -> int:
