@@ -8,7 +8,6 @@ from pydantic import Field
 
 from tangl.core import Singleton, Token
 from tangl.mechanics.assembly import ComponentManager, Slot
-from tangl.type_hints import UnstructuredData
 
 from .domain import (
     ContrabandItem,
@@ -87,7 +86,10 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
 
     region: Region = Region.LOCAL
     purpose: Indication = Indication.TRAVEL
-    possessions: list[ContrabandItem] = Field(default_factory=list)
+    possessions: list[ContrabandItem] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True},
+    )
 
     def get_region(self) -> Region:
         return self.region
@@ -122,19 +124,6 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
     def _id_component(self) -> CredentialComponent | None:
         components = self.get_slot(CREDENTIAL_ID_SLOT)
         return components[0] if components else None
-
-    def unstructure(self) -> UnstructuredData:
-        data = super().unstructure()
-        if self.region is not Region.LOCAL:
-            data["region"] = self.region.value
-        if self.purpose is not Indication.TRAVEL:
-            data["purpose"] = self.purpose.value
-        if self.possessions:
-            data["possessions"] = [
-                possession.model_dump(mode="json", exclude_defaults=True)
-                for possession in self.possessions
-            ]
-        return data
 
 
 __all__ = [

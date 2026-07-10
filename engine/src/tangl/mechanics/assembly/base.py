@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from tangl.core import Entity, Selector
+from tangl.core.bases import Unstructurable
 from tangl.type_hints import Tag, UnstructuredData
 from .budget import BudgetTracker
 from .component import Component, ComponentFacet
@@ -39,7 +40,10 @@ class SlottedContainer(BaseModel, Generic[CT]):
     tracked_resources: ClassVar[list[str]] = []
 
     assignments: dict[str, list[CT]] = Field(default_factory=lambda: defaultdict(list))
-    budgets: Optional[BudgetTracker] = None
+    budgets: Optional[BudgetTracker] = Field(
+        default=None,
+        json_schema_extra={"include": True},
+    )
     owner: Any = Field(default=None, exclude=True)
 
     def _slot_names(self) -> list[str]:
@@ -315,10 +319,17 @@ class SlottedContainer(BaseModel, Generic[CT]):
         return len(self.validate()) == 0
 
 
-class ComponentManager(SlottedContainer[CT]):
+class ComponentManager(Unstructurable, SlottedContainer[CT], Generic[CT]):
     """Owner-bound slotted manager that persists graph-member assignments by UUID."""
 
-    assignment_ids: dict[str, list[UUID]] = Field(default_factory=dict)
+    assignments: dict[str, list[CT]] = Field(
+        default_factory=lambda: defaultdict(list),
+        exclude=True,
+    )
+    assignment_ids: dict[str, list[UUID]] = Field(
+        default_factory=dict,
+        json_schema_extra={"include": True},
+    )
     _component_cache: dict[UUID, CT] = PrivateAttr(default_factory=dict)
     _holder_labels: dict[str, dict[UUID, str]] = PrivateAttr(default_factory=dict)
 
@@ -405,14 +416,6 @@ class ComponentManager(SlottedContainer[CT]):
             self._component_cache.pop(component.uid, None)
         self._holder_labels.get(slot_name, {}).pop(component.uid, None)
         return True
-
-    def unstructure(self) -> UnstructuredData:
-        data: UnstructuredData = {"kind": self.__class__}
-        if self.assignment_ids:
-            data["assignment_ids"] = self.assignment_ids
-        if self.budgets is not None:
-            data["budgets"] = self.budgets.model_dump(exclude_defaults=True)
-        return data
 
     @classmethod
     def structure(cls, data: UnstructuredData, _ctx: Any = None) -> "ComponentManager[CT]":

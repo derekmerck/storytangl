@@ -189,7 +189,7 @@ def test_packet_manager_keeps_contraband_value_shaped_for_now() -> None:
     assert derive_disposition(manager, LOCAL_RULES) is D.DENY
 
 
-def test_packet_manager_custom_unstructure_is_json_safe() -> None:
+def test_packet_manager_constructor_form_is_json_safe() -> None:
     manager = AssemblyCredentialPacketManager(
         region=Region.FOREIGN_EAST,
         purpose=IND.WORK,
