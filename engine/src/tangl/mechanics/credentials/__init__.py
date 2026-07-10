@@ -1,8 +1,14 @@
-"""Compatibility re-exports for credentials domain vocabulary."""
+"""Credential mechanics shared by games, assembly, and future transactions."""
 
-from __future__ import annotations
-
-from tangl.mechanics.credentials.domain import (
+from .assembly import (
+    CREDENTIAL_ID_SLOT,
+    CREDENTIAL_PACKET_SLOT,
+    CredentialComponent,
+    CredentialComponentToken,
+    CredentialDefinition,
+    CredentialPacketManager,
+)
+from .domain import (
     COMMON_ALLIED_RESTRICTIONS,
     COMMON_HOSTILE_RESTRICTIONS,
     COMMON_LOCAL_RESTRICTIONS,
@@ -27,6 +33,12 @@ __all__ = [
     "COMMON_HOSTILE_RESTRICTIONS",
     "COMMON_LOCAL_RESTRICTIONS",
     "CONTRABAND",
+    "CREDENTIAL_ID_SLOT",
+    "CREDENTIAL_PACKET_SLOT",
+    "CredentialComponent",
+    "CredentialComponentToken",
+    "CredentialDefinition",
+    "CredentialPacketManager",
     "CredentialStatus",
     "CredentialToken",
     "ContrabandItem",

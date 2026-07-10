@@ -33,7 +33,9 @@ validation, budget, and facet-discovery APIs:
 - `ComponentManager[CT]` is the owner-bound graph-aware specialization. It is embedded
   on a full graph member, persists with that owner, stores slot membership as component
   UUIDs, and dereferences those UUIDs through the owner's registry. Its `owner` pointer
-  and transient construction cache are not constructor-form data.
+  live `assignments` view, and transient construction cache are not constructor-form
+  data. Manager subclasses use the normal constructor-form path for local value fields;
+  graph-member component relationships are the `assignment_ids` reference map.
 
 This is the intended middle between "full graph member" and "plain Pydantic blob":
 components remain full graph members when they need graph identity; embedded managers

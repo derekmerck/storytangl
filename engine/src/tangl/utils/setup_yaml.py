@@ -1,3 +1,4 @@
+from enum import Enum
 from uuid import UUID
 
 import yaml
@@ -21,3 +22,8 @@ def string_representer(dumper, data):
     return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
 yaml.add_representer(str, string_representer)
+
+def enum_representer(dumper, data):
+    return dumper.represent_data(data.value)
+
+yaml.add_multi_representer(Enum, enum_representer)

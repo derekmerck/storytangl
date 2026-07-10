@@ -59,6 +59,7 @@ class HasGame:
 
         if self._game is None:
             self._game = self._game_class()
+        self._bind_game_component_managers()
         return self._game
 
     @property
@@ -85,7 +86,15 @@ class HasGame:
         if "_game" in obj:
             game_data = obj["_game"]
             instance._game = instance._game_class.model_validate(game_data)
+            instance._bind_game_component_managers()
         return instance
+
+    def _bind_game_component_managers(self) -> None:
+        """Let game state bind embedded component managers to this graph owner."""
+
+        if self._game is None:
+            return
+        self._game.bind_component_managers(self)
 
     @classmethod
     def create_game_block(

@@ -2,13 +2,14 @@
 This is the ONLY place that should be flattening/unflattening data.
 """
 
-from typing import Protocol, ClassVar
-import pickle
-import json
-from datetime import datetime
-from uuid import UUID
+from enum import Enum
 import inspect
+import json
+import pickle
+from datetime import datetime
 import types
+from typing import ClassVar, Protocol
+from uuid import UUID
 
 try:
     from bson import BSON
@@ -86,6 +87,8 @@ class JsonSerializationHandler:
                 return o.__name__
             elif isinstance(o, datetime):
                 return o.isoformat()
+            elif isinstance(o, Enum):
+                return o.value
             elif isinstance(o, UUID):
                 return o.hex
             elif isinstance(o, (bytes, bytearray, memoryview)):
@@ -158,6 +161,8 @@ class BsonSerializationHandler:
         # Check if the value is a class encode it by name
         if inspect.isclass(value):
             return value.__name__
+        if isinstance(value, Enum):
+            return value.value
         return value
 
     bson_codec_options: ClassVar = CodecOptions(
