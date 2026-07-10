@@ -63,6 +63,30 @@ Current implementation checkpoint:
 - `HasGame.game` asks hosted games to bind embedded component managers to the block
   when the game exposes `bind_component_managers(owner)`.
 
+## Resolved Review Constraints
+
+The first retrofit slice deliberately stops before graph-backed packets drive the
+game loop. Later slices must preserve these constraints:
+
+- **Disclosure discipline:** contribute moves from visible document existence, never
+  hidden validity; disclose validity only when a committed move resolves.
+- **Packet authority:** a case either owns an assembly packet manager as its write
+  target or projects a fresh compatibility adapter from authoritative flat fields.
+  A cached projection must not silently become authoritative.
+- **Phase purity:** graph-backed case materialization and registry writes happen at
+  setup or an UPDATE boundary, not on the first PLANNING read.
+- **State scope:** durable document facts belong on credential components;
+  encounter-scoped findings remain on the game and reset with the case.
+- **Facet adoption:** components contribute data and the credentials game handler
+  remains the choice factory, responsible for availability, time cost, off-menu
+  validation, and committed resolution. Components do not register dispatch behavior.
+- **Replay and provenance:** moving mutable facts outside the game model requires an
+  explicit graph/replay test. Prefer one document identity across the component,
+  projected piece, receipt, and journal provenance when that projection is adopted.
+- **Narrative projection:** authored `presented_documents` and `hidden_facts` remain
+  compatibility narrative until the expression/projection system can derive them from
+  component state without losing world-specific prose.
+
 ---
 
 ## Target Vocabulary
@@ -284,6 +308,11 @@ Status: landed. Tests confirm the current protocol:
 - generated cases still derive to their sampled target disposition;
 - `credential_gate` widget flow remains unchanged.
 
+The credentials derivation characterization suite, including the six disposition
+families and hazard ordering pinned for #276, is the parity oracle for later migration
+slices. A manager-path behavior difference is a retrofit regression unless the game
+contract is changed explicitly.
+
 No gameplay model changes were required.
 
 ### Phase 1: Move Domain Types To Global Credentials Package
@@ -368,16 +397,20 @@ Acceptance:
 
 ### Phase 5: Retrofit Factory And Roster Materialization
 
-Change `build_valid()`, `degrade()`, and `render_narrative()` to operate on the packet
-manager, while keeping compatibility shims for tests and worlds.
+Keep `build_valid()` and `degrade()` value-based initially. Convert their output into
+an owned packet manager at the committed case-arrival boundary, then migrate game-loop
+reads from flat case fields to packet/component projection helpers. Rework factory
+mutation only when generation must set graph identity such as media or holder bindings.
 
 Important rule: generation remains "start correct, then degrade."
 
 Acceptance:
 
 - sampled offers still materialize to their target disposition;
+- graph components are created and registered during setup or UPDATE, never on the
+  first PLANNING read;
 - failure modes mutate credential components or packet membership, not parallel flat
-  lists;
+  lists once the owned manager becomes authoritative;
 - narrative rendering reads packet/credential components through projection helpers.
 
 ### Phase 6: Adopt Component Facets For Contributions
@@ -388,10 +421,15 @@ Only after the VM phase-trigger/component-contribution shape is settled:
 - model document media projection as a media facet or direct adapter;
 - model score/disposition modifiers as game/credential channels;
 - keep mutation in the existing game UPDATE path or transaction offers.
+- let the game handler adopt facets into moves and apply time costs and off-menu
+  validation centrally;
+- gate move contribution on visible document existence, not hidden credential status.
 
 Acceptance:
 
 - PLANNING can discover credential-provided moves without mutation;
+- repeated move discovery exposes the same menu for visibly equivalent valid and
+  invalid documents;
 - UPDATE commits selected credential actions atomically;
 - JOURNAL can consume receipt/finding data for fragments;
 - no credentials-only dispatch pipeline is introduced.
@@ -404,6 +442,9 @@ Once `credential_gate`, factories, and tests all use the manager path:
 - remove duplicated discovery methods from the case, or make them pure delegation;
 - re-home game imports from `tangl.mechanics.games.credentials_enums` to
   `tangl.mechanics.credentials`.
+
+Retire authored packet narrative only after expression/projection helpers can preserve
+world-specific visible descriptions and committed hidden-fact disclosure.
 
 Do this only after a release/PR where both paths were tested side by side.
 
@@ -433,6 +474,13 @@ Serialization tests:
   credential component;
 - no raw `model_dump()` is used as a persistence proof.
 
+Replay/provenance tests for the authoritative manager path:
+
+- a transaction mutates a credential component outside the game model;
+- receipts and journal fragments identify the mutated component;
+- replay restores the same component state even when the game's local value hash does
+  not encode the component payload.
+
 VM/facet tests after phase-trigger work:
 
 - PLANNING gathers credential-provided moves purely;
@@ -449,6 +497,9 @@ VM/facet tests after phase-trigger work:
   credential components later.
 - Do not make all credential values graph members at once if compatibility fixtures
   still need flat data.
+- Do not decompose `CredentialStatus` while packet identity is migrating.
+- Do not give contraband graph identity until transactions need goods to move between
+  durable holders; contraband is not a credential component.
 - Do not create a credentials-only dispatch or phase-trigger framework.
 - Do not make facets durable derived state. Store credential facts and findings; derive
   contributions during phase handling.
