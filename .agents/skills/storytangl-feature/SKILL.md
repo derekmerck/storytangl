@@ -9,6 +9,26 @@ Run exactly one mode per task: `plan`, `implement`, `review`, or `close`.
 Do not advance through multiple modes autonomously. Read the root and applicable
 local `AGENTS.md` files plus the named design documents before editing.
 
+## Local Environment Fallback
+
+Prefer `poetry run`. If it fails only because Poetry cannot create or write its
+virtualenv cache, do not install dependencies or treat that as a feature blocker.
+Locate a pre-existing StoryTangl Python 3.13 venv, verify it imports `tangl`, then
+run tools with explicit source paths:
+
+```text
+PYTHONPATH=engine/src:apps/cli/src:apps/renpy/src:apps/server/src \
+  <verified-python> -m tangl.devref <command>
+```
+
+Do not hard-code a machine-specific venv path in committed docs. If no suitable
+venv exists, planning may use targeted `rg` plus the named canonical files; report
+the missing index rather than creating a new retrieval system.
+
+If Git LFS prevents broad `git status`, use scoped `git diff -- <paths>` and
+`git diff --check -- <paths>` for the current slice. Do not spend a planning task
+repairing unrelated local Git/LFS environment state.
+
 ## Plan
 
 1. Use `tangl-devref find` and `map` to identify canonical docs, code, tests,
