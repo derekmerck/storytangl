@@ -765,10 +765,16 @@ class CredentialsGame(PickingGame):
         for case in self.roster:
             case.bind_packet_manager_owner(owner)
         for case in self.materialized:
-            case.bind_packet_manager_owner(owner)
+            case.materialize_packet_manager(owner)
         for offer in self.offers:
             if offer.pinned_case is not None:
                 offer.pinned_case.bind_packet_manager_owner(owner)
+
+    @property
+    def has_component_manager_owner(self) -> bool:
+        """Whether sampled cases can materialize into graph credential components."""
+
+        return self._component_manager_owner is not None
 
     def prepare_active_case(self) -> CredentialCase:
         """Materialize the arriving sampled case at setup or UPDATE time."""
@@ -781,7 +787,7 @@ class CredentialsGame(PickingGame):
             offer = self.offers[len(self.materialized)]
             self.materialized.append(materialize(offer, self.restriction_map))
         case = self.materialized[self.case_index]
-        if self._component_manager_owner is not None:
+        if self.has_component_manager_owner:
             case.materialize_packet_manager(self._component_manager_owner)
         return case
 
@@ -797,7 +803,7 @@ class CredentialsGame(PickingGame):
             return self.roster[self.case_index]
         if len(self.materialized) <= self.case_index:
             if (
-                self._component_manager_owner is not None
+                self.has_component_manager_owner
                 and self.phase is GamePhase.READY
             ):
                 raise RuntimeError("Sampled credential cases must be prepared before PLANNING")
@@ -937,7 +943,7 @@ class CredentialsGame(PickingGame):
         self.packet_findings = {}
         self.committed_decision = None
         self.finding_status = {}
-        if self._component_manager_owner is not None and not self.shift_complete:
+        if self.has_component_manager_owner and not self.shift_complete:
             self.prepare_active_case()
 
     def to_namespace(self) -> dict[str, object]:
@@ -984,7 +990,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def on_setup(self, game: CredentialsGame) -> None:
         """Prepare the first sampled packet before move provisioning begins."""
 
-        if game._component_manager_owner is not None and game.offers:
+        if game.has_component_manager_owner and game.offers:
             game.prepare_active_case()
 
     def resolve_round(self, game, player_move, opponent_move):

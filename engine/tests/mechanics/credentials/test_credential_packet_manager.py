@@ -14,6 +14,7 @@ from tangl.mechanics.credentials import (
     CredentialComponent,
     CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
+    ensure_default_credential_definitions,
 )
 from tangl.mechanics.credentials.domain import (
     ContrabandItem,
@@ -414,7 +415,10 @@ def test_sampled_packet_graph_roundtrip_keeps_component_references() -> None:
         for component in packet.get_slot(slot_name)
     }
 
-    restored = Graph.structure(graph.unstructure())
+    payload = graph.unstructure()
+    CredentialDefinition.clear_instances()
+    ensure_default_credential_definitions()
+    restored = Graph.structure(payload)
     restored_block = restored.find_one(Selector(label="checkpoint"))
     restored_packet = restored_block.game.active_case.packet_manager
 
@@ -429,3 +433,29 @@ def test_sampled_packet_graph_roundtrip_keeps_component_references() -> None:
         sum(item.uid in component_ids for item in restored.members.values())
         == len(component_ids)
     )
+
+
+def test_binding_a_prepared_game_materializes_its_cached_sample() -> None:
+    game = CredentialsGame(
+        offers=[
+            ScenarioOffer(
+                candidate_name="Mara",
+                region=Region.LOCAL,
+                purpose=IND.WORK,
+            ),
+        ],
+        restriction_map=LOCAL_RULES,
+    )
+    handler = CredentialsGameHandler()
+    handler.setup(game)
+    cached_case = game.active_case
+    assert cached_case.packet_manager is None
+
+    graph = Graph()
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint", game_state=game)
+    packet = block.game.active_case.packet_manager
+
+    assert packet is not None
+    assert packet.owner is block
+    assert packet.get_slot(CREDENTIAL_ID_SLOT)
+    assert packet.get_slot(CREDENTIAL_PACKET_SLOT)

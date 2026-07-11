@@ -19,6 +19,7 @@ from .domain import (
 
 CREDENTIAL_ID_SLOT = "id"
 CREDENTIAL_PACKET_SLOT = "credentials"
+_DEFAULT_DOCUMENT_KINDS = ("id", "document")
 
 
 class CredentialDefinition(Singleton):
@@ -126,10 +127,10 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
 
     def all_credentials(self) -> list[CredentialToken]:
         credentials = self.document_credentials()
-        id_card = self._id_component()
+        id_card = self.id_credential()
         if id_card is None:
             return credentials
-        return [id_card.to_credential_token(), *credentials]
+        return [id_card, *credentials]
 
     def _id_component(self) -> CredentialComponent | None:
         components = self.get_slot(CREDENTIAL_ID_SLOT)
@@ -143,13 +144,10 @@ def _definition_for(
 ) -> CredentialDefinition:
     """Return the stable definition behind one materialized document token."""
 
-    label = ":".join(
-        (
-            "credential",
-            document_kind,
-            token.indication.value,
-            "requires-id" if token.requires_id else "standalone",
-        )
+    label = _definition_label(
+        document_kind=document_kind,
+        indication=token.indication,
+        requires_id=token.requires_id,
     )
     existing = CredentialDefinition.get_instance(label)
     if existing is not None:
@@ -160,6 +158,42 @@ def _definition_for(
         document_kind=document_kind,
         requires_id=token.requires_id,
     )
+
+
+def _definition_label(
+    *,
+    document_kind: str,
+    indication: Indication,
+    requires_id: bool,
+) -> str:
+    return ":".join(
+        (
+            "credential",
+            document_kind,
+            indication.value,
+            "requires-id" if requires_id else "standalone",
+        )
+    )
+
+
+def ensure_default_credential_definitions() -> None:
+    """Load the finite definition catalog used by generated credential packets."""
+
+    for document_kind in _DEFAULT_DOCUMENT_KINDS:
+        for indication in Indication:
+            for requires_id in (False, True):
+                label = _definition_label(
+                    document_kind=document_kind,
+                    indication=indication,
+                    requires_id=requires_id,
+                )
+                if CredentialDefinition.get_instance(label) is None:
+                    CredentialDefinition(
+                        label=label,
+                        indication=indication,
+                        document_kind=document_kind,
+                        requires_id=requires_id,
+                    )
 
 
 def materialize_packet(
@@ -222,5 +256,9 @@ __all__ = [
     "CredentialComponentToken",
     "CredentialDefinition",
     "CredentialPacketManager",
+    "ensure_default_credential_definitions",
     "materialize_packet",
 ]
+
+
+ensure_default_credential_definitions()

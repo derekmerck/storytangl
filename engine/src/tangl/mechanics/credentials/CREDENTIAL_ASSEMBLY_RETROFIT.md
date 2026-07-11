@@ -64,6 +64,9 @@ Current implementation checkpoint:
   delegate to it. Otherwise the legacy flat fields remain authoritative.
 - `HasGame.game_state` embeds the hosted `Game` through constructor-form recursion;
   `HasGame.game` binds embedded component managers to the block on access.
+- Generated packets use the finite default `CredentialDefinition` catalog loaded by
+  `tangl.mechanics.credentials`; those singleton labels therefore resolve before a
+  restored graph structures its credential components.
 
 ## Resolved Review Constraints
 
