@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from .credentials_roster import ScenarioOffer
 
 from tangl.core import BaseFragment
-from tangl.core.bases import BaseModelPlus
+from tangl.core.bases import BaseModelPlus, Unstructurable
 from tangl.journal.intent import PieceConstraints, PiecesAccepts, PickAccepts
 from tangl.journal.fragments import (
     ContentFragment,
@@ -34,6 +34,7 @@ from tangl.journal.fragments import (
 )
 from tangl.mechanics.credentials.assembly import (
     CredentialPacketManager as AssemblyCredentialPacketManager,
+    materialize_packet,
 )
 
 from .credentials_enums import (
@@ -46,7 +47,7 @@ from .credentials_enums import (
     Restrictions,
     RestrictionLevel,
 )
-from .enums import GameResult, RoundResult
+from .enums import GamePhase, GameResult, RoundResult
 from .game import Game
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 
@@ -199,7 +200,7 @@ class CredentialPacketManager(BaseModelPlus):
         return [self.id_card, *self.credentials]
 
 
-class CredentialCase(BaseModelPlus):
+class CredentialCase(Unstructurable):
     """One candidate, with an opaque credential packet behind a discovery API.
 
     The narrative strings (``presented_documents`` / ``hidden_facts`` /
@@ -267,6 +268,25 @@ class CredentialCase(BaseModelPlus):
         if self.packet_manager is not None:
             self.packet_manager.bind_owner(owner)
 
+    def materialize_packet_manager(self, owner: object) -> None:
+        """Replace this factory-shaped packet with its graph-owned assembly form."""
+
+        if self.packet_manager is not None:
+            self.packet_manager.bind_owner(owner)
+            return
+        self.packet_manager = materialize_packet(
+            owner=owner,
+            region=self.region,
+            purpose=self.purpose,
+            id_card=self.id_card,
+            credentials=self.packet,
+            possessions=self.possessions,
+            label_prefix=self.candidate_name,
+        )
+        self.id_card = None
+        self.packet = []
+        self.possessions = []
+
     def to_packet_manager(self) -> CredentialPacketProtocol:
         if self.packet_manager is not None:
             return self.packet_manager
@@ -291,9 +311,15 @@ class CredentialCase(BaseModelPlus):
     def id_status(self) -> CredentialStatus | None:
         """Status of the bearer id, or ``None`` if no id was presented."""
 
+        id_card = self.id_credential()
+        return id_card.status if id_card is not None else None
+
+    def id_credential(self) -> CredentialToken | None:
+        """Project the bearer id without exposing packet storage."""
+
         if self.packet_manager is not None:
-            return self.packet_manager.id_status()
-        return self.id_card.status if self.id_card is not None else None
+            return self.packet_manager.id_credential()
+        return self.id_card
 
     def credential_for(self, indication: Indication) -> CredentialToken | None:
         """The presented credential satisfying ``indication``, if any."""
@@ -313,6 +339,13 @@ class CredentialCase(BaseModelPlus):
         if self.id_card is None:
             return list(self.packet)
         return [self.id_card, *self.packet]
+
+    def document_credentials(self) -> list[CredentialToken]:
+        """Project visible non-id documents without exposing packet storage."""
+
+        if self.packet_manager is not None:
+            return self.packet_manager.document_credentials()
+        return list(self.packet)
 
 
 class CredentialCaseResult(BaseModelPlus):
@@ -637,11 +670,17 @@ class CredentialsGame(PickingGame):
     """A checkpoint shift: a roster of candidates inspected one at a time."""
 
     # --- Shift configuration (authored; never reset between candidates) ------
-    roster: list[CredentialCase] = Field(default_factory=_default_roster)
+    roster: list[CredentialCase] = Field(
+        default_factory=_default_roster,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
     # Optional lazy roster: when set, candidates are sampled offers materialized
     # on arrival (Phase A.3), and `offers` is the source of truth instead of
     # `roster`. See credentials_roster.py.
-    offers: list["ScenarioOffer"] = Field(default_factory=list)
+    offers: list["ScenarioOffer"] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
     allow_arrest: bool = True
     # The shift is lost when accumulated penalty exceeds this. 0 is the strict
     # default (any wrong call ends the shift); a world raises it for a more
@@ -711,7 +750,11 @@ class CredentialsGame(PickingGame):
     # Lazy cache of materialized offers (cleared on setup; rebuilt on arrival).
     materialized: list[CredentialCase] = Field(
         default_factory=list,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "include": True,
+            "reset_field": True,
+            "unstructurable": True,
+        },
     )
     _component_manager_owner: object | None = PrivateAttr(default=None)
 
@@ -727,6 +770,21 @@ class CredentialsGame(PickingGame):
             if offer.pinned_case is not None:
                 offer.pinned_case.bind_packet_manager_owner(owner)
 
+    def prepare_active_case(self) -> CredentialCase:
+        """Materialize the arriving sampled case at setup or UPDATE time."""
+
+        if not self.offers:
+            return self.roster[self.case_index]
+        from .credentials_roster import materialize
+
+        while len(self.materialized) <= self.case_index:
+            offer = self.offers[len(self.materialized)]
+            self.materialized.append(materialize(offer, self.restriction_map))
+        case = self.materialized[self.case_index]
+        if self._component_manager_owner is not None:
+            case.materialize_packet_manager(self._component_manager_owner)
+        return case
+
     # ----- active case access ----------------------------------------------
     def _total_cases(self) -> int:
         """Number of candidates this shift: sampled offers if any, else roster."""
@@ -737,15 +795,13 @@ class CredentialsGame(PickingGame):
     def active_case(self) -> CredentialCase:
         if not self.offers:
             return self.roster[self.case_index]
-        # Lazy: materialize each offer's packet only when the candidate arrives.
-        from .credentials_roster import materialize
-
-        while len(self.materialized) <= self.case_index:
-            offer = self.offers[len(self.materialized)]
-            case = materialize(offer, self.restriction_map)
-            if self._component_manager_owner is not None:
-                case.bind_packet_manager_owner(self._component_manager_owner)
-            self.materialized.append(case)
+        if len(self.materialized) <= self.case_index:
+            if (
+                self._component_manager_owner is not None
+                and self.phase is GamePhase.READY
+            ):
+                raise RuntimeError("Sampled credential cases must be prepared before PLANNING")
+            return self.prepare_active_case()
         return self.materialized[self.case_index]
 
     @property
@@ -881,6 +937,8 @@ class CredentialsGame(PickingGame):
         self.packet_findings = {}
         self.committed_decision = None
         self.finding_status = {}
+        if self._component_manager_owner is not None and not self.shift_complete:
+            self.prepare_active_case()
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
@@ -923,6 +981,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
     game_cls: ClassVar[type[Game]] = CredentialsGame
 
+    def on_setup(self, game: CredentialsGame) -> None:
+        """Prepare the first sampled packet before move provisioning begins."""
+
+        if game._component_manager_owner is not None and game.offers:
+            game.prepare_active_case()
+
     def resolve_round(self, game, player_move, opponent_move):
         # Charge the move's time cost to the shift budget before resolving it.
         # Soft budget: actions are never blocked; overtime converts to penalty.
@@ -948,13 +1012,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # outcome is disclosed by running the move, not by its presence.)
         #
         # request_document: offer for every presented permit not yet requested.
-        for token in case.packet:
+        for token in case.document_credentials():
             key = token.indication.value
             if key in game.finding_status:
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
         # verify_id: offer whenever an id is presented and not yet verified.
-        if case.id_card is not None and FindingKey.ID not in game.finding_status:
+        if case.id_status() is not None and FindingKey.ID not in game.finding_status:
             moves.append(CredentialsMove(kind="verify_id", target=""))
         # request_search: single move, once per case.
         if FindingKey.SEARCH not in game.finding_status:
@@ -1258,10 +1322,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         #   valid       -> they re-present the same sound permit ("verified");
         #   crime        -> the forgery cannot be reissued; it stands ("confirmed").
         # Only a cleared mitigatable finding upgrades derive_disposition.
-        permit = next(
-            (t for t in game.active_case.packet if t.indication.value == indication_value),
-            None,
-        )
+        permit = game.active_case.credential_for(Indication(indication_value))
         if permit is None:  # off-menu safety; receive_move does not validate
             detail["outcome"] = "request_document_not_applicable"
             detail["target_indication"] = indication_value

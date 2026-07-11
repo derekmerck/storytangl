@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tangl.core import Graph
+from tangl.core import Graph, Selector
 from tangl.mechanics.games import Game, GameHandler, GamePhase, RoundResult, HasGame
 from tangl.story import Block
 from tangl.vm import ResolutionPhase as P
@@ -49,7 +49,7 @@ class TestHasGameFacet:
         graph = Graph(label="test")
         block = _add_node(graph, kind=GameBlock, label="game_block")
 
-        assert block._game is None
+        assert block.game_state is None
 
         game = block.game
         assert isinstance(game, SampleGame)
@@ -65,7 +65,7 @@ class TestHasGameFacet:
         assert isinstance(handler, SampleGameHandler)
         assert block.game_handler is handler
 
-    def test_game_state_serialization(self) -> None:
+    def test_game_state_uses_constructor_form(self) -> None:
         graph = Graph(label="test")
         block = _add_node(graph, kind=GameBlock, label="game_block")
 
@@ -73,23 +73,37 @@ class TestHasGameFacet:
         block.game.phase = GamePhase.READY
         block.game.round = 5
 
-        data = block.model_dump()
-        assert data["_game"]["phase"] is GamePhase.READY
-        assert data["_game"]["round"] == 5
+        data = block.unstructure()
+        assert data["game_state"]["phase"] is GamePhase.READY
+        assert data["game_state"]["round"] == 5
+        assert data["game_state"]["kind"] is SampleGame
 
-        restored = GameBlock.model_validate(data)
+        restored = GameBlock.structure(data)
         assert restored.game.phase is GamePhase.READY
         assert restored.game.round == 5
+
+    def test_game_state_survives_graph_roundtrip(self) -> None:
+        graph = Graph(label="test")
+        block = _add_node(graph, kind=GameBlock, label="game_block")
+        block.game.phase = GamePhase.READY
+        block.game.round = 5
+
+        restored = Graph.structure(graph.unstructure())
+        restored_block = restored.find_one(Selector(label="game_block"))
+
+        assert isinstance(restored_block.game, SampleGame)
+        assert restored_block.game.phase is GamePhase.READY
+        assert restored_block.game.round == 5
 
     def test_handler_not_serialized(self) -> None:
         graph = Graph(label="test")
         block = _add_node(graph, kind=GameBlock, label="game_block")
 
         _ = block.game_handler
-        data = block.model_dump()
+        data = block.unstructure()
         assert "_game_handler" not in data
 
-        restored = GameBlock.model_validate(data)
+        restored = GameBlock.structure(data)
         assert restored._game_handler is None
         assert isinstance(restored.game_handler, SampleGameHandler)
 

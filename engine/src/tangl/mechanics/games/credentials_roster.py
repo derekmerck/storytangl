@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from pydantic import Field
 
-from tangl.core.bases import BaseModelPlus
+from tangl.core.bases import Unstructurable
 
 from .credentials_enums import (
     FailureClass,
@@ -49,7 +49,7 @@ _DEFAULT_DISPOSITIONS = {
 }
 
 
-class ScenarioOffer(BaseModelPlus):
+class ScenarioOffer(Unstructurable):
     """A promised encounter -- enough to materialize a candidate on arrival.
 
     Sampling (origin / disposition / failure mode) happens once at roster
@@ -65,7 +65,10 @@ class ScenarioOffer(BaseModelPlus):
     failure_modes: list[FailureMode] = Field(default_factory=list)
     whitelist: bool = False
     blacklist: bool = False
-    pinned_case: CredentialCase | None = None
+    pinned_case: CredentialCase | None = Field(
+        default=None,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
 
 @dataclass(frozen=True)

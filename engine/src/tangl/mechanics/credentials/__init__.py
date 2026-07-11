@@ -7,6 +7,7 @@ from .assembly import (
     CredentialComponentToken,
     CredentialDefinition,
     CredentialPacketManager,
+    materialize_packet,
 )
 from .domain import (
     COMMON_ALLIED_RESTRICTIONS,
@@ -39,6 +40,7 @@ __all__ = [
     "CredentialComponentToken",
     "CredentialDefinition",
     "CredentialPacketManager",
+    "materialize_packet",
     "CredentialStatus",
     "CredentialToken",
     "ContrabandItem",

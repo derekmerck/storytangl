@@ -195,7 +195,7 @@ def test_queueing_hasgame_provisions_self_loop_and_journals_fragments() -> None:
     graph = Graph(label="queueing_flow")
     intro = graph.add_node(kind=Block, label="intro")
     block = graph.add_node(kind=QueueBlock, label="queue")
-    block._game = _ed_game()
+    block.game_state = _ed_game()
     ChoiceEdge(
         graph=graph,
         predecessor_id=intro.uid,

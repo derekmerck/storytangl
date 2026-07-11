@@ -182,12 +182,13 @@ def render_narrative(case: CredentialCase) -> CredentialCase:
     documents: dict[str, str] = {}
     findings: dict[str, str] = {}
 
-    if case.id_card is not None:
+    id_card = case.id_credential()
+    if id_card is not None:
         documents["passport"] = "An identity document."
-        if not case.id_card.status.is_valid:
-            findings["passport"] = _STATUS_FINDINGS[case.id_card.status]
+        if not id_card.status.is_valid:
+            findings["passport"] = _STATUS_FINDINGS[id_card.status]
 
-    for token in case.packet:
+    for token in case.document_credentials():
         label = f"{token.indication.value} permit"
         documents[label] = f"A {token.indication.value} permit."
         if not token.status.is_valid:
