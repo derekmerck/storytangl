@@ -19,6 +19,7 @@ from .domain import (
 
 CREDENTIAL_ID_SLOT = "id"
 CREDENTIAL_PACKET_SLOT = "credentials"
+_DEFAULT_DOCUMENT_KINDS = ("id", "document")
 
 
 class CredentialDefinition(Singleton):
@@ -98,32 +99,154 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
         return self.purpose
 
     def id_status(self) -> CredentialStatus | None:
-        id_card = self._id_component()
+        id_card = self.id_credential()
         return id_card.status if id_card is not None else None
 
+    def id_credential(self) -> CredentialToken | None:
+        """Project the bearer-id component to the game compatibility shape."""
+
+        id_card = self._id_component()
+        return id_card.to_credential_token() if id_card is not None else None
+
     def credential_for(self, indication: Indication) -> CredentialToken | None:
-        for credential in self.get_slot(CREDENTIAL_PACKET_SLOT):
-            token = credential.to_credential_token()
+        for token in self.document_credentials():
             if token.indication is indication:
                 return token
         return None
+
+    def document_credentials(self) -> list[CredentialToken]:
+        """Project non-id credential components to the game compatibility shape."""
+
+        return [
+            credential.to_credential_token()
+            for credential in self.get_slot(CREDENTIAL_PACKET_SLOT)
+        ]
 
     def get_contraband(self) -> list[ContrabandItem]:
         return list(self.possessions)
 
     def all_credentials(self) -> list[CredentialToken]:
-        credentials = [
-            credential.to_credential_token()
-            for credential in self.get_slot(CREDENTIAL_PACKET_SLOT)
-        ]
-        id_card = self._id_component()
+        credentials = self.document_credentials()
+        id_card = self.id_credential()
         if id_card is None:
             return credentials
-        return [id_card.to_credential_token(), *credentials]
+        return [id_card, *credentials]
 
     def _id_component(self) -> CredentialComponent | None:
         components = self.get_slot(CREDENTIAL_ID_SLOT)
         return components[0] if components else None
+
+
+def _definition_for(
+    token: CredentialToken,
+    *,
+    document_kind: str,
+) -> CredentialDefinition:
+    """Return the stable definition behind one materialized document token."""
+
+    label = _definition_label(
+        document_kind=document_kind,
+        indication=token.indication,
+        requires_id=token.requires_id,
+    )
+    existing = CredentialDefinition.get_instance(label)
+    if existing is not None:
+        return existing
+    return CredentialDefinition(
+        label=label,
+        indication=token.indication,
+        document_kind=document_kind,
+        requires_id=token.requires_id,
+    )
+
+
+def _definition_label(
+    *,
+    document_kind: str,
+    indication: Indication,
+    requires_id: bool,
+) -> str:
+    return ":".join(
+        (
+            "credential",
+            document_kind,
+            indication.value,
+            "requires-id" if requires_id else "standalone",
+        )
+    )
+
+
+def ensure_default_credential_definitions() -> None:
+    """Load the finite definition catalog used by generated credential packets."""
+
+    for document_kind in _DEFAULT_DOCUMENT_KINDS:
+        for indication in Indication:
+            for requires_id in (False, True):
+                label = _definition_label(
+                    document_kind=document_kind,
+                    indication=indication,
+                    requires_id=requires_id,
+                )
+                if CredentialDefinition.get_instance(label) is None:
+                    CredentialDefinition(
+                        label=label,
+                        indication=indication,
+                        document_kind=document_kind,
+                        requires_id=requires_id,
+                    )
+
+
+def materialize_packet(
+    *,
+    owner: object,
+    region: Region,
+    purpose: Indication,
+    id_card: CredentialToken | None,
+    credentials: list[CredentialToken],
+    possessions: list[ContrabandItem],
+    label_prefix: str,
+) -> CredentialPacketManager:
+    """Create an owner-bound graph packet from a factory's value-shaped output."""
+
+    manager = CredentialPacketManager(
+        region=region,
+        purpose=purpose,
+        possessions=list(possessions),
+    ).bind_owner(owner)
+
+    def add_component(
+        token: CredentialToken,
+        *,
+        document_kind: str,
+        slot: str,
+        index: int,
+    ) -> None:
+        definition = _definition_for(token, document_kind=document_kind)
+        manager.assign(
+            slot,
+            CredentialComponent(
+                label=f"{label_prefix}:{document_kind}:{index}",
+                token_from=definition.label,
+                status=token.status,
+                holder_matches=token.holder_matches,
+            ),
+        )
+
+    if id_card is not None:
+        add_component(
+            id_card,
+            document_kind="id",
+            slot=CREDENTIAL_ID_SLOT,
+            index=0,
+        )
+    for index, credential in enumerate(credentials):
+        add_component(
+            credential,
+            document_kind="document",
+            slot=CREDENTIAL_PACKET_SLOT,
+            index=index,
+        )
+    return manager
 
 
 __all__ = [
@@ -133,4 +256,9 @@ __all__ = [
     "CredentialComponentToken",
     "CredentialDefinition",
     "CredentialPacketManager",
+    "ensure_default_credential_definitions",
+    "materialize_packet",
 ]
+
+
+ensure_default_credential_definitions()

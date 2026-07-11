@@ -116,7 +116,7 @@ class TestIncrementalIntegration:
     def test_move_labels_cover_assign_build_and_cycle(self) -> None:
         graph = Graph(label="incremental_labels")
         block = graph.add_node(kind=IncrementalBlock, label="yard")
-        block._game = _sample_game()
+        block.game_state = _sample_game()
         block.game_handler.setup(block.game)
 
         frame = Frame(graph=graph, cursor=block)
@@ -144,7 +144,7 @@ class TestIncrementalIntegration:
             defeat_dest=defeat,
             label="yard",
         )
-        block._game = _sample_game(
+        block.game_state = _sample_game(
             starting_resources={"food": 0, "scrap": 0},
             build_specs={"signal_fire": BuildSpec(cost={"scrap": 1}, resource_gain={"prestige": 1})},
             unlocked_tasks=["scavenge"],
@@ -196,7 +196,7 @@ class TestIncrementalIntegration:
     def test_context_exports_shell_state(self) -> None:
         graph = Graph(label="incremental_context")
         block = graph.add_node(kind=IncrementalBlock, label="yard")
-        block._game = _sample_game()
+        block.game_state = _sample_game()
         block.game_handler.setup(block.game)
 
         frame = Frame(graph=graph, cursor=block)

@@ -14,6 +14,7 @@ from tangl.mechanics.credentials import (
     CredentialComponent,
     CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
+    ensure_default_credential_definitions,
 )
 from tangl.mechanics.credentials.domain import (
     ContrabandItem,
@@ -281,7 +282,7 @@ def test_has_game_block_binds_roster_packet_manager_to_graph_owner() -> None:
     manager = AssemblyCredentialPacketManager(purpose=IND.WORK)
     manager.assign(CREDENTIAL_ID_SLOT, id_card)
     manager.assign(CREDENTIAL_PACKET_SLOT, work_permit)
-    block._game = CredentialsGame(
+    block.game_state = CredentialsGame(
         roster=[CredentialCase(candidate_name="Mara", packet_manager=manager)],
         restriction_map=LOCAL_RULES,
     )
@@ -294,15 +295,15 @@ def test_has_game_block_binds_roster_packet_manager_to_graph_owner() -> None:
     assert restored_manager.get_slot(CREDENTIAL_PACKET_SLOT) == [work_permit]
 
 
-def test_has_game_model_validate_binds_roster_packet_manager_to_restored_owner() -> None:
+def test_has_game_structure_binds_roster_packet_manager_to_restored_owner() -> None:
     manager = AssemblyCredentialPacketManager(purpose=IND.WORK)
     block = CredentialsBlock(label="checkpoint")
-    block._game = CredentialsGame(
+    block.game_state = CredentialsGame(
         roster=[CredentialCase(candidate_name="Mara", packet_manager=manager)],
         restriction_map=LOCAL_RULES,
     )
 
-    restored = CredentialsBlock.model_validate(block.model_dump())
+    restored = CredentialsBlock.structure(block.unstructure())
     restored_manager = restored.game.roster[0].packet_manager
 
     assert restored_manager is not None
@@ -325,7 +326,7 @@ def test_has_game_binds_pinned_offer_packet_manager_before_materialization() -> 
     manager = AssemblyCredentialPacketManager(purpose=IND.TRAVEL)
     manager.assign(CREDENTIAL_ID_SLOT, id_card)
     pinned_case = CredentialCase(candidate_name="Pinned", packet_manager=manager)
-    block._game = CredentialsGame(
+    block.game_state = CredentialsGame(
         offers=[ScenarioOffer(candidate_name="Pinned", pinned_case=pinned_case)],
         restriction_map=LOCAL_RULES,
     )
@@ -337,3 +338,124 @@ def test_has_game_binds_pinned_offer_packet_manager_before_materialization() -> 
     assert restored_manager is manager
     assert restored_manager.owner is block
     assert restored_manager.get_slot(CREDENTIAL_ID_SLOT) == [id_card]
+
+
+def test_sampled_offers_materialize_once_at_game_lifecycle_boundaries() -> None:
+    graph = Graph()
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+    block.game_state = CredentialsGame(
+        offers=[
+            ScenarioOffer(
+                candidate_name="Mara",
+                region=Region.LOCAL,
+                purpose=IND.WORK,
+            ),
+            ScenarioOffer(
+                candidate_name="Tomas",
+                region=Region.LOCAL,
+                purpose=IND.TRAVEL,
+            ),
+        ],
+        restriction_map=LOCAL_RULES,
+    )
+    handler = block.game_handler
+    handler.setup(block.game)
+
+    first_case = block.game.active_case
+    first_packet = first_case.packet_manager
+    assert first_packet is not None
+    assert first_packet.owner is block
+    assert first_case.id_card is None
+    assert first_case.packet == []
+    assert first_packet.get_slot(CREDENTIAL_ID_SLOT)
+    assert first_packet.get_slot(CREDENTIAL_PACKET_SLOT)
+    component_count = sum(
+        isinstance(item, CredentialComponent)
+        for item in graph.members.values()
+    )
+
+    assert handler.get_available_moves(block.game)
+    assert (
+        sum(isinstance(item, CredentialComponent) for item in graph.members.values())
+        == component_count
+    )
+
+    handler.receive_move(block.game, ("inspect", "passport"))
+    handler.receive_move(block.game, ("decide", "pass"))
+
+    second_case = block.game.active_case
+    assert second_case.candidate_name == "Tomas"
+    assert second_case.packet_manager is not None
+    assert second_case.packet_manager.owner is block
+    assert (
+        sum(isinstance(item, CredentialComponent) for item in graph.members.values())
+        > component_count
+    )
+
+
+def test_sampled_packet_graph_roundtrip_keeps_component_references() -> None:
+    graph = Graph()
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+    block.game_state = CredentialsGame(
+        offers=[
+            ScenarioOffer(
+                candidate_name="Mara",
+                region=Region.LOCAL,
+                purpose=IND.WORK,
+            ),
+        ],
+        restriction_map=LOCAL_RULES,
+    )
+    block.game_handler.setup(block.game)
+    packet = block.game.active_case.packet_manager
+    assert packet is not None
+    component_ids = {
+        component.uid
+        for slot_name in (CREDENTIAL_ID_SLOT, CREDENTIAL_PACKET_SLOT)
+        for component in packet.get_slot(slot_name)
+    }
+
+    payload = graph.unstructure()
+    CredentialDefinition.clear_instances()
+    ensure_default_credential_definitions()
+    restored = Graph.structure(payload)
+    restored_block = restored.find_one(Selector(label="checkpoint"))
+    restored_packet = restored_block.game.active_case.packet_manager
+
+    assert restored_packet is not None
+    assert restored_packet.owner is restored_block
+    assert {
+        component.uid
+        for slot_name in (CREDENTIAL_ID_SLOT, CREDENTIAL_PACKET_SLOT)
+        for component in restored_packet.get_slot(slot_name)
+    } == component_ids
+    assert (
+        sum(item.uid in component_ids for item in restored.members.values())
+        == len(component_ids)
+    )
+
+
+def test_binding_a_prepared_game_materializes_its_cached_sample() -> None:
+    game = CredentialsGame(
+        offers=[
+            ScenarioOffer(
+                candidate_name="Mara",
+                region=Region.LOCAL,
+                purpose=IND.WORK,
+            ),
+        ],
+        restriction_map=LOCAL_RULES,
+    )
+    handler = CredentialsGameHandler()
+    handler.setup(game)
+    cached_case = game.active_case
+    assert cached_case.packet_manager is None
+
+    graph = Graph()
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint", game_state=game)
+    packet = block.game.active_case.packet_manager
+
+    assert packet is not None
+    assert packet.owner is block
+    assert packet.get_slot(CREDENTIAL_ID_SLOT)
+    assert packet.get_slot(CREDENTIAL_PACKET_SLOT)

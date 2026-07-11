@@ -2,13 +2,16 @@ from __future__ import annotations
 
 """Facet mixin for blocks hosting game instances."""
 
-from typing import Any, ClassVar, Optional, TYPE_CHECKING
+from typing import Any, ClassVar, TYPE_CHECKING
 from uuid import UUID
+
+from pydantic import Field
 
 from tangl.mechanics.games import Game, GameHandler
 
 if TYPE_CHECKING:
     from tangl.core import Graph, Node
+
 
 def _add_node_compat(graph: Graph, *, kind: type, label: str | None, **kwargs: Any):
     """Create a node using the canonical ``kind=`` graph API."""
@@ -24,14 +27,14 @@ class HasGame:
     Wraps Layer 2 game state (:class:`~tangl.mechanics.games.Game`) inside story
     nodes so the VM can drive rounds and post-requisite exits. Mirrors
     :class:`~tangl.mechanics.assembly.base.HasSlottedContainer` with lazy
-    initialization, serialization hooks, and a convenience factory.
+    initialization, constructor-form persistence, and a convenience factory.
 
     Key Features
     ------------
     - **Lazy accessors**: instantiate the game and handler on first property
       access.
-    - **Serializable game state**: persist ``_game`` with the block; handler is
-      recreated when needed.
+    - **Serializable game state**: embed ``game_state`` in the block's normal
+      constructor form; handler is recreated when needed.
     - **Factory wiring**: :meth:`create_game_block` adds POSTREQS edges for
       victory/defeat/draw exits.
 
@@ -46,8 +49,11 @@ class HasGame:
     _game_class: ClassVar[type[Game]] = Game
     _game_handler_class: ClassVar[type[GameHandler]] = GameHandler
 
-    _game: Optional[Game] = None
-    _game_handler: Optional[GameHandler] = None
+    game_state: Game | None = Field(
+        default=None,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+    _game_handler: GameHandler | None = None
 
     victory_edge_id: UUID | None = None
     defeat_edge_id: UUID | None = None
@@ -57,10 +63,10 @@ class HasGame:
     def game(self) -> Game:
         """Return the game instance, creating it on first access."""
 
-        if self._game is None:
-            self._game = self._game_class()
+        if self.game_state is None:
+            self.game_state = self._game_class()
         self._bind_game_component_managers()
-        return self._game
+        return self.game_state
 
     @property
     def game_handler(self) -> GameHandler:
@@ -70,31 +76,12 @@ class HasGame:
             self._game_handler = self._game_handler_class()
         return self._game_handler
 
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
-        """Serialize the block, including game state if initialized."""
-
-        data = super().model_dump(**kwargs)  # type: ignore[misc]
-        if self._game is not None:
-            data["_game"] = self._game.model_dump()
-        return data
-
-    @classmethod
-    def model_validate(cls, obj: Any, **kwargs: Any):  # type: ignore[override]
-        """Deserialize the block and restore game state when present."""
-
-        instance = super().model_validate(obj, **kwargs)  # type: ignore[misc]
-        if "_game" in obj:
-            game_data = obj["_game"]
-            instance._game = instance._game_class.model_validate(game_data)
-            instance._bind_game_component_managers()
-        return instance
-
     def _bind_game_component_managers(self) -> None:
         """Let game state bind embedded component managers to this graph owner."""
 
-        if self._game is None:
+        if self.game_state is None:
             return
-        self._game.bind_component_managers(self)
+        self.game_state.bind_component_managers(self)
 
     @classmethod
     def create_game_block(

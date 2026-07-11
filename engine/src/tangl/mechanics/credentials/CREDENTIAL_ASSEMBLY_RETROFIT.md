@@ -10,9 +10,11 @@
 **Status:** PARTIALLY IMPLEMENTED. The first retrofit slice landed the global
 credentials domain import surface, graph-backed credential components, an
 owner-bound assembly packet manager, and a `CredentialCase` bridge behind the
-existing disposition protocol. Factory/materialization, move facets, expression
-narrative, contraband graph identity, and status decomposition remain future
-slices.
+existing disposition protocol. Phase 5 now materializes sampled offers into an
+authoritative packet manager at setup and case-advance boundaries, and persists
+the hosted game through the normal constructor-form graph path. Move facets,
+expression narrative, contraband graph identity, and status decomposition remain
+future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -60,8 +62,11 @@ Current implementation checkpoint:
   value-object adapter for flat legacy cases.
 - `CredentialCase.packet_manager` is optional; when present, case discovery methods
   delegate to it. Otherwise the legacy flat fields remain authoritative.
-- `HasGame.game` asks hosted games to bind embedded component managers to the block
-  when the game exposes `bind_component_managers(owner)`.
+- `HasGame.game_state` embeds the hosted `Game` through constructor-form recursion;
+  `HasGame.game` binds embedded component managers to the block on access.
+- Generated packets use the finite default `CredentialDefinition` catalog loaded by
+  `tangl.mechanics.credentials`; those singleton labels therefore resolve before a
+  restored graph structures its credential components.
 
 ## Resolved Review Constraints
 
@@ -396,6 +401,14 @@ Acceptance:
   access, without changing the broader `HasGame` private-game persistence path.
 
 ### Phase 5: Retrofit Factory And Roster Materialization
+
+Status: landed for sampled offers. Factory generation remains value-based and
+deterministic. A hosted game materializes its arriving offer into graph credential
+components and an owner-bound packet manager during setup or case advance; planning
+only reads that prepared manager. The source case clears its flat packet fields once
+the manager becomes authoritative. `HasGame.game_state` now persists through the
+normal `unstructure()` / `structure()` path, so the embedded manager and its component
+references survive graph restore.
 
 Keep `build_valid()` and `degrade()` value-based initially. Convert their output into
 an owned packet manager at the committed case-arrival boundary, then migrate game-loop
