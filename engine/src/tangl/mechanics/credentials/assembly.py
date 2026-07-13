@@ -7,7 +7,7 @@ from typing import ClassVar
 from pydantic import Field
 
 from tangl.core import Singleton, Token
-from tangl.mechanics.assembly import ComponentManager, Slot
+from tangl.mechanics.assembly import ComponentFacet, ComponentManager, Slot
 
 from .domain import (
     ContrabandItem,
@@ -28,6 +28,7 @@ class CredentialDefinition(Singleton):
     indication: Indication
     document_kind: str = "document"
     requires_id: bool = False
+    facets: tuple[ComponentFacet, ...] = ()
     status: CredentialStatus = Field(
         default=CredentialStatus.VALID,
         json_schema_extra={"instance_var": True},
@@ -40,6 +41,24 @@ class CredentialDefinition(Singleton):
 
 class CredentialComponentToken(Token):
     """Graph credential token that projects to the legacy packet value shape."""
+
+    def component_facets(
+        self,
+        *,
+        channel: str | None = None,
+        facet_type: str | None = None,
+        subject_id: str | None = None,
+    ) -> list[ComponentFacet]:
+        """Return copied definition facets with token and packet provenance."""
+
+        return [
+            facet.model_copy(deep=True).with_provenance(
+                source_id=str(self.uid),
+                subject_id=subject_id,
+            )
+            for facet in self.facets
+            if facet.matches(channel=channel, facet_type=facet_type)
+        ]
 
     def get_label(self) -> str:
         return self.token_from or self.label

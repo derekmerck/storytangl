@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from uuid import UUID
 
 import pytest
@@ -16,6 +17,7 @@ from tangl.mechanics.credentials import (
     CredentialPacketManager as AssemblyCredentialPacketManager,
     ensure_default_credential_definitions,
 )
+from tangl.mechanics.assembly import ComponentFacet
 from tangl.mechanics.credentials.domain import (
     ContrabandItem,
     CredentialStatus,
@@ -93,12 +95,14 @@ def credential_definition(
     *,
     document_kind: str = "document",
     requires_id: bool = False,
+    facets: tuple[ComponentFacet, ...] = (),
 ) -> CredentialDefinition:
     return CredentialDefinition(
         label=label,
         indication=indication,
         document_kind=document_kind,
         requires_id=requires_id,
+        facets=facets,
     )
 
 
@@ -254,6 +258,120 @@ def test_packet_manager_graph_roundtrip_preserves_credential_assignments_by_id()
     assert derive_disposition(restored_manager, LOCAL_RULES) is D.PASS
     assert sum(1 for item in restored.members.values() if item.uid == id_card.uid) == 1
     assert sum(1 for item in restored.members.values() if item.uid == work_permit.uid) == 1
+
+
+def test_credential_token_facets_are_isolated_and_keep_packet_provenance() -> None:
+    definition = credential_definition(
+        "faceted_work_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="credential_test",
+                facet_type="giver",
+                payload={"label": "authored"},
+            ),
+        ),
+    )
+    credential = credential_component("faceted-permit", definition)
+    manager = AssemblyCredentialPacketManager()
+    manager.assign(CREDENTIAL_PACKET_SLOT, credential)
+
+    gathered = manager.component_facets(channel="credential_test")
+
+    assert gathered == [
+        ComponentFacet(
+            channel="credential_test",
+            facet_type="giver",
+            payload={"label": "authored"},
+            source_id=str(credential.uid),
+            subject_id=CREDENTIAL_PACKET_SLOT,
+        )
+    ]
+    assert isinstance(gathered[0].payload, dict)
+    gathered[0].payload["label"] = "mutated"
+
+    assert definition.facets[0].payload == {"label": "authored"}
+    assert manager.component_facets(channel="credential_test")[0].payload == {
+        "label": "authored"
+    }
+
+
+def test_repeated_credential_facet_discovery_does_not_mutate_graph_state() -> None:
+    definition = credential_definition(
+        "pure_faceted_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="credential_test",
+                facet_type="giver",
+                payload="permit",
+            ),
+        ),
+    )
+    graph = Graph()
+    owner = graph.add_node(kind=CredentialPacketNode, label="checkpoint")
+    credential = graph.add_node(
+        kind=CredentialComponent,
+        label="pure-faceted-permit",
+        token_from=definition.label,
+    )
+    owner.packet_manager.assign(CREDENTIAL_PACKET_SLOT, credential)
+    before = deepcopy(graph.unstructure())
+
+    first = owner.packet_manager.component_facets(channel="credential_test")
+    second = owner.packet_manager.component_facets(channel="credential_test")
+
+    assert first == second
+    assert graph.unstructure() == before
+
+
+def test_facet_catalogue_loads_before_graph_structure() -> None:
+    definition = credential_definition(
+        "catalogued_faceted_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="credential_test",
+                facet_type="giver",
+                payload="catalogued",
+            ),
+        ),
+    )
+    graph = Graph()
+    owner = graph.add_node(kind=CredentialPacketNode, label="checkpoint")
+    credential = graph.add_node(
+        kind=CredentialComponent,
+        label="catalogued-faceted-permit",
+        token_from=definition.label,
+    )
+    owner.packet_manager.assign(CREDENTIAL_PACKET_SLOT, credential)
+    payload = graph.unstructure()
+
+    CredentialDefinition.clear_instances()
+    reloaded_definition = credential_definition(
+        "catalogued_faceted_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="credential_test",
+                facet_type="giver",
+                payload="catalogued",
+            ),
+        ),
+    )
+    restored = Graph.structure(payload)
+    restored_owner = restored.find_one(Selector(label="checkpoint"))
+    restored_credential = restored.find_one(Selector(label="catalogued-faceted-permit"))
+
+    assert restored_owner.packet_manager.assignment_ids == {
+        CREDENTIAL_PACKET_SLOT: [credential.uid],
+    }
+    assert restored_owner.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT) == [restored_credential]
+    assert restored_credential.reference_singleton is reloaded_definition
+    assert (
+        restored_credential.component_facets(channel="credential_test")[0].payload
+        == "catalogued"
+    )
 
 
 def test_has_game_block_binds_roster_packet_manager_to_graph_owner() -> None:
