@@ -381,7 +381,8 @@ worlds compose a broader range:
   fidelity and loss tracking mature; later it should support an explicit parity
   comparison rather than replace the canonical reskin;
 - the sandbox / Colossal Cave world exercises movement among location nodes,
-  location-driven activity fan-out, presence, and mobile roles;
+  location-driven activity fan-out, presence, mobile roles, and declarative
+  capability-conditioned opportunities;
 - the CarWars worlds exercise vehicle assembly, inventory, repair, loadouts,
   transactions, racing, and combat.
 
@@ -405,6 +406,21 @@ The archived catalogs favor symmetric three-value axes such as benign / neutral
 reason to hard-code world enums. The convergence proof is that the same authored
 component can contribute through several established facet channels while each
 handler retains its specialized fold.
+
+The robot also travels with the player. At each sandbox location, the active
+story state and local problems are matched against capabilities donated by the
+player, inventory, present actors, and the robot's current assembly. That match
+may expose a new activity, alter a challenge, or trigger a companion
+intervention. Locations declare requirements and outcomes; companions declare
+capabilities and interaction vocabulary. Neither side contains a catalog of the
+other side's concrete labels.
+
+The Colossal Cave demonstration is the smaller proof surface for this exchange.
+Its pirate and dwarves can be real scheduled mobile actors rather than anonymous
+room-event probabilities, while retaining an ambient encounter policy. A few
+additional declarations can then give those actors persistent state and richer
+interactions, or give the player a mobile companion whose capabilities change
+the cave's fanout without rewriting its rooms.
 
 A mechanics change is incomplete when its focused tests pass but the relevant
 demonstration worlds no longer compose or demonstrate the shared vocabulary.
@@ -446,5 +462,8 @@ grammars** rather than just “minigames.”
 4. Connect credential components to presence and media projection.
 5. Reconcile vehicle and loadout vocabulary with assembly, transactions, and
    progression.
-6. Exercise the combined vocabulary, sandbox traversal, and activity hubs in
+6. Extend the Adventure sandbox with one scheduled mobile actor and one
+   capability-bearing companion contribution, without world-specific choice
+   projection branches.
+7. Exercise the combined vocabulary, sandbox traversal, and activity hubs in
    the robot chopshop flow.

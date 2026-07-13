@@ -421,6 +421,74 @@ scheduled events. This proves the "pirate has a runtime home" shape without
 adding movement AI, pathfinding, fleeing, combat, trade negotiation, or lazy
 dialog scene generation yet.
 
+### Mobile Companions And Capability-Conditioned Fanout
+
+A companion is not a new sandbox primitive. It is a graph-owned concept whose
+current scope follows or otherwise intersects the player's location and whose
+facets contribute capabilities, interactions, modifiers, presence, and prose.
+A robot companion may also own an assembly, so changing one installed component
+can change what the companion contributes everywhere it travels.
+
+The declarative authoring pattern is a match among three sources:
+
+- the active location, fixture, event, or encounter declares a problem or
+  opportunity and the capability it requires;
+- in-scope providers -- the player, carried assets, present actors, and mobile
+  companions -- contribute capabilities and candidate interactions;
+- story state, time, location, presence, and schedules gate which matches are
+  currently eligible.
+
+The matching result projects an ordinary artifact: a choice, unavailable choice
+with blockers, redirect, challenge, modifier, or journal fragment. A companion
+that "automatically solves" a problem therefore uses an explicit resolution
+policy on the matched contribution. It may offer an intervention, preempt an
+encounter through a triggered action, or resolve a declared obstacle and emit a
+receipt. The obstacle should not contain a robot-specific conditional, and the
+companion should not know the labels of every obstacle it can solve.
+
+This is the same open-link/fanout model already used by sandbox hubs. A problem
+declares a requirement; scoped concepts advertise possible providers; normal
+binding, admission, projection, validation, UPDATE, and journal handling carry
+the interaction. If the first implementation needs a sandbox-local adapter, it
+should prove this exchange vocabulary rather than introduce a general rules
+engine or a second facet-dispatch mechanism.
+
+The robot chopshop becomes much more useful under this interpretation. Assembly
+and progression do not end at the workshop: the player takes the modified robot
+through the sandbox, and its current components, upgrades, damage, permissions,
+and learned capabilities alter the fanout of opportunities at each location.
+The sandbox is where those accumulated mechanical facts acquire narrative
+consequences.
+
+### Reifying Classic Ambient Encounters
+
+Classic *Adventure* often represents dwarves or the pirate as room-conditioned
+probabilities that an event occurs. StoryTangl can preserve that behavior while
+giving the apparent actor a real runtime identity:
+
+- the dwarf or pirate is a graph-backed mobile actor with state, inventory,
+  presence text, interactions, and a default schedule or roaming policy;
+- the schedule determines where the actor may be encountered, while normal
+  predicates gate story-specific behavior;
+- hub fanout exposes only the interactions contributed by actors currently in
+  scope;
+- adding a conversation, theft response, relationship state, or alternate
+  route extends the actor declaration rather than rewriting every room table.
+
+The current `Schedule` is deterministic. Faithfully emulating an ambient random
+encounter requires a small replay-safe stochastic scheduling or roaming policy
+whose draws become authoritative history; probability should remain a schedule
+policy, not the actor's identity. A deterministic authored itinerary is already
+enough to prove presence and fanout, and can be augmented later without changing
+the actor or interaction contracts.
+
+The Adventure demonstration should use this as a semantic-compression test:
+first express the original pirate-like behavior with one real scheduled mob,
+then add a few lines of interaction vocabulary, and finally introduce a mobile
+capability-bearing companion that changes how an existing obstacle or encounter
+fans out. Success means those additions require declarations and reusable
+handlers, not a growing world-specific `if`/`elif` projector.
+
 ### Sponsored Traversal And Concept-Owned Content
 
 Sandbox has exposed a broader StoryTangl pattern: traversable content does not
