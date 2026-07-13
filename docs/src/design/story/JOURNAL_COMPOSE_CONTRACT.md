@@ -96,8 +96,16 @@ Prose references are late-bound while generating a fragment. A template such as
 subsequent projections and an authored correction affects a recompiled or
 replayed story. Once emitted, however, the fragment records what was disclosed
 at that historical step. Current-state changes must not silently rewrite past
-journal content; explicit reference/control fragments may update a live
-presentation while the authoritative stream retains its provenance.
+journal content.
+
+That default is policy, not a technical impossibility. An explicit retcon tool
+may replay the realized choice path against corrected concept state, select
+affected fragments through their attribution and provenance, generate
+replacements, and tombstone or update the superseded records. The revised
+stream must retain both the replacement provenance and the fact of revision.
+The current runtime supplies the queryable stream, deterministic replay
+substrate, and update/delete `ControlFragment` vocabulary; selective replay and
+journal-splice orchestration are not yet a normal runtime workflow.
 
 ## Placement Rules
 

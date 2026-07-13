@@ -102,8 +102,10 @@ Symbolic prose references resolve from current graph state when a fragment is
 generated. Changing one concept field therefore changes every later projection
 that reads it. An emitted journal fragment is normally a historical snapshot of
 what was disclosed at that step and must not silently rewrite when current state
-changes; replaying from corrected authored data may, of course, produce a new
-history.
+changes. A deliberate retcon operation may instead replay the realized path,
+regenerate affected attributed fragments, and preserve the revision through
+replacement/tombstone records. That is an explicit rewrite of the syuzhet, not a
+side effect of ordinary concept mutation.
 
 ## Compilation and World Assembly
 

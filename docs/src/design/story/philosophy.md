@@ -264,8 +264,8 @@ fits the evidence already fixed in the syuzhet.
 
 This suggests a useful distinction:
 
-- **Observed truth**: fixed because it has appeared in the journal or has been
-  explicitly committed by the runtime ledger.
+- **Observed truth**: fixed within one realized journal because it has appeared
+  there or has been explicitly committed by the runtime ledger.
 - **Committed hidden truth**: fixed internally, but not yet disclosed.
 - **Soft truth**: provisional assumptions used by planners or authorities, but
   still revisable if the story can re-solve coherently.
@@ -279,6 +279,12 @@ Under this model, retcon is not cheating.  It is a controlled narrative
 operation over soft truth, constrained by the observed ledger.  The design goal
 is not to make every possible hidden fact mutable forever.  It is to know which
 facts have become accountable to the reader and which facts remain negotiable.
+
+A tooling-level retcon can go further by producing a revised realized journal:
+replay the same path against corrected state, regenerate affected attributed
+fragments, and preserve tombstones or replacement lineage for the old version.
+That does not make observed truth soft inside the original history; it creates
+an auditable new revision of that history.
 
 ### Latent Hooks and Foreshadowing
 
