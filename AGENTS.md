@@ -224,6 +224,24 @@ full type map and rationale.**
   assume `docs/_build/` exists after the test suite; run an explicit docs build
   if a local server needs static HTML at the configured service path.
 
+## Feature workflow
+- Prefer one continuous implementation task and one design/planning task in a
+  shared checkout. Do not require a new thread, branch, worktree, or contract
+  artifact for every implementation phase.
+- For substantial changes, briefly identify the capability, canonical
+  chokepoint, affected surfaces, and validation before editing. Update the
+  nearest durable design note when the architectural contract changes.
+- Use `tangl-devref` and curated bundles for orientation, then verify claims in
+  the real files. If Poetry is unavailable only because it cannot create its
+  cache, use an existing project Python with the repository source paths or
+  fall back to targeted `rg`; do not install dependencies just for planning.
+- Reviews should compare the actual diff with canonical docs and behavioral
+  tests. CodeRabbit is supplementary; use the actual PR base SHA and inspect
+  unresolved inline threads rather than loading entire generated walkthroughs.
+- Keep graph materialization and mutation at setup or UPDATE boundaries when
+  PLANNING must remain repeatable. Check owner rebinding and fresh-process
+  Singleton availability whenever graph-owned state crosses persistence.
+
 ## Coding style
 - Target **Python 3.13**. Use `from __future__ import annotations` for forward
   references.

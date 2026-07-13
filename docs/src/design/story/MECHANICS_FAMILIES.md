@@ -311,6 +311,93 @@ against v38 contracts.
 
 ---
 
+## Mechanics Convergence
+
+The lower StoryTangl strata remain deliberately generic:
+
+- core supplies entities, registries, graphs, selectors, references, and
+  dispatch;
+- VM advances story state through phase-governed movement and activity on that
+  graph;
+- story projects committed graph activity through the journal.
+
+Mechanics overlay an interoperable vocabulary for the detailed things a
+participant can possess, inspect, alter, combine, contest, repair, move, and
+trade. They should not become separate game engines. Specialized interactions
+remain graph-native and share the same identity, phase, persistence,
+affordance, transaction, progression, and presentation contracts.
+
+The converging vocabulary is:
+
+- **assembly managers** own collections of durable components;
+- **components** carry identity, state, provenance, and facets;
+- **facets** describe capabilities without creating another dispatch system;
+- **interactive game handlers** adopt facets into contextual choices,
+  validation, costs, and outcomes;
+- **presence** projects graph state into dynamic descriptions and visible
+  affordances;
+- **media generation** may render those projections on demand;
+- **transactions** move ownership and value through explicit committed
+  operations;
+- **stats and progression** support evaluation, repair, racing, combat, and
+  improvement;
+- **StoryTanglish interaction vocabulary** expresses those operations through
+  portable choices, accepts contracts, fragments, UX events, and story-info
+  projections rather than client-specific widgets;
+- **journal projection** remains the narrative output surface.
+
+Convergence does not require every family to share one base class or generic
+manager. Each family keeps its own kernel and specialized folds while exchanging
+compatible identity, discovery, interaction, commitment, receipt, and projection
+artifacts through the existing runtime lifecycle.
+
+Credentials are the first demanding convergence case. A credential packet
+combines durable component identity, visible evidence, hidden truth, inspection
+findings, holder bindings, provenance, generated media, contextual choices,
+phase purity, replay, and persistence.
+
+Its central hidden-information rule is:
+
+> Contribute choices from visible existence; disclose hidden validity only
+> through committed resolution.
+
+Components contribute state and facet vocabulary. The credentials game handler
+continues to own menus, time costs, validation, mediation, and disclosure.
+Planning must not mutate graph state; graph-backed materialization belongs at a
+setup or UPDATE boundary.
+
+### Demonstration worlds as conformance surfaces
+
+The demonstration worlds are integration fixtures, not disposable examples.
+Each should exercise one or two pieces of the shared vocabulary before later
+worlds compose a broader range:
+
+- the credentials world exercises hidden-information inspection and mediation;
+- the hall-monitor reskin must prove that the credentials loop is
+  genre-neutral;
+- the logical-adder reskin exercises the same underlying logic through different
+  content and feeling;
+- the separate Twine-loader demo remains a codec surface while round-trip
+  fidelity and loss tracking mature; later it should support an explicit parity
+  comparison rather than replace the canonical reskin;
+- the sandbox / Colossal Cave world exercises movement among location nodes,
+  location-driven activity fan-out, presence, and mobile roles;
+- the CarWars worlds exercise vehicle assembly, inventory, repair, loadouts,
+  transactions, racing, and combat.
+
+The eventual robot chopshop is the comprehensive integration target. The player
+sources, evaluates, legalizes, repairs, modifies, races, and trades graph-owned
+robots while using sandbox behavior to move among the relevant activity hubs.
+Travel and arrival expose location-specific work, encounters, and mobile roles,
+so movement between the yard, inspection station, workshop, registry, market,
+and track also advances the surrounding story rather than merely selecting a
+different mechanics screen.
+
+A mechanics change is incomplete when its focused tests pass but the relevant
+demonstration worlds no longer compose or demonstrate the shared vocabulary.
+
+---
+
 ## CalvinCards as Exemplar
 
 `scratch/mechanics/calvin_cards` is the clearest local example of the target
@@ -337,11 +424,14 @@ grammars** rather than just “minigames.”
 
 ## Current Implementation Priorities
 
-1. Document the family model and promotion rules.
-2. Refresh nearby README and docs surfaces to match the model.
-3. Modernize `demographics` as the first facet-oriented spike.
-4. Rescue `presence` by promoting real outfit/loadout logic out of examples and
-   reducing `look` to a cleaner domain/runtime plus render shape.
-5. Later, grow `progression` and `assembly` into fuller story-capable families,
-   and convert `sandbox` / `credentials` from design notes into composed v38
-   implementations.
+1. Let the credentials game handler adopt component facets through the existing
+   choice, validation, UPDATE, receipt, and journal lifecycle.
+2. Retire credential compatibility fields only after the manager-backed and
+   authored projection paths have been exercised side by side.
+3. Build the hall-monitor reskin without adding credentials-specific engine
+   vocabulary.
+4. Connect credential components to presence and media projection.
+5. Reconcile vehicle and loadout vocabulary with assembly, transactions, and
+   progression.
+6. Exercise the combined vocabulary, sandbox traversal, and activity hubs in
+   the robot chopshop flow.

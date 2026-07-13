@@ -1,4 +1,0 @@
-interface:
-  display_name: "StoryTangl Feature"
-  short_description: "Plan bounded StoryTangl feature slices"
-  default_prompt: "Use $storytangl-feature to plan or review a StoryTangl feature slice."
