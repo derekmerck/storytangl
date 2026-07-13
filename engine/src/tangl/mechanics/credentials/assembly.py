@@ -52,9 +52,12 @@ class CredentialComponentToken(Token):
         """Return copied definition facets with token and packet provenance."""
 
         return [
-            facet.model_copy(deep=True).with_provenance(
-                source_id=str(self.uid),
-                subject_id=subject_id,
+            facet.model_copy(
+                deep=True,
+                update={
+                    "source_id": str(self.uid),
+                    "subject_id": subject_id,
+                },
             )
             for facet in self.facets
             if facet.matches(channel=channel, facet_type=facet_type)

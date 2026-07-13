@@ -296,6 +296,31 @@ def test_credential_token_facets_are_isolated_and_keep_packet_provenance() -> No
     }
 
 
+def test_credential_token_facets_replace_authored_provenance() -> None:
+    definition = credential_definition(
+        "provenance_work_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="credential_test",
+                facet_type="giver",
+                source_id="authored-source",
+                subject_id="authored-subject",
+            ),
+        ),
+    )
+    credential = credential_component("provenance-permit", definition)
+    manager = AssemblyCredentialPacketManager()
+    manager.assign(CREDENTIAL_PACKET_SLOT, credential)
+
+    gathered = manager.component_facets(channel="credential_test")
+
+    assert gathered[0].source_id == str(credential.uid)
+    assert gathered[0].subject_id == CREDENTIAL_PACKET_SLOT
+    assert definition.facets[0].source_id == "authored-source"
+    assert definition.facets[0].subject_id == "authored-subject"
+
+
 def test_repeated_credential_facet_discovery_does_not_mutate_graph_state() -> None:
     definition = credential_definition(
         "pure_faceted_permit",
