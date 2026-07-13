@@ -12,9 +12,10 @@ credentials domain import surface, graph-backed credential components, an
 owner-bound assembly packet manager, and a `CredentialCase` bridge behind the
 existing disposition protocol. Phase 5 now materializes sampled offers into an
 authoritative packet manager at setup and case-advance boundaries, and persists
-the hosted game through the normal constructor-form graph path. Move facets,
-expression narrative, contraband graph identity, and status decomposition remain
-future slices.
+the hosted game through the normal constructor-form graph path. Phase 6a has landed
+the pure credential-token facet bridge; `PHASE_6B_REQUEST_DOCUMENT_HANDOFF.md`
+specifies the first game-handler adoption slice. Expression narrative, contraband
+graph identity, and status decomposition remain future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -24,6 +25,8 @@ component-manager slots can participate in transaction offers through a holder a
 **Related docs:**
 
 - `engine/src/tangl/mechanics/credentials/CREDENTIAL_MECHANIC.md`
+- `engine/src/tangl/mechanics/credentials/PHASE_6A_FACET_BRIDGE_CONTRACT.md`
+- `engine/src/tangl/mechanics/credentials/PHASE_6B_REQUEST_DOCUMENT_HANDOFF.md`
 - `engine/src/tangl/mechanics/games/CREDENTIALS_LOOP_DESIGN.md`
 - `engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md`
 - `engine/src/tangl/mechanics/TRANSACTION_OFFER_DESIGN.md`
