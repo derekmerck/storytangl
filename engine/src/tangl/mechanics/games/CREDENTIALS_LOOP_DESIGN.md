@@ -1048,11 +1048,12 @@ Build Phase A accordingly: **no border/travel nouns baked into the kernel.**
 the abstract chain (Indication -> RestrictionLevel -> Presentation -> Outcome)
 and the generator live in the engine.
 
-### Worked second skin: Steam-Automata Chop Shop
+### Worked composite: Steam-Automata Chop Shop
 
 A notes-rich world concept (an underground robot fencing / modification ring)
-reskins the mechanic onto robot legality. Its data lives in a *sibling checkout*,
-not this repo:
+uses the credential mechanic for robot legality, but is deliberately broader
+than a credentials reskin. Its archived data lives in a *sibling checkout*, not
+this repo:
 `/Users/derek/dev/storytangl/scratch/old/worlds/chopshop/resources/`
 (`automata_credential_types.yaml`, `automata_parts_list.yaml`,
 `automata_upgrades.yaml`, `scene_notes.yaml`).
@@ -1068,6 +1069,37 @@ not this repo:
   `cloaking` are contraband (deny / arrest). Same Indication -> ... -> Outcome
   derivation, with candidate truth *computed from config* rather than authored
   directly.
+
+The catalogs repeatedly use three-value axes -- local / allied / hostile
+origins, ordinary / specialized / luxury purposes, and harmless / restricted /
+illegal capabilities. That symmetry makes authored content easy to reason about;
+it is not a runtime cardinality. A world may define two origins, five severity
+tiers, or four dispositions without changing the mechanic.
+
+More importantly, one assembled automaton is the semantic source for several
+mechanical projections:
+
+- its installed parts and upgrades derive credential indications and therefore
+  its compliance requirements;
+- those same parts and upgrades donate capability tags and situational effects
+  to stat challenges against the environment or another automaton;
+- installation, removal, repair, legalization, purchase, and sale become
+  contextual choices backed by transactions;
+- component condition, appearance, provenance, and permits contribute presence,
+  story-info, and journal projections;
+- challenge and training results can change stats or qualify later upgrades.
+
+The permits are evidence attached to the unit, not a duplicate statement of its
+construction. Compliance compares the indications derived from the current
+assembly with the presented evidence and current rules. Changing a component can
+therefore change legality, challenge behavior, visible description, and future
+growth without synchronizing several independent models.
+
+The old `Badge` vocabulary should likewise be read as an authoring precursor,
+not as a runtime type to restore. In the converged design, a manually installed
+upgrade is component-owned state, an automatic upgrade is derived from an
+assembly condition, and both expose their effects through facets adopted by the
+relevant credential, challenge, interaction, or projection handler.
 
 ### Direction: assess -> remediate (legalize) loop
 
@@ -1086,6 +1118,18 @@ that vary day-by-day with explicit exceptions**. Border rules and chop-shop
 permits are mostly static catalogs of who-needs-what; the Hall Monitor's daily
 rules compose several orthogonal exception axes on top of the indication
 catalog:
+
+The checkpoint side of this catalog comparison is preserved as reference data
+in `worlds/credential_gate/credential_types.reference.yaml`. It is not a live
+loader contract; it records which semantics belong to the mechanic and which
+nouns, seals, labels, and consequences belong to the skin.
+
+The comparison also exposes current convergence debt: the fixed `Indication`
+enum still contains checkpoint nouns such as `travel`, `weapon`, and `secrets`
+even though indication identifiers belong to the world catalog. A future
+catalogue contract should preserve the semantic categories (purpose versus
+controlled item) and restriction operations while allowing authored indication
+ids. Do not generalize by adding hall-monitor nouns to the engine enum.
 
 - **attribute thresholds** -- "no one with a grade lower than a B is allowed to
   go to the bathroom"

@@ -385,13 +385,26 @@ worlds compose a broader range:
 - the CarWars worlds exercise vehicle assembly, inventory, repair, loadouts,
   transactions, racing, and combat.
 
-The eventual robot chopshop is the comprehensive integration target. The player
-sources, evaluates, legalizes, repairs, modifies, races, and trades graph-owned
-robots while using sandbox behavior to move among the relevant activity hubs.
-Travel and arrival expose location-specific work, encounters, and mobile roles,
-so movement between the yard, inspection station, workshop, registry, market,
-and track also advances the surrounding story rather than merely selecting a
-different mechanics screen.
+The eventual robot chopshop is the comprehensive integration target. It is a
+capstone because one graph-owned assembly feeds several mechanics, not merely
+because several minigames appear in the same world. Installed parts and upgrades
+derive legality indications, challenge effects and capability tags, visible
+condition, available work, and progression opportunities. Permits authorize
+derived indications but do not duplicate assembly truth. Repair, installation,
+legalization, purchase, and sale then commit changes to that same object.
+
+The player sources, evaluates, legalizes, repairs, modifies, races, and trades
+those robots while using sandbox behavior to move among the relevant activity
+hubs. Travel and arrival expose location-specific work, encounters, and mobile
+roles, so movement between the yard, inspection station, workshop, registry,
+market, and track also advances the surrounding story rather than merely
+selecting a different mechanics screen.
+
+The archived catalogs favor symmetric three-value axes such as benign / neutral
+/ harmful. Treat that as an authoring discipline, not an engine cardinality or a
+reason to hard-code world enums. The convergence proof is that the same authored
+component can contribute through several established facet channels while each
+handler retains its specialized fold.
 
 A mechanics change is incomplete when its focused tests pass but the relevant
 demonstration worlds no longer compose or demonstrate the shared vocabulary.
