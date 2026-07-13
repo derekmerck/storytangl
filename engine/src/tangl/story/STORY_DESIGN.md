@@ -85,6 +85,8 @@ Keep the following facts distinct:
   relationships or relationship-like story state;
 - committed encounters belong to ledger/receipt history and may deliberately
   mutate the participating concepts or relationships;
+- recoverable questions about prior narration should remain derived queries over
+  attributed journal fragments and their stable concept references;
 - narrator identification and disclosure belong to concept-local
   `EntityKnowledge`;
 - template lineage and planning bindings belong to `StoryGraph` provenance;
@@ -95,6 +97,13 @@ In particular, planning a concept into a scene does not imply a diegetic
 encounter. Disclosing it may update narrator knowledge; traversing and committing
 an interaction may update relationship state. Handlers must not infer one of
 those facts merely from another surface's bookkeeping.
+
+Symbolic prose references resolve from current graph state when a fragment is
+generated. Changing one concept field therefore changes every later projection
+that reads it. An emitted journal fragment is normally a historical snapshot of
+what was disclosed at that step and must not silently rewrite when current state
+changes; replaying from corrected authored data may, of course, produce a new
+history.
 
 ## Compilation and World Assembly
 

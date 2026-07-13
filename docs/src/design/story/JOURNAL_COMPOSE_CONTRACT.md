@@ -76,6 +76,29 @@ When a fragment carries `step`, `source_id`, `origin_id`, `tags`, or hint models
 a transform must preserve those fields unless the replacement fragment explicitly
 supersedes them and still carries an equivalent provenance trail.
 
+## Semantic Attribution And Derived History
+
+Fragment identity and attribution make the realized journal queryable story
+state, not merely rendered text. `source_id` identifies the entity or edge that
+donated ordinary content, `origin_id` preserves the producer trail, and
+attributed dialog may additionally carry stable `speaker_id` and speaker
+metadata. Composition must preserve these references.
+
+`Ledger.get_slice()` exposes the ordered fragment stream with optional
+`Selector` filtering. Higher-level story queries can therefore derive facts such
+as a concept's first appearance, its most recent attributed line, or every
+fragment donated by one interaction. Do not cache those answers as mutable
+concept fields unless a concrete performance or policy requirement justifies a
+separate index.
+
+Prose references are late-bound while generating a fragment. A template such as
+`<dragon.color>` reads the dragon's current state, so a runtime change affects
+subsequent projections and an authored correction affects a recompiled or
+replayed story. Once emitted, however, the fragment records what was disclosed
+at that historical step. Current-state changes must not silently rewrite past
+journal content; explicit reference/control fragments may update a live
+presentation while the authoritative stream retains its provenance.
+
 ## Placement Rules
 
 - VM render: produce raw ordered fragment contributions

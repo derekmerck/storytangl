@@ -144,8 +144,16 @@ Different kinds of continuity still belong in different places:
 | What is it wearing or carrying? | Durable assignments, holdings, or other relationships |
 | How does this person regard another? | Actor-to-actor relationship state |
 | What committed interaction occurred? | Ledger history, receipts, and consequent concept/relationship mutations |
+| What did this concept previously contribute or say? | Derived query over attributed journal fragments |
 | What has this narrator identified or disclosed? | Concept-local narrator knowledge |
 | Where did this runtime concept or binding come from? | Template, provisioning, and projection provenance |
+
+Prefer derived history queries over cached summary flags when the journal
+already contains the answer. Attributed dialog fragments retain stable speaker
+identity, and other fragments retain source and origin provenance. The first or
+last thing a dragon said can therefore be recovered from the ordered journal;
+it does not need `dragon.first_line` and `dragon.last_line` fields that can drift
+away from the realized story.
 
 Descriptions are derived views over those facts. A person's prose can mention
 the current outfit and relationship posture; a weapon can render as "a sword"
