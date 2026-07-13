@@ -71,6 +71,31 @@ longer part of the runtime design.
 factory is a `World`. The factory is the authority; the graph is the per-story
 instance state.
 
+## Continuity State Placement
+
+Recurring story nouns should be durable graph concepts rather than reconstructed
+from passage-local flags. Their current state and identity survive across scenes,
+while scoped namespace gathering and journal composition derive the description
+and opportunities appropriate to the current cursor.
+
+Keep the following facts distinct:
+
+- intrinsic and component state belongs to the concept or its owned managers;
+- holdings, assignments, familiarity, and social posture belong to explicit
+  relationships or relationship-like story state;
+- committed encounters belong to ledger/receipt history and may deliberately
+  mutate the participating concepts or relationships;
+- narrator identification and disclosure belong to concept-local
+  `EntityKnowledge`;
+- template lineage and planning bindings belong to `StoryGraph` provenance;
+- generated actions and journal fragments are projections, not additional
+  authoritative copies of the facts they render.
+
+In particular, planning a concept into a scene does not imply a diegetic
+encounter. Disclosing it may update narrator knowledge; traversing and committing
+an interaction may update relationship state. Handlers must not infer one of
+those facts merely from another surface's bookkeeping.
+
 ## Compilation and World Assembly
 
 `StoryCompiler` validates authored script data and produces:

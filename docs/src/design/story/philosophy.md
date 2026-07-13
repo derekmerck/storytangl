@@ -120,6 +120,54 @@ This is not a theoretical nicety.  It means you can test structural properties
 any traversal happens, and you can replay a specific syuzhet deterministically
 from a snapshot plus a choice log.
 
+## Concepts As Continuity Anchors
+
+The practical motivation for the graph is continuity. Branching authoring tools
+make it easy to accumulate scattered booleans such as `met_dragon`,
+`has_special_sword`, or `helped_pirate`, then forget which later passages should
+read or update them. A story developed in phases can therefore contradict its
+own earlier events even when every local branch is individually correct.
+
+StoryTangl instead encourages authors to reify a recurring noun as one durable,
+addressable concept. The person, sword, dragon, robot, permit, or place persists
+as the same graph-owned thing wherever it reappears. It can carry current state,
+participate in relationships, retain committed interaction history, contribute
+affordances, and project its own context-sensitive description. Later content
+queries or gathers that concept rather than reconstructing it from a collection
+of passage-local flags.
+
+Different kinds of continuity still belong in different places:
+
+| Question | Continuity surface |
+| --- | --- |
+| What is this thing currently like? | Concept state, facets, components, and managers |
+| What is it wearing or carrying? | Durable assignments, holdings, or other relationships |
+| How does this person regard another? | Actor-to-actor relationship state |
+| What committed interaction occurred? | Ledger history, receipts, and consequent concept/relationship mutations |
+| What has this narrator identified or disclosed? | Concept-local narrator knowledge |
+| Where did this runtime concept or binding come from? | Template, provisioning, and projection provenance |
+
+Descriptions are derived views over those facts. A person's prose can mention
+the current outfit and relationship posture; a weapon can render as "a sword"
+before identification and "Glamdring" afterward; a mobile actor can contribute
+different interactions after an earlier encounter. The prose is not another
+authoritative copy of the state it describes.
+
+This distinction also prevents several seductive category errors. A dragon
+being considered or bound by the planner is not the same as the dragon meeting
+the player. A dragon appearing in disclosed prose or a visible choice can change
+reader or narrator knowledge without changing the dragon's knowledge. Only a
+committed diegetic interaction should establish that the dragon recognizes,
+likes, fears, or remembers the player. Planning provenance, disclosure state,
+and world relationships may inform one another, but they are not interchangeable.
+
+Durable concepts do not eliminate authorial responsibility or infer facts that
+were never recorded. They make consequences composable. When an interaction is
+expressed through a semantic operation and receipt, a later mechanic can begin
+responding to that operation without teaching every earlier passage a new
+boolean. If an old event recorded only prose, recovering its missing semantics
+still requires an explicit migration or reinterpretation.
+
 ---
 
 ## The Compiler Metaphor
