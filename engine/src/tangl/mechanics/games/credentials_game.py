@@ -33,6 +33,7 @@ from tangl.journal.fragments import (
     PresentationHints,
 )
 from tangl.mechanics.credentials.assembly import (
+    CREDENTIAL_PACKET_SLOT,
     CredentialPacketManager as AssemblyCredentialPacketManager,
     materialize_packet,
 )
@@ -1017,9 +1018,9 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # mediation is indistinguishable from a dud until it is committed. (The
         # outcome is disclosed by running the move, not by its presence.)
         #
-        # request_document: offer for every presented permit not yet requested.
-        for token in case.document_credentials():
-            key = token.indication.value
+        # request_document: offer for every contributing permit not yet requested.
+        for indication in self._request_document_indications(case):
+            key = indication.value
             if key in game.finding_status:
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
@@ -1038,6 +1039,33 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if FindingKey.RELINQUISH not in game.finding_status and self._has_declared_contraband(game):
             moves.append(CredentialsMove(kind="request_relinquish", target=""))
         return moves
+
+    @staticmethod
+    def _request_document_indications(case: CredentialCase) -> list[Indication]:
+        """Return visible document indications that semantically offer reissue."""
+
+        if case.packet_manager is None:
+            return [credential.indication for credential in case.document_credentials()]
+
+        components_by_id = {
+            str(component.uid): component
+            for component in case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
+        }
+        indications: list[Indication] = []
+        for facet in case.packet_manager.component_facets(
+            channel="choice",
+            facet_type="giver",
+        ):
+            if (
+                facet.payload != "request_document"
+                or facet.subject_id != CREDENTIAL_PACKET_SLOT
+            ):
+                continue
+            assert facet.source_id is not None
+            indication = components_by_id[facet.source_id].indication
+            if indication not in indications:
+                indications.append(indication)
+        return indications
 
     def get_provisioned_moves(self, game: CredentialsGame) -> list[CredentialsMove]:
         moves = list(self.get_available_moves(game))
@@ -1328,7 +1356,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         #   valid       -> they re-present the same sound permit ("verified");
         #   crime        -> the forgery cannot be reissued; it stands ("confirmed").
         # Only a cleared mitigatable finding upgrades derive_disposition.
-        permit = game.active_case.credential_for(Indication(indication_value))
+        indication = Indication(indication_value)
+        if indication not in self._request_document_indications(game.active_case):
+            detail["outcome"] = "request_document_not_applicable"
+            detail["target_indication"] = indication_value
+            return RoundResult.CONTINUE
+
+        permit = game.active_case.credential_for(indication)
         if permit is None:  # off-menu safety; receive_move does not validate
             detail["outcome"] = "request_document_not_applicable"
             detail["target_indication"] = indication_value

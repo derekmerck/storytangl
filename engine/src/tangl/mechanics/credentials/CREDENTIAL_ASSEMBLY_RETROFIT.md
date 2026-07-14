@@ -12,10 +12,13 @@ credentials domain import surface, graph-backed credential components, an
 owner-bound assembly packet manager, and a `CredentialCase` bridge behind the
 existing disposition protocol. Phase 5 now materializes sampled offers into an
 authoritative packet manager at setup and case-advance boundaries, and persists
-the hosted game through the normal constructor-form graph path. Phase 6a has landed
-the pure credential-token facet bridge; `PHASE_6B_REQUEST_DOCUMENT_HANDOFF.md`
-specifies the first game-handler adoption slice. Expression narrative, contraband
-graph identity, and status decomposition remain future slices.
+the hosted game through the normal constructor-form graph path. Phase 6a landed the
+pure credential-token facet bridge, and Phase 6b landed its first consumer:
+`CredentialsGameHandler` derives the existing `request_document` move from the exact
+`choice / giver / request_document` facet on a manager-backed document. The handler
+remains the choice and resolution authority; flat cases remain a temporary fallback.
+Expression narrative, contraband graph identity, document-identity receipts, and
+status decomposition remain future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -431,9 +434,18 @@ Acceptance:
 
 ### Phase 6: Adopt Component Facets For Contributions
 
-Only after the VM phase-trigger/component-contribution shape is settled:
+Status: Phase 6a and the bounded 6b `request_document` adoption are landed. Phase 6a
+added pure token-to-packet facet discovery with constructor-form persistence proof.
+Phase 6b adds the generated non-id document `choice / giver / request_document`
+contribution and lets `CredentialsGameHandler` lower it into the existing
+indication-based move only when an assembly packet manager is present. It preserves
+the flat compatibility case path, existing labels, accepts, time cost, outcomes, and
+journal prose. A facetless manager document contributes no move, and the selected
+move path uses the same availability rule.
 
-- model credential-provided inspection moves as component facets;
+Later slices may:
+
+- model further credential-provided inspection moves as component facets;
 - model document media projection as a media facet or direct adapter;
 - model score/disposition modifiers as game/credential channels;
 - keep mutation in the existing game UPDATE path or transaction offers.

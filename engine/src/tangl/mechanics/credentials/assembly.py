@@ -179,6 +179,7 @@ def _definition_for(
         indication=token.indication,
         document_kind=document_kind,
         requires_id=token.requires_id,
+        facets=_default_definition_facets(document_kind),
     )
 
 
@@ -198,6 +199,18 @@ def _definition_label(
     )
 
 
+def _default_definition_facets(document_kind: str) -> tuple[ComponentFacet, ...]:
+    if document_kind == "document":
+        return (
+            ComponentFacet(
+                channel="choice",
+                facet_type="giver",
+                payload="request_document",
+            ),
+        )
+    return ()
+
+
 def ensure_default_credential_definitions() -> None:
     """Load the finite definition catalog used by generated credential packets."""
 
@@ -215,6 +228,7 @@ def ensure_default_credential_definitions() -> None:
                         indication=indication,
                         document_kind=document_kind,
                         requires_id=requires_id,
+                        facets=_default_definition_facets(document_kind),
                     )
 
 

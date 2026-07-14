@@ -1,5 +1,20 @@
 # Credentials Phase 6b: Facet-Backed `request_document`
 
+## Status
+
+Implemented 2026-07-14. Generated non-id document definitions now contribute the
+exact `choice / giver / request_document` facet. `CredentialsGameHandler` consumes
+that contribution only for manager-backed cases, resolves token provenance back to the
+packet slot, and retains the flat case loop only when no manager exists. The same
+availability rule protects selected moves, so a facetless manager-backed document is
+non-applicable even if a client submits the legacy move directly.
+
+The slice preserves the existing labels, accepts, time cost, finding outcomes, and
+journal text. Tests cover flat/manager parity, facetless suppression, visible-status
+secrecy, pure repeated availability/provisioning, constructor-form graph round trips,
+and the normal `HasGame` UPDATE path. Document identity remains intentionally deferred:
+the existing move and receipt contract is indication-based.
+
 ## Implementation prompt
 
 Implement the first credentials game consumer of the Phase 6a facet bridge on current
