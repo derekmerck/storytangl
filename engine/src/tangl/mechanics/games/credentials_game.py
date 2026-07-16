@@ -34,6 +34,7 @@ from tangl.journal.fragments import (
 )
 from tangl.mechanics.credentials.assembly import (
     CREDENTIAL_PACKET_SLOT,
+    CredentialComponent,
     CredentialPacketManager as AssemblyCredentialPacketManager,
     materialize_packet,
 )
@@ -1047,12 +1048,26 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if case.packet_manager is None:
             return [credential.indication for credential in case.document_credentials()]
 
+        return [
+            component.indication
+            for component in CredentialsGameHandler._request_document_components(
+                case.packet_manager
+            )
+        ]
+
+    @staticmethod
+    def _request_document_components(
+        manager: AssemblyCredentialPacketManager,
+    ) -> list[CredentialComponent]:
+        """Return the first packet component contributing each request target."""
+
         components_by_id = {
             str(component.uid): component
-            for component in case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
+            for component in manager.get_slot(CREDENTIAL_PACKET_SLOT)
         }
-        indications: list[Indication] = []
-        for facet in case.packet_manager.component_facets(
+        components: list[CredentialComponent] = []
+        indications: set[Indication] = set()
+        for facet in manager.component_facets(
             channel="choice",
             facet_type="giver",
         ):
@@ -1062,10 +1077,32 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             ):
                 continue
             assert facet.source_id is not None
-            indication = components_by_id[facet.source_id].indication
-            if indication not in indications:
-                indications.append(indication)
-        return indications
+            component = components_by_id[facet.source_id]
+            if component.indication not in indications:
+                components.append(component)
+                indications.add(component.indication)
+        return components
+
+    @staticmethod
+    def _request_document_credential(
+        case: CredentialCase,
+        indication: Indication,
+    ) -> CredentialToken | None:
+        """Return the credential whose facet contributed this request target."""
+
+        if case.packet_manager is None:
+            return case.credential_for(indication)
+        component = next(
+            (
+                component
+                for component in CredentialsGameHandler._request_document_components(
+                    case.packet_manager
+                )
+                if component.indication is indication
+            ),
+            None,
+        )
+        return component.to_credential_token() if component is not None else None
 
     def get_provisioned_moves(self, game: CredentialsGame) -> list[CredentialsMove]:
         moves = list(self.get_available_moves(game))
@@ -1362,7 +1399,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             detail["target_indication"] = indication_value
             return RoundResult.CONTINUE
 
-        permit = game.active_case.credential_for(indication)
+        permit = self._request_document_credential(game.active_case, indication)
         if permit is None:  # off-menu safety; receive_move does not validate
             detail["outcome"] = "request_document_not_applicable"
             detail["target_indication"] = indication_value

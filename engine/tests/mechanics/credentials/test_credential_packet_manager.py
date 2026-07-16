@@ -35,6 +35,7 @@ from tangl.mechanics.games.credentials_game import (
     CredentialsMove,
     CredentialsGame,
     CredentialsGameHandler,
+    Finding,
     derive_disposition,
 )
 from tangl.mechanics.games.credentials_roster import ScenarioOffer
@@ -274,6 +275,45 @@ def test_facetless_manager_document_cannot_request_reissue() -> None:
     assert moves == []
     handler.receive_move(game, ("request_document", IND.WORK.value))
     assert game.finding_status == {}
+
+
+def test_manager_request_document_resolves_the_contributing_component() -> None:
+    facetless_definition = credential_definition("facetless_work_permit", IND.WORK)
+    contributing_definition = credential_definition(
+        "contributing_work_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="choice",
+                facet_type="giver",
+                payload="request_document",
+            ),
+        ),
+    )
+    manager = AssemblyCredentialPacketManager(purpose=IND.WORK)
+    manager.assign(
+        CREDENTIAL_PACKET_SLOT,
+        credential_component(
+            "facetless-forged-work-permit",
+            facetless_definition,
+            status=S.FORGED,
+        ),
+    )
+    manager.assign(
+        CREDENTIAL_PACKET_SLOT,
+        credential_component(
+            "contributing-missing-seal-work-permit",
+            contributing_definition,
+            status=S.MISSING_SEAL,
+        ),
+    )
+    game, handler, moves = staged_request_document_moves(CredentialCase(packet_manager=manager))
+
+    assert moves == [CredentialsMove(kind="request_document", target=IND.WORK.value)]
+
+    handler.receive_move(game, ("request_document", IND.WORK.value))
+
+    assert game.finding_status == {IND.WORK.value: Finding.CLEARED}
 
 
 def test_manager_request_document_menu_does_not_reveal_credential_status() -> None:
