@@ -2,23 +2,29 @@
 
 ## Status
 
-Implemented 2026-07-16. World manifests now declare generic singleton asset
-sources; `AssetCompiler` loads qualified `CredentialDefinition` catalogs through
-the world class registry into `World.assets`. Credentials games opt into a catalog
-with an explicit namespace, retain generated defaults when no namespace is set, and
-use a small data-only presentation profile for `request_document` wording. Origin and
-indication coordinates accept authored strings while the existing checkpoint enums
-remain convenience constants. The credential-gate catalog is live, and a compiled
-Hall Monitor fixture proves a different vocabulary and prose over the same normalized
-move and outcome code.
+**REVISION REQUIRED (2026-07-17).** The first implementation proved generic authored
+singleton loading, open credential coordinates, and different prose over the same
+normalized operation. It also exposed an authority mismatch: the game carries a
+world-valued `catalog_namespace`, then credential lookup searches the process-global
+`CredentialDefinition` population. World nomination and qualified singleton labels
+prevent identity collisions, but they do not make a token catalog a bounded world
+resource.
+
+The revised contract keeps the authored-data and projection work while correcting
+catalog authority. A world exposes named, bounded token catalogs. A credentials scenario
+type selects one of those catalogs by a world-local reference. Packet materialization
+searches only that catalog's explicit members. World identity remains implicit in the
+story graph's bound factory, while qualified singleton labels remain an internal
+persistence detail.
 
 ## Implementation prompt
 
 Implement the next credentials-convergence slice after Phase 6b. The capability is:
 
-> A world can author credential definitions and skin vocabulary as data, while the
-> credentials kernel continues to operate on stable semantic identifiers and the
-> existing facet/game lifecycle.
+> A world can expose one or more bounded credential catalogs and skin vocabularies,
+> while a credentials scenario type adopts one local catalog and the credentials kernel
+> continues to operate on stable semantic identifiers through the existing facet/game
+> lifecycle.
 
 Read `ARCHITECTURE.md`, `agents.md`, this file,
 `PHASE_6B_REQUEST_DOCUMENT_HANDOFF.md`, `CREDENTIAL_ASSEMBLY_RETROFIT.md`,
@@ -27,16 +33,19 @@ Read `ARCHITECTURE.md`, `agents.md`, this file,
 `loaders/compilers/asset_compiler.py`, and `story/STORY_DESIGN.md` before editing.
 
 Use the existing world compilation and asset-authority seam. Add the smallest generic
-world asset-source declaration needed for a YAML mapping of singleton definitions, and
-make `AssetCompiler` load it into the world's existing assets facet. Do not add a
-credentials-specific manifest field, a second YAML loader, a catalog-plugin registry,
-or import-time world-module side effects. Resolve the declared singleton kind through
-the world/domain class registry already assembled by `WorldCompiler`.
+named asset-catalog declaration needed for a YAML mapping of singleton definitions, and
+make `AssetCompiler` load it into the world's existing assets facet as an explicit
+bounded `TokenCatalog`. Do not add a credentials-specific manifest field, a second YAML
+loader, a catalog-plugin registry, or import-time world-module side effects. Resolve the
+declared singleton kind through the world/domain class registry already assembled by
+`WorldCompiler`.
 
 Convert `worlds/credential_gate/credential_types.reference.yaml` into live authored
 input through that path. Each entry must lower to a `CredentialDefinition`, including
-its exact `choice / giver / request_document` facet where appropriate. Generated
-defaults remain the fallback for worlds that do not provide a catalog.
+its exact `choice / giver / request_document` facet where appropriate. Existing
+generated definitions may remain available through an explicitly exposed stock catalog
+for compatibility, but neither authored nor stock lookup may fall back to every loaded
+Singleton of the requested class.
 
 Make the live file conform to the actual model rather than teaching the generic loader
 credential aliases. `name`, allowed origin ids, validity period, issuer/seal group,
@@ -45,14 +54,22 @@ definition data and may be added as small typed `CredentialDefinition` fields. T
 not acquire expiration or seal-validation behavior in this slice. Reject unknown
 catalog fields instead of silently dropping reference data.
 
-Give an authored credentials game/packet an explicit catalog namespace rather than
-looking for an ambient “current world.” Thread that namespace through the existing
-setup/case-arrival materialization call. `_definition_for()` must select one loaded
-definition in that namespace by the current document coordinates (`document_kind`,
-`indication`, and `requires_id`), or honor an explicit definition ref when authored
-packet data needs to distinguish two documents with the same coordinates. A configured
-catalog with no unique match is an authoring error; it must not silently fall back to a
-generated default. No catalog configured means the existing generated-default path.
+Give an authored credentials **scenario type** a world-local catalog reference rather
+than a world namespace. Resolve that reference through the current story graph's bound
+world authority at setup/case-arrival materialization, then pass the selected catalog or
+its bounded member source downward. `_definition_for()` must select one definition from
+that catalog by the current document coordinates (`document_kind`, `indication`, and
+`requires_id`), or honor an explicit definition ref when authored packet data must
+distinguish two documents with the same coordinates. A selected catalog with no unique
+match is an authoring error; it must not silently fall back to a stock or process-global
+definition.
+
+Do not put a world label on `CredentialsGame`, `CredentialPacketManager`, or the
+compatibility credential value. World authority is structural: the story graph is bound
+to one world/factory, and only catalogs that authority exposes are candidates. A generic
+scenario may carry a local `catalog_ref`; a bespoke subtype such as
+`BorderCheckpointBlock` or `HallMonitorBlock` may hard-code that reference together with
+its own actions, dispositions, and policy adjustments.
 
 Untie world coordinates from the fixed checkpoint enums. Credential origin and
 indication fields become opaque authored string identifiers throughout the packet,
@@ -70,14 +87,17 @@ the existing request outcomes. Its defaults must reproduce the checkpoint behavi
 Do not put labels, prose, accepts, validity predicates, or outcome policy in the facet.
 Do not create a skin-specific handler subclass.
 
-Prove the boundary with two compiled fixtures:
+Prove the boundary with compiled fixtures covering both dimensions of scope:
 
 1. `credential_gate` loads its real catalog and preserves its current semantic moves,
    disclosure behavior, dispositions, and visible checkpoint wording.
-2. A minimal Hall Monitor fixture uses school-owned origin and indication identifiers,
-   school document names, and school wording. It produces the same normalized
-   `request_document` move and cleared/verified/confirmed outcomes through the same
-   handler, but different `ChoiceFragment` and journal text.
+2. A minimal combined-world fixture exposes both border and school catalogs. Two
+   scenario types adopt different local catalog refs; the Hall Monitor variant uses
+   school-owned identifiers, document names, and wording while producing the same
+   normalized `request_document` outcomes through the same kernel.
+3. A separately compiled world may reuse the same local catalog and item ids with
+   different definitions. Neither world's scenario can see or select the other's
+   catalog, and compiling both in one process does not collide or leak offers.
 
 The Hall Monitor fixture is a conformance proof, not the full demo world. Do not convert
 the other mediation moves, retire flat `CredentialCase` fields, add credential media,
@@ -114,7 +134,8 @@ Today three things prevent that proof:
 - `CredentialsGameHandler` hard-codes checkpoint wording for the operation it now
   discovers semantically.
 
-Phase 6c removes those three constraints without changing the game kernel.
+Phase 6c removes those three constraints without changing the game kernel, and it proves
+that world authority bounds which catalogs a scenario type may adopt.
 
 ## Canonical boundaries
 
@@ -133,30 +154,48 @@ WorldBundle / WorldManifest
 
 `AssetCompiler` is the chokepoint for authored singleton catalogs. It is currently a
 small placeholder, which is preferable to creating another loader. Add one explicit
-source shape, conceptually:
+named source shape, conceptually:
 
 ```yaml
 assets:
   - asset_kind: CredentialDefinition
+    catalog: border
     source: credential_types.yaml
 ```
 
-The exact field spelling may follow nearby loader conventions, but the contract is one
-generic asset-kind-plus-source declaration. The compiler reads the YAML mapping, resolves
-`CredentialDefinition` from the already loaded world class registry, and constructs the
-catalog through the singleton's ordinary constructor/load path. It does not teach the
-generic loader credential fields or add data-driven runtime casting.
+The exact field spelling may follow nearby loader conventions, but the contract separates
+three identities: the compiling world, a world-local catalog id, and an item id local to
+that catalog. The compiler reads the YAML mapping, resolves `CredentialDefinition` from
+the already loaded world class registry, constructs definitions through the singleton's
+ordinary constructor/load path, and retains their explicit membership in one named
+`TokenCatalog`. It does not teach the generic loader credential fields or add data-driven
+runtime casting.
 
-The compiled definitions should remain available through the existing world assets
-authority. Do not add another global catalog registry or make the credentials mechanic
-import story/loaders upward.
+The assets facet must expose its named catalogs through the existing world token-catalog
+authority. `TokenCatalog.find_all()` and `chain_find_all()` must iterate the catalog's
+explicit member source rather than `wst._instances`. Do not add another global catalog
+registry or make the credentials mechanic import story/loaders upward.
 
 Runtime packet construction must not reach upward into `World` or `WorldCompiler` to
-find that authority. The world config supplies the stable catalog namespace to its
-`CredentialsGame`; the credentials layer resolves the already-loaded singleton
-definitions through its own typed catalog using `Selector`, not an ad hoc loop or
-`getattr` probing. This keeps world compilation responsible for loading and mechanics
-responsible for consuming definitions it has explicitly been configured to use.
+find that authority. Existing factory/context provisioning supplies only catalogs exposed
+by the story graph's bound world. The scenario type selects a world-local catalog from
+that bounded set; the credentials layer resolves definitions within the selected typed
+catalog using `Selector`, not an ad hoc loop, unrestricted Singleton query, or `getattr`
+probing. This keeps world compilation responsible for availability, scenario types
+responsible for adoption, and mechanics responsible for consuming the selected
+definitions.
+
+The four layers for this slice are:
+
+```text
+World exposes border and/or school catalogs
+  -> scenario type selects one catalog and defines actions/dispositions
+     -> scenario instance configures roster size, distribution, and special cases
+        -> encounter owns one character, packet, applicable rules, and expected disposition
+```
+
+Phase 6c need not build the full scenario-instance generator, but its catalog API must fit
+that hierarchy rather than treating a world name as game configuration.
 
 ### Process-global Singleton identity
 
@@ -165,19 +204,20 @@ references serialize as `(kind, label)`. World-authored local labels therefore n
 stable internal qualification, for example:
 
 ```text
-credential_gate:work_permit
-hall_monitor:work_permit
+checkpoint_world:border:work_permit
+combined_world:school:activity_pass
 ```
 
-The YAML key remains the local authored id; the compiler derives the qualified singleton
-label from world identity. Display names remain authored content and must not be inferred
-from the qualified label.
+The YAML key remains the local authored item id; the catalog id is local to the world;
+the compiler derives the qualified singleton label from world, catalog, and item identity.
+Display names remain authored content and must not be inferred from the qualified label.
 
 Compilation must be idempotent in one process:
 
 - first compile creates the qualified singleton;
 - recompiling the same world with equivalent data reuses it;
-- the same local id in another world creates a distinct qualified singleton;
+- two catalogs in one world may reuse an item id without collision;
+- the same catalog and item ids in another world create a distinct qualified singleton;
 - conflicting data for an already-qualified label is a compile error;
 - compiling a world must never clear a singleton registry used by another live world or
   story.
@@ -209,11 +249,19 @@ Update all canonical credential surfaces consistently:
   detail payloads;
 - default/demo catalogs and tests.
 
-Catalog selection is configuration, not hidden process state. A minimal shape is a
-`catalog_namespace: str | None` on the authored credentials game (passed into packet
-materialization) plus an optional `definition_ref` on the compatibility credential
-value when an author must select a specific carrier. Do not infer a world from global
-singleton contents, the current working directory, or import order.
+Catalog selection is scenario-type configuration, not hidden process state. A minimal
+shape is a world-local `catalog_ref` on the authored credentials scenario type plus an
+optional item-local `definition_ref` on the compatibility credential value when an author
+must select a specific carrier. A bespoke scenario subtype may fix `catalog_ref` as a
+class/default policy rather than expose it in every script instance. Resolve the local
+catalog ref only against catalogs exposed by the bound world. Do not encode a world name
+on the game, infer a world from Singleton contents, or depend on working directory or
+import order.
+
+An explicit item reference such as `border:passport` and a catalog-scoped selector such
+as `catalog_ref=border, document_kind=id-card` are logically equivalent. The abbreviated
+form must resolve uniquely within the selected catalog. Zero or multiple matches are
+authoring errors unless the scenario explicitly selects an item.
 
 String identifiers must round-trip directly and remain JSON-safe. Replace `.value`
 projections and enum `is` comparisons on these two axes with direct string use and
@@ -287,23 +335,33 @@ authoring choice, never a schema constraint.
 
 ## Expected edit surface
 
+- `tangl/core/token.py`
+  - make each `TokenCatalog` a named, bounded view over explicit definitions;
+  - make all catalog queries iterate that view rather than the wrapped Singleton class's
+    process-global registry.
+- `tangl/story/fabula/world.py` and the existing factory/context catalog path
+  - expose only catalogs nominated by the current world assets/domain authority;
+  - preserve the existing downward dependency direction.
 - `tangl/loaders/manifest.py`, `bundle.py`, `compiler.py`, and
   `compilers/asset_compiler.py`
-  - add and compile one generic singleton asset-source declaration;
-  - retain compiled definitions through `World.assets`.
+  - add and compile one generic named singleton-catalog source declaration;
+  - retain explicit catalog membership through `World.assets`;
+  - support more than one catalog of the same definition kind in a world.
 - `tangl/mechanics/credentials/domain.py` and `assembly.py`
   - accept authored string coordinates;
   - add the small immutable name/origin/period/issuer fields required to preserve the
     live catalog without loss;
-  - preserve exact facet templates and default-catalog fallback.
+  - resolve only within the selected catalog and preserve exact facet templates.
 - `tangl/mechanics/games/credentials_*`
   - migrate origin/indication use to opaque ids;
-  - thread explicit catalog selection through setup/case-arrival materialization;
+  - replace world-valued catalog namespace with a world-local scenario-type catalog ref;
+  - thread the resolved bounded catalog through setup/case-arrival materialization;
   - add data-driven request-document realization without changing resolution.
 - `worlds/credential_gate`
-  - make the reference catalog live and preserve checkpoint behavior.
+  - make the named border reference catalog live and preserve checkpoint behavior.
 - focused loader, credentials, service/story-info, integration, and persistence tests
-  - add two-world collision/idempotency and two-skin parity proofs.
+  - add one-world/two-catalog selection, two-world isolation/idempotency, and two-skin
+    parity proofs.
 
 Do not broaden generic loaders beyond the one concrete source form needed here. If the
 existing world asset seam cannot retain the compiled catalog without a second authority,
@@ -315,15 +373,17 @@ package.
 | Concern | Required evidence |
 | --- | --- |
 | Canonical loading | one WorldCompiler/AssetCompiler path; no direct world YAML reads or import side effects |
-| Singleton identity | stable world-qualified labels; same-world idempotency; two-world isolation; conflict diagnostic |
-| Catalog selection | explicit game/packet namespace; unique coordinate match or explicit definition ref; no ambient-world lookup |
+| Bounded catalog | `TokenCatalog` queries explicit members; no query walks all instances of the wrapped Singleton class |
+| Singleton identity | stable world/catalog/item-qualified labels; same-world idempotency; intra-world and inter-world collisions remain distinct; conflict diagnostic |
+| World authority | a scenario sees only catalogs exposed by its graph's bound world; another loaded world's catalogs do not leak |
+| Catalog selection | scenario type selects a world-local catalog ref; unique catalog-scoped coordinate match or explicit item ref; no world name on game/packet |
 | Open vocabulary | school-owned string origin/indication ids pass without engine enum additions |
 | Facet parity | authored checkpoint definition contributes the same exact 6b facet and move |
 | Semantic secrecy | visible existence controls availability; hidden status only affects committed outcome |
 | Syntactic variation | checkpoint and Hall Monitor emit different choice/journal text for the same move/outcome codes |
 | Persistence | catalog is available before `Graph.structure()`; restored tokens resolve qualified definitions |
 | Lifecycle | compilation/setup creates definitions/components; repeated PLANNING remains pure |
-| Compatibility | no-catalog worlds retain generated defaults; existing checkpoint behavior remains stable |
+| Compatibility | any retained stock definitions are exposed through a bounded stock catalog; existing checkpoint behavior remains stable |
 | Scope | no full Hall Monitor world, other mediation conversion, media, flat-field retirement, or generic facet pipeline |
 
 ## Explicitly deferred
@@ -334,8 +394,12 @@ package.
 - Credential card media and presence-bound portraits.
 - Retirement of flat `CredentialCase` packet fields.
 - Promotion of the facet payload string into a richer universal operation type.
+- Cross-world dependency declarations, imports, re-exports, and catalog specialization.
+- A universal catalog/provider base spanning token catalogs, Faker/name sources, media,
+  templates, and sandbox affordances.
 - Robot/chopshop and sandbox consumers.
 
-The immediate follow-up after this slice should be the full Hall Monitor conformance
-world. Only after the manager-backed authored checkpoint and Hall Monitor paths run side
-by side should Phase 7 remove the flat compatibility representation.
+The immediate follow-up after the corrected bounded-catalog slice should be the full Hall
+Monitor conformance world, expressed as a scenario type and a configured scenario
+instance. Only after the manager-backed authored checkpoint and Hall Monitor paths run
+side by side should Phase 7 remove the flat compatibility representation.
