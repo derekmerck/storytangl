@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from tangl.mechanics.credentials import CredentialDefinition
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_enums import (
     CredentialStatus,
@@ -16,6 +17,7 @@ from tangl.mechanics.games.credentials_enums import (
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
     CredentialDisposition,
+    CredentialPresentationProfile,
     CredentialsGame,
     CredentialsGameHandler,
 )
@@ -135,6 +137,19 @@ class GateCredentialsGame(CredentialsGame):
     restriction_map: Restrictions = Field(
         default_factory=lambda: Restrictions.from_map(GATE_RULES)
     )
+    catalog_namespace: str = "credential_gate"
+    presentation: CredentialPresentationProfile = Field(
+        default_factory=lambda: CredentialPresentationProfile(
+            document_labels={
+                Indication.TRAVEL: "travel permit",
+                Indication.WORK: "work permit",
+                Indication.EMIGRATE: "emigration permit",
+                Indication.WEAPON: "weapon permit",
+                Indication.DRUGS: "drugs permit",
+                Indication.SECRETS: "secrets permit",
+            }
+        )
+    )
 
 
 class CredentialGateBlock(HasGame, Block):
@@ -180,6 +195,19 @@ class SampledGateGame(CredentialsGame):
     offers: list[ScenarioOffer] = Field(default_factory=_sampled_offers)
     restriction_map: Restrictions = Field(
         default_factory=lambda: Restrictions.from_map(GATE_RULES)
+    )
+    catalog_namespace: str = "credential_gate"
+    presentation: CredentialPresentationProfile = Field(
+        default_factory=lambda: CredentialPresentationProfile(
+            document_labels={
+                Indication.TRAVEL: "travel permit",
+                Indication.WORK: "work permit",
+                Indication.EMIGRATE: "emigration permit",
+                Indication.WEAPON: "weapon permit",
+                Indication.DRUGS: "drugs permit",
+                Indication.SECRETS: "secrets permit",
+            }
+        )
     )
 
 

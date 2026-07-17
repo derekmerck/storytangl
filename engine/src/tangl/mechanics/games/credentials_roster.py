@@ -26,9 +26,11 @@ from tangl.core.bases import Unstructurable
 from .credentials_enums import (
     FailureClass,
     FailureMode,
+    IndicationId,
+    OriginId,
     Indication,
-    PURPOSES,
     Region,
+    PURPOSES,
     RestrictionLevel,
     Restrictions,
 )
@@ -58,10 +60,10 @@ class ScenarioOffer(Unstructurable):
     """
 
     target_disposition: CredentialDisposition = CredentialDisposition.PASS
-    region: Region = Region.LOCAL
-    purpose: Indication = Indication.TRAVEL
+    region: OriginId = Region.LOCAL
+    purpose: IndicationId = Indication.TRAVEL
     candidate_name: str = "Traveler"
-    contraband: list[Indication] = Field(default_factory=list)
+    contraband: list[IndicationId] = Field(default_factory=list)
     failure_modes: list[FailureMode] = Field(default_factory=list)
     whitelist: bool = False
     blacklist: bool = False
@@ -77,13 +79,13 @@ class ShiftSpec:
 
     rules: Restrictions
     encounters: int = 5
-    origin_distribution: dict[Region, float] = field(
+    origin_distribution: dict[OriginId, float] = field(
         default_factory=lambda: {Region.LOCAL: 1.0}
     )
     disposition_distribution: dict[CredentialDisposition, float] = field(
         default_factory=lambda: dict(_DEFAULT_DISPOSITIONS)
     )
-    purpose_pool: Sequence[Indication] = tuple(sorted(PURPOSES, key=lambda i: i.value))
+    purpose_pool: Sequence[IndicationId] = tuple(sorted(PURPOSES))
     pinned: Sequence[ScenarioOffer] = ()
     seed: int | None = None
 
@@ -93,8 +95,8 @@ def _weighted_choice(distribution: dict, rng: random.Random):
 
 
 def _verified_offer(
-    region: Region,
-    purpose: Indication,
+    region: OriginId,
+    purpose: IndicationId,
     target: CredentialDisposition,
     rules: Restrictions,
     rng: random.Random,
@@ -134,8 +136,8 @@ def _verified_offer(
 
 
 def make_offer(
-    region: Region,
-    purpose: Indication,
+    region: OriginId,
+    purpose: IndicationId,
     target: CredentialDisposition,
     rules: Restrictions,
     rng: random.Random | None = None,

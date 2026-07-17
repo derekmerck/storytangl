@@ -19,21 +19,25 @@ See also: ``CREDENTIALS_LOOP_DESIGN.md`` -- "The rule and failure-mode model".
 from __future__ import annotations
 
 from enum import Enum
+from typing import TypeAlias
 
 from pydantic import Field
 
 from tangl.core.bases import BaseModelPlus
 
 
-class Region(Enum):
+class Region(str, Enum):
     """Candidate origin; selects which restriction map applies."""
 
     LOCAL = "local"
     FOREIGN_EAST = "foreign_east"  # typically allied
     FOREIGN_WEST = "foreign_west"  # typically hostile
 
+    def __str__(self) -> str:
+        return self.value
 
-class Indication(Enum):
+
+class Indication(str, Enum):
     """A reason a candidate may require a credential.
 
     Purpose indications (every candidate has one) and contraband indications
@@ -50,9 +54,20 @@ class Indication(Enum):
     DRUGS = "drugs"
     SECRETS = "secrets"
 
+    def __str__(self) -> str:
+        return self.value
 
-PURPOSES = frozenset({Indication.TRAVEL, Indication.WORK, Indication.EMIGRATE})
-CONTRABAND = frozenset({Indication.WEAPON, Indication.DRUGS, Indication.SECRETS})
+
+OriginId: TypeAlias = Region | str
+IndicationId: TypeAlias = Indication | str
+
+
+PURPOSES: frozenset[IndicationId] = frozenset(
+    {Indication.TRAVEL, Indication.WORK, Indication.EMIGRATE}
+)
+CONTRABAND: frozenset[IndicationId] = frozenset(
+    {Indication.WEAPON, Indication.DRUGS, Indication.SECRETS}
+)
 
 
 class RestrictionLevel(Enum):
@@ -158,29 +173,30 @@ class CredentialToken(BaseModelPlus):
     crime), independent of the permit's own ``status``.
     """
 
-    indication: Indication
+    indication: IndicationId
     status: CredentialStatus = CredentialStatus.VALID
     requires_id: bool = False
     holder_matches: bool = True
+    definition_ref: str | None = None
 
 
 class ContrabandItem(BaseModelPlus):
     """A possession that may need a waiver, be relinquished, or be concealed."""
 
-    indication: Indication
+    indication: IndicationId
     concealed: bool = False
     permit: CredentialToken | None = None
 
 
 # Authored as a nested map for convenience...
-RestrictionMap = dict[Indication, RestrictionLevel]
+RestrictionMap = dict[IndicationId, RestrictionLevel]
 
 
 class RestrictionRule(BaseModelPlus):
     """One rule: indication X from region R sits at restriction level L."""
 
-    region: Region
-    indication: Indication
+    region: OriginId
+    indication: IndicationId
     level: RestrictionLevel
 
 
@@ -198,19 +214,19 @@ class Restrictions(BaseModelPlus):
 
     def level_for(
         self,
-        region: Region,
-        indication: Indication,
+        region: OriginId,
+        indication: IndicationId,
         default: RestrictionLevel | None = None,
     ) -> RestrictionLevel:
         for rule in self.rules:
-            if rule.region is region and rule.indication is indication:
+            if rule.region == region and rule.indication == indication:
                 return rule.level
         return default if default is not None else self.default_level
 
     @classmethod
     def from_map(
         cls,
-        mapping: dict[Region, RestrictionMap],
+        mapping: dict[OriginId, RestrictionMap],
         *,
         default_level: RestrictionLevel = RestrictionLevel.ANONYMOUS,
     ) -> Restrictions:

@@ -17,11 +17,12 @@ pure credential-token facet bridge, and Phase 6b landed its first consumer:
 `CredentialsGameHandler` derives the existing `request_document` move from the exact
 `choice / giver / request_document` facet on a manager-backed document. The handler
 remains the choice and resolution authority; flat cases remain a temporary fallback.
-`PHASE_6C_AUTHORED_CATALOG_HANDOFF.md` defines the next slice: compile world-authored
-credential definitions and skin vocabulary while replacing checkpoint-owned enum
-coordinates with authored ids. Expression narrative beyond that first skin seam,
-contraband graph identity, document-identity receipts, and status decomposition remain
-future slices.
+Phase 6c now compiles world-authored credential definitions through the generic world
+asset path, selects them through an explicit game catalog namespace, accepts authored
+origin/indication ids, and lets a presentation profile reskin `request_document`
+without changing its semantic facet or outcome policy. Expression narrative beyond that
+first skin seam, contraband graph identity, document-identity receipts, and status
+decomposition remain future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores

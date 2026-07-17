@@ -1,6 +1,9 @@
 label: credential_gate
 scripts: script.yaml
 domain_module: credential_gate.domain
+assets:
+  - asset_kind: CredentialDefinition
+    source: credential_types.reference.yaml
 metadata:
   title: "Credential Gate"
   description: "A checkpoint shift: inspect a roster of travelers and rule on each disposition."

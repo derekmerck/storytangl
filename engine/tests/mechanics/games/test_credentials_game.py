@@ -408,10 +408,10 @@ class TestCredentialsIntegration:
         ledger.resolve_choice(intro_to_checkpoint.uid)
 
         self._inspect(ledger, "passport")
+        actions = self._actions(ledger)
+        assert "Request reissue of work permit" in [action.label for action in actions]
         action = next(
-            action
-            for action in self._actions(ledger)
-            if action.label == "Request reissue of work permit"
+            action for action in actions if action.label == "Request reissue of work permit"
         )
         history_size = len(block.game.history)
         ledger.resolve_choice(action.uid)

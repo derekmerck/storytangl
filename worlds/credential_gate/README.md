@@ -1,14 +1,12 @@
 # Credential Gate
 
 `credential_gate` is the checkpoint skin for the reusable credentials mechanic.
-The live demo currently defines a small restriction map and roster directly in
-`credential_gate/domain.py`.
+The live demo defines its restriction map and roster in `credential_gate/domain.py`,
+and compiles its credential definitions from `credential_types.reference.yaml` through
+the generic `assets` manifest declaration.
 
-`credential_types.reference.yaml` preserves the richer authored-catalog shape
-used when comparing skins. It is reference data, not loader input yet. Promoting
-it requires an explicit compiler/loader contract for `CredentialDefinition`;
-the runtime must not acquire a second ad hoc YAML path. The approved implementation
-contract is
+`credential_types.reference.yaml` is live loader input for the world-qualified
+`CredentialDefinition` catalog. The shared compiler/loader contract is
 `engine/src/tangl/mechanics/credentials/PHASE_6C_AUTHORED_CATALOG_HANDOFF.md`.
 
 ## Semantic operations versus skin vocabulary

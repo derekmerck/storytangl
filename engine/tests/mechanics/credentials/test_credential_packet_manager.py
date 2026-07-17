@@ -401,8 +401,8 @@ def test_packet_manager_constructor_form_is_json_safe() -> None:
     assert payload["region"] == Region.FOREIGN_EAST.value
     assert payload["purpose"] == IND.WORK.value
     assert payload["possessions"] == [{"indication": IND.DRUGS.value}]
-    assert restored.get_region() is Region.FOREIGN_EAST
-    assert restored.get_purpose() is IND.WORK
+    assert restored.get_region() == Region.FOREIGN_EAST.value
+    assert restored.get_purpose() == IND.WORK.value
     assert restored.get_contraband() == [ContrabandItem(indication=IND.DRUGS)]
 
 

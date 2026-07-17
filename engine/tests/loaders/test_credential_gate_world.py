@@ -7,6 +7,21 @@ from pathlib import Path
 from tangl.core import Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
+from tangl.mechanics.credentials import (
+    CredentialDefinition,
+    CredentialStatus,
+    CredentialToken,
+    Restrictions,
+    RestrictionLevel,
+    materialize_packet,
+)
+from tangl.mechanics.games.credentials_game import (
+    CredentialCase,
+    CredentialPresentationProfile,
+    CredentialsGame,
+    CredentialsGameHandler,
+    Finding,
+)
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -54,6 +69,118 @@ class TestCredentialGateWorld:
         bundle = registry.bundles["credential_gate"]
         assert bundle.manifest.label == "credential_gate"
         assert bundle.manifest.metadata["title"] == "Credential Gate"
+
+    def test_compiles_qualified_credential_catalog_idempotently(self) -> None:
+        bundle = WorldBundle.load(_credential_gate_root())
+        compiler = WorldCompiler()
+        first = compiler.compile(bundle)
+        compiler.asset_compiler.load_into(bundle, first.assets, first.class_registry)
+
+        definitions = first.assets.values["CredentialDefinition"]
+
+        assert CredentialDefinition.get_instance("credential_gate:work_permit") in definitions
+        assert {
+            definition.catalog_id for definition in definitions
+        } >= {"work_permit", "passport_work"}
+
+    def test_compiled_hall_monitor_uses_authored_ids_and_wording(self, tmp_path: Path) -> None:
+        root = tmp_path / "hall_monitor"
+        package = root / "hall_monitor"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "domain.py").write_text(
+            "from tangl.mechanics.credentials import CredentialDefinition\n",
+            encoding="utf-8",
+        )
+        (root / "world.yaml").write_text(
+            """label: hall_monitor
+scripts: script.yaml
+domain_module: hall_monitor.domain
+assets:
+  - asset_kind: CredentialDefinition
+    source: credential_types.yaml
+""",
+            encoding="utf-8",
+        )
+        (root / "script.yaml").write_text(
+            """label: hall_monitor
+metadata:
+  title: Hall Monitor
+scenes:
+  hall:
+    blocks:
+      entrance:
+        content: A student approaches.
+""",
+            encoding="utf-8",
+        )
+        (root / "credential_types.yaml").write_text(
+            """student_id:
+  name: Student ID
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: id
+  requires_id: false
+activity_pass:
+  name: Activity Pass
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: document
+  requires_id: true
+  facets:
+    - channel: choice
+      facet_type: giver
+      payload: request_document
+""",
+            encoding="utf-8",
+        )
+        world = WorldCompiler().compile(WorldBundle.load(root))
+        manager = materialize_packet(
+            owner=object(),
+            region="lower_school",
+            purpose="activity",
+            id_card=CredentialToken(indication="activity"),
+            credentials=[
+                CredentialToken(
+                    indication="activity",
+                    status=CredentialStatus.MISSING_SEAL,
+                    requires_id=True,
+                )
+            ],
+            possessions=[],
+            label_prefix="Nia",
+            catalog_namespace="hall_monitor",
+        )
+        game = CredentialsGame(
+            roster=[CredentialCase(packet_manager=manager)],
+            restriction_map=Restrictions.from_map(
+                {"lower_school": {"activity": RestrictionLevel.WITH_PERMIT}}
+            ),
+            catalog_namespace="hall_monitor",
+            presentation=CredentialPresentationProfile(
+                move_labels={"request_document": "Ask for corrected {document}"},
+                journal_text={
+                    "request_document": "You ask for a corrected {document}.",
+                    "request_document_cleared": "A signed replacement pass is produced.",
+                    "request_document_not_applicable": "No pass can be produced.",
+                },
+            ),
+        )
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        handler.receive_move(game, ("inspect", "passport"))
+        move = next(move for move in handler.get_available_moves(game) if move.kind == "request_document")
+
+        assert world.assets.values["CredentialDefinition"][1].catalog_namespace == "hall_monitor"
+        assert move.target == "activity"
+        assert handler.get_move_label(game, move) == "Ask for corrected Activity Pass"
+
+        handler.receive_move(game, ("request_document", "activity"))
+
+        assert game.finding_status == {"activity": Finding.CLEARED}
+        assert "A signed replacement pass is produced." in [
+            fragment.content for fragment in handler.get_journal_fragments(game)
+        ]
 
     def test_scheduled_shift_routes_to_victory(self) -> None:
         bundle = WorldBundle.load(_credential_gate_root())

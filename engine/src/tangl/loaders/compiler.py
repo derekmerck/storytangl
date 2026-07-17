@@ -217,7 +217,12 @@ class WorldCompiler:
             domain_facet = _WorldDomainAdjuncts()
             self.domain_compiler.load_into(domain_module, domain_facet)
 
-        assets_facet: Any | None = _WorldAssetsFacet()
+        assets_facet = _WorldAssetsFacet()
+        self.asset_compiler.load_into(
+            bundle,
+            assets_facet,
+            domain_facet.class_registry if domain_facet is not None else {},
+        )
 
         resources_facet = self.media_compiler.index(
             bundle.media_dir,

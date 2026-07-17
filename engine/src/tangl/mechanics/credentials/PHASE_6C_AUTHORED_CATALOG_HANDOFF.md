@@ -2,7 +2,15 @@
 
 ## Status
 
-Approved design handoff. Implementation has not started.
+Implemented 2026-07-16. World manifests now declare generic singleton asset
+sources; `AssetCompiler` loads qualified `CredentialDefinition` catalogs through
+the world class registry into `World.assets`. Credentials games opt into a catalog
+with an explicit namespace, retain generated defaults when no namespace is set, and
+use a small data-only presentation profile for `request_document` wording. Origin and
+indication coordinates accept authored strings while the existing checkpoint enums
+remain convenience constants. The credential-gate catalog is live, and a compiled
+Hall Monitor fixture proves a different vocabulary and prose over the same normalized
+move and outcome code.
 
 ## Implementation prompt
 

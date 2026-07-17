@@ -26,7 +26,8 @@ from .credentials_enums import (
     FailureClass,
     FailureMode,
     Indication,
-    Region,
+    IndicationId,
+    OriginId,
     RestrictionLevel,
     Restrictions,
 )
@@ -39,12 +40,12 @@ _DEFAULT_CONTRABAND = Indication.WEAPON
 
 
 def build_valid(
-    region: Region,
-    purpose: Indication,
+    region: OriginId,
+    purpose: IndicationId,
     restrictions: Restrictions,
     *,
     candidate_name: str = "Traveler",
-    contraband: Sequence[Indication] = (),
+    contraband: Sequence[IndicationId] = (),
 ) -> CredentialCase:
     """Assemble a fully valid packet for ``purpose`` (+ declared contraband).
 
@@ -79,7 +80,7 @@ def build_valid(
         if c_level in (RestrictionLevel.CRIMINAL, RestrictionLevel.FORBIDDEN):
             raise ValueError(
                 f"Cannot build a valid case with criminal/forbidden contraband: "
-                f"{c_ind.value} in {region.value}."
+                f"{c_ind} in {region}."
             )
         if c_level.requires_permit:
             case.packet.append(
@@ -189,8 +190,8 @@ def render_narrative(case: CredentialCase) -> CredentialCase:
             findings["passport"] = _STATUS_FINDINGS[id_card.status]
 
     for token in case.document_credentials():
-        label = f"{token.indication.value} permit"
-        documents[label] = f"A {token.indication.value} permit."
+        label = f"{token.indication} permit"
+        documents[label] = f"A {token.indication} permit."
         if not token.status.is_valid:
             findings[label] = _STATUS_FINDINGS[token.status]
         elif not token.holder_matches:
@@ -198,7 +199,7 @@ def render_narrative(case: CredentialCase) -> CredentialCase:
 
     for item in case.possessions:
         if not item.concealed:
-            documents[f"declared {item.indication.value}"] = f"Openly declared {item.indication.value}."
+            documents[f"declared {item.indication}"] = f"Openly declared {item.indication}."
 
     case.presented_documents = documents
     case.hidden_facts = findings
@@ -211,13 +212,13 @@ def render_narrative(case: CredentialCase) -> CredentialCase:
 
 
 def make_case(
-    region: Region,
-    purpose: Indication,
+    region: OriginId,
+    purpose: IndicationId,
     restrictions: Restrictions,
     *,
     failure_modes: Sequence[FailureMode] = (),
     candidate_name: str = "Traveler",
-    contraband: Sequence[Indication] = (),
+    contraband: Sequence[IndicationId] = (),
 ) -> CredentialCase:
     """Tier 2 entry: build a valid packet, degrade it, and render its narrative."""
 
