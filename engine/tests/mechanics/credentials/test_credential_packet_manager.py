@@ -16,6 +16,7 @@ from tangl.mechanics.credentials import (
     CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
     ensure_default_credential_definitions,
+    materialize_packet,
 )
 from tangl.mechanics.assembly import ComponentFacet
 from tangl.mechanics.credentials.domain import (
@@ -31,8 +32,10 @@ from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
     CredentialDisposition,
+    CredentialsMove,
     CredentialsGame,
     CredentialsGameHandler,
+    Finding,
     derive_disposition,
 )
 from tangl.mechanics.games.credentials_roster import ScenarioOffer
@@ -144,6 +147,44 @@ def valid_work_packet() -> tuple[
     return manager, id_card, work_permit
 
 
+def materialized_work_packet(
+    status: CredentialStatus = CredentialStatus.VALID,
+) -> AssemblyCredentialPacketManager:
+    return materialize_packet(
+        owner=object(),
+        region=Region.LOCAL,
+        purpose=IND.WORK,
+        id_card=CredentialToken(indication=IND.TRAVEL),
+        credentials=[
+            CredentialToken(
+                indication=IND.WORK,
+                status=status,
+                requires_id=True,
+            ),
+        ],
+        possessions=[],
+        label_prefix="candidate",
+    )
+
+
+def staged_request_document_moves(
+    case: CredentialCase,
+) -> tuple[CredentialsGame, CredentialsGameHandler, list[CredentialsMove]]:
+    game = CredentialsGame(roster=[case], restriction_map=LOCAL_RULES)
+    handler = CredentialsGameHandler()
+    handler.setup(game)
+    handler.receive_move(game, ("inspect", "passport"))
+    return (
+        game,
+        handler,
+        [
+            move
+            for move in handler.get_available_moves(game)
+            if move.kind == "request_document"
+        ],
+    )
+
+
 def test_assembly_packet_projects_legacy_discovery_surface() -> None:
     manager, id_card, work_permit = valid_work_packet()
 
@@ -182,6 +223,157 @@ def test_assembly_packet_preserves_failure_parity() -> None:
 
     assert derive_disposition(manager, LOCAL_RULES) is D.ARREST
     assert derive_disposition(case, LOCAL_RULES) is D.ARREST
+
+
+def test_default_document_definitions_offer_request_document() -> None:
+    manager = materialized_work_packet()
+    id_card = manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+    permit = manager.get_slot(CREDENTIAL_PACKET_SLOT)[0]
+
+    assert id_card.component_facets(channel="choice") == []
+    assert permit.component_facets(channel="choice") == [
+        ComponentFacet(
+            channel="choice",
+            facet_type="giver",
+            payload="request_document",
+            source_id=str(permit.uid),
+        )
+    ]
+
+
+def test_manager_backed_request_document_matches_flat_case_contract() -> None:
+    flat_case = CredentialCase(
+        purpose=IND.WORK,
+        id_card=CredentialToken(indication=IND.TRAVEL),
+        packet=[CredentialToken(indication=IND.WORK, requires_id=True)],
+    )
+    manager_case = CredentialCase(packet_manager=materialized_work_packet())
+
+    flat_game, flat_handler, flat_moves = staged_request_document_moves(flat_case)
+    manager_game, manager_handler, manager_moves = staged_request_document_moves(manager_case)
+
+    assert manager_moves == flat_moves == [
+        CredentialsMove(kind="request_document", target=IND.WORK.value),
+    ]
+    assert manager_handler.get_move_label(manager_game, manager_moves[0]) == (
+        flat_handler.get_move_label(flat_game, flat_moves[0])
+    )
+    assert manager_handler.get_move_accepts(manager_game, manager_moves[0]).model_dump() == (
+        flat_handler.get_move_accepts(flat_game, flat_moves[0]).model_dump()
+    )
+
+
+def test_facetless_manager_document_cannot_request_reissue() -> None:
+    definition = credential_definition("facetless_work_permit", IND.WORK)
+    manager = AssemblyCredentialPacketManager(purpose=IND.WORK)
+    manager.assign(
+        CREDENTIAL_PACKET_SLOT,
+        credential_component("facetless-work-permit", definition),
+    )
+    game, handler, moves = staged_request_document_moves(CredentialCase(packet_manager=manager))
+
+    assert moves == []
+    handler.receive_move(game, ("request_document", IND.WORK.value))
+    assert game.finding_status == {}
+
+
+def test_manager_request_document_resolves_the_contributing_component() -> None:
+    facetless_definition = credential_definition("facetless_work_permit", IND.WORK)
+    contributing_definition = credential_definition(
+        "contributing_work_permit",
+        IND.WORK,
+        facets=(
+            ComponentFacet(
+                channel="choice",
+                facet_type="giver",
+                payload="request_document",
+            ),
+        ),
+    )
+    manager = AssemblyCredentialPacketManager(purpose=IND.WORK)
+    manager.assign(
+        CREDENTIAL_PACKET_SLOT,
+        credential_component(
+            "facetless-forged-work-permit",
+            facetless_definition,
+            status=S.FORGED,
+        ),
+    )
+    manager.assign(
+        CREDENTIAL_PACKET_SLOT,
+        credential_component(
+            "contributing-missing-seal-work-permit",
+            contributing_definition,
+            status=S.MISSING_SEAL,
+        ),
+    )
+    game, handler, moves = staged_request_document_moves(CredentialCase(packet_manager=manager))
+
+    assert moves == [CredentialsMove(kind="request_document", target=IND.WORK.value)]
+
+    handler.receive_move(game, ("request_document", IND.WORK.value))
+
+    assert game.finding_status == {IND.WORK.value: Finding.CLEARED}
+
+
+def test_manager_request_document_menu_does_not_reveal_credential_status() -> None:
+    menus = []
+    for status in (S.VALID, S.MISSING_SEAL, S.FORGED):
+        _, _, moves = staged_request_document_moves(
+            CredentialCase(packet_manager=materialized_work_packet(status)),
+        )
+        menus.append(moves)
+
+    assert menus == [
+        [CredentialsMove(kind="request_document", target=IND.WORK.value)],
+    ] * 3
+
+
+def test_manager_request_document_availability_is_pure_and_roundtrips() -> None:
+    graph = Graph()
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+    block.game_state = CredentialsGame(
+        roster=[
+            CredentialCase(
+                packet_manager=materialize_packet(
+                    owner=block,
+                    region=Region.LOCAL,
+                    purpose=IND.WORK,
+                    id_card=CredentialToken(indication=IND.TRAVEL),
+                    credentials=[CredentialToken(indication=IND.WORK, requires_id=True)],
+                    possessions=[],
+                    label_prefix="Mara",
+                ),
+            ),
+        ],
+        restriction_map=LOCAL_RULES,
+    )
+    handler = block.game_handler
+    handler.setup(block.game)
+    handler.receive_move(block.game, ("inspect", "passport"))
+    before = deepcopy(graph.unstructure())
+
+    first = handler.get_available_moves(block.game)
+    provisioned = handler.get_provisioned_moves(block.game)
+
+    assert [move for move in first if move.kind == "request_document"] == [
+        CredentialsMove(kind="request_document", target=IND.WORK.value),
+    ]
+    assert [move for move in provisioned if move.kind == "request_document"] == [
+        CredentialsMove(kind="request_document", target=IND.WORK.value),
+    ]
+    assert graph.unstructure() == before
+
+    CredentialDefinition.clear_instances()
+    ensure_default_credential_definitions()
+    restored = Graph.structure(before)
+    restored_block = restored.find_one(Selector(label="checkpoint"))
+    restored_moves = restored_block.game_handler.get_available_moves(restored_block.game)
+
+    assert restored_block.game.active_case.packet_manager.owner is restored_block
+    assert [move for move in restored_moves if move.kind == "request_document"] == [
+        CredentialsMove(kind="request_document", target=IND.WORK.value),
+    ]
 
 
 def test_packet_manager_keeps_contraband_value_shaped_for_now() -> None:

@@ -5,7 +5,15 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Graph
-from tangl.mechanics.games import GameResult, HasGame
+from tangl.mechanics.credentials import materialize_packet
+from tangl.mechanics.games import (
+    CredentialStatus,
+    CredentialToken,
+    GameResult,
+    HasGame,
+    Indication,
+    Region,
+)
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
     CredentialDisposition,
@@ -356,3 +364,58 @@ class TestCredentialsIntegration:
         assert "passport" in namespace["credential_discovered_findings"]
         assert namespace["credential_stage"] == "packet"
         assert namespace["credential_roster_size"] == 2
+
+    def test_faceted_request_document_uses_existing_has_game_update_path(self) -> None:
+        graph = Graph(label="credential_facets")
+        intro = graph.add_node(kind=Block, label="intro")
+        victory = graph.add_node(kind=Block, label="victory")
+        defeat = graph.add_node(kind=Block, label="defeat")
+        block = CredentialsBlock.create_game_block(
+            graph=graph,
+            game_class=CredentialsGame,
+            handler_class=CredentialsGameHandler,
+            victory_dest=victory,
+            defeat_dest=defeat,
+            label="checkpoint",
+        )
+        block.game.roster = [
+            CredentialCase(
+                packet_manager=materialize_packet(
+                    owner=block,
+                    region=Region.LOCAL,
+                    purpose=Indication.WORK,
+                    id_card=CredentialToken(indication=Indication.TRAVEL),
+                    credentials=[
+                        CredentialToken(
+                            indication=Indication.WORK,
+                            status=CredentialStatus.MISSING_SEAL,
+                            requires_id=True,
+                        ),
+                    ],
+                    possessions=[],
+                    label_prefix="Mara",
+                ),
+            ),
+        ]
+        block.game_handler.setup(block.game)
+        intro_to_checkpoint = ChoiceEdge(
+            graph=graph,
+            predecessor_id=intro.uid,
+            successor_id=block.uid,
+            label="Open the gate ledger",
+        )
+        ledger = Ledger.from_graph(graph=graph, entry_id=intro.uid)
+        ledger.resolve_choice(intro_to_checkpoint.uid)
+
+        self._inspect(ledger, "passport")
+        action = next(
+            action
+            for action in self._actions(ledger)
+            if action.label == "Request reissue of work permit"
+        )
+        history_size = len(block.game.history)
+        ledger.resolve_choice(action.uid)
+
+        assert len(block.game.history) == history_size + 1
+        assert block.game.finding_status == {Indication.WORK.value: "cleared"}
+        assert block.game.time_spent == 3
