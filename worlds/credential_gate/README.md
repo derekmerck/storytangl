@@ -7,7 +7,9 @@ The live demo currently defines a small restriction map and roster directly in
 `credential_types.reference.yaml` preserves the richer authored-catalog shape
 used when comparing skins. It is reference data, not loader input yet. Promoting
 it requires an explicit compiler/loader contract for `CredentialDefinition`;
-the runtime must not acquire a second ad hoc YAML path.
+the runtime must not acquire a second ad hoc YAML path. The approved implementation
+contract is
+`engine/src/tangl/mechanics/credentials/PHASE_6C_AUTHORED_CATALOG_HANDOFF.md`.
 
 ## Semantic operations versus skin vocabulary
 

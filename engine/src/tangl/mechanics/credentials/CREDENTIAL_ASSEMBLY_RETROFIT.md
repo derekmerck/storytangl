@@ -17,8 +17,11 @@ pure credential-token facet bridge, and Phase 6b landed its first consumer:
 `CredentialsGameHandler` derives the existing `request_document` move from the exact
 `choice / giver / request_document` facet on a manager-backed document. The handler
 remains the choice and resolution authority; flat cases remain a temporary fallback.
-Expression narrative, contraband graph identity, document-identity receipts, and
-status decomposition remain future slices.
+`PHASE_6C_AUTHORED_CATALOG_HANDOFF.md` defines the next slice: compile world-authored
+credential definitions and skin vocabulary while replacing checkpoint-owned enum
+coordinates with authored ids. Expression narrative beyond that first skin seam,
+contraband graph identity, document-identity receipts, and status decomposition remain
+future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -30,6 +33,7 @@ component-manager slots can participate in transaction offers through a holder a
 - `engine/src/tangl/mechanics/credentials/CREDENTIAL_MECHANIC.md`
 - `engine/src/tangl/mechanics/credentials/PHASE_6A_FACET_BRIDGE_CONTRACT.md`
 - `engine/src/tangl/mechanics/credentials/PHASE_6B_REQUEST_DOCUMENT_HANDOFF.md`
+- `engine/src/tangl/mechanics/credentials/PHASE_6C_AUTHORED_CATALOG_HANDOFF.md`
 - `engine/src/tangl/mechanics/games/CREDENTIALS_LOOP_DESIGN.md`
 - `engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md`
 - `engine/src/tangl/mechanics/TRANSACTION_OFFER_DESIGN.md`
