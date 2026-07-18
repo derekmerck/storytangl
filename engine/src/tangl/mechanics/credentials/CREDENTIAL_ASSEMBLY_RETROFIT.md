@@ -17,14 +17,13 @@ pure credential-token facet bridge, and Phase 6b landed its first consumer:
 `CredentialsGameHandler` derives the existing `request_document` move from the exact
 `choice / giver / request_document` facet on a manager-backed document. The handler
 remains the choice and resolution authority; flat cases remain a temporary fallback.
-Phase 6c is under revision after its first implementation exposed a catalog-authority
-mismatch. It retains generic authored definitions, open origin/indication ids, and the
-presentation-profile reskin, but must replace the game-owned world namespace and global
-Singleton lookup with named, bounded token catalogs exposed by the bound world. A
-scenario type selects one world-local catalog; qualified definition labels remain an
-internal persistence detail. Expression narrative beyond that first skin seam,
-contraband graph identity, document-identity receipts, and status decomposition remain
-future slices.
+Phase 6c landed the corrected catalog authority: generic authored definitions and open
+origin/indication ids compile into named, bounded token catalogs exposed by the bound
+world. A scenario type selects one world-local catalog, and packet materialization
+searches only that catalog rather than a game-owned world namespace or the global
+Singleton population. Qualified definition labels remain an internal persistence detail.
+Expression narrative beyond that first skin seam, contraband graph identity,
+document-identity receipts, and status decomposition remain future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores

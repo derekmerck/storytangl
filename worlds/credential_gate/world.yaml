@@ -3,6 +3,7 @@ scripts: script.yaml
 domain_module: credential_gate.domain
 assets:
   - asset_kind: CredentialDefinition
+    catalog: border
     source: credential_types.reference.yaml
 metadata:
   title: "Credential Gate"

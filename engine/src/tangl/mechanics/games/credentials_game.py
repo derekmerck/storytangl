@@ -21,7 +21,7 @@ from pydantic import Field, PrivateAttr
 if TYPE_CHECKING:
     from .credentials_roster import ScenarioOffer
 
-from tangl.core import BaseFragment
+from tangl.core import BaseFragment, TokenCatalog
 from tangl.core.bases import BaseModelPlus, Unstructurable
 from tangl.journal.intent import PieceConstraints, PiecesAccepts, PickAccepts
 from tangl.journal.fragments import (
@@ -35,7 +35,9 @@ from tangl.journal.fragments import (
 from tangl.mechanics.credentials.assembly import (
     CREDENTIAL_PACKET_SLOT,
     CredentialComponent,
+    CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
+    default_credential_catalog,
     materialize_packet,
 )
 
@@ -275,7 +277,7 @@ class CredentialCase(Unstructurable):
     def materialize_packet_manager(
         self,
         owner: object,
-        catalog_namespace: str | None = None,
+        catalog: TokenCatalog[CredentialDefinition] | None = None,
     ) -> None:
         """Replace this factory-shaped packet with its graph-owned assembly form."""
 
@@ -290,7 +292,7 @@ class CredentialCase(Unstructurable):
             credentials=self.packet,
             possessions=self.possessions,
             label_prefix=self.candidate_name,
-            catalog_namespace=catalog_namespace,
+            catalog=catalog,
         )
         self.id_card = None
         self.packet = []
@@ -754,7 +756,7 @@ class CredentialsGame(PickingGame):
     restriction_map: Restrictions = Field(
         default_factory=lambda: DEFAULT_RESTRICTIONS.model_copy(deep=True)
     )
-    catalog_namespace: str | None = None
+    catalog_ref: str | None = None
     presentation: CredentialPresentationProfile = Field(default_factory=CredentialPresentationProfile)
 
     # --- Per-case working state (reset by advance_case) ----------------------
@@ -811,13 +813,32 @@ class CredentialsGame(PickingGame):
         """Bind assembly packet managers in already materialized cases to ``owner``."""
 
         self._component_manager_owner = owner
+        catalog = self._credential_catalog(owner)
         for case in self.roster:
-            case.materialize_packet_manager(owner, self.catalog_namespace)
+            case.materialize_packet_manager(owner, catalog)
         for case in self.materialized:
-            case.materialize_packet_manager(owner, self.catalog_namespace)
+            case.materialize_packet_manager(owner, catalog)
         for offer in self.offers:
             if offer.pinned_case is not None:
                 offer.pinned_case.bind_packet_manager_owner(owner)
+
+    def _credential_catalog(self, owner: object) -> TokenCatalog[CredentialDefinition]:
+        if self.catalog_ref is None:
+            return default_credential_catalog()
+        graph = owner.graph
+        world = graph.factory
+        assert world is not None
+        catalogs = [
+            catalog
+            for catalog in world.get_token_catalogs(caller=owner, graph=graph)
+            if catalog.label == self.catalog_ref and catalog.has_kind(CredentialDefinition)
+        ]
+        if len(catalogs) != 1:
+            raise ValueError(
+                f"World '{world.label}' exposes {len(catalogs)} credential catalogs "
+                f"named '{self.catalog_ref}'."
+            )
+        return catalogs[0]
 
     @property
     def has_component_manager_owner(self) -> bool:
@@ -839,7 +860,7 @@ class CredentialsGame(PickingGame):
         if self.has_component_manager_owner:
             case.materialize_packet_manager(
                 self._component_manager_owner,
-                self.catalog_namespace,
+                self._credential_catalog(self._component_manager_owner),
             )
         return case
 

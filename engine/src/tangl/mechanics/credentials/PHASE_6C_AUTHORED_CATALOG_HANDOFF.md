@@ -2,20 +2,18 @@
 
 ## Status
 
-**REVISION REQUIRED (2026-07-17).** The first implementation proved generic authored
-singleton loading, open credential coordinates, and different prose over the same
-normalized operation. It also exposed an authority mismatch: the game carries a
-world-valued `catalog_namespace`, then credential lookup searches the process-global
-`CredentialDefinition` population. World nomination and qualified singleton labels
-prevent identity collisions, but they do not make a token catalog a bounded world
-resource.
+**LANDED (2026-07-17).** The first implementation proved generic authored singleton
+loading, open credential coordinates, and different prose over the same normalized
+operation. Its world-valued `catalog_namespace` and process-global
+`CredentialDefinition` lookup were replaced with the corrected authority contract: a
+world exposes named, bounded `TokenCatalog` instances; a credentials scenario selects
+one by a world-local `catalog_ref`; and packet materialization searches only that
+catalog's explicit members. World identity remains implicit in the story graph's bound
+factory, while qualified singleton labels remain an internal persistence detail.
 
-The revised contract keeps the authored-data and projection work while correcting
-catalog authority. A world exposes named, bounded token catalogs. A credentials scenario
-type selects one of those catalogs by a world-local reference. Packet materialization
-searches only that catalog's explicit members. World identity remains implicit in the
-story graph's bound factory, while qualified singleton labels remain an internal
-persistence detail.
+The focused conformance tests compile `credential_gate`, a combined border/school
+fixture, and two separate school worlds with matching local ids. They prove skin parity,
+same-world catalog selection, and cross-world isolation without process-global fallback.
 
 ## Implementation prompt
 

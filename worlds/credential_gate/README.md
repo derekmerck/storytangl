@@ -5,8 +5,10 @@ The live demo defines its restriction map and roster in `credential_gate/domain.
 and compiles its credential definitions from `credential_types.reference.yaml` through
 the generic `assets` manifest declaration.
 
-`credential_types.reference.yaml` is live loader input for the world-qualified
-`CredentialDefinition` catalog. The shared compiler/loader contract is
+`credential_types.reference.yaml` is live loader input for the named `border`
+catalog of world-qualified `CredentialDefinition` singletons. A credentials scenario
+selects that catalog through its local `catalog_ref`; it does not query the process-wide
+singleton population. The shared compiler/loader contract is
 `engine/src/tangl/mechanics/credentials/PHASE_6C_AUTHORED_CATALOG_HANDOFF.md`.
 
 ## Semantic operations versus skin vocabulary

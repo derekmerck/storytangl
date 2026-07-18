@@ -6,7 +6,7 @@ from typing import Any, Protocol
 import yaml
 from pydantic import TypeAdapter
 
-from tangl.core import Singleton
+from tangl.core import Singleton, TokenCatalog
 
 from ..bundle import WorldBundle
 
@@ -34,20 +34,29 @@ class AssetCompiler:
                     f"Unknown singleton asset kind '{source.asset_kind}' "
                     f"in world '{bundle.manifest.label}'."
                 )
-            definitions = self._load_catalog(
+            catalog = self._load_catalog(
                 source_path=bundle.bundle_root / source.source,
                 definition_type=definition_type,
-                namespace=bundle.manifest.label,
+                world_label=bundle.manifest.label,
+                catalog_label=source.catalog,
             )
-            asset_manager.values[source.asset_kind] = definitions
+            if source.catalog in asset_manager.values:
+                if asset_manager.values[source.catalog] == catalog:
+                    continue
+                raise ValueError(
+                    f"Duplicate asset catalog '{source.catalog}' "
+                    f"in world '{bundle.manifest.label}'."
+                )
+            asset_manager.values[source.catalog] = catalog
 
     @staticmethod
     def _load_catalog(
         *,
         source_path: Path,
         definition_type: type[Singleton],
-        namespace: str,
-    ) -> list[Singleton]:
+        world_label: str,
+        catalog_label: str,
+    ) -> TokenCatalog[Singleton]:
         with source_path.open(encoding="utf-8") as source_file:
             data = yaml.safe_load(source_file) or {}
         if not isinstance(data, dict):
@@ -59,8 +68,7 @@ class AssetCompiler:
                 raise ValueError(f"Singleton catalog at {source_path} must map ids to mappings.")
             payload = {
                 **raw_definition,
-                "label": f"{namespace}:{catalog_id}",
-                "catalog_namespace": namespace,
+                "label": f"{world_label}:{catalog_label}:{catalog_id}",
                 "catalog_id": catalog_id,
             }
             existing = definition_type.get_instance(payload["label"])
@@ -77,7 +85,11 @@ class AssetCompiler:
                     f"Conflicting singleton catalog definition '{payload['label']}'."
                 )
             definitions.append(existing)
-        return definitions
+        return TokenCatalog(
+            wst=definition_type,
+            members=tuple(definitions),
+            label=catalog_label,
+        )
 
     @staticmethod
     def _normalized_fields(

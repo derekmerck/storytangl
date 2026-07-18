@@ -24,7 +24,7 @@ import logging
 import itertools
 from uuid import UUID
 from types import MethodType
-from typing import Any, Callable, ClassVar, Generic, Iterator, Self, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterable, Iterator, Self, Type, TypeVar
 from copy import deepcopy
 
 import pydantic
@@ -259,19 +259,31 @@ class Token(Node, Generic[WST]):
 
 @dataclass
 class TokenCatalog(Generic[WST]):
-    """Provisioner-facing adapter over one singleton instance registry."""
+    """Named, bounded provisioner-facing view over singleton definitions."""
 
     wst: Type[WST]
+    members: tuple[WST, ...] | None = None
+    label: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.members is None:
+            self.members = tuple(self.wst.all_instances())
 
     def has_kind(self, kind: Type[Node]) -> bool:
-        return self.wst.has_kind(kind)
+        return issubclass(self.wst, kind)
 
     def find_all(
         self,
         selector: Selector | None = None,
         sort_key: Callable[[WST], Any] | None = None,
     ) -> Iterator[WST]:
-        return self.wst._instances.find_all(selector=selector, sort_key=sort_key)
+        values: Iterable[WST] = self.members
+        if selector is not None:
+            values = selector.filter(values)
+        if sort_key is None:
+            yield from values
+            return
+        yield from sorted(values, key=sort_key)
 
     @classmethod
     def chain_find_all(
@@ -280,9 +292,7 @@ class TokenCatalog(Generic[WST]):
         selector: Selector | None = None,
         sort_key: Callable[[WST], Any] | None = None,
     ) -> Iterator[WST]:
-        values = itertools.chain.from_iterable(
-            catalog.wst._instances.values() for catalog in catalogs
-        )
+        values = itertools.chain.from_iterable(catalog.members for catalog in catalogs)
         if selector is not None:
             values = selector.filter(values)
         if sort_key is None:

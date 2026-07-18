@@ -36,6 +36,7 @@ class AssetSourceSpec(BaseModel):
     """One singleton catalog source owned by a world bundle."""
 
     asset_kind: str
+    catalog: str
     source: str
 
 

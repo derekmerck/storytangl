@@ -67,6 +67,9 @@ class _WorldAssetsFacet:
     def __init__(self) -> None:
         self.values: dict[str, Any] = {}
 
+    def get_token_catalogs(self, **_kwargs: Any) -> list[Any]:
+        return list(self.values.values())
+
 
 class WorldCompiler:
     """Orchestrate compilation from :class:`WorldBundle` to runtime :class:`World`."""

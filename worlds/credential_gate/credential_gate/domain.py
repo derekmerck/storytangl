@@ -137,7 +137,7 @@ class GateCredentialsGame(CredentialsGame):
     restriction_map: Restrictions = Field(
         default_factory=lambda: Restrictions.from_map(GATE_RULES)
     )
-    catalog_namespace: str = "credential_gate"
+    catalog_ref: str = "border"
     presentation: CredentialPresentationProfile = Field(
         default_factory=lambda: CredentialPresentationProfile(
             document_labels={
@@ -196,7 +196,7 @@ class SampledGateGame(CredentialsGame):
     restriction_map: Restrictions = Field(
         default_factory=lambda: Restrictions.from_map(GATE_RULES)
     )
-    catalog_namespace: str = "credential_gate"
+    catalog_ref: str = "border"
     presentation: CredentialPresentationProfile = Field(
         default_factory=lambda: CredentialPresentationProfile(
             document_labels={

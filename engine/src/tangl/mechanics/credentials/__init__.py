@@ -7,6 +7,7 @@ from .assembly import (
     CredentialComponentToken,
     CredentialDefinition,
     CredentialPacketManager,
+    default_credential_catalog,
     ensure_default_credential_definitions,
     materialize_packet,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "CredentialComponentToken",
     "CredentialDefinition",
     "CredentialPacketManager",
+    "default_credential_catalog",
     "ensure_default_credential_definitions",
     "materialize_packet",
     "CredentialStatus",
