@@ -67,6 +67,9 @@ class _WorldAssetsFacet:
     def __init__(self) -> None:
         self.values: dict[str, Any] = {}
 
+    def get_token_catalogs(self, **_kwargs: Any) -> list[Any]:
+        return list(self.values.values())
+
 
 class WorldCompiler:
     """Orchestrate compilation from :class:`WorldBundle` to runtime :class:`World`."""
@@ -217,7 +220,12 @@ class WorldCompiler:
             domain_facet = _WorldDomainAdjuncts()
             self.domain_compiler.load_into(domain_module, domain_facet)
 
-        assets_facet: Any | None = _WorldAssetsFacet()
+        assets_facet = _WorldAssetsFacet()
+        self.asset_compiler.load_into(
+            bundle,
+            assets_facet,
+            domain_facet.class_registry if domain_facet is not None else {},
+        )
 
         resources_facet = self.media_compiler.index(
             bundle.media_dir,

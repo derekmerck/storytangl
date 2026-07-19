@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
-from tangl.core import Singleton, Token
+from tangl.core import Selector, Singleton, Token, TokenCatalog
 from tangl.mechanics.assembly import ComponentFacet, ComponentManager, Slot
 
 from .domain import (
     ContrabandItem,
     CredentialStatus,
     CredentialToken,
-    Indication,
+    IndicationId,
+    OriginId,
     Region,
+    Indication,
 )
 
 CREDENTIAL_ID_SLOT = "id"
@@ -25,7 +27,14 @@ _DEFAULT_DOCUMENT_KINDS = ("id", "document")
 class CredentialDefinition(Singleton):
     """Credential document definition used by graph-local credential tokens."""
 
-    indication: Indication
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    catalog_id: str | None = None
+    name: str | None = None
+    origin_ids: tuple[OriginId, ...] = ()
+    valid_period: int | None = None
+    issuer_group: str | None = None
+    indication: IndicationId
     document_kind: str = "document"
     requires_id: bool = False
     facets: tuple[ComponentFacet, ...] = ()
@@ -107,17 +116,17 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
         ),
     }
 
-    region: Region = Region.LOCAL
-    purpose: Indication = Indication.TRAVEL
+    region: OriginId = Region.LOCAL
+    purpose: IndicationId = Indication.TRAVEL
     possessions: list[ContrabandItem] = Field(
         default_factory=list,
         json_schema_extra={"include": True},
     )
 
-    def get_region(self) -> Region:
+    def get_region(self) -> OriginId:
         return self.region
 
-    def get_purpose(self) -> Indication:
+    def get_purpose(self) -> IndicationId:
         return self.purpose
 
     def id_status(self) -> CredentialStatus | None:
@@ -130,9 +139,9 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
         id_card = self._id_component()
         return id_card.to_credential_token() if id_card is not None else None
 
-    def credential_for(self, indication: Indication) -> CredentialToken | None:
+    def credential_for(self, indication: IndicationId) -> CredentialToken | None:
         for token in self.document_credentials():
-            if token.indication is indication:
+            if token.indication == indication:
                 return token
         return None
 
@@ -163,37 +172,44 @@ def _definition_for(
     token: CredentialToken,
     *,
     document_kind: str,
+    catalog: TokenCatalog[CredentialDefinition] | None,
 ) -> CredentialDefinition:
     """Return the stable definition behind one materialized document token."""
 
-    label = _definition_label(
-        document_kind=document_kind,
-        indication=token.indication,
-        requires_id=token.requires_id,
+    catalog = catalog or default_credential_catalog()
+    selector = (
+        Selector(catalog_id=token.definition_ref)
+        if token.definition_ref is not None
+        else Selector(
+            document_kind=document_kind,
+            indication=token.indication,
+            requires_id=token.requires_id,
+        )
     )
-    existing = CredentialDefinition.get_instance(label)
-    if existing is not None:
-        return existing
-    return CredentialDefinition(
-        label=label,
-        indication=token.indication,
-        document_kind=document_kind,
-        requires_id=token.requires_id,
-        facets=_default_definition_facets(document_kind),
-    )
+    definitions = list(catalog.find_all(selector))
+    if len(definitions) != 1:
+        target = token.definition_ref or (
+            f"{document_kind}/{token.indication}/"
+            f"{'requires-id' if token.requires_id else 'standalone'}"
+        )
+        raise ValueError(
+            f"Credential catalog '{catalog.label or 'stock'}' has "
+            f"{len(definitions)} definitions for {target}."
+        )
+    return definitions[0]
 
 
 def _definition_label(
     *,
     document_kind: str,
-    indication: Indication,
+    indication: IndicationId,
     requires_id: bool,
 ) -> str:
     return ":".join(
         (
             "credential",
             document_kind,
-            indication.value,
+            indication,
             "requires-id" if requires_id else "standalone",
         )
     )
@@ -215,7 +231,14 @@ def ensure_default_credential_definitions() -> None:
     """Load the finite definition catalog used by generated credential packets."""
 
     for document_kind in _DEFAULT_DOCUMENT_KINDS:
-        for indication in Indication:
+        for indication in (
+            "travel",
+            "work",
+            "emigrate",
+            "weapon",
+            "drugs",
+            "secrets",
+        ):
             for requires_id in (False, True):
                 label = _definition_label(
                     document_kind=document_kind,
@@ -232,15 +255,39 @@ def ensure_default_credential_definitions() -> None:
                     )
 
 
+def default_credential_catalog() -> TokenCatalog[CredentialDefinition]:
+    """Return the bounded stock catalog used by unconfigured compatibility games."""
+
+    ensure_default_credential_definitions()
+    definitions = []
+    for document_kind in _DEFAULT_DOCUMENT_KINDS:
+        for indication in ("travel", "work", "emigrate", "weapon", "drugs", "secrets"):
+            for requires_id in (False, True):
+                label = _definition_label(
+                    document_kind=document_kind,
+                    indication=indication,
+                    requires_id=requires_id,
+                )
+                definition = CredentialDefinition.get_instance(label)
+                assert definition is not None
+                definitions.append(definition)
+    return TokenCatalog(
+        wst=CredentialDefinition,
+        members=tuple(definitions),
+        label="stock",
+    )
+
+
 def materialize_packet(
     *,
     owner: object,
-    region: Region,
-    purpose: Indication,
+    region: OriginId,
+    purpose: IndicationId,
     id_card: CredentialToken | None,
     credentials: list[CredentialToken],
     possessions: list[ContrabandItem],
     label_prefix: str,
+    catalog: TokenCatalog[CredentialDefinition] | None = None,
 ) -> CredentialPacketManager:
     """Create an owner-bound graph packet from a factory's value-shaped output."""
 
@@ -257,7 +304,11 @@ def materialize_packet(
         slot: str,
         index: int,
     ) -> None:
-        definition = _definition_for(token, document_kind=document_kind)
+        definition = _definition_for(
+            token,
+            document_kind=document_kind,
+            catalog=catalog,
+        )
         manager.assign(
             slot,
             CredentialComponent(

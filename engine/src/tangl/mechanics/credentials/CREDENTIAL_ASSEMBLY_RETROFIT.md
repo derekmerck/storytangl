@@ -17,11 +17,13 @@ pure credential-token facet bridge, and Phase 6b landed its first consumer:
 `CredentialsGameHandler` derives the existing `request_document` move from the exact
 `choice / giver / request_document` facet on a manager-backed document. The handler
 remains the choice and resolution authority; flat cases remain a temporary fallback.
-`PHASE_6C_AUTHORED_CATALOG_HANDOFF.md` defines the next slice: compile world-authored
-credential definitions and skin vocabulary while replacing checkpoint-owned enum
-coordinates with authored ids. Expression narrative beyond that first skin seam,
-contraband graph identity, document-identity receipts, and status decomposition remain
-future slices.
+Phase 6c landed the corrected catalog authority: generic authored definitions and open
+origin/indication ids compile into named, bounded token catalogs exposed by the bound
+world. A scenario type selects one world-local catalog, and packet materialization
+searches only that catalog rather than a game-owned world namespace or the global
+Singleton population. Qualified definition labels remain an internal persistence detail.
+Expression narrative beyond that first skin seam, contraband graph identity,
+document-identity receipts, and status decomposition remain future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -74,9 +76,10 @@ Current implementation checkpoint:
   delegate to it. Otherwise the legacy flat fields remain authoritative.
 - `HasGame.game_state` embeds the hosted `Game` through constructor-form recursion;
   `HasGame.game` binds embedded component managers to the block on access.
-- Generated packets use the finite default `CredentialDefinition` catalog loaded by
-  `tangl.mechanics.credentials`; those singleton labels therefore resolve before a
-  restored graph structures its credential components.
+- Generated packets currently use finite default `CredentialDefinition` instances loaded
+  by `tangl.mechanics.credentials`; the Phase 6c revision must expose any retained stock
+  definitions through a bounded catalog while still ensuring their labels resolve before
+  a restored graph structures its credential components.
 
 ## Resolved Review Constraints
 
@@ -447,6 +450,13 @@ the flat compatibility case path, existing labels, accepts, time cost, outcomes,
 journal prose. A facetless manager document contributes no move, and the selected
 move path uses the same availability rule.
 
+Phase 6c is the catalog-authority continuation of this adoption. The corrected contract
+requires a world to expose named token catalogs with explicit members. A scenario type
+selects a world-local catalog reference, while a scenario instance configures roster and
+encounter composition. Packet materialization resolves only within the selected catalog;
+it must not search the process-global Singleton population or carry a world label as game
+state. The full Hall Monitor conformance scenario follows that correction.
+
 Later slices may:
 
 - model further credential-provided inspection moves as component facets;
@@ -490,7 +500,9 @@ Core/global credentials tests:
 - packet manager graph round-trip with id, permit, and contraband components;
 - manager owner rebound after structure;
 - disposition derivation parity with current value-token fixtures;
-- component facets gathered by channel and subject.
+- component facets gathered by channel and subject;
+- one world may expose and select two credential catalogs independently;
+- separately loaded worlds may reuse local catalog/item ids without visibility leakage.
 
 Game compatibility tests:
 

@@ -120,7 +120,7 @@ def _rules_section(game: CredentialsGame) -> ProjectedSection:
     for rule in game.restriction_map.rules:
         rows.append(
             KvRow(
-                key=f"{rule.indication.value} ({rule.region.value})",
+                key=f"{rule.indication} ({rule.region})",
                 value=rule.level.value,
             )
         )

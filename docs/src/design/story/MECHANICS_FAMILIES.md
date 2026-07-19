@@ -351,6 +351,63 @@ manager. Each family keeps its own kernel and specialized folds while exchanging
 compatible identity, discovery, interaction, commitment, receipt, and projection
 artifacts through the existing runtime lifecycle.
 
+### World-adopted mechanics and scenario layers
+
+Mechanics are world-agnostic kernels. They define durable state, operations,
+resolution, and interchange artifacts without assuming a particular setting or
+presentation. A world adopts a mechanic by exposing the catalogs, providers, and
+behavior authorities that the mechanic may use. World domain logic may specialize
+the mechanic with subclasses, additional handlers, or modified policy, but those
+changes remain local to that world's authority surface rather than mutating the
+global mechanic.
+
+Adoption has four authored/runtime layers:
+
+```text
+World authority
+  -> scenario or consumer type
+     -> configured scenario instance
+        -> materialized entity, encounter, or situation
+```
+
+- The **world** controls which local, system-provided, or explicitly imported
+  catalogs and authorities are visible.
+- The **scenario type** selects from those resources and defines the interaction
+  class: its ordinary actions, dispositions, rules, and extension logic. It may be
+  a bespoke Python subtype such as a hall-monitor or robot-vetting block; mechanics
+  convergence does not require all policy to become data.
+- The **scenario instance** configures one invocation: quantities, distributions,
+  objectives, exceptions, and special encounters or actions.
+- The **materialized instance** carries the durable state for one participant,
+  packet, assembly, encounter, generated actor, or current sandbox situation.
+
+Catalogs answer what can exist. Scenario-type policy determines how those things
+are interpreted. Scenario-instance distributions determine what a particular run
+contains. Narrative and media projection determine what the resulting logical state
+is called and how it appears.
+
+| Mechanic | World exposes | Scenario type defines | Scenario instance configures | Concrete instance |
+| --- | --- | --- | --- | --- |
+| credentials | credential catalogs and handlers | selected catalog, actions, dispositions, policy | encounter count, disposition distribution, special cases | character, packet, defects, expected disposition |
+| outfits | wearable catalogs and projections | slots, dress rules, actions, scoring | challenges, contestants, rounds, special garments | actor, outfit assembly, environment, result |
+| sandbox | templates, maps, schedules, actors, affordance providers | exploration and interaction policy | active region, objectives, population, events | current location, present actors, state, affordances |
+| demographics | system name banks plus world-specific providers | population or NPC archetype profile | trait distributions, population size, exceptions | NPC with committed traits, name, and provenance |
+| progression | skills, upgrades, badges, challenges | advancement and evaluation policy | starting state, curve, rewards, special challenges | actor capabilities, history, and current condition |
+
+This authority boundary is not a permanent ban on cross-world reuse. A future
+world dependency may explicitly import and re-export a catalog or behavior registry,
+making it part of the importing world's authority surface. Runtime consumers still
+resolve only through their bound world; they do not reach into another loaded world
+by name. Foundational system providers, such as ordinary real-world name banks, may
+be mounted into every world deliberately, while bespoke providers remain local or
+explicitly imported.
+
+Catalog implementations must preserve that boundary. Nominating a catalog from a
+world is insufficient if the catalog then searches a process-global population of
+all instances of its token class. A token catalog therefore represents an explicit,
+bounded set of definitions. Scenario types select a world-local catalog reference;
+internal world/catalog/item qualification may remain a persistence detail.
+
 Credentials are the first demanding convergence case. A credential packet
 combines durable component identity, visible evidence, hidden truth, inspection
 findings, holder bindings, provenance, generated media, contextual choices,
@@ -453,17 +510,23 @@ grammars** rather than just “minigames.”
 
 ## Current Implementation Priorities
 
-1. Let the credentials game handler adopt component facets through the existing
-   choice, validation, UPDATE, receipt, and journal lifecycle.
-2. Retire credential compatibility fields only after the manager-backed and
-   authored projection paths have been exercised side by side.
-3. Build the hall-monitor reskin without adding credentials-specific engine
+1. Make token catalogs explicit bounded collections exposed by a world authority;
+   scenario types select a local catalog reference without naming or searching a
+   world.
+2. Continue the credentials vertical through that corrected authority seam: one
+   world can expose both border and school catalogs, while two separately loaded
+   worlds remain isolated even when local catalog and item ids collide.
+3. Build the full hall-monitor conformance scenario through the four-layer
+   world/type/instance/encounter model without adding credentials-specific engine
    vocabulary.
-4. Connect credential components to presence and media projection.
-5. Reconcile vehicle and loadout vocabulary with assembly, transactions, and
+4. Retire credential compatibility fields only after the manager-backed border and
+   hall-monitor paths have been exercised side by side.
+5. Normalize credential defects and connect credential components to presence and
+   media projection.
+6. Reconcile vehicle and loadout vocabulary with assembly, transactions, and
    progression.
-6. Extend the Adventure sandbox with one scheduled mobile actor and one
+7. Extend the Adventure sandbox with one scheduled mobile actor and one
    capability-bearing companion contribution, without world-specific choice
    projection branches.
-7. Exercise the combined vocabulary, sandbox traversal, and activity hubs in
+8. Exercise the combined vocabulary, sandbox traversal, and activity hubs in
    the robot chopshop flow.

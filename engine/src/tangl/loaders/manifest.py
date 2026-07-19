@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -32,6 +33,14 @@ class StorySourceSpec(BaseModel):
         return value
 
 
+class AssetSourceSpec(BaseModel):
+    """One singleton catalog source owned by a world bundle."""
+
+    asset_kind: str
+    catalog: str
+    source: Path
+
+
 class WorldManifest(BaseModel):
     """Schema for ``world.yaml`` files with convention-based defaults.
 
@@ -55,6 +64,7 @@ class WorldManifest(BaseModel):
     media_dir: str = "media"
     media_organization: dict[str, dict] | None = Field(default=None)
     domain_module: str | None = Field(default=None)
+    assets: list[AssetSourceSpec] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("scripts", mode="before")

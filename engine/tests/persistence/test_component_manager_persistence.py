@@ -112,8 +112,8 @@ def test_component_manager_graph_roundtrip_all_backends(manager) -> None:
     packet = owner.packet_manager
 
     assert packet.owner is owner
-    assert packet.get_region() is Region.FOREIGN_EAST
-    assert packet.get_purpose() is Indication.WORK
+    assert packet.get_region() == Region.FOREIGN_EAST
+    assert packet.get_purpose() == Indication.WORK
     assert packet.get_contraband() == [
         ContrabandItem(indication=Indication.DRUGS, concealed=True),
     ]

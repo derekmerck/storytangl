@@ -21,7 +21,7 @@ from pydantic import Field, PrivateAttr
 if TYPE_CHECKING:
     from .credentials_roster import ScenarioOffer
 
-from tangl.core import BaseFragment
+from tangl.core import BaseFragment, TokenCatalog
 from tangl.core.bases import BaseModelPlus, Unstructurable
 from tangl.journal.intent import PieceConstraints, PiecesAccepts, PickAccepts
 from tangl.journal.fragments import (
@@ -35,7 +35,9 @@ from tangl.journal.fragments import (
 from tangl.mechanics.credentials.assembly import (
     CREDENTIAL_PACKET_SLOT,
     CredentialComponent,
+    CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
+    default_credential_catalog,
     materialize_packet,
 )
 
@@ -44,6 +46,8 @@ from .credentials_enums import (
     ContrabandItem,
     CredentialStatus,
     CredentialToken,
+    IndicationId,
+    OriginId,
     Indication,
     Region,
     Restrictions,
@@ -128,13 +132,13 @@ class CredentialPacketProtocol(Protocol):
     ``CredentialPacketManager`` and ``derive_disposition``.
     """
 
-    def get_region(self) -> Region: ...
+    def get_region(self) -> OriginId: ...
 
-    def get_purpose(self) -> Indication: ...
+    def get_purpose(self) -> IndicationId: ...
 
     def id_status(self) -> CredentialStatus | None: ...
 
-    def credential_for(self, indication: Indication) -> CredentialToken | None: ...
+    def credential_for(self, indication: IndicationId) -> CredentialToken | None: ...
 
     def get_contraband(self) -> list[ContrabandItem]: ...
 
@@ -171,16 +175,16 @@ class CredentialPacketManager(BaseModelPlus):
     ``CredentialPacketProtocol`` and ``CredentialCase``.
     """
 
-    region: Region = Region.LOCAL
-    purpose: Indication = Indication.TRAVEL
+    region: OriginId = Region.LOCAL
+    purpose: IndicationId = Indication.TRAVEL
     id_card: CredentialToken | None = None
     credentials: list[CredentialToken] = Field(default_factory=list)
     possessions: list[ContrabandItem] = Field(default_factory=list)
 
-    def get_region(self) -> Region:
+    def get_region(self) -> OriginId:
         return self.region
 
-    def get_purpose(self) -> Indication:
+    def get_purpose(self) -> IndicationId:
         return self.purpose
 
     def id_status(self) -> CredentialStatus | None:
@@ -188,10 +192,10 @@ class CredentialPacketManager(BaseModelPlus):
 
         return self.id_card.status if self.id_card is not None else None
 
-    def credential_for(self, indication: Indication) -> CredentialToken | None:
+    def credential_for(self, indication: IndicationId) -> CredentialToken | None:
         """The presented credential satisfying ``indication``, if any."""
 
-        return next((c for c in self.credentials if c.indication is indication), None)
+        return next((c for c in self.credentials if c.indication == indication), None)
 
     def get_contraband(self) -> list[ContrabandItem]:
         return list(self.possessions)
@@ -242,8 +246,8 @@ class CredentialCase(Unstructurable):
     )
 
     # --- Structured truth (read only via the discovery API below) ------------
-    region: Region = Region.LOCAL
-    purpose: Indication = Indication.TRAVEL
+    region: OriginId = Region.LOCAL
+    purpose: IndicationId = Indication.TRAVEL
     id_card: CredentialToken | None = None
     packet: list[CredentialToken] = Field(default_factory=list)
     possessions: list[ContrabandItem] = Field(default_factory=list)
@@ -270,7 +274,11 @@ class CredentialCase(Unstructurable):
         if self.packet_manager is not None:
             self.packet_manager.bind_owner(owner)
 
-    def materialize_packet_manager(self, owner: object) -> None:
+    def materialize_packet_manager(
+        self,
+        owner: object,
+        catalog: TokenCatalog[CredentialDefinition] | None = None,
+    ) -> None:
         """Replace this factory-shaped packet with its graph-owned assembly form."""
 
         if self.packet_manager is not None:
@@ -284,6 +292,7 @@ class CredentialCase(Unstructurable):
             credentials=self.packet,
             possessions=self.possessions,
             label_prefix=self.candidate_name,
+            catalog=catalog,
         )
         self.id_card = None
         self.packet = []
@@ -300,12 +309,12 @@ class CredentialCase(Unstructurable):
             possessions=list(self.possessions),
         )
 
-    def get_region(self) -> Region:
+    def get_region(self) -> OriginId:
         if self.packet_manager is not None:
             return self.packet_manager.get_region()
         return self.region
 
-    def get_purpose(self) -> Indication:
+    def get_purpose(self) -> IndicationId:
         if self.packet_manager is not None:
             return self.packet_manager.get_purpose()
         return self.purpose
@@ -323,12 +332,12 @@ class CredentialCase(Unstructurable):
             return self.packet_manager.id_credential()
         return self.id_card
 
-    def credential_for(self, indication: Indication) -> CredentialToken | None:
+    def credential_for(self, indication: IndicationId) -> CredentialToken | None:
         """The presented credential satisfying ``indication``, if any."""
 
         if self.packet_manager is not None:
             return self.packet_manager.credential_for(indication)
-        return next((c for c in self.packet if c.indication is indication), None)
+        return next((c for c in self.packet if c.indication == indication), None)
 
     def get_contraband(self) -> list[ContrabandItem]:
         if self.packet_manager is not None:
@@ -521,7 +530,7 @@ def _assess_credential(
         return CredentialDisposition.ARREST  # forged; crimes not mediatable in B.1
     # Mitigatable (missing seal / bad date / expired): Phase B.1 mediation can
     # clear it via ``request_document``; check the per-case finding_status.
-    if finding_status and finding_status.get(token.indication.value) == Finding.CLEARED:
+    if finding_status and finding_status.get(token.indication) == Finding.CLEARED:
         return CredentialDisposition.PASS
     return CredentialDisposition.DENY
 
@@ -545,7 +554,7 @@ def _assess_id(
 
 def _assess_requirement(
     packet: CredentialPacketProtocol,
-    indication: Indication,
+    indication: IndicationId,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
@@ -668,6 +677,44 @@ def derive_disposition(
     return worst
 
 
+class CredentialPresentationProfile(BaseModelPlus):
+    """Authored wording for the existing credential mediation grammar."""
+
+    indication_labels: dict[IndicationId, str] = Field(default_factory=dict)
+    document_labels: dict[IndicationId, str] = Field(default_factory=dict)
+    move_labels: dict[str, str] = Field(
+        default_factory=lambda: {
+            "request_document": "Request reissue of {document}",
+        }
+    )
+    journal_text: dict[str, str] = Field(
+        default_factory=lambda: {
+            "request_document": "You request a reissue of the {document}.",
+            "request_document_cleared": "The candidate produces a corrected copy.",
+            "request_document_verified": "The candidate re-presents the same sound permit.",
+            "request_document_confirmed": "No valid copy is forthcoming; the permit will not hold up.",
+            "request_document_not_applicable": "There is nothing to reissue.",
+        }
+    )
+
+    def document_label(
+        self,
+        indication: IndicationId,
+        component: CredentialComponent | None = None,
+    ) -> str:
+        if indication in self.document_labels:
+            return self.document_labels[indication]
+        if component is not None and component.reference_singleton.name is not None:
+            return component.reference_singleton.name
+        return f"{self.indication_labels.get(indication, indication)} permit"
+
+    def format(self, template: str, *, document: str, indication: IndicationId) -> str:
+        return template.format(
+            document=document,
+            indication=self.indication_labels.get(indication, indication),
+        )
+
+
 class CredentialsGame(PickingGame):
     """A checkpoint shift: a roster of candidates inspected one at a time."""
 
@@ -709,6 +756,8 @@ class CredentialsGame(PickingGame):
     restriction_map: Restrictions = Field(
         default_factory=lambda: DEFAULT_RESTRICTIONS.model_copy(deep=True)
     )
+    catalog_ref: str | None = None
+    presentation: CredentialPresentationProfile = Field(default_factory=CredentialPresentationProfile)
 
     # --- Per-case working state (reset by advance_case) ----------------------
     case_index: int = Field(default=0, json_schema_extra={"reset_field": True})
@@ -764,13 +813,32 @@ class CredentialsGame(PickingGame):
         """Bind assembly packet managers in already materialized cases to ``owner``."""
 
         self._component_manager_owner = owner
+        catalog = self._credential_catalog(owner)
         for case in self.roster:
-            case.bind_packet_manager_owner(owner)
+            case.materialize_packet_manager(owner, catalog)
         for case in self.materialized:
-            case.materialize_packet_manager(owner)
+            case.materialize_packet_manager(owner, catalog)
         for offer in self.offers:
             if offer.pinned_case is not None:
                 offer.pinned_case.bind_packet_manager_owner(owner)
+
+    def _credential_catalog(self, owner: object) -> TokenCatalog[CredentialDefinition]:
+        if self.catalog_ref is None:
+            return default_credential_catalog()
+        graph = owner.graph
+        world = graph.factory
+        assert world is not None
+        catalogs = [
+            catalog
+            for catalog in world.get_token_catalogs(caller=owner, graph=graph)
+            if catalog.label == self.catalog_ref and catalog.has_kind(CredentialDefinition)
+        ]
+        if len(catalogs) != 1:
+            raise ValueError(
+                f"World '{world.label}' exposes {len(catalogs)} credential catalogs "
+                f"named '{self.catalog_ref}'."
+            )
+        return catalogs[0]
 
     @property
     def has_component_manager_owner(self) -> bool:
@@ -790,7 +858,10 @@ class CredentialsGame(PickingGame):
             self.materialized.append(materialize(offer, self.restriction_map))
         case = self.materialized[self.case_index]
         if self.has_component_manager_owner:
-            case.materialize_packet_manager(self._component_manager_owner)
+            case.materialize_packet_manager(
+                self._component_manager_owner,
+                self._credential_catalog(self._component_manager_owner),
+            )
         return case
 
     # ----- active case access ----------------------------------------------
@@ -1021,7 +1092,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         #
         # request_document: offer for every contributing permit not yet requested.
         for indication in self._request_document_indications(case):
-            key = indication.value
+            key = str(indication)
             if key in game.finding_status:
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
@@ -1042,7 +1113,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         return moves
 
     @staticmethod
-    def _request_document_indications(case: CredentialCase) -> list[Indication]:
+    def _request_document_indications(case: CredentialCase) -> list[IndicationId]:
         """Return visible document indications that semantically offer reissue."""
 
         if case.packet_manager is None:
@@ -1066,7 +1137,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             for component in manager.get_slot(CREDENTIAL_PACKET_SLOT)
         }
         components: list[CredentialComponent] = []
-        indications: set[Indication] = set()
+        indications: set[IndicationId] = set()
         for facet in manager.component_facets(
             channel="choice",
             facet_type="giver",
@@ -1086,23 +1157,40 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     @staticmethod
     def _request_document_credential(
         case: CredentialCase,
-        indication: Indication,
+        indication: IndicationId,
     ) -> CredentialToken | None:
         """Return the credential whose facet contributed this request target."""
 
         if case.packet_manager is None:
             return case.credential_for(indication)
-        component = next(
+        component = CredentialsGameHandler._request_document_component(case, indication)
+        return component.to_credential_token() if component is not None else None
+
+    @staticmethod
+    def _request_document_component(
+        case: CredentialCase,
+        indication: IndicationId,
+    ) -> CredentialComponent | None:
+        if case.packet_manager is None:
+            return None
+        return next(
             (
                 component
                 for component in CredentialsGameHandler._request_document_components(
                     case.packet_manager
                 )
-                if component.indication is indication
+                if component.indication == indication
             ),
             None,
         )
-        return component.to_credential_token() if component is not None else None
+
+    @staticmethod
+    def _request_document_label(game: CredentialsGame, indication: IndicationId) -> str:
+        component = CredentialsGameHandler._request_document_component(
+            game.active_case,
+            indication,
+        )
+        return game.presentation.document_label(indication, component)
 
     def get_provisioned_moves(self, game: CredentialsGame) -> list[CredentialsMove]:
         moves = list(self.get_available_moves(game))
@@ -1151,7 +1239,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 return f"Review {move.target}"
             return f"Inspect {move.target}"
         if move.kind == "request_document":
-            return f"Request reissue of {move.target} permit"
+            return game.presentation.format(
+                game.presentation.move_labels["request_document"],
+                document=self._request_document_label(game, move.target),
+                indication=move.target,
+            )
         if move.kind == "verify_id":
             return "Verify identity"
         if move.kind == "request_search":
@@ -1393,7 +1485,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         #   valid       -> they re-present the same sound permit ("verified");
         #   crime        -> the forgery cannot be reissued; it stands ("confirmed").
         # Only a cleared mitigatable finding upgrades derive_disposition.
-        indication = Indication(indication_value)
+        indication = indication_value
         if indication not in self._request_document_indications(game.active_case):
             detail["outcome"] = "request_document_not_applicable"
             detail["target_indication"] = indication_value
@@ -1447,7 +1539,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if concealed:
             game.finding_status[FindingKey.SEARCH] = Finding.CONFIRMED
             detail["outcome"] = "search_found_concealment"
-            detail["concealed"] = [item.indication.value for item in concealed]
+            detail["concealed"] = [str(item.indication) for item in concealed]
         else:
             game.finding_status[FindingKey.SEARCH] = Finding.CLEARED
             detail["outcome"] = "search_clean"
@@ -1469,12 +1561,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if concealed and game.finding_status.get(FindingKey.SEARCH) == Finding.CONFIRMED:
             game.finding_status[FindingKey.DISCLOSURE] = Finding.TOO_LATE
             detail["outcome"] = "disclosure_too_late"
-            detail["declared"] = [item.indication.value for item in concealed]
+            detail["declared"] = [str(item.indication) for item in concealed]
         else:
             game.finding_status[FindingKey.DISCLOSURE] = Finding.DECLARED
             if concealed:
                 detail["outcome"] = "disclosure_declared"
-                detail["declared"] = [item.indication.value for item in concealed]
+                detail["declared"] = [str(item.indication) for item in concealed]
             else:
                 detail["outcome"] = "disclosure_nothing"
         return RoundResult.CONTINUE
@@ -1576,16 +1668,20 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         if action == "request_document":
             outcome = notes.get("outcome")
-            if outcome == "request_document_cleared":
-                line = "The candidate produces a corrected copy."
-            elif outcome == "request_document_verified":
-                line = "The candidate re-presents the same sound permit."
-            elif outcome == "request_document_confirmed":
-                line = "No valid copy is forthcoming; the permit will not hold up."
-            else:
-                line = "There is nothing to reissue."
+            outcome_key = str(outcome)
+            line = game.presentation.journal_text.get(
+                outcome_key,
+                game.presentation.journal_text["request_document_not_applicable"],
+            )
+            document = self._request_document_label(game, target)
             return [
-                ContentFragment(content=f"You request a reissue of the {target} permit."),
+                ContentFragment(
+                    content=game.presentation.format(
+                        game.presentation.journal_text["request_document"],
+                        document=document,
+                        indication=target,
+                    )
+                ),
                 ContentFragment(content=line),
             ]
         if action == "verify_id":
@@ -1684,8 +1780,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             piece_kind="candidate",
             content=case.candidate_name,
             properties={
-                "declared_purpose": case.get_purpose().value,
-                "declared_region": case.get_region().value,
+                "declared_purpose": str(case.get_purpose()),
+                "declared_region": str(case.get_region()),
             },
             hints=PresentationHints(label_text=case.candidate_name),
         )

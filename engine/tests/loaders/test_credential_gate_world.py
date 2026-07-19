@@ -4,11 +4,31 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tangl.core import Selector
+import pytest
+
+from tangl.core import Graph, Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
+from tangl.loaders.compilers.asset_compiler import AssetCompiler
+from tangl.mechanics.credentials import (
+    CREDENTIAL_PACKET_SLOT,
+    CredentialDefinition,
+    CredentialStatus,
+    CredentialToken,
+    Restrictions,
+    RestrictionLevel,
+    materialize_packet,
+)
+from tangl.mechanics.games import HasGame
+from tangl.mechanics.games.credentials_game import (
+    CredentialCase,
+    CredentialPresentationProfile,
+    CredentialsGame,
+    CredentialsGameHandler,
+    Finding,
+)
 from tangl.service.world_registry import WorldRegistry
-from tangl.story import Action, InitMode
+from tangl.story import Action, Block, InitMode, World
 from tangl.vm import Ledger
 
 
@@ -44,6 +64,98 @@ def _inspect(ledger: Ledger, target: str) -> None:
     )
 
 
+class CatalogCredentialsBlock(HasGame, Block):
+    """Minimal world-bound host for catalog selection coverage."""
+
+    _game_class = CredentialsGame
+    _game_handler_class = CredentialsGameHandler
+
+
+def _catalog_document_name(world: World, catalog_ref: str) -> str:
+    """Materialize a school-shaped packet through a world-bound game host."""
+
+    graph = Graph(factory=world)
+    block = graph.add_node(
+        kind=CatalogCredentialsBlock,
+        label=catalog_ref,
+        game_state=CredentialsGame(
+            catalog_ref=catalog_ref,
+            roster=[
+                CredentialCase(
+                    candidate_name="Nia",
+                    region="lower_school",
+                    purpose="activity",
+                    id_card=CredentialToken(indication="activity"),
+                    packet=[
+                        CredentialToken(
+                            indication="activity",
+                            requires_id=True,
+                        )
+                    ],
+                )
+            ],
+        ),
+    )
+
+    manager = block.game.roster[0].packet_manager
+    assert manager is not None
+    return manager.get_slot(CREDENTIAL_PACKET_SLOT)[0].name
+
+
+def _compile_school_world(root: Path, *, label: str, pass_name: str) -> World:
+    package = root / label
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "domain.py").write_text(
+        "from tangl.mechanics.credentials import CredentialDefinition\n",
+        encoding="utf-8",
+    )
+    (root / "world.yaml").write_text(
+        f"""label: {label}
+scripts: script.yaml
+domain_module: {label}.domain
+assets:
+  - asset_kind: CredentialDefinition
+    catalog: school
+    source: credential_types.yaml
+""",
+        encoding="utf-8",
+    )
+    (root / "script.yaml").write_text(
+        f"""label: {label}
+metadata:
+  title: {label}
+scenes:
+  hall:
+    blocks:
+      entrance:
+        content: A student approaches.
+""",
+        encoding="utf-8",
+    )
+    (root / "credential_types.yaml").write_text(
+        f"""student_id:
+  name: Student ID
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: id
+  requires_id: false
+activity_pass:
+  name: {pass_name}
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: document
+  requires_id: true
+  facets:
+    - channel: choice
+      facet_type: giver
+      payload: request_document
+""",
+        encoding="utf-8",
+    )
+    return WorldCompiler().compile(WorldBundle.load(root))
+
+
 class TestCredentialGateWorld:
     """Tests for the staged credentials demo world."""
 
@@ -54,6 +166,174 @@ class TestCredentialGateWorld:
         bundle = registry.bundles["credential_gate"]
         assert bundle.manifest.label == "credential_gate"
         assert bundle.manifest.metadata["title"] == "Credential Gate"
+
+    def test_compiles_qualified_credential_catalog_idempotently(self) -> None:
+        bundle = WorldBundle.load(_credential_gate_root())
+        compiler = WorldCompiler()
+        first = compiler.compile(bundle)
+        catalog = first.assets.values["border"]
+        members_before = tuple(catalog.members)
+        compiler.asset_compiler.load_into(bundle, first.assets, first.class_registry)
+
+        assert first.assets.values["border"] is catalog
+        assert tuple(catalog.members) == members_before
+        definitions = catalog.members
+
+        assert CredentialDefinition.get_instance("credential_gate:border:work_permit") in definitions
+        assert catalog.label == "border"
+        assert {
+            definition.catalog_id for definition in definitions
+        } >= {"work_permit", "passport_work"}
+
+    def test_rejects_missing_required_catalog_definition_field(self) -> None:
+        with pytest.raises(ValueError, match="Missing required field 'indication'"):
+            AssetCompiler._normalized_fields(
+                CredentialDefinition,
+                {"label": "incomplete"},
+            )
+
+    def test_compiled_hall_monitor_uses_authored_ids_and_wording(self, tmp_path: Path) -> None:
+        root = tmp_path / "hall_monitor"
+        package = root / "hall_monitor"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "domain.py").write_text(
+            "from tangl.mechanics.credentials import CredentialDefinition\n",
+            encoding="utf-8",
+        )
+        (root / "world.yaml").write_text(
+            """label: hall_monitor
+scripts: script.yaml
+domain_module: hall_monitor.domain
+assets:
+  - asset_kind: CredentialDefinition
+    catalog: border
+    source: border_credentials.yaml
+  - asset_kind: CredentialDefinition
+    catalog: school
+    source: credential_types.yaml
+""",
+            encoding="utf-8",
+        )
+        (root / "script.yaml").write_text(
+            """label: hall_monitor
+metadata:
+  title: Hall Monitor
+scenes:
+  hall:
+    blocks:
+      entrance:
+        content: A student approaches.
+""",
+            encoding="utf-8",
+        )
+        (root / "credential_types.yaml").write_text(
+            """student_id:
+  name: Student ID
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: id
+  requires_id: false
+activity_pass:
+  name: Activity Pass
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: document
+  requires_id: true
+  facets:
+    - channel: choice
+      facet_type: giver
+      payload: request_document
+""",
+            encoding="utf-8",
+        )
+        (root / "border_credentials.yaml").write_text(
+            """student_id:
+  name: Border Identity Card
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: id
+  requires_id: false
+activity_pass:
+  name: Border Activity Permit
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: document
+  requires_id: true
+  facets:
+    - channel: choice
+      facet_type: giver
+      payload: request_document
+""",
+            encoding="utf-8",
+        )
+        world = WorldCompiler().compile(WorldBundle.load(root))
+        manager = materialize_packet(
+            owner=object(),
+            region="lower_school",
+            purpose="activity",
+            id_card=CredentialToken(indication="activity"),
+            credentials=[
+                CredentialToken(
+                    indication="activity",
+                    status=CredentialStatus.MISSING_SEAL,
+                    requires_id=True,
+                )
+            ],
+            possessions=[],
+            label_prefix="Nia",
+            catalog=world.assets.values["school"],
+        )
+        game = CredentialsGame(
+            roster=[CredentialCase(packet_manager=manager)],
+            restriction_map=Restrictions.from_map(
+                {"lower_school": {"activity": RestrictionLevel.WITH_PERMIT}}
+            ),
+            presentation=CredentialPresentationProfile(
+                move_labels={"request_document": "Ask for corrected {document}"},
+                journal_text={
+                    "request_document": "You ask for a corrected {document}.",
+                    "request_document_cleared": "A signed replacement pass is produced.",
+                    "request_document_not_applicable": "No pass can be produced.",
+                },
+            ),
+        )
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        handler.receive_move(game, ("inspect", "passport"))
+        move = next(move for move in handler.get_available_moves(game) if move.kind == "request_document")
+
+        assert world.assets.values["school"].label == "school"
+        assert _catalog_document_name(world, "school") == "Activity Pass"
+        assert _catalog_document_name(world, "border") == "Border Activity Permit"
+        assert move.target == "activity"
+        assert handler.get_move_label(game, move) == "Ask for corrected Activity Pass"
+
+        handler.receive_move(game, ("request_document", "activity"))
+
+        assert game.finding_status == {"activity": Finding.CLEARED}
+        assert "A signed replacement pass is produced." in [
+            fragment.content for fragment in handler.get_journal_fragments(game)
+        ]
+
+    def test_separate_worlds_isolate_matching_local_catalog_ids(self, tmp_path: Path) -> None:
+        first = _compile_school_world(
+            tmp_path / "north_hall",
+            label="north_hall",
+            pass_name="North Hall Activity Pass",
+        )
+        second = _compile_school_world(
+            tmp_path / "south_hall",
+            label="south_hall",
+            pass_name="South Hall Activity Pass",
+        )
+
+        assert _catalog_document_name(first, "school") == "North Hall Activity Pass"
+        assert _catalog_document_name(second, "school") == "South Hall Activity Pass"
+        assert (
+            CredentialDefinition.get_instance("north_hall:school:activity_pass")
+            is not CredentialDefinition.get_instance("south_hall:school:activity_pass")
+        )
 
     def test_scheduled_shift_routes_to_victory(self) -> None:
         bundle = WorldBundle.load(_credential_gate_root())
