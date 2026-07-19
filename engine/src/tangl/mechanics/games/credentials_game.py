@@ -1092,7 +1092,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         #
         # request_document: offer for every contributing permit not yet requested.
         for indication in self._request_document_indications(case):
-            key = indication
+            key = str(indication)
             if key in game.finding_status:
                 continue
             moves.append(CredentialsMove(kind="request_document", target=key))
@@ -1539,7 +1539,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if concealed:
             game.finding_status[FindingKey.SEARCH] = Finding.CONFIRMED
             detail["outcome"] = "search_found_concealment"
-            detail["concealed"] = [item.indication for item in concealed]
+            detail["concealed"] = [str(item.indication) for item in concealed]
         else:
             game.finding_status[FindingKey.SEARCH] = Finding.CLEARED
             detail["outcome"] = "search_clean"
@@ -1561,12 +1561,12 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if concealed and game.finding_status.get(FindingKey.SEARCH) == Finding.CONFIRMED:
             game.finding_status[FindingKey.DISCLOSURE] = Finding.TOO_LATE
             detail["outcome"] = "disclosure_too_late"
-            detail["declared"] = [item.indication for item in concealed]
+            detail["declared"] = [str(item.indication) for item in concealed]
         else:
             game.finding_status[FindingKey.DISCLOSURE] = Finding.DECLARED
             if concealed:
                 detail["outcome"] = "disclosure_declared"
-                detail["declared"] = [item.indication for item in concealed]
+                detail["declared"] = [str(item.indication) for item in concealed]
             else:
                 detail["outcome"] = "disclosure_nothing"
         return RoundResult.CONTINUE
@@ -1780,8 +1780,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             piece_kind="candidate",
             content=case.candidate_name,
             properties={
-                "declared_purpose": case.get_purpose(),
-                "declared_region": case.get_region(),
+                "declared_purpose": str(case.get_purpose()),
+                "declared_region": str(case.get_region()),
             },
             hints=PresentationHints(label_text=case.candidate_name),
         )

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tangl.core import Graph, Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
+from tangl.loaders.compilers.asset_compiler import AssetCompiler
 from tangl.mechanics.credentials import (
     CREDENTIAL_PACKET_SLOT,
     CredentialDefinition,
@@ -168,9 +171,12 @@ class TestCredentialGateWorld:
         bundle = WorldBundle.load(_credential_gate_root())
         compiler = WorldCompiler()
         first = compiler.compile(bundle)
+        catalog = first.assets.values["border"]
+        members_before = tuple(catalog.members)
         compiler.asset_compiler.load_into(bundle, first.assets, first.class_registry)
 
-        catalog = first.assets.values["border"]
+        assert first.assets.values["border"] is catalog
+        assert tuple(catalog.members) == members_before
         definitions = catalog.members
 
         assert CredentialDefinition.get_instance("credential_gate:border:work_permit") in definitions
@@ -178,6 +184,13 @@ class TestCredentialGateWorld:
         assert {
             definition.catalog_id for definition in definitions
         } >= {"work_permit", "passport_work"}
+
+    def test_rejects_missing_required_catalog_definition_field(self) -> None:
+        with pytest.raises(ValueError, match="Missing required field 'indication'"):
+            AssetCompiler._normalized_fields(
+                CredentialDefinition,
+                {"label": "incomplete"},
+            )
 
     def test_compiled_hall_monitor_uses_authored_ids_and_wording(self, tmp_path: Path) -> None:
         root = tmp_path / "hall_monitor"

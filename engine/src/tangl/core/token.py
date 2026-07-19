@@ -269,6 +269,12 @@ class TokenCatalog(Generic[WST]):
         if self.members is None:
             self.members = tuple(self.wst.all_instances())
 
+    def _member_values(self) -> tuple[WST, ...]:
+        """Return the explicit members established during initialization."""
+
+        assert self.members is not None
+        return self.members
+
     def has_kind(self, kind: Type[Node]) -> bool:
         return issubclass(self.wst, kind)
 
@@ -277,7 +283,7 @@ class TokenCatalog(Generic[WST]):
         selector: Selector | None = None,
         sort_key: Callable[[WST], Any] | None = None,
     ) -> Iterator[WST]:
-        values: Iterable[WST] = self.members
+        values: Iterable[WST] = self._member_values()
         if selector is not None:
             values = selector.filter(values)
         if sort_key is None:
@@ -292,7 +298,9 @@ class TokenCatalog(Generic[WST]):
         selector: Selector | None = None,
         sort_key: Callable[[WST], Any] | None = None,
     ) -> Iterator[WST]:
-        values = itertools.chain.from_iterable(catalog.members for catalog in catalogs)
+        values = itertools.chain.from_iterable(
+            catalog._member_values() for catalog in catalogs
+        )
         if selector is not None:
             values = selector.filter(values)
         if sort_key is None:

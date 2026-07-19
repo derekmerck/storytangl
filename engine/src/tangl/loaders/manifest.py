@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -37,7 +38,7 @@ class AssetSourceSpec(BaseModel):
 
     asset_kind: str
     catalog: str
-    source: str
+    source: Path
 
 
 class WorldManifest(BaseModel):

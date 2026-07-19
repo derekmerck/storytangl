@@ -418,4 +418,5 @@ class TestCredentialsIntegration:
 
         assert len(block.game.history) == history_size + 1
         assert block.game.finding_status == {Indication.WORK.value: "cleared"}
+        assert type(next(iter(block.game.finding_status))) is str
         assert block.game.time_spent == 3

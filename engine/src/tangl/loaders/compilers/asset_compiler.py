@@ -107,6 +107,10 @@ class AssetCompiler:
                 continue
             if field_name in payload:
                 value = payload[field_name]
+            elif field_info.is_required():
+                raise ValueError(
+                    f"Missing required field '{field_name}' for {definition_type.__name__}."
+                )
             else:
                 value = field_info.get_default(call_default_factory=True)
             expected[field_name] = TypeAdapter(field_info.annotation).validate_python(value)
