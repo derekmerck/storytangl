@@ -682,11 +682,29 @@ class CredentialPresentationProfile(BaseModelPlus):
 
     indication_labels: dict[IndicationId, str] = Field(default_factory=dict)
     document_labels: dict[IndicationId, str] = Field(default_factory=dict)
+    identity_label: str = "passport"
+    identity_description: str = "An identity document."
+    document_description: str = "A {document}."
+    possession_description: str = "Openly declared {indication}."
+    status_text: dict[CredentialStatus, str] = Field(
+        default_factory=lambda: {
+            CredentialStatus.MISSING_SEAL: "The issuing seal is missing.",
+            CredentialStatus.BAD_DATE: "The issue date is wrong.",
+            CredentialStatus.EXPIRED: "The credential has expired.",
+            CredentialStatus.FORGED: "The seal is a forgery.",
+            CredentialStatus.WRONG_HOLDER: "The holder does not match this document.",
+        }
+    )
+    holder_mismatch_text: str = "The permit's holder does not match the bearer id."
+    packet_inconsistency_text: str = (
+        "The packet does not satisfy the checkpoint rules as presented."
+    )
     move_labels: dict[str, str] = Field(
         default_factory=lambda: {
             "request_document": "Request reissue of {document}",
         }
     )
+    decision_labels: dict[str, str] = Field(default_factory=dict)
     journal_text: dict[str, str] = Field(
         default_factory=lambda: {
             "request_document": "You request a reissue of the {document}.",
@@ -713,6 +731,39 @@ class CredentialPresentationProfile(BaseModelPlus):
             document=document,
             indication=self.indication_labels.get(indication, indication),
         )
+
+    def render_case(self, case: CredentialCase) -> CredentialCase:
+        """Project compatibility inspection text from logical packet truth."""
+
+        documents: dict[str, str] = {}
+        findings: dict[str, str] = {}
+
+        id_card = case.id_credential()
+        if id_card is not None:
+            documents[self.identity_label] = self.identity_description
+            if not id_card.status.is_valid:
+                findings[self.identity_label] = self.status_text[id_card.status]
+
+        for token in case.document_credentials():
+            document = self.document_label(token.indication)
+            documents[document] = self.document_description.format(document=document)
+            if not token.status.is_valid:
+                findings[document] = self.status_text[token.status]
+            elif not token.holder_matches:
+                findings[document] = self.holder_mismatch_text
+
+        for item in case.possessions:
+            indication = self.indication_labels.get(item.indication, item.indication)
+            documents[f"declared {indication}"] = self.possession_description.format(
+                indication=indication,
+            )
+
+        case.presented_documents = documents
+        case.hidden_facts = findings
+        case.packet_hidden_facts = (
+            {"packet consistency": self.packet_inconsistency_text} if findings else {}
+        )
+        return case
 
 
 class CredentialsGame(PickingGame):
@@ -855,7 +906,13 @@ class CredentialsGame(PickingGame):
 
         while len(self.materialized) <= self.case_index:
             offer = self.offers[len(self.materialized)]
-            self.materialized.append(materialize(offer, self.restriction_map))
+            self.materialized.append(
+                materialize(
+                    offer,
+                    self.restriction_map,
+                    narrative_renderer=self.presentation.render_case,
+                )
+            )
         case = self.materialized[self.case_index]
         if self.has_component_manager_owner:
             case.materialize_packet_manager(
@@ -1252,6 +1309,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return "Ask for anything to declare"
         if move.kind == "request_relinquish":
             return "Have the contraband surrendered"
+        if move.kind == "decide":
+            return game.presentation.decision_labels.get(
+                move.target,
+                f"Choose {move.target}",
+            )
         return f"Choose {move.target}"
 
     def get_move_accepts(

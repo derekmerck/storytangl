@@ -16,7 +16,7 @@ repeated generation and ordinary list edits on the offers; no extra machinery.
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from pydantic import Field
@@ -86,6 +86,7 @@ class ShiftSpec:
         default_factory=lambda: dict(_DEFAULT_DISPOSITIONS)
     )
     purpose_pool: Sequence[IndicationId] = tuple(sorted(PURPOSES))
+    allowed_failure_modes: Sequence[FailureMode] | None = None
     pinned: Sequence[ScenarioOffer] = ()
     seed: int | None = None
 
@@ -100,6 +101,7 @@ def _verified_offer(
     target: CredentialDisposition,
     rules: Restrictions,
     rng: random.Random,
+    allowed_failure_modes: Sequence[FailureMode] | None = None,
 ) -> ScenarioOffer | None:
     """Build an offer for ``(region, purpose)`` that derives to ``target``, or None.
 
@@ -122,6 +124,8 @@ def _verified_offer(
         FailureClass.MITIGATABLE if target is CredentialDisposition.DENY else FailureClass.CRIME
     )
     candidates = applicable_modes(base, failure_class)
+    if allowed_failure_modes is not None:
+        candidates = [mode for mode in candidates if mode in allowed_failure_modes]
     rng.shuffle(candidates)
     for mode in candidates:
         trial = degrade(build_valid(region, purpose, rules), [mode])
@@ -175,7 +179,14 @@ def generate_roster(spec: ShiftSpec, rng: random.Random | None = None) -> list[S
 
         offer = None
         for purpose in purposes:
-            offer = _verified_offer(region, purpose, target, spec.rules, rng)
+            offer = _verified_offer(
+                region,
+                purpose,
+                target,
+                spec.rules,
+                rng,
+                spec.allowed_failure_modes,
+            )
             if offer is not None:
                 break
         roster.append(offer or make_offer(region, purposes[0], target, spec.rules, rng))
@@ -185,7 +196,12 @@ def generate_roster(spec: ShiftSpec, rng: random.Random | None = None) -> list[S
     return roster
 
 
-def materialize(offer: ScenarioOffer, rules: Restrictions) -> CredentialCase:
+def materialize(
+    offer: ScenarioOffer,
+    rules: Restrictions,
+    *,
+    narrative_renderer: Callable[[CredentialCase], CredentialCase] | None = None,
+) -> CredentialCase:
     """Build the concrete candidate for ``offer`` (deterministic).
 
     Replays the offer's verified failure modes onto a fresh valid packet, so the
@@ -204,7 +220,7 @@ def materialize(offer: ScenarioOffer, rules: Restrictions) -> CredentialCase:
         contraband=list(offer.contraband),
     )
     degrade(case, offer.failure_modes)
-    render_narrative(case)
+    (narrative_renderer or render_narrative)(case)
     case.whitelist = offer.whitelist
     case.blacklist = offer.blacklist
     return case

@@ -1,0 +1,10 @@
+label: hall_monitor
+scripts: script.yaml
+domain_module: hall_monitor.domain
+assets:
+  - asset_kind: CredentialDefinition
+    catalog: school
+    source: credential_types.yaml
+metadata:
+  title: "Hall Monitor"
+  description: "Inspect student passes and decide who may proceed through the halls."

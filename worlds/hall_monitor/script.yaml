@@ -1,0 +1,45 @@
+label: hall_monitor
+
+metadata:
+  title: "Hall Monitor"
+  description: "Run a morning hallway shift with school-specific passes and rulings."
+  start_at: halls.entrance
+
+scenes:
+  halls:
+    title: "Main Hall"
+    blocks:
+      entrance:
+        content: |
+          The warning bell has rung. Students begin moving between classrooms,
+          activities, and the front office.
+        actions:
+          - text: "Monitor the morning halls"
+            successor: morning_shift
+
+      morning_shift:
+        kind: "hall_monitor.domain.HallMonitorBlock"
+        encounters: 5
+        disposition_distribution:
+          pass: 0.50
+          deny: 0.30
+          arrest: 0.20
+        seed: 20260719
+        content: |
+          Check each student’s identification and pass before deciding whether
+          to allow them onward, send them back to class, or refer them to office.
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          The morning bell settles the halls. Every student was handled correctly.
+
+      defeat:
+        content: |
+          The passing period ends with an unresolved mistake on the attendance sheet.

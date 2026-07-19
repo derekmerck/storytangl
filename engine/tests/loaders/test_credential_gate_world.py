@@ -193,8 +193,8 @@ class TestCredentialGateWorld:
             )
 
     def test_compiled_hall_monitor_uses_authored_ids_and_wording(self, tmp_path: Path) -> None:
-        root = tmp_path / "hall_monitor"
-        package = root / "hall_monitor"
+        root = tmp_path / "hall_monitor_fixture"
+        package = root / "hall_monitor_fixture"
         package.mkdir(parents=True)
         (package / "__init__.py").write_text("", encoding="utf-8")
         (package / "domain.py").write_text(
@@ -202,9 +202,9 @@ class TestCredentialGateWorld:
             encoding="utf-8",
         )
         (root / "world.yaml").write_text(
-            """label: hall_monitor
+            """label: hall_monitor_fixture
 scripts: script.yaml
-domain_module: hall_monitor.domain
+domain_module: hall_monitor_fixture.domain
 assets:
   - asset_kind: CredentialDefinition
     catalog: border
@@ -216,7 +216,7 @@ assets:
             encoding="utf-8",
         )
         (root / "script.yaml").write_text(
-            """label: hall_monitor
+            """label: hall_monitor_fixture
 metadata:
   title: Hall Monitor
 scenes:
