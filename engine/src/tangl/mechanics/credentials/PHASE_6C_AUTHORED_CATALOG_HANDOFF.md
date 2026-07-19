@@ -401,3 +401,6 @@ The immediate follow-up after the corrected bounded-catalog slice should be the 
 Monitor conformance world, expressed as a scenario type and a configured scenario
 instance. Only after the manager-backed authored checkpoint and Hall Monitor paths run
 side by side should Phase 7 remove the flat compatibility representation.
+
+The bounded implementation contract is
+`PHASE_6D_HALL_MONITOR_SCENARIO_HANDOFF.md`.

@@ -22,6 +22,10 @@ origin/indication ids compile into named, bounded token catalogs exposed by the 
 world. A scenario type selects one world-local catalog, and packet materialization
 searches only that catalog rather than a game-owned world namespace or the global
 Singleton population. Qualified definition labels remain an internal persistence detail.
+Phase 6d is planned as the real Hall Monitor conformance vertical: a bespoke scenario
+type selects the school catalog, a script-configured shift narrows it to one scenario
+instance, and generated plus pinned student encounters reuse the same logical packet,
+disposition, handler, and persistence path under a school-specific projection.
 Expression narrative beyond that first skin seam, contraband graph identity,
 document-identity receipts, and status decomposition remain future slices.
 
@@ -36,6 +40,7 @@ component-manager slots can participate in transaction offers through a holder a
 - `engine/src/tangl/mechanics/credentials/PHASE_6A_FACET_BRIDGE_CONTRACT.md`
 - `engine/src/tangl/mechanics/credentials/PHASE_6B_REQUEST_DOCUMENT_HANDOFF.md`
 - `engine/src/tangl/mechanics/credentials/PHASE_6C_AUTHORED_CATALOG_HANDOFF.md`
+- `engine/src/tangl/mechanics/credentials/PHASE_6D_HALL_MONITOR_SCENARIO_HANDOFF.md`
 - `engine/src/tangl/mechanics/games/CREDENTIALS_LOOP_DESIGN.md`
 - `engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md`
 - `engine/src/tangl/mechanics/TRANSACTION_OFFER_DESIGN.md`
@@ -455,7 +460,8 @@ requires a world to expose named token catalogs with explicit members. A scenari
 selects a world-local catalog reference, while a scenario instance configures roster and
 encounter composition. Packet materialization resolves only within the selected catalog;
 it must not search the process-global Singleton population or carry a world label as game
-state. The full Hall Monitor conformance scenario follows that correction.
+state. Phase 6d applies that hierarchy in the real Hall Monitor conformance world; see
+`PHASE_6D_HALL_MONITOR_SCENARIO_HANDOFF.md`.
 
 Later slices may:
 
@@ -478,7 +484,8 @@ Acceptance:
 
 ### Phase 7: Retire Compatibility Fields
 
-Once `credential_gate`, factories, and tests all use the manager path:
+Once manager-backed Credential Gate and Hall Monitor paths have run side by side and
+their scenario-specific projections are covered:
 
 - remove direct packet lists from `CredentialCase`;
 - remove duplicated discovery methods from the case, or make them pure delegation;
