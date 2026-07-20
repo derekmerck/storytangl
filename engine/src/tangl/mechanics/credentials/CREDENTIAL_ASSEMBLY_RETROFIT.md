@@ -22,8 +22,8 @@ origin/indication ids compile into named, bounded token catalogs exposed by the 
 world. A scenario type selects one world-local catalog, and packet materialization
 searches only that catalog rather than a game-owned world namespace or the global
 Singleton population. Qualified definition labels remain an internal persistence detail.
-Phase 6d is planned as the real Hall Monitor conformance vertical: a bespoke scenario
-type selects the school catalog, a script-configured shift narrows it to one scenario
+Phase 6d landed as the real Hall Monitor conformance vertical: a bespoke scenario type
+selects the school catalog, a script-configured shift narrows it to one scenario
 instance, and generated plus pinned student encounters reuse the same logical packet,
 disposition, handler, and persistence path under a school-specific projection.
 Expression narrative beyond that first skin seam, contraband graph identity,

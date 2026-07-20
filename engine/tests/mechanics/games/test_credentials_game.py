@@ -16,6 +16,7 @@ from tangl.mechanics.games import (
 )
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
+    CredentialPresentationProfile,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
@@ -67,6 +68,13 @@ class CredentialsBlock(HasGame, Block):
 
     _game_class = CredentialsGame
     _game_handler_class = CredentialsGameHandler
+
+
+def test_presentation_requires_text_for_every_invalid_status() -> None:
+    with pytest.raises(ValueError, match="status_text must define every invalid credential status"):
+        CredentialPresentationProfile(
+            status_text={CredentialStatus.MISSING_SEAL: "The seal is missing."}
+        )
 
 
 class TestCredentialsCore:

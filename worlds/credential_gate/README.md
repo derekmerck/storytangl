@@ -11,6 +11,10 @@ selects that catalog through its local `catalog_ref`; it does not query the proc
 singleton population. The shared compiler/loader contract is
 `engine/src/tangl/mechanics/credentials/PHASE_6C_AUTHORED_CATALOG_HANDOFF.md`.
 
+Together with `worlds/hall_monitor`, this is a conformance surface for the same
+credentials kernel: each world supplies only its catalog, scenario policy, and
+presentation while packet, disposition, game, and persistence lifecycle stay shared.
+
 ## Semantic operations versus skin vocabulary
 
 The checkpoint and hall-monitor skins use the same normalized operations but

@@ -2,12 +2,13 @@
 
 ## Status
 
-**READY FOR IMPLEMENTATION (2026-07-19).** Phase 6c landed in PR #311 with named,
-bounded world catalogs, world-local `catalog_ref` selection, qualified persistence
-identity, open origin/indication coordinates, and skin-aware `request_document`
-realization. Its temporary Hall Monitor fixture proves catalog and wording isolation,
-but it is not a playable world and does not prove the lower half of the mechanics
-adoption model.
+**LANDED (2026-07-19).** Phase 6c landed in PR #311 with named, bounded world
+catalogs, world-local `catalog_ref` selection, qualified persistence identity, open
+origin/indication coordinates, and skin-aware `request_document` realization. Phase 6d
+adds the playable `worlds/hall_monitor` conformance world: its script configures a
+seeded school shift with a pinned student, while generated encounters use the existing
+offer, packet, disposition, game-handler, planning, and persistence lifecycle. School
+presentation realizes the same logical statuses without changing checkpoint behavior.
 
 Phase 6d proves:
 
