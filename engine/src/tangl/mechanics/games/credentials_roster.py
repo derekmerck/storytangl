@@ -75,7 +75,11 @@ class ScenarioOffer(Unstructurable):
 
 @dataclass(frozen=True)
 class ShiftSpec:
-    """Generation-time recipe for one shift's roster (not persisted game state)."""
+    """Generation-time recipe for one shift's roster (not persisted game state).
+
+    When ``allowed_failure_modes`` is set, it must still permit every requested
+    disposition for the configured origin and purpose pools.
+    """
 
     rules: Restrictions
     encounters: int = 5
@@ -189,7 +193,12 @@ def generate_roster(spec: ShiftSpec, rng: random.Random | None = None) -> list[S
             )
             if offer is not None:
                 break
-        roster.append(offer or make_offer(region, purposes[0], target, spec.rules, rng))
+        if offer is None:
+            raise ValueError(
+                f"No configured purpose can produce {target.value!r} for {region!r} "
+                "under the configured failure policy."
+            )
+        roster.append(offer)
 
     for offer in pinned:
         roster.insert(rng.randint(0, len(roster)), offer)

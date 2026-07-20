@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Protocol
+from typing import TYPE_CHECKING, ClassVar, Protocol, Self
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, model_validator
 
 if TYPE_CHECKING:
     from .credentials_roster import ScenarioOffer
@@ -714,6 +714,22 @@ class CredentialPresentationProfile(BaseModelPlus):
             "request_document_not_applicable": "There is nothing to reissue.",
         }
     )
+
+    @model_validator(mode="after")
+    def validate_status_text(self) -> Self:
+        """Require authored profiles to name every invalid credential status."""
+
+        missing = [
+            status.value
+            for status in CredentialStatus
+            if not status.is_valid and status not in self.status_text
+        ]
+        if missing:
+            raise ValueError(
+                "status_text must define every invalid credential status; "
+                f"missing: {', '.join(missing)}"
+            )
+        return self
 
     def document_label(
         self,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 from tangl.mechanics.games import (
     CredentialCase,
     CredentialDisposition,
@@ -63,6 +65,18 @@ class TestGenerateRoster:
         a = generate_roster(_spec(seed=7))
         b = generate_roster(_spec(seed=7))
         assert [o.model_dump() for o in a] == [o.model_dump() for o in b]
+
+    def test_rejects_an_unsatisfiable_allowed_failure_policy(self) -> None:
+        spec = _spec(
+            encounters=1,
+            origin_distribution={Region.LOCAL: 1.0},
+            purpose_pool=[IND.WORK],
+            disposition_distribution={D.ARREST: 1.0},
+            allowed_failure_modes=[FailureMode.MISSING_PERMIT],
+        )
+
+        with pytest.raises(ValueError, match="No configured purpose"):
+            generate_roster(spec)
 
 
 class TestLinchpinInvariant:
