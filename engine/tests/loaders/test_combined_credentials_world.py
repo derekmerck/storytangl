@@ -7,7 +7,11 @@ from pathlib import Path
 from tangl.core import Graph, Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
-from tangl.mechanics.credentials import CREDENTIAL_PACKET_SLOT, CredentialDefinition
+from tangl.mechanics.credentials import (
+    CREDENTIAL_ID_SLOT,
+    CREDENTIAL_PACKET_SLOT,
+    CredentialDefinition,
+)
 from tangl.mechanics.games.credentials_game import CredentialsGame, CredentialsGameHandler
 from tangl.story import Action, InitMode, World
 from tangl.vm import Ledger
@@ -17,18 +21,25 @@ def _actions(ledger: Ledger) -> list[Action]:
     return list(ledger.cursor.edges_out(Selector(has_kind=Action, trigger_phase=None)))
 
 
+def _action(ledger: Ledger, label: str) -> Action:
+    """Return an authored or game-provisioned action by its player-facing label."""
+
+    actions = _actions(ledger)
+    for action in actions:
+        if action.label == label or action.text == label:
+            return action
+    available = [(action.label, action.text) for action in actions]
+    raise AssertionError(f"Action {label!r} not found; available: {available!r}")
+
+
 def _choose(ledger: Ledger, label: str) -> None:
-    action = next(
-        action for action in _actions(ledger) if action.label == label or action.text == label
-    )
-    ledger.resolve_choice(action.uid)
+    ledger.resolve_choice(_action(ledger, label).uid)
 
 
 def _inspect(ledger: Ledger, target: str) -> None:
-    action = next(action for action in _actions(ledger) if action.label == "Inspect a document")
     game = ledger.cursor.game
     ledger.resolve_choice(
-        action.uid,
+        _action(ledger, "Inspect a document").uid,
         choice_payload={"piece_ids": [f"{game.case_index}:{target}"]},
     )
 
@@ -307,7 +318,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         assert ledger.cursor is block
         game = ledger.cursor.game
         assert isinstance(game, CredentialsGame)
-        assert type(ledger.cursor.game_handler) is CredentialsGameHandler
+        assert isinstance(ledger.cursor.game_handler, CredentialsGameHandler)
         assert game.catalog_ref == catalog_ref
 
         first = ledger.cursor.game_handler.get_provisioned_moves(game)
@@ -321,18 +332,35 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         assert finding in case.hidden_facts.values()
         manager = case.packet_manager
         assert manager is not None
+        component_ids = {
+            component.uid
+            for slot_name in (CREDENTIAL_ID_SLOT, CREDENTIAL_PACKET_SLOT)
+            for component in manager.get_slot(slot_name)
+        }
+        packet_components = manager.get_slot(CREDENTIAL_PACKET_SLOT)
+        assert packet_components
         assert all(
             component.reference_singleton.label.startswith(prefix)
-            for component in manager.get_slot(CREDENTIAL_PACKET_SLOT)
+            for component in packet_components
         )
 
         restored = Graph.structure(result.graph.unstructure())
         restored_block = restored.find_one(Selector(label=block_label))
         restored_manager = restored_block.game.active_case.packet_manager
         assert restored_manager is not None
+        restored_components = [
+            component
+            for slot_name in (CREDENTIAL_ID_SLOT, CREDENTIAL_PACKET_SLOT)
+            for component in restored_manager.get_slot(slot_name)
+        ]
+        assert {component.uid for component in restored_components} == component_ids
         assert all(
             component.reference_singleton.label.startswith(prefix)
-            for component in restored_manager.get_slot(CREDENTIAL_PACKET_SLOT)
+            for component in restored_components
+        )
+        assert (
+            sum(item.uid in component_ids for item in restored.members.values())
+            == len(component_ids)
         )
 
         _inspect(ledger, identity_label)
