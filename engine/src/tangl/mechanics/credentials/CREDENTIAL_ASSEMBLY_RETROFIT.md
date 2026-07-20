@@ -26,6 +26,9 @@ Phase 6d landed as the real Hall Monitor conformance vertical: a bespoke scenari
 selects the school catalog, a script-configured shift narrows it to one scenario
 instance, and generated plus pinned student encounters reuse the same logical packet,
 disposition, handler, and persistence path under a school-specific projection.
+Phase 6e then proves the same authority boundary inside one compiled world: distinct
+border and school scenario types each select their own local catalog, policy, and
+presentation while sharing the credentials game and handler lifecycle.
 Expression narrative beyond that first skin seam, contraband graph identity,
 document-identity receipts, and status decomposition remain future slices.
 
@@ -461,7 +464,8 @@ selects a world-local catalog reference, while a scenario instance configures ro
 encounter composition. Packet materialization resolves only within the selected catalog;
 it must not search the process-global Singleton population or carry a world label as game
 state. Phase 6d applies that hierarchy in the real Hall Monitor conformance world; see
-`PHASE_6D_HALL_MONITOR_SCENARIO_HANDOFF.md`.
+`PHASE_6D_HALL_MONITOR_SCENARIO_HANDOFF.md`. Phase 6e proves that two locally authored
+scenario types can make those selections independently inside one compiled world.
 
 Later slices may:
 
@@ -484,8 +488,8 @@ Acceptance:
 
 ### Phase 7: Retire Compatibility Fields
 
-Once manager-backed Credential Gate and Hall Monitor paths have run side by side and
-their scenario-specific projections are covered:
+Now that manager-backed Credential Gate and Hall Monitor paths have run both side by
+side and through an intra-world two-catalog conformance story:
 
 - remove direct packet lists from `CredentialCase`;
 - remove duplicated discovery methods from the case, or make them pure delegation;
