@@ -430,8 +430,11 @@ Each should exercise one or two pieces of the shared vocabulary before later
 worlds compose a broader range:
 
 - the credentials world exercises hidden-information inspection and mediation;
-- the hall-monitor reskin must prove that the credentials loop is
+- the hall-monitor reskin proves that the credentials loop is
   genre-neutral;
+- a combined credentials conformance world proves that one world can host
+  multiple locally authored scenario types, each selecting a bounded local catalog
+  without mutating the shared kernel;
 - the logical-adder reskin exercises the same underlying logic through different
   content and feeling;
 - the separate Twine-loader demo remains a codec surface while round-trip
@@ -510,17 +513,16 @@ grammars** rather than just “minigames.”
 
 ## Current Implementation Priorities
 
-1. Make token catalogs explicit bounded collections exposed by a world authority;
-   scenario types select a local catalog reference without naming or searching a
-   world.
-2. Continue the credentials vertical through that corrected authority seam: one
-   world can expose both border and school catalogs, while two separately loaded
-   worlds remain isolated even when local catalog and item ids collide.
-3. Build the full hall-monitor conformance scenario through the four-layer
-   world/type/instance/encounter model without adding credentials-specific engine
-   vocabulary.
-4. Retire credential compatibility fields only after the manager-backed border and
-   hall-monitor paths have been exercised side by side.
+1. Complete: token catalogs are explicit bounded collections exposed by a world
+   authority; scenario types select a local catalog reference without naming or
+   searching a world.
+2. Complete: one combined world exposes both border and school catalogs, while two
+   separately loaded worlds remain isolated even when local catalog and item ids
+   collide.
+3. Complete: the Hall Monitor conformance scenario exercises the four-layer
+   world/type/instance/encounter model without credentials-specific engine vocabulary.
+4. Retire credential compatibility fields now that the manager-backed border and
+   hall-monitor paths have been exercised both separately and in one world.
 5. Normalize credential defects and connect credential components to presence and
    media projection.
 6. Reconcile vehicle and loadout vocabulary with assembly, transactions, and

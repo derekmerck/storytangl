@@ -9,6 +9,9 @@ adds the playable `worlds/hall_monitor` conformance world: its script configures
 seeded school shift with a pinned student, while generated encounters use the existing
 offer, packet, disposition, game-handler, planning, and persistence lifecycle. School
 presentation realizes the same logical statuses without changing checkpoint behavior.
+Phase 6e then proves intra-world plurality: one compiled conformance world exposes both
+`border` and `school` catalogs, and locally authored block types select their own
+catalog, policy, and presentation through the shared credentials lifecycle.
 
 Phase 6d proves:
 
@@ -250,8 +253,8 @@ hide a new generic game-configuration framework inside the Hall Monitor domain m
 
 ## Follow-up
 
-After the manager-backed Credential Gate and Hall Monitor worlds run side by side, Phase
-7 may remove the flat packet compatibility representation. Only after that identity
-cutover should a later slice replace checkpoint-flavored status/failure names with
-normalized evidence defects and connect those defects to richer presence and media
-projection.
+With the manager-backed Credential Gate and Hall Monitor paths now proven both across
+separate worlds and inside one combined-world story, Phase 7 may remove the flat packet
+compatibility representation. Only after that identity cutover should a later slice
+replace checkpoint-flavored status/failure names with normalized evidence defects and
+connect those defects to richer presence and media projection.
