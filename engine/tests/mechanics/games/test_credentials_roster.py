@@ -92,6 +92,28 @@ class TestLinchpinInvariant:
             case = materialize(offer, RULES)
             assert derive_disposition(case.packet_manager, RULES) is offer.target_disposition
 
+    def test_declared_with_id_contraband_reuses_the_purpose_id(self) -> None:
+        rules = Restrictions.from_map(
+            {
+                Region.LOCAL: {
+                    IND.TRAVEL: L.WITH_ID,
+                    IND.WEAPON: L.WITH_ID,
+                }
+            }
+        )
+
+        spec = ShiftSpec(
+            rules=rules,
+            encounters=1,
+            origin_distribution={Region.LOCAL: 1.0},
+            purpose_pool=(IND.TRAVEL,),
+            disposition_distribution={D.DENY: 1.0},
+            allowed_failure_modes=(FailureMode.UNPERMITTED_CONTRABAND,),
+        )
+
+        with pytest.raises(ValueError, match="No configured purpose"):
+            generate_roster(spec)
+
 
 class TestMaterialize:
     def test_is_deterministic(self) -> None:

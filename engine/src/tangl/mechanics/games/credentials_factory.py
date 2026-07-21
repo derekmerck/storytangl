@@ -159,18 +159,16 @@ def apply_failure(mode: FailureMode, case: CredentialCase) -> None:
         case FailureMode.WRONG_HOLDER_PERMIT:
             if permit is not None:
                 permit.holder_matches = False
-        case FailureMode.MISSING_ID:
+        case FailureMode.MISSING_ID | FailureMode.EXPIRED_ID | FailureMode.FAKE_ID:
             id_components = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
             if id_components:
-                case.packet_manager.unassign(CREDENTIAL_ID_SLOT, id_components[0])
-        case FailureMode.EXPIRED_ID:
-            id_components = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
-            if id_components:
-                id_components[0].status = CredentialStatus.EXPIRED
-        case FailureMode.FAKE_ID:
-            id_components = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
-            if id_components:
-                id_components[0].status = CredentialStatus.WRONG_HOLDER
+                id_component = id_components[0]
+                if mode is FailureMode.MISSING_ID:
+                    case.packet_manager.unassign(CREDENTIAL_ID_SLOT, id_component)
+                elif mode is FailureMode.EXPIRED_ID:
+                    id_component.status = CredentialStatus.EXPIRED
+                else:
+                    id_component.status = CredentialStatus.WRONG_HOLDER
         case FailureMode.UNPERMITTED_CONTRABAND:
             case.packet_manager.possessions.append(
                 ContrabandItem(indication=_DEFAULT_CONTRABAND, concealed=False)

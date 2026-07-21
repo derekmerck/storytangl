@@ -109,8 +109,9 @@ class CredentialCase(Unstructurable):
 
     The narrative strings (``presented_documents`` / ``hidden_facts`` /
     ``packet_hidden_facts``) drive the v1 inspect loop. The *structured truth*
-    (``region`` / ``purpose`` / ``id_card`` / ``packet`` / ``possessions``) is
-    what :func:`derive_disposition` reads through the owner-bound packet manager.
+    (region, purpose, id card, documents, and possessions) lives in the required
+    ``packet_manager``; :func:`derive_disposition` reads it through that
+    owner-bound manager, never from the case directly.
 
     ``correct_disposition`` is an optional authored *override*: when set it wins,
     otherwise the disposition is derived from the rules.

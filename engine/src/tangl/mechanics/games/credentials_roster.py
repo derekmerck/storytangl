@@ -130,6 +130,9 @@ def _offer_disposition(
     elif purpose_level is RestrictionLevel.FORBIDDEN:
         worst = CredentialDisposition.DENY
 
+    has_valid_id = purpose_level.requires_id
+    has_weapon_permit = purpose == Indication.WEAPON and purpose_level.requires_permit
+
     for mode in modes:
         match mode:
             case FailureMode.MISSING_PERMIT | FailureMode.UNSEALED_PERMIT:
@@ -146,6 +149,10 @@ def _offer_disposition(
                     worst = _worse(worst, CredentialDisposition.ARREST)
             case FailureMode.UNPERMITTED_CONTRABAND | FailureMode.CONCEALED_CONTRABAND:
                 level = rules.level_for(region, Indication.WEAPON, RestrictionLevel.FORBIDDEN)
+                weapon_is_credentialed = (
+                    (not level.requires_id or has_valid_id)
+                    and (not level.requires_permit or has_weapon_permit)
+                )
                 if level is RestrictionLevel.CRIMINAL:
                     worst = _worse(worst, CredentialDisposition.ARREST)
                 elif level is RestrictionLevel.FORBIDDEN:
@@ -158,11 +165,11 @@ def _offer_disposition(
                 elif mode is FailureMode.CONCEALED_CONTRABAND:
                     worst = _worse(
                         worst,
-                        CredentialDisposition.ARREST
-                        if level.requires_id or level.requires_permit
-                        else CredentialDisposition.DENY,
+                        CredentialDisposition.DENY
+                        if weapon_is_credentialed
+                        else CredentialDisposition.ARREST,
                     )
-                elif level.requires_id or level.requires_permit:
+                elif not weapon_is_credentialed:
                     worst = _worse(worst, CredentialDisposition.DENY)
     return worst
 
