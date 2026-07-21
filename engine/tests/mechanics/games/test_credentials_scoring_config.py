@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from tangl.mechanics.games import (
     ContrabandItem,
-    CredentialCase,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
@@ -25,6 +24,7 @@ from tangl.mechanics.games import (
     default_penalty_matrix,
     disposition_penalty,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 D = CredentialDisposition
 S = CredentialStatus
@@ -306,7 +306,9 @@ class TestEvidenceTaxEdgeCases:
     def test_concealed_contraband_is_not_self_evident(self) -> None:
         # A *concealed* item is hidden: denying without searching is unjustified.
         case = _declared_drugs_case()
-        case.possessions = [ContrabandItem(indication=IND.DRUGS, concealed=True)]
+        case.packet_manager.possessions = [
+            ContrabandItem(indication=IND.DRUGS, concealed=True)
+        ]
         game, handler = _game([case], no_evidence_penalty=1)
         assert game.expected_disposition(game.active_case) is D.ARREST  # smuggling
         _decide(handler, game, "arrest")  # correct, but blind

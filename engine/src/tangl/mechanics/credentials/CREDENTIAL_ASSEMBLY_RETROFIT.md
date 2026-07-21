@@ -28,7 +28,12 @@ instance, and generated plus pinned student encounters reuse the same logical pa
 disposition, handler, and persistence path under a school-specific projection.
 Phase 6e then proves the same authority boundary inside one compiled world: distinct
 border and school scenario types each select their own local catalog, policy, and
-presentation while sharing the credentials game and handler lifecycle.
+presentation while sharing the credentials game and handler lifecycle. Phase 7
+completed the authority cutover: every runtime `CredentialCase` now requires one
+owner-bound assembly packet manager; offer materialization creates it directly with
+the selected catalog; and the flat case fields, packet protocol, game-layer manager,
+and enum compatibility module are gone. Gate and Hall Monitor retain their authored
+wording as narrative overrides on ordinary offers.
 Expression narrative beyond that first skin seam, contraband graph identity,
 document-identity receipts, and status decomposition remain future slices.
 
@@ -52,9 +57,8 @@ component-manager slots can participate in transaction offers through a holder a
 
 ## Why Retrofit
 
-The live credentials implementation already split the *game loop* from a packet
-discovery protocol. `CredentialCase` still owns compatibility fields and narrative
-strings, while `CredentialPacketManager` projects the structured packet shape used by
+The live credentials implementation keeps narrative strings on `CredentialCase`,
+while its required `CredentialPacketManager` owns the structured packet shape used by
 `derive_disposition()`.
 
 That bridge solved the immediate layering problem, but it remains parallel to the
@@ -63,25 +67,20 @@ newer assembly pattern:
 - outfit: active body loadout manager over wearable graph tokens;
 - wardrobe: inactive storage manager over wearable graph tokens;
 - vehicle: loadout manager over vehicle-part graph tokens;
-- credentials today: packet-shaped value object over embedded `CredentialToken`
-  values.
+- credentials today: owner-bound packet manager over graph credential tokens.
 
 The retrofit makes credentials another assembly specialization without losing the
 existing game semantics: credential instances are tokens, the packet is an
-owner-bound manager, and disposition derivation reads the packet through the same
-small protocol it already uses.
+owner-bound manager, and disposition derivation reads that concrete manager.
 
 Current implementation checkpoint:
 
-- `tangl.mechanics.credentials.domain` owns the credential enums/value types, while
-  `tangl.mechanics.games.credentials_enums` remains a compatibility re-export.
+- `tangl.mechanics.credentials.domain` owns the credential enums/value types through
+  the public `tangl.mechanics.credentials` surface.
 - `CredentialDefinition` / `CredentialComponent` provide graph credential tokens
   that project to the legacy `CredentialToken` value shape.
-- `tangl.mechanics.credentials.CredentialPacketManager` is the assembly-backed
-  manager. The older `tangl.mechanics.games.CredentialPacketManager` remains the
-  value-object adapter for flat legacy cases.
-- `CredentialCase.packet_manager` is optional; when present, case discovery methods
-  delegate to it. Otherwise the legacy flat fields remain authoritative.
+- `tangl.mechanics.credentials.CredentialPacketManager` is the only packet manager.
+- `CredentialCase.packet_manager` is required; case discovery methods delegate to it.
 - `HasGame.game_state` embeds the hosted `Game` through constructor-form recursion;
   `HasGame.game` binds embedded component managers to the block on access.
 - Generated packets currently use finite default `CredentialDefinition` instances loaded
@@ -96,9 +95,8 @@ game loop. Later slices must preserve these constraints:
 
 - **Disclosure discipline:** contribute moves from visible document existence, never
   hidden validity; disclose validity only when a committed move resolves.
-- **Packet authority:** a case either owns an assembly packet manager as its write
-  target or projects a fresh compatibility adapter from authoritative flat fields.
-  A cached projection must not silently become authoritative.
+- **Packet authority:** every runtime case owns one assembly packet manager as its
+  write target; no flat packet projection remains.
 - **Phase purity:** graph-backed case materialization and registry writes happen at
   setup or an UPDATE boundary, not on the first PLANNING read.
 - **State scope:** durable document facts belong on credential components;
@@ -395,6 +393,9 @@ Acceptance:
 
 ### Phase 4: Bridge `CredentialCase`
 
+**Superseded by Phase 7.** The temporary optional-manager/flat-field bridge below
+is retained only as implementation history.
+
 Status: landed. `CredentialCase` can carry the new manager while retaining flat fields
 as compatibility inputs.
 
@@ -422,6 +423,9 @@ Acceptance:
   access, without changing the broader `HasGame` private-game persistence path.
 
 ### Phase 5: Retrofit Factory And Roster Materialization
+
+**Superseded by Phase 7.** Arrival materialization now creates the manager directly;
+there is no value-shaped case to convert or clear.
 
 Status: landed for sampled offers. Factory generation remains value-based and
 deterministic. A hosted game materializes its arriving offer into graph credential
@@ -453,9 +457,9 @@ Status: Phase 6a and the bounded 6b `request_document` adoption are landed. Phas
 added pure token-to-packet facet discovery with constructor-form persistence proof.
 Phase 6b adds the generated non-id document `choice / giver / request_document`
 contribution and lets `CredentialsGameHandler` lower it into the existing
-indication-based move only when an assembly packet manager is present. It preserves
-the flat compatibility case path, existing labels, accepts, time cost, outcomes, and
-journal prose. A facetless manager document contributes no move, and the selected
+indication-based move from the required assembly packet manager. It preserves
+existing labels, accepts, time cost, outcomes, and journal prose. A facetless manager
+document contributes no move, and the selected
 move path uses the same availability rule.
 
 Phase 6c is the catalog-authority continuation of this adoption. The corrected contract
@@ -488,13 +492,14 @@ Acceptance:
 
 ### Phase 7: Retire Compatibility Fields
 
-Now that manager-backed Credential Gate and Hall Monitor paths have run both side by
-side and through an intra-world two-catalog conformance story:
+**Status: landed (2026-07-20).** Manager-backed Credential Gate and Hall Monitor
+paths now run through ordinary offers and the intra-world two-catalog conformance
+story. This slice:
 
-- remove direct packet lists from `CredentialCase`;
-- remove duplicated discovery methods from the case, or make them pure delegation;
-- re-home game imports from `tangl.mechanics.games.credentials_enums` to
-  `tangl.mechanics.credentials`.
+- removes direct packet lists from `CredentialCase`;
+- keeps only pure case delegation to its required manager;
+- re-homes imports to `tangl.mechanics.credentials` and removes the game enum
+  compatibility module.
 
 Retire authored packet narrative only after expression/projection helpers can preserve
 world-specific visible descriptions and committed hidden-fact disclosure.

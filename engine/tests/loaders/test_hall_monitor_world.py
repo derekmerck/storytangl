@@ -77,7 +77,7 @@ class TestHallMonitorWorld:
             "records",
         }
 
-    def test_script_configures_a_seeded_shift_with_a_pinned_student(self) -> None:
+    def test_script_configures_a_seeded_shift_with_an_authored_student_offer(self) -> None:
         graph, ledger = _started_shift()
         block = graph.find_one(Selector(label="morning_shift"))
         game = ledger.cursor.game
@@ -91,7 +91,7 @@ class TestHallMonitorWorld:
             CredentialDisposition.ARREST: 0.2,
         }
         assert len(game.offers) == 5
-        assert any(offer.pinned_case is not None for offer in game.offers)
+        assert any(offer.candidate_name == "Mira Quill" for offer in game.offers)
         assert all(
             set(offer.failure_modes).isdisjoint(
                 {FailureMode.UNPERMITTED_CONTRABAND, FailureMode.CONCEALED_CONTRABAND}
@@ -103,9 +103,11 @@ class TestHallMonitorWorld:
             case = materialize(
                 offer,
                 game.restriction_map,
+                owner=object(),
+                catalog=game._credential_catalog(ledger.cursor),
                 narrative_renderer=game.presentation.render_case,
             )
-            assert derive_disposition(case, game.restriction_map) is offer.target_disposition
+            assert derive_disposition(case.packet_manager, game.restriction_map) is offer.target_disposition
 
     def test_school_projection_and_full_shift_keep_the_shared_loop(self) -> None:
         _, ledger = _started_shift()

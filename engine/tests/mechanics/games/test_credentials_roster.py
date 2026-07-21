@@ -7,7 +7,6 @@ import random
 import pytest
 
 from tangl.mechanics.games import (
-    CredentialCase,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
@@ -91,7 +90,7 @@ class TestLinchpinInvariant:
         )
         for offer in generate_roster(spec):
             case = materialize(offer, RULES)
-            assert derive_disposition(case, RULES) is offer.target_disposition
+            assert derive_disposition(case.packet_manager, RULES) is offer.target_disposition
 
 
 class TestMaterialize:
@@ -99,7 +98,10 @@ class TestMaterialize:
         offer = generate_roster(_spec(disposition_distribution={D.DENY: 1.0}))[0]
         first = materialize(offer, RULES)
         second = materialize(offer, RULES)
-        assert first.model_dump() == second.model_dump()
+        assert first.candidate_name == second.candidate_name
+        assert first.packet_manager.get_region() == second.packet_manager.get_region()
+        assert first.packet_manager.get_purpose() == second.packet_manager.get_purpose()
+        assert first.packet_manager.all_credentials() == second.packet_manager.all_credentials()
 
     def test_materialized_case_is_inspectable(self) -> None:
         offer = ScenarioOffer(region=Region.LOCAL, purpose=IND.WORK, target_disposition=D.PASS)
@@ -108,10 +110,15 @@ class TestMaterialize:
         assert "passport" in case.presented_documents
         assert any("permit" in label for label in case.presented_documents)
 
-    def test_pinned_case_materializes_verbatim(self) -> None:
-        authored = CredentialCase(candidate_name="Pinned", purpose=IND.TRAVEL)
-        offer = ScenarioOffer(candidate_name="Pinned", pinned_case=authored)
-        assert materialize(offer, RULES) is authored
+    def test_narrative_overrides_are_preserved(self) -> None:
+        offer = ScenarioOffer(
+            candidate_name="Pinned",
+            target_disposition=D.PASS,
+            presented_documents_override={"passport": "An authored passport."},
+        )
+        assert materialize(offer, RULES).presented_documents == {
+            "passport": "An authored passport."
+        }
 
 
 class TestWhitelistedPin:
@@ -129,7 +136,7 @@ class TestWhitelistedPin:
         case = materialize(offer, RULES)
         game = CredentialsGame(offers=[offer], restriction_map=RULES)
         # The packet itself is criminal...
-        assert derive_disposition(case, RULES) is D.ARREST
+        assert derive_disposition(case.packet_manager, RULES) is D.ARREST
         # ...but the whitelist override makes the *expected* call an allow.
         assert game.expected_disposition(case) is D.PASS
 

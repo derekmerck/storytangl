@@ -10,13 +10,13 @@ risk wrong calls).
 from __future__ import annotations
 
 from tangl.mechanics.games import (
-    CredentialCase,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
     CredentialsMove,
     move_time_cost,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 D = CredentialDisposition
 

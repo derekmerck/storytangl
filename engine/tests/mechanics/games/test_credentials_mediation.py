@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from tangl.mechanics.games import (
     ContrabandItem,
-    CredentialCase,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
@@ -15,6 +14,7 @@ from tangl.mechanics.games import (
     Restrictions,
     RestrictionLevel,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 D = CredentialDisposition
 S = CredentialStatus

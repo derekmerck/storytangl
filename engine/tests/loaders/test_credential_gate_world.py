@@ -21,12 +21,14 @@ from tangl.mechanics.credentials import (
 )
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
-    CredentialCase,
+    CredentialDisposition,
     CredentialPresentationProfile,
     CredentialsGame,
     CredentialsGameHandler,
     Finding,
 )
+from tangl.mechanics.games.credentials_roster import ScenarioOffer
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, Block, InitMode, World
 from tangl.vm import Ledger
@@ -80,25 +82,22 @@ def _catalog_document_name(world: World, catalog_ref: str) -> str:
         label=catalog_ref,
         game_state=CredentialsGame(
             catalog_ref=catalog_ref,
-            roster=[
-                CredentialCase(
+            restriction_map=Restrictions.from_map(
+                {"lower_school": {"activity": RestrictionLevel.WITH_PERMIT}}
+            ),
+            offers=[
+                ScenarioOffer(
                     candidate_name="Nia",
+                    target_disposition=CredentialDisposition.PASS,
                     region="lower_school",
                     purpose="activity",
-                    id_card=CredentialToken(indication="activity"),
-                    packet=[
-                        CredentialToken(
-                            indication="activity",
-                            requires_id=True,
-                        )
-                    ],
                 )
             ],
         ),
     )
 
-    manager = block.game.roster[0].packet_manager
-    assert manager is not None
+    block.game_handler.setup(block.game)
+    manager = block.game.active_case.packet_manager
     return manager.get_slot(CREDENTIAL_PACKET_SLOT)[0].name
 
 

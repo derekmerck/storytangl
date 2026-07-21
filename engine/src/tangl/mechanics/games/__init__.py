@@ -94,7 +94,7 @@ from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, Twen
 from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 from .kim_game import KimGame, KimGameHandler, KimMove
-from .credentials_enums import (
+from tangl.mechanics.credentials import (
     ContrabandItem,
     CredentialStatus,
     CredentialToken,
@@ -113,8 +113,6 @@ from .credentials_game import (
     CredentialCaseResult,
     CredentialDisposition,
     CredentialPresentationProfile,
-    CredentialPacketManager,
-    CredentialPacketProtocol,
     CredentialsGame,
     CredentialsGameHandler,
     CredentialsMove,
@@ -195,8 +193,6 @@ __all__ = [
     "CredentialPresentationProfile",
     "CredentialCase",
     "CredentialCaseResult",
-    "CredentialPacketManager",
-    "CredentialPacketProtocol",
     "derive_disposition",
     "disposition_penalty",
     "default_penalty_matrix",

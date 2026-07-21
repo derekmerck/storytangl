@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from tangl.mechanics.games import (
     ContrabandItem,
-    CredentialCase,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
@@ -29,6 +28,7 @@ from tangl.mechanics.games import (
     RestrictionLevel,
     derive_disposition,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 D = CredentialDisposition
 S = CredentialStatus
@@ -84,7 +84,7 @@ class TestWhitelist:
         # The sponsored-carrier exemption: even per-se-criminal goods are waved
         # through (the whitelist overlay sits above derive_disposition).
         case = _smuggler(whitelist=True)
-        assert derive_disposition(case, RULES) is D.ARREST  # the packet is criminal
+        assert derive_disposition(case.packet_manager, RULES) is D.ARREST  # the packet is criminal
         game, _ = _game(case)
         assert game.expected_disposition(case) is D.PASS  # ...but sponsored -> pass
 
@@ -100,7 +100,7 @@ class TestWhitelist:
 class TestBlacklist:
     def test_blacklist_escalates_a_clean_packet_to_arrest(self) -> None:
         case = _clean(blacklist=True)
-        assert derive_disposition(case, RULES) is D.PASS  # nothing wrong
+        assert derive_disposition(case.packet_manager, RULES) is D.PASS  # nothing wrong
         game, _ = _game(case)
         assert game.expected_disposition(case) is D.ARREST  # ...but wanted -> arrest
 

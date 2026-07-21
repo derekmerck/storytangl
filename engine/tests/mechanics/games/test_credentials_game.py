@@ -15,12 +15,12 @@ from tangl.mechanics.games import (
     Region,
 )
 from tangl.mechanics.games.credentials_game import (
-    CredentialCase,
     CredentialPresentationProfile,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.mechanics.games.handlers import inject_game_context
 from tangl.story import Action, Block
 from tangl.vm import Ledger, TraversableEdge as ChoiceEdge

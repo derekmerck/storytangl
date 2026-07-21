@@ -14,11 +14,11 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.mechanics.games import (
-    CredentialCase,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 
 def _case() -> CredentialCase:
