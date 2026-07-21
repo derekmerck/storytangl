@@ -9,9 +9,8 @@ scorer + soft time budget + per-rule-set scoring config (configurable
 contraband tier (per-se crime, no rescue, per-rule-set) LANDED 2026-06-05; Phase C
 whitelist/blacklist override (data flags clamping `expected_disposition`; overt vs
 shadow = the tax toggle) LANDED 2026-06-06; B.3 (declines axis) + the malfeasance
-layer (bribe/plant/invalidate) designed below as overlays; credential-packet
-manager adapter LANDED 2026-06-25 as a compatibility bridge toward assembly-style
-credential packets
+layer (bribe/plant/invalidate) designed below as overlays; Phase 7 packet
+authority cutover LANDED 2026-07-20 (one owner-bound assembly manager per case)
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -276,22 +275,19 @@ Five properties keep Phases A/B/C as extensions rather than entangled rewrites:
 5. **Consequences route through namespace + authored POSTREQS edges** in YAML, not
    hardcoded branches.
 
-### Packet-manager compatibility bridge (2026-06-25)
+### Packet authority cutover (2026-07-20)
 
-`CredentialCase` still owns the v1 narrative presentation and compatibility
-fields, but the structured packet surface now projects through
-`CredentialPacketManager`. `derive_disposition` accepts the manager protocol
-(`get_region`, `get_purpose`, `id_status`, `credential_for`, `get_contraband`,
-`all_credentials`) instead of reaching through case fields. This is deliberately
-a no-behavior-change adapter: the game, roster factory, mediation flow, and
-`credential_gate` data can keep passing `CredentialCase`, while future work can
-promote the packet itself into the common assembly/manager vocabulary.
+`CredentialPacketManager` is the sole runtime credential authority.
+`CredentialCase` retains only candidate and narrative/projection state plus its
+required manager; it has no parallel region, purpose, id, document, or
+possession fields. `derive_disposition` reads the concrete manager directly.
 
-The bridge is intentionally narrower than the outfit/vehicle managers for now.
-Credential tokens and contraband items remain value objects, not graph members,
-so there is no id-backed graph membership to restore yet. The next retrofit
-should decide whether credentials become graph-token components, remain embedded
-packet values, or support both by authoring style.
+`ScenarioOffer` is the authored arrival contract. At setup/UPDATE materialization
+creates one manager with the host owner and selected catalog, then applies failure
+modes to its components and possessions. A small private sampler feasibility
+check stays data-only; the materialized manager is asserted against the offer's
+target disposition. Gate and Hall Monitor both use ordinary offers, with only
+narrative overrides for their authored wording.
 
 ---
 
@@ -423,8 +419,8 @@ Indication --(restriction map)--> RestrictionLevel --> Presentation --> Outcome
 `expected_disposition(case)` derives against the shift's `restriction_map`,
 returning the **most-severe applicable disposition** (an explicit
 `ARREST > DENY > PASS` severity order on `CredentialDisposition`). Authored
-`correct_disposition` stays an explicit override so v1 cases and pinned
-encounters keep working unchanged. (The two design subsections A.1 and A.2 were
+`correct_disposition` stays an explicit override for exceptional authored cases.
+(The two design subsections A.1 and A.2 were
 implemented together as the "A.1 derivation spine" increment.)
 
 ### A.3 Candidate factory: one pipeline, three entry points (the A.2 increment, LANDED)
@@ -1170,10 +1166,9 @@ The seams already exist; persistence is the missing piece:
 - **Identity persistence.** A `CredentialCaseResult` already captures one
   decided candidate. Continuity needs a stable *candidate id* (and the option
   to persist a materialized `CredentialCase` snapshot keyed to that id).
-- **Recurrence as a pinned offer.** `ScenarioOffer.pinned_case` already lets a
-  shift pin a fully-authored candidate. A recurring candidate is a pinned
-  offer whose payload carries prior `CredentialCaseResult`s alongside the
-  current packet.
+- **Recurrence as an authored offer.** A recurring candidate is a normal
+  `ScenarioOffer` whose payload carries prior `CredentialCaseResult`s alongside
+  the current packet and any narrative overrides.
 - **Prior-encounter context on the case.** A `prior_encounters:
   list[CredentialCaseResult]` field (on `CredentialCase` or a "candidate
   dossier" wrapper). `derive_disposition` and `expected_disposition` read it
@@ -1183,7 +1178,7 @@ The seams already exist; persistence is the missing piece:
 **Promotion paths** (procedural → recurring):
 
 - *Wrongly admitted.* A procedural candidate dispositioned ALLOW that should
-  have been DENY/ARREST is promoted into a future shift's pinned offers as a
+  have been DENY/ARREST is promoted into a future shift's authored offers as a
   returning narrative thread -- the smuggler whose forged permit you missed
   comes back to blackmail you (the engine equivalent of Pope's recurring
   political consequence).
@@ -1209,7 +1204,7 @@ The seams already exist; persistence is the missing piece:
 
 This is design intent only; no implementation in scope. Worth capturing now
 because it's a cross-shift persistence step the engine doesn't currently
-support, and the seams (`ScenarioOffer.pinned_case`, `CredentialCase`,
+support, and the seams (`ScenarioOffer`, `CredentialCase`,
 `CredentialCaseResult`) all need to admit the continuity story when this lands.
 
 ---

@@ -45,7 +45,7 @@ EXPECTED_CLASS_DISPOSITION = {
 
 
 def _derive(case: CredentialCase) -> CredentialDisposition:
-    return derive_disposition(case, RULES)
+    return derive_disposition(case.packet_manager, RULES)
 
 
 class TestBuildValid:

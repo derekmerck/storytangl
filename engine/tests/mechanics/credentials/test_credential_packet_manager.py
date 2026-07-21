@@ -212,8 +212,8 @@ def test_credential_case_delegates_to_owned_assembly_packet() -> None:
         indication=IND.WORK,
         requires_id=True,
     )
-    assert case.to_packet_manager() is manager
-    assert derive_disposition(case, LOCAL_RULES) is D.PASS
+    assert case.packet_manager is manager
+    assert derive_disposition(case.packet_manager, LOCAL_RULES) is D.PASS
 
 
 def test_assembly_packet_preserves_failure_parity() -> None:
@@ -222,7 +222,7 @@ def test_assembly_packet_preserves_failure_parity() -> None:
     case = CredentialCase(packet_manager=manager)
 
     assert derive_disposition(manager, LOCAL_RULES) is D.ARREST
-    assert derive_disposition(case, LOCAL_RULES) is D.ARREST
+    assert derive_disposition(case.packet_manager, LOCAL_RULES) is D.ARREST
 
 
 def test_default_document_definitions_offer_request_document() -> None:
@@ -241,26 +241,14 @@ def test_default_document_definitions_offer_request_document() -> None:
     ]
 
 
-def test_manager_backed_request_document_matches_flat_case_contract() -> None:
-    flat_case = CredentialCase(
-        purpose=IND.WORK,
-        id_card=CredentialToken(indication=IND.TRAVEL),
-        packet=[CredentialToken(indication=IND.WORK, requires_id=True)],
-    )
+def test_manager_backed_request_document_has_the_expected_surface() -> None:
     manager_case = CredentialCase(packet_manager=materialized_work_packet())
-
-    flat_game, flat_handler, flat_moves = staged_request_document_moves(flat_case)
     manager_game, manager_handler, manager_moves = staged_request_document_moves(manager_case)
 
-    assert manager_moves == flat_moves == [
+    assert manager_moves == [
         CredentialsMove(kind="request_document", target=IND.WORK.value),
     ]
-    assert manager_handler.get_move_label(manager_game, manager_moves[0]) == (
-        flat_handler.get_move_label(flat_game, flat_moves[0])
-    )
-    assert manager_handler.get_move_accepts(manager_game, manager_moves[0]).model_dump() == (
-        flat_handler.get_move_accepts(flat_game, flat_moves[0]).model_dump()
-    )
+    assert manager_handler.get_move_label(manager_game, manager_moves[0]) == "Request reissue of work permit"
 
 
 def test_facetless_manager_document_cannot_request_reissue() -> None:
@@ -645,34 +633,26 @@ def test_has_game_structure_binds_roster_packet_manager_to_restored_owner() -> N
     assert restored_manager.owner is restored
 
 
-def test_has_game_binds_pinned_offer_packet_manager_before_materialization() -> None:
-    id_definition = credential_definition(
-        "pinned_id",
-        IND.TRAVEL,
-        document_kind="id",
-    )
+def test_has_game_materializes_offer_packet_manager_on_arrival() -> None:
     graph = Graph()
     block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
-    id_card = graph.add_node(
-        kind=CredentialComponent,
-        label="pinned-id",
-        token_from=id_definition.label,
-    )
-    manager = AssemblyCredentialPacketManager(purpose=IND.TRAVEL)
-    manager.assign(CREDENTIAL_ID_SLOT, id_card)
-    pinned_case = CredentialCase(candidate_name="Pinned", packet_manager=manager)
     block.game_state = CredentialsGame(
-        offers=[ScenarioOffer(candidate_name="Pinned", pinned_case=pinned_case)],
+        offers=[
+            ScenarioOffer(
+                candidate_name="Pinned",
+                target_disposition=D.PASS,
+                region=Region.LOCAL,
+                purpose=IND.TRAVEL,
+            )
+        ],
         restriction_map=LOCAL_RULES,
     )
 
     active_case = block.game.active_case
     restored_manager = active_case.packet_manager
 
-    assert active_case is pinned_case
-    assert restored_manager is manager
     assert restored_manager.owner is block
-    assert restored_manager.get_slot(CREDENTIAL_ID_SLOT) == [id_card]
+    assert restored_manager.get_slot(CREDENTIAL_ID_SLOT)
 
 
 def test_sampled_offers_materialize_once_at_game_lifecycle_boundaries() -> None:
@@ -698,10 +678,7 @@ def test_sampled_offers_materialize_once_at_game_lifecycle_boundaries() -> None:
 
     first_case = block.game.active_case
     first_packet = first_case.packet_manager
-    assert first_packet is not None
     assert first_packet.owner is block
-    assert first_case.id_card is None
-    assert first_case.packet == []
     assert first_packet.get_slot(CREDENTIAL_ID_SLOT)
     assert first_packet.get_slot(CREDENTIAL_PACKET_SLOT)
     component_count = sum(
@@ -720,7 +697,6 @@ def test_sampled_offers_materialize_once_at_game_lifecycle_boundaries() -> None:
 
     second_case = block.game.active_case
     assert second_case.candidate_name == "Tomas"
-    assert second_case.packet_manager is not None
     assert second_case.packet_manager.owner is block
     assert (
         sum(isinstance(item, CredentialComponent) for item in graph.members.values())
@@ -784,13 +760,14 @@ def test_binding_a_prepared_game_materializes_its_cached_sample() -> None:
     handler = CredentialsGameHandler()
     handler.setup(game)
     cached_case = game.active_case
-    assert cached_case.packet_manager is None
+    cached_packet = cached_case.packet_manager
 
     graph = Graph()
     block = graph.add_node(kind=CredentialsBlock, label="checkpoint", game_state=game)
     packet = block.game.active_case.packet_manager
 
     assert packet is not None
+    assert packet is cached_packet
     assert packet.owner is block
     assert packet.get_slot(CREDENTIAL_ID_SLOT)
     assert packet.get_slot(CREDENTIAL_PACKET_SLOT)

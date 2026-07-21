@@ -21,9 +21,10 @@ from dataclasses import dataclass, field
 
 from pydantic import Field
 
+from tangl.core import TokenCatalog
 from tangl.core.bases import Unstructurable
-
-from .credentials_enums import (
+from tangl.mechanics.credentials import (
+    CredentialDefinition,
     FailureClass,
     FailureMode,
     IndicationId,
@@ -34,7 +35,7 @@ from .credentials_enums import (
     RestrictionLevel,
     Restrictions,
 )
-from .credentials_factory import applicable_modes, build_valid, degrade, render_narrative
+from .credentials_factory import build_valid, degrade, render_narrative
 from .credentials_game import (
     CredentialCase,
     CredentialDisposition,
@@ -55,8 +56,8 @@ class ScenarioOffer(Unstructurable):
     """A promised encounter -- enough to materialize a candidate on arrival.
 
     Sampling (origin / disposition / failure mode) happens once at roster
-    generation; the packet is built lazily by :func:`materialize`. A ``pinned_case``
-    is a fully-authored Tier 1 candidate that materializes verbatim.
+    generation; the packet is built lazily by :func:`materialize`. Narrative
+    overrides are the only authored presentation data retained on the offer.
     """
 
     target_disposition: CredentialDisposition = CredentialDisposition.PASS
@@ -67,10 +68,9 @@ class ScenarioOffer(Unstructurable):
     failure_modes: list[FailureMode] = Field(default_factory=list)
     whitelist: bool = False
     blacklist: bool = False
-    pinned_case: CredentialCase | None = Field(
-        default=None,
-        json_schema_extra={"include": True, "unstructurable": True},
-    )
+    presented_documents_override: dict[str, str] | None = None
+    hidden_facts_override: dict[str, str] | None = None
+    packet_hidden_facts_override: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +99,106 @@ def _weighted_choice(distribution: dict, rng: random.Random):
     return rng.choices(list(distribution.keys()), weights=list(distribution.values()), k=1)[0]
 
 
+def _worse(
+    left: CredentialDisposition,
+    right: CredentialDisposition,
+) -> CredentialDisposition:
+    order = {
+        CredentialDisposition.PASS: 0,
+        CredentialDisposition.DENY: 1,
+        CredentialDisposition.ARREST: 2,
+    }
+    return left if order[left] >= order[right] else right
+
+
+def _offer_disposition(
+    region: OriginId,
+    purpose: IndicationId,
+    rules: Restrictions,
+    modes: Sequence[FailureMode] = (),
+) -> CredentialDisposition:
+    """Pure sampler feasibility check before a world owns a packet manager.
+
+    Arrival materializes the real catalog-backed manager and checks the same
+    target, so this stays a small preflight rather than a second packet model.
+    """
+
+    purpose_level = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
+    worst = CredentialDisposition.PASS
+    if purpose_level is RestrictionLevel.CRIMINAL:
+        worst = CredentialDisposition.ARREST
+    elif purpose_level is RestrictionLevel.FORBIDDEN:
+        worst = CredentialDisposition.DENY
+
+    has_valid_id = purpose_level.requires_id
+    has_weapon_permit = purpose == Indication.WEAPON and purpose_level.requires_permit
+
+    for mode in modes:
+        match mode:
+            case FailureMode.MISSING_PERMIT | FailureMode.UNSEALED_PERMIT:
+                if purpose_level.requires_permit:
+                    worst = _worse(worst, CredentialDisposition.DENY)
+            case FailureMode.FORGED_PERMIT | FailureMode.WRONG_HOLDER_PERMIT:
+                if purpose_level.requires_permit:
+                    worst = _worse(worst, CredentialDisposition.ARREST)
+            case FailureMode.MISSING_ID | FailureMode.EXPIRED_ID:
+                if purpose_level.requires_id:
+                    worst = _worse(worst, CredentialDisposition.DENY)
+            case FailureMode.FAKE_ID:
+                if purpose_level.requires_id:
+                    worst = _worse(worst, CredentialDisposition.ARREST)
+            case FailureMode.UNPERMITTED_CONTRABAND | FailureMode.CONCEALED_CONTRABAND:
+                level = rules.level_for(region, Indication.WEAPON, RestrictionLevel.FORBIDDEN)
+                weapon_is_credentialed = (
+                    (not level.requires_id or has_valid_id)
+                    and (not level.requires_permit or has_weapon_permit)
+                )
+                if level is RestrictionLevel.CRIMINAL:
+                    worst = _worse(worst, CredentialDisposition.ARREST)
+                elif level is RestrictionLevel.FORBIDDEN:
+                    worst = _worse(
+                        worst,
+                        CredentialDisposition.ARREST
+                        if mode is FailureMode.CONCEALED_CONTRABAND
+                        else CredentialDisposition.DENY,
+                    )
+                elif mode is FailureMode.CONCEALED_CONTRABAND:
+                    worst = _worse(
+                        worst,
+                        CredentialDisposition.DENY
+                        if weapon_is_credentialed
+                        else CredentialDisposition.ARREST,
+                    )
+                elif not weapon_is_credentialed:
+                    worst = _worse(worst, CredentialDisposition.DENY)
+    return worst
+
+
+def _applicable_modes(
+    region: OriginId,
+    purpose: IndicationId,
+    rules: Restrictions,
+) -> list[FailureMode]:
+    """Failure modes applicable to the valid packet implied by an offer."""
+
+    level = rules.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
+    modes = [FailureMode.UNPERMITTED_CONTRABAND, FailureMode.CONCEALED_CONTRABAND]
+    if level.requires_permit:
+        modes.extend(
+            (
+                FailureMode.MISSING_PERMIT,
+                FailureMode.UNSEALED_PERMIT,
+                FailureMode.FORGED_PERMIT,
+                FailureMode.WRONG_HOLDER_PERMIT,
+            )
+        )
+    if level.requires_id:
+        modes.extend(
+            (FailureMode.MISSING_ID, FailureMode.EXPIRED_ID, FailureMode.FAKE_ID)
+        )
+    return modes
+
+
 def _verified_offer(
     region: OriginId,
     purpose: IndicationId,
@@ -115,8 +215,7 @@ def _verified_offer(
     holds by construction.
     """
 
-    base = build_valid(region, purpose, rules)
-    base_disposition = derive_disposition(base, rules)
+    base_disposition = _offer_disposition(region, purpose, rules)
 
     if target is base_disposition:
         # Already at the target with no failure (e.g. a forbidden purpose -> deny).
@@ -127,13 +226,16 @@ def _verified_offer(
     failure_class = (
         FailureClass.MITIGATABLE if target is CredentialDisposition.DENY else FailureClass.CRIME
     )
-    candidates = applicable_modes(base, failure_class)
+    candidates = [
+        mode
+        for mode in _applicable_modes(region, purpose, rules)
+        if mode.failure_class is failure_class
+    ]
     if allowed_failure_modes is not None:
         candidates = [mode for mode in candidates if mode in allowed_failure_modes]
     rng.shuffle(candidates)
     for mode in candidates:
-        trial = degrade(build_valid(region, purpose, rules), [mode])
-        if derive_disposition(trial, rules) is target:
+        if _offer_disposition(region, purpose, rules, [mode]) is target:
             return ScenarioOffer(
                 target_disposition=target,
                 region=region,
@@ -157,9 +259,10 @@ def make_offer(
     offer = _verified_offer(region, purpose, target, rules, rng)
     if offer is not None:
         return offer
-    base = build_valid(region, purpose, rules)
     return ScenarioOffer(
-        target_disposition=derive_disposition(base, rules), region=region, purpose=purpose
+        target_disposition=_offer_disposition(region, purpose, rules),
+        region=region,
+        purpose=purpose,
     )
 
 
@@ -209,6 +312,8 @@ def materialize(
     offer: ScenarioOffer,
     rules: Restrictions,
     *,
+    owner: object | None = None,
+    catalog: TokenCatalog[CredentialDefinition] | None = None,
     narrative_renderer: Callable[[CredentialCase], CredentialCase] | None = None,
 ) -> CredentialCase:
     """Build the concrete candidate for ``offer`` (deterministic).
@@ -218,20 +323,31 @@ def materialize(
     overrides like whitelist are applied for the game's ``expected_disposition``).
     """
 
-    if offer.pinned_case is not None:
-        return offer.pinned_case
-
     case = build_valid(
         offer.region,
         offer.purpose,
         rules,
         candidate_name=offer.candidate_name,
         contraband=list(offer.contraband),
+        owner=owner or object(),
+        catalog=catalog,
     )
     degrade(case, offer.failure_modes)
     (narrative_renderer or render_narrative)(case)
     case.whitelist = offer.whitelist
     case.blacklist = offer.blacklist
+    if offer.presented_documents_override is not None:
+        case.presented_documents = offer.presented_documents_override
+    if offer.hidden_facts_override is not None:
+        case.hidden_facts = offer.hidden_facts_override
+    if offer.packet_hidden_facts_override is not None:
+        case.packet_hidden_facts = offer.packet_hidden_facts_override
+    actual = derive_disposition(case.packet_manager, rules)
+    if actual is not offer.target_disposition:
+        raise ValueError(
+            f"Offer for {offer.candidate_name!r} targets {offer.target_disposition.value!r}, "
+            f"but its materialized packet derives {actual.value!r}."
+        )
     return case
 
 

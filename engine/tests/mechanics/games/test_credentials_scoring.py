@@ -6,12 +6,12 @@ from __future__ import annotations
 import pytest
 
 from tangl.mechanics.games import (
-    CredentialCase,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
     disposition_penalty,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 D = CredentialDisposition
 

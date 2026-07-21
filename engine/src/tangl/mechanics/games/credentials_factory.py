@@ -8,19 +8,23 @@ applied only as the chosen failure modes dictate, so the only discrepancies
 present are the intended ones (the doctrine from the scratch
 ``credentialed.py::generate_credentials``).
 
-These functions are pure and on-demand -- they just materialize ``CredentialCase``
-data and validate against :func:`~tangl.mechanics.games.credentials_game.derive_disposition`.
-The day spec, origin/disposition sampling, and lazy roster of *offers* are Phase
-A.3 and live elsewhere; this module is only the case factory the sampler will
-call.
+These functions materialize a ``CredentialCase`` around one owner-bound
+``CredentialPacketManager``. The day spec, origin/disposition sampling, and lazy
+roster of *offers* are Phase A.3 and live elsewhere; this module is only the
+arrival-time factory the sampler calls.
 """
 from __future__ import annotations
 
 import random
 from collections.abc import Iterable, Sequence
 
-from .credentials_enums import (
+from tangl.core import TokenCatalog
+from tangl.mechanics.credentials import (
+    CREDENTIAL_ID_SLOT,
+    CREDENTIAL_PACKET_SLOT,
     ContrabandItem,
+    CredentialComponent,
+    CredentialDefinition,
     CredentialStatus,
     CredentialToken,
     FailureClass,
@@ -30,6 +34,7 @@ from .credentials_enums import (
     OriginId,
     RestrictionLevel,
     Restrictions,
+    materialize_packet,
 )
 from .credentials_game import CredentialCase
 
@@ -46,6 +51,8 @@ def build_valid(
     *,
     candidate_name: str = "Traveler",
     contraband: Sequence[IndicationId] = (),
+    owner: object | None = None,
+    catalog: TokenCatalog[CredentialDefinition] | None = None,
 ) -> CredentialCase:
     """Assemble a fully valid packet for ``purpose`` (+ declared contraband).
 
@@ -54,19 +61,14 @@ def build_valid(
     can carry it (fail loud rather than return a non-valid case).
     """
 
-    case = CredentialCase(
-        candidate_name=candidate_name,
-        region=region,
-        purpose=purpose,
-        presented_documents={},
-        hidden_facts={},
-        packet_hidden_facts={},
-    )
+    id_card: CredentialToken | None = None
+    credentials: list[CredentialToken] = []
+    possessions: list[ContrabandItem] = []
     level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
     if level.requires_id:
-        case.id_card = CredentialToken(indication=purpose, status=CredentialStatus.VALID)
+        id_card = CredentialToken(indication=purpose, status=CredentialStatus.VALID)
     if level.requires_permit:
-        case.packet.append(
+        credentials.append(
             CredentialToken(
                 indication=purpose,
                 status=CredentialStatus.VALID,
@@ -83,7 +85,7 @@ def build_valid(
                 f"{c_ind} in {region}."
             )
         if c_level.requires_permit:
-            case.packet.append(
+            credentials.append(
                 CredentialToken(
                     indication=c_ind,
                     status=CredentialStatus.VALID,
@@ -91,13 +93,35 @@ def build_valid(
                     holder_matches=True,
                 )
             )
-        case.possessions.append(ContrabandItem(indication=c_ind, concealed=False))
+        possessions.append(ContrabandItem(indication=c_ind, concealed=False))
 
-    return case
+    return CredentialCase(
+        candidate_name=candidate_name,
+        presented_documents={},
+        hidden_facts={},
+        packet_hidden_facts={},
+        packet_manager=materialize_packet(
+            owner=owner or object(),
+            region=region,
+            purpose=purpose,
+            id_card=id_card,
+            credentials=credentials,
+            possessions=possessions,
+            label_prefix=candidate_name,
+            catalog=catalog,
+        ),
+    )
 
 
-def _purpose_permit(case: CredentialCase) -> CredentialToken | None:
-    return case.credential_for(case.get_purpose())
+def _purpose_permit(case: CredentialCase) -> CredentialComponent | None:
+    return next(
+        (
+            component
+            for component in case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
+            if component.indication == case.get_purpose()
+        ),
+        None,
+    )
 
 
 def applies_to(mode: FailureMode, case: CredentialCase) -> bool:
@@ -112,7 +136,7 @@ def applies_to(mode: FailureMode, case: CredentialCase) -> bool:
         ):
             return _purpose_permit(case) is not None
         case FailureMode.MISSING_ID | FailureMode.EXPIRED_ID | FailureMode.FAKE_ID:
-            return case.id_card is not None
+            return bool(case.packet_manager.get_slot(CREDENTIAL_ID_SLOT))
         case FailureMode.UNPERMITTED_CONTRABAND | FailureMode.CONCEALED_CONTRABAND:
             return True
     return False
@@ -125,7 +149,7 @@ def apply_failure(mode: FailureMode, case: CredentialCase) -> None:
     match mode:
         case FailureMode.MISSING_PERMIT:
             if permit is not None:
-                case.packet.remove(permit)
+                case.packet_manager.unassign(CREDENTIAL_PACKET_SLOT, permit)
         case FailureMode.UNSEALED_PERMIT:
             if permit is not None:
                 permit.status = CredentialStatus.MISSING_SEAL
@@ -135,20 +159,22 @@ def apply_failure(mode: FailureMode, case: CredentialCase) -> None:
         case FailureMode.WRONG_HOLDER_PERMIT:
             if permit is not None:
                 permit.holder_matches = False
-        case FailureMode.MISSING_ID:
-            case.id_card = None
-        case FailureMode.EXPIRED_ID:
-            if case.id_card is not None:
-                case.id_card.status = CredentialStatus.EXPIRED
-        case FailureMode.FAKE_ID:
-            if case.id_card is not None:
-                case.id_card.status = CredentialStatus.WRONG_HOLDER
+        case FailureMode.MISSING_ID | FailureMode.EXPIRED_ID | FailureMode.FAKE_ID:
+            id_components = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
+            if id_components:
+                id_component = id_components[0]
+                if mode is FailureMode.MISSING_ID:
+                    case.packet_manager.unassign(CREDENTIAL_ID_SLOT, id_component)
+                elif mode is FailureMode.EXPIRED_ID:
+                    id_component.status = CredentialStatus.EXPIRED
+                else:
+                    id_component.status = CredentialStatus.WRONG_HOLDER
         case FailureMode.UNPERMITTED_CONTRABAND:
-            case.possessions.append(
+            case.packet_manager.possessions.append(
                 ContrabandItem(indication=_DEFAULT_CONTRABAND, concealed=False)
             )
         case FailureMode.CONCEALED_CONTRABAND:
-            case.possessions.append(
+            case.packet_manager.possessions.append(
                 ContrabandItem(indication=_DEFAULT_CONTRABAND, concealed=True)
             )
 
@@ -197,7 +223,7 @@ def render_narrative(case: CredentialCase) -> CredentialCase:
         elif not token.holder_matches:
             findings[label] = "The permit's holder does not match the bearer id."
 
-    for item in case.possessions:
+    for item in case.get_contraband():
         if not item.concealed:
             documents[f"declared {item.indication}"] = f"Openly declared {item.indication}."
 
@@ -219,11 +245,19 @@ def make_case(
     failure_modes: Sequence[FailureMode] = (),
     candidate_name: str = "Traveler",
     contraband: Sequence[IndicationId] = (),
+    owner: object | None = None,
+    catalog: TokenCatalog[CredentialDefinition] | None = None,
 ) -> CredentialCase:
     """Tier 2 entry: build a valid packet, degrade it, and render its narrative."""
 
     case = build_valid(
-        region, purpose, restrictions, candidate_name=candidate_name, contraband=contraband
+        region,
+        purpose,
+        restrictions,
+        candidate_name=candidate_name,
+        contraband=contraband,
+        owner=owner,
+        catalog=catalog,
     )
     degrade(case, failure_modes)
     return render_narrative(case)

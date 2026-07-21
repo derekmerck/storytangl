@@ -7,14 +7,12 @@ from pydantic import Field, model_validator
 from tangl.mechanics.credentials import (
     CredentialDefinition,
     CredentialStatus,
-    CredentialToken,
     FailureMode,
     Restrictions,
     RestrictionLevel,
 )
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
-    CredentialCase,
     CredentialDisposition,
     CredentialPresentationProfile,
     CredentialsGame,
@@ -117,29 +115,19 @@ def _special_student() -> ScenarioOffer:
     return ScenarioOffer(
         target_disposition=CredentialDisposition.DENY,
         candidate_name="Mira Quill",
-        pinned_case=CredentialCase(
-            candidate_name="Mira Quill",
-            presented_documents={
-                "student ID": "A laminated lower-school student identification card.",
-                "activity pass": "An activity pass lacking the teacher's signature.",
-            },
-            hidden_facts={
-                "activity pass": "The required teacher signature is missing.",
-            },
-            packet_hidden_facts={
-                "packet consistency": "The student's papers do not satisfy the hall rules.",
-            },
-            region="lower",
-            purpose="activity",
-            id_card=CredentialToken(indication="activity"),
-            packet=[
-                CredentialToken(
-                    indication="activity",
-                    status=CredentialStatus.MISSING_SEAL,
-                    requires_id=True,
-                )
-            ],
-        ),
+        region="lower",
+        purpose="activity",
+        failure_modes=[FailureMode.UNSEALED_PERMIT],
+        presented_documents_override={
+            "student ID": "A laminated lower-school student identification card.",
+            "activity pass": "An activity pass lacking the teacher's signature.",
+        },
+        hidden_facts_override={
+            "activity pass": "The required teacher signature is missing.",
+        },
+        packet_hidden_facts_override={
+            "packet consistency": "The student's papers do not satisfy the hall rules.",
+        },
     )
 
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from tangl.mechanics.games import (
     ContrabandItem,
-    CredentialCase,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
@@ -21,6 +20,7 @@ from tangl.mechanics.games import (
     RestrictionLevel,
     derive_disposition,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
 D = CredentialDisposition
 S = CredentialStatus
@@ -59,7 +59,7 @@ def _case(*possessions: ContrabandItem, packet: list | None = None) -> Credentia
 
 
 def _derive(case: CredentialCase, fs: dict | None = None) -> CredentialDisposition:
-    return derive_disposition(case, RULES, fs)
+    return derive_disposition(case.packet_manager, RULES, fs)
 
 
 class TestContrabandDerivation:
@@ -218,7 +218,7 @@ CRIMINAL_RULES = Restrictions.from_map(
 
 
 def _derive_crim(case: CredentialCase, fs: dict | None = None) -> CredentialDisposition:
-    return derive_disposition(case, CRIMINAL_RULES, fs)
+    return derive_disposition(case.packet_manager, CRIMINAL_RULES, fs)
 
 
 class TestCriminalContrabandTier:
@@ -305,7 +305,7 @@ class TestSharedRestrictionLevelEdges:
             presented_documents={"passport": "An id."},
             id_card=_id(),
         )
-        assert derive_disposition(case, PURPOSE_CRIMINAL_RULES) is D.ARREST
+        assert derive_disposition(case.packet_manager, PURPOSE_CRIMINAL_RULES) is D.ARREST
 
     def test_with_id_contraband_does_not_bypass_the_id_check(self) -> None:
         # A WITH_ID good is not merely declarable: a declared one with no id denies.
@@ -315,7 +315,7 @@ class TestSharedRestrictionLevelEdges:
             id_card=None,
             possessions=[ContrabandItem(indication=IND.SECRETS)],
         )
-        assert derive_disposition(no_id, ID_CONTRABAND_RULES) is D.DENY
+        assert derive_disposition(no_id.packet_manager, ID_CONTRABAND_RULES) is D.DENY
 
     def test_with_id_contraband_allows_with_a_valid_id(self) -> None:
         with_id = CredentialCase(
@@ -324,7 +324,7 @@ class TestSharedRestrictionLevelEdges:
             id_card=_id(),
             possessions=[ContrabandItem(indication=IND.SECRETS)],
         )
-        assert derive_disposition(with_id, ID_CONTRABAND_RULES) is D.PASS
+        assert derive_disposition(with_id.packet_manager, ID_CONTRABAND_RULES) is D.PASS
 
 
 class TestMediationOffMenuSafety:

@@ -1,8 +1,7 @@
 # Credential Mechanic — Design Note
 
-**Status:** PLANNED (design precedes code; this doc stakes the intended shape);
-game-layer packet-manager adapter landed 2026-06-25 as a compatibility bridge,
-not the full global mechanic extraction.
+**Status:** PLANNED for the global document/media mechanic; Phase 7 landed the
+game-facing packet authority cutover (2026-07-20), but not the full extraction.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
@@ -27,10 +26,8 @@ with carrier/bearer binding — that the credentials checkpoint **game**
 The credentials *game* is one skin. The primitives underneath it are a reusable
 pattern that recurs well outside a checkpoint: the player's own papers in
 inventory, an NPC flashing a badge, an access-gated door, a comp tier, a hall
-pass. Those primitives currently live inside the games package
-(`credentials_enums.py`); promoting them to `tangl.mechanics.credentials` (a
-sibling of `presence`, `demographics`, `progression`) was always the intended
-shape.
+pass. The shared vocabulary now lives in `tangl.mechanics.credentials`, a sibling
+of `presence`, `demographics`, and `progression`.
 
 The pattern is a **projection chain**:
 
@@ -317,16 +314,14 @@ worth naming, not worth gating the media work on.
 
 ## 7 · Staged plan (media spec is the forcing function)
 
-### Assembly compatibility step already landed
+### Assembly packet authority landed
 
 The shared credentials package now owns the credential domain vocabulary and the
-canonical assembly-backed packet path. The live game package still exposes its
-value-object `CredentialPacketManager` compatibility adapter, while `CredentialCase`
-can now also carry `tangl.mechanics.credentials.CredentialPacketManager`, an
-owner-bound manager over graph credential components. During the transition both paths
-answer the same discovery surface used by disposition derivation, so the current
-roster/game/demo data keeps working while graph-backed packet identity is adopted
-incrementally.
+canonical assembly-backed packet path. `CredentialCase` now requires
+`tangl.mechanics.credentials.CredentialPacketManager`, an owner-bound manager over
+graph credential components; disposition derivation reads that concrete manager.
+Offer arrival materializes the manager from the selected catalog before gameplay,
+so the roster/game/demo paths share graph-backed packet identity.
 
 This is still not the full credential mechanic described above: document/media
 projection has not landed, presence-snapshot holder binding is not implemented,
@@ -334,8 +329,7 @@ contraband remains value-shaped, and `credential_gate` remains the reference
 consumer rather than a retrofit target. It does establish the retirement path for
 the current game-local implementation: future canonical packets should store
 graph-token credentials by id through the same owner-bound manager pattern used by
-outfits, vehicles, and connector groups, while value credentials remain a deliberate
-compatibility or lightweight-data choice.
+outfits, vehicles, and connector groups.
 
 0. **(Media-layer prerequisite, separate track.)** A minimal **RIT registry +
    composition-strategy** surface, replacing the legacy `svg_forge`/`raster_forge`

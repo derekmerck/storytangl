@@ -12,7 +12,6 @@ from tangl.core import Graph
 # Importing the module registers its dispatch handlers.
 import tangl.mechanics.games.credentials_story_info  # noqa: F401
 from tangl.mechanics.games import (
-    CredentialCase,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
@@ -24,6 +23,7 @@ from tangl.mechanics.games import (
     Restrictions,
     RestrictionLevel,
 )
+from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
 from tangl.service.response import KvListValue, ScalarValue, StoryInfoRequest, TableValue
 from tangl.story import Block

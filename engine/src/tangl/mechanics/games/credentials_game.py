@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Protocol, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from pydantic import Field, PrivateAttr, model_validator
 
@@ -41,7 +41,7 @@ from tangl.mechanics.credentials.assembly import (
     materialize_packet,
 )
 
-from .credentials_enums import (
+from tangl.mechanics.credentials import (
     DEFAULT_RESTRICTIONS,
     ContrabandItem,
     CredentialStatus,
@@ -104,118 +104,14 @@ class CredentialDisposition(Enum):
 CredentialsMove = PickingMove
 
 
-class CredentialPacketProtocol(Protocol):
-    """Discovery surface used by disposition derivation.
-
-    Why
-    ---
-    Disposition rules should depend on what a packet can answer, not on how a
-    candidate case stores its fields.
-
-    Key Features
-    ------------
-    - exposes declared region and purpose
-    - exposes bearer-id status and credentials by indication
-    - exposes contraband and all presented credentials for severity checks
-
-    API
-    ---
-    Implement the methods below; callers should not inspect concrete storage.
-
-    Notes
-    -----
-    This is the compatibility seam between the v1 ``CredentialCase`` shape and
-    future credential-packet managers.
-
-    See also
-    --------
-    ``CredentialPacketManager`` and ``derive_disposition``.
-    """
-
-    def get_region(self) -> OriginId: ...
-
-    def get_purpose(self) -> IndicationId: ...
-
-    def id_status(self) -> CredentialStatus | None: ...
-
-    def credential_for(self, indication: IndicationId) -> CredentialToken | None: ...
-
-    def get_contraband(self) -> list[ContrabandItem]: ...
-
-    def all_credentials(self) -> list[CredentialToken]: ...
-
-
-class CredentialPacketManager(BaseModelPlus):
-    """A candidate's credential packet, separated from case presentation.
-
-    Why
-    ---
-    Credentials need the same owner-bound manager vocabulary as outfits and
-    vehicles, but the live game still carries flat packet fields on
-    ``CredentialCase``.
-
-    Key Features
-    ------------
-    - carries declared region, purpose, bearer id, credentials, and possessions
-    - exposes the packet discovery API used by disposition derivation
-    - stays value-object based; no graph-token migration is implied
-
-    API
-    ---
-    Use ``get_region``, ``get_purpose``, ``id_status``, ``credential_for``,
-    ``get_contraband``, and ``all_credentials``.
-
-    Notes
-    -----
-    ``CredentialCase.to_packet_manager`` is the compatibility bridge for current
-    game data.
-
-    See also
-    --------
-    ``CredentialPacketProtocol`` and ``CredentialCase``.
-    """
-
-    region: OriginId = Region.LOCAL
-    purpose: IndicationId = Indication.TRAVEL
-    id_card: CredentialToken | None = None
-    credentials: list[CredentialToken] = Field(default_factory=list)
-    possessions: list[ContrabandItem] = Field(default_factory=list)
-
-    def get_region(self) -> OriginId:
-        return self.region
-
-    def get_purpose(self) -> IndicationId:
-        return self.purpose
-
-    def id_status(self) -> CredentialStatus | None:
-        """Status of the bearer id, or ``None`` if no id was presented."""
-
-        return self.id_card.status if self.id_card is not None else None
-
-    def credential_for(self, indication: IndicationId) -> CredentialToken | None:
-        """The presented credential satisfying ``indication``, if any."""
-
-        return next((c for c in self.credentials if c.indication == indication), None)
-
-    def get_contraband(self) -> list[ContrabandItem]:
-        return list(self.possessions)
-
-    def all_credentials(self) -> list[CredentialToken]:
-        if self.id_card is None:
-            return list(self.credentials)
-        return [self.id_card, *self.credentials]
-
-
 class CredentialCase(Unstructurable):
-    """One candidate, with an opaque credential packet behind a discovery API.
+    """One candidate, with its credential truth in a required packet manager.
 
     The narrative strings (``presented_documents`` / ``hidden_facts`` /
     ``packet_hidden_facts``) drive the v1 inspect loop. The *structured truth*
-    (``region`` / ``purpose`` / ``id_card`` / ``packet`` / ``possessions``) is
-    what :func:`derive_disposition` reads -- but only through the discovery
-    methods below, never by reaching into the fields. That keeps the internal
-    representation swappable (flat tokens today; a Singleton catalog with media
-    later, see ``CREDENTIALS_LOOP_DESIGN.md`` A.6) behind one stable surface.
+    (region, purpose, id card, documents, and possessions) lives in the required
+    ``packet_manager``; :func:`derive_disposition` reads it through that
+    owner-bound manager, never from the case directly.
 
     ``correct_disposition`` is an optional authored *override*: when set it wins,
     otherwise the disposition is derived from the rules.
@@ -245,14 +141,8 @@ class CredentialCase(Unstructurable):
         }
     )
 
-    # --- Structured truth (read only via the discovery API below) ------------
-    region: OriginId = Region.LOCAL
-    purpose: IndicationId = Indication.TRAVEL
-    id_card: CredentialToken | None = None
-    packet: list[CredentialToken] = Field(default_factory=list)
-    possessions: list[ContrabandItem] = Field(default_factory=list)
-    packet_manager: AssemblyCredentialPacketManager | None = Field(
-        default=None,
+    # --- Structured truth -----------------------------------------------------
+    packet_manager: AssemblyCredentialPacketManager = Field(
         json_schema_extra={"include": True, "unstructurable": True},
     )
 
@@ -269,55 +159,15 @@ class CredentialCase(Unstructurable):
     # packet about its content, declared intent, and validity.
 
     def bind_packet_manager_owner(self, owner: object) -> None:
-        """Bind any owned assembly packet manager to its graph registry anchor."""
+        """Bind the owned assembly packet manager to its graph registry anchor."""
 
-        if self.packet_manager is not None:
-            self.packet_manager.bind_owner(owner)
-
-    def materialize_packet_manager(
-        self,
-        owner: object,
-        catalog: TokenCatalog[CredentialDefinition] | None = None,
-    ) -> None:
-        """Replace this factory-shaped packet with its graph-owned assembly form."""
-
-        if self.packet_manager is not None:
-            self.packet_manager.bind_owner(owner)
-            return
-        self.packet_manager = materialize_packet(
-            owner=owner,
-            region=self.region,
-            purpose=self.purpose,
-            id_card=self.id_card,
-            credentials=self.packet,
-            possessions=self.possessions,
-            label_prefix=self.candidate_name,
-            catalog=catalog,
-        )
-        self.id_card = None
-        self.packet = []
-        self.possessions = []
-
-    def to_packet_manager(self) -> CredentialPacketProtocol:
-        if self.packet_manager is not None:
-            return self.packet_manager
-        return CredentialPacketManager(
-            region=self.region,
-            purpose=self.purpose,
-            id_card=self.id_card,
-            credentials=list(self.packet),
-            possessions=list(self.possessions),
-        )
+        self.packet_manager.bind_owner(owner)
 
     def get_region(self) -> OriginId:
-        if self.packet_manager is not None:
-            return self.packet_manager.get_region()
-        return self.region
+        return self.packet_manager.get_region()
 
     def get_purpose(self) -> IndicationId:
-        if self.packet_manager is not None:
-            return self.packet_manager.get_purpose()
-        return self.purpose
+        return self.packet_manager.get_purpose()
 
     def id_status(self) -> CredentialStatus | None:
         """Status of the bearer id, or ``None`` if no id was presented."""
@@ -328,35 +178,23 @@ class CredentialCase(Unstructurable):
     def id_credential(self) -> CredentialToken | None:
         """Project the bearer id without exposing packet storage."""
 
-        if self.packet_manager is not None:
-            return self.packet_manager.id_credential()
-        return self.id_card
+        return self.packet_manager.id_credential()
 
     def credential_for(self, indication: IndicationId) -> CredentialToken | None:
         """The presented credential satisfying ``indication``, if any."""
 
-        if self.packet_manager is not None:
-            return self.packet_manager.credential_for(indication)
-        return next((c for c in self.packet if c.indication == indication), None)
+        return self.packet_manager.credential_for(indication)
 
     def get_contraband(self) -> list[ContrabandItem]:
-        if self.packet_manager is not None:
-            return self.packet_manager.get_contraband()
-        return list(self.possessions)
+        return self.packet_manager.get_contraband()
 
     def all_credentials(self) -> list[CredentialToken]:
-        if self.packet_manager is not None:
-            return self.packet_manager.all_credentials()
-        if self.id_card is None:
-            return list(self.packet)
-        return [self.id_card, *self.packet]
+        return self.packet_manager.all_credentials()
 
     def document_credentials(self) -> list[CredentialToken]:
         """Project visible non-id documents without exposing packet storage."""
 
-        if self.packet_manager is not None:
-            return self.packet_manager.document_credentials()
-        return list(self.packet)
+        return self.packet_manager.document_credentials()
 
 
 class CredentialCaseResult(BaseModelPlus):
@@ -378,7 +216,18 @@ def _default_roster() -> list[CredentialCase]:
     """A two-candidate shift so a bare game is playable and demonstrable."""
 
     return [
-        CredentialCase(correct_disposition=CredentialDisposition.DENY),
+        CredentialCase(
+            packet_manager=materialize_packet(
+                owner=object(),
+                region=Region.LOCAL,
+                purpose=Indication.TRAVEL,
+                id_card=None,
+                credentials=[],
+                possessions=[],
+                label_prefix="Traveler",
+            ),
+            correct_disposition=CredentialDisposition.DENY,
+        ),
         CredentialCase(
             candidate_name="Tomas Vey",
             presented_documents={
@@ -387,6 +236,15 @@ def _default_roster() -> list[CredentialCase]:
             },
             hidden_facts={},
             packet_hidden_facts={},
+            packet_manager=materialize_packet(
+                owner=object(),
+                region=Region.LOCAL,
+                purpose=Indication.TRAVEL,
+                id_card=CredentialToken(indication=Indication.TRAVEL),
+                credentials=[],
+                possessions=[],
+                label_prefix="Tomas Vey",
+            ),
             correct_disposition=CredentialDisposition.PASS,
         ),
     ]
@@ -536,7 +394,7 @@ def _assess_credential(
 
 
 def _assess_id(
-    packet: CredentialPacketProtocol,
+    packet: AssemblyCredentialPacketManager,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
     status = packet.id_status()
@@ -553,7 +411,7 @@ def _assess_id(
 
 
 def _assess_requirement(
-    packet: CredentialPacketProtocol,
+    packet: AssemblyCredentialPacketManager,
     indication: IndicationId,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
@@ -586,7 +444,7 @@ def _contraband_class(level: RestrictionLevel) -> str:
 
 
 def _assess_contraband(
-    packet: CredentialPacketProtocol,
+    packet: AssemblyCredentialPacketManager,
     item: ContrabandItem,
     level: RestrictionLevel,
     finding_status: dict[str, str] | None = None,
@@ -635,7 +493,7 @@ def _assess_contraband(
 
 
 def derive_disposition(
-    packet: CredentialPacketProtocol,
+    packet: AssemblyCredentialPacketManager,
     restrictions: Restrictions,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
@@ -768,7 +626,7 @@ class CredentialPresentationProfile(BaseModelPlus):
             elif not token.holder_matches:
                 findings[document] = self.holder_mismatch_text
 
-        for item in case.possessions:
+        for item in case.get_contraband():
             indication = self.indication_labels.get(item.indication, item.indication)
             documents[f"declared {indication}"] = self.possession_description.format(
                 indication=indication,
@@ -880,14 +738,10 @@ class CredentialsGame(PickingGame):
         """Bind assembly packet managers in already materialized cases to ``owner``."""
 
         self._component_manager_owner = owner
-        catalog = self._credential_catalog(owner)
         for case in self.roster:
-            case.materialize_packet_manager(owner, catalog)
+            case.bind_packet_manager_owner(owner)
         for case in self.materialized:
-            case.materialize_packet_manager(owner, catalog)
-        for offer in self.offers:
-            if offer.pinned_case is not None:
-                offer.pinned_case.bind_packet_manager_owner(owner)
+            case.bind_packet_manager_owner(owner)
 
     def _credential_catalog(self, owner: object) -> TokenCatalog[CredentialDefinition]:
         if self.catalog_ref is None:
@@ -926,16 +780,16 @@ class CredentialsGame(PickingGame):
                 materialize(
                     offer,
                     self.restriction_map,
+                    owner=self._component_manager_owner or object(),
+                    catalog=(
+                        self._credential_catalog(self._component_manager_owner)
+                        if self._component_manager_owner is not None
+                        else None
+                    ),
                     narrative_renderer=self.presentation.render_case,
                 )
             )
-        case = self.materialized[self.case_index]
-        if self.has_component_manager_owner:
-            case.materialize_packet_manager(
-                self._component_manager_owner,
-                self._credential_catalog(self._component_manager_owner),
-            )
-        return case
+        return self.materialized[self.case_index]
 
     # ----- active case access ----------------------------------------------
     def _total_cases(self) -> int:
@@ -1065,7 +919,7 @@ class CredentialsGame(PickingGame):
             )
         if case.correct_disposition is not None:
             return case.correct_disposition
-        return derive_disposition(case, self.restriction_map, self.finding_status)
+        return derive_disposition(case.packet_manager, self.restriction_map, self.finding_status)
 
     # ----- roster advancement ----------------------------------------------
     def advance_case(self) -> None:
@@ -1189,9 +1043,6 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def _request_document_indications(case: CredentialCase) -> list[IndicationId]:
         """Return visible document indications that semantically offer reissue."""
 
-        if case.packet_manager is None:
-            return [credential.indication for credential in case.document_credentials()]
-
         return [
             component.indication
             for component in CredentialsGameHandler._request_document_components(
@@ -1234,8 +1085,6 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     ) -> CredentialToken | None:
         """Return the credential whose facet contributed this request target."""
 
-        if case.packet_manager is None:
-            return case.credential_for(indication)
         component = CredentialsGameHandler._request_document_component(case, indication)
         return component.to_credential_token() if component is not None else None
 
@@ -1244,8 +1093,6 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         case: CredentialCase,
         indication: IndicationId,
     ) -> CredentialComponent | None:
-        if case.packet_manager is None:
-            return None
         return next(
             (
                 component
