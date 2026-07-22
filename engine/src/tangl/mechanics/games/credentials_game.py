@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Literal, Self
 
 from pydantic import Field, PrivateAttr, model_validator
 
@@ -33,6 +33,7 @@ from tangl.journal.fragments import (
     PresentationHints,
 )
 from tangl.mechanics.credentials.assembly import (
+    CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
     CredentialComponent,
     CredentialDefinition,
@@ -44,8 +45,11 @@ from tangl.mechanics.credentials.assembly import (
 from tangl.mechanics.credentials import (
     DEFAULT_RESTRICTIONS,
     ContrabandItem,
+    CredentialDefect,
+    CredentialDefectKind,
     CredentialStatus,
     CredentialToken,
+    FailureClass,
     IndicationId,
     OriginId,
     Indication,
@@ -252,17 +256,6 @@ def _default_roster() -> list[CredentialCase]:
 
 # --- Disposition derivation (reads cases only via the discovery API) --------
 
-_DISPOSITION_SEVERITY: dict[CredentialDisposition, int] = {
-    CredentialDisposition.PASS: 0,
-    CredentialDisposition.DENY: 1,
-    CredentialDisposition.ARREST: 2,
-}
-
-
-def _worse(a: CredentialDisposition, b: CredentialDisposition) -> CredentialDisposition:
-    return a if _DISPOSITION_SEVERITY[a] >= _DISPOSITION_SEVERITY[b] else b
-
-
 # Graduated scoring: the cost of the chosen call given the correct one, over the
 # ordered allow -> deny -> arrest axis. One step off costs 2; two steps off
 # (allow <-> arrest) costs 5; correct costs 0. Arrest-when-wrong is always the
@@ -330,15 +323,6 @@ class FindingKey:
     RELINQUISH = "relinquish"
 
 
-class ContrabandClass:
-    """How a contraband indication's restriction level is handled (B.2)."""
-
-    CRIMINAL = "criminal"
-    FORBIDDEN = "forbidden"
-    CREDENTIALED = "credentialed"  # needs a valid permit and/or bearer id
-    DECLARATION_ONLY = "declaration_only"
-
-
 # finding_status values that represent *surfaced* evidence -- an investigation
 # that turned a problem up (CONFIRMED), repaired a mitigatable one (CLEARED), or
 # recovered contraband (YIELDED). A plain VERIFIED (checked, sound) is not adverse
@@ -376,120 +360,279 @@ def move_time_cost(move: PickingMove) -> int:
     return _MOVE_TIME_COST.get(move.kind, 1)
 
 
-def _assess_credential(
-    token: CredentialToken | None,
-    finding_status: dict[str, str] | None = None,
-) -> CredentialDisposition:
-    if token is None:
-        return CredentialDisposition.DENY  # missing -> produce it (mitigatable)
-    if token.status.is_valid:
-        return CredentialDisposition.PASS
-    if token.status.is_crime:
-        return CredentialDisposition.ARREST  # forged; crimes not mediatable in B.1
-    # Mitigatable (missing seal / bad date / expired): Phase B.1 mediation can
-    # clear it via ``request_document``; check the per-case finding_status.
-    if finding_status and finding_status.get(token.indication) == Finding.CLEARED:
-        return CredentialDisposition.PASS
-    return CredentialDisposition.DENY
+def _id_component(packet: AssemblyCredentialPacketManager) -> CredentialComponent | None:
+    components = packet.get_slot(CREDENTIAL_ID_SLOT)
+    return components[0] if components else None
 
 
-def _assess_id(
+def _permit_component(
     packet: AssemblyCredentialPacketManager,
-    finding_status: dict[str, str] | None = None,
-) -> CredentialDisposition:
-    status = packet.id_status()
-    if status is None:
-        return CredentialDisposition.DENY  # missing id -> produce it (mitigatable)
-    if status.is_valid:
-        return CredentialDisposition.PASS
-    if status.is_crime:
-        return CredentialDisposition.ARREST  # fake / wrong-holder id
-    # Mitigatable id (expired / bad date): cleared by future id-mediation.
-    if finding_status and finding_status.get(FindingKey.ID) == Finding.CLEARED:
-        return CredentialDisposition.PASS
-    return CredentialDisposition.DENY
+    indication: IndicationId,
+) -> CredentialComponent | None:
+    return next(
+        (
+            component
+            for component in packet.get_slot(CREDENTIAL_PACKET_SLOT)
+            if component.indication == indication
+        ),
+        None,
+    )
 
 
-def _assess_requirement(
+def _document_defect(
+    component: CredentialComponent,
+    *,
+    subject: Literal["identity", "authorization"],
+    indication: IndicationId,
+    cleared: bool,
+    invalid_kind: CredentialDefectKind,
+    invalid_subject: Literal["identity", "authorization", "possession"],
+) -> CredentialDefect | None:
+    """Classify a supplied document once; missing documents are caller-owned."""
+
+    if component.status is CredentialStatus.FORGED:
+        return CredentialDefect(
+            kind=CredentialDefectKind.FRAUDULENT_EVIDENCE,
+            failure_class=FailureClass.CRIME,
+            subject=subject,
+            indication=indication,
+            source_id=component.uid,
+            cause=component.status,
+        )
+    if component.status is CredentialStatus.WRONG_HOLDER or not component.holder_matches:
+        return CredentialDefect(
+            kind=CredentialDefectKind.SUBJECT_MISMATCH,
+            failure_class=FailureClass.CRIME,
+            subject=subject,
+            indication=indication,
+            source_id=component.uid,
+            cause=(
+                component.status
+                if component.status is CredentialStatus.WRONG_HOLDER
+                else None
+            ),
+        )
+    if component.status.is_valid or cleared:
+        return None
+    return CredentialDefect(
+        kind=invalid_kind,
+        failure_class=FailureClass.MITIGATABLE,
+        subject=invalid_subject,
+        indication=indication,
+        source_id=component.uid,
+        cause=component.status,
+    )
+
+
+def _requirement_defects(
     packet: AssemblyCredentialPacketManager,
     indication: IndicationId,
     level: RestrictionLevel,
-    finding_status: dict[str, str] | None = None,
-) -> CredentialDisposition:
-    """Assess one indication against its required level (the two error surfaces)."""
+    finding_status: dict[str, str],
+    *,
+    missing_kind: CredentialDefectKind = CredentialDefectKind.MISSING_EVIDENCE,
+    invalid_kind: CredentialDefectKind = CredentialDefectKind.INVALID_EVIDENCE,
+    missing_subject: Literal["identity", "authorization", "possession"] | None = None,
+) -> list[CredentialDefect]:
+    """Derive defects for one authorization requirement without choosing a result."""
 
-    worst = CredentialDisposition.PASS
+    defects: list[CredentialDefect] = []
     if level.requires_permit:
-        permit = packet.credential_for(indication)
-        worst = _worse(worst, _assess_credential(permit, finding_status))
-        if permit is not None and not permit.holder_matches:
-            worst = _worse(worst, CredentialDisposition.ARREST)  # permit/id mismatch
+        permit = _permit_component(packet, indication)
+        if permit is None:
+            defects.append(
+                CredentialDefect(
+                    kind=missing_kind,
+                    failure_class=FailureClass.MITIGATABLE,
+                    subject=missing_subject or "authorization",
+                    indication=indication,
+                )
+            )
+        else:
+            defect = _document_defect(
+                permit,
+                subject="authorization",
+                indication=indication,
+                cleared=finding_status.get(indication) == Finding.CLEARED,
+                invalid_kind=invalid_kind,
+                invalid_subject=missing_subject or "authorization",
+            )
+            if defect is not None:
+                defects.append(defect)
     if level.requires_id:
-        worst = _worse(worst, _assess_id(packet, finding_status))
-    return worst
+        id_card = _id_component(packet)
+        if id_card is None:
+            defects.append(
+                CredentialDefect(
+                    kind=missing_kind,
+                    failure_class=FailureClass.MITIGATABLE,
+                    subject=missing_subject or "identity",
+                    indication=indication,
+                )
+            )
+        else:
+            defect = _document_defect(
+                id_card,
+                subject="identity",
+                indication=indication,
+                cleared=finding_status.get(FindingKey.ID) == Finding.CLEARED,
+                invalid_kind=invalid_kind,
+                invalid_subject=missing_subject or "identity",
+            )
+            if defect is not None:
+                defects.append(defect)
+    return defects
 
 
-def _contraband_class(level: RestrictionLevel) -> str:
-    """Classify a contraband indication's rule (Phase B.2)."""
+def _append_once(defects: list[CredentialDefect], defect: CredentialDefect) -> None:
+    """Keep one observation per semantic source and kind."""
 
-    if level is RestrictionLevel.CRIMINAL:
-        return ContrabandClass.CRIMINAL  # per-se crime; possession arrests, no rescue
-    if level is RestrictionLevel.FORBIDDEN:
-        return ContrabandClass.FORBIDDEN
-    if level.requires_permit or level.requires_id:
-        # Needs a valid permit and/or bearer id: route through _assess_requirement
-        # so the id is actually checked (a WITH_ID good is not merely declarable).
-        return ContrabandClass.CREDENTIALED
-    return ContrabandClass.DECLARATION_ONLY  # anonymous level: allowed once declared
+    if not any(
+        existing.kind is defect.kind
+        and existing.source_id == defect.source_id
+        and existing.indication == defect.indication
+        for existing in defects
+    ):
+        defects.append(defect)
 
 
-def _assess_contraband(
+def derive_defects(
     packet: AssemblyCredentialPacketManager,
-    item: ContrabandItem,
-    level: RestrictionLevel,
+    restrictions: Restrictions,
     finding_status: dict[str, str] | None = None,
-) -> CredentialDisposition:
-    """Assess one contraband item under the declaration-is-the-requirement model.
+) -> list[CredentialDefect]:
+    """Return the mediated semantic defects in ``packet`` under ``restrictions``.
 
-    Contraband is, by definition, what must be declared; concealing any of it is
-    itself the violation. ``request_disclosure`` rescues (the candidate declares,
-    so it is assessed as declared); ``request_search`` only reveals it (the
-    concealment stands). See ``CREDENTIALS_LOOP_DESIGN.md`` B.2.
+    The returned observations are transient assessment output. ``finding_status``
+    changes only remediable observations; it never becomes a credential defect or
+    substitutes discovered evidence for the packet's own state.
     """
 
-    fs = finding_status or {}
-    cls = _contraband_class(level)
-    if cls == ContrabandClass.CRIMINAL:
-        # Per-se crime: mere possession is the offense. Declaring or surrendering
-        # it does not rescue (you cannot relinquish your way out of trafficking).
-        # A permissive regime that tolerates the good simply maps it below
-        # CRIMINAL. (A privileged-origin whitelist exemption is a Phase C overlay
-        # applied above derive_disposition, not here.)
-        return CredentialDisposition.ARREST
-    # disclosure declares all concealed goods; a bare un-concealed item is
-    # already declared. The contraband's permit (when one is required) lives in
-    # the packet keyed by indication, so its standing is assessed by
-    # _assess_requirement -- the same machinery as a purpose permit.
-    declared = (not item.concealed) or fs.get(FindingKey.DISCLOSURE) == Finding.DECLARED
+    finding_status = finding_status or {}
+    defects: list[CredentialDefect] = []
+    region = packet.get_region()
+    purpose = packet.get_purpose()
+    purpose_level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
 
-    if declared:
-        if fs.get(FindingKey.RELINQUISH) == Finding.YIELDED:
-            return CredentialDisposition.PASS  # voluntarily surrendered
-        if cls == ContrabandClass.FORBIDDEN:
-            return CredentialDisposition.DENY  # declared forbidden -> relinquish/deny
-        if cls == ContrabandClass.CREDENTIALED:
-            return _assess_requirement(packet, item.indication, level, fs)
-        return CredentialDisposition.PASS  # declaration-only, declared -> allow
+    if purpose_level is RestrictionLevel.CRIMINAL:
+        defects.append(
+            CredentialDefect(
+                kind=CredentialDefectKind.CRIMINAL_INTENT,
+                failure_class=FailureClass.CRIME,
+                subject="intent",
+                indication=purpose,
+            )
+        )
+    elif purpose_level is RestrictionLevel.FORBIDDEN:
+        defects.append(
+            CredentialDefect(
+                kind=CredentialDefectKind.PROHIBITED_INTENT,
+                failure_class=FailureClass.MITIGATABLE,
+                subject="intent",
+                indication=purpose,
+            )
+        )
+    else:
+        defects.extend(
+            _requirement_defects(packet, purpose, purpose_level, finding_status)
+        )
 
-    # Concealed and not disclosed: concealment is the violation.
-    if cls == ContrabandClass.FORBIDDEN:
-        return CredentialDisposition.ARREST  # smuggling forbidden goods
-    if cls == ContrabandClass.DECLARATION_ONLY:
-        return CredentialDisposition.DENY  # concealed declarable goods
-    # credentialed (permit and/or id required), concealed:
-    if _assess_requirement(packet, item.indication, level, fs) is CredentialDisposition.PASS:
-        return CredentialDisposition.DENY  # had a valid credential but concealed it (Q1)
-    return CredentialDisposition.ARREST  # smuggling un-credentialed goods
+    for item in packet.get_contraband():
+        level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
+        if level is RestrictionLevel.CRIMINAL:
+            defects.append(
+                CredentialDefect(
+                    kind=CredentialDefectKind.CRIMINAL_POSSESSION,
+                    failure_class=FailureClass.CRIME,
+                    subject="possession",
+                    indication=item.indication,
+                )
+            )
+            continue
+
+        declared = (
+            not item.concealed
+            or finding_status.get(FindingKey.DISCLOSURE) == Finding.DECLARED
+        )
+        if declared and finding_status.get(FindingKey.RELINQUISH) == Finding.YIELDED:
+            continue
+        if level is RestrictionLevel.FORBIDDEN:
+            defects.append(
+                CredentialDefect(
+                    kind=(
+                        CredentialDefectKind.UNAUTHORIZED_POSSESSION
+                        if declared
+                        else CredentialDefectKind.UNDECLARED_POSSESSION
+                    ),
+                    failure_class=(
+                        FailureClass.MITIGATABLE if declared else FailureClass.CRIME
+                    ),
+                    subject="possession",
+                    indication=item.indication,
+                )
+            )
+            continue
+        if not level.requires_permit and not level.requires_id:
+            if not declared:
+                defects.append(
+                    CredentialDefect(
+                        kind=CredentialDefectKind.UNDECLARED_POSSESSION,
+                        failure_class=FailureClass.MITIGATABLE,
+                        subject="possession",
+                        indication=item.indication,
+                    )
+                )
+            continue
+
+        requirement_defects = _requirement_defects(
+            packet,
+            item.indication,
+            level,
+            finding_status,
+            missing_kind=CredentialDefectKind.UNAUTHORIZED_POSSESSION,
+            invalid_kind=CredentialDefectKind.UNAUTHORIZED_POSSESSION,
+            missing_subject="possession",
+        )
+        if declared:
+            defects.extend(requirement_defects)
+            continue
+        for defect in requirement_defects:
+            if defect.failure_class is FailureClass.CRIME:
+                _append_once(defects, defect)
+        defects.append(
+            CredentialDefect(
+                kind=CredentialDefectKind.UNDECLARED_POSSESSION,
+                failure_class=(
+                    FailureClass.CRIME if requirement_defects else FailureClass.MITIGATABLE
+                ),
+                subject="possession",
+                indication=item.indication,
+            )
+        )
+
+    # A forged document is criminal even when the day's rules did not require it.
+    # ``holder_matches`` is meaningful only while assessing a required document,
+    # matching the pre-Phase-8 policy.
+    for component, subject in [
+        *[(component, "identity") for component in packet.get_slot(CREDENTIAL_ID_SLOT)],
+        *[
+            (component, "authorization")
+            for component in packet.get_slot(CREDENTIAL_PACKET_SLOT)
+        ],
+    ]:
+        if component.status.is_crime:
+            defect = _document_defect(
+                component,
+                subject=subject,
+                indication=component.indication,
+                cleared=False,
+                invalid_kind=CredentialDefectKind.INVALID_EVIDENCE,
+                invalid_subject=subject,
+            )
+            if defect is not None:
+                _append_once(defects, defect)
+
+    return defects
 
 
 def derive_disposition(
@@ -497,42 +640,12 @@ def derive_disposition(
     restrictions: Restrictions,
     finding_status: dict[str, str] | None = None,
 ) -> CredentialDisposition:
-    """Derive the correct disposition from the rules and the candidate's packet.
+    """Fold structured defects into the three available checkpoint outcomes."""
 
-    Reads the candidate only through its discovery API, so the packet's internal
-    representation stays opaque. Returns the most-severe applicable outcome
-    (ARREST > DENY > PASS). If ``finding_status`` is given (Phase B.1 mediation
-    outcomes for the active case), cleared mitigatable findings contribute PASS
-    instead of DENY.
-    """
-
-    region = packet.get_region()
-    worst = CredentialDisposition.PASS
-
-    purpose = packet.get_purpose()
-    level = restrictions.level_for(region, purpose, RestrictionLevel.ANONYMOUS)
-    if level is RestrictionLevel.CRIMINAL:
-        # The stated purpose is itself a crime (RestrictionLevel is shared by
-        # purpose and contraband rules) -- e.g. an authored {WORK: CRIMINAL} regime.
-        worst = _worse(worst, CredentialDisposition.ARREST)
-    elif level is RestrictionLevel.FORBIDDEN:
-        worst = _worse(worst, CredentialDisposition.DENY)  # purpose not allowed
-    else:
-        worst = _worse(worst, _assess_requirement(packet, purpose, level, finding_status))
-
-    for item in packet.get_contraband():
-        level = restrictions.level_for(region, item.indication, RestrictionLevel.FORBIDDEN)
-        worst = _worse(worst, _assess_contraband(packet, item, level, finding_status))
-
-    # Presenting a forged / fake document is a crime in itself, regardless of
-    # whether the document was required -- handing over a fake id unasked still
-    # arrests. (A merely *invalid* document -- expired, unsealed -- with nothing
-    # to back is moot, since its status is not a crime.)
-    for token in packet.all_credentials():
-        if token.status.is_crime:
-            worst = _worse(worst, CredentialDisposition.ARREST)
-
-    return worst
+    defects = derive_defects(packet, restrictions, finding_status)
+    if any(defect.failure_class is FailureClass.CRIME for defect in defects):
+        return CredentialDisposition.ARREST
+    return CredentialDisposition.DENY if defects else CredentialDisposition.PASS
 
 
 class CredentialPresentationProfile(BaseModelPlus):
@@ -606,27 +719,49 @@ class CredentialPresentationProfile(BaseModelPlus):
             indication=self.indication_labels.get(indication, indication),
         )
 
-    def render_case(self, case: CredentialCase) -> CredentialCase:
-        """Project compatibility inspection text from logical packet truth."""
+    def render_case(
+        self,
+        case: CredentialCase,
+        defects: list[CredentialDefect],
+    ) -> CredentialCase:
+        """Project packet documents and defects into compatibility inspection text.
+
+        Defects choose the policy-relevant finding text. A visible document still
+        renders its raw status when that status is moot under the current rules;
+        presentation does not promote that observation into a disposition defect.
+        """
 
         documents: dict[str, str] = {}
         findings: dict[str, str] = {}
+        defects_by_source = {
+            defect.source_id: defect for defect in defects if defect.source_id is not None
+        }
 
-        id_card = case.id_credential()
+        id_card = _id_component(case.packet_manager)
         if id_card is not None:
             documents[self.identity_label] = self.identity_description
-            if not id_card.status.is_valid:
+            defect = defects_by_source.get(id_card.uid)
+            if defect is not None and defect.cause is not None:
+                findings[self.identity_label] = self.status_text[defect.cause]
+            elif not id_card.status.is_valid:
                 findings[self.identity_label] = self.status_text[id_card.status]
 
-        for token in case.document_credentials():
-            document = self.document_label(token.indication)
+        for component in case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT):
+            document = self.document_label(component.indication, component)
             documents[document] = self.document_description.format(document=document)
-            if not token.status.is_valid:
-                findings[document] = self.status_text[token.status]
-            elif not token.holder_matches:
+            defect = defects_by_source.get(component.uid)
+            if defect is not None and defect.cause is not None:
+                findings[document] = self.status_text[defect.cause]
+            elif defect is not None and defect.kind is CredentialDefectKind.SUBJECT_MISMATCH:
+                findings[document] = self.holder_mismatch_text
+            elif not component.status.is_valid:
+                findings[document] = self.status_text[component.status]
+            elif not component.holder_matches:
                 findings[document] = self.holder_mismatch_text
 
         for item in case.get_contraband():
+            if item.concealed:
+                continue
             indication = self.indication_labels.get(item.indication, item.indication)
             documents[f"declared {indication}"] = self.possession_description.format(
                 indication=indication,

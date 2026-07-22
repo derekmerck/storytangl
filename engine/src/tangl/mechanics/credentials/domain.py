@@ -19,7 +19,8 @@ See also: ``CREDENTIALS_LOOP_DESIGN.md`` -- "The rule and failure-mode model".
 from __future__ import annotations
 
 from enum import Enum
-from typing import TypeAlias
+from typing import Literal, TypeAlias
+from uuid import UUID
 
 from pydantic import Field
 
@@ -128,6 +129,79 @@ class FailureClass(Enum):
 
     MITIGATABLE = "mitigatable"  # fixable in the moment -> deny if unfixed
     CRIME = "crime"              # -> arrest
+
+
+class CredentialDefectKind(Enum):
+    """The normalized kinds of a transient credential assessment.
+
+    Why
+    ---
+    Policy and rendering need one semantic vocabulary instead of separate status
+    interpretations.
+
+    Key Features
+    ------------
+    Covers evidence, subject, intent, and possession violations without
+    embedding world prose or disposition state.
+
+    API
+    ---
+    Used as :attr:`CredentialDefect.kind` by the credentials evaluator.
+
+    Notes
+    -----
+    These values are derived from a packet and mediated findings; they are not
+    persisted on the packet or game.
+
+    See also
+    --------
+    :class:`CredentialDefect`, :class:`FailureClass`.
+    """
+
+    MISSING_EVIDENCE = "missing_evidence"
+    INVALID_EVIDENCE = "invalid_evidence"
+    FRAUDULENT_EVIDENCE = "fraudulent_evidence"
+    SUBJECT_MISMATCH = "subject_mismatch"
+    PROHIBITED_INTENT = "prohibited_intent"
+    CRIMINAL_INTENT = "criminal_intent"
+    UNAUTHORIZED_POSSESSION = "unauthorized_possession"
+    UNDECLARED_POSSESSION = "undeclared_possession"
+    CRIMINAL_POSSESSION = "criminal_possession"
+
+
+class CredentialDefect(BaseModelPlus):
+    """One derived, presentation-free credential assessment observation.
+
+    Why
+    ---
+    Represents the evaluator's policy input without making a second packet state.
+
+    Key Features
+    ------------
+    Carries a normalized kind, severity class, semantic subject, and optional
+    indication, component source, and status cause for rendering.
+
+    API
+    ---
+    Produced by ``derive_defects`` and folded by ``derive_disposition``; a
+    presentation profile may use ``source_id`` and ``cause`` for wording.
+
+    Notes
+    -----
+    This value is transient assessment output. It neither persists on a packet
+    nor replaces game-owned mediated finding state.
+
+    See also
+    --------
+    :class:`CredentialDefectKind`, :class:`FailureClass`.
+    """
+
+    kind: CredentialDefectKind
+    failure_class: FailureClass
+    subject: Literal["intent", "identity", "authorization", "possession"]
+    indication: IndicationId | None = None
+    source_id: UUID | None = None
+    cause: CredentialStatus | None = None
 
 
 class FailureMode(Enum):

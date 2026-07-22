@@ -6,9 +6,15 @@ import random
 
 import pytest
 
+from tangl.mechanics.credentials import (
+    CredentialToken,
+    materialize_packet,
+)
 from tangl.mechanics.games import (
     CredentialCase,
+    CredentialDefectKind,
     CredentialDisposition,
+    CredentialStatus,
     FailureClass,
     FailureMode,
     Indication,
@@ -18,8 +24,10 @@ from tangl.mechanics.games import (
     applicable_modes,
     build_valid,
     degrade,
+    derive_defects,
     derive_disposition,
     make_case,
+    render_narrative,
     sample_failure_mode,
 )
 
@@ -41,6 +49,18 @@ RULES = Restrictions.from_map(
 EXPECTED_CLASS_DISPOSITION = {
     FailureClass.MITIGATABLE: D.DENY,
     FailureClass.CRIME: D.ARREST,
+}
+
+EXPECTED_DEFECT_KIND = {
+    FailureMode.MISSING_PERMIT: CredentialDefectKind.MISSING_EVIDENCE,
+    FailureMode.UNSEALED_PERMIT: CredentialDefectKind.INVALID_EVIDENCE,
+    FailureMode.FORGED_PERMIT: CredentialDefectKind.FRAUDULENT_EVIDENCE,
+    FailureMode.WRONG_HOLDER_PERMIT: CredentialDefectKind.SUBJECT_MISMATCH,
+    FailureMode.MISSING_ID: CredentialDefectKind.MISSING_EVIDENCE,
+    FailureMode.EXPIRED_ID: CredentialDefectKind.INVALID_EVIDENCE,
+    FailureMode.FAKE_ID: CredentialDefectKind.SUBJECT_MISMATCH,
+    FailureMode.UNPERMITTED_CONTRABAND: CredentialDefectKind.UNAUTHORIZED_POSSESSION,
+    FailureMode.CONCEALED_CONTRABAND: CredentialDefectKind.UNDECLARED_POSSESSION,
 }
 
 
@@ -73,6 +93,9 @@ class TestRoundTripInvariant:
         # Use a WORK candidate so permit and id surfaces both exist.
         case = make_case(Region.LOCAL, IND.WORK, RULES, failure_modes=[mode])
         assert _derive(case) is EXPECTED_CLASS_DISPOSITION[mode.failure_class]
+        assert EXPECTED_DEFECT_KIND[mode] in {
+            defect.kind for defect in derive_defects(case.packet_manager, RULES)
+        }
 
     def test_composition_takes_the_worst(self) -> None:
         # A mitigatable permit flaw plus a smuggling crime -> arrest.
@@ -83,6 +106,42 @@ class TestRoundTripInvariant:
             failure_modes=[FailureMode.UNSEALED_PERMIT, FailureMode.CONCEALED_CONTRABAND],
         )
         assert _derive(case) is D.ARREST
+
+
+class TestGeneratedPresentation:
+    def test_concealed_contraband_is_not_rendered_as_declared(self) -> None:
+        case = make_case(
+            Region.LOCAL,
+            IND.WORK,
+            RULES,
+            failure_modes=[FailureMode.CONCEALED_CONTRABAND],
+        )
+
+        assert "declared weapon" not in case.presented_documents
+
+    def test_optional_visible_invalid_document_keeps_its_finding(self) -> None:
+        case = CredentialCase(
+            packet_manager=materialize_packet(
+                owner=object(),
+                region=Region.LOCAL,
+                purpose=IND.TRAVEL,
+                id_card=CredentialToken(indication=IND.TRAVEL),
+                credentials=[
+                    CredentialToken(
+                        indication=IND.WEAPON,
+                        status=CredentialStatus.EXPIRED,
+                        requires_id=True,
+                    )
+                ],
+                possessions=[],
+                label_prefix="Traveler",
+            )
+        )
+
+        render_narrative(case, derive_defects(case.packet_manager, RULES))
+
+        assert _derive(case) is D.PASS
+        assert case.hidden_facts["weapon permit"] == "The credential has expired."
 
 
 class TestApplicability:

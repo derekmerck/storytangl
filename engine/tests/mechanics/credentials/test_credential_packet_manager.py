@@ -13,6 +13,7 @@ from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
     CredentialComponent,
+    CredentialDefectKind,
     CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
     ensure_default_credential_definitions,
@@ -36,6 +37,7 @@ from tangl.mechanics.games.credentials_game import (
     CredentialsGame,
     CredentialsGameHandler,
     Finding,
+    derive_defects,
     derive_disposition,
 )
 from tangl.mechanics.games.credentials_roster import ScenarioOffer
@@ -438,6 +440,47 @@ def test_packet_manager_graph_roundtrip_preserves_credential_assignments_by_id()
     assert derive_disposition(restored_manager, LOCAL_RULES) is D.PASS
     assert sum(1 for item in restored.members.values() if item.uid == id_card.uid) == 1
     assert sum(1 for item in restored.members.values() if item.uid == work_permit.uid) == 1
+
+
+def test_defects_recompute_from_a_restored_packet_manager() -> None:
+    id_definition = credential_definition(
+        "defect_roundtrip_id",
+        IND.TRAVEL,
+        document_kind="id",
+    )
+    permit_definition = credential_definition(
+        "defect_roundtrip_work_permit",
+        IND.WORK,
+        requires_id=True,
+    )
+    graph = Graph()
+    owner = graph.add_node(kind=CredentialPacketNode, label="checkpoint")
+    id_card = graph.add_node(
+        kind=CredentialComponent,
+        label="defect-roundtrip-id",
+        token_from=id_definition.label,
+    )
+    permit = graph.add_node(
+        kind=CredentialComponent,
+        label="defect-roundtrip-work-permit",
+        token_from=permit_definition.label,
+        status=S.MISSING_SEAL,
+    )
+    manager = owner.packet_manager
+    manager.purpose = IND.WORK
+    manager.assign(CREDENTIAL_ID_SLOT, id_card)
+    manager.assign(CREDENTIAL_PACKET_SLOT, permit)
+
+    before = derive_defects(manager, LOCAL_RULES)
+
+    restored = Graph.structure(graph.unstructure())
+    restored_owner = restored.find_one(Selector(label="checkpoint"))
+    after = derive_defects(restored_owner.packet_manager, LOCAL_RULES)
+
+    assert [(defect.kind, defect.source_id, defect.cause) for defect in before] == [
+        (CredentialDefectKind.INVALID_EVIDENCE, permit.uid, S.MISSING_SEAL),
+    ]
+    assert after == before
 
 
 def test_credential_token_facets_are_isolated_and_keep_packet_provenance() -> None:

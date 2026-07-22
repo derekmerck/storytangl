@@ -1,7 +1,8 @@
 # Credential Mechanic — Design Note
 
-**Status:** PLANNED for the global document/media mechanic; Phase 7 landed the
-game-facing packet authority cutover (2026-07-20), but not the full extraction.
+**Status:** PLANNED for the global document/media mechanic; Phases 7 and 8 landed
+the game-facing packet-authority cutover and transient shared defect vocabulary
+(2026-07-20/21), but not the full extraction.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.

@@ -413,6 +413,11 @@ combines durable component identity, visible evidence, hidden truth, inspection
 findings, holder bindings, provenance, generated media, contextual choices,
 phase purity, replay, and persistence.
 
+Phase 8 gives the family a shared, transient `CredentialDefect` vocabulary.
+The packet manager and mediated game state derive defects; policy folds them into
+pass/deny/arrest; renderers consume the same observations without owning a second
+status interpretation.
+
 Its central hidden-information rule is:
 
 > Contribute choices from visible existence; disclose hidden validity only
@@ -523,8 +528,8 @@ grammars** rather than just “minigames.”
    world/type/instance/encounter model without credentials-specific engine vocabulary.
 4. Retire credential compatibility fields now that the manager-backed border and
    hall-monitor paths have been exercised both separately and in one world.
-5. Normalize credential defects and connect credential components to presence and
-   media projection.
+5. Complete: normalize credential defects as a shared derived vocabulary; retain
+   presence and media projection as the next credential integration.
 6. Reconcile vehicle and loadout vocabulary with assembly, transactions, and
    progression.
 7. Extend the Adventure sandbox with one scheduled mobile actor and one
