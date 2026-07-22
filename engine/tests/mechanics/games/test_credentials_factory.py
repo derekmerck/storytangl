@@ -6,10 +6,15 @@ import random
 
 import pytest
 
+from tangl.mechanics.credentials import (
+    CredentialToken,
+    materialize_packet,
+)
 from tangl.mechanics.games import (
     CredentialCase,
     CredentialDefectKind,
     CredentialDisposition,
+    CredentialStatus,
     FailureClass,
     FailureMode,
     Indication,
@@ -22,6 +27,7 @@ from tangl.mechanics.games import (
     derive_defects,
     derive_disposition,
     make_case,
+    render_narrative,
     sample_failure_mode,
 )
 
@@ -100,6 +106,42 @@ class TestRoundTripInvariant:
             failure_modes=[FailureMode.UNSEALED_PERMIT, FailureMode.CONCEALED_CONTRABAND],
         )
         assert _derive(case) is D.ARREST
+
+
+class TestGeneratedPresentation:
+    def test_concealed_contraband_is_not_rendered_as_declared(self) -> None:
+        case = make_case(
+            Region.LOCAL,
+            IND.WORK,
+            RULES,
+            failure_modes=[FailureMode.CONCEALED_CONTRABAND],
+        )
+
+        assert "declared weapon" not in case.presented_documents
+
+    def test_optional_visible_invalid_document_keeps_its_finding(self) -> None:
+        case = CredentialCase(
+            packet_manager=materialize_packet(
+                owner=object(),
+                region=Region.LOCAL,
+                purpose=IND.TRAVEL,
+                id_card=CredentialToken(indication=IND.TRAVEL),
+                credentials=[
+                    CredentialToken(
+                        indication=IND.WEAPON,
+                        status=CredentialStatus.EXPIRED,
+                        requires_id=True,
+                    )
+                ],
+                possessions=[],
+                label_prefix="Traveler",
+            )
+        )
+
+        render_narrative(case, derive_defects(case.packet_manager, RULES))
+
+        assert _derive(case) is D.PASS
+        assert case.hidden_facts["weapon permit"] == "The credential has expired."
 
 
 class TestApplicability:

@@ -98,8 +98,14 @@ class TestStructuredDefects:
 
         defects = derive_defects(case.packet_manager, LOCAL_RULES)
         assert [
-            (defect.kind, defect.failure_class, defect.subject, defect.indication,
-             defect.source_id, defect.cause)
+            (
+                defect.kind,
+                defect.failure_class,
+                defect.subject,
+                defect.indication,
+                defect.source_id,
+                defect.cause,
+            )
             for defect in defects
         ] == [
             (

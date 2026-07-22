@@ -724,7 +724,12 @@ class CredentialPresentationProfile(BaseModelPlus):
         case: CredentialCase,
         defects: list[CredentialDefect],
     ) -> CredentialCase:
-        """Project compatibility inspection text from packet documents and defects."""
+        """Project packet documents and defects into compatibility inspection text.
+
+        Defects choose the policy-relevant finding text. A visible document still
+        renders its raw status when that status is moot under the current rules;
+        presentation does not promote that observation into a disposition defect.
+        """
 
         documents: dict[str, str] = {}
         findings: dict[str, str] = {}
@@ -738,6 +743,8 @@ class CredentialPresentationProfile(BaseModelPlus):
             defect = defects_by_source.get(id_card.uid)
             if defect is not None and defect.cause is not None:
                 findings[self.identity_label] = self.status_text[defect.cause]
+            elif not id_card.status.is_valid:
+                findings[self.identity_label] = self.status_text[id_card.status]
 
         for component in case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT):
             document = self.document_label(component.indication, component)
@@ -747,8 +754,14 @@ class CredentialPresentationProfile(BaseModelPlus):
                 findings[document] = self.status_text[defect.cause]
             elif defect is not None and defect.kind is CredentialDefectKind.SUBJECT_MISMATCH:
                 findings[document] = self.holder_mismatch_text
+            elif not component.status.is_valid:
+                findings[document] = self.status_text[component.status]
+            elif not component.holder_matches:
+                findings[document] = self.holder_mismatch_text
 
         for item in case.get_contraband():
+            if item.concealed:
+                continue
             indication = self.indication_labels.get(item.indication, item.indication)
             documents[f"declared {indication}"] = self.possession_description.format(
                 indication=indication,

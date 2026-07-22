@@ -394,7 +394,7 @@ scoring only via `expected_disposition`.
 dispositions. Rules are stored as a flat `Restrictions` model (a rule list with
 `level_for` + a `from_map` authoring constructor) rather than an enum-keyed dict,
 because the VM hashes node state with `json.dumps` and enum dict-keys are not
-JSON-serializable. A.2+ below is still pending.
+JSON-serializable. Later sections record extensions and remaining proposals.
 
 ### A.1 Derivation vocabulary (port)
 
