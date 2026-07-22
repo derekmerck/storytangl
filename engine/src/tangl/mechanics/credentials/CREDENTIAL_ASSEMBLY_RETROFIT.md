@@ -33,9 +33,13 @@ completed the authority cutover: every runtime `CredentialCase` now requires one
 owner-bound assembly packet manager; offer materialization creates it directly with
 the selected catalog; and the flat case fields, packet protocol, game-layer manager,
 and enum compatibility module are gone. Gate and Hall Monitor retain their authored
-wording as narrative overrides on ordinary offers.
-Expression narrative beyond that first skin seam, contraband graph identity,
-document-identity receipts, and status decomposition remain future slices.
+wording as narrative overrides on ordinary offers. Phase 8 adds transient,
+normalized `CredentialDefect` observations: the shared domain owns their vocabulary,
+the credentials game derives them from the manager plus mediated findings, and the
+three checkpoint dispositions fold that one result. Renderers consume those defects
+rather than independently interpreting document status.
+Expression narrative beyond that first skin seam, contraband graph identity, and
+document-identity receipts remain future slices.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -505,6 +509,18 @@ Retire authored packet narrative only after expression/projection helpers can pr
 world-specific visible descriptions and committed hidden-fact disclosure.
 
 Do this only after a release/PR where both paths were tested side by side.
+
+### Phase 8: Structured Credential Defects
+
+**Status: landed (2026-07-21).** `CredentialDefect` is a derived value object,
+not packet or game state. `derive_defects(packet_manager, restrictions,
+finding_status)` records missing/invalid/fraudulent evidence, subject mismatches,
+intent violations, and possession violations with a failure class and optional
+component source id. `derive_disposition` now only folds that list: no defects
+passes, a mitigatable defect denies, and any crime arrests. Cleared evidence and
+yielded surrender suppress only remediable defects; findings themselves never become
+packet truth. Presentation profiles receive the same defect list and preserve
+status-specific wording through `cause`.
 
 ---
 

@@ -8,6 +8,7 @@ import pytest
 
 from tangl.mechanics.games import (
     CredentialCase,
+    CredentialDefectKind,
     CredentialDisposition,
     FailureClass,
     FailureMode,
@@ -18,6 +19,7 @@ from tangl.mechanics.games import (
     applicable_modes,
     build_valid,
     degrade,
+    derive_defects,
     derive_disposition,
     make_case,
     sample_failure_mode,
@@ -41,6 +43,18 @@ RULES = Restrictions.from_map(
 EXPECTED_CLASS_DISPOSITION = {
     FailureClass.MITIGATABLE: D.DENY,
     FailureClass.CRIME: D.ARREST,
+}
+
+EXPECTED_DEFECT_KIND = {
+    FailureMode.MISSING_PERMIT: CredentialDefectKind.MISSING_EVIDENCE,
+    FailureMode.UNSEALED_PERMIT: CredentialDefectKind.INVALID_EVIDENCE,
+    FailureMode.FORGED_PERMIT: CredentialDefectKind.FRAUDULENT_EVIDENCE,
+    FailureMode.WRONG_HOLDER_PERMIT: CredentialDefectKind.SUBJECT_MISMATCH,
+    FailureMode.MISSING_ID: CredentialDefectKind.MISSING_EVIDENCE,
+    FailureMode.EXPIRED_ID: CredentialDefectKind.INVALID_EVIDENCE,
+    FailureMode.FAKE_ID: CredentialDefectKind.SUBJECT_MISMATCH,
+    FailureMode.UNPERMITTED_CONTRABAND: CredentialDefectKind.UNAUTHORIZED_POSSESSION,
+    FailureMode.CONCEALED_CONTRABAND: CredentialDefectKind.UNDECLARED_POSSESSION,
 }
 
 
@@ -73,6 +87,9 @@ class TestRoundTripInvariant:
         # Use a WORK candidate so permit and id surfaces both exist.
         case = make_case(Region.LOCAL, IND.WORK, RULES, failure_modes=[mode])
         assert _derive(case) is EXPECTED_CLASS_DISPOSITION[mode.failure_class]
+        assert EXPECTED_DEFECT_KIND[mode] in {
+            defect.kind for defect in derive_defects(case.packet_manager, RULES)
+        }
 
     def test_composition_takes_the_worst(self) -> None:
         # A mitigatable permit flaw plus a smuggling crime -> arrest.

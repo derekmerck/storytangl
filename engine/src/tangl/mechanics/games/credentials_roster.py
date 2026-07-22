@@ -24,6 +24,7 @@ from pydantic import Field
 from tangl.core import TokenCatalog
 from tangl.core.bases import Unstructurable
 from tangl.mechanics.credentials import (
+    CredentialDefect,
     CredentialDefinition,
     FailureClass,
     FailureMode,
@@ -40,6 +41,7 @@ from .credentials_game import (
     CredentialCase,
     CredentialDisposition,
     CredentialsGame,
+    derive_defects,
     derive_disposition,
 )
 
@@ -314,7 +316,9 @@ def materialize(
     *,
     owner: object | None = None,
     catalog: TokenCatalog[CredentialDefinition] | None = None,
-    narrative_renderer: Callable[[CredentialCase], CredentialCase] | None = None,
+    narrative_renderer: (
+        Callable[[CredentialCase, list[CredentialDefect]], CredentialCase] | None
+    ) = None,
 ) -> CredentialCase:
     """Build the concrete candidate for ``offer`` (deterministic).
 
@@ -333,7 +337,8 @@ def materialize(
         catalog=catalog,
     )
     degrade(case, offer.failure_modes)
-    (narrative_renderer or render_narrative)(case)
+    defects = derive_defects(case.packet_manager, rules)
+    (narrative_renderer or render_narrative)(case, defects)
     case.whitelist = offer.whitelist
     case.blacklist = offer.blacklist
     if offer.presented_documents_override is not None:

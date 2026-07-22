@@ -19,7 +19,8 @@ See also: ``CREDENTIALS_LOOP_DESIGN.md`` -- "The rule and failure-mode model".
 from __future__ import annotations
 
 from enum import Enum
-from typing import TypeAlias
+from typing import Literal, TypeAlias
+from uuid import UUID
 
 from pydantic import Field
 
@@ -128,6 +129,31 @@ class FailureClass(Enum):
 
     MITIGATABLE = "mitigatable"  # fixable in the moment -> deny if unfixed
     CRIME = "crime"              # -> arrest
+
+
+class CredentialDefectKind(Enum):
+    """Normalized semantic observations derived from a credential packet."""
+
+    MISSING_EVIDENCE = "missing_evidence"
+    INVALID_EVIDENCE = "invalid_evidence"
+    FRAUDULENT_EVIDENCE = "fraudulent_evidence"
+    SUBJECT_MISMATCH = "subject_mismatch"
+    PROHIBITED_INTENT = "prohibited_intent"
+    CRIMINAL_INTENT = "criminal_intent"
+    UNAUTHORIZED_POSSESSION = "unauthorized_possession"
+    UNDECLARED_POSSESSION = "undeclared_possession"
+    CRIMINAL_POSSESSION = "criminal_possession"
+
+
+class CredentialDefect(BaseModelPlus):
+    """A derived, presentation-free credential assessment observation."""
+
+    kind: CredentialDefectKind
+    failure_class: FailureClass
+    subject: Literal["intent", "identity", "authorization", "possession"]
+    indication: IndicationId | None = None
+    source_id: UUID | None = None
+    cause: CredentialStatus | None = None
 
 
 class FailureMode(Enum):

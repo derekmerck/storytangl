@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+from tangl.mechanics.credentials import CREDENTIAL_PACKET_SLOT
 from tangl.mechanics.games import (
     ContrabandItem,
+    CredentialDefectKind,
     CredentialDisposition,
     CredentialStatus,
     CredentialToken,
     CredentialsGame,
     DEFAULT_RESTRICTIONS,
+    FailureClass,
     Indication,
     Region,
     Restrictions,
     RestrictionLevel,
     derive_disposition,
+    derive_defects,
 )
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 
@@ -81,6 +85,47 @@ class TestPacketManager:
             derive_disposition(case.packet_manager, LOCAL_RULES, {IND.WORK.value: "cleared"})
             is D.PASS
         )
+
+
+class TestStructuredDefects:
+    def test_defect_records_document_cause_and_component_source(self) -> None:
+        case = CredentialCase(
+            purpose=IND.WORK,
+            id_card=_id(S.VALID),
+            packet=[_permit(IND.WORK, S.MISSING_SEAL)],
+        )
+        component = case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)[0]
+
+        defects = derive_defects(case.packet_manager, LOCAL_RULES)
+        assert [
+            (defect.kind, defect.failure_class, defect.subject, defect.indication,
+             defect.source_id, defect.cause)
+            for defect in defects
+        ] == [
+            (
+                CredentialDefectKind.INVALID_EVIDENCE,
+                FailureClass.MITIGATABLE,
+                "authorization",
+                IND.WORK,
+                component.uid,
+                S.MISSING_SEAL,
+            )
+        ]
+
+    def test_mediation_suppresses_the_remediable_defect_not_packet_truth(self) -> None:
+        case = CredentialCase(
+            purpose=IND.WORK,
+            id_card=_id(S.VALID),
+            packet=[_permit(IND.WORK, S.MISSING_SEAL)],
+        )
+
+        assert derive_defects(case.packet_manager, LOCAL_RULES)
+        assert derive_defects(
+            case.packet_manager,
+            LOCAL_RULES,
+            {IND.WORK.value: "cleared"},
+        ) == []
+        assert case.credential_for(IND.WORK).status is S.MISSING_SEAL
 
 
 class TestAnonymousAndId:

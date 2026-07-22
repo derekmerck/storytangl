@@ -10,7 +10,9 @@ contraband tier (per-se crime, no rescue, per-rule-set) LANDED 2026-06-05; Phase
 whitelist/blacklist override (data flags clamping `expected_disposition`; overt vs
 shadow = the tax toggle) LANDED 2026-06-06; B.3 (declines axis) + the malfeasance
 layer (bribe/plant/invalidate) designed below as overlays; Phase 7 packet
-authority cutover LANDED 2026-07-20 (one owner-bound assembly manager per case)
+authority cutover LANDED 2026-07-20 (one owner-bound assembly manager per case);
+Phase 8 structured defects LANDED 2026-07-21 (one mediated evaluator, then a
+disposition fold)
 **Scope:** the credentials / checkpoint interaction as a stacked picking-game
 composition inside `tangl.mechanics.games`  
 **Background sources:** `docs/src/notes/CREDENTIALS_INTERACTION.md`,
@@ -383,12 +385,11 @@ specification funnel (A.3) possible at all. Do not reintroduce a packet-validato
 to compute dispositions; dispositions are an *input* to generation, derived for
 scoring only via `expected_disposition`.
 
-**A.1 landed (2026-05-22).** `credentials_enums.py` holds the vocabulary
-(`Region`, `Indication`, `RestrictionLevel`, `CredentialStatus`) and the lean
-packet types (`CredentialToken`, `ContrabandItem`); `derive_disposition` reads a
-case only through its **discovery API** (`get_region` / `get_purpose` /
-`id_status` / `credential_for` / `get_contraband`) so the packet's internals stay
-opaque and swappable. `expected_disposition` derives unless an authored
+**A.1/Phase 8 landed (2026-05-22/2026-07-21).**
+`tangl.mechanics.credentials` holds the vocabulary (`Region`, `Indication`,
+`RestrictionLevel`, `CredentialStatus`, `CredentialDefect`) and lean packet types.
+`derive_defects` reads the concrete owner-bound manager and mediated findings once;
+`derive_disposition` folds its failure classes. `expected_disposition` derives unless an authored
 `correct_disposition` override is set; `credential_gate` now derives all three
 dispositions. Rules are stored as a flat `Restrictions` model (a rule list with
 `level_for` + a `from_map` authoring constructor) rather than an enum-keyed dict,
@@ -414,11 +415,11 @@ Indication --(restriction map)--> RestrictionLevel --> Presentation --> Outcome
 - `tests/test_outcomes.py` locks the presentation -> outcome mapping; port it as
   the spec for the canonical vocabulary (reconcile the two enum files into one).
 
-### A.2 derive_disposition (landed with A.1)
+### A.2 derive_disposition (refactored in Phase 8)
 
-`expected_disposition(case)` derives against the shift's `restriction_map`,
-returning the **most-severe applicable disposition** (an explicit
-`ARREST > DENY > PASS` severity order on `CredentialDisposition`). Authored
+`expected_disposition(case)` derives against the shift's `restriction_map` by
+folding structured defects: any crime arrests, any remaining mitigatable defect
+denies, and no defects pass. Authored
 `correct_disposition` stays an explicit override for exceptional authored cases.
 (The two design subsections A.1 and A.2 were
 implemented together as the "A.1 derivation spine" increment.)
@@ -615,8 +616,9 @@ for genuinely-blocked actions (e.g. deciding before any inspection), not for
 leaking backend logic. Only a ``cleared`` mitigatable finding upgrades
 ``derive_disposition``; ``verified`` / ``confirmed`` are audit-only.
 
-``derive_disposition`` consults ``finding_status``: a cleared mitigatable doc
-finding contributes PASS instead of DENY; everything else as before.
+``derive_defects`` consults ``finding_status``: a cleared mitigatable doc defect
+is absent from the derived list; ``derive_disposition`` then folds the remainder.
+Verified and confirmed findings remain audit-only.
 
 Enabled by a small base refactor: ``PickingGameHandler.resolve_round``
 dispatches through a kind-keyed registry (with inspect/decide as defaults), so

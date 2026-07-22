@@ -24,6 +24,7 @@ from tangl.mechanics.credentials import (
     CREDENTIAL_PACKET_SLOT,
     ContrabandItem,
     CredentialComponent,
+    CredentialDefect,
     CredentialDefinition,
     CredentialStatus,
     CredentialToken,
@@ -36,7 +37,11 @@ from tangl.mechanics.credentials import (
     Restrictions,
     materialize_packet,
 )
-from .credentials_game import CredentialCase
+from .credentials_game import (
+    CredentialCase,
+    CredentialPresentationProfile,
+    derive_defects,
+)
 
 # Contraband used by smuggling / relinquish failures when the intent itself
 # carries none. Weapons are permit-gated (not anonymous) in the usual rule sets,
@@ -187,54 +192,13 @@ def degrade(case: CredentialCase, modes: Iterable[FailureMode]) -> CredentialCas
     return case
 
 
-_STATUS_FINDINGS = {
-    CredentialStatus.MISSING_SEAL: "The issuing seal is missing.",
-    CredentialStatus.BAD_DATE: "The issue date is wrong.",
-    CredentialStatus.EXPIRED: "The credential has expired.",
-    CredentialStatus.FORGED: "The seal is a forgery.",
-    CredentialStatus.WRONG_HOLDER: "The holder does not match this document.",
-}
+def render_narrative(
+    case: CredentialCase,
+    defects: list[CredentialDefect],
+) -> CredentialCase:
+    """Render the default profile from one already-derived defect list."""
 
-
-def render_narrative(case: CredentialCase) -> CredentialCase:
-    """Populate the inspect-loop strings from the structured truth, in place.
-
-    Gives a generated case the ``presented_documents`` / ``hidden_facts`` /
-    ``packet_hidden_facts`` the v1 inspect loop needs. Document-level infractions
-    (bad/forged seal, holder mismatch) surface here; missing documents and
-    concealed contraband are detected by Phase B follow-up moves, not by plain
-    inspection, so they are not rendered as findings.
-    """
-
-    documents: dict[str, str] = {}
-    findings: dict[str, str] = {}
-
-    id_card = case.id_credential()
-    if id_card is not None:
-        documents["passport"] = "An identity document."
-        if not id_card.status.is_valid:
-            findings["passport"] = _STATUS_FINDINGS[id_card.status]
-
-    for token in case.document_credentials():
-        label = f"{token.indication} permit"
-        documents[label] = f"A {token.indication} permit."
-        if not token.status.is_valid:
-            findings[label] = _STATUS_FINDINGS[token.status]
-        elif not token.holder_matches:
-            findings[label] = "The permit's holder does not match the bearer id."
-
-    for item in case.get_contraband():
-        if not item.concealed:
-            documents[f"declared {item.indication}"] = f"Openly declared {item.indication}."
-
-    case.presented_documents = documents
-    case.hidden_facts = findings
-    case.packet_hidden_facts = (
-        {"packet consistency": "The packet does not satisfy the checkpoint rules as presented."}
-        if findings
-        else {}
-    )
-    return case
+    return CredentialPresentationProfile().render_case(case, defects)
 
 
 def make_case(
@@ -260,7 +224,7 @@ def make_case(
         catalog=catalog,
     )
     degrade(case, failure_modes)
-    return render_narrative(case)
+    return render_narrative(case, derive_defects(case.packet_manager, restrictions))
 
 
 def applicable_modes(
