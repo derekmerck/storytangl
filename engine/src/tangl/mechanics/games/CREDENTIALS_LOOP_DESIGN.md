@@ -599,8 +599,9 @@ Adds three move kinds and a per-case ``finding_status: dict[str, str]``
   reissued). Maps to ``accepts.kind="pieces"`` in the rendering contract
   (`bundles/credentials/EXTENSIONS.md`).
 - **``verify_id``** — single Action, available whenever an id is presented.
-  Answers only the holder question: ``confirmed`` for WRONG_HOLDER (a crime),
-  ``verified`` otherwise. It never repairs a stale id, so an expired/mis-dated
+  Answers only the subject-binding question: ``confirmed`` for an effective
+  `SUBJECT_MISMATCH` defect sourced by the id (a crime), ``verified`` otherwise.
+  It never repairs a stale id, so an expired/mis-dated
   id stays a deny (id-reissue is B.2).
 - **``request_search``** — single Action; reveals concealed contraband if any.
 

@@ -1,8 +1,9 @@
 # Credential Mechanic — Design Note
 
-**Status:** PLANNED for the global document/media mechanic; Phases 7 and 8 landed
-the game-facing packet-authority cutover and transient shared defect vocabulary
-(2026-07-20/21), but not the full extraction.
+**Status:** PLANNED for the global document/media mechanic; Phases 7–9 landed the
+game-facing packet-authority cutover, transient shared defect vocabulary, and
+graph-bound bearer/document subject references (2026-07-20/22), but not media
+composition or card extraction.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
@@ -46,17 +47,17 @@ with **carrier binding** threaded through every layer.
 
 ### Credential
 An attestation: issuer / indication (purpose or contraband) / validity status.
-This is today's `CredentialToken` (`VALID` / `MISSING_SEAL` / `EXPIRED` /
-`FORGED` / `WRONG_HOLDER`).
+This is today's component status (`VALID` / `MISSING_SEAL` / `EXPIRED` /
+`FORGED`). `CredentialToken.WRONG_HOLDER` remains accepted only as a compatibility
+input and compiles to subject references during materialization.
 
 ### Document — the carrier form
 A credential rendered as a concrete document type. Two carrier modes:
 
-- **Self-carrying** — an *id card* identifies its own holder; the bearer *is* the
-  carrier.
-- **Carrier-bound by reference** — a *permit* references an id; the binding is the
-  `holder_matches` axis, and a broken binding is `WRONG_HOLDER`. ("Carrier-bound
-  id" = the permit-references-id relationship.)
+- **Self-carrying** — an *id card* names a subject; it is valid for the presenter
+  when `id.subject_id == packet.bearer_id`.
+- **Carrier-bound by reference** — an *id-bound permit* names the same subject as
+  the id when `permit.subject_id == id.subject_id`.
 
 ### Media — the visible card
 A `CredentialCardSpec(MediaSpec)` composes the card: frame + seal(issuer,
@@ -83,7 +84,9 @@ exactly this seam:
 So:
 
 ```text
-id_photo  =  bearer.adapt_look_media_spec(media_role="id_photo")
+id_photo = packet.resolve_subject(id.subject_id).adapt_look_media_spec(
+    media_role="id_photo"
+)
 ```
 
 **Division of ownership:** credentials owns the *card* (frame, seal, layout,
@@ -92,15 +95,13 @@ face — it asks the bearer's presence for one.
 
 This makes discrepancy rendering fall out for free:
 
-- **valid** → bind the *true bearer's* look.
-- **`WRONG_HOLDER`** → bind a *different* entity's look (or a mismatched
-  demographic), so the photo doesn't match the declared identity — a thing the
-  player can *spot*.
+- **valid** → the id subject is the presenting bearer.
+- **subject mismatch** → the id (or permit) names a distinct subject entity, even
+  if the two subjects currently have identical looks.
 
-This is the visual arm of the **build-correct-then-degrade** factory the game
-already has: the same `degrade` step that sets a token's status drives which look
-the card binds. The credential mechanic reads token status; it does not maintain
-a parallel error flag.
+This is the visual arm of the **build-correct-then-degrade** factory: degradation
+changes a component's subject binding. The evaluator compares bindings; presence
+only projects those independently resolved subjects for prose and media.
 
 ---
 
@@ -261,8 +262,8 @@ under LFS and reverse the policy deliberately. The rule is really "no
 ## 6 · Disclosure discipline carries over
 
 The card renders the candidate's **presentation**: a forged seal draws a subtly
-wrong seal, a wrong-holder card draws a mismatched portrait, an expired card
-shows a past date. These are *visible to a careful look* — but the *finding*
+wrong seal, a subject-mismatched card names a different presence entity, and an
+expired card shows a past date. These are *visible to a careful look* — but the *finding*
 ("this seal is forged") is revealed only by inspecting. The image is the visual
 analog of `presented_documents` (visible) vs. `hidden_facts` (revealed on
 inspection). The card must **not** flag "FORGED" in red; the player must notice.
@@ -277,14 +278,14 @@ artifact, and the widget vocab's CLI-floor rule requires every interaction be
 reachable by a text client. So a "visual" discrepancy cannot live *only* in
 pixels. The resolution is that **the discrepancy lives in the structured truth,
 not in any one rendering channel**: a portrait mismatch is a difference in the
-`Look` data and the token status, and presence already projects that truth to
+`Look` data and the subject references, and presence already projects that truth to
 *both* channels —
 
 - **prose** via `Look.describe()` / `trait_tokens()`,
 - **media** via `adapt_look_media_spec()`.
 
 MEDIA_DESIGN frames these as symmetric output dimensions of one adapted intent.
-So a wrong-holder card is, for a text client, a **prose look-diff**: the id reads
+So a subject-mismatched card is, for a text client, a **prose look-diff**: the id reads
 "a fair-skinned woman, blonde, neutral"; the traveler at the counter reads "a
 fair-skinned woman, dark hair." The player compares two *descriptions* exactly as
 a rich client compares two *faces*. The discrepancy is reachable at the CLI
@@ -344,8 +345,7 @@ outfits, vehicles, and connector groups.
    the *simplest consumer* of the composition framework.
 2. **Extract primitives** (`Credential`, `Document`, carrier binding) into
    `tangl.mechanics.credentials` — partially landed for the current enum/value
-   vocabulary and assembly packet proof. Carrier binding still waits on the
-   presence-snapshot surface.
+   vocabulary, assembly packet proof, and graph-owned presence binding.
 3. **Re-point the game** at the promoted primitives; the game adds its overrides
    (regions, seals, permits).
 4. **Default assets** land alongside (1) so the projection is provable from day
@@ -358,14 +358,9 @@ the one genuine dependency, and it is a media-subsystem concern in its own right
 
 ## 8 · Open questions
 
-- **Portrait pool keying.** Demographic descriptor → portrait identity mapping for
-  the world pre-render pool (so `WRONG_HOLDER` can deterministically bind a
-  *different* pool entry, and so a base portrait can be re-used as the img2img
-  reference for the side-by-side live figure). Likely a `demographics`-driven key.
-- **Where bearer identity lives for procedural candidates.** A sampled candidate
-  has no `HasLook` entity yet; the factory may need to materialize a minimal
-  presence (a `Look`) per candidate so the card can bind a portrait — and so the
-  base-identity-vs-mutable-presentation split (§3b) has somewhere to live.
+- **Portrait pool keying.** Phase 9 materializes a minimal `HasSimpleLook` subject
+  per procedural candidate. The remaining question is how a world later maps
+  those stable subject ids to reusable portrait-pool entries.
 - **RIT registry + composition-strategy surface (media-layer, §3a step 0).** The
   one genuine dependency. Unifies the legacy `svg_forge` catalog-assembler and the
   `raster_forge`/file-forge stub into registries of mini-RITs + interchangeable

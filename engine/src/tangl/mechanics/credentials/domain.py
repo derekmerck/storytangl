@@ -113,7 +113,7 @@ class CredentialStatus(Enum):
     EXPIRED = "expired"
     # crimes
     FORGED = "forged"            # bad / fake seal
-    WRONG_HOLDER = "wrong_holder"  # fake or mismatched id
+    WRONG_HOLDER = "wrong_holder"  # compatibility input; compiles to subject bindings
 
     @property
     def is_valid(self) -> bool:
@@ -242,9 +242,10 @@ _CRIME_MODES = frozenset(
 class CredentialToken(BaseModelPlus):
     """A single presented credential.
 
-    ``holder_matches`` models the id-linkage surface for permits: a permit may be
-    intrinsically valid yet reference a different bearer than the presented id (a
-    crime), independent of the permit's own ``status``.
+    ``holder_matches`` is accepted only at the factory compatibility boundary.
+    Packet materialization turns it into a distinct component ``subject_id``;
+    runtime assessment compares those subject references instead of consulting
+    this value.
     """
 
     indication: IndicationId

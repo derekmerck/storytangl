@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from typing import ClassVar
+from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, Field
 
 from tangl.core import Selector, Singleton, Token, TokenCatalog
 from tangl.mechanics.assembly import ComponentFacet, ComponentManager, Slot
+from tangl.mechanics.presence.look import HasSimpleLook
 
 from .domain import (
     ContrabandItem,
@@ -42,14 +44,12 @@ class CredentialDefinition(Singleton):
         default=CredentialStatus.VALID,
         json_schema_extra={"instance_var": True},
     )
-    holder_matches: bool = Field(
-        default=True,
-        json_schema_extra={"instance_var": True},
-    )
 
 
 class CredentialComponentToken(Token):
     """Graph credential token that projects to the legacy packet value shape."""
+
+    subject_id: UUID = Field(default_factory=uuid4)
 
     def component_facets(
         self,
@@ -76,13 +76,13 @@ class CredentialComponentToken(Token):
         return self.token_from or self.label
 
     def to_credential_token(self) -> CredentialToken:
-        """Return the compatibility value read by disposition derivation."""
+        """Return the legacy value projection for compatibility callers."""
 
         return CredentialToken(
             indication=self.indication,
             status=self.status,
             requires_id=self.requires_id,
-            holder_matches=self.holder_matches,
+            holder_matches=True,
         )
 
 
@@ -118,6 +118,7 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
 
     region: OriginId = Region.LOCAL
     purpose: IndicationId = Indication.TRAVEL
+    bearer_id: UUID = Field(default_factory=uuid4, json_schema_extra={"include": True})
     possessions: list[ContrabandItem] = Field(
         default_factory=list,
         json_schema_extra={"include": True},
@@ -125,6 +126,32 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
 
     def get_region(self) -> OriginId:
         return self.region
+
+    def has_resolved_subject(self, subject_id: UUID) -> bool:
+        """Whether ``subject_id`` resolves to a registered presence entity."""
+
+        registry = self._owner_registry()
+        return registry is not None and isinstance(registry.get(subject_id), HasSimpleLook)
+
+    def resolve_subject(self, subject_id: UUID) -> HasSimpleLook:
+        """Resolve one bound subject through the manager owner's graph registry."""
+
+        registry = self._owner_registry()
+        if registry is None:
+            raise KeyError("Credential subjects require a graph-bound packet manager")
+        subject = registry.get(subject_id)
+        if not isinstance(subject, HasSimpleLook):
+            raise KeyError(f"Credential subject {subject_id} is not a presence entity")
+        return subject
+
+    def materialize_subject(self, label: str) -> HasSimpleLook:
+        """Create one minimal presence subject and register it when graph-bound."""
+
+        subject = HasSimpleLook(label=label)
+        registry = self._owner_registry()
+        if registry is not None:
+            registry.add(subject)
+        return subject
 
     def get_purpose(self) -> IndicationId:
         return self.purpose
@@ -296,6 +323,11 @@ def materialize_packet(
         purpose=purpose,
         possessions=list(possessions),
     ).bind_owner(owner)
+    bearer = manager.materialize_subject(f"{label_prefix}:bearer")
+    manager.bearer_id = bearer.uid
+    id_subject = bearer
+    if id_card is not None and id_card.status is CredentialStatus.WRONG_HOLDER:
+        id_subject = manager.materialize_subject(f"{label_prefix}:id-subject")
 
     def add_component(
         token: CredentialToken,
@@ -303,6 +335,7 @@ def materialize_packet(
         document_kind: str,
         slot: str,
         index: int,
+        subject_id: UUID,
     ) -> None:
         definition = _definition_for(
             token,
@@ -314,8 +347,12 @@ def materialize_packet(
             CredentialComponent(
                 label=f"{label_prefix}:{document_kind}:{index}",
                 token_from=definition.label,
-                status=token.status,
-                holder_matches=token.holder_matches,
+                status=(
+                    CredentialStatus.VALID
+                    if token.status is CredentialStatus.WRONG_HOLDER
+                    else token.status
+                ),
+                subject_id=subject_id,
             ),
         )
 
@@ -325,13 +362,23 @@ def materialize_packet(
             document_kind="id",
             slot=CREDENTIAL_ID_SLOT,
             index=0,
+            subject_id=id_subject.uid,
         )
     for index, credential in enumerate(credentials):
+        subject = id_subject if id_card is not None else bearer
+        if (
+            credential.status is CredentialStatus.WRONG_HOLDER
+            or not credential.holder_matches
+        ):
+            subject = manager.materialize_subject(
+                f"{label_prefix}:document-subject:{index}"
+            )
         add_component(
             credential,
             document_kind="document",
             slot=CREDENTIAL_PACKET_SLOT,
             index=index,
+            subject_id=subject.uid,
         )
     return manager
 

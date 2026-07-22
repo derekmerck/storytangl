@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tangl.mechanics.credentials import CREDENTIAL_PACKET_SLOT
+from tangl.mechanics.credentials import CREDENTIAL_ID_SLOT, CREDENTIAL_PACKET_SLOT
 from tangl.mechanics.games import (
     ContrabandItem,
     CredentialDefectKind,
@@ -132,6 +132,45 @@ class TestStructuredDefects:
             {IND.WORK.value: "cleared"},
         ) == []
         assert case.credential_for(IND.WORK).status is S.MISSING_SEAL
+
+    def test_wrong_id_compiles_to_one_subject_mismatch(self) -> None:
+        case = CredentialCase(purpose=IND.TRAVEL, id_card=_id(S.WRONG_HOLDER))
+        id_card = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+
+        defects = derive_defects(case.packet_manager, LOCAL_RULES)
+
+        assert id_card.status is S.VALID
+        assert id_card.subject_id != case.packet_manager.bearer_id
+        assert [(defect.kind, defect.failure_class, defect.source_id) for defect in defects] == [
+            (CredentialDefectKind.SUBJECT_MISMATCH, FailureClass.CRIME, id_card.uid),
+        ]
+
+    def test_wrong_permit_compiles_to_a_document_subject_mismatch(self) -> None:
+        case = CredentialCase(
+            purpose=IND.WORK,
+            id_card=_id(S.VALID),
+            packet=[_permit(IND.WORK, holder_matches=False)],
+        )
+        id_card = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+        permit = case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)[0]
+
+        defects = derive_defects(case.packet_manager, LOCAL_RULES)
+
+        assert permit.subject_id != id_card.subject_id
+        assert [(defect.kind, defect.failure_class, defect.source_id) for defect in defects] == [
+            (CredentialDefectKind.SUBJECT_MISMATCH, FailureClass.CRIME, permit.uid),
+        ]
+
+    def test_missing_id_does_not_manufacture_a_subject_mismatch(self) -> None:
+        case = CredentialCase(
+            purpose=IND.WORK,
+            id_card=None,
+            packet=[_permit(IND.WORK, holder_matches=False)],
+        )
+
+        defects = derive_defects(case.packet_manager, LOCAL_RULES)
+
+        assert [defect.kind for defect in defects] == [CredentialDefectKind.MISSING_EVIDENCE]
 
 
 class TestAnonymousAndId:
