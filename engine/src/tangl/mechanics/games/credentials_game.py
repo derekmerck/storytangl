@@ -384,6 +384,7 @@ def _document_defect(
     *,
     subject: Literal["identity", "authorization"],
     indication: IndicationId,
+    expected_subject_id: uuid.UUID | None,
     cleared: bool,
     invalid_kind: CredentialDefectKind,
     invalid_subject: Literal["identity", "authorization", "possession"],
@@ -399,18 +400,13 @@ def _document_defect(
             source_id=component.uid,
             cause=component.status,
         )
-    if component.status is CredentialStatus.WRONG_HOLDER or not component.holder_matches:
+    if expected_subject_id is not None and component.subject_id != expected_subject_id:
         return CredentialDefect(
             kind=CredentialDefectKind.SUBJECT_MISMATCH,
             failure_class=FailureClass.CRIME,
             subject=subject,
             indication=indication,
             source_id=component.uid,
-            cause=(
-                component.status
-                if component.status is CredentialStatus.WRONG_HOLDER
-                else None
-            ),
         )
     if component.status.is_valid or cleared:
         return None
@@ -437,6 +433,7 @@ def _requirement_defects(
     """Derive defects for one authorization requirement without choosing a result."""
 
     defects: list[CredentialDefect] = []
+    id_card = _id_component(packet)
     if level.requires_permit:
         permit = _permit_component(packet, indication)
         if permit is None:
@@ -453,6 +450,7 @@ def _requirement_defects(
                 permit,
                 subject="authorization",
                 indication=indication,
+                expected_subject_id=(id_card.subject_id if id_card is not None else None),
                 cleared=finding_status.get(indication) == Finding.CLEARED,
                 invalid_kind=invalid_kind,
                 invalid_subject=missing_subject or "authorization",
@@ -460,7 +458,6 @@ def _requirement_defects(
             if defect is not None:
                 defects.append(defect)
     if level.requires_id:
-        id_card = _id_component(packet)
         if id_card is None:
             defects.append(
                 CredentialDefect(
@@ -475,6 +472,7 @@ def _requirement_defects(
                 id_card,
                 subject="identity",
                 indication=indication,
+                expected_subject_id=packet.bearer_id,
                 cleared=finding_status.get(FindingKey.ID) == Finding.CLEARED,
                 invalid_kind=invalid_kind,
                 invalid_subject=missing_subject or "identity",
@@ -611,8 +609,6 @@ def derive_defects(
         )
 
     # A forged document is criminal even when the day's rules did not require it.
-    # ``holder_matches`` is meaningful only while assessing a required document,
-    # matching the pre-Phase-8 policy.
     for component, subject in [
         *[(component, "identity") for component in packet.get_slot(CREDENTIAL_ID_SLOT)],
         *[
@@ -620,11 +616,12 @@ def derive_defects(
             for component in packet.get_slot(CREDENTIAL_PACKET_SLOT)
         ],
     ]:
-        if component.status.is_crime:
+        if component.status is CredentialStatus.FORGED:
             defect = _document_defect(
                 component,
                 subject=subject,
                 indication=component.indication,
+                expected_subject_id=None,
                 cleared=False,
                 invalid_kind=CredentialDefectKind.INVALID_EVIDENCE,
                 invalid_subject=subject,
@@ -743,6 +740,8 @@ class CredentialPresentationProfile(BaseModelPlus):
             defect = defects_by_source.get(id_card.uid)
             if defect is not None and defect.cause is not None:
                 findings[self.identity_label] = self.status_text[defect.cause]
+            elif defect is not None and defect.kind is CredentialDefectKind.SUBJECT_MISMATCH:
+                findings[self.identity_label] = self.holder_mismatch_text
             elif not id_card.status.is_valid:
                 findings[self.identity_label] = self.status_text[id_card.status]
 
@@ -756,8 +755,6 @@ class CredentialPresentationProfile(BaseModelPlus):
                 findings[document] = self.holder_mismatch_text
             elif not component.status.is_valid:
                 findings[document] = self.status_text[component.status]
-            elif not component.holder_matches:
-                findings[document] = self.holder_mismatch_text
 
         for item in case.get_contraband():
             if item.concealed:
@@ -1214,16 +1211,6 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         return components
 
     @staticmethod
-    def _request_document_credential(
-        case: CredentialCase,
-        indication: IndicationId,
-    ) -> CredentialToken | None:
-        """Return the credential whose facet contributed this request target."""
-
-        component = CredentialsGameHandler._request_document_component(case, indication)
-        return component.to_credential_token() if component is not None else None
-
-    @staticmethod
     def _request_document_component(
         case: CredentialCase,
         indication: IndicationId,
@@ -1551,21 +1538,33 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             detail["target_indication"] = indication_value
             return RoundResult.CONTINUE
 
-        permit = self._request_document_credential(game.active_case, indication)
+        permit = self._request_document_component(game.active_case, indication)
         if permit is None:  # off-menu safety; receive_move does not validate
             detail["outcome"] = "request_document_not_applicable"
             detail["target_indication"] = indication_value
             return RoundResult.CONTINUE
 
-        if permit.status.is_crime:
+        defect = next(
+            (
+                defect
+                for defect in derive_defects(
+                    game.active_case.packet_manager,
+                    game.restriction_map,
+                    game.finding_status,
+                )
+                if defect.source_id == permit.uid
+            ),
+            None,
+        )
+        if defect is not None and defect.failure_class is FailureClass.CRIME:
             game.finding_status[indication_value] = Finding.CONFIRMED
             detail["outcome"] = "request_document_confirmed"
-        elif permit.status.is_valid:
-            game.finding_status[indication_value] = Finding.VERIFIED
-            detail["outcome"] = "request_document_verified"
-        else:
+        elif defect is not None:
             game.finding_status[indication_value] = Finding.CLEARED
             detail["outcome"] = "request_document_cleared"
+        else:
+            game.finding_status[indication_value] = Finding.VERIFIED
+            detail["outcome"] = "request_document_verified"
         detail["target_indication"] = indication_value
         return RoundResult.CONTINUE
 
@@ -1575,14 +1574,23 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail: dict[str, object],
     ) -> RoundResult:
         # verify_id answers only "does the id match the bearer?". It discloses a
-        # holder mismatch (a crime) but never mechanically repairs a stale id --
+        # subject mismatch (a crime) but never mechanically repairs a stale id --
         # an expired or mis-dated id stays a deny until a future id-reissue move
         # (B.2). So it records VERIFIED / CONFIRMED, never CLEARED.
-        status = game.active_case.id_status()
-        if status is None:  # off-menu safety; the menu offers this only with an id
+        id_card = _id_component(game.active_case.packet_manager)
+        if id_card is None:  # off-menu safety; the menu offers this only with an id
             detail["outcome"] = "id_verified_not_applicable"
             return RoundResult.CONTINUE
-        if status is CredentialStatus.WRONG_HOLDER:
+        mismatch = any(
+            defect.kind is CredentialDefectKind.SUBJECT_MISMATCH
+            and defect.source_id == id_card.uid
+            for defect in derive_defects(
+                game.active_case.packet_manager,
+                game.restriction_map,
+                game.finding_status,
+            )
+        )
+        if mismatch:
             game.finding_status[FindingKey.ID] = Finding.CONFIRMED
             detail["outcome"] = "id_verified_problem"
         else:
@@ -1833,24 +1841,51 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         case = game.active_case
         idx = game.case_index
         packet_uid = _piece_uid(game.uid, idx, "packet")
+        candidate_properties: dict[str, object] = {
+            "declared_purpose": str(case.get_purpose()),
+            "declared_region": str(case.get_region()),
+        }
+        if case.packet_manager.has_resolved_subject(case.packet_manager.bearer_id):
+            bearer = case.packet_manager.resolve_subject(case.packet_manager.bearer_id)
+            candidate_properties.update(
+                {
+                    "look_description": bearer.describe_look(subject=case.candidate_name),
+                    "look_media_payload": bearer.adapt_look_media_spec(
+                        media_role="candidate"
+                    ),
+                }
+            )
 
         candidate = PieceFragment(
             uid=_piece_uid(game.uid, idx, "candidate"),
             piece_id=f"candidate-{idx}",
             piece_kind="candidate",
             content=case.candidate_name,
-            properties={
-                "declared_purpose": str(case.get_purpose()),
-                "declared_region": str(case.get_region()),
-            },
+            properties=candidate_properties,
             hints=PresentationHints(label_text=case.candidate_name),
         )
 
+        id_card = _id_component(case.packet_manager)
         doc_uids: list[uuid.UUID] = []
         doc_pieces: list[BaseFragment] = []
         for label, description in case.presented_documents.items():
             doc_uid = _piece_uid(game.uid, idx, f"doc:{label}")
             doc_uids.append(doc_uid)
+            properties: dict[str, object] = {}
+            if (
+                id_card is not None
+                and label == game.presentation.identity_label
+                and case.packet_manager.has_resolved_subject(id_card.subject_id)
+            ):
+                subject = case.packet_manager.resolve_subject(id_card.subject_id)
+                properties.update(
+                    {
+                        "look_description": subject.describe_look(),
+                        "look_media_payload": subject.adapt_look_media_spec(
+                            media_role="id_photo"
+                        ),
+                    }
+                )
             doc_pieces.append(
                 PieceFragment(
                     uid=doc_uid,
@@ -1858,6 +1893,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     piece_kind=_document_kind(label),
                     content=description,
                     zone_ref=packet_uid,
+                    properties=properties,
                     hints=PresentationHints(label_text=label),
                 )
             )

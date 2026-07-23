@@ -11,8 +11,15 @@ from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
     CredentialDefinition,
+    CredentialDefectKind,
+    FailureMode,
 )
-from tangl.mechanics.games.credentials_game import CredentialsGame, CredentialsGameHandler
+from tangl.mechanics.games.credentials_game import (
+    CredentialDisposition,
+    CredentialsGame,
+    CredentialsGameHandler,
+    derive_defects,
+)
 from tangl.story import Action, InitMode, World
 from tangl.vm import Ledger
 
@@ -93,6 +100,7 @@ BORDER_PRESENTATION = CredentialPresentationProfile(
         CredentialStatus.FORGED: "The seal is a forgery.",
         CredentialStatus.WRONG_HOLDER: "The holder does not match this document.",
     },
+    holder_mismatch_text="The passport does not name this bearer.",
     decision_labels={"pass": "Clear the checkpoint", "deny": "Turn away", "arrest": "Detain"},
 )
 
@@ -109,6 +117,7 @@ SCHOOL_PRESENTATION = CredentialPresentationProfile(
         CredentialStatus.FORGED: "The teacher signature is forged.",
         CredentialStatus.WRONG_HOLDER: "The student ID does not match this document.",
     },
+    holder_mismatch_text="The student ID does not name this student.",
     decision_labels={
         "pass": "Allow onward",
         "deny": "Send back to class",
@@ -366,3 +375,42 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         _inspect(ledger, identity_label)
         _choose(ledger, decision)
         assert ledger.cursor.label == "victory"
+
+
+def test_combined_world_profiles_one_subject_mismatch_per_skin(tmp_path: Path) -> None:
+    combined_world = _compile_combined_world(tmp_path)
+
+    for choice, block_label, identity_label, finding in (
+        (
+            "Work the border checkpoint",
+            "border_shift",
+            "passport",
+            "The passport does not name this bearer.",
+        ),
+        (
+            "Monitor the school halls",
+            "school_shift",
+            "student ID",
+            "The student ID does not name this student.",
+        ),
+    ):
+        result = combined_world.create_story("combined_credentials", init_mode=InitMode.EAGER)
+        block = result.graph.find_one(Selector(label=block_label))
+        offer = block.game.offers[0].model_copy(
+            update={
+                "failure_modes": [FailureMode.FAKE_ID],
+                "target_disposition": CredentialDisposition.ARREST,
+            }
+        )
+        block.game.offers = [offer]
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        _choose(ledger, choice)
+
+        case = block.game.active_case
+        id_card = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+        defects = derive_defects(case.packet_manager, block.game.restriction_map)
+        assert [(defect.kind, defect.source_id) for defect in defects] == [
+            (CredentialDefectKind.SUBJECT_MISMATCH, id_card.uid),
+        ]
+        assert case.hidden_facts == {identity_label: finding}

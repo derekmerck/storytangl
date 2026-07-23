@@ -37,8 +37,17 @@ def _id(status: S = S.VALID) -> CredentialToken:
     return CredentialToken(indication=IND.TRAVEL, status=status)
 
 
-def _permit(indication: IND, status: S = S.VALID) -> CredentialToken:
-    return CredentialToken(indication=indication, status=status, requires_id=True)
+def _permit(
+    indication: IND,
+    status: S = S.VALID,
+    holder_matches: bool = True,
+) -> CredentialToken:
+    return CredentialToken(
+        indication=indication,
+        status=status,
+        requires_id=True,
+        holder_matches=holder_matches,
+    )
 
 
 def _game(*cases: CredentialCase, **overrides) -> tuple[CredentialsGame, CredentialsGameHandler]:
@@ -112,6 +121,19 @@ class TestMediationAvailability:
         # it won't hold up, but never upgrades the disposition.
         case = CredentialCase(
             purpose=IND.WORK, id_card=_id(), packet=[_permit(IND.WORK, S.FORGED)]
+        )
+        game, handler = _game(case)
+        handler.receive_move(game, ("inspect", "passport"))
+        handler.receive_move(game, ("request_document", IND.WORK.value))
+
+        assert game.finding_status[IND.WORK.value] == "confirmed"
+        assert game.expected_disposition(case) is D.ARREST
+
+    def test_request_document_confirms_a_subject_mismatch(self) -> None:
+        case = CredentialCase(
+            purpose=IND.WORK,
+            id_card=_id(),
+            packet=[_permit(IND.WORK, holder_matches=False)],
         )
         game, handler = _game(case)
         handler.receive_move(game, ("inspect", "passport"))
