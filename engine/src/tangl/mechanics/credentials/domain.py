@@ -121,7 +121,7 @@ class CredentialStatus(Enum):
 
     @property
     def is_crime(self) -> bool:
-        return self in (CredentialStatus.FORGED, CredentialStatus.WRONG_HOLDER)
+        return self is CredentialStatus.FORGED
 
 
 class FailureClass(Enum):

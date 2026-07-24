@@ -145,6 +145,16 @@ class TestStructuredDefects:
             (CredentialDefectKind.SUBJECT_MISMATCH, FailureClass.CRIME, id_card.uid),
         ]
 
+    def test_wrong_id_uses_identity_specific_presentation_text(self) -> None:
+        case = CredentialCase(purpose=IND.TRAVEL, id_card=_id(S.WRONG_HOLDER))
+        game = CredentialsGame()
+
+        game.presentation.render_case(case, derive_defects(case.packet_manager, LOCAL_RULES))
+
+        assert case.hidden_facts == {
+            "passport": "The identity document does not name this bearer.",
+        }
+
     def test_wrong_permit_compiles_to_a_document_subject_mismatch(self) -> None:
         case = CredentialCase(
             purpose=IND.WORK,

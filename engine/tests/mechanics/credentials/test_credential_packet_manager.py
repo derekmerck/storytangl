@@ -20,6 +20,7 @@ from tangl.mechanics.credentials import (
     materialize_packet,
 )
 from tangl.mechanics.assembly import ComponentFacet
+from tangl.mechanics.presence.look import HasSimpleLook
 from tangl.mechanics.credentials.domain import (
     ContrabandItem,
     CredentialStatus,
@@ -303,7 +304,7 @@ def test_manager_request_document_resolves_the_contributing_component() -> None:
 
     handler.receive_move(game, ("request_document", IND.WORK.value))
 
-    assert game.finding_status == {IND.WORK.value: Finding.VERIFIED}
+    assert game.finding_status == {IND.WORK.value: Finding.CLEARED}
 
 
 def test_manager_request_document_menu_does_not_reveal_credential_status() -> None:
@@ -444,6 +445,27 @@ def test_packet_manager_graph_roundtrip_preserves_credential_assignments_by_id()
     assert sum(1 for item in restored.members.values() if item.uid == work_permit.uid) == 1
 
 
+def test_unbound_packet_materializes_subjects_when_its_owner_becomes_graph_bound() -> None:
+    manager = materialized_work_packet()
+    graph = Graph()
+    owner = graph.add_node(kind=CredentialPacketNode, label="checkpoint")
+    owner.packet_manager = manager
+    manager.bind_owner(owner)
+    id_card = manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+    permit = manager.get_slot(CREDENTIAL_PACKET_SLOT)[0]
+
+    assert manager.resolve_subject(manager.bearer_id).uid == manager.bearer_id
+    assert manager.resolve_subject(id_card.subject_id).uid == id_card.subject_id
+    assert manager.resolve_subject(permit.subject_id).uid == permit.subject_id
+
+    restored = Graph.structure(graph.unstructure())
+    restored_manager = restored.find_one(Selector(label="checkpoint")).packet_manager
+    restored_id = restored_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+
+    assert restored_manager.resolve_subject(restored_manager.bearer_id).uid == manager.bearer_id
+    assert restored_manager.resolve_subject(restored_id.subject_id).uid == id_card.subject_id
+
+
 def test_defects_recompute_from_a_restored_packet_manager() -> None:
     id_definition = credential_definition(
         "defect_roundtrip_id",
@@ -505,6 +527,9 @@ def test_graph_bound_subjects_roundtrip_and_look_changes_do_not_affect_identity(
 
     assert id_card.subject_id == manager.bearer_id
     assert manager.resolve_subject(id_card.subject_id) is bearer
+    assert [item.uid for item in graph.members.values() if isinstance(item, HasSimpleLook)] == [
+        manager.bearer_id,
+    ]
 
     recorded_subject = manager.materialize_subject("Mara:recorded-subject")
     id_card.subject_id = recorded_subject.uid

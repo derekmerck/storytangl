@@ -663,6 +663,7 @@ class CredentialPresentationProfile(BaseModelPlus):
             CredentialStatus.WRONG_HOLDER: "The holder does not match this document.",
         }
     )
+    identity_mismatch_text: str = "The identity document does not name this bearer."
     holder_mismatch_text: str = "The permit's holder does not match the bearer id."
     packet_inconsistency_text: str = (
         "The packet does not satisfy the checkpoint rules as presented."
@@ -741,7 +742,7 @@ class CredentialPresentationProfile(BaseModelPlus):
             if defect is not None and defect.cause is not None:
                 findings[self.identity_label] = self.status_text[defect.cause]
             elif defect is not None and defect.kind is CredentialDefectKind.SUBJECT_MISMATCH:
-                findings[self.identity_label] = self.holder_mismatch_text
+                findings[self.identity_label] = self.identity_mismatch_text
             elif not id_card.status.is_valid:
                 findings[self.identity_label] = self.status_text[id_card.status]
 
@@ -1544,17 +1545,15 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             detail["target_indication"] = indication_value
             return RoundResult.CONTINUE
 
-        defect = next(
-            (
-                defect
-                for defect in derive_defects(
-                    game.active_case.packet_manager,
-                    game.restriction_map,
-                    game.finding_status,
-                )
-                if defect.source_id == permit.uid
-            ),
-            None,
+        id_card = _id_component(game.active_case.packet_manager)
+        defect = _document_defect(
+            permit,
+            subject="authorization",
+            indication=indication,
+            expected_subject_id=(id_card.subject_id if id_card is not None else None),
+            cleared=game.finding_status.get(indication) == Finding.CLEARED,
+            invalid_kind=CredentialDefectKind.INVALID_EVIDENCE,
+            invalid_subject="authorization",
         )
         if defect is not None and defect.failure_class is FailureClass.CRIME:
             game.finding_status[indication_value] = Finding.CONFIRMED

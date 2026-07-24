@@ -124,6 +124,30 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
         json_schema_extra={"include": True},
     )
 
+    def bind_owner(self, owner: object) -> "CredentialPacketManager":
+        """Bind cached components and subject references to a graph owner."""
+
+        super().bind_owner(owner)
+        registry = self._owner_registry()
+        if registry is None:
+            return self
+
+        subject_ids = {self.bearer_id}
+        for component_ids in self.assignment_ids.values():
+            for component_id in component_ids:
+                component = registry.get(component_id) or self._component_cache.get(component_id)
+                if component is not None:
+                    subject_ids.add(component.subject_id)
+        for subject_id in subject_ids:
+            if registry.get(subject_id) is None:
+                registry.add(
+                    HasSimpleLook(
+                        uid=subject_id,
+                        label=f"credential-subject-{subject_id}",
+                    )
+                )
+        return self
+
     def get_region(self) -> OriginId:
         return self.region
 
@@ -322,9 +346,10 @@ def materialize_packet(
         region=region,
         purpose=purpose,
         possessions=list(possessions),
-    ).bind_owner(owner)
+    )
     bearer = manager.materialize_subject(f"{label_prefix}:bearer")
     manager.bearer_id = bearer.uid
+    manager.bind_owner(owner)
     id_subject = bearer
     if id_card is not None and id_card.status is CredentialStatus.WRONG_HOLDER:
         id_subject = manager.materialize_subject(f"{label_prefix}:id-subject")

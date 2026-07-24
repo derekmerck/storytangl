@@ -48,7 +48,7 @@ with **carrier binding** threaded through every layer.
 ### Credential
 An attestation: issuer / indication (purpose or contraband) / validity status.
 This is today's component status (`VALID` / `MISSING_SEAL` / `EXPIRED` /
-`FORGED`). `CredentialToken.WRONG_HOLDER` remains accepted only as a compatibility
+`FORGED`). `CredentialStatus.WRONG_HOLDER` remains accepted only as a compatibility
 input and compiles to subject references during materialization.
 
 ### Document — the carrier form

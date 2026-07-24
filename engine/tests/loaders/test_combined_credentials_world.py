@@ -100,6 +100,7 @@ BORDER_PRESENTATION = CredentialPresentationProfile(
         CredentialStatus.FORGED: "The seal is a forgery.",
         CredentialStatus.WRONG_HOLDER: "The holder does not match this document.",
     },
+    identity_mismatch_text="The passport does not name this bearer.",
     holder_mismatch_text="The passport does not name this bearer.",
     decision_labels={"pass": "Clear the checkpoint", "deny": "Turn away", "arrest": "Detain"},
 )
@@ -117,6 +118,7 @@ SCHOOL_PRESENTATION = CredentialPresentationProfile(
         CredentialStatus.FORGED: "The teacher signature is forged.",
         CredentialStatus.WRONG_HOLDER: "The student ID does not match this document.",
     },
+    identity_mismatch_text="The student ID does not name this student.",
     holder_mismatch_text="The student ID does not name this student.",
     decision_labels={
         "pass": "Allow onward",
