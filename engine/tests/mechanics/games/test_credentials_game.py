@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Graph
-from tangl.mechanics.credentials import materialize_packet
+from tangl.journal.fragments import PieceFragment
+from tangl.mechanics.credentials import CREDENTIAL_ID_SLOT, materialize_packet
 from tangl.mechanics.games import (
     CredentialStatus,
     CredentialToken,
@@ -428,3 +429,41 @@ class TestCredentialsIntegration:
         assert block.game.finding_status == {Indication.WORK.value: "cleared"}
         assert type(next(iter(block.game.finding_status))) is str
         assert block.game.time_spent == 3
+
+
+def test_graph_bound_packet_projects_neutral_bearer_and_id_photo_looks() -> None:
+    graph = Graph(label="credential_presence")
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+    manager = materialize_packet(
+        owner=block,
+        region=Region.LOCAL,
+        purpose=Indication.TRAVEL,
+        id_card=CredentialToken(indication=Indication.TRAVEL),
+        credentials=[],
+        possessions=[],
+        label_prefix="Mara",
+    )
+    id_card = manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+    id_card.subject_id = manager.materialize_subject("Mara:recorded-subject").uid
+    block.game.roster = [
+        CredentialCase(
+            candidate_name="Mara",
+            packet_manager=manager,
+            presented_documents={"passport": "A passport."},
+        ),
+    ]
+    block.game_handler.setup(block.game)
+
+    pieces = [
+        fragment
+        for fragment in block.game_handler.get_journal_fragments(block.game)
+        if isinstance(fragment, PieceFragment)
+    ]
+    candidate = next(piece for piece in pieces if piece.piece_kind == "candidate")
+    passport = next(piece for piece in pieces if piece.piece_kind == "id_card")
+
+    assert candidate.properties["look_description"] == "Mara"
+    assert candidate.properties["look_media_payload"].media_role == "candidate"
+    assert passport.properties["look_description"] == ""
+    assert passport.properties["look_media_payload"].media_role == "id_photo"
+    assert "mismatch" not in str([candidate.content, passport.content]).lower()

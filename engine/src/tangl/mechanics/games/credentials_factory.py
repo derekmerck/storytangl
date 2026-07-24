@@ -78,7 +78,6 @@ def build_valid(
                 indication=purpose,
                 status=CredentialStatus.VALID,
                 requires_id=True,
-                holder_matches=True,
             )
         )
 
@@ -95,7 +94,6 @@ def build_valid(
                     indication=c_ind,
                     status=CredentialStatus.VALID,
                     requires_id=True,
-                    holder_matches=True,
                 )
             )
         possessions.append(ContrabandItem(indication=c_ind, concealed=False))
@@ -163,7 +161,9 @@ def apply_failure(mode: FailureMode, case: CredentialCase) -> None:
                 permit.status = CredentialStatus.FORGED
         case FailureMode.WRONG_HOLDER_PERMIT:
             if permit is not None:
-                permit.holder_matches = False
+                permit.subject_id = case.packet_manager.materialize_subject(
+                    f"{case.candidate_name}:permit-subject"
+                ).uid
         case FailureMode.MISSING_ID | FailureMode.EXPIRED_ID | FailureMode.FAKE_ID:
             id_components = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
             if id_components:
@@ -173,7 +173,13 @@ def apply_failure(mode: FailureMode, case: CredentialCase) -> None:
                 elif mode is FailureMode.EXPIRED_ID:
                     id_component.status = CredentialStatus.EXPIRED
                 else:
-                    id_component.status = CredentialStatus.WRONG_HOLDER
+                    subject_id = case.packet_manager.materialize_subject(
+                        f"{case.candidate_name}:id-subject"
+                    ).uid
+                    id_component.subject_id = subject_id
+                    for component in case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT):
+                        if component.requires_id:
+                            component.subject_id = subject_id
         case FailureMode.UNPERMITTED_CONTRABAND:
             case.packet_manager.possessions.append(
                 ContrabandItem(indication=_DEFAULT_CONTRABAND, concealed=False)

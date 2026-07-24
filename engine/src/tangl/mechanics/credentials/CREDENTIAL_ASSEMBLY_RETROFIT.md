@@ -226,7 +226,7 @@ generic slot list. The manager should own:
 
 - required id rules;
 - purpose permit rules;
-- `requires_id` / `holder_matches` checks;
+- subject-reference checks between the packet bearer, id, and id-bound permits;
 - document status aggregation;
 - credentialed contraband requirements;
 - declared vs concealed item rules;
@@ -362,12 +362,14 @@ Status: landed without changing the game loop:
 
 - `CredentialDefinition` definition singleton;
 - `CredentialComponent` graph token wrapper;
-- fields equivalent to current `CredentialToken` for indication, status,
-  `requires_id`, and holder-match compatibility.
+- fields for indication and status, plus a `subject_id` binding for each runtime
+  document; the packet manager owns the presenting `bearer_id`.
 
-Presence snapshots and derived holder matching are intentionally not implemented in
-this slice. `holder_matches` remains compatibility state until the presence binding
-surface exists.
+Phase 9 landed the presence binding: procedural packets materialize minimal
+`HasSimpleLook` graph entities through their owner registry, and compatibility
+`CredentialToken.holder_matches` / `CredentialStatus.WRONG_HOLDER` inputs compile
+to distinct subject ids at materialization. Runtime evaluators and presentation do
+not consult those compatibility values.
 
 Acceptance:
 

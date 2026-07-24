@@ -463,10 +463,11 @@ on one packet); a correct candidate is `degrade(..., [])`.
 **Failure-mode catalog.** `degrade` is driven by an explicit `FailureMode` set,
 and the same catalog is what A.3's sampler draws from. Each mode carries:
 
-- a **class** -- *mitigatable* (-> deny if unfixed) vs *crime* (-> arrest), matching
-  `CredentialStatus.is_crime` and the concealed-contraband case from A.1;
-- the **mutation** it applies (which token/id status it sets, or contraband it
-  conceals); and
+- a **class** -- *mitigatable* (-> deny if unfixed) vs *crime* (-> arrest),
+  matching forged evidence, subject-mismatch defects, and the concealed-
+  contraband case from A.1;
+- the **mutation** it applies (which component status or subject binding it sets,
+  or which contraband it conceals); and
 - an **applicability** predicate: which modes a given indication can even exhibit
   at its current restriction level (you can only "miss a permit" where a permit is
   required; only "forge a seal" where a credential exists; only conceal contraband
@@ -599,8 +600,9 @@ Adds three move kinds and a per-case ``finding_status: dict[str, str]``
   reissued). Maps to ``accepts.kind="pieces"`` in the rendering contract
   (`bundles/credentials/EXTENSIONS.md`).
 - **``verify_id``** — single Action, available whenever an id is presented.
-  Answers only the holder question: ``confirmed`` for WRONG_HOLDER (a crime),
-  ``verified`` otherwise. It never repairs a stale id, so an expired/mis-dated
+  Answers only the subject-binding question: ``confirmed`` for an effective
+  `SUBJECT_MISMATCH` defect sourced by the id (a crime), ``verified`` otherwise.
+  It never repairs a stale id, so an expired/mis-dated
   id stays a deny (id-reissue is B.2).
 - **``request_search``** — single Action; reveals concealed contraband if any.
 
