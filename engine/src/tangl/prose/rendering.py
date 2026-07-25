@@ -16,6 +16,12 @@ from tangl.utils.rejinja import RecursiveTemplate
 from tangl.vm.ctx import VmPhaseCtx
 
 Scope: TypeAlias = dict[str, object]
+IdentityKey: TypeAlias = tuple[str, str | int]
+RenderFrameKey: TypeAlias = tuple[str, IdentityKey, IdentityKey]
+
+
+def _default_environment() -> jinja2.Environment:
+    return jinja2.Environment(undefined=jinja2.StrictUndefined)
 
 
 class RecursiveRenderError(RuntimeError):
@@ -40,7 +46,7 @@ class RecursiveRenderError(RuntimeError):
 class _RecursiveRenderState:
     """Active template and output values for one recursive render tree."""
 
-    templates: set[str] = field(default_factory=set)
+    frames: set[RenderFrameKey] = field(default_factory=set)
     outputs: set[str] = field(default_factory=set)
 
 
@@ -76,7 +82,7 @@ class TextRenderSession:
     ctx: VmPhaseCtx
     discourse: Scope = field(default_factory=dict)
     max_depth: int = 32
-    environment: jinja2.Environment = field(default_factory=jinja2.Environment)
+    environment: jinja2.Environment = field(default_factory=_default_environment)
     _active_state: _RecursiveRenderState | None = field(default=None, init=False, repr=False)
 
     def render(
@@ -102,14 +108,15 @@ class TextRenderSession:
         if subject is not None:
             scope["subject"] = subject
 
+        frame_identity = _frame_identity(subject, scope_source)
         state = self._active_state
         if state is not None:
-            return self._render_recursive(content, scope, state)
+            return self._render_recursive(content, scope, frame_identity, state)
 
         state = _RecursiveRenderState()
         self._active_state = state
         try:
-            return self._render_recursive(content, scope, state)
+            return self._render_recursive(content, scope, frame_identity, state)
         finally:
             self._active_state = None
 
@@ -142,22 +149,24 @@ class TextRenderSession:
         self,
         content: str,
         scope: Scope,
+        frame_identity: tuple[IdentityKey, IdentityKey],
         state: _RecursiveRenderState,
     ) -> str:
         current = content
-        templates: list[str] = []
+        frames: list[RenderFrameKey] = []
         outputs: list[str] = []
 
         try:
             while True:
-                if len(state.templates) >= self.max_depth:
+                if len(state.frames) >= self.max_depth:
                     raise RecursiveRenderError(
                         f"Recursive template exceeded maximum depth ({self.max_depth})",
                     )
-                if current in state.templates:
+                frame = (current, *frame_identity)
+                if frame in state.frames:
                     raise RecursiveRenderError("Recursive template cycle detected")
-                state.templates.add(current)
-                templates.append(current)
+                state.frames.add(frame)
+                frames.append(frame)
 
                 template = self.environment.from_string(
                     current,
@@ -172,8 +181,8 @@ class TextRenderSession:
                 outputs.append(rendered)
                 current = rendered
         finally:
-            for template in templates:
-                state.templates.remove(template)
+            for frame in frames:
+                state.frames.remove(frame)
             for output in outputs:
                 state.outputs.remove(output)
 
@@ -206,6 +215,22 @@ def _contains_template_syntax(content: str, environment: jinja2.Environment) -> 
             environment.comment_start_string,
         )
     )
+
+
+def _frame_identity(
+    subject: object | None,
+    source: object | None,
+) -> tuple[IdentityKey, IdentityKey]:
+    return _identity_key(subject), _identity_key(source)
+
+
+def _identity_key(value: object | None) -> IdentityKey:
+    if value is None:
+        return "none", 0
+    uid = getattr(value, "uid", None)
+    if uid is not None:
+        return "uid", str(uid)
+    return "object", id(value)
 
 
 __all__ = ["RecursiveRenderError", "TextRenderSession", "render_text"]
