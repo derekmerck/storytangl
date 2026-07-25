@@ -6,27 +6,78 @@ does not own graph state, journal emission, or a general content-product model.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import TypeAlias
 
 import jinja2
 
 from tangl.utils.rejinja import RecursiveTemplate
 from tangl.vm.ctx import VmPhaseCtx
 
+Scope: TypeAlias = dict[str, object]
+
 
 class RecursiveRenderError(RuntimeError):
-    """Raised when generated template text cannot reach a stable result."""
+    """Terminate an unbounded recursive rendering path.
+
+    Why
+    ---
+    Author-provided recursive text must fail predictably rather than consume
+    the Python call stack or emit unresolved template syntax.
+
+    Key Features
+    ------------
+    Reports template cycles, repeated generated output, and exhausted depth.
+
+    See Also
+    --------
+    :class:`TextRenderSession`
+    """
+
+
+@dataclass(slots=True)
+class _RecursiveRenderState:
+    """Active template and output values for one recursive render tree."""
+
+    templates: set[str] = field(default_factory=set)
+    outputs: set[str] = field(default_factory=set)
 
 
 @dataclass(slots=True)
 class TextRenderSession:
-    """Render related text segments with shared, ephemeral discourse state."""
+    """Render related narrative text with shared, ephemeral discourse state.
+
+    Why
+    ---
+    A renderer needs the phase-assembled namespace and a short-lived place for
+    consecutive prose segments to retain focus without mutating graph state.
+
+    Key Features
+    ------------
+    Renders through :class:`RecursiveTemplate`, provides child ``subject``
+    bindings, and bounds recursive output across nested child renders.
+
+    API
+    ---
+    :meth:`render` produces one text value, :meth:`render_child` binds a child
+    subject, and :meth:`render_segments` keeps the same discourse mapping.
+
+    Notes
+    -----
+    Jinja reserves ``self`` for template references; ``subject`` is the
+    author-visible child binding.
+
+    See Also
+    --------
+    :func:`render_text`, :class:`tangl.vm.runtime.frame.PhaseCtx`
+    """
 
     ctx: VmPhaseCtx
-    discourse: dict[str, Any] = field(default_factory=dict)
+    discourse: Scope = field(default_factory=dict)
     max_depth: int = 32
     environment: jinja2.Environment = field(default_factory=jinja2.Environment)
+    _active_state: _RecursiveRenderState | None = field(default=None, init=False, repr=False)
 
     def render(
         self,
@@ -34,7 +85,7 @@ class TextRenderSession:
         *,
         source: object | None = None,
         subject: object | None = None,
-        bindings: dict[str, Any] | None = None,
+        bindings: Mapping[str, object] | None = None,
     ) -> str:
         """Render text against the source's gathered namespace.
 
@@ -43,7 +94,7 @@ class TextRenderSession:
         repurposed as an authored variable.
         """
         scope_source = source if source is not None else self.ctx.cursor
-        scope = dict(self.ctx.get_ns(scope_source))
+        scope: Scope = dict(self.ctx.get_ns(scope_source))
         if bindings:
             scope.update(bindings)
         scope["discourse"] = self.discourse
@@ -51,7 +102,16 @@ class TextRenderSession:
         if subject is not None:
             scope["subject"] = subject
 
-        return self._render_recursive(content, scope)
+        state = self._active_state
+        if state is not None:
+            return self._render_recursive(content, scope, state)
+
+        state = _RecursiveRenderState()
+        self._active_state = state
+        try:
+            return self._render_recursive(content, scope, state)
+        finally:
+            self._active_state = None
 
     def render_child(
         self,
@@ -59,7 +119,7 @@ class TextRenderSession:
         subject: object,
         *,
         source: object | None = None,
-        bindings: dict[str, Any] | None = None,
+        bindings: Mapping[str, object] | None = None,
     ) -> str:
         """Render child text with a fresh gathered scope and child subject."""
         return self.render(
@@ -78,31 +138,44 @@ class TextRenderSession:
         """Render consecutive segments while preserving this session's discourse."""
         return [self.render(segment, source=source) for segment in segments]
 
-    def _render_recursive(self, content: str, scope: dict[str, Any]) -> str:
+    def _render_recursive(
+        self,
+        content: str,
+        scope: Scope,
+        state: _RecursiveRenderState,
+    ) -> str:
         current = content
-        seen_templates: set[str] = set()
-        seen_outputs: set[str] = set()
+        templates: list[str] = []
+        outputs: list[str] = []
 
-        for _ in range(self.max_depth):
-            if current in seen_templates:
-                raise RecursiveRenderError("Recursive template cycle detected")
-            seen_templates.add(current)
+        try:
+            while True:
+                if len(state.templates) >= self.max_depth:
+                    raise RecursiveRenderError(
+                        f"Recursive template exceeded maximum depth ({self.max_depth})",
+                    )
+                if current in state.templates:
+                    raise RecursiveRenderError("Recursive template cycle detected")
+                state.templates.add(current)
+                templates.append(current)
 
-            template = self.environment.from_string(
-                current,
-                template_class=RecursiveTemplate,
-            )
-            rendered = template.render_once(scope).strip()
-            if not _contains_template_syntax(rendered):
-                return rendered
-            if rendered in seen_outputs:
-                raise RecursiveRenderError("Recursive template produced repeated output")
-            seen_outputs.add(rendered)
-            current = rendered
-
-        raise RecursiveRenderError(
-            f"Recursive template exceeded maximum depth ({self.max_depth})",
-        )
+                template = self.environment.from_string(
+                    current,
+                    template_class=RecursiveTemplate,
+                )
+                rendered = template.render_once(scope).strip()
+                if not _contains_template_syntax(rendered, self.environment):
+                    return rendered
+                if rendered in state.outputs:
+                    raise RecursiveRenderError("Recursive template produced repeated output")
+                state.outputs.add(rendered)
+                outputs.append(rendered)
+                current = rendered
+        finally:
+            for template in templates:
+                state.templates.remove(template)
+            for output in outputs:
+                state.outputs.remove(output)
 
 
 def render_text(
@@ -111,7 +184,7 @@ def render_text(
     ctx: VmPhaseCtx,
     source: object | None = None,
     subject: object | None = None,
-    discourse: dict[str, Any] | None = None,
+    discourse: Scope | None = None,
 ) -> str:
     """Render one text value through the default bounded recursive session."""
     return TextRenderSession(
@@ -124,8 +197,15 @@ def render_text(
     )
 
 
-def _contains_template_syntax(content: str) -> bool:
-    return "{{" in content or "{%" in content
+def _contains_template_syntax(content: str, environment: jinja2.Environment) -> bool:
+    return any(
+        delimiter in content
+        for delimiter in (
+            environment.variable_start_string,
+            environment.block_start_string,
+            environment.comment_start_string,
+        )
+    )
 
 
 __all__ = ["RecursiveRenderError", "TextRenderSession", "render_text"]

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 
 import jinja2
 
@@ -25,7 +26,7 @@ class RecursiveTemplate(jinja2.Template):
         s = s.strip()
         return s
 
-    def render_once(self, *args, **kwargs) -> str:
+    def render_once(self, *args: Mapping[str, object], **kwargs: object) -> str:
         """Render one Jinja pass without following generated template text."""
         return super().render(*args, **kwargs)
 

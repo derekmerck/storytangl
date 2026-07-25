@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import SimpleNamespace
 
+import jinja2
 import pytest
 
 from tangl.prose import RecursiveRenderError, TextRenderSession, render_text
@@ -53,6 +54,14 @@ def test_render_child_keeps_its_subject_binding_inside_a_loop() -> None:
     assert rendered == "[Ada][Bea]"
 
 
+def test_render_child_shares_recursive_cycle_protection() -> None:
+    child = _Child("Ada", content="{{ render_child(subject.content, subject) }}")
+    session = TextRenderSession(ctx=_Ctx({}))
+
+    with pytest.raises(RecursiveRenderError, match="cycle"):
+        session.render("{{ render_child(subject.content, subject) }}", subject=child)
+
+
 def test_consecutive_segments_share_ephemeral_discourse() -> None:
     session = TextRenderSession(ctx=_Ctx({}))
 
@@ -90,3 +99,19 @@ def test_recursive_template_honors_maximum_depth() -> None:
 
     with pytest.raises(RecursiveRenderError, match="maximum depth"):
         session.render("{{ first }}")
+
+
+def test_render_text_strips_generated_jinja_comments() -> None:
+    assert render_text("{{ first }}", ctx=_Ctx({"first": "{# hidden #}Done"})) == "Done"
+
+
+def test_render_text_honors_custom_environment_delimiters() -> None:
+    session = TextRenderSession(
+        ctx=_Ctx({"first": "[[ second ]]", "second": "Done"}),
+        environment=jinja2.Environment(
+            variable_start_string="[[",
+            variable_end_string="]]",
+        ),
+    )
+
+    assert session.render("[[ first ]]") == "Done"
