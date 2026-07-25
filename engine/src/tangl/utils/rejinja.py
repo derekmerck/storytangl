@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 
 import jinja2
 
@@ -15,7 +16,7 @@ class RecursiveTemplate(jinja2.Template):
 
     def render(self, *args, **kwargs) -> str:
         # recursive jinja2 evaluation
-        s = super().render(*args, **kwargs)
+        s = self.render_once(*args, **kwargs)
         logger.debug( s )
         if "{{" in s or "{%" in s:
             templ = self.environment.from_string(s,
@@ -24,6 +25,10 @@ class RecursiveTemplate(jinja2.Template):
             return templ.render(*args, **kwargs)
         s = s.strip()
         return s
+
+    def render_once(self, *args: Mapping[str, object], **kwargs: object) -> str:
+        """Render one Jinja pass without following generated template text."""
+        return super().render(*args, **kwargs)
 
 
 # try:

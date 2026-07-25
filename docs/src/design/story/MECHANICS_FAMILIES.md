@@ -346,6 +346,11 @@ The converging vocabulary is:
   projections rather than client-specific widgets;
 - **journal projection** remains the narrative output surface.
 
+The shared rendering boundary is described in
+[Episode-to-Syuzhet Rendering](EPISODE_SYUZHET_RENDERING.md): phase-assembled
+namespaces feed typed content adapters, while individual mechanics contribute
+semantic facts without owning prose, media, or other presentation policy.
+
 Convergence does not require every family to share one base class or generic
 manager. Each family keeps its own kernel and specialized folds while exchanging
 compatible identity, discovery, interaction, commitment, receipt, and projection
