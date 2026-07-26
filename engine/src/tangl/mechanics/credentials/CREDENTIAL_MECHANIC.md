@@ -2,8 +2,10 @@
 
 **Status:** PLANNED for the global document/media mechanic; Phases 7–9 landed the
 game-facing packet-authority cutover, transient shared defect vocabulary, and
-graph-bound bearer/document subject references (2026-07-20/22), but not media
-composition or card extraction.
+graph-bound bearer/document subject references (2026-07-20/22). Phase 12 adds a
+text-only identity-document projection through the shared story presentation
+chain; it resolves the bound presence subject but does not evaluate validity,
+render a packet, compose a card, or produce media.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.

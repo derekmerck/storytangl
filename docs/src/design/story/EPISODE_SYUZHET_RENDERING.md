@@ -12,7 +12,10 @@ general content request or JOURNAL adapter. Phase 11 adds the text-specific
 ``tangl.story.presentation.render_text_as(...)`` invocation seam: it selects a
 ``str`` source through ``story_dispatch``, exposes that resolver to recursive
 text templates, and ships replaceable presence defaults. It remains separate
-from fragment and media products.
+from fragment and media products. Phase 12 adds one credential-owned
+``document_description`` adapter: an identity document resolves its bound
+subject through its packet manager and recursively projects that presence,
+without interpreting credential validity or rendering a packet.
 
 ## Purpose
 

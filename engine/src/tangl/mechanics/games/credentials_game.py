@@ -1092,6 +1092,8 @@ class CredentialsGame(PickingGame):
                 "credential_stage": self.current_stage,
                 "credential_packet_findings": dict(self.packet_findings),
                 "credential_num_packet_findings": len(self.packet_findings),
+                # Graph-bound context for recursive document presentation.
+                "packet": self.active_case.packet_manager,
                 "credential_allow_arrest": self.allow_arrest,
                 "credential_disposition": (
                     self.disposition.value if self.disposition is not None else None
