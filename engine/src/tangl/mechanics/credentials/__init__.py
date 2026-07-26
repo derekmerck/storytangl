@@ -35,6 +35,9 @@ from .domain import (
     Restrictions,
 )
 
+# Register the credential-owned default text presentation handlers.
+from . import presentation as _presentation  # noqa: F401
+
 __all__ = [
     "COMMON_ALLIED_RESTRICTIONS",
     "COMMON_HOSTILE_RESTRICTIONS",
