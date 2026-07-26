@@ -6,9 +6,9 @@ does not own graph state, journal emission, or a general content-product model.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Protocol, TypeAlias
+from typing import Protocol, TypeAlias, cast
 
 import jinja2
 
@@ -32,6 +32,18 @@ class TextAspectResolver(Protocol):
         session: TextRenderSession,
         content: str | None = None,
     ) -> str: ...
+
+
+@jinja2.pass_context
+def _render_as_filter(
+    context: jinja2.runtime.Context,
+    target: object,
+    aspect: str,
+    content: str | None = None,
+) -> str:
+    """Delegate Jinja's ``render_as`` filter to this render scope's callback."""
+    render_as = cast(Callable[..., str], context["render_as"])
+    return render_as(target, aspect, content=content)
 
 
 def _default_environment() -> jinja2.Environment:
@@ -99,6 +111,10 @@ class TextRenderSession:
     environment: jinja2.Environment = field(default_factory=_default_environment)
     text_resolver: TextAspectResolver | None = None
     _active_state: _RecursiveRenderState | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Install the documented filter on this session's environment."""
+        self.environment.filters["render_as"] = _render_as_filter
 
     def render(
         self,

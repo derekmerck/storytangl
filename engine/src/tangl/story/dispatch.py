@@ -60,18 +60,21 @@ def do_render_text(
     ctx: VmPhaseCtx,
 ) -> str | None:
     """Select the last applicable textual source for a presentation aspect."""
-    receipts = story_dispatch.execute_all(
-        task="render_text",
-        call_kwargs={"caller": caller, "aspect": aspect},
-        ctx=ctx,
-        selector=Selector(caller_kind=type(caller)),
-    )
-    result = CallReceipt.last_result(*receipts)
-    if result is not None and not isinstance(result, str):
-        raise TypeError(
-            "render_text handlers must return str or None, "
-            f"got {type(result).__name__}",
+    receipts = list(
+        story_dispatch.execute_all(
+            task="render_text",
+            call_kwargs={"caller": caller, "aspect": aspect},
+            ctx=ctx,
+            selector=Selector(caller_kind=type(caller)),
         )
+    )
+    for result in CallReceipt.iter_results(*receipts):
+        if not isinstance(result, str):
+            raise TypeError(
+                "render_text handlers must return str or None, "
+                f"got {type(result).__name__}",
+            )
+    result = CallReceipt.last_result(*receipts)
     return result
 
 

@@ -21,6 +21,7 @@ from tangl.mechanics.presence.ornaments import Ornament, OrnamentType
 from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableType
 from tangl.prose import TextRenderSession
 from tangl.story import Actor
+from tangl.story.dispatch import do_render_text
 from tangl.story.presentation import render_text_as
 
 
@@ -157,6 +158,20 @@ def test_shared_session_renders_multiple_presence_subjects() -> None:
     assert "blue long hair" in rendered
 
 
+def test_render_as_filter_matches_documented_authoring_syntax() -> None:
+    actor = _SimpleActor(label="guide", look=_actor_look())
+
+    rendered = render_text_as(
+        actor,
+        "presence_description",
+        ctx=_TextCtx(),
+        content="{{ subject | render_as('presence_description') }}",
+    )
+
+    assert "olive skin" in rendered
+    assert "red long hair" in rendered
+
+
 def test_authored_content_replaces_recursive_presence_composition() -> None:
     target = object()
 
@@ -193,6 +208,34 @@ def test_authority_dispatch_can_override_presence_text() -> None:
         "presence_description",
         ctx=_TextCtx(authorities=[authority]),
     ) == "The school librarian."
+
+
+def test_dispatch_rejects_an_invalid_non_winning_handler_result() -> None:
+    target = object()
+    authority = BehaviorRegistry(
+        label="presentation.invalid-result",
+        default_dispatch_layer=DispatchLayer.AUTHOR,
+    )
+
+    authority.register(
+        lambda **_kwargs: 42,
+        task="render_text",
+        wants_caller_kind=object,
+        wants_exact_kind=False,
+    )
+    authority.register(
+        lambda **_kwargs: "valid override",
+        task="render_text",
+        wants_caller_kind=object,
+        wants_exact_kind=False,
+    )
+
+    with pytest.raises(TypeError, match="must return str or None"):
+        do_render_text(
+            target,
+            aspect="presence_description",
+            ctx=_TextCtx(authorities=[authority]),
+        )
 
 
 def test_missing_adapter_and_symbol_fail_explicitly() -> None:
