@@ -17,8 +17,12 @@ from tangl.mechanics.credentials import (
     CredentialStatus,
     Indication,
 )
+from tangl.mechanics.games import CredentialsGame, HasGame
+from tangl.mechanics.games.credentials_game import CredentialCase
 from tangl.mechanics.presence.look import HairColor, HairStyle, Look, SkinTone
+from tangl.story import Block
 from tangl.story.presentation import render_text_as
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 class _TextCtx:
@@ -52,6 +56,15 @@ class CredentialPacketOwner(Node):
 
 
 CredentialPacketOwner.model_rebuild(_types_namespace={"UUID": UUID})
+
+
+class CredentialsBlock(HasGame, Block):
+    """Story host for a credentials game namespace integration test."""
+
+    _game_class = CredentialsGame
+
+
+CredentialsBlock.model_rebuild(_types_namespace={"UUID": UUID})
 
 
 @pytest.fixture(autouse=True)
@@ -117,6 +130,37 @@ def test_graph_bound_identity_document_renders_its_named_subject() -> None:
     assert "travel passport" in rendered
     assert "olive skin" in rendered
     assert "red long hair" in rendered
+
+
+def test_document_renders_from_the_hosted_credentials_namespace() -> None:
+    definition = CredentialDefinition(
+        label="hosted_presentation_id",
+        name="travel passport",
+        indication=Indication.TRAVEL,
+        document_kind="id",
+    )
+    manager = CredentialPacketManager()
+    game = CredentialsGame(roster=[CredentialCase(packet_manager=manager)])
+    graph = Graph()
+    block = graph.add_node(
+        kind=CredentialsBlock,
+        label="checkpoint",
+        game_state=game,
+    )
+    packet = block.game.active_case.packet_manager
+    bearer = packet.resolve_subject(packet.bearer_id)
+    bearer.look = _look(HairColor.RED)
+    document = graph.add_node(
+        kind=CredentialComponent,
+        label="hosted-candidate-id",
+        token_from=definition.label,
+        subject_id=packet.bearer_id,
+    )
+    packet.assign(CREDENTIAL_ID_SLOT, document)
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+
+    assert ctx.get_ns(block)["packet"] is packet
+    assert "red long hair" in render_text_as(document, "document_description", ctx=ctx)
 
 
 def test_identity_document_uses_a_neutral_fallback_name() -> None:
