@@ -21,7 +21,9 @@ from tangl.mechanics.games.credentials_game import (
     derive_defects,
 )
 from tangl.story import Action, InitMode, World
+from tangl.story.presentation import render_text_as
 from tangl.vm import Ledger
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _actions(ledger: Ledger) -> list[Action]:
@@ -296,7 +298,17 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         combined_world.assets.values["school"].members
     )
 
-    for choice, block_label, catalog_ref, prefix, identity_label, finding, decision in (
+    for (
+        choice,
+        block_label,
+        catalog_ref,
+        prefix,
+        identity_label,
+        finding,
+        decision,
+        expected_names,
+        excluded_names,
+    ) in (
         (
             "Work the border checkpoint",
             "border_shift",
@@ -305,6 +317,8 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             "passport",
             "The issuing stamp is missing.",
             "Turn away",
+            ("Border Identity Card", "Work Permit"),
+            ("Student ID", "Activity Pass"),
         ),
         (
             "Monitor the school halls",
@@ -314,6 +328,8 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             "student ID",
             "The required teacher signature is missing.",
             "Send back to class",
+            ("Student ID", "Activity Pass"),
+            ("Border Identity Card", "Work Permit"),
         ),
     ):
         result = combined_world.create_story("combined_credentials", init_mode=InitMode.EAGER)
@@ -354,6 +370,13 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             component.reference_singleton.label.startswith(prefix)
             for component in packet_components
         )
+        packet_description = render_text_as(
+            manager,
+            "inspection_description",
+            ctx=PhaseCtx(graph=result.graph, cursor_id=block.uid),
+        )
+        assert all(name in packet_description for name in expected_names)
+        assert not any(name in packet_description for name in excluded_names)
 
         restored = Graph.structure(result.graph.unstructure())
         restored_block = restored.find_one(Selector(label=block_label))

@@ -11,6 +11,7 @@ from pydantic import Field, model_validator
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, Node, Selector
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
+    CREDENTIAL_PACKET_SLOT,
     CredentialComponent,
     CredentialDefinition,
     CredentialPacketManager,
@@ -122,6 +123,45 @@ def _render_document(
     )
 
 
+def _render_packet(
+    packet: CredentialPacketManager,
+    *,
+    ctx: _TextCtx | None = None,
+    content: str | None = None,
+) -> str:
+    return render_text_as(
+        packet,
+        "inspection_description",
+        ctx=ctx or _TextCtx(),
+        content=content,
+    )
+
+
+def _add_document(
+    graph: Graph,
+    owner: CredentialPacketOwner,
+    *,
+    label: str,
+    name: str | None,
+    indication: Indication = Indication.WORK,
+) -> CredentialComponent:
+    definition = CredentialDefinition(
+        label=f"presentation_{label}",
+        name=name,
+        indication=indication,
+        document_kind="document",
+        requires_id=True,
+    )
+    document = graph.add_node(
+        kind=CredentialComponent,
+        label=label,
+        token_from=definition.label,
+        subject_id=owner.packet_manager.bearer_id,
+    )
+    owner.packet_manager.assign(CREDENTIAL_PACKET_SLOT, document)
+    return document
+
+
 def test_graph_bound_identity_document_renders_its_named_subject() -> None:
     _, owner, document = _identity_document_graph()
 
@@ -130,6 +170,124 @@ def test_graph_bound_identity_document_renders_its_named_subject() -> None:
     assert "travel passport" in rendered
     assert "olive skin" in rendered
     assert "red long hair" in rendered
+
+
+def test_id_only_packet_renders_through_its_document_aspect() -> None:
+    _, owner, document = _identity_document_graph()
+
+    rendered = _render_packet(owner.packet_manager)
+
+    assert "travel passport" in rendered
+    assert "red long hair" in rendered
+    assert document.uid in {
+        component.uid for component in owner.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
+    }
+
+
+def test_packet_renders_identity_before_ordered_ordinary_documents() -> None:
+    graph, owner, identity = _identity_document_graph()
+    first = _add_document(graph, owner, label="first-permit", name="Work Permit")
+    second = _add_document(graph, owner, label="second-permit", name="Travel Visa")
+
+    rendered = _render_packet(owner.packet_manager)
+
+    assert [component.uid for component in owner.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)] == [
+        first.uid,
+        second.uid,
+    ]
+    assert rendered.index("travel passport") < rendered.index("Work Permit")
+    assert rendered.index("Work Permit") < rendered.index("Travel Visa")
+    assert identity.subject_id == owner.packet_manager.bearer_id
+
+
+def test_packet_omits_empty_slots_and_has_a_neutral_empty_rendering() -> None:
+    _, owner, _ = _identity_document_graph()
+    packet = owner.packet_manager
+    assert ";" not in _render_packet(packet)
+
+    graph = Graph()
+    empty_owner = graph.add_node(kind=CredentialPacketOwner, label="empty-checkpoint")
+    empty_owner.packet_manager.bind_owner(empty_owner)
+    assert _render_packet(empty_owner.packet_manager) == "No documents."
+
+
+def test_non_id_document_uses_authored_name_or_neutral_indication_fallback() -> None:
+    graph, owner, _ = _identity_document_graph()
+    named = _add_document(graph, owner, label="work-permit", name="Work Permit")
+    fallback = _add_document(
+        graph,
+        owner,
+        label="travel-document",
+        name=None,
+        indication=Indication.TRAVEL,
+    )
+
+    assert _render_document(named, owner.packet_manager) == "Work Permit"
+    assert _render_document(fallback, owner.packet_manager) == "travel document"
+
+
+def test_packet_bindings_are_explicit_and_status_does_not_change_output() -> None:
+    _, owner, document = _identity_document_graph()
+    packet = owner.packet_manager
+    initial = _render_packet(packet)
+    document.status = CredentialStatus.FORGED
+    status_changed = _render_packet(packet)
+
+    assert "red long hair" in initial
+    assert status_changed == initial
+    assert not any(
+        forbidden in initial.lower()
+        for forbidden in ("invalid", "valid", "forged", "expired", "missing seal", "arrest")
+    )
+
+
+def test_authority_can_replace_or_wrap_packet_presentation() -> None:
+    _, owner, _ = _identity_document_graph()
+    authority = BehaviorRegistry(
+        label="credential-packet-presentation-author",
+        default_dispatch_layer=DispatchLayer.AUTHOR,
+    )
+
+    authority.register(
+        lambda **_kwargs: "They arrange their school papers on the desk.",
+        task="render_text",
+        wants_caller_kind=CredentialPacketManager,
+        wants_exact_kind=False,
+    )
+    assert _render_packet(owner.packet_manager, ctx=_TextCtx(authorities=[authority])) == (
+        "They arrange their school papers on the desk."
+    )
+
+    authority.clear()
+    authority.register(
+        lambda **_kwargs: (
+            "Packet: {{ render_as(subject.get_slot('id')[0], "
+            "'document_description', bindings={'packet': subject}) }}"
+        ),
+        task="render_text",
+        wants_caller_kind=CredentialPacketManager,
+        wants_exact_kind=False,
+    )
+    rendered = _render_packet(owner.packet_manager, ctx=_TextCtx(authorities=[authority]))
+    assert rendered.startswith("Packet: travel passport, bearing a portrait of")
+
+
+def test_packet_rendering_preserves_graph_state_and_roundtrips_in_order() -> None:
+    graph, owner, identity = _identity_document_graph()
+    first = _add_document(graph, owner, label="first-permit", name="Work Permit")
+    second = _add_document(graph, owner, label="second-permit", name="Travel Visa")
+    before_state = graph.unstructure()
+    before = _render_packet(owner.packet_manager)
+
+    assert graph.unstructure() == before_state
+    restored = Graph.structure(graph.unstructure())
+    restored_owner = restored.find_one(Selector(label="checkpoint"))
+    restored_packet = restored_owner.packet_manager
+    restored_documents = restored_packet.get_slot(CREDENTIAL_PACKET_SLOT)
+
+    assert [component.uid for component in restored_documents] == [first.uid, second.uid]
+    assert restored_packet.get_slot(CREDENTIAL_ID_SLOT)[0].uid == identity.uid
+    assert _render_packet(restored_packet) == before
 
 
 def test_document_renders_from_the_hosted_credentials_namespace() -> None:
