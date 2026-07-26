@@ -25,6 +25,16 @@ class _Child:
     content: str = "{{ subject.name }}"
 
 
+@dataclass
+class _TreeSubject:
+    name: str
+    child: _TreeSubject | None = None
+    content: str = (
+        "{{ subject.name }}"
+        "{% if subject.child %} {{ render_child(subject.content, subject.child) }}{% endif %}"
+    )
+
+
 def test_render_text_returns_literal_text() -> None:
     assert render_text("A quiet room.", ctx=_Ctx({})) == "A quiet room."
 
@@ -60,6 +70,20 @@ def test_render_child_shares_recursive_cycle_protection() -> None:
 
     with pytest.raises(RecursiveRenderError, match="cycle"):
         session.render("{{ render_child(subject.content, subject) }}", subject=child)
+
+
+def test_render_child_allows_one_template_for_distinct_tree_subjects() -> None:
+    three = _TreeSubject("three")
+    two = _TreeSubject("two", child=three)
+    one = _TreeSubject("one", child=two)
+    session = TextRenderSession(ctx=_Ctx({}))
+
+    rendered = session.render(
+        "{{ render_child(subject.content, subject) }}",
+        subject=one,
+    )
+
+    assert rendered == "one two three"
 
 
 def test_consecutive_segments_share_ephemeral_discourse() -> None:
@@ -115,3 +139,14 @@ def test_render_text_honors_custom_environment_delimiters() -> None:
     )
 
     assert session.render("[[ first ]]") == "Done"
+
+
+def test_render_text_raises_for_undefined_symbols_by_default() -> None:
+    with pytest.raises(jinja2.UndefinedError):
+        render_text("A {{ missing }} arrives.", ctx=_Ctx({}))
+
+
+def test_render_text_accepts_an_explicit_permissive_environment() -> None:
+    session = TextRenderSession(ctx=_Ctx({}), environment=jinja2.Environment())
+
+    assert session.render("A {{ missing }} arrives.") == "A  arrives."
