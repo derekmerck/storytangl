@@ -8,7 +8,11 @@
 **Implementation status:** Phase 10.1 provides the text-only floor:
 ``TextRenderSession`` renders bounded recursive Jinja text against a
 ``PhaseCtx`` namespace and carries ephemeral discourse state. It is not yet a
-general content request or JOURNAL adapter.
+general content request or JOURNAL adapter. Phase 11 adds the text-specific
+``tangl.story.presentation.render_text_as(...)`` invocation seam: it selects a
+``str`` source through ``story_dispatch``, exposes that resolver to recursive
+text templates, and ships replaceable presence defaults. It remains separate
+from fragment and media products.
 
 ## Purpose
 
