@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Selector
+from tangl.vm.ctx import VmPhaseCtx
 
 from .episode import Action
 
@@ -45,6 +46,38 @@ def on_find_edges(func=None, **kwargs):
     return story_dispatch.register(func=func, task="find_edges", **kwargs)
 
 
+def on_render_text(func=None, **kwargs):
+    """Register a story-level text-presentation handler."""
+    if func is None:
+        return lambda f: story_dispatch.register(func=f, task="render_text", **kwargs)
+    return story_dispatch.register(func=func, task="render_text", **kwargs)
+
+
+def do_render_text(
+    caller: object,
+    *,
+    aspect: str,
+    ctx: VmPhaseCtx,
+) -> str | None:
+    """Select the last applicable textual source for a presentation aspect."""
+    receipts = list(
+        story_dispatch.execute_all(
+            task="render_text",
+            call_kwargs={"caller": caller, "aspect": aspect},
+            ctx=ctx,
+            selector=Selector(caller_kind=type(caller)),
+        )
+    )
+    for result in CallReceipt.iter_results(*receipts):
+        if not isinstance(result, str):
+            raise TypeError(
+                "render_text handlers must return str or None, "
+                f"got {type(result).__name__}",
+            )
+    result = CallReceipt.last_result(*receipts)
+    return result
+
+
 def do_find_edges(
     caller: object,
     *,
@@ -79,9 +112,11 @@ def do_find_edges(
 
 __all__ = [
     "do_find_edges",
+    "do_render_text",
     "on_find_edges",
     "on_compose_journal",
     "story_dispatch",
     "on_gather_ns",
     "on_journal",
+    "on_render_text",
 ]

@@ -111,10 +111,12 @@ from .analysis import (
 from .story_graph import StoryGraph
 from .dispatch import (
     do_find_edges,
+    do_render_text,
     on_compose_journal,
     on_find_edges,
     on_gather_ns,
     on_journal,
+    on_render_text,
     story_dispatch,
 )
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
@@ -165,6 +167,7 @@ __all__ = [
     "collapse_linear_chains",
     "cluster_by_scene",
     "do_find_edges",
+    "do_render_text",
     "episode_only_selector",
     "episode_plus_concepts_selector",
     "focus_runtime_window",
@@ -175,6 +178,7 @@ __all__ = [
     "on_find_edges",
     "on_gather_ns",
     "on_journal",
+    "on_render_text",
     "project_story_graph",
     "project_world_graph",
     "projected_graph_to_dict",

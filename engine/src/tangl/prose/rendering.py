@@ -6,9 +6,9 @@ does not own graph state, journal emission, or a general content-product model.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import TypeAlias
+from typing import Protocol, TypeAlias, cast
 
 import jinja2
 
@@ -18,6 +18,32 @@ from tangl.vm.ctx import VmPhaseCtx
 Scope: TypeAlias = dict[str, object]
 IdentityKey: TypeAlias = tuple[str, str | int]
 RenderFrameKey: TypeAlias = tuple[str, IdentityKey, IdentityKey]
+
+
+class TextAspectResolver(Protocol):
+    """Resolve one typed textual aspect through a render session."""
+
+    def __call__(
+        self,
+        target: object,
+        aspect: str,
+        *,
+        ctx: VmPhaseCtx,
+        session: TextRenderSession,
+        content: str | None = None,
+    ) -> str: ...
+
+
+@jinja2.pass_context
+def _render_as_filter(
+    context: jinja2.runtime.Context,
+    target: object,
+    aspect: str,
+    content: str | None = None,
+) -> str:
+    """Delegate Jinja's ``render_as`` filter to this render scope's callback."""
+    render_as = cast(Callable[..., str], context["render_as"])
+    return render_as(target, aspect, content=content)
 
 
 def _default_environment() -> jinja2.Environment:
@@ -83,7 +109,12 @@ class TextRenderSession:
     discourse: Scope = field(default_factory=dict)
     max_depth: int = 32
     environment: jinja2.Environment = field(default_factory=_default_environment)
+    text_resolver: TextAspectResolver | None = None
     _active_state: _RecursiveRenderState | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Install the documented filter on this session's environment."""
+        self.environment.filters["render_as"] = _render_as_filter
 
     def render(
         self,
@@ -105,6 +136,8 @@ class TextRenderSession:
             scope.update(bindings)
         scope["discourse"] = self.discourse
         scope["render_child"] = self.render_child
+        if self.text_resolver is not None:
+            scope["render_as"] = self._render_as
         if subject is not None:
             scope["subject"] = subject
 
@@ -135,6 +168,19 @@ class TextRenderSession:
             subject=subject,
             bindings=bindings,
         )
+
+    def _render_as(
+        self,
+        target: object,
+        aspect: str,
+        *,
+        content: str | None = None,
+    ) -> str:
+        """Resolve a nested text aspect through the injected story callback."""
+        resolver = self.text_resolver
+        if resolver is None:
+            raise RuntimeError("No text-aspect resolver is configured")
+        return resolver(target, aspect, ctx=self.ctx, session=self, content=content)
 
     def render_segments(
         self,
@@ -233,4 +279,9 @@ def _identity_key(value: object | None) -> IdentityKey:
     return "object", id(value)
 
 
-__all__ = ["RecursiveRenderError", "TextRenderSession", "render_text"]
+__all__ = [
+    "RecursiveRenderError",
+    "TextAspectResolver",
+    "TextRenderSession",
+    "render_text",
+]
