@@ -172,6 +172,32 @@ def test_render_as_filter_matches_documented_authoring_syntax() -> None:
     assert "red long hair" in rendered
 
 
+def test_render_as_filter_forwards_explicit_child_bindings() -> None:
+    target = object()
+    authority = BehaviorRegistry(
+        label="presentation.child-bindings",
+        default_dispatch_layer=DispatchLayer.AUTHOR,
+    )
+    authority.register(
+        lambda **_kwargs: "{{ packet.label }}",
+        task="render_text",
+        wants_caller_kind=object,
+        wants_exact_kind=False,
+    )
+    bindings = {"packet": SimpleNamespace(label="bound packet")}
+
+    rendered = render_text_as(
+        target,
+        "outer",
+        ctx=_TextCtx(authorities=[authority]),
+        content="{{ subject | render_as('nested', bindings={'packet': packet}) }}",
+        bindings=bindings,
+    )
+
+    assert rendered == "bound packet"
+    assert bindings == {"packet": SimpleNamespace(label="bound packet")}
+
+
 def test_authored_content_replaces_recursive_presence_composition() -> None:
     target = object()
 

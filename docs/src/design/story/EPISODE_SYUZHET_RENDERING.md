@@ -16,6 +16,9 @@ from fragment and media products. Phase 12 adds one credential-owned
 ``document_description`` adapter: an identity document resolves its bound
 subject through its packet manager and recursively projects that presence,
 without interpreting credential validity or rendering a packet.
+Phase 13 adds a credential-owned ``inspection_description`` adapter that
+recursively composes a packet's ordered identity and ordinary documents, with
+explicit child bindings and no JOURNAL, media, or disposition interpretation.
 
 ## Purpose
 

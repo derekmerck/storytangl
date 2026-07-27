@@ -5,7 +5,9 @@ game-facing packet-authority cutover, transient shared defect vocabulary, and
 graph-bound bearer/document subject references (2026-07-20/22). Phase 12 adds a
 text-only identity-document projection through the shared story presentation
 chain; it resolves the bound presence subject but does not evaluate validity,
-render a packet, compose a card, or produce media.
+compose a card, or produce media. Phase 13 adds a text-only packet projection
+that composes the packet's assigned document components through the same chain,
+without findings, JOURNAL, or game-owned presentation labels.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.

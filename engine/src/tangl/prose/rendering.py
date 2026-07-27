@@ -31,6 +31,7 @@ class TextAspectResolver(Protocol):
         ctx: VmPhaseCtx,
         session: TextRenderSession,
         content: str | None = None,
+        bindings: Mapping[str, object] | None = None,
     ) -> str: ...
 
 
@@ -40,10 +41,11 @@ def _render_as_filter(
     target: object,
     aspect: str,
     content: str | None = None,
+    bindings: Mapping[str, object] | None = None,
 ) -> str:
     """Delegate Jinja's ``render_as`` filter to this render scope's callback."""
     render_as = cast(Callable[..., str], context["render_as"])
-    return render_as(target, aspect, content=content)
+    return render_as(target, aspect, content=content, bindings=bindings)
 
 
 def _default_environment() -> jinja2.Environment:
@@ -175,12 +177,20 @@ class TextRenderSession:
         aspect: str,
         *,
         content: str | None = None,
+        bindings: Mapping[str, object] | None = None,
     ) -> str:
         """Resolve a nested text aspect through the injected story callback."""
         resolver = self.text_resolver
         if resolver is None:
             raise RuntimeError("No text-aspect resolver is configured")
-        return resolver(target, aspect, ctx=self.ctx, session=self, content=content)
+        return resolver(
+            target,
+            aspect,
+            ctx=self.ctx,
+            session=self,
+            content=content,
+            bindings=bindings,
+        )
 
     def render_segments(
         self,
