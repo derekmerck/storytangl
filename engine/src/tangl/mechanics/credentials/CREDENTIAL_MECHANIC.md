@@ -7,7 +7,10 @@ text-only identity-document projection through the shared story presentation
 chain; it resolves the bound presence subject but does not evaluate validity,
 compose a card, or produce media. Phase 13 adds a text-only packet projection
 that composes the packet's assigned document components through the same chain,
-without findings, JOURNAL, or game-owned presentation labels.
+without findings, JOURNAL, or game-owned presentation labels. Phase 14 invokes
+those projections from the credentials game's JOURNAL path through scenario
+arrival and packet templates, while preserving the existing typed candidate,
+packet, document, choice, and finding surfaces.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.

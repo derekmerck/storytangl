@@ -15,6 +15,7 @@ from pydantic import Field
 
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
+from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
 from .game import Game
@@ -239,7 +240,13 @@ class BlackjackGameHandler(GameHandler[BlackjackGame]):
             detail["dealer_hand"] = [card.short_name for card in game.dealer_hand]
         return detail
 
-    def get_journal_fragments(self, game: BlackjackGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: BlackjackGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         last_round = game.last_round
         if last_round is None:
             return []

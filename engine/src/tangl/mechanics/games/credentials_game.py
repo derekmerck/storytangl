@@ -57,6 +57,9 @@ from tangl.mechanics.credentials import (
     Restrictions,
     RestrictionLevel,
 )
+from tangl.prose import TextRenderSession
+from tangl.story.presentation import render_text_as
+from tangl.vm.ctx import VmPhaseCtx
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
@@ -221,12 +224,19 @@ def _default_roster() -> list[CredentialCase]:
 
     return [
         CredentialCase(
+            presented_documents={
+                "passport": "A worn passport with a blurred seal.",
+                "travel permit": "A permit stamped for this week.",
+            },
             packet_manager=materialize_packet(
                 owner=object(),
                 region=Region.LOCAL,
                 purpose=Indication.TRAVEL,
-                id_card=None,
-                credentials=[],
+                id_card=CredentialToken(
+                    indication=Indication.TRAVEL,
+                    status=CredentialStatus.MISSING_SEAL,
+                ),
+                credentials=[CredentialToken(indication=Indication.TRAVEL)],
                 possessions=[],
                 label_prefix="Traveler",
             ),
@@ -245,7 +255,7 @@ def _default_roster() -> list[CredentialCase]:
                 region=Region.LOCAL,
                 purpose=Indication.TRAVEL,
                 id_card=CredentialToken(indication=Indication.TRAVEL),
-                credentials=[],
+                credentials=[CredentialToken(indication=Indication.TRAVEL)],
                 possessions=[],
                 label_prefix="Tomas Vey",
             ),
@@ -654,6 +664,13 @@ class CredentialPresentationProfile(BaseModelPlus):
     identity_description: str = "An identity document."
     document_description: str = "A {document}."
     possession_description: str = "Openly declared {indication}."
+    candidate_arrival_template: str = (
+        "{{ candidate_name }}{% set description = render_as(candidate, 'presence_description') %}"
+        "{% if description %}, {{ description }}{% endif %} steps forward."
+    )
+    packet_presentation_template: str = (
+        "They present their documents: {{ render_as(packet, 'inspection_description') }}"
+    )
     status_text: dict[CredentialStatus, str] = Field(
         default_factory=lambda: {
             CredentialStatus.MISSING_SEAL: "The issuing seal is missing.",
@@ -1693,21 +1710,36 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         detail["shift_complete"] = game.shift_complete
         return detail
 
-    def get_journal_fragments(self, game: CredentialsGame) -> list[BaseFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: CredentialsGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[BaseFragment] | None:
         last_round = game.last_round
         if last_round is None:
-            return [] if game.shift_complete else self._candidate_fragments(game)
+            if game.shift_complete:
+                return []
+            return [
+                *self._arrival_fragments(game, ctx=ctx),
+                *self._candidate_fragments(game, ctx=ctx),
+            ]
 
         move = self._normalize_move(last_round.player_move)
         prose = self._prose_fragments(game, last_round, move.kind, move.target, last_round.notes or {})
 
+        if not game.shift_complete and move.kind == "decide":
+            return [
+                *prose,
+                *self._arrival_fragments(game, ctx=ctx),
+                *self._candidate_fragments(game, ctx=ctx),
+            ]
+
         fragments: list[BaseFragment] = []
         # Structured candidate / packet view (Bridge.1). Skip once the shift is
-        # over -- there is no next candidate to present. On a non-final decision
-        # this is the *arriving* candidate, which lands alongside the
-        # "next traveler steps up" prose.
+        # over -- there is no next candidate to present.
         if not game.shift_complete:
-            fragments.extend(self._candidate_fragments(game))
+            fragments.extend(self._candidate_fragments(game, ctx=ctx))
         # Findings table for the active case; present on inspect / mediation
         # rounds, empty after a decision resets the working state.
         findings = self._findings_fragment(game)
@@ -1824,15 +1856,61 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     )
                 )
             )
-        else:
-            fragments.append(
-                ContentFragment(content="The next traveler steps up to the counter.")
-            )
         return fragments
 
     # ----- Bridge.1: structured (typed) fragment projection ----------------
 
-    def _candidate_fragments(self, game: CredentialsGame) -> list[BaseFragment]:
+    def _arrival_fragments(
+        self,
+        game: CredentialsGame,
+        *,
+        ctx: VmPhaseCtx | None,
+    ) -> list[ContentFragment]:
+        """Render the current candidate and packet once on arrival."""
+
+        if ctx is None:
+            return []
+
+        case = game.active_case
+        packet = case.packet_manager
+        candidate = packet.resolve_subject(packet.bearer_id)
+        session = TextRenderSession(ctx=ctx, text_resolver=render_text_as)
+        bindings = {
+            "candidate_name": case.candidate_name,
+            "candidate": candidate,
+            "packet": packet,
+        }
+        return [
+            ContentFragment(
+                content=render_text_as(
+                    candidate,
+                    "arrival_description",
+                    ctx=ctx,
+                    session=session,
+                    content=game.presentation.candidate_arrival_template,
+                    bindings=bindings,
+                ),
+                source_id=candidate.uid,
+            ),
+            ContentFragment(
+                content=render_text_as(
+                    packet,
+                    "packet_presentation",
+                    ctx=ctx,
+                    session=session,
+                    content=game.presentation.packet_presentation_template,
+                    bindings=bindings,
+                ),
+                source_id=ctx.cursor.uid,
+            ),
+        ]
+
+    def _candidate_fragments(
+        self,
+        game: CredentialsGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[BaseFragment]:
         """Project the active candidate + packet zone + document pieces.
 
         Deterministic uids (per game + case index) let the client update these
@@ -1848,14 +1926,15 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         }
         if case.packet_manager.has_resolved_subject(case.packet_manager.bearer_id):
             bearer = case.packet_manager.resolve_subject(case.packet_manager.bearer_id)
-            candidate_properties.update(
-                {
-                    "look_description": bearer.describe_look(subject=case.candidate_name),
-                    "look_media_payload": bearer.adapt_look_media_spec(
-                        media_role="candidate"
-                    ),
-                }
+            candidate_properties["look_media_payload"] = bearer.adapt_look_media_spec(
+                media_role="candidate"
             )
+            if ctx is not None:
+                candidate_properties["look_description"] = render_text_as(
+                    bearer,
+                    "presence_description",
+                    ctx=ctx,
+                )
 
         candidate = PieceFragment(
             uid=_piece_uid(game.uid, idx, "candidate"),

@@ -13,6 +13,7 @@ from pydantic import Field
 
 from tangl.journal.intent import QuantityAccepts
 from tangl.journal.fragments import ContentFragment
+from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
 from .game import Game
@@ -166,7 +167,13 @@ class NimGameHandler(GameHandler[NimGame]):
         detail["opponent_next_take"] = game.opponent_next_move
         return detail
 
-    def get_journal_fragments(self, game: NimGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: NimGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         last_round = game.last_round
         if last_round is None:
             return []

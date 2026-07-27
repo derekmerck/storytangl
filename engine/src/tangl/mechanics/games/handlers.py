@@ -339,7 +339,7 @@ def generate_game_journal(
     if not isinstance(cursor, HasGame):
         return []
 
-    custom_fragments = cursor.game_handler.get_journal_fragments(cursor.game)
+    custom_fragments = cursor.game_handler.get_journal_fragments(cursor.game, ctx=ctx)
     if custom_fragments is not None:
         logger.debug(
             "Generated %s tailored journal fragments for %s",

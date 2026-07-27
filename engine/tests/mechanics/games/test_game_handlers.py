@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Graph
+from tangl.journal.fragments import ContentFragment
 from tangl.journal.intent import PieceConstraints, PiecesAccepts
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
 from tangl.story import Action, Block
@@ -15,7 +16,7 @@ from tangl.mechanics.games.handlers import (
     provision_game_moves,
     setup_game_on_first_visit,
 )
-from tangl.vm import Frame
+from tangl.vm import Frame, VmPhaseCtx
 
 
 class SampleGame(Game):
@@ -48,6 +49,21 @@ class TestGameHandler(GameHandler[SampleGame]):
         if game.last_round is None:
             return GameResult.IN_PROCESS
         return game.last_round.result.to_game_result()
+
+
+class ContextJournalHandler(TestGameHandler):
+    """Confirms the generic JOURNAL chokepoint forwards its live context."""
+
+    received_ctx: VmPhaseCtx | None = None
+
+    def get_journal_fragments(
+        self,
+        game: SampleGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment]:
+        self.received_ctx = ctx
+        return [ContentFragment(content="Context-aware journal.")]
 
 
 class GameBlock(HasGame, Block):
@@ -231,6 +247,20 @@ class TestUpdateHandler:
 
 
 class TestJournalHandler:
+    def test_journal_projection_receives_the_live_phase_context(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        ctx = make_ctx(make_frame(game_graph, game_block.uid))
+        handler = ContextJournalHandler()
+        game_block._game_handler = handler
+
+        fragments = generate_game_journal(game_block, ctx=ctx)
+
+        assert handler.received_ctx is ctx
+        assert [fragment.content for fragment in fragments] == ["Context-aware journal."]
+
     def test_journal_generation_from_last_round(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
         ctx = make_ctx(frame)

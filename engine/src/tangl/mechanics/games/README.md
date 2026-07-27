@@ -17,7 +17,12 @@ Concrete games can optionally refine the shared VM presentation hooks too:
 
 - `get_move_label`
 - `build_round_notes`
-- `get_journal_fragments`
+- `get_journal_fragments(game, *, ctx: VmPhaseCtx | None = None)`
+
+The VM supplies ``ctx`` to this hook during JOURNAL so a game may render against
+the phase namespace. Overrides must accept the optional keyword; direct library
+callers may omit it. Returning ``None`` retains the generic round-summary
+fallback.
 
 Some game families expose narrower public operations for non-modal hosts. For
 example, `IncrementalGameHandler.resolve_cycle_tick()` resolves one

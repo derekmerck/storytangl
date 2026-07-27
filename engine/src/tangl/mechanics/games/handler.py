@@ -20,6 +20,7 @@ from .strategies import opponent_strategies, scoring_strategies
 if TYPE_CHECKING:
     from tangl.core import BaseFragment
     from tangl.journal.intent import Accepts
+    from tangl.vm.ctx import VmPhaseCtx
 
 GameT = TypeVar("GameT", bound=Game)
 
@@ -146,12 +147,18 @@ class GameHandler(ABC, Generic[GameT]):
         """
         return None
 
-    def get_journal_fragments(self, game: GameT) -> list[BaseFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: GameT,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[BaseFragment] | None:
         """
         Return tailored journal fragments for the latest round.
 
-        Returning ``None`` tells the package JOURNAL handler to fall back to the
-        generic round summary.
+        ``ctx`` is the live JOURNAL context when called by the VM; direct
+        library callers may omit it. Returning ``None`` tells the package
+        JOURNAL handler to fall back to the generic round summary.
         """
         return None
     
