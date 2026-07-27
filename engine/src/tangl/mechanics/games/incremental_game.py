@@ -13,6 +13,7 @@ from pydantic import Field
 
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
+from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
 from .game import Game
@@ -249,7 +250,13 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         detail["cycle"] = game.cycle
         return detail
 
-    def get_journal_fragments(self, game: IncrementalGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: IncrementalGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         last_round = game.last_round
         if last_round is None:
             return []

@@ -12,6 +12,7 @@ from typing import ClassVar
 from pydantic import Field
 
 from tangl.journal.fragments import ContentFragment
+from tangl.vm.ctx import VmPhaseCtx
 
 from .aggregate_force_game import AggregateForceGame, AggregateForceGameHandler, ForceCommitMove
 from .enums import GameResult, RoundResult
@@ -185,7 +186,13 @@ class SiegeRpsGameHandler(AggregateForceGameHandler[SiegeRpsGame]):
         game.round_detail = detail
         return RoundResult.LOSE
 
-    def get_journal_fragments(self, game: SiegeRpsGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: SiegeRpsGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         last_round = game.last_round
         if last_round is None:
             return []

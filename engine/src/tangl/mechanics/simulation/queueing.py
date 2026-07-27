@@ -13,6 +13,7 @@ from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.games import Game, GameHandler
 from tangl.mechanics.games.enums import GameResult, RoundResult
 from tangl.mechanics.sandbox.time import advance_world_turn_to
+from tangl.vm.ctx import VmPhaseCtx
 
 from .calendar import EventCalendar, SimulationEvent
 
@@ -275,7 +276,13 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
             "metrics": game.metrics.model_dump() if game.metrics is not None else None,
         }
 
-    def get_journal_fragments(self, game: QueueSimulation) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: QueueSimulation,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         return [
             ContentFragment(content=self.render_trace_event(game, event))
             for event in game.latest_trace

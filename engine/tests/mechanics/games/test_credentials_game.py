@@ -24,7 +24,7 @@ from tangl.mechanics.games.credentials_game import (
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.mechanics.games.handlers import inject_game_context
 from tangl.story import Action, Block
-from tangl.vm import Ledger, TraversableEdge as ChoiceEdge
+from tangl.vm import Frame, Ledger, TraversableEdge as ChoiceEdge
 
 
 def _two_case_roster() -> list[CredentialCase]:
@@ -454,15 +454,16 @@ def test_graph_bound_packet_projects_neutral_bearer_and_id_photo_looks() -> None
     ]
     block.game_handler.setup(block.game)
 
+    ctx = Frame(graph=graph, cursor=block)._make_ctx()
     pieces = [
         fragment
-        for fragment in block.game_handler.get_journal_fragments(block.game)
+        for fragment in block.game_handler.get_journal_fragments(block.game, ctx=ctx)
         if isinstance(fragment, PieceFragment)
     ]
     candidate = next(piece for piece in pieces if piece.piece_kind == "candidate")
     passport = next(piece for piece in pieces if piece.piece_kind == "id_card")
 
-    assert candidate.properties["look_description"] == "Mara"
+    assert candidate.properties["look_description"] == ""
     assert candidate.properties["look_media_payload"].media_role == "candidate"
     assert passport.properties["look_description"] == ""
     assert passport.properties["look_media_payload"].media_role == "id_photo"

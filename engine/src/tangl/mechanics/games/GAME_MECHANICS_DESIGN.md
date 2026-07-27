@@ -39,8 +39,9 @@ The current games package revolves around a small, stable contract:
 - **`GameHandler`** is the rule object that sets up a game, offers moves, receives
   moves, resolves rounds, and evaluates terminal state
 - **optional handler hooks** like `get_move_label()`, `build_round_notes()`, and
-  `get_journal_fragments()` let concrete games project richer choices and narration
-  without bypassing the shared VM handlers
+  `get_journal_fragments(game, ctx=...)` let concrete games project richer
+  choices and narration through the live phase namespace without bypassing the
+  shared VM handlers
 - **`HasGame`** is the author-facing facade that attaches a game to a story node
 - **package handlers** connect games to VM PREREQS, PLANNING, UPDATE, JOURNAL,
   and CONTEXT phases

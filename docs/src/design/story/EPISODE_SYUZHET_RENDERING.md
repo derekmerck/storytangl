@@ -19,6 +19,12 @@ without interpreting credential validity or rendering a packet.
 Phase 13 adds a credential-owned ``inspection_description`` adapter that
 recursively composes a packet's ordered identity and ordinary documents, with
 explicit child bindings and no JOURNAL, media, or disposition interpretation.
+Phase 14 makes credentials the first vertical JOURNAL consumer: game-owned
+arrival and packet templates invoke those text adapters through the live phase
+context, then emit attributed ``ContentFragment`` values before the existing
+candidate, packet-zone, and document-piece surfaces. The templates disclose
+only ordinary appearance and visible documents; findings and disposition remain
+on their committed interaction paths.
 
 ## Purpose
 

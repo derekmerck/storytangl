@@ -14,6 +14,7 @@ import random
 from pydantic import Field
 
 from tangl.journal.fragments import ContentFragment
+from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.dispatch import dispatch
 
 from .enums import GamePhase, GameResult, RoundResult
@@ -89,7 +90,13 @@ class RpsGameHandler(SimpleGameHandler[RpsGame]):
             game.score["opponent"] += 1
             return RoundResult.LOSE
 
-    def get_journal_fragments(self, game: RpsGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: RpsGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
 
 
@@ -235,7 +242,13 @@ class RpslsGameHandler(SimpleGameHandler[RpslsGame]):
             game.score["opponent"] += 1
             return RoundResult.LOSE
 
-    def get_journal_fragments(self, game: RpslsGame) -> list[ContentFragment] | None:
+    def get_journal_fragments(
+        self,
+        game: RpslsGame,
+        *,
+        ctx: VmPhaseCtx | None = None,
+    ) -> list[ContentFragment] | None:
+        _ = ctx
         return _round_journal_fragments(game, verb_templates=RPSLS_VERB_TEMPLATES)
 
 
