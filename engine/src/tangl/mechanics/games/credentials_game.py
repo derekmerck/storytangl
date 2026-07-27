@@ -224,12 +224,19 @@ def _default_roster() -> list[CredentialCase]:
 
     return [
         CredentialCase(
+            presented_documents={
+                "passport": "A worn passport with a blurred seal.",
+                "travel permit": "A permit stamped for this week.",
+            },
             packet_manager=materialize_packet(
                 owner=object(),
                 region=Region.LOCAL,
                 purpose=Indication.TRAVEL,
-                id_card=None,
-                credentials=[],
+                id_card=CredentialToken(
+                    indication=Indication.TRAVEL,
+                    status=CredentialStatus.MISSING_SEAL,
+                ),
+                credentials=[CredentialToken(indication=Indication.TRAVEL)],
                 possessions=[],
                 label_prefix="Traveler",
             ),
@@ -248,7 +255,7 @@ def _default_roster() -> list[CredentialCase]:
                 region=Region.LOCAL,
                 purpose=Indication.TRAVEL,
                 id_card=CredentialToken(indication=Indication.TRAVEL),
-                credentials=[],
+                credentials=[CredentialToken(indication=Indication.TRAVEL)],
                 possessions=[],
                 label_prefix="Tomas Vey",
             ),

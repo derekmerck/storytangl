@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Graph
-from tangl.journal.fragments import PieceFragment
+from tangl.journal.fragments import ContentFragment, PieceFragment
 from tangl.mechanics.credentials import CREDENTIAL_ID_SLOT, materialize_packet
 from tangl.mechanics.games import (
     CredentialStatus,
@@ -468,3 +468,24 @@ def test_graph_bound_packet_projects_neutral_bearer_and_id_photo_looks() -> None
     assert passport.properties["look_description"] == ""
     assert passport.properties["look_media_payload"].media_role == "id_photo"
     assert "mismatch" not in str([candidate.content, passport.content]).lower()
+
+
+def test_default_roster_packet_matches_its_visible_document_surface() -> None:
+    graph = Graph(label="default_credential_journal")
+    block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
+    block.game_handler.setup(block.game)
+    ctx = Frame(graph=graph, cursor=block)._make_ctx()
+
+    fragments = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    prose = [fragment.content for fragment in fragments if isinstance(fragment, ContentFragment)]
+    documents = [
+        fragment
+        for fragment in fragments
+        if isinstance(fragment, PieceFragment) and fragment.piece_kind != "candidate"
+    ]
+
+    assert "No documents" not in " ".join(prose)
+    assert {fragment.content for fragment in documents} == {
+        "A worn passport with a blurred seal.",
+        "A permit stamped for this week.",
+    }
