@@ -24,7 +24,12 @@ arrival and packet templates invoke those text adapters through the live phase
 context, then emit attributed ``ContentFragment`` values before the existing
 candidate, packet-zone, and document-piece surfaces. The templates disclose
 only ordinary appearance and visible documents; findings and disposition remain
-on their committed interaction paths.
+on their committed interaction paths. Phase 15 converges packet prose and
+targetable credential pieces on the packet manager's ordered components and
+the same ``document_description`` adapter. Scenario-authored complete document
+text remains an explicit replacement, while compatibility-only visible items
+such as baggage remain separate pieces; document-part degradation and media
+composition remain deferred.
 
 ## Purpose
 

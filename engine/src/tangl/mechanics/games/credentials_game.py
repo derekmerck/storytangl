@@ -669,7 +669,9 @@ class CredentialPresentationProfile(BaseModelPlus):
         "{% if description %}, {{ description }}{% endif %} steps forward."
     )
     packet_presentation_template: str = (
-        "They present their documents: {{ render_as(packet, 'inspection_description') }}"
+        "They present their documents: "
+        "{{ render_as(packet, 'inspection_description', "
+        "bindings={'document_replacements': document_replacements}) }}"
     )
     status_text: dict[CredentialStatus, str] = Field(
         default_factory=lambda: {
@@ -1879,6 +1881,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             "candidate_name": case.candidate_name,
             "candidate": candidate,
             "packet": packet,
+            "document_replacements": self._document_replacements(game),
         }
         return [
             ContentFragment(
@@ -1904,6 +1907,51 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 source_id=ctx.cursor.uid,
             ),
         ]
+
+    def _component_label(
+        self,
+        game: CredentialsGame,
+        component: CredentialComponent,
+    ) -> str:
+        """Return the scenario-facing label for one packet component."""
+
+        if component.document_kind == "id":
+            return game.presentation.identity_label
+        return game.presentation.document_label(component.indication, component)
+
+    def _document_components(
+        self,
+        game: CredentialsGame,
+    ) -> list[tuple[CredentialComponent, str, str | None]]:
+        """Pair canonical packet components with optional authored text."""
+
+        case = game.active_case
+        documents = []
+        for component in case.packet_manager.document_components():
+            label = self._component_label(game, component)
+            documents.append((component, label, case.presented_documents.get(label)))
+        return documents
+
+    def _document_replacements(self, game: CredentialsGame) -> dict[uuid.UUID, str]:
+        """Return authored document replacements keyed by live component id."""
+
+        return {
+            component.uid: description
+            for component, _label, description in self._document_components(game)
+            if description is not None
+        }
+
+    @staticmethod
+    def _fallback_document_description(
+        component: CredentialComponent,
+    ) -> str:
+        """Keep direct callers useful when no live rendering context exists."""
+
+        if component.reference_singleton.name is not None:
+            return component.reference_singleton.name
+        if component.document_kind == "id":
+            return "identity document"
+        return f"{component.indication} document"
 
     def _candidate_fragments(
         self,
@@ -1945,27 +1993,40 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             hints=PresentationHints(label_text=case.candidate_name),
         )
 
-        id_card = _id_component(case.packet_manager)
         doc_uids: list[uuid.UUID] = []
         doc_pieces: list[BaseFragment] = []
-        for label, description in case.presented_documents.items():
+        component_labels: set[str] = set()
+        for component, label, authored_description in self._document_components(game):
+            component_labels.add(label)
+            description = (
+                render_text_as(
+                    component,
+                    "document_description",
+                    ctx=ctx,
+                    content=authored_description,
+                    bindings={"packet": case.packet_manager},
+                )
+                if ctx is not None
+                else authored_description
+                or self._fallback_document_description(component)
+            )
             doc_uid = _piece_uid(game.uid, idx, f"doc:{label}")
             doc_uids.append(doc_uid)
-            properties: dict[str, object] = {}
+            properties: dict[str, object] = {"component_id": component.uid}
             if (
-                id_card is not None
-                and label == game.presentation.identity_label
-                and case.packet_manager.has_resolved_subject(id_card.subject_id)
+                component.document_kind == "id"
+                and case.packet_manager.has_resolved_subject(component.subject_id)
             ):
-                subject = case.packet_manager.resolve_subject(id_card.subject_id)
-                properties.update(
-                    {
-                        "look_description": subject.describe_look(),
-                        "look_media_payload": subject.adapt_look_media_spec(
-                            media_role="id_photo"
-                        ),
-                    }
+                subject = case.packet_manager.resolve_subject(component.subject_id)
+                properties["look_media_payload"] = subject.adapt_look_media_spec(
+                    media_role="id_photo"
                 )
+                if ctx is not None:
+                    properties["look_description"] = render_text_as(
+                        subject,
+                        "presence_description",
+                        ctx=ctx,
+                    )
             doc_pieces.append(
                 PieceFragment(
                     uid=doc_uid,
@@ -1974,6 +2035,22 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     content=description,
                     zone_ref=packet_uid,
                     properties=properties,
+                    hints=PresentationHints(label_text=label),
+                )
+            )
+
+        for label, description in case.presented_documents.items():
+            if label in component_labels:
+                continue
+            doc_uid = _piece_uid(game.uid, idx, f"doc:{label}")
+            doc_uids.append(doc_uid)
+            doc_pieces.append(
+                PieceFragment(
+                    uid=doc_uid,
+                    piece_id=_document_piece_id(idx, label),
+                    piece_kind=_document_kind(label),
+                    content=description,
+                    zone_ref=packet_uid,
                     hints=PresentationHints(label_text=label),
                 )
             )

@@ -195,6 +195,11 @@ def test_packet_renders_identity_before_ordered_ordinary_documents() -> None:
         first.uid,
         second.uid,
     ]
+    assert [component.uid for component in owner.packet_manager.document_components()] == [
+        identity.uid,
+        first.uid,
+        second.uid,
+    ]
     assert rendered.index("travel passport") < rendered.index("Work Permit")
     assert rendered.index("Work Permit") < rendered.index("Travel Visa")
     assert identity.subject_id == owner.packet_manager.bearer_id

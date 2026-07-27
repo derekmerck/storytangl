@@ -7,20 +7,21 @@ update across rounds.
 
 from __future__ import annotations
 
-from tangl.core import Graph
+from tangl.core import Graph, Selector
 from tangl.journal.fragments import (
     ContentFragment,
     GroupFragment,
     KvFragment,
     PieceFragment,
 )
-from tangl.mechanics.credentials import CredentialToken, Indication
+from tangl.mechanics.credentials import CredentialStatus, CredentialToken, Indication
 from tangl.mechanics.games import (
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
     HasGame,
 )
+from tangl.mechanics.presence.look import HairColor, HairStyle, Look, SkinTone
 from tangl.story import Block
 from tangl.vm import Frame, VmPhaseCtx
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
@@ -90,7 +91,7 @@ class TestStructuredEmission:
 
         assert len(content) == 2
         assert "Edda Marrow" in content[0].content
-        assert "identity document" in content[1].content
+        assert "A worn passport." in content[1].content
         assert content[0].source_id == block.game.active_case.packet_manager.bearer_id
         assert content[1].source_id == block.uid
         assert fragments.index(content[0]) < fragments.index(content[1]) < fragments.index(candidate)
@@ -260,3 +261,168 @@ class TestStructuredEmission:
             p for p in _by_type(frags, PieceFragment) if p.piece_kind == "candidate"
         ]
         assert candidate and candidate[0].content == "Tomas Vey"
+
+    def test_component_documents_share_ordered_content_with_packet_prose(self) -> None:
+        case = CredentialCase(
+            candidate_name="Edda Marrow",
+            presented_documents={
+                "passport": "A blue passport.",
+                "travel permit": "A blue travel permit.",
+                "work permit": "A blue work permit.",
+                "baggage": "A blue suitcase.",
+            },
+            id_card=CredentialToken(indication=Indication.TRAVEL),
+            packet=[
+                CredentialToken(indication=Indication.TRAVEL),
+                CredentialToken(indication=Indication.WORK),
+            ],
+        )
+        block, handler, ctx = _live_game(case)
+
+        fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+        packet_prose = _by_type(fragments, ContentFragment)[1].content
+        documents = [
+            fragment
+            for fragment in _by_type(fragments, PieceFragment)
+            if fragment.piece_kind != "candidate"
+        ]
+        component_pieces = [
+            fragment for fragment in documents if "component_id" in fragment.properties
+        ]
+        packet_components = block.game.active_case.packet_manager.document_components()
+
+        assert [piece.properties["component_id"] for piece in component_pieces] == [
+            component.uid for component in packet_components
+        ]
+        assert [piece.content for piece in component_pieces] == [
+            "A blue passport.",
+            "A blue travel permit.",
+            "A blue work permit.",
+        ]
+        assert [packet_prose.index(piece.content) for piece in component_pieces] == sorted(
+            packet_prose.index(piece.content) for piece in component_pieces
+        )
+        baggage = next(piece for piece in documents if piece.content == "A blue suitcase.")
+        assert "component_id" not in baggage.properties
+
+    def test_default_identity_projection_uses_the_same_recursive_portrait_text(self) -> None:
+        case = CredentialCase(
+            candidate_name="Edda Marrow",
+            presented_documents={"baggage": "A lacquered case."},
+            id_card=CredentialToken(indication=Indication.TRAVEL),
+        )
+        block, handler, ctx = _live_game(case)
+        packet = block.game.active_case.packet_manager
+        packet.resolve_subject(packet.bearer_id).look = Look(
+            hair_color=HairColor.RED,
+            hair_style=HairStyle.LONG,
+            skin_tone=SkinTone.OLIVE,
+        )
+
+        fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+        packet_prose = _by_type(fragments, ContentFragment)[1].content
+        identity_piece = next(
+            piece
+            for piece in _by_type(fragments, PieceFragment)
+            if piece.properties.get("component_id")
+            == packet.document_components()[0].uid
+        )
+
+        assert "red long hair" in identity_piece.content
+        assert identity_piece.content in packet_prose
+        assert identity_piece.properties["look_description"] in identity_piece.content
+
+    def test_invalid_components_do_not_change_the_visible_piece_shape(self) -> None:
+        valid = CredentialCase(
+            presented_documents={"passport": "A passport."},
+            id_card=CredentialToken(indication=Indication.TRAVEL),
+        )
+        invalid = CredentialCase(
+            presented_documents={"passport": "A passport."},
+            id_card=CredentialToken(
+                indication=Indication.TRAVEL,
+                status=CredentialStatus.FORGED,
+            ),
+        )
+        valid_block, valid_handler, valid_ctx = _live_game(valid)
+        invalid_block, invalid_handler, invalid_ctx = _live_game(invalid)
+
+        def visible_shape(handler, game, ctx):
+            fragments = handler.get_journal_fragments(game, ctx=ctx)
+            pieces = [
+                piece
+                for piece in _by_type(fragments, PieceFragment)
+                if piece.piece_kind != "candidate"
+            ]
+            return [
+                (
+                    piece.piece_kind,
+                    piece.presentation_hints.label_text,
+                    set(piece.properties),
+                )
+                for piece in pieces
+            ], " ".join(
+                fragment.content for fragment in _by_type(fragments, ContentFragment)
+            ).lower()
+
+        valid_shape, valid_text = visible_shape(valid_handler, valid_block.game, valid_ctx)
+        invalid_shape, invalid_text = visible_shape(
+            invalid_handler,
+            invalid_block.game,
+            invalid_ctx,
+        )
+
+        assert invalid_shape == valid_shape
+        assert not any(
+            term in valid_text + invalid_text
+            for term in ("forged", "invalid", "deny")
+        )
+
+    def test_unbound_projection_keeps_authored_document_text(self) -> None:
+        case = CredentialCase(
+            presented_documents={"passport": "A stamped passport."},
+            id_card=CredentialToken(indication=Indication.TRAVEL),
+        )
+        game, handler = _game(case)
+
+        pieces = [
+            piece
+            for piece in _by_type(handler.get_journal_fragments(game), PieceFragment)
+            if piece.piece_kind != "candidate"
+        ]
+
+        assert len(pieces) == 1
+        assert pieces[0].content == "A stamped passport."
+        assert (
+            pieces[0].properties["component_id"]
+            == game.active_case.packet_manager.document_components()[0].uid
+        )
+
+    def test_component_piece_projection_survives_graph_roundtrip(self) -> None:
+        case = CredentialCase(
+            presented_documents={
+                "passport": "A stamped passport.",
+                "travel permit": "A stamped travel permit.",
+            },
+            id_card=CredentialToken(indication=Indication.TRAVEL),
+            packet=[CredentialToken(indication=Indication.TRAVEL)],
+        )
+        block, handler, ctx = _live_game(case)
+
+        def component_projection(active_handler, game, active_ctx):
+            return [
+                (piece.content, piece.properties["component_id"])
+                for piece in _by_type(
+                    active_handler.get_journal_fragments(game, ctx=active_ctx),
+                    PieceFragment,
+                )
+                if "component_id" in piece.properties
+            ]
+
+        before = component_projection(handler, block.game, ctx)
+        restored_graph = Graph.structure(ctx.graph.unstructure())
+        restored_block = restored_graph.find_one(Selector(label="checkpoint"))
+        restored_handler = restored_block.game_handler
+        restored_ctx = Frame(graph=restored_graph, cursor=restored_block)._make_ctx()
+
+        assert component_projection(restored_handler, restored_block.game, restored_ctx) == before

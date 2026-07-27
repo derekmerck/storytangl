@@ -10,7 +10,11 @@ that composes the packet's assigned document components through the same chain,
 without findings, JOURNAL, or game-owned presentation labels. Phase 14 invokes
 those projections from the credentials game's JOURNAL path through scenario
 arrival and packet templates, while preserving the existing typed candidate,
-packet, document, choice, and finding surfaces.
+packet, document, choice, and finding surfaces. Phase 15 makes the packet
+manager's ordered components the shared inventory for recursive packet prose
+and targetable document pieces, with scenario-authored document text supplied
+as an explicit replacement. Compatibility-only visible items remain separate,
+and visible document-part degradation is still deferred.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
