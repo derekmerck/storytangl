@@ -17,6 +17,7 @@ from tangl.journal.fragments import (
 from tangl.mechanics.credentials import CredentialStatus, CredentialToken, Indication
 from tangl.mechanics.games import (
     CredentialDisposition,
+    CredentialPresentationProfile,
     CredentialsGame,
     CredentialsGameHandler,
     HasGame,
@@ -331,6 +332,61 @@ class TestStructuredEmission:
         assert "red long hair" in identity_piece.content
         assert identity_piece.content in packet_prose
         assert identity_piece.properties["look_description"] in identity_piece.content
+
+    def test_procedural_default_identity_description_falls_through_to_portrait(self) -> None:
+        case = CredentialCase(
+            candidate_name="Edda Marrow",
+            id_card=CredentialToken(indication=Indication.TRAVEL),
+        )
+        profile = CredentialPresentationProfile()
+        profile.render_case(case, [])
+        assert case.presented_documents[profile.identity_label] == profile.identity_description
+
+        block, handler, ctx = _live_game(case)
+        packet = block.game.active_case.packet_manager
+        packet.resolve_subject(packet.bearer_id).look = Look(
+            hair_color=HairColor.RED,
+            hair_style=HairStyle.LONG,
+            skin_tone=SkinTone.OLIVE,
+        )
+
+        fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+        packet_prose = _by_type(fragments, ContentFragment)[1].content
+        identity_piece = next(
+            piece
+            for piece in _by_type(fragments, PieceFragment)
+            if piece.presentation_hints.label_text == profile.identity_label
+        )
+
+        assert "red long hair" in identity_piece.content
+        assert identity_piece.content in packet_prose
+
+    def test_duplicate_component_labels_have_distinct_fragment_uids(self) -> None:
+        case = CredentialCase(
+            presented_documents={"travel permit": "A stamped travel permit."},
+            packet=[
+                CredentialToken(indication=Indication.TRAVEL),
+                CredentialToken(indication=Indication.TRAVEL),
+            ],
+        )
+        block, handler, ctx = _live_game(case)
+
+        fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+        packet = next(
+            fragment
+            for fragment in fragments
+            if isinstance(fragment, GroupFragment) and fragment.zone_role == "packet"
+        )
+        permits = [
+            piece
+            for piece in _by_type(fragments, PieceFragment)
+            if piece.presentation_hints.label_text == "travel permit"
+        ]
+
+        assert len(permits) == 2
+        assert len({piece.uid for piece in permits}) == 2
+        assert len(set(packet.member_ids)) == 2
+        assert {piece.piece_id for piece in permits} == {"0:travel permit"}
 
     def test_invalid_components_do_not_change_the_visible_piece_shape(self) -> None:
         valid = CredentialCase(

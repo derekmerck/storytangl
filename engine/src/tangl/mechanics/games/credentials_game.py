@@ -1919,6 +1919,25 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return game.presentation.identity_label
         return game.presentation.document_label(component.indication, component)
 
+    @staticmethod
+    def _authored_document_description(
+        game: CredentialsGame,
+        component: CredentialComponent,
+        label: str,
+    ) -> str | None:
+        """Return a replacement when the scenario supplies more than boilerplate."""
+
+        description = game.active_case.presented_documents.get(label)
+        default_identity_description = CredentialPresentationProfile.model_fields[
+            "identity_description"
+        ].default
+        if (
+            component.document_kind == "id"
+            and description == default_identity_description
+        ):
+            return None
+        return description
+
     def _document_components(
         self,
         game: CredentialsGame,
@@ -1929,7 +1948,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         documents = []
         for component in case.packet_manager.document_components():
             label = self._component_label(game, component)
-            documents.append((component, label, case.presented_documents.get(label)))
+            documents.append(
+                (
+                    component,
+                    label,
+                    self._authored_document_description(game, component, label),
+                )
+            )
         return documents
 
     def _document_replacements(self, game: CredentialsGame) -> dict[uuid.UUID, str]:
@@ -2010,7 +2035,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 else authored_description
                 or self._fallback_document_description(component)
             )
-            doc_uid = _piece_uid(game.uid, idx, f"doc:{label}")
+            doc_uid = _piece_uid(game.uid, idx, f"doc:{component.uid}")
             doc_uids.append(doc_uid)
             properties: dict[str, object] = {"component_id": component.uid}
             if (
