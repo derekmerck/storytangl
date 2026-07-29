@@ -1992,7 +1992,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         """Pair canonical components with their profile base and visible parts."""
 
         case = game.active_case
-        documents = []
+        documents: list[_CredentialDocumentRender] = []
         for component in case.packet_manager.document_components():
             label = self._component_label(game, component)
             base_description = (
@@ -2005,21 +2005,27 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 )
             )
             presented_description = case.presented_documents.get(label)
+            complete_replacement = (
+                presented_description
+                if presented_description != base_description
+                else None
+            )
             documents.append(
                 _CredentialDocumentRender(
                     component=component,
                     label=label,
                     base_description=base_description,
-                    complete_replacement=(
-                        presented_description
-                        if presented_description != base_description
-                        else None
-                    ),
-                    visible_observations=game.presentation.attestation_observations(
-                        component,
-                        reissued=(
-                            game.finding_status.get(component.indication) == Finding.CLEARED
-                        ),
+                    complete_replacement=complete_replacement,
+                    visible_observations=(
+                        ()
+                        if complete_replacement is not None
+                        else game.presentation.attestation_observations(
+                            component,
+                            reissued=(
+                                game.finding_status.get(component.indication)
+                                == Finding.CLEARED
+                            ),
+                        )
                     ),
                 )
             )

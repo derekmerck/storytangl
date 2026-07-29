@@ -510,7 +510,7 @@ class TestStructuredEmission:
         ).properties["visible_parts"] == []
         replacement = permit_piece(replacement_handler, replacement_block, replacement_ctx)
         assert replacement.content == "A hand-written work permit."
-        assert replacement.properties["visible_parts"]
+        assert replacement.properties["visible_parts"] == []
 
     def test_default_identity_projection_uses_the_same_recursive_portrait_text(self) -> None:
         case = CredentialCase(
