@@ -14,6 +14,7 @@ from tangl.journal.fragments import (
     KvFragment,
     PieceFragment,
 )
+from tangl.mechanics.assembly import ComponentFacet
 from tangl.mechanics.credentials import (
     CredentialDefinition,
     CredentialStatus,
@@ -61,12 +62,15 @@ def _attested_case(
     status: CredentialStatus = CredentialStatus.VALID,
     issuer_group: str | None = "immigration",
     presented_documents: dict[str, str] | None = None,
+    requestable: bool = False,
 ) -> CredentialCase:
     permit_label = (
         "phase16_permit_with_issuer"
         if issuer_group is not None
         else "phase16_permit_without_issuer"
     )
+    if requestable:
+        permit_label += "_requestable"
     id_definition = CredentialDefinition.get_instance("phase16_identity") or CredentialDefinition(
         label="phase16_identity",
         name="Passport",
@@ -80,6 +84,15 @@ def _attested_case(
         issuer_group=issuer_group,
         document_kind="document",
         requires_id=True,
+        facets=(
+            ComponentFacet(
+                channel="choice",
+                facet_type="giver",
+                payload="request_document",
+            ),
+        )
+        if requestable
+        else (),
     )
     catalog = TokenCatalog(
         wst=CredentialDefinition,
@@ -386,6 +399,47 @@ class TestStructuredEmission:
         assert permit.model_dump(mode="json", by_alias=True)["properties"][
             "visible_parts"
         ] == permit.properties["visible_parts"]
+
+    def test_context_free_document_piece_includes_its_visible_attestation(self) -> None:
+        game, handler = _game(_attested_case())
+
+        permit = next(
+            piece
+            for piece in _by_type(handler.get_journal_fragments(game), PieceFragment)
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+        attestation = "A round blue immigration seal is impressed beside the bearer line."
+
+        assert attestation in permit.content
+        assert permit.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": attestation}
+        ]
+
+    def test_reissued_missing_seal_projects_an_ordinary_attestation(self) -> None:
+        block, handler, ctx = _live_game(
+            _attested_case(
+                status=CredentialStatus.MISSING_SEAL,
+                requestable=True,
+            )
+        )
+        handler.receive_move(block.game, ("request_document", "work"))
+
+        permit = next(
+            piece
+            for piece in _by_type(
+                handler.get_journal_fragments(block.game, ctx=ctx),
+                PieceFragment,
+            )
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+        attestation = "A round blue immigration seal is impressed beside the bearer line."
+
+        assert block.game.finding_status[Indication.WORK.value] == "cleared"
+        assert attestation in permit.content
+        assert "seal space is blank" not in permit.content
+        assert permit.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": attestation}
+        ]
 
     def test_missing_and_alternate_attestations_remain_neutral_observations(self) -> None:
         for status, expected in (

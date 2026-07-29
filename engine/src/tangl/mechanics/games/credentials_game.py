@@ -766,13 +766,15 @@ class CredentialPresentationProfile(BaseModelPlus):
     def attestation_observations(
         self,
         component: CredentialComponent,
+        *,
+        reissued: bool = False,
     ) -> tuple[CredentialAttestationObservation, ...]:
         """Project the visible issuer attestation without interpreting it."""
 
         if component.issuer_group is None:
             return ()
         template = self.ordinary_attestation_template
-        if component.status is CredentialStatus.MISSING_SEAL:
+        if component.status is CredentialStatus.MISSING_SEAL and not reissued:
             template = self.missing_attestation_template
         elif component.status is CredentialStatus.FORGED:
             template = self.alternate_attestation_template
@@ -2014,7 +2016,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                         else None
                     ),
                     visible_observations=game.presentation.attestation_observations(
-                        component
+                        component,
+                        reissued=(
+                            game.finding_status.get(component.indication) == Finding.CLEARED
+                        ),
                     ),
                 )
             )
@@ -2117,7 +2122,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 )
                 if ctx is not None
                 else document.complete_replacement
-                or self._fallback_document_description(component)
+                or "; ".join(
+                    [self._fallback_document_description(component)]
+                    + [
+                        observation.content
+                        for observation in document.visible_observations
+                    ]
+                )
             )
             doc_uid = _piece_uid(game.uid, idx, f"doc:{component.uid}")
             doc_uids.append(doc_uid)
