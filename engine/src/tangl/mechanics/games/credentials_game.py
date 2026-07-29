@@ -13,6 +13,7 @@ next candidate after every disposition until the game reports terminal.
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, Literal, Self
 
@@ -80,6 +81,10 @@ def _piece_uid(game_uid: uuid.UUID, case_index: int, key: str) -> uuid.UUID:
 
 def _document_piece_id(case_index: int, label: str) -> str:
     return f"{case_index}:{label}"
+
+
+def _component_piece_id(case_index: int, component_id: uuid.UUID) -> str:
+    return f"{case_index}:component:{component_id}"
 
 
 def _document_kind(label: str) -> str:
@@ -669,7 +674,9 @@ class CredentialPresentationProfile(BaseModelPlus):
         "{% if description %}, {{ description }}{% endif %} steps forward."
     )
     packet_presentation_template: str = (
-        "They present their documents: {{ render_as(packet, 'inspection_description') }}"
+        "They present their documents: "
+        "{{ render_as(packet, 'inspection_description', "
+        "bindings={'document_replacements': document_replacements}) }}"
     )
     status_text: dict[CredentialStatus, str] = Field(
         default_factory=lambda: {
@@ -1353,11 +1360,22 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         selected_piece_id = piece_ids[0]
         if not isinstance(selected_piece_id, str):
             raise ValueError("Document piece_id must be a string")
-        target_by_piece_id = {
-            _document_piece_id(game.case_index, target): target
+        inspect_targets = {
+            target
             for target in self.get_available_inspect_targets(game)
             if target in game.presented_documents
         }
+        target_by_piece_id = {
+            _document_piece_id(game.case_index, target): target
+            for target in inspect_targets
+        }
+        component_documents = self._document_components(game)
+        label_counts = Counter(label for _component, label, _description in component_documents)
+        for component, label, _description in component_documents:
+            if label_counts[label] <= 1 or label not in inspect_targets:
+                continue
+            target_by_piece_id.pop(_document_piece_id(game.case_index, label), None)
+            target_by_piece_id[_component_piece_id(game.case_index, component.uid)] = label
         target = target_by_piece_id.get(selected_piece_id)
         if target is None:
             raise ValueError(f"Document piece is not inspectable: {selected_piece_id}")
@@ -1879,6 +1897,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             "candidate_name": case.candidate_name,
             "candidate": candidate,
             "packet": packet,
+            "document_replacements": self._document_replacements(game),
         }
         return [
             ContentFragment(
@@ -1904,6 +1923,76 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 source_id=ctx.cursor.uid,
             ),
         ]
+
+    def _component_label(
+        self,
+        game: CredentialsGame,
+        component: CredentialComponent,
+    ) -> str:
+        """Return the scenario-facing label for one packet component."""
+
+        if component.document_kind == "id":
+            return game.presentation.identity_label
+        return game.presentation.document_label(component.indication, component)
+
+    @staticmethod
+    def _authored_document_description(
+        game: CredentialsGame,
+        component: CredentialComponent,
+        label: str,
+    ) -> str | None:
+        """Return a replacement when the scenario supplies more than boilerplate."""
+
+        description = game.active_case.presented_documents.get(label)
+        default_identity_description = CredentialPresentationProfile.model_fields[
+            "identity_description"
+        ].default
+        if (
+            component.document_kind == "id"
+            and description == default_identity_description
+        ):
+            return None
+        return description
+
+    def _document_components(
+        self,
+        game: CredentialsGame,
+    ) -> list[tuple[CredentialComponent, str, str | None]]:
+        """Pair canonical packet components with optional authored text."""
+
+        case = game.active_case
+        documents = []
+        for component in case.packet_manager.document_components():
+            label = self._component_label(game, component)
+            documents.append(
+                (
+                    component,
+                    label,
+                    self._authored_document_description(game, component, label),
+                )
+            )
+        return documents
+
+    def _document_replacements(self, game: CredentialsGame) -> dict[uuid.UUID, str]:
+        """Return authored document replacements keyed by live component id."""
+
+        return {
+            component.uid: description
+            for component, _label, description in self._document_components(game)
+            if description is not None
+        }
+
+    @staticmethod
+    def _fallback_document_description(
+        component: CredentialComponent,
+    ) -> str:
+        """Keep direct callers useful when no live rendering context exists."""
+
+        if component.reference_singleton.name is not None:
+            return component.reference_singleton.name
+        if component.document_kind == "id":
+            return "identity document"
+        return f"{component.indication} document"
 
     def _candidate_fragments(
         self,
@@ -1945,27 +2034,65 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             hints=PresentationHints(label_text=case.candidate_name),
         )
 
-        id_card = _id_component(case.packet_manager)
         doc_uids: list[uuid.UUID] = []
         doc_pieces: list[BaseFragment] = []
+        component_labels: set[str] = set()
+        component_documents = self._document_components(game)
+        label_counts = Counter(
+            label for _component, label, _description in component_documents
+        )
+        for component, label, authored_description in component_documents:
+            component_labels.add(label)
+            description = (
+                render_text_as(
+                    component,
+                    "document_description",
+                    ctx=ctx,
+                    content=authored_description,
+                    bindings={"packet": case.packet_manager},
+                )
+                if ctx is not None
+                else authored_description
+                or self._fallback_document_description(component)
+            )
+            doc_uid = _piece_uid(game.uid, idx, f"doc:{component.uid}")
+            doc_uids.append(doc_uid)
+            properties: dict[str, object] = {"component_id": component.uid}
+            if (
+                component.document_kind == "id"
+                and case.packet_manager.has_resolved_subject(component.subject_id)
+            ):
+                subject = case.packet_manager.resolve_subject(component.subject_id)
+                properties["look_media_payload"] = subject.adapt_look_media_spec(
+                    media_role="id_photo"
+                )
+                if ctx is not None:
+                    properties["look_description"] = render_text_as(
+                        subject,
+                        "presence_description",
+                        ctx=ctx,
+                    )
+            doc_pieces.append(
+                PieceFragment(
+                    uid=doc_uid,
+                    piece_id=(
+                        _component_piece_id(idx, component.uid)
+                        if label_counts[label] > 1
+                        else _document_piece_id(idx, label)
+                    ),
+                    piece_kind=_document_kind(label),
+                    content=description,
+                    zone_ref=packet_uid,
+                    properties=properties,
+                    hints=PresentationHints(label_text=label),
+                )
+            )
+
         for label, description in case.presented_documents.items():
+            if label in component_labels:
+                continue
             doc_uid = _piece_uid(game.uid, idx, f"doc:{label}")
             doc_uids.append(doc_uid)
-            properties: dict[str, object] = {}
-            if (
-                id_card is not None
-                and label == game.presentation.identity_label
-                and case.packet_manager.has_resolved_subject(id_card.subject_id)
-            ):
-                subject = case.packet_manager.resolve_subject(id_card.subject_id)
-                properties.update(
-                    {
-                        "look_description": subject.describe_look(),
-                        "look_media_payload": subject.adapt_look_media_spec(
-                            media_role="id_photo"
-                        ),
-                    }
-                )
             doc_pieces.append(
                 PieceFragment(
                     uid=doc_uid,
@@ -1973,7 +2100,6 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     piece_kind=_document_kind(label),
                     content=description,
                     zone_ref=packet_uid,
-                    properties=properties,
                     hints=PresentationHints(label_text=label),
                 )
             )

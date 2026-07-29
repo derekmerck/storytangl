@@ -5,12 +5,7 @@ from __future__ import annotations
 from tangl.story.dispatch import on_render_text
 from tangl.vm.ctx import VmPhaseCtx
 
-from .assembly import (
-    CREDENTIAL_ID_SLOT,
-    CREDENTIAL_PACKET_SLOT,
-    CredentialComponent,
-    CredentialPacketManager,
-)
+from .assembly import CredentialComponent, CredentialPacketManager
 
 
 @on_render_text(wants_caller_kind=CredentialPacketManager, wants_exact_kind=False)
@@ -25,12 +20,12 @@ def render_packet_text(
     if aspect != "inspection_description":
         return None
     return (
-        f"{{% set identity = subject.get_slot('{CREDENTIAL_ID_SLOT}') %}}"
-        f"{{% set documents = subject.get_slot('{CREDENTIAL_PACKET_SLOT}') %}}"
-        "{% set presented = identity + documents %}"
+        "{% set presented = subject.document_components() %}"
+        "{% set replacements = document_replacements | default({}) %}"
         "{% if presented %}"
         "{% for document in presented %}"
-        "{{ render_as(document, 'document_description', bindings={'packet': subject}) }}"
+        "{{ render_as(document, 'document_description', "
+        "content=replacements.get(document.uid), bindings={'packet': subject}) }}"
         "{% if not loop.last %}; {% endif %}"
         "{% endfor %}"
         "{% else %}No documents.{% endif %}"

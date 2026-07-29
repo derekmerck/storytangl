@@ -204,6 +204,14 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
             for credential in self.get_slot(CREDENTIAL_PACKET_SLOT)
         ]
 
+    def document_components(self) -> list[CredentialComponent]:
+        """Return the packet's visible documents in presentation order."""
+
+        return [
+            *self.get_slot(CREDENTIAL_ID_SLOT),
+            *self.get_slot(CREDENTIAL_PACKET_SLOT),
+        ]
+
     def get_contraband(self) -> list[ContrabandItem]:
         return list(self.possessions)
 
