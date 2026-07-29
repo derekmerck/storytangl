@@ -12,6 +12,7 @@ from tangl.core import BehaviorRegistry, DispatchLayer, Graph, Node, Selector
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
+    CredentialAttestationObservation,
     CredentialComponent,
     CredentialDefinition,
     CredentialPacketManager,
@@ -229,6 +230,14 @@ def test_non_id_document_uses_authored_name_or_neutral_indication_fallback() -> 
 
     assert _render_document(named, owner.packet_manager) == "Work Permit"
     assert _render_document(fallback, owner.packet_manager) == "travel document"
+
+
+def test_attestation_observation_renders_through_its_own_text_aspect() -> None:
+    observation = CredentialAttestationObservation(
+        content="A round blue immigration seal is impressed beside the bearer line."
+    )
+
+    assert render_text_as(observation, "part_description", ctx=_TextCtx()) == observation.content
 
 
 def test_packet_bindings_are_explicit_and_status_does_not_change_output() -> None:

@@ -28,8 +28,12 @@ on their committed interaction paths. Phase 15 converges packet prose and
 targetable credential pieces on the packet manager's ordered components and
 the same ``document_description`` adapter. Scenario-authored complete document
 text remains an explicit replacement, while compatibility-only visible items
-such as baggage remain separate pieces; document-part degradation and media
-composition remain deferred.
+such as baggage remain separate pieces. Phase 16 adds one immutable, typed
+issuer-attestation observation to the same recursive projection: profile-owned
+neutral wording becomes both document prose and a structured ``visible_parts``
+entry on the corresponding piece. A complete authored document replacement owns
+its content and does not append generated parts; media composition remains
+deferred.
 
 ## Purpose
 

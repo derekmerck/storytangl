@@ -126,7 +126,14 @@ class GateCredentialsGame(CredentialsGame):
                 Indication.WEAPON: "weapon permit",
                 Indication.DRUGS: "drugs permit",
                 Indication.SECRETS: "secrets permit",
-            }
+            },
+            ordinary_attestation_template=(
+                "A round blue {issuer_group} seal is impressed beside the bearer line."
+            ),
+            missing_attestation_template="The {issuer_group} seal space is blank.",
+            alternate_attestation_template=(
+                "An over-bright {issuer_group} seal sits beside the bearer line."
+            ),
         )
     )
 
@@ -185,7 +192,14 @@ class SampledGateGame(CredentialsGame):
                 Indication.WEAPON: "weapon permit",
                 Indication.DRUGS: "drugs permit",
                 Indication.SECRETS: "secrets permit",
-            }
+            },
+            ordinary_attestation_template=(
+                "A round blue {issuer_group} seal is impressed beside the bearer line."
+            ),
+            missing_attestation_template="The {issuer_group} seal space is blank.",
+            alternate_attestation_template=(
+                "An over-bright {issuer_group} seal sits beside the bearer line."
+            ),
         )
     )
 
