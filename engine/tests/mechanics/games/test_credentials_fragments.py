@@ -20,6 +20,7 @@ from tangl.mechanics.games import (
     CredentialPresentationProfile,
     CredentialsGame,
     CredentialsGameHandler,
+    CredentialsMove,
     HasGame,
 )
 from tangl.mechanics.presence.look import HairColor, HairStyle, Look, SkinTone
@@ -385,8 +386,17 @@ class TestStructuredEmission:
 
         assert len(permits) == 2
         assert len({piece.uid for piece in permits}) == 2
+        assert len({piece.piece_id for piece in permits}) == 2
         assert len(set(packet.member_ids)) == 2
-        assert {piece.piece_id for piece in permits} == {"0:travel permit"}
+        assert all(piece.piece_id.startswith("0:component:") for piece in permits)
+        assert {
+            handler.resolve_move_payload(
+                block.game,
+                CredentialsMove(kind="inspect", target="__document_piece__"),
+                {"piece_ids": [piece.piece_id]},
+            ).target
+            for piece in permits
+        } == {"travel permit"}
 
     def test_invalid_components_do_not_change_the_visible_piece_shape(self) -> None:
         valid = CredentialCase(

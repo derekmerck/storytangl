@@ -13,6 +13,7 @@ next candidate after every disposition until the game reports terminal.
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, Literal, Self
 
@@ -80,6 +81,10 @@ def _piece_uid(game_uid: uuid.UUID, case_index: int, key: str) -> uuid.UUID:
 
 def _document_piece_id(case_index: int, label: str) -> str:
     return f"{case_index}:{label}"
+
+
+def _component_piece_id(case_index: int, component_id: uuid.UUID) -> str:
+    return f"{case_index}:component:{component_id}"
 
 
 def _document_kind(label: str) -> str:
@@ -1355,11 +1360,22 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         selected_piece_id = piece_ids[0]
         if not isinstance(selected_piece_id, str):
             raise ValueError("Document piece_id must be a string")
-        target_by_piece_id = {
-            _document_piece_id(game.case_index, target): target
+        inspect_targets = {
+            target
             for target in self.get_available_inspect_targets(game)
             if target in game.presented_documents
         }
+        target_by_piece_id = {
+            _document_piece_id(game.case_index, target): target
+            for target in inspect_targets
+        }
+        component_documents = self._document_components(game)
+        label_counts = Counter(label for _component, label, _description in component_documents)
+        for component, label, _description in component_documents:
+            if label_counts[label] <= 1 or label not in inspect_targets:
+                continue
+            target_by_piece_id.pop(_document_piece_id(game.case_index, label), None)
+            target_by_piece_id[_component_piece_id(game.case_index, component.uid)] = label
         target = target_by_piece_id.get(selected_piece_id)
         if target is None:
             raise ValueError(f"Document piece is not inspectable: {selected_piece_id}")
@@ -2021,7 +2037,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         doc_uids: list[uuid.UUID] = []
         doc_pieces: list[BaseFragment] = []
         component_labels: set[str] = set()
-        for component, label, authored_description in self._document_components(game):
+        component_documents = self._document_components(game)
+        label_counts = Counter(
+            label for _component, label, _description in component_documents
+        )
+        for component, label, authored_description in component_documents:
             component_labels.add(label)
             description = (
                 render_text_as(
@@ -2055,7 +2075,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             doc_pieces.append(
                 PieceFragment(
                     uid=doc_uid,
-                    piece_id=_document_piece_id(idx, label),
+                    piece_id=(
+                        _component_piece_id(idx, component.uid)
+                        if label_counts[label] > 1
+                        else _document_piece_id(idx, label)
+                    ),
                     piece_kind=_document_kind(label),
                     content=description,
                     zone_ref=packet_uid,
