@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
+from pydantic import ConfigDict
+
+from tangl.core.bases import BaseModelPlus
 from tangl.story.dispatch import on_render_text
 from tangl.vm.ctx import VmPhaseCtx
 
 from .assembly import CredentialComponent, CredentialPacketManager
+
+
+class CredentialAttestationObservation(BaseModelPlus):
+    """One neutral, visible issuer-attestation observation on a document."""
+
+    model_config = ConfigDict(frozen=True)
+
+    part_id: Literal["issuer_attestation"] = "issuer_attestation"
+    content: str
 
 
 @on_render_text(wants_caller_kind=CredentialPacketManager, wants_exact_kind=False)
@@ -22,10 +36,14 @@ def render_packet_text(
     return (
         "{% set presented = subject.document_components() %}"
         "{% set replacements = document_replacements | default({}) %}"
+        "{% set bases = document_bases | default({}) %}"
+        "{% set observations = document_observations | default({}) %}"
         "{% if presented %}"
         "{% for document in presented %}"
         "{{ render_as(document, 'document_description', "
-        "content=replacements.get(document.uid), bindings={'packet': subject}) }}"
+        "content=replacements.get(document.uid), bindings={'packet': subject, "
+        "'base_description': bases.get(document.uid), "
+        "'visible_observations': observations.get(document.uid, ())}) }}"
         "{% if not loop.last %}; {% endif %}"
         "{% endfor %}"
         "{% else %}No documents.{% endif %}"
@@ -45,11 +63,37 @@ def render_document_text(
         return None
     if caller.document_kind == "id":
         return (
-            "{{ subject.name or 'identity document' }}, bearing a portrait of "
+            "{% set base = base_description | default(subject.name or 'identity document', true) %}"
+            "{{ base }}, bearing a portrait of "
             "{{ render_as(packet.resolve_subject(subject.subject_id), "
             "'presence_description') }}"
+            "{% for observation in visible_observations | default(()) %}; "
+            "{{ render_as(observation, 'part_description') }}{% endfor %}"
         )
-    return "{{ subject.name or (subject.indication | replace('_', ' ') ~ ' document') }}"
+    return (
+        "{% set base = base_description | default(subject.name or "
+        "(subject.indication | replace('_', ' ') ~ ' document'), true) %}"
+        "{{ base }}{% for observation in visible_observations | default(()) %}; "
+        "{{ render_as(observation, 'part_description') }}{% endfor %}"
+    )
 
 
-__all__ = ["render_document_text", "render_packet_text"]
+@on_render_text(wants_caller_kind=CredentialAttestationObservation, wants_exact_kind=False)
+def render_attestation_text(
+    *,
+    caller: CredentialAttestationObservation,
+    aspect: str,
+    ctx: VmPhaseCtx,
+) -> str | None:
+    """Render the authored visible wording for one issuer attestation."""
+
+    _ = ctx
+    return caller.content if aspect == "part_description" else None
+
+
+__all__ = [
+    "CredentialAttestationObservation",
+    "render_attestation_text",
+    "render_document_text",
+    "render_packet_text",
+]

@@ -72,7 +72,14 @@ HALL_PRESENTATION = CredentialPresentationProfile(
     },
     identity_label="student ID",
     identity_description="A laminated student identification card.",
-    document_description="{document}. Signed for this period.",
+    document_description="{document}.",
+    ordinary_attestation_template=(
+        "The {issuer_group} signature appears in blue ink."
+    ),
+    missing_attestation_template="The {issuer_group} signature line is blank.",
+    alternate_attestation_template=(
+        "The {issuer_group} signature is written in a heavy, unfamiliar hand."
+    ),
     possession_description="A student openly declares {indication}.",
     status_text={
         CredentialStatus.MISSING_SEAL: "The required teacher signature is missing.",

@@ -7,6 +7,7 @@ from pathlib import Path
 from tangl.core import Graph, Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
+from tangl.journal.fragments import PieceFragment
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
@@ -95,6 +96,13 @@ BORDER_PRESENTATION = CredentialPresentationProfile(
     identity_label="passport",
     identity_description="A border identity document.",
     document_description="A {document}.",
+    ordinary_attestation_template=(
+        "A round blue {issuer_group} seal is impressed beside the bearer line."
+    ),
+    missing_attestation_template="The {issuer_group} seal space is blank.",
+    alternate_attestation_template=(
+        "An over-bright {issuer_group} seal sits beside the bearer line."
+    ),
     status_text={
         CredentialStatus.MISSING_SEAL: "The issuing stamp is missing.",
         CredentialStatus.BAD_DATE: "The issue date is wrong.",
@@ -113,6 +121,11 @@ SCHOOL_PRESENTATION = CredentialPresentationProfile(
     identity_label="student ID",
     identity_description="A laminated student identification card.",
     document_description="A {document}.",
+    ordinary_attestation_template="The {issuer_group} signature appears in blue ink.",
+    missing_attestation_template="The {issuer_group} signature line is blank.",
+    alternate_attestation_template=(
+        "The {issuer_group} signature is written in a heavy, unfamiliar hand."
+    ),
     status_text={
         CredentialStatus.MISSING_SEAL: "The required teacher signature is missing.",
         CredentialStatus.BAD_DATE: "The date on the pass is wrong.",
@@ -212,6 +225,7 @@ activity_pass:
   name: Work Permit
   origin_ids: [border]
   indication: work
+  issuer_group: immigration
   document_kind: document
   requires_id: true
   facets:
@@ -232,6 +246,7 @@ activity_pass:
   name: Activity Pass
   origin_ids: [school]
   indication: activity
+  issuer_group: classroom
   document_kind: document
   requires_id: true
   facets:
@@ -308,6 +323,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         decision,
         expected_names,
         excluded_names,
+        expected_attestation,
     ) in (
         (
             "Work the border checkpoint",
@@ -319,6 +335,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             "Turn away",
             ("Border Identity Card", "Work Permit"),
             ("Student ID", "Activity Pass"),
+            "The immigration seal space is blank.",
         ),
         (
             "Monitor the school halls",
@@ -330,6 +347,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             "Send back to class",
             ("Student ID", "Activity Pass"),
             ("Border Identity Card", "Work Permit"),
+            "The classroom signature line is blank.",
         ),
     ):
         result = combined_world.create_story("combined_credentials", init_mode=InitMode.EAGER)
@@ -377,6 +395,21 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         )
         assert all(name in packet_description for name in expected_names)
         assert not any(name in packet_description for name in excluded_names)
+
+        fragments = ledger.cursor.game_handler.get_journal_fragments(
+            game,
+            ctx=PhaseCtx(graph=result.graph, cursor_id=block.uid),
+        )
+        permit_piece = next(
+            fragment
+            for fragment in fragments
+            if isinstance(fragment, PieceFragment)
+            and fragment.properties.get("component_id") == packet_components[0].uid
+        )
+        assert permit_piece.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": expected_attestation}
+        ]
+        assert expected_attestation in permit_piece.content
 
         restored = Graph.structure(result.graph.unstructure())
         restored_block = restored.find_one(Selector(label=block_label))

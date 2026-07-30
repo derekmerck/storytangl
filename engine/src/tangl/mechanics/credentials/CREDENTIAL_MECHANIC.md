@@ -14,7 +14,13 @@ packet, document, choice, and finding surfaces. Phase 15 makes the packet
 manager's ordered components the shared inventory for recursive packet prose
 and targetable document pieces, with scenario-authored document text supplied
 as an explicit replacement. Compatibility-only visible items remain separate,
-and visible document-part degradation is still deferred.
+and further visible document-part degradation is still deferred. Phase 16 adds the
+first concrete visible document part: a profile-owned, immutable issuer
+attestation observation. The ordinary, missing, and alternate visible forms
+project neutrally into the recursive text description and the matching piece's
+``visible_parts`` payload, without exposing a credential finding or disposition.
+A scenario-authored complete document replacement remains self-contained and
+does not append generated parts.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.

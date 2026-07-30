@@ -7,14 +7,22 @@ update across rounds.
 
 from __future__ import annotations
 
-from tangl.core import Graph, Selector
+from tangl.core import Graph, Selector, TokenCatalog
 from tangl.journal.fragments import (
     ContentFragment,
     GroupFragment,
     KvFragment,
     PieceFragment,
 )
-from tangl.mechanics.credentials import CredentialStatus, CredentialToken, Indication
+from tangl.mechanics.assembly import ComponentFacet
+from tangl.mechanics.credentials import (
+    CredentialDefinition,
+    CredentialStatus,
+    CredentialToken,
+    Indication,
+    Region,
+    materialize_packet,
+)
 from tangl.mechanics.games import (
     CredentialDisposition,
     CredentialPresentationProfile,
@@ -46,6 +54,70 @@ def _renderable_case() -> CredentialCase:
         candidate_name="Edda Marrow",
         presented_documents={"passport": "A worn passport."},
         id_card=CredentialToken(indication=Indication.TRAVEL),
+    )
+
+
+def _attested_case(
+    *,
+    status: CredentialStatus = CredentialStatus.VALID,
+    issuer_group: str | None = "immigration",
+    presented_documents: dict[str, str] | None = None,
+    requestable: bool = False,
+) -> CredentialCase:
+    permit_label = (
+        "phase16_permit_with_issuer"
+        if issuer_group is not None
+        else "phase16_permit_without_issuer"
+    )
+    if requestable:
+        permit_label += "_requestable"
+    id_definition = CredentialDefinition.get_instance("phase16_identity") or CredentialDefinition(
+        label="phase16_identity",
+        name="Passport",
+        indication=Indication.WORK,
+        document_kind="id",
+    )
+    permit_definition = CredentialDefinition.get_instance(permit_label) or CredentialDefinition(
+        label=permit_label,
+        name="Work Permit",
+        indication=Indication.WORK,
+        issuer_group=issuer_group,
+        document_kind="document",
+        requires_id=True,
+        facets=(
+            ComponentFacet(
+                channel="choice",
+                facet_type="giver",
+                payload="request_document",
+            ),
+        )
+        if requestable
+        else (),
+    )
+    catalog = TokenCatalog(
+        wst=CredentialDefinition,
+        members=(id_definition, permit_definition),
+        label="phase16",
+    )
+    return CredentialCase(
+        candidate_name="Edda Marrow",
+        presented_documents=presented_documents or {},
+        packet_manager=materialize_packet(
+            owner=object(),
+            region=Region.LOCAL,
+            purpose=Indication.WORK,
+            id_card=CredentialToken(indication=Indication.WORK),
+            credentials=[
+                CredentialToken(
+                    indication=Indication.WORK,
+                    status=status,
+                    requires_id=True,
+                )
+            ],
+            possessions=[],
+            label_prefix="Edda Marrow",
+            catalog=catalog,
+        ),
     )
 
 
@@ -307,6 +379,139 @@ class TestStructuredEmission:
         baggage = next(piece for piece in documents if piece.content == "A blue suitcase.")
         assert "component_id" not in baggage.properties
 
+    def test_visible_attestation_is_shared_by_packet_prose_and_document_piece(self) -> None:
+        block, handler, ctx = _live_game(_attested_case())
+
+        fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+        packet_prose = _by_type(fragments, ContentFragment)[1].content
+        permit = next(
+            piece
+            for piece in _by_type(fragments, PieceFragment)
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+        attestation = "A round blue immigration seal is impressed beside the bearer line."
+
+        assert permit.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": attestation}
+        ]
+        assert attestation in permit.content
+        assert permit.content in packet_prose
+        assert permit.model_dump(mode="json", by_alias=True)["properties"][
+            "visible_parts"
+        ] == permit.properties["visible_parts"]
+
+    def test_context_free_document_piece_includes_its_visible_attestation(self) -> None:
+        game, handler = _game(_attested_case())
+
+        permit = next(
+            piece
+            for piece in _by_type(handler.get_journal_fragments(game), PieceFragment)
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+        attestation = "A round blue immigration seal is impressed beside the bearer line."
+
+        assert attestation in permit.content
+        assert permit.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": attestation}
+        ]
+
+    def test_reissued_missing_seal_projects_an_ordinary_attestation(self) -> None:
+        block, handler, ctx = _live_game(
+            _attested_case(
+                status=CredentialStatus.MISSING_SEAL,
+                requestable=True,
+            )
+        )
+        handler.receive_move(block.game, ("request_document", "work"))
+
+        permit = next(
+            piece
+            for piece in _by_type(
+                handler.get_journal_fragments(block.game, ctx=ctx),
+                PieceFragment,
+            )
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+        attestation = "A round blue immigration seal is impressed beside the bearer line."
+
+        assert block.game.finding_status[Indication.WORK.value] == "cleared"
+        assert attestation in permit.content
+        assert "seal space is blank" not in permit.content
+        assert permit.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": attestation}
+        ]
+
+    def test_missing_and_alternate_attestations_remain_neutral_observations(self) -> None:
+        for status, expected in (
+            (CredentialStatus.MISSING_SEAL, "The immigration seal space is blank."),
+            (
+                CredentialStatus.FORGED,
+                "An over-bright immigration seal sits beside the bearer line.",
+            ),
+        ):
+            block, handler, ctx = _live_game(_attested_case(status=status))
+            fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+            permit = next(
+                piece
+                for piece in _by_type(fragments, PieceFragment)
+                if piece.presentation_hints.label_text == "Work Permit"
+            )
+
+            assert permit.properties["visible_parts"][0]["content"] == expected
+            assert expected in permit.content
+            assert not any(
+                word in permit.content.lower()
+                for word in ("forged", "fake", "wrong", "invalid", "deny", "arrest")
+            )
+
+        for status in (
+            CredentialStatus.BAD_DATE,
+            CredentialStatus.EXPIRED,
+            CredentialStatus.WRONG_HOLDER,
+        ):
+            block, handler, ctx = _live_game(_attested_case(status=status))
+            permit = next(
+                piece
+                for piece in _by_type(
+                    handler.get_journal_fragments(block.game, ctx=ctx),
+                    PieceFragment,
+                )
+                if piece.presentation_hints.label_text == "Work Permit"
+            )
+
+            assert permit.properties["visible_parts"][0]["content"] == (
+                "A round blue immigration seal is impressed beside the bearer line."
+            )
+
+    def test_non_attested_and_complete_replacement_documents_do_not_append_parts(self) -> None:
+        no_attestation_block, no_attestation_handler, no_attestation_ctx = _live_game(
+            _attested_case(issuer_group=None)
+        )
+        replacement_block, replacement_handler, replacement_ctx = _live_game(
+            _attested_case(
+                presented_documents={"Work Permit": "A hand-written work permit."}
+            )
+        )
+
+        def permit_piece(handler, block, ctx):
+            return next(
+                piece
+                for piece in _by_type(
+                    handler.get_journal_fragments(block.game, ctx=ctx),
+                    PieceFragment,
+                )
+                if piece.presentation_hints.label_text == "Work Permit"
+            )
+
+        assert permit_piece(
+            no_attestation_handler,
+            no_attestation_block,
+            no_attestation_ctx,
+        ).properties["visible_parts"] == []
+        replacement = permit_piece(replacement_handler, replacement_block, replacement_ctx)
+        assert replacement.content == "A hand-written work permit."
+        assert replacement.properties["visible_parts"] == []
+
     def test_default_identity_projection_uses_the_same_recursive_portrait_text(self) -> None:
         case = CredentialCase(
             candidate_name="Edda Marrow",
@@ -465,19 +670,15 @@ class TestStructuredEmission:
         )
 
     def test_component_piece_projection_survives_graph_roundtrip(self) -> None:
-        case = CredentialCase(
-            presented_documents={
-                "passport": "A stamped passport.",
-                "travel permit": "A stamped travel permit.",
-            },
-            id_card=CredentialToken(indication=Indication.TRAVEL),
-            packet=[CredentialToken(indication=Indication.TRAVEL)],
-        )
-        block, handler, ctx = _live_game(case)
+        block, handler, ctx = _live_game(_attested_case())
 
         def component_projection(active_handler, game, active_ctx):
             return [
-                (piece.content, piece.properties["component_id"])
+                (
+                    piece.content,
+                    piece.properties["component_id"],
+                    piece.properties["visible_parts"],
+                )
                 for piece in _by_type(
                     active_handler.get_journal_fragments(game, ctx=active_ctx),
                     PieceFragment,

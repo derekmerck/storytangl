@@ -36,7 +36,7 @@ from .domain import (
 )
 
 # Register the credential-owned default text presentation handlers.
-from . import presentation as _presentation  # noqa: F401
+from .presentation import CredentialAttestationObservation
 
 __all__ = [
     "COMMON_ALLIED_RESTRICTIONS",
@@ -47,6 +47,7 @@ __all__ = [
     "CREDENTIAL_PACKET_SLOT",
     "CredentialComponent",
     "CredentialComponentToken",
+    "CredentialAttestationObservation",
     "CredentialDefinition",
     "CredentialPacketManager",
     "default_credential_catalog",
