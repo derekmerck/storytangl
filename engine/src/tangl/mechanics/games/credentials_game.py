@@ -2043,7 +2043,15 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 if presented_description != base_description
                 else None
             )
-            reissued = game.finding_status.get(component.indication) == Finding.CLEARED
+            reissued_component = self._request_document_component(
+                case,
+                component.indication,
+            )
+            reissued = (
+                reissued_component is not None
+                and component.uid == reissued_component.uid
+                and game.finding_status.get(component.indication) == Finding.CLEARED
+            )
             documents.append(
                 _CredentialDocumentRender(
                     component=component,

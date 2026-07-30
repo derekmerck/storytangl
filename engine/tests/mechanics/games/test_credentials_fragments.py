@@ -62,6 +62,8 @@ def _attested_case(
     status: CredentialStatus = CredentialStatus.VALID,
     issuer_group: str | None = "immigration",
     valid_period: int | None = None,
+    id_status: CredentialStatus = CredentialStatus.VALID,
+    id_valid_period: int | None = None,
     presented_documents: dict[str, str] | None = None,
     requestable: bool = False,
 ) -> CredentialCase:
@@ -74,10 +76,14 @@ def _attested_case(
         permit_label += "_requestable"
     if valid_period is not None:
         permit_label += f"_period_{valid_period}"
-    id_definition = CredentialDefinition.get_instance("phase16_identity") or CredentialDefinition(
-        label="phase16_identity",
+    id_label = "phase16_identity"
+    if id_valid_period is not None:
+        id_label += f"_period_{id_valid_period}"
+    id_definition = CredentialDefinition.get_instance(id_label) or CredentialDefinition(
+        label=id_label,
         name="Passport",
         indication=Indication.WORK,
+        valid_period=id_valid_period,
         document_kind="id",
     )
     permit_definition = CredentialDefinition.get_instance(permit_label) or CredentialDefinition(
@@ -110,7 +116,10 @@ def _attested_case(
             owner=object(),
             region=Region.LOCAL,
             purpose=Indication.WORK,
-            id_card=CredentialToken(indication=Indication.WORK),
+            id_card=CredentialToken(
+                indication=Indication.WORK,
+                status=id_status,
+            ),
             credentials=[
                 CredentialToken(
                     indication=Indication.WORK,
@@ -498,6 +507,35 @@ class TestStructuredEmission:
             "part_id": "validity",
             "content": "The validity line reads “Valid through the current entry period.”",
         }
+
+    def test_reissuing_a_permit_does_not_refresh_an_expired_id(self) -> None:
+        block, handler, ctx = _live_game(
+            _attested_case(
+                status=CredentialStatus.MISSING_SEAL,
+                valid_period=0,
+                id_status=CredentialStatus.EXPIRED,
+                id_valid_period=0,
+                requestable=True,
+            )
+        )
+        handler.receive_move(block.game, ("request_document", "work"))
+
+        identity = next(
+            piece
+            for piece in _by_type(
+                handler.get_journal_fragments(block.game, ctx=ctx),
+                PieceFragment,
+            )
+            if piece.presentation_hints.label_text == "passport"
+        )
+
+        assert block.game.finding_status[Indication.WORK.value] == "cleared"
+        assert identity.properties["visible_parts"] == [
+            {
+                "part_id": "validity",
+                "content": "The validity line reads “Valid through the previous entry period.”",
+            }
+        ]
 
     def test_statuses_change_only_their_visible_observation(self) -> None:
         ordinary_attestation = "A round blue immigration seal is impressed beside the bearer line."
