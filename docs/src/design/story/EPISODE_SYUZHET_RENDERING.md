@@ -33,7 +33,10 @@ issuer-attestation observation to the same recursive projection: profile-owned
 neutral wording becomes both document prose and a structured ``visible_parts``
 entry on the corresponding piece. A complete authored document replacement owns
 its content and does not append generated parts; media composition remains
-deferred.
+deferred. Phase 17 adds a second concrete validity observation and a narrow
+union of those two heterogeneous leaves. The packet/document projection now
+proves ordered text and structured interactive evidence are the same transient
+presentation product; media integration remains a separate next discussion.
 
 ## Purpose
 

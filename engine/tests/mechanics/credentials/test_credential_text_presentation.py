@@ -17,6 +17,7 @@ from tangl.mechanics.credentials import (
     CredentialDefinition,
     CredentialPacketManager,
     CredentialStatus,
+    CredentialValidityObservation,
     Indication,
 )
 from tangl.mechanics.games import CredentialsGame, HasGame
@@ -235,6 +236,14 @@ def test_non_id_document_uses_authored_name_or_neutral_indication_fallback() -> 
 def test_attestation_observation_renders_through_its_own_text_aspect() -> None:
     observation = CredentialAttestationObservation(
         content="A round blue immigration seal is impressed beside the bearer line."
+    )
+
+    assert render_text_as(observation, "part_description", ctx=_TextCtx()) == observation.content
+
+
+def test_validity_observation_renders_through_its_own_text_aspect() -> None:
+    observation = CredentialValidityObservation(
+        content="The validity line reads “Valid through the current entry period.”"
     )
 
     assert render_text_as(observation, "part_description", ctx=_TextCtx()) == observation.content

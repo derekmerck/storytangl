@@ -36,7 +36,11 @@ from .domain import (
 )
 
 # Register the credential-owned default text presentation handlers.
-from .presentation import CredentialAttestationObservation
+from .presentation import (
+    CredentialAttestationObservation,
+    CredentialValidityObservation,
+    CredentialVisibleObservation,
+)
 
 __all__ = [
     "COMMON_ALLIED_RESTRICTIONS",
@@ -48,6 +52,8 @@ __all__ = [
     "CredentialComponent",
     "CredentialComponentToken",
     "CredentialAttestationObservation",
+    "CredentialValidityObservation",
+    "CredentialVisibleObservation",
     "CredentialDefinition",
     "CredentialPacketManager",
     "default_credential_catalog",

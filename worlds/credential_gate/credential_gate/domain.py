@@ -134,6 +134,13 @@ class GateCredentialsGame(CredentialsGame):
             alternate_attestation_template=(
                 "An over-bright {issuer_group} seal sits beside the bearer line."
             ),
+            ordinary_validity_template=(
+                "The validity line reads “Valid through the current entry period.”"
+            ),
+            unusual_date_validity_template="The issue line reads “32 September.”",
+            past_validity_template=(
+                "The validity line reads “Valid through the previous entry period.”"
+            ),
         )
     )
 
@@ -199,6 +206,13 @@ class SampledGateGame(CredentialsGame):
             missing_attestation_template="The {issuer_group} seal space is blank.",
             alternate_attestation_template=(
                 "An over-bright {issuer_group} seal sits beside the bearer line."
+            ),
+            ordinary_validity_template=(
+                "The validity line reads “Valid through the current entry period.”"
+            ),
+            unusual_date_validity_template="The issue line reads “32 September.”",
+            past_validity_template=(
+                "The validity line reads “Valid through the previous entry period.”"
             ),
         )
     )

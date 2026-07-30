@@ -52,6 +52,8 @@ from tangl.mechanics.credentials import (
     CredentialDefectKind,
     CredentialStatus,
     CredentialToken,
+    CredentialValidityObservation,
+    CredentialVisibleObservation,
     FailureClass,
     IndicationId,
     OriginId,
@@ -115,7 +117,7 @@ class _CredentialDocumentRender:
     label: str
     base_description: str
     complete_replacement: str | None
-    visible_observations: tuple[CredentialAttestationObservation, ...]
+    visible_observations: tuple[CredentialVisibleObservation, ...]
 
 
 class CredentialDisposition(Enum):
@@ -688,6 +690,13 @@ class CredentialPresentationProfile(BaseModelPlus):
     alternate_attestation_template: str = (
         "An over-bright {issuer_group} seal sits beside the bearer line."
     )
+    ordinary_validity_template: str = (
+        "The validity line reads “Valid through the current entry period.”"
+    )
+    unusual_date_validity_template: str = "The issue line reads “32 September.”"
+    past_validity_template: str = (
+        "The validity line reads “Valid through the previous entry period.”"
+    )
     possession_description: str = "Openly declared {indication}."
     candidate_arrival_template: str = (
         "{{ candidate_name }}{% set description = render_as(candidate, 'presence_description') %}"
@@ -782,6 +791,30 @@ class CredentialPresentationProfile(BaseModelPlus):
             CredentialAttestationObservation(
                 content=template.format(
                     issuer_group=component.issuer_group.replace("_", " "),
+                )
+            ),
+        )
+
+    def validity_observations(
+        self,
+        component: CredentialComponent,
+        *,
+        reissued: bool = False,
+    ) -> tuple[CredentialValidityObservation, ...]:
+        """Project visible date wording without evaluating the credential."""
+
+        if component.valid_period is None:
+            return ()
+        template = self.ordinary_validity_template
+        if component.status is CredentialStatus.BAD_DATE and not reissued:
+            template = self.unusual_date_validity_template
+        elif component.status is CredentialStatus.EXPIRED and not reissued:
+            template = self.past_validity_template
+        return (
+            CredentialValidityObservation(
+                content=template.format(
+                    valid_period=component.valid_period,
+                    issuer_group=(component.issuer_group or "").replace("_", " "),
                 )
             ),
         )
@@ -2010,6 +2043,15 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 if presented_description != base_description
                 else None
             )
+            reissued_component = self._request_document_component(
+                case,
+                component.indication,
+            )
+            reissued = (
+                reissued_component is not None
+                and component.uid == reissued_component.uid
+                and game.finding_status.get(component.indication) == Finding.CLEARED
+            )
             documents.append(
                 _CredentialDocumentRender(
                     component=component,
@@ -2019,12 +2061,15 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     visible_observations=(
                         ()
                         if complete_replacement is not None
-                        else game.presentation.attestation_observations(
-                            component,
-                            reissued=(
-                                game.finding_status.get(component.indication)
-                                == Finding.CLEARED
-                            ),
+                        else (
+                            game.presentation.attestation_observations(
+                                component,
+                                reissued=reissued,
+                            )
+                            + game.presentation.validity_observations(
+                                component,
+                                reissued=reissued,
+                            )
                         )
                     ),
                 )
