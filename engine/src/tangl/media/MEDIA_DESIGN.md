@@ -301,13 +301,19 @@ deterministic checker harness are all active.
 provides two dispatch-backed methods:
 
 - `adapt_spec(ref, ctx)` → dispatches through `on_adapt_media_spec` to inject
-  context-specific details (for example character appearance into an image prompt)
+  context-specific details (for example character appearance into an image prompt).
+  An adapter may replace a semantic request subtype with a different,
+  backend-specific `MediaSpec` subtype; it is not restricted to refining the
+  original class.
 - `create_media(ref, ctx)` → dispatches through `on_create_media` to invoke the
   appropriate forge, returning `(media_data, realized_spec)`
 
 **`on_adapt_media_spec`** uses pipeline aggregation; each handler can refine the
 spec progressively. **`on_create_media`** uses first-result aggregation; the
-first forge that handles the spec type wins.
+first forge that handles the resulting backend spec type wins. A generated RIT
+therefore preserves three distinct payloads: `derivation_spec` is the semantic
+request, `adapted_spec` is the backend request used for cache identity, and
+`execution_spec` is the concrete backend request returned by the creator.
 
 **Creator implementations currently present:**
 

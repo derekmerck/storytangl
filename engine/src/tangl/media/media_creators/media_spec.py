@@ -125,7 +125,7 @@ class MediaSpec(Entity):
         }
         return hashing_func(payload).hex()
 
-    def adapt_spec(self, *, ref: Entity = None, ctx: StringMap = None) -> Self:
+    def adapt_spec(self, *, ref: Entity = None, ctx: StringMap = None) -> MediaSpec:
         if ref is not None:
             if ctx is None and hasattr(ref, "gather_context"):
                 ctx = ref.gather_context()
@@ -143,7 +143,12 @@ class MediaSpec(Entity):
                 return adapted_spec
         return self
 
-    def create_media(self, *, ref: Entity = None, ctx: StringMap = None) -> tuple[Media, Self]:
+    def create_media(
+        self,
+        *,
+        ref: Entity = None,
+        ctx: StringMap = None,
+    ) -> tuple[Media, MediaSpec]:
         if ref is not None:
             if ctx is None and hasattr(ref, "gather_context"):
                 ctx = ref.gather_context()
