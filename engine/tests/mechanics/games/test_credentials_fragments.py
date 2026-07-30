@@ -61,6 +61,7 @@ def _attested_case(
     *,
     status: CredentialStatus = CredentialStatus.VALID,
     issuer_group: str | None = "immigration",
+    valid_period: int | None = None,
     presented_documents: dict[str, str] | None = None,
     requestable: bool = False,
 ) -> CredentialCase:
@@ -71,6 +72,8 @@ def _attested_case(
     )
     if requestable:
         permit_label += "_requestable"
+    if valid_period is not None:
+        permit_label += f"_period_{valid_period}"
     id_definition = CredentialDefinition.get_instance("phase16_identity") or CredentialDefinition(
         label="phase16_identity",
         name="Passport",
@@ -82,6 +85,7 @@ def _attested_case(
         name="Work Permit",
         indication=Indication.WORK,
         issuer_group=issuer_group,
+        valid_period=valid_period,
         document_kind="document",
         requires_id=True,
         facets=(
@@ -400,8 +404,31 @@ class TestStructuredEmission:
             "visible_parts"
         ] == permit.properties["visible_parts"]
 
+    def test_visible_observations_are_ordered_and_shared_by_packet_and_piece(self) -> None:
+        block, handler, ctx = _live_game(_attested_case(valid_period=0))
+
+        fragments = handler.get_journal_fragments(block.game, ctx=ctx)
+        packet_prose = _by_type(fragments, ContentFragment)[1].content
+        permit = next(
+            piece
+            for piece in _by_type(fragments, PieceFragment)
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+        attestation = "A round blue immigration seal is impressed beside the bearer line."
+        validity = "The validity line reads “Valid through the current entry period.”"
+
+        assert permit.properties["visible_parts"] == [
+            {"part_id": "issuer_attestation", "content": attestation},
+            {"part_id": "validity", "content": validity},
+        ]
+        assert permit.content.index(attestation) < permit.content.index(validity)
+        assert permit.content in packet_prose
+        assert permit.model_dump(mode="json", by_alias=True)["properties"][
+            "visible_parts"
+        ] == permit.properties["visible_parts"]
+
     def test_context_free_document_piece_includes_its_visible_attestation(self) -> None:
-        game, handler = _game(_attested_case())
+        game, handler = _game(_attested_case(valid_period=0))
 
         permit = next(
             piece
@@ -409,16 +436,19 @@ class TestStructuredEmission:
             if piece.presentation_hints.label_text == "Work Permit"
         )
         attestation = "A round blue immigration seal is impressed beside the bearer line."
+        validity = "The validity line reads “Valid through the current entry period.”"
 
         assert attestation in permit.content
         assert permit.properties["visible_parts"] == [
-            {"part_id": "issuer_attestation", "content": attestation}
+            {"part_id": "issuer_attestation", "content": attestation},
+            {"part_id": "validity", "content": validity},
         ]
 
     def test_reissued_missing_seal_projects_an_ordinary_attestation(self) -> None:
         block, handler, ctx = _live_game(
             _attested_case(
                 status=CredentialStatus.MISSING_SEAL,
+                valid_period=0,
                 requestable=True,
             )
         )
@@ -433,13 +463,87 @@ class TestStructuredEmission:
             if piece.presentation_hints.label_text == "Work Permit"
         )
         attestation = "A round blue immigration seal is impressed beside the bearer line."
+        validity = "The validity line reads “Valid through the current entry period.”"
 
         assert block.game.finding_status[Indication.WORK.value] == "cleared"
         assert attestation in permit.content
         assert "seal space is blank" not in permit.content
         assert permit.properties["visible_parts"] == [
-            {"part_id": "issuer_attestation", "content": attestation}
+            {"part_id": "issuer_attestation", "content": attestation},
+            {"part_id": "validity", "content": validity},
         ]
+
+    def test_reissued_bad_date_projects_an_ordinary_validity_line(self) -> None:
+        block, handler, ctx = _live_game(
+            _attested_case(
+                status=CredentialStatus.BAD_DATE,
+                valid_period=0,
+                requestable=True,
+            )
+        )
+        handler.receive_move(block.game, ("request_document", "work"))
+
+        permit = next(
+            piece
+            for piece in _by_type(
+                handler.get_journal_fragments(block.game, ctx=ctx),
+                PieceFragment,
+            )
+            if piece.presentation_hints.label_text == "Work Permit"
+        )
+
+        assert block.game.finding_status[Indication.WORK.value] == "cleared"
+        assert "The issue line reads “32 September.”" not in permit.content
+        assert permit.properties["visible_parts"][1] == {
+            "part_id": "validity",
+            "content": "The validity line reads “Valid through the current entry period.”",
+        }
+
+    def test_statuses_change_only_their_visible_observation(self) -> None:
+        ordinary_attestation = "A round blue immigration seal is impressed beside the bearer line."
+        ordinary_validity = "The validity line reads “Valid through the current entry period.”"
+        expected = {
+            CredentialStatus.BAD_DATE: (
+                ordinary_attestation,
+                "The issue line reads “32 September.”",
+            ),
+            CredentialStatus.EXPIRED: (
+                ordinary_attestation,
+                "The validity line reads “Valid through the previous entry period.”",
+            ),
+            CredentialStatus.MISSING_SEAL: (
+                "The immigration seal space is blank.",
+                ordinary_validity,
+            ),
+            CredentialStatus.FORGED: (
+                "An over-bright immigration seal sits beside the bearer line.",
+                ordinary_validity,
+            ),
+            CredentialStatus.WRONG_HOLDER: (
+                ordinary_attestation,
+                ordinary_validity,
+            ),
+        }
+
+        for status, (attestation, validity) in expected.items():
+            block, handler, ctx = _live_game(_attested_case(status=status, valid_period=0))
+            permit = next(
+                piece
+                for piece in _by_type(
+                    handler.get_journal_fragments(block.game, ctx=ctx),
+                    PieceFragment,
+                )
+                if piece.presentation_hints.label_text == "Work Permit"
+            )
+
+            assert permit.properties["visible_parts"] == [
+                {"part_id": "issuer_attestation", "content": attestation},
+                {"part_id": "validity", "content": validity},
+            ]
+            assert not any(
+                word in permit.content.lower()
+                for word in ("forged", "invalid", "expired", "wrong", "deny", "arrest")
+            )
 
     def test_missing_and_alternate_attestations_remain_neutral_observations(self) -> None:
         for status, expected in (
@@ -489,6 +593,7 @@ class TestStructuredEmission:
         )
         replacement_block, replacement_handler, replacement_ctx = _live_game(
             _attested_case(
+                valid_period=0,
                 presented_documents={"Work Permit": "A hand-written work permit."}
             )
         )
@@ -670,7 +775,7 @@ class TestStructuredEmission:
         )
 
     def test_component_piece_projection_survives_graph_roundtrip(self) -> None:
-        block, handler, ctx = _live_game(_attested_case())
+        block, handler, ctx = _live_game(_attested_case(valid_period=0))
 
         def component_projection(active_handler, game, active_ctx):
             return [

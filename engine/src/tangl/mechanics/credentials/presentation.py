@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from pydantic import ConfigDict
 
@@ -20,6 +20,20 @@ class CredentialAttestationObservation(BaseModelPlus):
 
     part_id: Literal["issuer_attestation"] = "issuer_attestation"
     content: str
+
+
+class CredentialValidityObservation(BaseModelPlus):
+    """One neutral, visible validity observation on a document."""
+
+    model_config = ConfigDict(frozen=True)
+
+    part_id: Literal["validity"] = "validity"
+    content: str
+
+
+CredentialVisibleObservation: TypeAlias = (
+    CredentialAttestationObservation | CredentialValidityObservation
+)
 
 
 @on_render_text(wants_caller_kind=CredentialPacketManager, wants_exact_kind=False)
@@ -91,9 +105,25 @@ def render_attestation_text(
     return caller.content if aspect == "part_description" else None
 
 
+@on_render_text(wants_caller_kind=CredentialValidityObservation, wants_exact_kind=False)
+def render_validity_text(
+    *,
+    caller: CredentialValidityObservation,
+    aspect: str,
+    ctx: VmPhaseCtx,
+) -> str | None:
+    """Render the authored visible wording for one document validity line."""
+
+    _ = ctx
+    return caller.content if aspect == "part_description" else None
+
+
 __all__ = [
     "CredentialAttestationObservation",
+    "CredentialValidityObservation",
+    "CredentialVisibleObservation",
     "render_attestation_text",
     "render_document_text",
     "render_packet_text",
+    "render_validity_text",
 ]

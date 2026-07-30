@@ -80,6 +80,9 @@ HALL_PRESENTATION = CredentialPresentationProfile(
     alternate_attestation_template=(
         "The {issuer_group} signature is written in a heavy, unfamiliar hand."
     ),
+    ordinary_validity_template="The pass is marked “Valid for this period.”",
+    unusual_date_validity_template="The period box is marked “Period 9.”",
+    past_validity_template="The pass is marked “Valid for last period.”",
     possession_description="A student openly declares {indication}.",
     status_text={
         CredentialStatus.MISSING_SEAL: "The required teacher signature is missing.",

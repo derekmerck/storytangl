@@ -14,13 +14,18 @@ packet, document, choice, and finding surfaces. Phase 15 makes the packet
 manager's ordered components the shared inventory for recursive packet prose
 and targetable document pieces, with scenario-authored document text supplied
 as an explicit replacement. Compatibility-only visible items remain separate,
-and further visible document-part degradation is still deferred. Phase 16 adds the
-first concrete visible document part: a profile-owned, immutable issuer
-attestation observation. The ordinary, missing, and alternate visible forms
+and Phase 16 adds the first concrete visible document part: a profile-owned,
+immutable issuer attestation observation. The ordinary, missing, and alternate visible forms
 project neutrally into the recursive text description and the matching piece's
 ``visible_parts`` payload, without exposing a credential finding or disposition.
 A scenario-authored complete document replacement remains self-contained and
-does not append generated parts.
+does not append generated parts. Phase 17 adds a second concrete visible part:
+validity wording selected from the definition's existing ``valid_period`` and
+the component status. The narrow two-value union preserves ordered, neutral
+attestation-plus-validity prose and ``visible_parts`` without evaluating a
+credential from presentation output. This text/JOURNAL/interactive floor is
+sufficient to discuss a separate media-compositor integration plan; credentials
+will not create placeholder cards or a private forge.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
@@ -333,7 +338,7 @@ worth naming, not worth gating the media work on.
 
 ## 7 · Staged plan (media spec is the forcing function)
 
-### Assembly packet authority landed
+### Assembly and presentation floor landed
 
 The shared credentials package now owns the credential domain vocabulary and the
 canonical assembly-backed packet path. `CredentialCase` now requires
@@ -342,34 +347,16 @@ graph credential components; disposition derivation reads that concrete manager.
 Offer arrival materializes the manager from the selected catalog before gameplay,
 so the roster/game/demo paths share graph-backed packet identity.
 
-This is still not the full credential mechanic described above: document/media
-projection has not landed, presence-snapshot holder binding is not implemented,
-contraband remains value-shaped, and `credential_gate` remains the reference
-consumer rather than a retrofit target. It does establish the retirement path for
-the current game-local implementation: future canonical packets should store
-graph-token credentials by id through the same owner-bound manager pattern used by
-outfits, vehicles, and connector groups.
+Phases 7–17 now cover graph-token packet authority, bearer/subject binding,
+transient defect mediation, recursive text projection, JOURNAL delivery,
+component-backed pieces, and two ordered visible document observations. This is
+the complete text/JOURNAL/interactive floor. It deliberately does not compose a
+card or generate media.
 
-0. **(Media-layer prerequisite, separate track.)** A minimal **RIT registry +
-   composition-strategy** surface, replacing the legacy `svg_forge`/`raster_forge`
-   shape (§3a). Owned by media, not credentials; Phase D consumes it.
-1. **`CredentialCardSpec`** as a `MediaSpec`, built *on the media framework*
-   (`MediaSpec` → `MediaSpecProvisioner` → `MediaRIT` → `MediaFragment`) and the
-   composition surface from (0) — **not** a hand-rolled composition or journal
-   path. It reads a credential's status + carrier binding to render discrepancies,
-   and calls presence's `adapt_look_media_spec(media_role="id_photo")` for the
-   bearer portrait. The genuine *second consumer* of the credential primitives and
-   the *simplest consumer* of the composition framework.
-2. **Extract primitives** (`Credential`, `Document`, carrier binding) into
-   `tangl.mechanics.credentials` — partially landed for the current enum/value
-   vocabulary, assembly packet proof, and graph-owned presence binding.
-3. **Re-point the game** at the promoted primitives; the game adds its overrides
-   (regions, seals, permits).
-4. **Default assets** land alongside (1) so the projection is provable from day
-   one.
-
-Steps 1–4 keep the merged game working; nothing is a big-bang refactor. Step 0 is
-the one genuine dependency, and it is a media-subsystem concern in its own right.
+The next step is a separate requirements and integration-plan discussion with the
+media compositor refactor. Credentials should consume the resulting
+``MediaSpec → MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not
+invent placeholder cards, a private forge, or a parallel journal channel.
 
 ---
 

@@ -103,6 +103,13 @@ BORDER_PRESENTATION = CredentialPresentationProfile(
     alternate_attestation_template=(
         "An over-bright {issuer_group} seal sits beside the bearer line."
     ),
+    ordinary_validity_template=(
+        "The validity line reads “Valid through the current entry period.”"
+    ),
+    unusual_date_validity_template="The issue line reads “32 September.”",
+    past_validity_template=(
+        "The validity line reads “Valid through the previous entry period.”"
+    ),
     status_text={
         CredentialStatus.MISSING_SEAL: "The issuing stamp is missing.",
         CredentialStatus.BAD_DATE: "The issue date is wrong.",
@@ -126,6 +133,9 @@ SCHOOL_PRESENTATION = CredentialPresentationProfile(
     alternate_attestation_template=(
         "The {issuer_group} signature is written in a heavy, unfamiliar hand."
     ),
+    ordinary_validity_template="The pass is marked “Valid for this period.”",
+    unusual_date_validity_template="The period box is marked “Period 9.”",
+    past_validity_template="The pass is marked “Valid for last period.”",
     status_text={
         CredentialStatus.MISSING_SEAL: "The required teacher signature is missing.",
         CredentialStatus.BAD_DATE: "The date on the pass is wrong.",
@@ -224,6 +234,7 @@ assets:
 activity_pass:
   name: Work Permit
   origin_ids: [border]
+  valid_period: 0
   indication: work
   issuer_group: immigration
   document_kind: document
@@ -245,6 +256,7 @@ activity_pass:
 activity_pass:
   name: Activity Pass
   origin_ids: [school]
+  valid_period: 0
   indication: activity
   issuer_group: classroom
   document_kind: document
@@ -324,6 +336,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
         expected_names,
         excluded_names,
         expected_attestation,
+        expected_validity,
     ) in (
         (
             "Work the border checkpoint",
@@ -336,6 +349,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             ("Border Identity Card", "Work Permit"),
             ("Student ID", "Activity Pass"),
             "The immigration seal space is blank.",
+            "The validity line reads “Valid through the current entry period.”",
         ),
         (
             "Monitor the school halls",
@@ -348,6 +362,7 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             ("Student ID", "Activity Pass"),
             ("Border Identity Card", "Work Permit"),
             "The classroom signature line is blank.",
+            "The pass is marked “Valid for this period.”",
         ),
     ):
         result = combined_world.create_story("combined_credentials", init_mode=InitMode.EAGER)
@@ -407,9 +422,18 @@ def test_compiled_story_selects_its_local_credentials_scenarios(tmp_path: Path) 
             and fragment.properties.get("component_id") == packet_components[0].uid
         )
         assert permit_piece.properties["visible_parts"] == [
-            {"part_id": "issuer_attestation", "content": expected_attestation}
+            {"part_id": "issuer_attestation", "content": expected_attestation},
+            {"part_id": "validity", "content": expected_validity},
         ]
+        journal_packet = next(
+            fragment.content
+            for fragment in fragments
+            if fragment.fragment_type == "content"
+            and "They present their documents:" in fragment.content
+        )
         assert expected_attestation in permit_piece.content
+        assert expected_validity in permit_piece.content
+        assert permit_piece.content in journal_packet
 
         restored = Graph.structure(result.graph.unstructure())
         restored_block = restored.find_one(Selector(label=block_label))
