@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from tangl.core import Graph
 from tangl.media.media_resource.media_resource_inv_tag import (
@@ -11,6 +12,8 @@ from tangl.media.media_resource.media_resource_inv_tag import (
 )
 
 from .composition_spec import CompositionInputRef, CompositionSpec
+
+COMPOSITION_INPUTS_CONTEXT_KEY = "composition_inputs"
 
 
 class CompositionInputUnavailable(ValueError):
@@ -23,6 +26,16 @@ class ResolvedCompositionInput:
 
     ref: CompositionInputRef
     svg: str
+
+
+def with_composition_inputs(
+    ctx: dict[str, Any] | None,
+    inputs: list[ResolvedCompositionInput],
+) -> dict[str, Any]:
+    """Return a creation context carrying a resolved composition render plan."""
+    result = dict(ctx or {})
+    result[COMPOSITION_INPUTS_CONTEXT_KEY] = inputs
+    return result
 
 
 def resolve_composition_inputs(

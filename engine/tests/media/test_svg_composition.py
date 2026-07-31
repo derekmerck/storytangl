@@ -8,9 +8,10 @@ from types import SimpleNamespace
 from lxml import etree
 import pytest
 
-from tangl.core import Graph
+from tangl.core import Graph, Priority
 from tangl.media import MediaDataType
 from tangl.media.media_creators.composition_forge.composition_inputs import (
+    COMPOSITION_INPUTS_CONTEXT_KEY,
     CompositionInputUnavailable,
     resolve_composition_inputs,
 )
@@ -18,6 +19,7 @@ from tangl.media.media_creators.composition_forge.composition_spec import (
     CompositionInputRef,
     CompositionSpec,
 )
+from tangl.media.media_creators.media_spec import on_create_media
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
 from tangl.media.media_resource.media_resource_inv_tag import MediaRITStatus
@@ -244,3 +246,34 @@ def test_composition_provisions_once_and_retains_full_provenance(
     ]
     assert len(reused) == 1
     assert reused[0].candidate is parent
+
+
+def test_composition_creation_uses_the_canonical_creator_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block = _story(monkeypatch, tmp_path)
+    first = _child(_RECT_SVG, label="rect")
+    second = _child(_CIRCLE_SVG, label="circle")
+    story.add(first)
+    story.add(second)
+    dispatched: list[dict[str, object]] = []
+
+    @on_create_media.register(priority=Priority.EARLY)
+    def record_composition_dispatch(
+        spec: CompositionSpec,
+        ctx: dict[str, object] | None = None,
+    ) -> None:
+        dispatched.append({"spec": spec, "ctx": ctx})
+
+    record_composition_dispatch._behavior.wants_caller_kind = CompositionSpec
+    try:
+        parent = _offers(story, block, _spec(first, second))[0].callback(
+            _ctx=_context(story, block)
+        )
+    finally:
+        on_create_media.remove(record_composition_dispatch._behavior.uid)
+
+    assert parent.status is MediaRITStatus.RESOLVED
+    assert dispatched[0]["spec"].__class__ is CompositionSpec
+    assert len(dispatched[0]["ctx"][COMPOSITION_INPUTS_CONTEXT_KEY]) == 2

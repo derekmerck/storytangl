@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import Any
 
 from lxml import etree
 
-from .composition_inputs import ResolvedCompositionInput
+from tangl.core import Priority
+from tangl.media.media_creators.media_spec import on_create_media
+
+from .composition_inputs import COMPOSITION_INPUTS_CONTEXT_KEY, ResolvedCompositionInput
 from .composition_spec import CompositionSpec
 
 
@@ -56,3 +60,22 @@ class CompositionForge:
                 "resolved_input_hashes": [item.ref.content_hash for item in inputs],
             }
         )
+
+
+@on_create_media.register(priority=Priority.NORMAL)
+def create_composition_media(
+    spec: CompositionSpec,
+    ctx: dict[str, Any] | None = None,
+) -> tuple[str, CompositionSpec]:
+    """Create a composition from the render plan prepared by media provisioning."""
+    if ctx is None or COMPOSITION_INPUTS_CONTEXT_KEY not in ctx:
+        raise ValueError("Composition creation requires resolved composition inputs")
+    inputs = ctx[COMPOSITION_INPUTS_CONTEXT_KEY]
+    if not isinstance(inputs, list) or not all(
+        isinstance(item, ResolvedCompositionInput) for item in inputs
+    ):
+        raise TypeError("Composition creation requires resolved composition inputs")
+    return CompositionForge().create_media(spec, inputs=inputs)
+
+
+create_composition_media._behavior.wants_caller_kind = CompositionSpec

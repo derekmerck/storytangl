@@ -14,10 +14,10 @@ from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.provision.provisioner import ProvisionOffer, ProvisionPolicy
 from tangl.vm.provision.requirement import Requirement
 
-from ..media_creators.composition_forge.composition_forge import CompositionForge
 from ..media_creators.composition_forge.composition_inputs import (
     CompositionInputUnavailable,
     resolve_composition_inputs,
+    with_composition_inputs,
 )
 from ..media_creators.composition_forge.composition_spec import CompositionSpec
 from ..media_creators.media_spec import MediaResolutionClass, MediaSpec
@@ -240,14 +240,16 @@ def materialize_rit_from_spec(
     if manager is None:
         raise RuntimeError("Story media manager is not available")
 
+    creation_ctx = ctx_ns
     if isinstance(spec, CompositionSpec):
-        inputs = resolve_composition_inputs(spec, graph=graph)
-        media, realized_spec = CompositionForge().create_media(spec, inputs=inputs)
-    else:
-        media, realized_spec = spec.create_media(
-            ref=parent,
-            ctx=ctx_ns,
+        creation_ctx = with_composition_inputs(
+            ctx_ns,
+            resolve_composition_inputs(spec, graph=graph),
         )
+    media, realized_spec = spec.create_media(
+        ref=parent,
+        ctx=creation_ctx,
+    )
     realized_spec = realized_spec or spec
 
     existing = _graph_media_by_identifier(graph, fingerprint)
