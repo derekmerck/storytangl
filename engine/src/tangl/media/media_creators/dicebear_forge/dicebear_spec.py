@@ -8,7 +8,7 @@ from functools import cache
 from hashlib import sha256
 from importlib.metadata import version
 from importlib.resources import files
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dicebear import Style
 from pydantic import Field
@@ -22,6 +22,9 @@ from tangl.media.media_creators.media_spec import (
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_creators.portrait_spec import PortraitSpec
 from tangl.utils.hashing import hashing_func
+
+if TYPE_CHECKING:
+    from .dicebear_forge import DiceBearForge
 
 
 DICEBEAR_STYLE_ID = "lorelei"
@@ -145,7 +148,7 @@ class DiceBearSpec(MediaSpec):
     resolved_options: dict[str, Any] | None = None
 
     @classmethod
-    def get_creation_service(cls) -> "DiceBearForge":
+    def get_creation_service(cls) -> DiceBearForge:
         from .dicebear_forge import DiceBearForge
 
         return DiceBearForge()

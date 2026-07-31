@@ -56,7 +56,12 @@ def resolve_composition_inputs(
         if rit.get_content_hash() != ref.content_hash:
             raise CompositionInputUnavailable(f"Composition input {ref.role!r} content hash changed")
         if rit.path is not None:
-            svg = rit.path.read_text(encoding="utf-8")
+            try:
+                svg = rit.path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise CompositionInputUnavailable(
+                    f"Composition input {ref.role!r} could not be read"
+                ) from exc
         elif isinstance(rit.data, str):
             svg = rit.data
         else:

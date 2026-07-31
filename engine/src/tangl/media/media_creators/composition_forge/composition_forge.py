@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 from typing import Any
 
 from lxml import etree
@@ -12,6 +13,38 @@ from tangl.media.media_creators.media_spec import on_create_media
 
 from .composition_inputs import COMPOSITION_INPUTS_CONTEXT_KEY, ResolvedCompositionInput
 from .composition_spec import CompositionSpec
+
+_SVG_REFERENCE = re.compile(r"url\(#([^)]+)\)|#([A-Za-z_][\w:.-]*)")
+
+
+def _namespace_svg_ids(root: etree._Element, *, prefix: str) -> None:
+    """Make one child document's local fragment references unique in its parent."""
+    identifiers = {
+        value: f"{prefix}{value}"
+        for value in root.xpath(".//*[@id]/@id")
+    }
+    if not identifiers:
+        return
+
+    def rewrite(value: str) -> str:
+        def replace(match: re.Match[str]) -> str:
+            identifier = match.group(1) or match.group(2)
+            replacement = identifiers.get(identifier)
+            if replacement is None:
+                return match.group(0)
+            if match.group(1) is not None:
+                return f"url(#{replacement})"
+            return f"#{replacement}"
+
+        return _SVG_REFERENCE.sub(replace, value)
+
+    for element in root.iter():
+        if identifier := element.get("id"):
+            element.set("id", identifiers[identifier])
+        for name, value in element.attrib.items():
+            element.set(name, rewrite(value))
+        if element.text:
+            element.text = rewrite(element.text)
 
 
 class CompositionForge:
@@ -41,17 +74,17 @@ class CompositionForge:
                 height=str(height),
                 fill=spec.background,
             )
-        for item in inputs:
+        for index, item in enumerate(inputs):
             child_root = etree.fromstring(item.svg.encode("utf-8"))
+            _namespace_svg_ids(child_root, prefix=f"input-{index}-")
             x, y = item.ref.offset
             group = etree.SubElement(
                 root,
                 "{http://www.w3.org/2000/svg}g",
-                id=item.ref.role,
+                id=f"input-{index}-{item.ref.role}",
                 transform=f"translate({x},{y})",
             )
-            for child in child_root:
-                group.append(deepcopy(child))
+            group.append(deepcopy(child_root))
         svg = etree.tostring(root, encoding="unicode")
         return svg, spec.model_copy(
             update={

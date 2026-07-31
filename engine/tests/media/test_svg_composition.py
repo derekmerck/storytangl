@@ -37,6 +37,13 @@ _CIRCLE_SVG = (
     '<circle cx="30" cy="30" r="20" fill="gold"/>'
     "</svg>"
 )
+_VIEWPORT_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 10 10">'
+    '<defs><linearGradient id="paint"><stop offset="0" stop-color="navy"/></linearGradient></defs>'
+    '<rect width="10" height="10" fill="url(#paint)"/>'
+    "</svg>"
+)
+_SECOND_VIEWPORT_SVG = _VIEWPORT_SVG.replace("navy", "gold")
 
 
 def _story_media_root(tmp_path: Path):
@@ -188,6 +195,46 @@ def test_resolver_uses_graph_owned_child_and_rejects_hash_mismatch() -> None:
     first.data = _RECT_SVG.replace("navy", "green")
     with pytest.raises(CompositionInputUnavailable, match="content hash changed"):
         resolve_composition_inputs(spec, graph=graph)
+
+
+def test_resolver_reports_an_unreadable_child_as_unavailable(tmp_path: Path) -> None:
+    graph = Graph(label="composition")
+    missing = MediaRIT(
+        label="missing",
+        path=tmp_path / "missing.svg",
+        preset_content_hash=b"expected",
+        data_type=MediaDataType.VECTOR,
+    )
+    second = _child(_CIRCLE_SVG, label="circle")
+    graph.add(missing)
+    graph.add(second)
+
+    with pytest.raises(CompositionInputUnavailable, match="could not be read"):
+        resolve_composition_inputs(_spec(missing, second), graph=graph)
+
+
+def test_compositor_preserves_child_viewports_and_namespaces_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block = _story(monkeypatch, tmp_path)
+    first = _child(_VIEWPORT_SVG, label="first")
+    second = _child(_SECOND_VIEWPORT_SVG, label="second")
+    story.add(first)
+    story.add(second)
+
+    parent = _offers(story, block, _spec(first, second))[0].callback(
+        _ctx=_context(story, block)
+    )
+    assert parent.path is not None
+    root = etree.fromstring(parent.path.read_bytes())
+    nested_svgs = root.xpath("./svg:g/svg:svg", namespaces={"svg": "http://www.w3.org/2000/svg"})
+    gradients = root.xpath(".//svg:linearGradient", namespaces={"svg": "http://www.w3.org/2000/svg"})
+
+    assert [svg.get("viewBox") for svg in nested_svgs] == ["0 0 10 10", "0 0 10 10"]
+    assert [gradient.get("id") for gradient in gradients] == ["input-0-paint", "input-1-paint"]
+    assert b"url(#input-0-paint)" in parent.path.read_bytes()
+    assert b"url(#input-1-paint)" in parent.path.read_bytes()
 
 
 def test_pending_child_suppresses_parent_create_until_resolved(
