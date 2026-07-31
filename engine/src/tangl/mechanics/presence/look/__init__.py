@@ -11,3 +11,4 @@ from .look import (
     OrnamentMediaPayload,
     OutfitMediaPayload,
 )
+from .portrait_media import portrait_spec_from_look
