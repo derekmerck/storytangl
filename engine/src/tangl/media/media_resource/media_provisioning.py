@@ -14,6 +14,12 @@ from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.provision.provisioner import ProvisionOffer, ProvisionPolicy
 from tangl.vm.provision.requirement import Requirement
 
+from ..media_creators.composition_forge.composition_inputs import (
+    CompositionInputUnavailable,
+    resolve_composition_inputs,
+    with_composition_inputs,
+)
+from ..media_creators.composition_forge.composition_spec import CompositionSpec
 from ..media_creators.media_spec import MediaResolutionClass, MediaSpec
 from ..media_data_type import MediaDataType
 from ..story_media import get_story_resource_manager
@@ -234,9 +240,15 @@ def materialize_rit_from_spec(
     if manager is None:
         raise RuntimeError("Story media manager is not available")
 
+    creation_ctx = ctx_ns
+    if isinstance(spec, CompositionSpec):
+        creation_ctx = with_composition_inputs(
+            ctx_ns,
+            resolve_composition_inputs(spec, graph=graph),
+        )
     media, realized_spec = spec.create_media(
         ref=parent,
-        ctx=ctx_ns,
+        ctx=creation_ctx,
     )
     realized_spec = realized_spec or spec
 
@@ -476,6 +488,11 @@ class MediaSpecProvisioner:
             return
 
         if policy & ProvisionPolicy.CREATE:
+            if isinstance(adapted_spec, CompositionSpec):
+                try:
+                    resolve_composition_inputs(adapted_spec, graph=graph)
+                except CompositionInputUnavailable:
+                    return
             resolution_class = _media_resolution_class(adapted_spec)
             yield ProvisionOffer(
                 origin_id="MediaSpecProvisioner",

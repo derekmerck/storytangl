@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -34,8 +35,19 @@ class MediaDep(Dependency[MediaRIT]):
     @model_validator(mode="before")
     @classmethod
     def _pre_resolve(cls, data: Any):
-        if not isinstance(data, dict) or "requirement" in data:
+        if not isinstance(data, dict):
             return data
+
+        if "requirement" in data:
+            payload = dict(data)
+            requirement = payload["requirement"]
+            if isinstance(requirement, Mapping):
+                requirement_payload = dict(requirement)
+                media_spec = requirement_payload.get("media_spec")
+                if isinstance(media_spec, Mapping):
+                    requirement_payload["media_spec"] = MediaSpec.from_authoring(media_spec)
+                payload["requirement"] = requirement_payload
+            return payload
 
         payload = dict(data)
         identifier = payload.get("media_id")
@@ -107,6 +119,16 @@ class MediaDep(Dependency[MediaRIT]):
     script_spec: dict[str, Any] | None = None
     realized_spec: dict[str, Any] | None = None
     final_spec: dict[str, Any] | None = None
+
+    def unstructure(self) -> dict[str, Any]:
+        """Persist a dependency-carried spec through its constructor form."""
+        data = super().unstructure()
+        media_spec = getattr(self.requirement, "media_spec", None)
+        if isinstance(media_spec, MediaSpec):
+            requirement = dict(data["requirement"])
+            requirement["media_spec"] = media_spec.unstructure()
+            data["requirement"] = requirement
+        return data
 
     @property
     def render_ready(self) -> bool:

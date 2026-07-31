@@ -301,13 +301,33 @@ deterministic checker harness are all active.
 provides two dispatch-backed methods:
 
 - `adapt_spec(ref, ctx)` → dispatches through `on_adapt_media_spec` to inject
-  context-specific details (for example character appearance into an image prompt)
+  context-specific details (for example character appearance into an image prompt).
+  An adapter may replace a semantic request subtype with a different,
+  backend-specific `MediaSpec` subtype; it is not restricted to refining the
+  original class.
 - `create_media(ref, ctx)` → dispatches through `on_create_media` to invoke the
   appropriate forge, returning `(media_data, realized_spec)`
 
-**`on_adapt_media_spec`** uses pipeline aggregation; each handler can refine the
-spec progressively. **`on_create_media`** uses first-result aggregation; the
-first forge that handles the spec type wins.
+**`on_adapt_media_spec`** is ordered dispatch over one original spec object.
+In-place mutations are visible to subsequent handlers. Returned replacement
+specs are collected independently; last non-``None`` result wins, and is not
+fed into later handlers. This supports a semantic request adapting to a
+backend-specific `MediaSpec` subtype without making the registry a general
+reducer. **`on_create_media`** uses first-result aggregation; the first forge
+that handles the resulting backend spec type wins. A generated RIT therefore
+preserves three distinct payloads: `derivation_spec` is the semantic request,
+`adapted_spec` is the backend request used for cache identity, and
+`execution_spec` is the concrete backend request returned by the creator.
+
+**Spec payloads and identity.** A generated RIT retains three stored payloads:
+the semantic derivation request, the adapted backend request, and the realized
+execution request. ``MediaSpec.normalized_spec_payload()`` is that stored
+request/provenance form. ``MediaSpec.fingerprint_payload()`` is its rendering
+identity projection, which defaults to the normalized payload; ``spec_fingerprint()``
+hashes only that projection. A backend may retain non-rendering provenance
+without making it part of cache identity. Consequently, a reused RIT retains
+the provenance of its first realization while a later equivalent dependency may
+carry different non-rendering request provenance. That is normal cache behavior.
 
 **Creator implementations currently present:**
 
@@ -315,10 +335,30 @@ first forge that handles the spec type wins.
 |-------|------------|--------|
 | `checker_forge` | IMAGE | Active deterministic harness used to prove sync/async pipeline slices |
 | `comfy_forge` | IMAGE | Active ComfyUI backend with workflow-backed specs, async dispatch, and optional `FAST_SYNC` creation |
+| `dicebear_forge` | VECTOR | Active local deterministic portrait example; one CC0 Lorelei style, not a general style catalog |
 | `svg_forge` | VECTOR | Partial — group/transform/viewbox infrastructure exists |
 | `stable_forge` | IMAGE | Partial — API client and spec model exist |
 | `tts_forge` | AUDIO | Partial/stub — API clients exist, worker-backed flow deferred |
 | `raster_forge` | IMAGE | Stub |
+
+The DiceBear example is deliberately narrow: a renderer-neutral `PortraitSpec`
+maps a small set of normalized look traits into one locally installed Lorelei
+definition. The official DiceBear core provides the generated SVG and resolved
+options; the exact definition content hash and package version are part of the
+backend request. Unsupported traits remain provenance, but are excluded from
+the adapted-spec fingerprint because they cannot change the rendered output.
+There is no HTTP renderer path or style-selection catalog at this layer.
+
+`composition_forge` is the first one-level consumer of this distinction. A
+`CompositionSpec` persists ordered `CompositionInputRef` values with each child
+RIT UUID, content hash, role, and layout offset. Before a new parent is created,
+media-owned resolution loads those graph-owned children and verifies their live
+content hashes. The compositor receives only that resolved SVG plan; it has no
+graph, provisioning, world, or credentials knowledge. Composition identity
+projects child content hashes, roles, layout, canvas, treatment, and compositor
+version while excluding RIT UUIDs, so equivalent child content can reuse a
+parent even when supplied by distinct child RIT instances. This is deliberately
+one level only; it is not a generic media DAG or recursive renderer.
 
 The creator pipeline will continue to change as richer worker-backed forges and
 named spec registries take final shape. The stable commitments are the dispatch

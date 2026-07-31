@@ -25,6 +25,9 @@ on_create_media = BehaviorRegistry(
 _SPEC_ALIAS_MAP = {
     "checker": "tangl.media.media_creators.checker_forge.checker_spec.CheckerSpec",
     "comfy": "tangl.media.media_creators.comfy_forge.comfy_spec.ComfySpec",
+    "composition": "tangl.media.media_creators.composition_forge.composition_spec.CompositionSpec",
+    "dicebear": "tangl.media.media_creators.dicebear_forge.dicebear_spec.DiceBearSpec",
+    "portrait": "tangl.media.media_creators.portrait_spec.PortraitSpec",
     "stable": "tangl.media.media_creators.stable_forge.stable_spec.StableSpec",
     "vector": "tangl.media.media_creators.svg_forge.vector_spec.VectorSpec",
     "tts": "tangl.media.media_creators.tts_forge.tts_spec.TtsSpec",
@@ -116,16 +119,20 @@ class MediaSpec(Entity):
         setattr(self, "seed", int.from_bytes(seed_bytes[-4:], byteorder="little", signed=False))
         return self
 
+    def fingerprint_payload(self) -> dict[str, Any]:
+        """Return the rendering-identity projection of this persisted spec."""
+        return self.normalized_spec_payload()
+
     def spec_fingerprint(self) -> str:
         """Return a deterministic identifier for this spec's authored content."""
         self.commit_deterministic_seed()
         payload = {
             "spec_cls": self.__class__.__fqn__(),
-            "data": self.normalized_spec_payload(),
+            "data": self.fingerprint_payload(),
         }
         return hashing_func(payload).hex()
 
-    def adapt_spec(self, *, ref: Entity = None, ctx: StringMap = None) -> Self:
+    def adapt_spec(self, *, ref: Entity = None, ctx: StringMap = None) -> MediaSpec:
         if ref is not None:
             if ctx is None and hasattr(ref, "gather_context"):
                 ctx = ref.gather_context()
@@ -143,7 +150,12 @@ class MediaSpec(Entity):
                 return adapted_spec
         return self
 
-    def create_media(self, *, ref: Entity = None, ctx: StringMap = None) -> tuple[Media, Self]:
+    def create_media(
+        self,
+        *,
+        ref: Entity = None,
+        ctx: StringMap = None,
+    ) -> tuple[Media, MediaSpec]:
         if ref is not None:
             if ctx is None and hasattr(ref, "gather_context"):
                 ctx = ref.gather_context()
