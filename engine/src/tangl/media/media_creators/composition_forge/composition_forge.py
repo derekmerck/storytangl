@@ -14,37 +14,52 @@ from tangl.media.media_creators.media_spec import on_create_media
 from .composition_inputs import COMPOSITION_INPUTS_CONTEXT_KEY, ResolvedCompositionInput
 from .composition_spec import CompositionSpec
 
-_SVG_REFERENCE = re.compile(r"url\(#([^)]+)\)|#([A-Za-z_][\w:.-]*)")
+_URL_REFERENCE = re.compile(r"url\(#([A-Za-z_][\w:.-]*)\)")
+_REFERENCE_VALUE_ATTRIBUTES = {
+    "clip-path",
+    "cursor",
+    "fill",
+    "filter",
+    "marker-end",
+    "marker-mid",
+    "marker-start",
+    "mask",
+    "stroke",
+    "style",
+}
 
 
 def _namespace_svg_ids(root: etree._Element, *, prefix: str) -> None:
     """Make one child document's local fragment references unique in its parent."""
     identifiers = {
-        value: f"{prefix}{value}"
-        for value in root.xpath(".//*[@id]/@id")
+        identifier: f"{prefix}{identifier}"
+        for element in root.iter()
+        if (identifier := element.get("id"))
     }
     if not identifiers:
         return
 
-    def rewrite(value: str) -> str:
+    def rewrite_url_references(value: str) -> str:
         def replace(match: re.Match[str]) -> str:
-            identifier = match.group(1) or match.group(2)
+            identifier = match.group(1)
             replacement = identifiers.get(identifier)
             if replacement is None:
                 return match.group(0)
-            if match.group(1) is not None:
-                return f"url(#{replacement})"
-            return f"#{replacement}"
+            return f"url(#{replacement})"
 
-        return _SVG_REFERENCE.sub(replace, value)
+        return _URL_REFERENCE.sub(replace, value)
 
     for element in root.iter():
         if identifier := element.get("id"):
             element.set("id", identifiers[identifier])
         for name, value in element.attrib.items():
-            element.set(name, rewrite(value))
-        if element.text:
-            element.text = rewrite(element.text)
+            local_name = etree.QName(name).localname
+            if local_name == "href" and value.startswith("#"):
+                identifier = value[1:]
+                if replacement := identifiers.get(identifier):
+                    element.set(name, f"#{replacement}")
+            elif local_name in _REFERENCE_VALUE_ATTRIBUTES:
+                element.set(name, rewrite_url_references(value))
 
 
 class CompositionForge:
@@ -81,7 +96,6 @@ class CompositionForge:
             group = etree.SubElement(
                 root,
                 "{http://www.w3.org/2000/svg}g",
-                id=f"input-{index}-{item.ref.role}",
                 transform=f"translate({x},{y})",
             )
             group.append(deepcopy(child_root))

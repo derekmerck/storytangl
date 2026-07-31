@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 from lxml import etree
 import pytest
@@ -13,8 +14,10 @@ from tangl.media import MediaDataType
 from tangl.media.media_creators.composition_forge.composition_inputs import (
     COMPOSITION_INPUTS_CONTEXT_KEY,
     CompositionInputUnavailable,
+    ResolvedCompositionInput,
     resolve_composition_inputs,
 )
+from tangl.media.media_creators.composition_forge.composition_forge import CompositionForge
 from tangl.media.media_creators.composition_forge.composition_spec import (
     CompositionInputRef,
     CompositionSpec,
@@ -44,6 +47,14 @@ _VIEWPORT_SVG = (
     "</svg>"
 )
 _SECOND_VIEWPORT_SVG = _VIEWPORT_SVG.replace("navy", "gold")
+_REFERENCE_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" id="portrait">'
+    '<defs><linearGradient id="paint"/></defs><path id="face"/>'
+    '<use href="#face"/><use href="other.svg#face"/>'
+    '<rect fill="url(#paint)" stroke="#face"/>'
+    '<text>literal #face</text>'
+    "</svg>"
+)
 
 
 def _story_media_root(tmp_path: Path):
@@ -235,6 +246,34 @@ def test_compositor_preserves_child_viewports_and_namespaces_ids(
     assert [gradient.get("id") for gradient in gradients] == ["input-0-paint", "input-1-paint"]
     assert b"url(#input-0-paint)" in parent.path.read_bytes()
     assert b"url(#input-1-paint)" in parent.path.read_bytes()
+
+
+def test_compositor_namespaces_only_svg_reference_syntax() -> None:
+    ref = CompositionInputRef(role="portrait", rit_id=uuid4(), content_hash=b"child")
+    svg, _ = CompositionForge().create_media(
+        CompositionSpec(inputs=[]),
+        inputs=[ResolvedCompositionInput(ref=ref, svg=_REFERENCE_SVG)],
+    )
+    root = etree.fromstring(svg.encode("utf-8"))
+    child = root.xpath("./svg:g/svg:svg", namespaces={"svg": "http://www.w3.org/2000/svg"})[0]
+    values = {
+        "root": child.get("id"),
+        "href": child.xpath(".//svg:use", namespaces={"svg": "http://www.w3.org/2000/svg"})[0].get("href"),
+        "external": child.xpath(".//svg:use", namespaces={"svg": "http://www.w3.org/2000/svg"})[1].get("href"),
+        "fill": child.xpath(".//svg:rect", namespaces={"svg": "http://www.w3.org/2000/svg"})[0].get("fill"),
+        "stroke": child.xpath(".//svg:rect", namespaces={"svg": "http://www.w3.org/2000/svg"})[0].get("stroke"),
+        "text": child.xpath(".//svg:text", namespaces={"svg": "http://www.w3.org/2000/svg"})[0].text,
+    }
+
+    assert child.getparent().get("id") is None
+    assert values == {
+        "root": "input-0-portrait",
+        "href": "#input-0-face",
+        "external": "other.svg#face",
+        "fill": "url(#input-0-paint)",
+        "stroke": "#face",
+        "text": "literal #face",
+    }
 
 
 def test_pending_child_suppresses_parent_create_until_resolved(
