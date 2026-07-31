@@ -319,6 +319,16 @@ preserves three distinct payloads: `derivation_spec` is the semantic request,
 `adapted_spec` is the backend request used for cache identity, and
 `execution_spec` is the concrete backend request returned by the creator.
 
+**Spec payloads and identity.** A generated RIT retains three stored payloads:
+the semantic derivation request, the adapted backend request, and the realized
+execution request. ``MediaSpec.normalized_spec_payload()`` is that stored
+request/provenance form. ``MediaSpec.fingerprint_payload()`` is its rendering
+identity projection, which defaults to the normalized payload; ``spec_fingerprint()``
+hashes only that projection. A backend may retain non-rendering provenance
+without making it part of cache identity. Consequently, a reused RIT retains
+the provenance of its first realization while a later equivalent dependency may
+carry different non-rendering request provenance. That is normal cache behavior.
+
 **Creator implementations currently present:**
 
 | Forge | Media type | Status |
@@ -338,6 +348,17 @@ options; the exact definition content hash and package version are part of the
 backend request. Unsupported traits remain provenance, but are excluded from
 the adapted-spec fingerprint because they cannot change the rendered output.
 There is no HTTP renderer path or style-selection catalog at this layer.
+
+`composition_forge` is the first one-level consumer of this distinction. A
+`CompositionSpec` persists ordered `CompositionInputRef` values with each child
+RIT UUID, content hash, role, and layout offset. Before a new parent is created,
+media-owned resolution loads those graph-owned children and verifies their live
+content hashes. The compositor receives only that resolved SVG plan; it has no
+graph, provisioning, world, or credentials knowledge. Composition identity
+projects child content hashes, roles, layout, canvas, treatment, and compositor
+version while excluding RIT UUIDs, so equivalent child content can reuse a
+parent even when supplied by distinct child RIT instances. This is deliberately
+one level only; it is not a generic media DAG or recursive renderer.
 
 The creator pipeline will continue to change as richer worker-backed forges and
 named spec registries take final shape. The stable commitments are the dispatch

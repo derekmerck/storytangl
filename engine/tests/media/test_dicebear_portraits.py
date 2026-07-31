@@ -12,6 +12,7 @@ from tangl.media.media_creators.dicebear_forge import DiceBearForge, DiceBearSpe
 from tangl.media.media_creators.portrait_spec import PortraitSpec
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.story.fabula import World
+from tangl.utils.hashing import hashing_func
 
 
 def _portrait_request(**overrides: object) -> PortraitSpec:
@@ -113,6 +114,19 @@ def test_portrait_adapter_maps_traits_and_preserves_ignored_provenance() -> None
     assert adapted.spec_fingerprint() == _adapt(changed_unsupported).spec_fingerprint()
     assert "eyesColor" not in _adapt(absent).options
     assert "skinColor" not in _adapt(absent).options
+
+
+def test_ignored_traits_remain_persisted_but_outside_dicebear_identity() -> None:
+    adapted = _adapt(_portrait_request())
+    expected = hashing_func(
+        {
+            "spec_cls": adapted.__class__.__fqn__(),
+            "data": adapted.normalized_spec_payload(exclude={"ignored_traits"}),
+        }
+    ).hex()
+
+    assert adapted.spec_fingerprint() == expected
+    assert adapted.normalized_spec_payload()["ignored_traits"]
 
 
 def test_explicit_seed_and_style_definition_hash_participate_in_identity() -> None:

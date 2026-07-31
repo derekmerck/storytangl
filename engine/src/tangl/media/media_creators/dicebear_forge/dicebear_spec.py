@@ -150,13 +150,9 @@ class DiceBearSpec(MediaSpec):
 
         return DiceBearForge()
 
-    def spec_fingerprint(self) -> str:
-        """Hash rendering inputs while retaining ignored traits as provenance only."""
-        payload = {
-            "spec_cls": self.__class__.__fqn__(),
-            "data": self.normalized_spec_payload(exclude={"ignored_traits"}),
-        }
-        return hashing_func(payload).hex()
+    def fingerprint_payload(self) -> dict[str, Any]:
+        """Exclude ignored source traits from rendering identity only."""
+        return self.normalized_spec_payload(exclude={"ignored_traits"})
 
 
 @on_adapt_media_spec.register(priority=Priority.NORMAL)
