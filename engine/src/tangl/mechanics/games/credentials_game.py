@@ -48,6 +48,7 @@ from tangl.mechanics.credentials import (
     DEFAULT_RESTRICTIONS,
     ContrabandItem,
     CredentialAttestationObservation,
+    CredentialCardProjection,
     CredentialDefect,
     CredentialDefectKind,
     CredentialStatus,
@@ -2075,6 +2076,28 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 )
             )
         return documents
+
+    def credential_card_projections(
+        self,
+        game: CredentialsGame,
+    ) -> list[CredentialCardProjection]:
+        """Project the active case's canonical ID documents for future card media."""
+        case = game.active_case
+        return [
+            CredentialCardProjection(
+                component_id=document.component.uid,
+                subject_id=document.component.subject_id,
+                document_kind=document.component.document_kind,
+                document_label=document.label,
+                bearer_label=case.candidate_name,
+                visible_parts=document.visible_observations,
+            )
+            for document in self._document_components(game)
+            if (
+                document.component.document_kind == "id"
+                and document.complete_replacement is None
+            )
+        ]
 
     def _document_bindings(self, game: CredentialsGame) -> dict[str, object]:
         """Return the explicit per-component bindings for recursive packet text."""

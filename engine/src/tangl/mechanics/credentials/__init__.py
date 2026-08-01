@@ -38,6 +38,7 @@ from .domain import (
 # Register the credential-owned default text presentation handlers.
 from .presentation import (
     CredentialAttestationObservation,
+    CredentialCardProjection,
     CredentialValidityObservation,
     CredentialVisibleObservation,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "CredentialComponent",
     "CredentialComponentToken",
     "CredentialAttestationObservation",
+    "CredentialCardProjection",
     "CredentialValidityObservation",
     "CredentialVisibleObservation",
     "CredentialDefinition",

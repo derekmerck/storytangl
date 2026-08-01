@@ -25,7 +25,9 @@ the component status. The narrow two-value union preserves ordered, neutral
 attestation-plus-validity prose and ``visible_parts`` without evaluating a
 credential from presentation output. This text/JOURNAL/interactive floor is
 sufficient to discuss a separate media-compositor integration plan; credentials
-will not create placeholder cards or a private forge.
+will not create placeholder cards or a private forge. Media Slices A–C landed
+through PR #326, and D1 adds the presentation-safe ``CredentialCardProjection``
+for canonical ID documents without provisioning or emitting media.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
@@ -353,10 +355,15 @@ component-backed pieces, and two ordered visible document observations. This is
 the complete text/JOURNAL/interactive floor. It deliberately does not compose a
 card or generate media.
 
-The next step is a separate requirements and integration-plan discussion with the
-media compositor refactor. Credentials should consume the resulting
-``MediaSpec → MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not
-invent placeholder cards, a private forge, or a parallel journal channel.
+Media Slices A–C landed through PR #326, including the minimal one-level
+compositor. D1 adds the credentials-owned, presentation-safe
+``CredentialCardProjection`` from the canonical document-render calculation;
+it still does not provision or emit media. The next slice needs a generic
+printable text/vector child before a credential card can compose meaningful
+content. Credentials must consume the resulting ``MediaSpec →
+MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not invent a
+packet sheet, recursive DAG, credential forge, catalog abstraction, or parallel
+JOURNAL media channel.
 
 ---
 
@@ -365,13 +372,13 @@ invent placeholder cards, a private forge, or a parallel journal channel.
 - **Portrait pool keying.** Phase 9 materializes a minimal `HasSimpleLook` subject
   per procedural candidate. The remaining question is how a world later maps
   those stable subject ids to reusable portrait-pool entries.
-- **RIT registry + composition-strategy surface (media-layer, §3a step 0).** The
-  one genuine dependency. Unifies the legacy `svg_forge` catalog-assembler and the
-  `raster_forge`/file-forge stub into registries of mini-RITs + interchangeable
-  composition strategies producing a composite RIT. Recipe/spec format (layer list
-  + transforms + strategy + content-addressing) is the open piece. Paperdoll-
-  driven; credentials is the degenerate validating consumer, not the driver.
-  Deserves its own media-subsystem design note / issue.
+- **Broader RIT catalog + composition-strategy surface (media-layer, §3a step
+  0).** The minimal one-level ``CompositionSpec`` compositor landed in PR #326.
+  What remains open is generalizing the legacy `svg_forge` catalog-assembler and
+  the `raster_forge`/file-forge stub into registries of mini-RITs plus
+  interchangeable composition strategies. Recipe/spec format (layer list +
+  transforms + strategy + content-addressing) remains a media concern;
+  paperdolls, not credentials, are the likely forcing consumer.
 - **Journal integration of composed media.** The single-RIT path exists
   (`MediaFragment(content=rit)` → service deref). Confirm a composite RIT rides
   the same path unchanged (it should — a composite is just a RIT), so neither

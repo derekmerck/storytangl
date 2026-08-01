@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Literal, TypeAlias
+from uuid import UUID
 
 from pydantic import ConfigDict
 
@@ -34,6 +35,19 @@ class CredentialValidityObservation(BaseModelPlus):
 CredentialVisibleObservation: TypeAlias = (
     CredentialAttestationObservation | CredentialValidityObservation
 )
+
+
+class CredentialCardProjection(BaseModelPlus):
+    """Presentation-safe semantic input for one future credential-card renderer."""
+
+    model_config = ConfigDict(frozen=True)
+
+    component_id: UUID
+    subject_id: UUID
+    document_kind: str
+    document_label: str
+    bearer_label: str
+    visible_parts: tuple[CredentialVisibleObservation, ...]
 
 
 @on_render_text(wants_caller_kind=CredentialPacketManager, wants_exact_kind=False)
@@ -120,6 +134,7 @@ def render_validity_text(
 
 __all__ = [
     "CredentialAttestationObservation",
+    "CredentialCardProjection",
     "CredentialValidityObservation",
     "CredentialVisibleObservation",
     "render_attestation_text",
