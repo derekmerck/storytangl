@@ -360,7 +360,8 @@ compositor. D1 adds the credentials-owned, presentation-safe
 ``CredentialCardProjection`` from the canonical document-render calculation;
 it still does not provision or emit media. The next slice needs a generic
 printable text/vector child before a credential card can compose meaningful
-content. Credentials must consume the resulting ``MediaSpec →
+content. D2 supplies that media-owned generic child but does not consume a
+credential projection. Credentials must consume the resulting ``MediaSpec →
 MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not invent a
 packet sheet, recursive DAG, credential forge, catalog abstraction, or parallel
 JOURNAL media channel.
