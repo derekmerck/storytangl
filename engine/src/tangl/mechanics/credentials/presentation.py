@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Literal, TypeAlias
+from uuid import UUID
 
 from pydantic import ConfigDict
 
@@ -34,6 +35,36 @@ class CredentialValidityObservation(BaseModelPlus):
 CredentialVisibleObservation: TypeAlias = (
     CredentialAttestationObservation | CredentialValidityObservation
 )
+
+
+class CredentialCardProjection(BaseModelPlus):
+    """Projection data for future credential-card renderers.
+
+    Why:
+        Keep presentation data separate from credential evaluation and mutation.
+
+    Key Features:
+        Preserve canonical IDs, scenario labels, and ordered visible observations.
+
+    API:
+        ``CredentialsGameHandler.credential_card_projections()`` produces this
+        value from the canonical ID document render.
+
+    Notes:
+        This model excludes validity, defect, policy, and outcome state.
+
+    See also:
+        ``CredentialVisibleObservation`` for the ordered visible document parts.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    component_id: UUID
+    subject_id: UUID
+    document_kind: str
+    document_label: str
+    bearer_label: str
+    visible_parts: tuple[CredentialVisibleObservation, ...]
 
 
 @on_render_text(wants_caller_kind=CredentialPacketManager, wants_exact_kind=False)
@@ -120,6 +151,7 @@ def render_validity_text(
 
 __all__ = [
     "CredentialAttestationObservation",
+    "CredentialCardProjection",
     "CredentialValidityObservation",
     "CredentialVisibleObservation",
     "render_attestation_text",
