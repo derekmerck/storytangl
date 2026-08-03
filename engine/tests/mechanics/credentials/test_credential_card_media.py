@@ -12,7 +12,6 @@ import pytest
 
 from tangl.core import TokenCatalog
 from tangl.media import MediaDataType
-from tangl.media.media_creators.composition_forge.composition_spec import CompositionSpec
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
 from tangl.mechanics.credentials import (
@@ -74,7 +73,11 @@ def _case(*, status: CredentialStatus = CredentialStatus.VALID) -> CredentialCas
             credentials=[],
             possessions=[],
             label_prefix="Ada Venn",
-            catalog=TokenCatalog(wst=CredentialDefinition, label="card", members=(definition,)),
+            catalog=TokenCatalog(
+                wst=CredentialDefinition,
+                label="card",
+                members=(definition,),
+            ),
         ),
     )
 
@@ -166,6 +169,8 @@ def test_card_specs_use_document_subject_and_safe_ordered_text(
     assert "DiceBear" not in Path(__file__).parents[3].joinpath(
         "src/tangl/mechanics/credentials/card_media.py"
     ).read_text()
+    with pytest.raises(ValueError, match="does not match projection"):
+        credential_card_portrait_spec(projection, bearer)
 
 
 def test_card_composition_provisions_and_reuses_children_and_parent(
@@ -178,8 +183,9 @@ def test_card_composition_provisions_and_reuses_children_and_parent(
     text_spec = credential_card_text_spec(projection)
     portrait_rit = _provision(story, block, portrait_spec)
     text_rit = _provision(story, block, text_spec)
+    reused_portrait = _provision(story, block, portrait_spec)
+    reused_text = _provision(story, block, text_spec)
     composition = credential_card_composition_spec(
-        projection,
         portrait_rit=portrait_rit,
         text_rit=text_rit,
     )
@@ -188,12 +194,13 @@ def test_card_composition_provisions_and_reuses_children_and_parent(
         story,
         block,
         credential_card_composition_spec(
-            projection,
             portrait_rit=portrait_rit,
             text_rit=text_rit,
         ),
     )
 
+    assert portrait_rit.uid == reused_portrait.uid
+    assert text_rit.uid == reused_text.uid
     assert card_rit.uid == reused.uid
     assert card_rit.status.value == "resolved"
     assert card_rit.data_type is MediaDataType.VECTOR
@@ -225,12 +232,10 @@ def test_card_identity_uses_visible_children_not_component_or_rit_ids(
     second_portrait = MediaRIT(label="portrait-two", data="<svg/>", data_type=MediaDataType.VECTOR)
     second_text = MediaRIT(label="text-two", data="<svg>text</svg>", data_type=MediaDataType.VECTOR)
     first = credential_card_composition_spec(
-        projection,
         portrait_rit=first_portrait,
         text_rit=first_text,
     )
     equivalent = credential_card_composition_spec(
-        equivalent_projection,
         portrait_rit=second_portrait,
         text_rit=second_text,
     )
@@ -243,7 +248,6 @@ def test_card_identity_uses_visible_children_not_component_or_rit_ids(
         data_type=MediaDataType.VECTOR,
     )
     changed_parent = credential_card_composition_spec(
-        projection.model_copy(update={"document_label": "student ID"}),
         portrait_rit=first_portrait,
         text_rit=changed_text_rit,
     )

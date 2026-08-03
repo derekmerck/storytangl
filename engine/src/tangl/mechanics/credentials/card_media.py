@@ -15,6 +15,8 @@ def credential_card_portrait_spec(
     subject: HasSimpleLook,
 ) -> PortraitSpec:
     """Build the recorded document subject's renderer-neutral portrait request."""
+    if subject.uid != projection.subject_id:
+        raise ValueError("Credential-card portrait subject does not match projection")
     payload = subject.adapt_look_media_spec(media_role="id_photo")
     return portrait_spec_from_look(payload, identity_key=str(projection.subject_id))
 
@@ -32,13 +34,11 @@ def credential_card_text_spec(projection: CredentialCardProjection) -> Printable
 
 
 def credential_card_composition_spec(
-    projection: CredentialCardProjection,
     *,
     portrait_rit: MediaRIT,
     text_rit: MediaRIT,
 ) -> CompositionSpec:
     """Compose resolved portrait and printable-text resources into one ID card."""
-    _ = projection
     portrait_hash = portrait_rit.get_content_hash()
     text_hash = text_rit.get_content_hash()
     if portrait_hash is None or text_hash is None:
