@@ -12,12 +12,32 @@ if TYPE_CHECKING:
 
 
 class SvgTextSpec(MediaSpec):
-    """Resolved fixed-layout SVG instructions for ordered text lines."""
+    """Resolved SVG layout instructions for printable text.
+
+    Why:
+        Make a printable-text request's concrete dimensions, typography, and
+        ordered rendered lines explicit before SVG creation.
+
+    Key Features:
+        Captures deterministic canvas geometry and the selected profile's
+        resolved lines, including wrapped credential-card text.
+
+    API:
+        ``get_creation_service()`` supplies ``SvgTextForge`` for local SVG
+        materialization.
+
+    Notes:
+        This is backend-specific execution input, not an authored text model.
+
+    See also:
+        ``PrintableTextSpec`` for the semantic request contract.
+    """
 
     resolution_class: MediaResolutionClass = MediaResolutionClass.FAST_SYNC
     data_type: MediaDataType = MediaDataType.VECTOR
 
     lines: tuple[str, ...]
+    style_profile: str
     canvas_width: int
     canvas_height: int
     padding: int

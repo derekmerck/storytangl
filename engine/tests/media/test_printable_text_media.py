@@ -55,6 +55,7 @@ def test_printable_text_adapts_to_concrete_svg_layout() -> None:
 
     assert isinstance(adapted, SvgTextSpec)
     assert adapted.lines == request.lines
+    assert adapted.style_profile == "default"
     assert adapted.canvas_width == 320
     assert adapted.canvas_height == 80
     assert adapted.font_family == "sans-serif"
@@ -92,6 +93,28 @@ def test_printable_text_identity_includes_order_and_resolved_layout() -> None:
     assert adapted.spec_fingerprint() != adapted.model_copy(
         update={"font_size": adapted.font_size + 1}
     ).spec_fingerprint()
+
+
+def test_credential_card_profile_wraps_into_its_resolved_layout() -> None:
+    request = PrintableTextSpec(
+        style_profile="credential_card",
+        lines=(
+            "passport",
+            "Ada Venn",
+            "A round blue border control seal is impressed beside the bearer line.",
+            "The validity line reads “Valid through the current entry period.”",
+        ),
+    )
+
+    adapted = request.adapt_spec(ctx={})
+
+    assert isinstance(adapted, SvgTextSpec)
+    assert adapted.style_profile == "credential_card"
+    assert adapted.canvas_width == 320
+    assert adapted.font_family == "monospace"
+    assert all(len(line) <= 34 for line in adapted.lines)
+    assert adapted.canvas_height == 32 + 20 * len(adapted.lines)
+    assert adapted.canvas_height <= 176
 
 
 def test_printable_text_provisions_and_reuses_story_svg(

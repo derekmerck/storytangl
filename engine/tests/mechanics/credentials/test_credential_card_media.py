@@ -14,6 +14,8 @@ from tangl.core import TokenCatalog
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
+from tangl.media.media_resource.media_resource_inv_tag import MediaRITStatus
+from tangl.media.media_creators.svg_text_forge import SvgTextSpec
 from tangl.mechanics.credentials import (
     CredentialDefinition,
     CredentialStatus,
@@ -207,7 +209,10 @@ def test_card_composition_provisions_and_reuses_children_and_parent(
     assert card_rit.path is not None
     root = etree.fromstring(card_rit.path.read_bytes())
     lines = root.xpath(".//svg:text", namespaces={"svg": "http://www.w3.org/2000/svg"})
-    assert [line.text for line in lines] == list(text_spec.lines)
+    adapted_text = text_spec.adapt_spec(ctx={})
+    assert isinstance(adapted_text, SvgTextSpec)
+    assert [line.text for line in lines] == list(adapted_text.lines)
+    assert adapted_text.canvas_height <= 176
     assert [item.role for item in composition.inputs] == ["portrait", "printable_text"]
     assert [item.offset for item in composition.inputs] == [(16, 32), (176, 16)]
     assert composition.canvas_size == (512, 192)
@@ -216,6 +221,22 @@ def test_card_composition_provisions_and_reuses_children_and_parent(
     assert card_rit.derivation_spec == composition.normalized_spec_payload()
     assert card_rit.adapted_spec is not None
     assert card_rit.execution_spec is not None
+
+
+def test_card_composition_requires_resolved_child_content(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _, _, _, projection = _live_card_case(monkeypatch, tmp_path)
+    pending = MediaRIT(
+        label="pending-portrait",
+        status=MediaRITStatus.PENDING,
+        data_type=MediaDataType.VECTOR,
+    )
+    text = MediaRIT(label="text", data="<svg/>", data_type=MediaDataType.VECTOR)
+
+    with pytest.raises(ValueError, match="requires resolved child content"):
+        credential_card_composition_spec(portrait_rit=pending, text_rit=text)
 
 
 def test_card_identity_uses_visible_children_not_component_or_rit_ids(

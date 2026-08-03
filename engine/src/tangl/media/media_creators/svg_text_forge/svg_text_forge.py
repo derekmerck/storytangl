@@ -8,7 +8,26 @@ from .svg_text_spec import SvgTextSpec
 
 
 class SvgTextForge:
-    """Render resolved printable text layout into a standalone SVG document."""
+    """Render resolved printable-text layout into standalone SVG.
+
+    Why:
+        Provide a deterministic local vector backend without a remote text
+        rendering service.
+
+    Key Features:
+        Emits namespace-qualified SVG with XML-safe, whitespace-preserving text
+        nodes from resolved layout instructions.
+
+    API:
+        ``create_media()`` returns SVG data and the realized ``SvgTextSpec``.
+
+    Notes:
+        The forge performs no wrapping or measurement; those decisions belong
+        to the profile adapter that produced the spec.
+
+    See also:
+        ``SvgTextSpec`` for the resolved input contract.
+    """
 
     def create_media(self, spec: SvgTextSpec) -> tuple[str, SvgTextSpec]:
         """Return XML-safe SVG text and the realized backend spec."""

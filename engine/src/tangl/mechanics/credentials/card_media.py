@@ -25,6 +25,7 @@ def credential_card_text_spec(projection: CredentialCardProjection) -> Printable
     """Build the card's ordered, presentation-safe printed wording."""
     return PrintableTextSpec(
         label="credential_card_text",
+        style_profile="credential_card",
         lines=(
             projection.document_label,
             projection.bearer_label,
