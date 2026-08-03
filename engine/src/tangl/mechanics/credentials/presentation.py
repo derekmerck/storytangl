@@ -38,7 +38,24 @@ CredentialVisibleObservation: TypeAlias = (
 
 
 class CredentialCardProjection(BaseModelPlus):
-    """Presentation-safe semantic input for one future credential-card renderer."""
+    """Projection data for future credential-card renderers.
+
+    Why:
+        Keep presentation data separate from credential evaluation and mutation.
+
+    Key Features:
+        Preserve canonical IDs, scenario labels, and ordered visible observations.
+
+    API:
+        ``CredentialsGameHandler.credential_card_projections()`` produces this
+        value from the canonical ID document render.
+
+    Notes:
+        This model excludes validity, defect, policy, and outcome state.
+
+    See also:
+        ``CredentialVisibleObservation`` for the ordered visible document parts.
+    """
 
     model_config = ConfigDict(frozen=True)
 

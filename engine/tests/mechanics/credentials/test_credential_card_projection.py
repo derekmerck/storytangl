@@ -105,7 +105,10 @@ def _game(
     *,
     presentation: CredentialPresentationProfile | None = None,
 ) -> tuple[CredentialsGame, CredentialsGameHandler]:
-    game = CredentialsGame(roster=[case], presentation=presentation or CredentialPresentationProfile())
+    game = CredentialsGame(
+        roster=[case],
+        presentation=presentation or CredentialPresentationProfile(),
+    )
     handler = CredentialsGameHandler()
     handler.setup(game)
     return game, handler
