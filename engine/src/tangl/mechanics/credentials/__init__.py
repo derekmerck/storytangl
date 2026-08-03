@@ -42,6 +42,11 @@ from .presentation import (
     CredentialValidityObservation,
     CredentialVisibleObservation,
 )
+from .card_media import (
+    credential_card_composition_spec,
+    credential_card_portrait_spec,
+    credential_card_text_spec,
+)
 
 __all__ = [
     "COMMON_ALLIED_RESTRICTIONS",
@@ -56,6 +61,9 @@ __all__ = [
     "CredentialCardProjection",
     "CredentialValidityObservation",
     "CredentialVisibleObservation",
+    "credential_card_composition_spec",
+    "credential_card_portrait_spec",
+    "credential_card_text_spec",
     "CredentialDefinition",
     "CredentialPacketManager",
     "default_credential_catalog",
