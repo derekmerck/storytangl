@@ -352,11 +352,12 @@ There is no HTTP renderer path or style-selection catalog at this layer.
 
 `PrintableTextSpec` is the corresponding generic text leaf: an ordered sequence
 of printable lines with one semantic default profile. Its adapter produces a
-fully resolved `SvgTextSpec` (fixed panel dimensions, padding, font, colors,
-and adapter version), and `SvgTextForge` emits XML-safe standalone SVG. It is
-not a text-layout system: wrapping, font measurement, rich text, and template
-rendering remain outside this contract. The semantic request and resolved SVG
-request retain the normal derivation/adapted/execution RIT provenance split.
+fully resolved `SvgTextSpec` with deterministic dimensions derived from the
+line count, plus padding, font, colors, and adapter version; `SvgTextForge`
+emits XML-safe standalone SVG. It is not a text-layout system: wrapping, font
+measurement, rich text, and template rendering remain outside this contract.
+The semantic request and resolved SVG request retain the normal
+derivation/adapted/execution RIT provenance split.
 
 `composition_forge` is the first one-level consumer of this distinction. A
 `CompositionSpec` persists ordered `CompositionInputRef` values with each child
