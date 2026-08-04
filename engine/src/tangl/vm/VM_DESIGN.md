@@ -119,6 +119,51 @@ JOURNAL — the player's next choice is recorded at the start of the *next*
 `resolve_choice` call, not at the end of the current pipeline. This keeps the pipeline
 atomic and simplifies replay: every step is a complete VALIDATE→POSTREQS sequence.
 
+### Turn atomicity and frontier timing
+
+User interaction begins a turn; presentation of the next live frontier ends it. The
+pipeline never blocks midway for more external instruction. A question that needs a
+player answer is itself an end-of-turn choice surface; the answer begins another
+complete cycle.
+
+PLANNING establishes the topology of the next frontier. From the current node it
+provisions the successor nodes, providers, dependencies, and actions that may be
+selected next. Those successors must exist before they are presented: a disclosed
+“note on the door” is either a fact on an already-provisioned provider or a durable
+constraint that any remaining lazy realization must satisfy.
+
+UPDATE changes committed state after the frontier's shape is mostly settled. It may
+lock or unlock already-provisioned doors, transfer custody, apply injury, change
+relationships, or activate the selected successor. Availability and presentation then
+interpret the provisioned frontier under that updated state.
+
+UPDATE may create an entity when creation is itself a consequence, but the new entity
+does not retroactively participate in a namespace/frontier assembled earlier in the
+same turn. Ordinary interaction with it begins during the following turn's PLANNING.
+If same-turn use appears necessary, the design has usually hidden another turn;
+represent that as an automatic setup/continuation step instead.
+
+A pre-materialized world does not waive this rule. Adding “one temporary sword”
+directly during UPDATE because it is convenient bypasses the dependency/affordance and
+provenance contracts just as surely as lazy story generation does. If the sword must
+be a selectable or inspectable possibility this turn, provision it into the frontier.
+If receiving the sword is the consequence of the selected action, create/transfer it
+during UPDATE and expose its uses next turn.
+
+JIT provisioning of the current node is an exceptional recovery path for startup,
+out-of-order/debug traversal, stale derived frontier state, or explicit on-demand
+projections such as a map. It is not the ordinary choice lifecycle.
+
+```
+user input
+  → validate selected choice
+  → provision next frontier
+  → settle prerequisites
+  → update committed state
+  → journal and project live choices
+  → return control to user
+```
+
 **Phases are recursively refinable symbols.** A phase is atomic at the contract
 boundary but may be decomposed at the implementation boundary. At the VM level,
 `UPDATE` is one causal symbol in the pipeline. Internally it may be refined into
