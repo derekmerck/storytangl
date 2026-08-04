@@ -26,8 +26,9 @@ attestation-plus-validity prose and ``visible_parts`` without evaluating a
 credential from presentation output. This text/JOURNAL/interactive floor is
 sufficient to discuss a separate media-compositor integration plan; credentials
 will not create placeholder cards or a private forge. Media Slices A–C landed
-through PR #326, and D1 adds the presentation-safe ``CredentialCardProjection``
-for canonical ID documents without provisioning or emitting media.
+through PR #326, D1–D3 landed the presentation-safe
+``CredentialCardProjection`` and its one-level card-media requests, and Slice E
+adds lifecycle-safe provisioning plus JOURNAL association for eligible ID cards.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
@@ -366,12 +367,15 @@ subject portrait and printable text, then compose their resolved RITs into one
 presentation-safe ID card. Its media-owned ``credential_card`` text profile
 wraps the safe observation wording into the fixed card-text layout and elides
 only overflowing execution lines; the complete projection remains in the
-derivation payload. That card is not yet emitted into JOURNAL. Slice E remains
-responsible for lifecycle timing, ``PieceFragment`` association, text fallback,
-authored alternatives/replacements, and media selection. Credentials must
-consume the resulting ``MediaSpec → MediaSpecProvisioner → MediaRIT →
-MediaFragment`` path; it must not invent a packet sheet, recursive DAG,
-credential forge, catalog abstraction, or parallel JOURNAL media channel.
+derivation payload. Slice E provisions its portrait and printable-text children
+before the one-level parent, keeps the text ``PieceFragment`` unconditional,
+and emits an ordinary associated ``MediaFragment`` only when the complete card
+is resolved. Complete authored replacements suppress that generated card.
+Authored alternatives/replacements and world-scoped media selection remain the
+next slice. Credentials must consume the resulting ``MediaSpec →
+MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not invent a
+packet sheet, recursive DAG, credential forge, catalog abstraction, or parallel
+JOURNAL media channel.
 
 ---
 

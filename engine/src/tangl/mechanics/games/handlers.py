@@ -207,6 +207,9 @@ def provision_game_moves(
     if cursor.game.phase != GamePhase.READY:
         return None if runtime_planning else []
 
+    if runtime_planning:
+        cursor.game_handler.provision_presentation(cursor.game, ctx=ctx)
+
     moves = cursor.game_handler.get_provisioned_moves(cursor.game)
 
     if not moves:

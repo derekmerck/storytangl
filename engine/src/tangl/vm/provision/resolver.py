@@ -254,6 +254,8 @@ class Resolver:
         *,
         _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
+        if requirement.media_spec is not None:
+            return []
         if _ctx is None:
             return []
 
