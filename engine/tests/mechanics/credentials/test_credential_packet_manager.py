@@ -769,7 +769,7 @@ def test_has_game_materializes_offer_packet_manager_on_arrival() -> None:
     assert restored_manager.get_slot(CREDENTIAL_ID_SLOT)
 
 
-def test_sampled_offers_materialize_once_at_game_lifecycle_boundaries() -> None:
+def test_sampled_offers_prepare_successor_before_update_selects_it() -> None:
     graph = Graph()
     block = graph.add_node(kind=CredentialsBlock, label="checkpoint")
     block.game_state = CredentialsGame(
@@ -800,21 +800,28 @@ def test_sampled_offers_materialize_once_at_game_lifecycle_boundaries() -> None:
         for item in graph.members.values()
     )
 
+    second_case = block.game.prepare_case(1)
+    prepared_component_count = sum(
+        isinstance(item, CredentialComponent)
+        for item in graph.members.values()
+    )
+    assert second_case.candidate_name == "Tomas"
+    assert prepared_component_count > component_count
+
     assert handler.get_available_moves(block.game)
     assert (
         sum(isinstance(item, CredentialComponent) for item in graph.members.values())
-        == component_count
+        == prepared_component_count
     )
 
     handler.receive_move(block.game, ("inspect", "passport"))
     handler.receive_move(block.game, ("decide", "pass"))
 
-    second_case = block.game.active_case
-    assert second_case.candidate_name == "Tomas"
+    assert block.game.active_case is second_case
     assert second_case.packet_manager.owner is block
     assert (
         sum(isinstance(item, CredentialComponent) for item in graph.members.values())
-        > component_count
+        == prepared_component_count
     )
 
 
