@@ -35,6 +35,30 @@ deliberately small: an ephemeral `TransactionOffer` validates, accepts, and
 receipts a list of commitments while domain mechanics keep their own policy and
 author-facing words.
 
+## Mechanics as Pressure Systems
+
+Mechanics should help an author avoid enumerating cross-product decision trees.
+Worlds provide rules, populations, resources, authority, histories, consequences,
+and presentation policy; scenarios narrow those inputs; mechanics derive available
+interventions, costs, outcomes, and durable writeback. Later scenarios can consume
+the resulting artifacts, relationships, capabilities, and memories as new context.
+
+Correctness is deliberately multi-axis. A choice may be allowed, rules-correct,
+evidentially justified, easy for the player, and harmful to someone else. Those facts
+remain separate so authored worlds can create moral, institutional, personal, and
+resource pressures without a universal morality function or a special-case branch for
+every combination.
+
+Families contribute different parts of that grammar: assembly exposes component state
+to downstream mechanics; progression and badges accumulate durable change; sandbox
+presence and schedules determine what is currently in scope; transactions move custody
+and value; games and contests resolve bounded pressure; credentials, combat, racing,
+and similar capstones compose several of these surfaces at once.
+
+See `docs/src/design/story/MECHANICS_FAMILIES.md` for the full convergence model,
+including world/scenario/encounter narrowing and the exemplar-decomposition records
+used to treat demonstration worlds as conformance cases and representational probes.
+
 ## Review Lens
 
 When reviewing or reviving a mechanic family, describe it with these four questions:

@@ -356,6 +356,127 @@ manager. Each family keeps its own kernel and specialized folds while exchanging
 compatible identity, discovery, interaction, commitment, receipt, and projection
 artifacts through the existing runtime lifecycle.
 
+### Mechanics as pressure systems
+
+The strongest mechanics are not merely examples of attaching a minigame to the
+narrative engine. They attach in a way that lets authors avoid enumerating the
+cross-product of every earlier choice, current condition, available resource, and
+possible outcome as a bespoke decision tree.
+
+Compact minigames still have an important place as **resolution grammars** inside
+that larger system. Rock-paper-scissors can drive a duel whose authored actions are
+heavy attack, feint, and defend; the algebra resolves the exchange while injury,
+position, reputation, equipment, and future retaliation supply its pressure and
+consequence. A card game may score hands like poker while players strategically
+raise, bluff, or call through a multiplayer rock-paper-scissors kernel. The reusable
+value lies in the small, legible resolution grammar, not in presenting it as an
+isolated diversion.
+
+Resolution and concrete realization need not always occur in the intuitive order.
+When supporting details were hidden and did not participate in the player's choice,
+the mechanic may resolve the strategic exchange first and then materialize artifacts
+consistent with that result. The card game can construct or reveal a hand after the
+round so it beats the losers or loses to the winner. This is constrained realization,
+not arbitrary contradiction:
+
+```text
+committed strategies + stakes
+  -> abstract resolution
+     -> outcome constraints
+        -> materialized cards, blows, evidence, or other diegetic details
+           -> narrative and media projection
+```
+
+Anything already observed or mechanically operative remains committed truth and
+cannot be rewritten merely to justify the result. But latent details may be sampled,
+assembled, or generated from the resolved constraints. This lets a tiny game kernel
+support rich deterministic or procedural content without making authors enumerate
+every possible hand, exchange, or presentation in advance.
+
+None of this complexity is mandatory. The default challenge should remain the
+simplest legible contract: establish the relevant state, accept the player's move,
+resolve it through the kernel, and commit the result. Perceived fairness is an
+authorial and narrative tool, not a universal engine invariant or a score every
+mechanic must calculate. A scenario may add tells, hidden information, responsive
+opponents, late realization, or outcome steering only when those devices create
+useful pressure.
+
+What matters to the player is the presented causal contract. A fair-seeming contest
+should preserve enough consistency and responsiveness for the player's move to feel
+meaningful; an intentionally unfair contest should preserve the intended experience
+of coercion, corruption, fate, comedy, or dramatic necessity. Internal orchestration
+may be simpler or more directed than its diegetic presentation, provided it does not
+accidentally contradict facts the story has committed. The engine should make
+ordinary fair play easy and leave bounded intervention seams available, not require
+every author to configure a theory of fairness before resolving a challenge.
+
+The authored unit is therefore better understood as a **pressure system** than as
+a branch. A world supplies populations, rules, resources, authority, histories,
+consequences, and presentation policy. A scenario selects and narrows those inputs.
+The mechanic combines them into currently available interventions, evaluates the
+committed choice, and writes durable results that later situations may interpret.
+
+```text
+state + rules + resources + authority + history
+  -> available interventions and their costs
+     -> committed action and multi-axis evaluation
+        -> durable consequences
+           -> facts, relationships, and resources for future pressures
+```
+
+This does not require one universal correctness or morality score. The same action
+may be evaluated independently as:
+
+- **available** under the participant's current authority, inventory, location,
+  knowledge, and relationships;
+- **rules-correct** under the scenario's institutional or procedural policy;
+- **evidentially supported** by what was visible or established when the action was
+  committed;
+- **beneficial or harmful** to the participant, candidate, institution, faction, or
+  world according to authored consequence logic;
+- **easy or difficult** in time, attention, resources, reputation, exposure, skill,
+  or other tunable costs;
+- **durable**, producing artifacts, memories, relationships, injuries, upgrades,
+  permissions, obligations, or world facts that affect later scenarios.
+
+These axes remain separate so an action can be procedurally correct, institutionally
+rewarded, personally safe, and disastrous for somebody else. Conversely, an action
+may violate policy, cost the player dearly, and still produce an authored compassionate
+outcome. The engine records attributable facts and applies explicit rules; the world
+decides what those facts mean and when their consequences return to the story.
+
+Mechanic families contribute different parts of this pressure grammar:
+
+- **assembly** is a foundational adapter. It turns durable components and their
+  relationships into capabilities, restrictions, defects, resource budgets, and
+  other semantic facts that downstream mechanics can consume;
+- **progression and badges** accumulate durable changes in competency, reputation,
+  permission, and history, altering the costs and possibilities of later actions;
+- **sandbox presence, locations, and schedules** determine which actors, resources,
+  problems, and opportunities are currently in scope, allowing the same durable
+  state to produce different local fan-outs without rewriting each location;
+- **transactions** move artifacts, custody, value, and authority between participants
+  through explicit commitments and receipts;
+- **games and contests** turn gathered facts into bounded offers, costs, resolution,
+  and writeback;
+- **credentials, combat, racing, and similar capstones** combine several families at
+  once: assemblies and capabilities, hidden or visible evidence, opposing objectives,
+  resource pressure, institutional rules, risk, progression, and durable consequence.
+
+Special authored encounters remain valuable. The goal is not to eliminate bespoke
+storytelling, but to reserve it for distinctive meaning and dramatic events rather
+than using it to manually restate every mechanical combination. A named candidate,
+companion, weapon, waiver, injury, or prior betrayal can remain a durable graph-owned
+fact and re-enter later namespaces, offers, and rendering. When an author adds a new
+consequence after the fact, existing structured history supplies the context without
+requiring every earlier passage to have anticipated that exact branch.
+
+Projection completes the pattern. Narrative, dialogue, UI fragments, and media are
+derived from the same committed semantic state, so deterministic or generated content
+can remain synchronized with the pressures that produced it. Rendering does not own
+the mechanic's truth, and the mechanic does not hard-code one prose, visual, or audio
+realization.
+
 ### World-adopted mechanics and scenario layers
 
 Mechanics are world-agnostic kernels. They define durable state, operations,
@@ -435,8 +556,50 @@ setup or UPDATE boundary.
 
 ### Demonstration worlds as conformance surfaces
 
-The demonstration worlds are integration fixtures, not disposable examples.
-Each should exercise one or two pieces of the shared vocabulary before later
+The demonstration worlds are integration fixtures and architectural probes, not
+disposable examples. Each serves three related purposes:
+
+- an **author-facing example** provides a reusable pattern for constructing an
+  interaction;
+- an **engine conformance case** proves that the shared mechanics, VM, journal, and
+  rendering contracts compose;
+- a **representational experiment** tests whether the interesting, non-grindy part
+  of an inspiration can be reconstructed from stable primitives, declarative
+  world/scenario data, and a small bespoke residual.
+
+The third purpose is story-compression-adjacent, but it does not require a ratio of
+source lines to authored data. The useful evidence is whether narratively distinct
+examples repeatedly decompose into the same small vocabulary while their bespoke
+code increasingly describes their identity rather than rebuilding recurrence,
+hidden information, response mediation, consequence persistence, or content
+projection.
+
+Each substantial exemplar should therefore retain a lightweight decomposition
+record alongside its design or world notes:
+
+1. **Source inspiration** — the encounter, system, or experience being approximated.
+2. **Experiential invariant** — what must remain interesting or recognizable to the
+   player.
+3. **Pressure structure** — objectives, hidden and disclosed facts, resources,
+   preparation, interventions, costs, and consequences.
+4. **StoryTangl mapping** — the kernels, scoped concepts, catalogs, assemblies,
+   offers, transactions, schedules, persistence, and projection surfaces used.
+5. **Deliberate approximation** — what differs from the inspiration by choice rather
+   than by accident.
+6. **Bespoke residual and framework friction** — what still requires special logic,
+   what encoded awkwardly, and what reusable primitive the attempt may have exposed.
+7. **Parity status** — which invariants have been demonstrated mechanically,
+   narratively, and through a playable client.
+
+These are design-provenance records, not benchmark scorecards. Comparing them across
+the inhaler dilemma, recurring forgery, bribed denial, accomplice-assisted guessing,
+environmentally transformed combat, scheduled pirate, inner voices, and robot
+chopshop makes reimplementation choices concrete without pretending that narrative
+fidelity is a single number. Persistent friction shared by several exemplars is
+evidence for a missing coordinate; one-off residual is often exactly where authored
+specificity belongs.
+
+Each world should exercise one or two pieces of the shared vocabulary before later
 worlds compose a broader range:
 
 - the credentials world exercises hidden-information inspection and mediation;
