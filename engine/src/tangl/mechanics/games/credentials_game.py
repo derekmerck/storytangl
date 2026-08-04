@@ -1025,14 +1025,14 @@ class CredentialsGame(PickingGame):
 
         return self._component_manager_owner is not None
 
-    def prepare_active_case(self) -> CredentialCase:
-        """Materialize the arriving sampled case at setup or UPDATE time."""
+    def prepare_case(self, case_index: int) -> CredentialCase:
+        """Materialize one sequential case without making it active."""
 
         if not self.offers:
-            return self.roster[self.case_index]
+            return self.roster[case_index]
         from .credentials_roster import materialize
 
-        while len(self.materialized) <= self.case_index:
+        while len(self.materialized) <= case_index:
             offer = self.offers[len(self.materialized)]
             self.materialized.append(
                 materialize(
@@ -1047,7 +1047,7 @@ class CredentialsGame(PickingGame):
                     narrative_renderer=self.presentation.render_case,
                 )
             )
-        return self.materialized[self.case_index]
+        return self.materialized[case_index]
 
     # ----- active case access ----------------------------------------------
     def _total_cases(self) -> int:
@@ -1065,7 +1065,7 @@ class CredentialsGame(PickingGame):
                 and self.phase is GamePhase.READY
             ):
                 raise RuntimeError("Sampled credential cases must be prepared before PLANNING")
-            return self.prepare_active_case()
+            return self.prepare_case(self.case_index)
         return self.materialized[self.case_index]
 
     @property
@@ -1201,8 +1201,6 @@ class CredentialsGame(PickingGame):
         self.packet_findings = {}
         self.committed_decision = None
         self.finding_status = {}
-        if self.has_component_manager_owner and not self.shift_complete:
-            self.prepare_active_case()
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
@@ -1251,15 +1249,35 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         """Prepare the first sampled packet before move provisioning begins."""
 
         if game.has_component_manager_owner and game.offers:
-            game.prepare_active_case()
+            game.prepare_case(game.case_index)
 
     def provision_presentation(self, game: CredentialsGame, *, ctx: VmPhaseCtx) -> None:
-        """Provision one eligible ID card through ordinary media dependencies."""
+        """Prepare the current and sequential successor card frontiers."""
         if game.shift_complete or ctx.cursor is None:
             return
 
-        case = game.active_case
-        for projection in self.credential_card_projections(game):
+        indices = [game.case_index]
+        if game.case_index + 1 < game._total_cases():
+            indices.append(game.case_index + 1)
+        for case_index in indices:
+            case = game.prepare_case(case_index)
+            self._provision_case_presentation(
+                game,
+                case=case,
+                case_index=case_index,
+                ctx=ctx,
+            )
+
+    def _provision_case_presentation(
+        self,
+        game: CredentialsGame,
+        *,
+        case: CredentialCase,
+        case_index: int,
+        ctx: VmPhaseCtx,
+    ) -> None:
+        """Provision one already-prepared case without changing active state."""
+        for projection in self.credential_card_projections(game, case=case):
             component = next(
                 component
                 for component in case.packet_manager.document_components()
@@ -1269,6 +1287,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             portrait = self._card_media_dependency(
                 game,
                 component=component,
+                case_index=case_index,
                 role="portrait",
                 spec=credential_card_portrait_spec(projection, subject),
                 ctx=ctx,
@@ -1276,6 +1295,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             text = self._card_media_dependency(
                 game,
                 component=component,
+                case_index=case_index,
                 role="printable_text",
                 spec=credential_card_text_spec(projection),
                 ctx=ctx,
@@ -1297,6 +1317,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             card = self._card_media_dependency(
                 game,
                 component=component,
+                case_index=case_index,
                 role="card",
                 spec=credential_card_composition_spec(
                     portrait_rit=portrait_rit,
@@ -1312,6 +1333,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game: CredentialsGame,
         *,
         component: CredentialComponent,
+        case_index: int,
         role: str,
         spec: MediaSpec,
         ctx: VmPhaseCtx,
@@ -1319,7 +1341,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         """Return one stable, graph-owned media dependency for a card role."""
         dependency_id = _card_media_dep_uid(
             game.uid,
-            game.case_index,
+            case_index,
             component.uid,
             role,
         )
@@ -2129,10 +2151,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def _document_components(
         self,
         game: CredentialsGame,
+        *,
+        case: CredentialCase | None = None,
     ) -> list[_CredentialDocumentRender]:
         """Pair canonical components with their profile base and visible parts."""
 
-        case = game.active_case
+        case = case or game.active_case
+        is_active_case = case is game.active_case
         documents: list[_CredentialDocumentRender] = []
         for component in case.packet_manager.document_components():
             label = self._component_label(game, component)
@@ -2156,7 +2181,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 component.indication,
             )
             reissued = (
-                reissued_component is not None
+                is_active_case
+                and reissued_component is not None
                 and component.uid == reissued_component.uid
                 and game.finding_status.get(component.indication) == Finding.CLEARED
             )
@@ -2187,9 +2213,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def credential_card_projections(
         self,
         game: CredentialsGame,
+        *,
+        case: CredentialCase | None = None,
     ) -> list[CredentialCardProjection]:
-        """Project the active case's canonical ID documents for future card media."""
-        case = game.active_case
+        """Project one case's canonical ID documents for future card media."""
+        case = case or game.active_case
         return [
             CredentialCardProjection(
                 component_id=document.component.uid,
@@ -2199,7 +2227,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 bearer_label=case.candidate_name,
                 visible_parts=document.visible_observations,
             )
-            for document in self._document_components(game)
+            for document in self._document_components(game, case=case)
             if (
                 document.component.document_kind == "id"
                 and document.complete_replacement is None

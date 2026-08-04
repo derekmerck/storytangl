@@ -454,12 +454,30 @@ def test_lifecycle_provisions_the_next_candidate_during_update(
 
     ctx.current_phase = ResolutionPhase.PLANNING
     provision_game_moves(cursor=block, ctx=ctx)
+    next_projection = block.game_handler.credential_card_projections(block.game, case=second_case)[0]
+    prepared_dependency_ids = {
+        dependency.uid for dependency in story.values() if isinstance(dependency, MediaDep)
+    }
+    active_journal = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+
+    assert block.game.case_index == 0
+    assert block.game.active_case is first_case
+    assert block.game.to_namespace()["credential_candidate_name"] == "Ada Venn"
+    assert len(prepared_dependency_ids) == 6
+    assert not any(
+        isinstance(fragment, MediaFragment) and fragment.source_id == next_projection.component_id
+        for fragment in active_journal
+    )
+    assert all("Bea Moss" not in str(fragment.content) for fragment in active_journal)
+
     ctx.current_phase = ResolutionPhase.UPDATE
     process_game_move(block, ctx=ctx)
 
     assert block.game.case_index == 1
-    next_projection = block.game_handler.credential_card_projections(block.game)[0]
     journal = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert {
+        dependency.uid for dependency in story.values() if isinstance(dependency, MediaDep)
+    } == prepared_dependency_ids
     assert any(
         isinstance(fragment, MediaFragment) and fragment.source_id == next_projection.component_id
         for fragment in journal

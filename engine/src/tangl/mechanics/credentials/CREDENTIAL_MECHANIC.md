@@ -368,9 +368,12 @@ presentation-safe ID card. Its media-owned ``credential_card`` text profile
 wraps the safe observation wording into the fixed card-text layout and elides
 only overflowing execution lines; the complete projection remains in the
 derivation payload. Slice E provisions its portrait and printable-text children
-before the one-level parent, keeps the text ``PieceFragment`` unconditional,
-and emits an ordinary associated ``MediaFragment`` only when the complete card
-is resolved. Complete authored replacements suppress that generated card.
+before the one-level parent, including the sequential successor frontier during
+PLANNING without changing the active case. UPDATE then selects the already
+prepared successor; it does not JIT-provision presentation. The text
+``PieceFragment`` remains unconditional, and an ordinary associated
+``MediaFragment`` appears only when the complete card is resolved. Complete
+authored replacements suppress that generated card.
 Authored alternatives/replacements and world-scoped media selection remain the
 next slice. Credentials must consume the resulting ``MediaSpec →
 MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not invent a
