@@ -227,7 +227,7 @@ def test_card_composition_requires_resolved_child_content(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    _, _, _, projection = _live_card_case(monkeypatch, tmp_path)
+    _live_card_case(monkeypatch, tmp_path)
     pending = MediaRIT(
         label="pending-portrait",
         status=MediaRITStatus.PENDING,

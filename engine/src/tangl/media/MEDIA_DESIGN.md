@@ -356,10 +356,13 @@ lines. Its adapter produces a fully resolved `SvgTextSpec` with deterministic
 dimensions derived from the resolved line count, plus padding, font, colors,
 and adapter version; `SvgTextForge` emits XML-safe standalone SVG. The first
 consumer-specific `credential_card` profile deterministically wraps into a
-fixed-width, monospaced card-text layout. This remains deliberately narrower
-than a general text-layout system: font measurement, rich text, and template
-rendering remain outside the contract. The semantic request and resolved SVG
-request retain the normal derivation/adapted/execution RIT provenance split.
+fixed-width, monospaced card-text layout. Its execution layout is capped at
+the available card height with a final ellipsis, while the semantic request
+retains the complete source wording as derivation provenance. This remains
+deliberately narrower than a general text-layout system: font measurement, rich
+text, and template rendering remain outside the contract. The semantic request
+and resolved SVG request retain the normal derivation/adapted/execution RIT
+provenance split.
 
 `composition_forge` is the first one-level consumer of this distinction. A
 `CompositionSpec` persists ordered `CompositionInputRef` values with each child

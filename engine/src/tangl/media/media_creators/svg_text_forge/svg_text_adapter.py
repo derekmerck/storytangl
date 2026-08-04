@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from textwrap import TextWrapper
-from typing import Any
 
 from tangl.core import Priority
 from tangl.media.media_creators.media_spec import on_adapt_media_spec
 from tangl.media.media_creators.printable_text_spec import PrintableTextSpec
+from tangl.type_hints import StringMap
 
 from .svg_text_spec import SvgTextSpec
 
@@ -25,6 +25,7 @@ _CREDENTIAL_CARD_FONT_FAMILY = "monospace"
 _CREDENTIAL_CARD_FONT_SIZE = 14
 _CREDENTIAL_CARD_LINE_HEIGHT = 20
 _CREDENTIAL_CARD_LINE_WIDTH = 34
+_CREDENTIAL_CARD_MAX_LINES = 7
 
 
 def _credential_card_lines(lines: tuple[str, ...]) -> tuple[str, ...]:
@@ -34,17 +35,20 @@ def _credential_card_lines(lines: tuple[str, ...]) -> tuple[str, ...]:
         break_long_words=True,
         break_on_hyphens=False,
     )
-    return tuple(
+    wrapped_lines = tuple(
         wrapped
         for line in lines
         for wrapped in (wrapper.wrap(line) or [""])
     )
+    if len(wrapped_lines) <= _CREDENTIAL_CARD_MAX_LINES:
+        return wrapped_lines
+    return (*wrapped_lines[: _CREDENTIAL_CARD_MAX_LINES - 1], "…")
 
 
 @on_adapt_media_spec.register(priority=Priority.NORMAL)
 def adapt_printable_text_spec(
     spec: PrintableTextSpec,
-    ctx: dict[str, Any] | None = None,
+    ctx: StringMap | None = None,
 ) -> SvgTextSpec:
     """Resolve a named printable-text profile into deterministic SVG layout."""
     _ = ctx

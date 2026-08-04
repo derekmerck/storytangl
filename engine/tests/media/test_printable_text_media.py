@@ -117,6 +117,19 @@ def test_credential_card_profile_wraps_into_its_resolved_layout() -> None:
     assert adapted.canvas_height <= 176
 
 
+def test_credential_card_profile_caps_overflow_without_losing_source_text() -> None:
+    source = "An unusually long credential observation requires more than seven lines. " * 8
+    request = PrintableTextSpec(style_profile="credential_card", lines=(source,))
+
+    adapted = request.adapt_spec(ctx={})
+
+    assert isinstance(adapted, SvgTextSpec)
+    assert len(adapted.lines) == 7
+    assert adapted.lines[-1] == "…"
+    assert adapted.canvas_height <= 176
+    assert request.lines == (source,)
+
+
 def test_printable_text_provisions_and_reuses_story_svg(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

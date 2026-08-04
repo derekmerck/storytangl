@@ -364,13 +364,14 @@ content. D2 supplies that media-owned generic child but does not consume a
 credential projection. D3 proves that one projection can request a recorded
 subject portrait and printable text, then compose their resolved RITs into one
 presentation-safe ID card. Its media-owned ``credential_card`` text profile
-wraps the safe observation wording into the fixed card-text layout. That card
-is not yet emitted into JOURNAL. Slice E remains responsible for lifecycle
-timing, ``PieceFragment`` association, text fallback, authored
-alternatives/replacements, and media selection. Credentials must consume the
-resulting ``MediaSpec → MediaSpecProvisioner → MediaRIT → MediaFragment`` path;
-it must not invent a packet sheet, recursive DAG, credential forge, catalog
-abstraction, or parallel JOURNAL media channel.
+wraps the safe observation wording into the fixed card-text layout and elides
+only overflowing execution lines; the complete projection remains in the
+derivation payload. That card is not yet emitted into JOURNAL. Slice E remains
+responsible for lifecycle timing, ``PieceFragment`` association, text fallback,
+authored alternatives/replacements, and media selection. Credentials must
+consume the resulting ``MediaSpec → MediaSpecProvisioner → MediaRIT →
+MediaFragment`` path; it must not invent a packet sheet, recursive DAG,
+credential forge, catalog abstraction, or parallel JOURNAL media channel.
 
 ---
 
