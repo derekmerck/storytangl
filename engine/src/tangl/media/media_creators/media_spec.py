@@ -28,6 +28,7 @@ _SPEC_ALIAS_MAP = {
     "composition": "tangl.media.media_creators.composition_forge.composition_spec.CompositionSpec",
     "dicebear": "tangl.media.media_creators.dicebear_forge.dicebear_spec.DiceBearSpec",
     "portrait": "tangl.media.media_creators.portrait_spec.PortraitSpec",
+    "printable_text": "tangl.media.media_creators.printable_text_spec.PrintableTextSpec",
     "stable": "tangl.media.media_creators.stable_forge.stable_spec.StableSpec",
     "vector": "tangl.media.media_creators.svg_forge.vector_spec.VectorSpec",
     "tts": "tangl.media.media_creators.tts_forge.tts_spec.TtsSpec",

@@ -336,6 +336,7 @@ carry different non-rendering request provenance. That is normal cache behavior.
 | `checker_forge` | IMAGE | Active deterministic harness used to prove sync/async pipeline slices |
 | `comfy_forge` | IMAGE | Active ComfyUI backend with workflow-backed specs, async dispatch, and optional `FAST_SYNC` creation |
 | `dicebear_forge` | VECTOR | Active local deterministic portrait example; one CC0 Lorelei style, not a general style catalog |
+| `svg_text_forge` | VECTOR | Active local deterministic printable-text leaf with one fixed profile |
 | `svg_forge` | VECTOR | Partial — group/transform/viewbox infrastructure exists |
 | `stable_forge` | IMAGE | Partial — API client and spec model exist |
 | `tts_forge` | AUDIO | Partial/stub — API clients exist, worker-backed flow deferred |
@@ -348,6 +349,20 @@ options; the exact definition content hash and package version are part of the
 backend request. Unsupported traits remain provenance, but are excluded from
 the adapted-spec fingerprint because they cannot change the rendered output.
 There is no HTTP renderer path or style-selection catalog at this layer.
+
+`PrintableTextSpec` is the corresponding generic text leaf: an ordered sequence
+of printable lines with a semantic default profile that preserves exact source
+lines. Its adapter produces a fully resolved `SvgTextSpec` with deterministic
+dimensions derived from the resolved line count, plus padding, font, colors,
+and adapter version; `SvgTextForge` emits XML-safe standalone SVG. The first
+consumer-specific `credential_card` profile deterministically wraps into a
+fixed-width, monospaced card-text layout. Its execution layout is capped at
+the available card height with a final ellipsis, while the semantic request
+retains the complete source wording as derivation provenance. This remains
+deliberately narrower than a general text-layout system: font measurement, rich
+text, and template rendering remain outside the contract. The semantic request
+and resolved SVG request retain the normal derivation/adapted/execution RIT
+provenance split.
 
 `composition_forge` is the first one-level consumer of this distinction. A
 `CompositionSpec` persists ordered `CompositionInputRef` values with each child
