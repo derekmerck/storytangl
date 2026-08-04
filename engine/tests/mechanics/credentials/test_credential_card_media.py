@@ -29,10 +29,14 @@ from tangl.mechanics.credentials import (
     materialize_packet,
 )
 from tangl.mechanics.games import CredentialsGame, CredentialsGameHandler, HasGame
-from tangl.mechanics.games.handlers import provision_game_moves
-from tangl.mechanics.games.credentials_game import CredentialCase
+from tangl.mechanics.games.handlers import process_game_move, provision_game_moves
+from tangl.mechanics.games.credentials_game import (
+    CredentialCase,
+    CredentialDisposition,
+    CredentialsMove,
+)
 from tangl.mechanics.presence.look import HairColor, Look
-from tangl.story import Block
+from tangl.story import Action, Block
 from tangl.story.fabula import World
 from tangl.vm import Frame, ResolutionPhase
 
@@ -58,9 +62,14 @@ def _story_media_root(tmp_path: Path):
     return _resolve
 
 
-def _case(*, status: CredentialStatus = CredentialStatus.VALID) -> CredentialCase:
+def _case(
+    *,
+    status: CredentialStatus = CredentialStatus.VALID,
+    candidate_name: str = "Ada Venn",
+    definition_label: str = "card-id",
+) -> CredentialCase:
     definition = CredentialDefinition(
-        label="card-id",
+        label=definition_label,
         name="Border Pass",
         indication=Indication.TRAVEL,
         document_kind="id",
@@ -68,7 +77,7 @@ def _case(*, status: CredentialStatus = CredentialStatus.VALID) -> CredentialCas
         valid_period=0,
     )
     return CredentialCase(
-        candidate_name="Ada Venn",
+        candidate_name=candidate_name,
         presented_documents={"passport": "An identity document."},
         packet_manager=materialize_packet(
             owner=object(),
@@ -92,6 +101,7 @@ def _live_card_case(
     tmp_path: Path,
     *,
     status: CredentialStatus = CredentialStatus.VALID,
+    roster: list[CredentialCase] | None = None,
 ):
     monkeypatch.setattr(
         "tangl.media.story_media.get_story_media_dir",
@@ -107,7 +117,7 @@ def _live_card_case(
     block = story.add_node(
         kind=_CredentialsBlock,
         label="checkpoint",
-        game_state=CredentialsGame(roster=[_case(status=status)]),
+        game_state=CredentialsGame(roster=roster or [_case(status=status)]),
     )
     handler = block.game_handler
     handler.setup(block.game)
@@ -391,6 +401,69 @@ def test_lifecycle_uses_document_subject_and_keeps_text_when_card_inputs_fail(
     stale = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
     assert any(isinstance(fragment, PieceFragment) for fragment in stale)
     assert not any(isinstance(fragment, MediaFragment) for fragment in stale)
+
+
+def test_lifecycle_keeps_text_when_parent_card_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, _ = _live_card_case(monkeypatch, tmp_path)
+    ctx = Frame(graph=story, cursor=block)._make_ctx()
+    block.game_handler.provision_presentation(block.game, ctx=ctx)
+    card = next(
+        dependency
+        for dependency in story.values()
+        if isinstance(dependency, MediaDep) and dependency.label == "credential-card-card"
+    )
+
+    card.provider.status = MediaRITStatus.PENDING
+    pending = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in pending)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in pending)
+    assert not any(
+        isinstance(fragment, GroupFragment) and fragment.group_type == "piece_media"
+        for fragment in pending
+    )
+
+    card.provider.status = MediaRITStatus.FAILED
+    failed = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in failed)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in failed)
+
+
+def test_lifecycle_provisions_the_next_candidate_during_update(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first_case = _case(candidate_name="Ada Venn", definition_label="card-id-one")
+    second_case = _case(candidate_name="Bea Moss", definition_label="card-id-two")
+    story, block, _, _ = _live_card_case(
+        monkeypatch,
+        tmp_path,
+        roster=[first_case, second_case],
+    )
+    frame = Frame(graph=story, cursor=block)
+    action = Action(
+        graph=story,
+        predecessor_id=block.uid,
+        successor_id=block.uid,
+        payload={"move": CredentialsMove(kind="decide", target=CredentialDisposition.PASS.value)},
+    )
+    frame.selected_edge = action
+    ctx = frame._make_ctx(incoming_edge=action, incoming_payload=action.payload)
+
+    ctx.current_phase = ResolutionPhase.PLANNING
+    provision_game_moves(cursor=block, ctx=ctx)
+    ctx.current_phase = ResolutionPhase.UPDATE
+    process_game_move(block, ctx=ctx)
+
+    assert block.game.case_index == 1
+    next_projection = block.game_handler.credential_card_projections(block.game)[0]
+    journal = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(
+        isinstance(fragment, MediaFragment) and fragment.source_id == next_projection.component_id
+        for fragment in journal
+    )
 
 
 def test_lifecycle_replacement_suppresses_previously_provisioned_card_media(

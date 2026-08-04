@@ -254,8 +254,6 @@ class Resolver:
         *,
         _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
-        if requirement.media_spec is not None:
-            return []
         if _ctx is None:
             return []
 
@@ -342,11 +340,11 @@ class Resolver:
         _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         offers: list[ProvisionOffer] = list(preferred_offers or [])
+        offers.extend(self._media_spec_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._existing_offers_for_requirement(requirement))
         offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._token_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._media_inventory_offers_for_requirement(requirement, _ctx=_ctx))
-        offers.extend(self._media_spec_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._inline_template_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
         return offers

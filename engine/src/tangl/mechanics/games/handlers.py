@@ -300,6 +300,9 @@ def process_game_move(
     if isinstance(ns_inflight, set):
         ns_inflight.clear()
 
+    if cursor.game.phase == GamePhase.READY and not cursor.game.result.is_terminal:
+        cursor.game_handler.provision_presentation(cursor.game, ctx=ctx)
+
     _clear_dynamic_game_actions(cursor, ctx=ctx)
     if cursor.game.phase == GamePhase.READY and not cursor.game.result.is_terminal:
         actions = _build_game_actions(cursor)

@@ -103,7 +103,13 @@ class Requirement(Selector, Generic[PT]):
             return False
 
         criteria = dict(self.__pydantic_extra__ or {})
-        for key in ("has_identifier", "authored_path", "is_qualified", "is_absolute"):
+        for key in (
+            "has_identifier",
+            "authored_path",
+            "is_qualified",
+            "is_absolute",
+            "adapted_spec",
+        ):
             criteria.pop(key, None)
         return Selector(predicate=self.predicate, **criteria).matches(entity)
 
