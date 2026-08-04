@@ -143,13 +143,16 @@ class TestHallMonitorWorld:
             for component in restored_manager.get_slot(CREDENTIAL_PACKET_SLOT)
         )
 
-    def test_repeated_provisioning_does_not_materialize_another_case(self) -> None:
+    def test_repeated_move_reads_do_not_expand_the_prepared_frontier(self) -> None:
         _, ledger = _started_shift()
         game = ledger.cursor.game
         handler = ledger.cursor.game_handler
+        prepared = tuple(game.materialized)
 
         first = handler.get_provisioned_moves(game)
         second = handler.get_provisioned_moves(game)
 
         assert first == second
-        assert len(game.materialized) == 1
+        assert game.materialized == list(prepared)
+        assert len(prepared) == 2
+        assert game.active_case is prepared[0]
