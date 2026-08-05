@@ -356,6 +356,13 @@ differs.
 
 ### 1.5 Cursors and journal channels — Tier P1
 
+```{storytangl-topic}
+:topics: multi_lane, widget
+:facets: design, governance
+:relation: defines
+:related: journal, ledger, frame
+```
+
 > Each cursor has its own journal channel. Envelopes are per-channel.
 > The backend coordinates shared world state across channels; the
 > contract makes no commitment about turn ordering or simultaneous input

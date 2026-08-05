@@ -387,6 +387,13 @@ roadmap.  See the research agenda for "Narrative Shape Space" directions.
 
 ## The Observer Roles
 
+```{storytangl-topic}
+:topics: multi_lane
+:facets: overview, design
+:relation: documents
+:related: journal, ledger, traversal
+```
+
 Three roles interact with the narrative system, each engaging a different
 layer:
 

@@ -290,9 +290,11 @@ def iter_source_paths(repo_root: Path) -> list[Path]:
         "engine/tests/AGENTS.md",
         "docs/src/**/*.md",
         "docs/src/**/*.rst",
+        "docs/notes/**/*.md",
+        "docs/notes/**/*.rst",
         "engine/src/**/*.py",
         "engine/src/**/*_DESIGN.md",
-        "engine/src/**/notes.md",
+        "engine/src/**/*notes.md",
         "engine/tests/**/*.py",
         "apps/**/AGENTS.md",
         "apps/**/notes/**/*.md",
@@ -367,10 +369,19 @@ def extract_python_source(
         return [], []
     module_name = module_name_for_path(path, repo_root)
     module_doc = ast.get_docstring(tree, clean=False) or ""
+    module_annotations = extract_storytangl_topic_annotations(module_doc)
     artifacts: list[ExtractedArtifact] = []
     symbols: list[ExtractedSymbol] = []
 
-    if module_doc and (path.name == "__init__.py" or "tests" in path.parts):
+    # Package and test modules always carry an overview artifact. Any other
+    # module opts in by writing a topic annotation into its docstring, so
+    # annotating a module is enough to make it addressable without indexing
+    # every module docstring in the tree.
+    if module_doc and (
+        path.name == "__init__.py"
+        or "tests" in path.parts
+        or module_annotations
+    ):
         kind, facet, relation = classify_source(path, repo_root)
         title = module_name or path.stem
         if "tests" in path.parts:
@@ -389,7 +400,7 @@ def extract_python_source(
                 summary=summarize_text(module_doc),
                 content=module_doc,
                 metadata={
-                    "annotations": [item.model_dump(mode="python") for item in extract_storytangl_topic_annotations(module_doc)],
+                    "annotations": [item.model_dump(mode="python") for item in module_annotations],
                     "related_paths": [],
                     "symbol_refs": [],
                 },
@@ -445,7 +456,10 @@ def extract_python_source(
                 content=(ast.get_docstring(node, clean=False) or "").strip(),
                 qualified_name=qualified_name,
                 metadata={
-                    "annotations": [],
+                    "annotations": [
+                        item.model_dump(mode="python")
+                        for item in extract_storytangl_topic_annotations(docstring)
+                    ],
                     "related_paths": [],
                     "symbol_refs": [qualified_name],
                     "module_name": module_name,

@@ -200,6 +200,13 @@ that the intermediate state be reconstructable from patches alone.  But:
 
 ### When to Revisit
 
+```{storytangl-topic}
+:topics: multi_lane, replay
+:facets: notes
+:relation: documents
+:related: ledger, journal
+```
+
 Dual-phase patches become relevant when:
 
 - Multi-lane stories where multiple players share a graph and need to

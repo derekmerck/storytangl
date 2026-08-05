@@ -350,6 +350,32 @@
     ]
   },
   {
+    "topic_id": "multi_lane",
+    "display_name": "Multi-Lane Stories",
+    "aliases": [
+      "multi-lane",
+      "multi lane",
+      "multi-cursor",
+      "multi-participant",
+      "cursor channel",
+      "journal channel",
+      "per-cursor",
+      "hot-seat",
+      "navigator role",
+      "focalization"
+    ],
+    "layer": "vm",
+    "short_description": "Several navigators traversing one shared fabula: N cursors, N journal channels, per-participant visibility, and cross-lane coordination above follow.",
+    "related_topic_ids": [
+      "ledger",
+      "journal",
+      "widget",
+      "traversal",
+      "frame",
+      "replay"
+    ]
+  },
+  {
     "topic_id": "open_link",
     "display_name": "Open Link",
     "aliases": [

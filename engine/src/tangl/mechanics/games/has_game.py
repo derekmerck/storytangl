@@ -44,6 +44,17 @@ class HasGame:
     formal model is closer to a self-fanout: each available move is an edge
     variant carrying different payload/label data while still targeting this
     same node.
+
+    This self-fanout block is the structural shape a contest node needs: a
+    re-entrant node whose outgoing move edges are recomputed each visit from
+    current shared state. Multi-lane contests reuse it directly; lane asymmetry
+    lives in the template registry, not here.
+
+    .. storytangl-topic::
+       :topics: multi_lane, open_link
+       :facets: code
+       :relation: demonstrates
+       :related: traversal, provisioning
     """
 
     _game_class: ClassVar[type[Game]] = Game

@@ -3,6 +3,16 @@
 
 The Ledger owns long-lived state that persists across player actions:
 the graph, cursor position and history, return stack, and accumulated output.
+
+One ledger holds exactly one cursor and one output stream. Multi-lane stories
+(several navigators over one shared fabula) require this to become plural; see
+the widget vocabulary "Cursors and journal channels" contract.
+
+.. storytangl-topic::
+   :topics: ledger, multi_lane
+   :facets: code
+   :relation: defines
+   :related: journal, frame, widget
 """
 
 from __future__ import annotations

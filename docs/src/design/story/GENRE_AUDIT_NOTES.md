@@ -134,6 +134,13 @@ might be worth promoting. Today: convention covers it.
 
 ### Hot-seat as multi-cursor stand-in
 
+```{storytangl-topic}
+:topics: multi_lane
+:facets: notes
+:relation: documents
+:related: widget, journal
+```
+
 Elefant Hunt and any future multi-player bundle must hot-seat
 through one cursor until §1.5 graduates from Tier P1. The
 convention: emit "Pass the keyboard to Player Red" `content`
