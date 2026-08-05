@@ -16,3 +16,8 @@ Mira Quill medical-note case records a durable, bearer-attributed inhaler outcom
 after UPDATE, but reveals it only from the later attendance-note beat using the
 bearer's then-current graph presentation. The credentials mechanic supplies the
 case receipt; it does not decide the school meaning or change scoring.
+
+The attendance note also prepares one authored return encounter. That encounter
+uses a fresh packet with the same graph-owned bearer UUID and receives the first
+case receipt as semantic prior context. Its recognition prose resolves the
+bearer's current presence only when the return is entered.

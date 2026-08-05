@@ -18,6 +18,7 @@ from tangl.mechanics.credentials import (
 from tangl.mechanics.presence.look import HasSimpleLook
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
+    CredentialCaseResult,
     CredentialDisposition,
     CredentialPresentationProfile,
     CredentialsGame,
@@ -28,9 +29,9 @@ from tangl.mechanics.games.credentials_roster import (
     ShiftSpec,
     generate_roster,
 )
-from tangl.story import Block, on_journal
+from tangl.story import Action, Block, on_journal
 from tangl.story.presentation import render_text_as
-from tangl.vm import on_update
+from tangl.vm import on_provision, on_update
 from tangl.vm.ctx import VmPhaseCtx
 
 
@@ -222,6 +223,7 @@ class HallMonitorBlock(HasGame, Block):
     def _configure_game(self) -> HallMonitorBlock:
         if self.game_state is None:
             self.game_state = HallMonitorCredentialsGame(
+                roster=[],
                 offers=_hall_offers(
                     encounters=self.encounters,
                     disposition_distribution=self.disposition_distribution,
@@ -242,6 +244,20 @@ class HallMonitorConsequenceBlock(Block):
     """
 
     source_block_label: str = "morning_shift"
+    return_block_label: str = "returning_student"
+
+
+class HallMonitorReturnBlock(HasGame, Block):
+    """One pre-authored return encounter prepared from the attendance note.
+
+    Why
+    ---
+    The node is ordinary authored topology. Its game is configured only after
+    the first case receipt exists, during the predecessor's PLANNING pass.
+    """
+
+    _game_class = HallMonitorCredentialsGame
+    _game_handler_class = CredentialsGameHandler
 
 
 @on_update(wants_caller_kind=HallMonitorBlock, wants_exact_kind=False)
@@ -279,6 +295,60 @@ def record_hall_monitor_consequence(
     return None
 
 
+@on_provision(wants_caller_kind=HallMonitorConsequenceBlock, wants_exact_kind=False)
+def prepare_hall_monitor_return(
+    *,
+    caller: HallMonitorConsequenceBlock,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> None:
+    """Configure the authored return before its successor is presented."""
+
+    source = caller.graph.find_one(Selector(label=caller.source_block_label))
+    return_block = caller.graph.find_one(Selector(label=caller.return_block_label))
+    if not isinstance(source, HallMonitorBlock) or not isinstance(
+        return_block,
+        HallMonitorReturnBlock,
+    ):
+        raise LookupError("Hall Monitor return topology is incomplete")
+    if not source.consequences:
+        return None
+
+    consequence = source.consequences[-1]
+    if return_block.game_state is None:
+        prior_result = source.game.case_results[consequence.source_case_index]
+        if prior_result.bearer_id != consequence.bearer_id:
+            raise ValueError("Hall Monitor consequence does not match its source receipt")
+        return_block.game_state = HallMonitorCredentialsGame(
+            roster=[],
+            offers=[
+                ScenarioOffer(
+                    target_disposition=CredentialDisposition.PASS,
+                    region="lower",
+                    purpose="medicine",
+                    candidate_name="Returning student",
+                    bearer_id=consequence.bearer_id,
+                    prior_case_results=[prior_result],
+                    presented_documents_override={
+                        "student ID": "A current student identification card.",
+                        "doctor's note": "A fresh nurse-signed note for an inhaler.",
+                    },
+                )
+            ]
+        )
+    if not any(
+        caller.edges_out(Selector(has_kind=Action, successor_id=return_block.uid)),
+    ):
+        Action(
+            registry=caller.graph,
+            predecessor_id=caller.uid,
+            successor_id=return_block.uid,
+            text="Meet the returning student",
+            tags={"dynamic", "hall_monitor_return"},
+        )
+    return None
+
+
 @on_journal(wants_caller_kind=HallMonitorConsequenceBlock, wants_exact_kind=False)
 def render_hall_monitor_consequence(
     *,
@@ -309,6 +379,32 @@ def render_hall_monitor_consequence(
         content=content,
         source_id=consequence.bearer_id,
         tags={"hall_monitor_consequence"},
+    )
+
+
+@on_journal(wants_caller_kind=HallMonitorReturnBlock, wants_exact_kind=False)
+def render_hall_monitor_return(
+    *,
+    caller: HallMonitorReturnBlock,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> ContentFragment | None:
+    """Recognize the returning bearer through their live presence projection."""
+
+    game = caller.game
+    if game.history or not game.active_case.prior_case_results:
+        return None
+    prior_result = game.active_case.prior_case_results[0]
+    bearer = game.active_case.packet_manager.resolve_subject(prior_result.bearer_id)
+    name = bearer.get_label()
+    presence = render_text_as(bearer, "presence_description", ctx=ctx)
+    subject = f"{name}, {presence}," if presence else name
+    return ContentFragment(
+        content=(
+            f"{subject} returns after this morning's decision with a fresh nurse-signed note."
+        ),
+        source_id=bearer.uid,
+        tags={"hall_monitor_return"},
     )
 
 

@@ -1171,6 +1171,19 @@ school-specific inhaler outcome, then an attendance-note action projects that
 outcome with the bearer's current graph-owned presentation on a later turn.
 Credentials itself still owns only evaluation and scoring.
 
+### Same-story returning bearer (landed 2026-08-04)
+
+A world may author one return node and configure its ordinary `ScenarioOffer`
+during the predecessor's PLANNING pass after a prior receipt exists. The offer
+may carry the earlier `CredentialCaseResult` as semantic context plus its
+canonical `bearer_id`; normal packet materialization then creates a fresh packet
+whose ID-bound documents point at that existing graph subject. The return node
+is already prepared before selection, and its JOURNAL narration resolves the
+bearer's current graph presentation at use time.
+
+This is deliberately one-story, one-authored-return proof. It is not a
+candidate dossier, recurrence scheduler, or cross-session identity system.
+
 A procedural candidate today is generated for one shift and disappears at
 terminal. A *real* checkpoint story wants candidates to return: the
 procedurally-sampled traveler you wrongly admitted on day 1 walks back through
