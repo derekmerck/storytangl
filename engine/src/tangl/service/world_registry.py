@@ -65,6 +65,12 @@ def clear_manual_worlds() -> None:
     _MANUAL_WORLDS.clear()
 
 
+def clear_discovered_world_registries() -> None:
+    """Clear cached discovered registries between isolated service runs."""
+
+    _DISCOVERED_REGISTRIES.clear()
+
+
 def resolve_world(world_id: str) -> World:
     """Resolve a world from manual overrides or configured registries."""
 

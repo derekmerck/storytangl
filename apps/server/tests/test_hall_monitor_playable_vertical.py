@@ -18,7 +18,9 @@ from tangl.rest.dependencies_gateway import (
 )
 from tangl.service.user.user import User
 from tangl.service.world_registry import resolve_world
+from tangl.story import InitMode
 from tangl.story.fabula.world import World
+from tangl.story.story_graph import StoryGraph
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 
 
@@ -120,11 +122,25 @@ def test_hall_monitor_inspection_survives_http_session_reload(
     assert "The required nurse signature is missing." in reloaded_text
 
 
-def test_hall_monitor_world_resolution_reuses_the_compiled_world(
+def test_hall_monitor_world_resolution_reuses_until_service_reset(
     hall_monitor_client: tuple[TestClient, dict[str, str]],
 ) -> None:
-    """Repeated service lookups keep one compiled singleton world per directory set."""
+    """A reset recompiles and registers worlds used by persisted story graphs."""
 
     _client, _headers = hall_monitor_client
+    first = resolve_world("hall_monitor")
+    assert resolve_world("hall_monitor") is first
+    graph_payload = first.create_story(
+        "hall_monitor",
+        init_mode=InitMode.EAGER,
+    ).graph.unstructure()
 
-    assert resolve_world("hall_monitor") is resolve_world("hall_monitor")
+    reset_service_state_for_testing()
+    World.clear_instances()
+
+    second = resolve_world("hall_monitor")
+    assert second is not first
+    assert World.get_instance("hall_monitor") is second
+
+    restored = StoryGraph.structure(graph_payload)
+    assert restored.world is second
