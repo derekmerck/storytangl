@@ -96,14 +96,25 @@ def first_paragraph(text: str) -> str:
 
     paragraphs: list[str] = []
     block: list[str] = []
+    in_topic_fence = False
     for raw_line in text.splitlines():
         line = raw_line.strip()
+        # A MyST topic directive is a fenced block; skip through its closing
+        # fence so the delimiter never becomes the section summary. The rst
+        # form has no closing delimiter and needs only the opening skip.
+        if in_topic_fence:
+            if line.startswith("```"):
+                in_topic_fence = False
+            continue
+        if line.startswith("```{storytangl-topic}"):
+            in_topic_fence = True
+            continue
         if not line:
             if block:
                 paragraphs.append(" ".join(block))
                 block = []
             continue
-        if line.startswith(".. storytangl-topic::") or line.startswith("```{storytangl-topic}"):
+        if line.startswith(".. storytangl-topic::"):
             continue
         if line.startswith(":") and block == []:
             continue
@@ -224,6 +235,8 @@ def classify_source(path: Path, repo_root: Path) -> tuple[str, DevTopicFacet, De
         return "note", "notes", "mentions"
     if path.name == "__init__.py":
         return "doc_section", "overview", "documents"
+    if path.suffix.lower() == ".py":
+        return "doc_section", "code", "defines"
     return "doc_section", "notes", "mentions"
 
 
@@ -290,9 +303,11 @@ def iter_source_paths(repo_root: Path) -> list[Path]:
         "engine/tests/AGENTS.md",
         "docs/src/**/*.md",
         "docs/src/**/*.rst",
+        "docs/notes/**/*.md",
+        "docs/notes/**/*.rst",
         "engine/src/**/*.py",
         "engine/src/**/*_DESIGN.md",
-        "engine/src/**/notes.md",
+        "engine/src/**/*notes.md",
         "engine/tests/**/*.py",
         "apps/**/AGENTS.md",
         "apps/**/notes/**/*.md",
@@ -367,10 +382,19 @@ def extract_python_source(
         return [], []
     module_name = module_name_for_path(path, repo_root)
     module_doc = ast.get_docstring(tree, clean=False) or ""
+    module_annotations = extract_storytangl_topic_annotations(module_doc)
     artifacts: list[ExtractedArtifact] = []
     symbols: list[ExtractedSymbol] = []
 
-    if module_doc and (path.name == "__init__.py" or "tests" in path.parts):
+    # Package and test modules always carry an overview artifact. Any other
+    # module opts in by writing a topic annotation into its docstring, so
+    # annotating a module is enough to make it addressable without indexing
+    # every module docstring in the tree.
+    if module_doc and (
+        path.name == "__init__.py"
+        or "tests" in path.parts
+        or module_annotations
+    ):
         kind, facet, relation = classify_source(path, repo_root)
         title = module_name or path.stem
         if "tests" in path.parts:
@@ -389,7 +413,7 @@ def extract_python_source(
                 summary=summarize_text(module_doc),
                 content=module_doc,
                 metadata={
-                    "annotations": [item.model_dump(mode="python") for item in extract_storytangl_topic_annotations(module_doc)],
+                    "annotations": [item.model_dump(mode="python") for item in module_annotations],
                     "related_paths": [],
                     "symbol_refs": [],
                 },
@@ -445,7 +469,10 @@ def extract_python_source(
                 content=(ast.get_docstring(node, clean=False) or "").strip(),
                 qualified_name=qualified_name,
                 metadata={
-                    "annotations": [],
+                    "annotations": [
+                        item.model_dump(mode="python")
+                        for item in extract_storytangl_topic_annotations(docstring)
+                    ],
                     "related_paths": [],
                     "symbol_refs": [qualified_name],
                     "module_name": module_name,

@@ -6,6 +6,13 @@ Capture the recurring theoretical framing that guided earlier iterations so we c
 
 ## Key theoretical threads
 
+```{storytangl-topic}
+:topics: multi_lane
+:facets: notes
+:relation: mentions
+:related: traversal, journal
+```
+
 - **Tangled feature space** – prior notes describe narrative design as exploring a superposition of interdependent features, with traversal collapsing the space into a stable measurement that becomes the playable lane.【F:scratch/overviews/notes_v34.md†L100-L176】
 - **Cross-domain inspirations** – the same notes tie StoryTangl to Bayesian inference, constraint solving, package resolution, compiler IRs, and quantum collapse, highlighting how deterministic yet replayable execution should feel.【F:scratch/overviews/notes_v34.md†L108-L115】
 - **Navigation as a separable role** – older notes repeatedly treat the

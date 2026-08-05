@@ -44,6 +44,22 @@ class HasGame:
     formal model is closer to a self-fanout: each available move is an edge
     variant carrying different payload/label data while still targeting this
     same node.
+
+    The self-fanout shape — a re-entrant node whose outgoing move edges are
+    recomputed each visit from current state — is also what a two-party contest
+    node would need. Nothing here is multi-navigator today: the opponent is a
+    strategy inside this game state, not a second cursor.
+
+    .. storytangl-topic::
+       :topics: open_link
+       :facets: code
+       :relation: demonstrates
+       :related: traversal, provisioning
+
+    .. storytangl-topic::
+       :topics: multi_lane
+       :facets: code
+       :relation: mentions
     """
 
     _game_class: ClassVar[type[Game]] = Game

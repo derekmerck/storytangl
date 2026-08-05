@@ -42,6 +42,12 @@ def extract_storytangl_topic_annotations(text: str) -> list[TopicAnnotation]:
                 candidate = lines[index]
                 if candidate.strip() and not candidate.startswith((" ", "\t")):
                     break
+                # A following directive ends this one even when both are
+                # indented, as they are inside a class or method docstring.
+                # Without this the second block is swallowed as body text and
+                # its options silently overwrite the first block's.
+                if candidate.strip() == ".. storytangl-topic::":
+                    break
                 if candidate.strip():
                     body.append(candidate)
                 index += 1

@@ -6,6 +6,28 @@ from tangl.devref.annotations import extract_storytangl_topic_annotations
 from tangl.devref.builder import extract_symbol_refs, parse_sections
 
 
+def test_consecutive_indented_directives_stay_separate() -> None:
+    """Two directives in one class docstring must not merge into one."""
+
+    docstring = """Mixin docstring.
+
+    .. storytangl-topic::
+       :topics: open_link
+       :facets: code
+       :relation: demonstrates
+
+    .. storytangl-topic::
+       :topics: multi_lane
+       :facets: code
+       :relation: mentions
+    """
+
+    annotations = extract_storytangl_topic_annotations(docstring)
+
+    assert [item.topics for item in annotations] == [["open_link"], ["multi_lane"]]
+    assert [item.relation for item in annotations] == ["demonstrates", "mentions"]
+
+
 def test_extract_storytangl_topic_annotations_from_rst_and_myst() -> None:
     rst_text = """
 .. storytangl-topic::
