@@ -45,10 +45,14 @@ def _inspect(ledger: Ledger, target: str) -> None:
     )
 
 
-def _started_shift() -> tuple[StoryGraph, Ledger]:
+def _started_shift(*, pinned_candidate_name: str | None = None) -> tuple[StoryGraph, Ledger]:
     world = WorldCompiler().compile(WorldBundle.load(_hall_monitor_root()))
     result = world.create_story("hall_monitor", init_mode=InitMode.EAGER)
     ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+    if pinned_candidate_name is not None:
+        block = result.graph.find_one(Selector(label="morning_shift"))
+        assert block is not None
+        block.game.offers[0].candidate_name = pinned_candidate_name
     _choose(ledger, "Monitor the morning halls")
     return result.graph, ledger
 
@@ -101,6 +105,7 @@ class TestHallMonitorWorld:
         assert block is ledger.cursor
         assert block.encounters == 5
         assert block.seed == 20260719
+        assert block.inhaler_case_index == 0
         assert block.disposition_distribution == {
             CredentialDisposition.PASS: 0.5,
             CredentialDisposition.DENY: 0.3,
@@ -174,7 +179,7 @@ class TestHallMonitorWorld:
         assert game.active_case is prepared[0]
 
     def test_hall_monitor_records_and_later_reveals_harsh_inhaler_outcome(self) -> None:
-        graph, ledger = _started_shift()
+        graph, ledger = _started_shift(pinned_candidate_name="Ren Ito")
         block = ledger.cursor
         game = block.game
         bearer_id = game.active_case.packet_manager.bearer_id
@@ -188,7 +193,7 @@ class TestHallMonitorWorld:
         assert len(block.consequences) == 1
         consequence = block.consequences[0]
         assert consequence.bearer_id == bearer_id
-        assert consequence.candidate_name == "Mira Quill"
+        assert consequence.candidate_name == "Ren Ito"
         assert consequence.outcome == "inhaler_withheld"
         assert "remained at the hall desk" not in _journal_text(ledger)
 
@@ -198,14 +203,20 @@ class TestHallMonitorWorld:
         _choose(ledger, "Read the attendance note")
 
         assert ledger.cursor.label == "attendance_note"
-        assert "Mira Quill was sent back to class" in _journal_text(ledger)
+        assert "Ren Ito was sent back to class" in _journal_text(ledger)
 
         restored = Graph.structure(graph.unstructure())
         restored_block = restored.find_one(Selector(label="morning_shift"))
         assert restored_block is not None
         assert restored_block.consequences == [consequence]
+        restored_result = restored_block.game.case_results[0]
+        assert restored_result.case_index == consequence.source_case_index
+        assert restored_result.bearer_id == consequence.bearer_id
+        assert restored.get(restored_result.bearer_id) is not None
 
-    def test_hall_monitor_records_compassionate_inhaler_outcome_without_changing_score(self) -> None:
+    def test_hall_monitor_records_compassionate_inhaler_outcome_without_changing_score(
+        self,
+    ) -> None:
         _, ledger = _started_shift()
         block = ledger.cursor
         game = block.game

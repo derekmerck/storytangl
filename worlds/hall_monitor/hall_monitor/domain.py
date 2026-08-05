@@ -194,7 +194,6 @@ class HallMonitorConsequence(BaseModelPlus):
     bearer_id: UUID
     candidate_name: str
     outcome: Literal["inhaler_withheld", "inhaler_allowed"]
-    later_text: str
 
 
 class HallMonitorBlock(HasGame, Block):
@@ -209,6 +208,7 @@ class HallMonitorBlock(HasGame, Block):
         }
     )
     seed: int = 20260719
+    inhaler_case_index: int = 0
     consequences: list[HallMonitorConsequence] = Field(
         default_factory=list,
         json_schema_extra={"include": True},
@@ -256,20 +256,15 @@ def record_hall_monitor_consequence(
     if not game.case_results:
         return None
     result = game.case_results[-1]
-    if result.candidate_name != "Mira Quill":
+    if result.case_index != caller.inhaler_case_index:
         return None
     if any(fact.source_case_index == result.case_index for fact in caller.consequences):
         return None
 
     if result.chosen_disposition is CredentialDisposition.DENY:
         outcome: Literal["inhaler_withheld", "inhaler_allowed"] = "inhaler_withheld"
-        later_text = (
-            "Mira Quill was sent back to class. Her inhaler remained at the hall desk "
-            "while the nurse's unsigned note was checked."
-        )
     elif result.chosen_disposition is CredentialDisposition.PASS:
         outcome = "inhaler_allowed"
-        later_text = "Mira Quill reached the nurse's office with her inhaler."
     else:
         return None
 
@@ -279,7 +274,6 @@ def record_hall_monitor_consequence(
             bearer_id=result.bearer_id,
             candidate_name=result.candidate_name,
             outcome=outcome,
-            later_text=later_text,
         )
     )
     return None
@@ -298,8 +292,15 @@ def render_hall_monitor_consequence(
     if not isinstance(source, HallMonitorBlock) or not source.consequences:
         return None
     consequence = source.consequences[-1]
+    if consequence.outcome == "inhaler_withheld":
+        content = (
+            f"{consequence.candidate_name} was sent back to class. Their inhaler remained "
+            "at the hall desk while the nurse's unsigned note was checked."
+        )
+    else:
+        content = f"{consequence.candidate_name} reached the nurse's office with their inhaler."
     return ContentFragment(
-        content=consequence.later_text,
+        content=content,
         source_id=consequence.bearer_id,
         tags={"hall_monitor_consequence"},
     )

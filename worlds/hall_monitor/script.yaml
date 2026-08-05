@@ -25,6 +25,7 @@ scenes:
           deny: 0.30
           arrest: 0.20
         seed: 20260719
+        inhaler_case_index: 0
         content: |
           Check each student’s identification and pass before deciding whether
           to allow them onward, send them back to class, or refer them to office.

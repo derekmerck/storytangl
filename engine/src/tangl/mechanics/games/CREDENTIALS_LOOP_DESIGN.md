@@ -1166,9 +1166,10 @@ UPDATE, record an idempotent world fact attributed to its `case_index` and
 `bearer_id`, and reveal that fact on a genuinely later beat. It must not add the
 fact to the frontier or namespace already assembled for the disposition turn.
 
-Hall Monitor is the worked proof: Mira Quill's medical-note decision records a
-school-specific inhaler outcome, then an attendance-note action reveals it on a
-later turn. Credentials itself still owns only evaluation and scoring.
+Hall Monitor is the worked proof: its authored medical-note encounter records a
+school-specific inhaler outcome, then an attendance-note action projects that
+outcome with the receipt's recorded candidate label on a later turn. Credentials
+itself still owns only evaluation and scoring.
 
 A procedural candidate today is generated for one shift and disappears at
 terminal. A *real* checkpoint story wants candidates to return: the
