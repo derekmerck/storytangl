@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from tangl.core import Selector
+from tangl.core.bases import BaseModelPlus
+from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.credentials import (
     CredentialDefinition,
     CredentialStatus,
@@ -11,6 +15,7 @@ from tangl.mechanics.credentials import (
     Restrictions,
     RestrictionLevel,
 )
+from tangl.mechanics.presence.look import HasSimpleLook
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
     CredentialDisposition,
@@ -23,7 +28,10 @@ from tangl.mechanics.games.credentials_roster import (
     ShiftSpec,
     generate_roster,
 )
-from tangl.story import Block
+from tangl.story import Block, on_journal
+from tangl.story.presentation import render_text_as
+from tangl.vm import on_update
+from tangl.vm.ctx import VmPhaseCtx
 
 
 HALL_RULES = {
@@ -120,20 +128,20 @@ _HALL_FAILURES = (
 
 
 def _special_student() -> ScenarioOffer:
-    """Return the recurring lower-school activity-pass case for every shift."""
+    """Return the recurring lower-school medical-pass case for every shift."""
 
     return ScenarioOffer(
         target_disposition=CredentialDisposition.DENY,
         candidate_name="Mira Quill",
         region="lower",
-        purpose="activity",
+        purpose="medicine",
         failure_modes=[FailureMode.UNSEALED_PERMIT],
         presented_documents_override={
             "student ID": "A laminated lower-school student identification card.",
-            "activity pass": "An activity pass lacking the teacher's signature.",
+            "doctor's note": "A doctor's note for an inhaler, lacking the nurse's signature.",
         },
         hidden_facts_override={
-            "activity pass": "The required teacher signature is missing.",
+            "doctor's note": "The required nurse signature is missing.",
         },
         packet_hidden_facts_override={
             "packet consistency": "The student's papers do not satisfy the hall rules.",
@@ -175,6 +183,20 @@ class HallMonitorCredentialsGame(CredentialsGame):
     )
 
 
+class HallMonitorConsequence(BaseModelPlus):
+    """World-authored later fate for one completed Hall Monitor case.
+
+    Why
+    ---
+    Credentials records the mechanical receipt. Hall Monitor owns the meaning
+    and the later narration of that receipt.
+    """
+
+    source_case_index: int
+    bearer_id: UUID
+    outcome: Literal["inhaler_withheld", "inhaler_allowed"]
+
+
 class HallMonitorBlock(HasGame, Block):
     """Script-configured Hall Monitor scenario instance."""
 
@@ -187,6 +209,11 @@ class HallMonitorBlock(HasGame, Block):
         }
     )
     seed: int = 20260719
+    inhaler_case_index: int = 0
+    consequences: list[HallMonitorConsequence] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True},
+    )
 
     _game_class = HallMonitorCredentialsGame
     _game_handler_class = CredentialsGameHandler
@@ -202,6 +229,87 @@ class HallMonitorBlock(HasGame, Block):
                 )
             )
         return self
+
+
+class HallMonitorConsequenceBlock(Block):
+    """Later attendance-note beat that reveals a recorded Hall Monitor fate.
+
+    Why
+    ---
+    A completed credential disposition is a mechanical receipt. This ordinary
+    later block makes any Hall Monitor interpretation visible without granting
+    it same-turn frontier or namespace visibility.
+    """
+
+    source_block_label: str = "morning_shift"
+
+
+@on_update(wants_caller_kind=HallMonitorBlock, wants_exact_kind=False)
+def record_hall_monitor_consequence(
+    *,
+    caller: HallMonitorBlock,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> None:
+    """Record Mira's later outcome after the credentials disposition commits."""
+
+    game = caller.game
+    if not game.case_results:
+        return None
+    result = game.case_results[-1]
+    if result.case_index != caller.inhaler_case_index:
+        return None
+    if any(fact.source_case_index == result.case_index for fact in caller.consequences):
+        return None
+
+    if result.chosen_disposition is CredentialDisposition.DENY:
+        outcome: Literal["inhaler_withheld", "inhaler_allowed"] = "inhaler_withheld"
+    elif result.chosen_disposition is CredentialDisposition.PASS:
+        outcome = "inhaler_allowed"
+    else:
+        return None
+
+    caller.consequences.append(
+        HallMonitorConsequence(
+            source_case_index=result.case_index,
+            bearer_id=result.bearer_id,
+            outcome=outcome,
+        )
+    )
+    return None
+
+
+@on_journal(wants_caller_kind=HallMonitorConsequenceBlock, wants_exact_kind=False)
+def render_hall_monitor_consequence(
+    *,
+    caller: HallMonitorConsequenceBlock,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> ContentFragment | None:
+    """Reveal recorded Hall Monitor consequences only at the later note beat."""
+
+    source = caller.graph.find_one(Selector(label=caller.source_block_label))
+    if not isinstance(source, HallMonitorBlock) or not source.consequences:
+        return None
+    consequence = source.consequences[-1]
+    bearer = caller.graph.get(consequence.bearer_id)
+    if not isinstance(bearer, HasSimpleLook):
+        raise LookupError(f"Hall Monitor bearer {consequence.bearer_id} is not present")
+    name = bearer.get_label()
+    presence = render_text_as(bearer, "presence_description", ctx=ctx)
+    subject = f"{name}, {presence}," if presence else name
+    if consequence.outcome == "inhaler_withheld":
+        content = (
+            f"{subject} was sent back to class. Their inhaler remained at the "
+            "hall desk while the nurse's unsigned note was checked."
+        )
+    else:
+        content = f"{subject} reached the nurse's office with their inhaler."
+    return ContentFragment(
+        content=content,
+        source_id=consequence.bearer_id,
+        tags={"hall_monitor_consequence"},
+    )
 
 
 HallMonitorBlock.model_rebuild(_types_namespace={"UUID": UUID})

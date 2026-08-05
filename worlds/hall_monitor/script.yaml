@@ -25,6 +25,7 @@ scenes:
           deny: 0.30
           arrest: 0.20
         seed: 20260719
+        inhaler_case_index: 0
         content: |
           Check each student’s identification and pass before deciding whether
           to allow them onward, send them back to class, or refer them to office.
@@ -39,7 +40,18 @@ scenes:
       victory:
         content: |
           The morning bell settles the halls. Every student was handled correctly.
+        actions:
+          - text: "Read the attendance note"
+            successor: attendance_note
 
       defeat:
         content: |
           The passing period ends with an unresolved mistake on the attendance sheet.
+        actions:
+          - text: "Read the attendance note"
+            successor: attendance_note
+
+      attendance_note:
+        kind: "hall_monitor.domain.HallMonitorConsequenceBlock"
+        content: |
+          The attendance office has filed one note from the morning shift.

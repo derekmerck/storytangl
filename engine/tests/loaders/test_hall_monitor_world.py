@@ -12,6 +12,7 @@ from tangl.mechanics.credentials import (
     CredentialDefinition,
     FailureMode,
 )
+from tangl.mechanics.presence.look import HairColor, HasSimpleLook
 from tangl.mechanics.games.credentials_game import CredentialDisposition, derive_disposition
 from tangl.mechanics.games.credentials_roster import materialize
 from tangl.service.world_registry import WorldRegistry
@@ -53,6 +54,22 @@ def _started_shift() -> tuple[StoryGraph, Ledger]:
     return result.graph, ledger
 
 
+def _journal_text(ledger: Ledger) -> str:
+    return " ".join(
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment.content, str)
+    )
+
+
+def _finish_shift_correctly(ledger: Ledger) -> None:
+    while ledger.cursor.label == "morning_shift":
+        game = ledger.cursor.game
+        _inspect(ledger, next(iter(game.presented_documents)))
+        decision = game.expected_disposition(game.active_case).value
+        _choose(ledger, game.presentation.decision_labels[decision])
+
+
 class TestHallMonitorWorld:
     """The school skin exercises the shared credentials lifecycle."""
 
@@ -85,6 +102,7 @@ class TestHallMonitorWorld:
         assert block is ledger.cursor
         assert block.encounters == 5
         assert block.seed == 20260719
+        assert block.inhaler_case_index == 0
         assert block.disposition_distribution == {
             CredentialDisposition.PASS: 0.5,
             CredentialDisposition.DENY: 0.3,
@@ -114,7 +132,7 @@ class TestHallMonitorWorld:
         first_case = ledger.cursor.game.active_case
 
         assert "student ID" in first_case.presented_documents
-        assert "activity pass" in first_case.presented_documents
+        assert "doctor's note" in first_case.presented_documents
         assert "passport" not in first_case.presented_documents
 
         while ledger.cursor.label == "morning_shift":
@@ -156,3 +174,68 @@ class TestHallMonitorWorld:
         assert game.materialized == list(prepared)
         assert len(prepared) == 2
         assert game.active_case is prepared[0]
+
+    def test_hall_monitor_records_and_later_reveals_harsh_inhaler_outcome(self) -> None:
+        graph, ledger = _started_shift()
+        block = ledger.cursor
+        game = block.game
+        bearer_id = game.active_case.packet_manager.bearer_id
+
+        _inspect(ledger, "doctor's note")
+        _choose(ledger, "Send back to class")
+
+        assert game.case_results[0].correct is True
+        assert game.score["player"] == 1
+        assert game.score["opponent"] == 0
+        assert len(block.consequences) == 1
+        consequence = block.consequences[0]
+        assert consequence.bearer_id == bearer_id
+        assert consequence.outcome == "inhaler_withheld"
+        assert "remained at the hall desk" not in _journal_text(ledger)
+
+        bearer = graph.get(bearer_id)
+        assert isinstance(bearer, HasSimpleLook)
+        bearer.label = "Zapp"
+        bearer.look.hair_color = HairColor.BLUE
+
+        _finish_shift_correctly(ledger)
+        assert ledger.cursor.label == "victory"
+        assert block.consequences == [consequence]
+        _choose(ledger, "Read the attendance note")
+
+        assert ledger.cursor.label == "attendance_note"
+        assert "Zapp, with blue hair, was sent back to class" in _journal_text(ledger)
+
+        restored = Graph.structure(graph.unstructure())
+        restored_block = restored.find_one(Selector(label="morning_shift"))
+        assert restored_block is not None
+        assert restored_block.consequences == [consequence]
+        restored_result = restored_block.game.case_results[0]
+        assert restored_result.case_index == consequence.source_case_index
+        assert restored_result.bearer_id == consequence.bearer_id
+        assert restored.get(restored_result.bearer_id) is not None
+
+    def test_hall_monitor_records_compassionate_inhaler_outcome_without_changing_score(
+        self,
+    ) -> None:
+        _, ledger = _started_shift()
+        block = ledger.cursor
+        game = block.game
+
+        _inspect(ledger, "doctor's note")
+        _choose(ledger, "Allow onward")
+
+        assert game.case_results[0].correct is False
+        assert game.score["opponent"] == 1
+        assert game.score["player"] == 0
+        assert [fact.outcome for fact in block.consequences] == ["inhaler_allowed"]
+        assert "reached the nurse's office" not in _journal_text(ledger)
+
+        _finish_shift_correctly(ledger)
+        assert ledger.cursor.label == "defeat"
+        _choose(ledger, "Read the attendance note")
+        assert "reached the nurse's office with their inhaler" in _journal_text(ledger)
+
+        ledger.get_journal()
+        ledger.get_journal()
+        assert len(block.consequences) == 1
