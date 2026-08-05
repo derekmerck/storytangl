@@ -367,9 +367,8 @@ activity_pass:
         )
         assert "shift complete" in content.lower()
 
-    def test_randomized_shift_materializes_lazily_and_routes_to_victory(self) -> None:
-        """The sampled path materializes each candidate on arrival and, played
-        correctly, routes to the same victory ending."""
+    def test_randomized_shift_prepares_one_successor_and_routes_to_victory(self) -> None:
+        """The sampled path prepares one successor frontier and reaches victory."""
 
         bundle = WorldBundle.load(_credential_gate_root())
         world = WorldCompiler().compile(bundle)
@@ -385,8 +384,10 @@ activity_pass:
         game = ledger.cursor.game
         total = game._total_cases()
         assert total > 1
-        # Lazy: only the active arrival has materialized; the rest still pending.
-        assert len(game.materialized) == 1
+        # PLANNING prepares the active case and its one sequential successor;
+        # later offers remain unmaterialized until they become the frontier.
+        assert len(game.materialized) == min(2, total)
+        assert game.case_index == 0
 
         for _ in range(total):
             target = game.expected_disposition(game.active_case).value

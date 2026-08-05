@@ -30,6 +30,7 @@ from tangl.core import (
     TokenCatalog,
 )
 from tangl.core.runtime_op import Predicate
+from tangl.media import MediaDataType
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
 from tangl.media.media_resource import (
     MediaInventory,
@@ -676,6 +677,54 @@ class TestResolverOfferGathering:
 
         assert len(offers) == 1
         assert offers[0].policy == ProvisionPolicy.CREATE
+
+    def test_inline_media_spec_inventory_matching_uses_adapted_fingerprint(self) -> None:
+        spec = VectorSpec(label="checkpoint-card")
+        fingerprint = spec.adapt_spec(ctx={}).spec_fingerprint()
+        exact = MediaRIT(
+            label="exact.svg",
+            data="<svg/>",
+            data_type=MediaDataType.VECTOR,
+            adapted_spec_hash=fingerprint,
+        )
+        unrelated = MediaRIT(label="other.svg", data="<svg/>", data_type=MediaDataType.VECTOR)
+        inventory = _media_inventory("world", unrelated, exact)
+        requirement = Requirement(
+            has_kind=MediaRIT,
+            media_spec=spec,
+            provision_policy=ProvisionPolicy.ANY,
+        )
+
+        ctx = _ctx_with_media_inventories(inventory)
+        resolver = Resolver()
+        offers = resolver.gather_offers(requirement, _ctx=ctx)
+
+        assert requirement.has_identifier == fingerprint
+        assert [offer.policy for offer in offers] == [ProvisionPolicy.EXISTING, ProvisionPolicy.CREATE]
+        assert offers[0].candidate is exact
+        provider = resolver.resolve_requirement(requirement, _ctx=ctx)
+        assert provider.uid == exact.uid
+        assert requirement.selected_offer_policy is ProvisionPolicy.EXISTING
+
+    def test_inline_media_spec_without_inventory_match_creates(self) -> None:
+        spec = VectorSpec(label="checkpoint-card")
+        inventory = _media_inventory(
+            "world",
+            MediaRIT(label="other.svg", data="<svg/>", data_type=MediaDataType.VECTOR),
+        )
+        requirement = Requirement(
+            has_kind=MediaRIT,
+            media_spec=spec,
+            provision_policy=ProvisionPolicy.ANY,
+        )
+
+        offers = Resolver().gather_offers(
+            requirement,
+            _ctx=_ctx_with_media_inventories(inventory),
+        )
+
+        assert len(offers) == 1
+        assert offers[0].policy is ProvisionPolicy.CREATE
 
     def test_clone_offer_uses_selected_reference_and_template(self) -> None:
         source = Entity(label="source")

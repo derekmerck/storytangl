@@ -10,7 +10,8 @@ from uuid import uuid4
 from lxml import etree
 import pytest
 
-from tangl.core import TokenCatalog
+from tangl.core import Graph, Selector, TokenCatalog
+from tangl.journal.fragments import GroupFragment, MediaFragment, PieceFragment
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
@@ -28,10 +29,16 @@ from tangl.mechanics.credentials import (
     materialize_packet,
 )
 from tangl.mechanics.games import CredentialsGame, CredentialsGameHandler, HasGame
-from tangl.mechanics.games.credentials_game import CredentialCase
+from tangl.mechanics.games.handlers import process_game_move, provision_game_moves
+from tangl.mechanics.games.credentials_game import (
+    CredentialCase,
+    CredentialDisposition,
+    CredentialsMove,
+)
 from tangl.mechanics.presence.look import HairColor, Look
-from tangl.story import Block
+from tangl.story import Action, Block
 from tangl.story.fabula import World
+from tangl.vm import Frame, ResolutionPhase
 
 
 @pytest.fixture(autouse=True)
@@ -55,9 +62,14 @@ def _story_media_root(tmp_path: Path):
     return _resolve
 
 
-def _case(*, status: CredentialStatus = CredentialStatus.VALID) -> CredentialCase:
+def _case(
+    *,
+    status: CredentialStatus = CredentialStatus.VALID,
+    candidate_name: str = "Ada Venn",
+    definition_label: str = "card-id",
+) -> CredentialCase:
     definition = CredentialDefinition(
-        label="card-id",
+        label=definition_label,
         name="Border Pass",
         indication=Indication.TRAVEL,
         document_kind="id",
@@ -65,7 +77,7 @@ def _case(*, status: CredentialStatus = CredentialStatus.VALID) -> CredentialCas
         valid_period=0,
     )
     return CredentialCase(
-        candidate_name="Ada Venn",
+        candidate_name=candidate_name,
         presented_documents={"passport": "An identity document."},
         packet_manager=materialize_packet(
             owner=object(),
@@ -89,6 +101,7 @@ def _live_card_case(
     tmp_path: Path,
     *,
     status: CredentialStatus = CredentialStatus.VALID,
+    roster: list[CredentialCase] | None = None,
 ):
     monkeypatch.setattr(
         "tangl.media.story_media.get_story_media_dir",
@@ -104,7 +117,7 @@ def _live_card_case(
     block = story.add_node(
         kind=_CredentialsBlock,
         label="checkpoint",
-        game_state=CredentialsGame(roster=[_case(status=status)]),
+        game_state=CredentialsGame(roster=roster or [_case(status=status)]),
     )
     handler = block.game_handler
     handler.setup(block.game)
@@ -293,3 +306,227 @@ def test_complete_replacement_has_no_card_media_path(
 
     assert block.game_handler.credential_card_projections(block.game) == []
     assert story.get(block.uid) is block
+
+
+def test_lifecycle_provisions_one_card_and_emits_stable_piece_media_relation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, projection = _live_card_case(monkeypatch, tmp_path)
+    ctx = Frame(graph=story, cursor=block)._make_ctx()
+
+    assert not any(
+        isinstance(fragment, MediaFragment)
+        for fragment in block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    )
+    ctx.current_phase = ResolutionPhase.PLANNING
+    assert provision_game_moves(cursor=block, ctx=ctx) is None
+    first = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    block.game_handler.provision_presentation(block.game, ctx=ctx)
+    second = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+
+    dependencies = [value for value in story.values() if isinstance(value, MediaDep)]
+    rits = [value for value in story.values() if isinstance(value, MediaRIT)]
+    assert [dependency.label for dependency in dependencies] == [
+        "credential-card-portrait",
+        "credential-card-printable_text",
+        "credential-card-card",
+    ]
+    assert len(rits) == 3
+
+    document = next(
+        fragment
+        for fragment in first
+        if isinstance(fragment, PieceFragment)
+        and fragment.properties.get("component_id") == projection.component_id
+    )
+    media = [fragment for fragment in first if isinstance(fragment, MediaFragment)]
+    relation = [
+        fragment
+        for fragment in first
+        if isinstance(fragment, GroupFragment) and fragment.group_type == "piece_media"
+    ]
+    assert len(media) == 1
+    assert media[0].source_id == projection.component_id
+    assert media[0].content_format == "rit"
+    assert len(relation) == 1
+    assert relation[0].member_ids == [document.uid, media[0].uid]
+    assert [fragment.uid for fragment in second if isinstance(fragment, MediaFragment)] == [
+        media[0].uid
+    ]
+    assert [
+        fragment.uid
+        for fragment in second
+        if isinstance(fragment, GroupFragment) and fragment.group_type == "piece_media"
+    ] == [relation[0].uid]
+
+
+def test_lifecycle_uses_document_subject_and_keeps_text_when_card_inputs_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, packet, projection = _live_card_case(
+        monkeypatch,
+        tmp_path,
+        status=CredentialStatus.WRONG_HOLDER,
+    )
+    ctx = Frame(graph=story, cursor=block)._make_ctx()
+    block.game_handler.provision_presentation(block.game, ctx=ctx)
+    portrait = next(
+        dependency
+        for dependency in story.values()
+        if isinstance(dependency, MediaDep) and dependency.label == "credential-card-portrait"
+    )
+    text = next(
+        dependency
+        for dependency in story.values()
+        if isinstance(dependency, MediaDep) and dependency.label == "credential-card-printable_text"
+    )
+
+    assert portrait.provider.derivation_spec["identity_key"] == str(projection.subject_id)
+    assert projection.subject_id != packet.bearer_id
+    text.provider.status = MediaRITStatus.PENDING
+    pending = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in pending)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in pending)
+
+    text.provider.status = MediaRITStatus.FAILED
+    failed = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in failed)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in failed)
+
+    text.provider.status = MediaRITStatus.RESOLVED
+    text.provider.data = "<svg/>"
+    text.provider.path = None
+    stale = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in stale)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in stale)
+
+
+def test_lifecycle_keeps_text_when_parent_card_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, _ = _live_card_case(monkeypatch, tmp_path)
+    ctx = Frame(graph=story, cursor=block)._make_ctx()
+    block.game_handler.provision_presentation(block.game, ctx=ctx)
+    card = next(
+        dependency
+        for dependency in story.values()
+        if isinstance(dependency, MediaDep) and dependency.label == "credential-card-card"
+    )
+
+    card.provider.status = MediaRITStatus.PENDING
+    pending = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in pending)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in pending)
+    assert not any(
+        isinstance(fragment, GroupFragment) and fragment.group_type == "piece_media"
+        for fragment in pending
+    )
+
+    card.provider.status = MediaRITStatus.FAILED
+    failed = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert any(isinstance(fragment, PieceFragment) for fragment in failed)
+    assert not any(isinstance(fragment, MediaFragment) for fragment in failed)
+
+
+def test_lifecycle_provisions_the_next_candidate_during_update(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first_case = _case(candidate_name="Ada Venn", definition_label="card-id-one")
+    second_case = _case(candidate_name="Bea Moss", definition_label="card-id-two")
+    story, block, _, _ = _live_card_case(
+        monkeypatch,
+        tmp_path,
+        roster=[first_case, second_case],
+    )
+    frame = Frame(graph=story, cursor=block)
+    action = Action(
+        graph=story,
+        predecessor_id=block.uid,
+        successor_id=block.uid,
+        payload={"move": CredentialsMove(kind="decide", target=CredentialDisposition.PASS.value)},
+    )
+    frame.selected_edge = action
+    ctx = frame._make_ctx(incoming_edge=action, incoming_payload=action.payload)
+
+    ctx.current_phase = ResolutionPhase.PLANNING
+    provision_game_moves(cursor=block, ctx=ctx)
+    next_projection = block.game_handler.credential_card_projections(block.game, case=second_case)[0]
+    prepared_dependency_ids = {
+        dependency.uid for dependency in story.values() if isinstance(dependency, MediaDep)
+    }
+    active_journal = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+
+    assert block.game.case_index == 0
+    assert block.game.active_case is first_case
+    assert block.game.to_namespace()["credential_candidate_name"] == "Ada Venn"
+    assert len(prepared_dependency_ids) == 6
+    assert not any(
+        isinstance(fragment, MediaFragment) and fragment.source_id == next_projection.component_id
+        for fragment in active_journal
+    )
+    assert all("Bea Moss" not in str(fragment.content) for fragment in active_journal)
+
+    ctx.current_phase = ResolutionPhase.UPDATE
+    process_game_move(block, ctx=ctx)
+
+    assert block.game.case_index == 1
+    journal = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+    assert {
+        dependency.uid for dependency in story.values() if isinstance(dependency, MediaDep)
+    } == prepared_dependency_ids
+    assert any(
+        isinstance(fragment, MediaFragment) and fragment.source_id == next_projection.component_id
+        for fragment in journal
+    )
+
+
+def test_lifecycle_replacement_suppresses_previously_provisioned_card_media(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, _ = _live_card_case(monkeypatch, tmp_path)
+    ctx = Frame(graph=story, cursor=block)._make_ctx()
+    block.game_handler.provision_presentation(block.game, ctx=ctx)
+    block.game.active_case.presented_documents = {"passport": "An authored replacement."}
+
+    fragments = block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+
+    assert not any(isinstance(fragment, MediaFragment) for fragment in fragments)
+    assert any(
+        isinstance(fragment, PieceFragment) and fragment.content == "An authored replacement."
+        for fragment in fragments
+    )
+
+
+def test_lifecycle_round_trip_preserves_card_dependencies_and_fragment_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, _ = _live_card_case(monkeypatch, tmp_path)
+    ctx = Frame(graph=story, cursor=block)._make_ctx()
+    block.game_handler.provision_presentation(block.game, ctx=ctx)
+    original = next(
+        fragment
+        for fragment in block.game_handler.get_journal_fragments(block.game, ctx=ctx)
+        if isinstance(fragment, MediaFragment)
+    )
+
+    restored = Graph.structure(story.unstructure())
+    restored_block = restored.find_one(Selector(label="checkpoint"))
+    restored_ctx = Frame(graph=restored, cursor=restored_block)._make_ctx()
+    restored_block.game_handler.provision_presentation(restored_block.game, ctx=restored_ctx)
+    restored_media = [
+        fragment
+        for fragment in restored_block.game_handler.get_journal_fragments(
+            restored_block.game,
+            ctx=restored_ctx,
+        )
+        if isinstance(fragment, MediaFragment)
+    ]
+
+    assert len([value for value in restored.values() if isinstance(value, MediaDep)]) == 3
+    assert [fragment.uid for fragment in restored_media] == [original.uid]

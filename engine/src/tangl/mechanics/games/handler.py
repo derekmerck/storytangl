@@ -161,6 +161,10 @@ class GameHandler(ABC, Generic[GameT]):
         JOURNAL handler to fall back to the generic round summary.
         """
         return None
+
+    def provision_presentation(self, game: GameT, *, ctx: VmPhaseCtx) -> None:
+        """Provision optional game presentation resources during PLANNING."""
+        _ = game, ctx
     
     # ─────────────────────────────────────────────────────────────────────
     # Lifecycle methods

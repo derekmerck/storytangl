@@ -31,9 +31,17 @@ from tangl.journal.fragments import (
     GroupFragment,
     KvFragment,
     KvRow,
+    MediaFragment,
     PieceFragment,
     PresentationHints,
 )
+from tangl.media.media_creators.composition_forge.composition_inputs import (
+    CompositionInputUnavailable,
+    resolve_composition_inputs,
+)
+from tangl.media.media_creators.composition_forge.composition_spec import CompositionSpec
+from tangl.media.media_creators.media_spec import MediaSpec
+from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.mechanics.credentials.assembly import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
@@ -62,10 +70,14 @@ from tangl.mechanics.credentials import (
     Region,
     Restrictions,
     RestrictionLevel,
+    credential_card_composition_spec,
+    credential_card_portrait_spec,
+    credential_card_text_spec,
 )
 from tangl.prose import TextRenderSession
 from tangl.story.presentation import render_text_as
 from tangl.vm.ctx import VmPhaseCtx
+from tangl.vm.provision.resolver import Resolver
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
@@ -82,6 +94,16 @@ _DOCUMENT_SELECTOR_TARGET = "__document_piece__"
 
 def _piece_uid(game_uid: uuid.UUID, case_index: int, key: str) -> uuid.UUID:
     return uuid.uuid5(_PIECE_NS, f"credentials:{game_uid}:{case_index}:{key}")
+
+
+def _card_media_dep_uid(
+    game_uid: uuid.UUID,
+    case_index: int,
+    component_id: uuid.UUID,
+    role: str,
+) -> uuid.UUID:
+    """Return the stable dependency ID for one credential-card media role."""
+    return _piece_uid(game_uid, case_index, f"card-dependency:{component_id}:{role}")
 
 
 def _document_piece_id(case_index: int, label: str) -> str:
@@ -1003,14 +1025,14 @@ class CredentialsGame(PickingGame):
 
         return self._component_manager_owner is not None
 
-    def prepare_active_case(self) -> CredentialCase:
-        """Materialize the arriving sampled case at setup or UPDATE time."""
+    def prepare_case(self, case_index: int) -> CredentialCase:
+        """Materialize one sequential case without making it active."""
 
         if not self.offers:
-            return self.roster[self.case_index]
+            return self.roster[case_index]
         from .credentials_roster import materialize
 
-        while len(self.materialized) <= self.case_index:
+        while len(self.materialized) <= case_index:
             offer = self.offers[len(self.materialized)]
             self.materialized.append(
                 materialize(
@@ -1025,7 +1047,7 @@ class CredentialsGame(PickingGame):
                     narrative_renderer=self.presentation.render_case,
                 )
             )
-        return self.materialized[self.case_index]
+        return self.materialized[case_index]
 
     # ----- active case access ----------------------------------------------
     def _total_cases(self) -> int:
@@ -1043,7 +1065,7 @@ class CredentialsGame(PickingGame):
                 and self.phase is GamePhase.READY
             ):
                 raise RuntimeError("Sampled credential cases must be prepared before PLANNING")
-            return self.prepare_active_case()
+            return self.prepare_case(self.case_index)
         return self.materialized[self.case_index]
 
     @property
@@ -1179,8 +1201,6 @@ class CredentialsGame(PickingGame):
         self.packet_findings = {}
         self.committed_decision = None
         self.finding_status = {}
-        if self.has_component_manager_owner and not self.shift_complete:
-            self.prepare_active_case()
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
@@ -1229,7 +1249,116 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         """Prepare the first sampled packet before move provisioning begins."""
 
         if game.has_component_manager_owner and game.offers:
-            game.prepare_active_case()
+            game.prepare_case(game.case_index)
+
+    def provision_presentation(self, game: CredentialsGame, *, ctx: VmPhaseCtx) -> None:
+        """Prepare the current and sequential successor card frontiers."""
+        if game.shift_complete or ctx.cursor is None:
+            return
+
+        indices = [game.case_index]
+        if game.case_index + 1 < game._total_cases():
+            indices.append(game.case_index + 1)
+        for case_index in indices:
+            case = game.prepare_case(case_index)
+            self._provision_case_presentation(
+                game,
+                case=case,
+                case_index=case_index,
+                ctx=ctx,
+            )
+
+    def _provision_case_presentation(
+        self,
+        game: CredentialsGame,
+        *,
+        case: CredentialCase,
+        case_index: int,
+        ctx: VmPhaseCtx,
+    ) -> None:
+        """Provision one already-prepared case without changing active state."""
+        for projection in self.credential_card_projections(game, case=case):
+            component = next(
+                component
+                for component in case.packet_manager.document_components()
+                if component.uid == projection.component_id
+            )
+            subject = case.packet_manager.resolve_subject(projection.subject_id)
+            portrait = self._card_media_dependency(
+                game,
+                component=component,
+                case_index=case_index,
+                role="portrait",
+                spec=credential_card_portrait_spec(projection, subject),
+                ctx=ctx,
+            )
+            text = self._card_media_dependency(
+                game,
+                component=component,
+                case_index=case_index,
+                role="printable_text",
+                spec=credential_card_text_spec(projection),
+                ctx=ctx,
+            )
+            resolver = Resolver.from_ctx(ctx)
+            for dependency in (portrait, text):
+                if not dependency.render_ready:
+                    resolver.resolve_dependency(dependency, _ctx=ctx)
+            if not portrait.render_ready or not text.render_ready:
+                continue
+
+            portrait_rit = portrait.provider
+            text_rit = text.provider
+            if not isinstance(portrait_rit, MediaRIT) or not isinstance(text_rit, MediaRIT):
+                continue
+            if portrait_rit.get_content_hash() is None or text_rit.get_content_hash() is None:
+                continue
+
+            card = self._card_media_dependency(
+                game,
+                component=component,
+                case_index=case_index,
+                role="card",
+                spec=credential_card_composition_spec(
+                    portrait_rit=portrait_rit,
+                    text_rit=text_rit,
+                ),
+                ctx=ctx,
+            )
+            if not card.render_ready:
+                resolver.resolve_dependency(card, _ctx=ctx)
+
+    @staticmethod
+    def _card_media_dependency(
+        game: CredentialsGame,
+        *,
+        component: CredentialComponent,
+        case_index: int,
+        role: str,
+        spec: MediaSpec,
+        ctx: VmPhaseCtx,
+    ) -> MediaDep:
+        """Return one stable, graph-owned media dependency for a card role."""
+        dependency_id = _card_media_dep_uid(
+            game.uid,
+            case_index,
+            component.uid,
+            role,
+        )
+        existing = ctx.graph.get(dependency_id)
+        if existing is not None:
+            assert isinstance(existing, MediaDep)
+            return existing
+        dependency = MediaDep(
+            uid=dependency_id,
+            registry=ctx.graph,
+            predecessor_id=ctx.cursor_id,
+            media_spec=spec,
+            media_role="credential_card",
+            label=f"credential-card-{role}",
+        )
+        ctx.graph.add(dependency, _ctx=ctx)
+        return dependency
 
     def resolve_round(self, game, player_move, opponent_move):
         # Charge the move's time cost to the shift budget before resolving it.
@@ -2022,10 +2151,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def _document_components(
         self,
         game: CredentialsGame,
+        *,
+        case: CredentialCase | None = None,
     ) -> list[_CredentialDocumentRender]:
         """Pair canonical components with their profile base and visible parts."""
 
-        case = game.active_case
+        case = case or game.active_case
+        is_active_case = case is game.active_case
         documents: list[_CredentialDocumentRender] = []
         for component in case.packet_manager.document_components():
             label = self._component_label(game, component)
@@ -2049,7 +2181,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 component.indication,
             )
             reissued = (
-                reissued_component is not None
+                is_active_case
+                and reissued_component is not None
                 and component.uid == reissued_component.uid
                 and game.finding_status.get(component.indication) == Finding.CLEARED
             )
@@ -2080,9 +2213,11 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def credential_card_projections(
         self,
         game: CredentialsGame,
+        *,
+        case: CredentialCase | None = None,
     ) -> list[CredentialCardProjection]:
-        """Project the active case's canonical ID documents for future card media."""
-        case = game.active_case
+        """Project one case's canonical ID documents for future card media."""
+        case = case or game.active_case
         return [
             CredentialCardProjection(
                 component_id=document.component.uid,
@@ -2092,7 +2227,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 bearer_label=case.candidate_name,
                 visible_parts=document.visible_observations,
             )
-            for document in self._document_components(game)
+            for document in self._document_components(game, case=case)
             if (
                 document.component.document_kind == "id"
                 and document.complete_replacement is None
@@ -2175,6 +2310,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         doc_pieces: list[BaseFragment] = []
         component_labels: set[str] = set()
         component_documents = self._document_components(game)
+        card_projections = {
+            projection.component_id: projection
+            for projection in self.credential_card_projections(game)
+        }
         label_counts = Counter(
             document.label for document in component_documents
         )
@@ -2241,6 +2380,16 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     hints=PresentationHints(label_text=label),
                 )
             )
+            projection = card_projections.get(component.uid)
+            if projection is not None:
+                doc_pieces.extend(
+                    self._card_media_fragments(
+                        game,
+                        projection=projection,
+                        document_piece_id=doc_uid,
+                        ctx=ctx,
+                    )
+                )
 
         for label, description in case.presented_documents.items():
             if label in component_labels:
@@ -2266,6 +2415,62 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             hints=PresentationHints(label_text="Credentials packet"),
         )
         return [candidate, packet, *doc_pieces]
+
+    @staticmethod
+    def _card_media_fragments(
+        game: CredentialsGame,
+        *,
+        projection: CredentialCardProjection,
+        document_piece_id: uuid.UUID,
+        ctx: VmPhaseCtx | None,
+    ) -> list[BaseFragment]:
+        """Project one resolved card RIT beside its canonical document piece."""
+        if ctx is None:
+            return []
+        dependency = ctx.graph.get(
+            _card_media_dep_uid(
+                game.uid,
+                game.case_index,
+                projection.component_id,
+                "card",
+            )
+        )
+        if not isinstance(dependency, MediaDep) or not dependency.render_ready:
+            return []
+        card = dependency.provider
+        spec = dependency.requirement.media_spec
+        if not isinstance(card, MediaRIT) or not isinstance(spec, CompositionSpec):
+            return []
+        try:
+            resolve_composition_inputs(spec, graph=ctx.graph)
+        except CompositionInputUnavailable:
+            return []
+
+        media_uid = _piece_uid(
+            game.uid,
+            game.case_index,
+            f"card-media:{projection.component_id}",
+        )
+        return [
+            MediaFragment(
+                uid=media_uid,
+                source_id=projection.component_id,
+                media_role="credential_card",
+                content=card,
+                content_format="rit",
+                content_type=card.data_type,
+                scope="story",
+            ),
+            GroupFragment(
+                uid=_piece_uid(
+                    game.uid,
+                    game.case_index,
+                    f"piece-media:{projection.component_id}",
+                ),
+                group_type="piece_media",
+                member_ids=[document_piece_id, media_uid],
+            ),
+        ]
 
     def _findings_fragment(self, game: CredentialsGame) -> KvFragment | None:
         """Project revealed document/packet findings as a KvFragment.
