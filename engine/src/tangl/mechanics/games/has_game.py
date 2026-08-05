@@ -45,10 +45,10 @@ class HasGame:
     variant carrying different payload/label data while still targeting this
     same node.
 
-    This self-fanout block is the structural shape a contest node needs: a
-    re-entrant node whose outgoing move edges are recomputed each visit from
-    current shared state. Multi-lane contests reuse it directly; lane asymmetry
-    lives in the template registry, not here.
+    The self-fanout shape — a re-entrant node whose outgoing move edges are
+    recomputed each visit from current state — is also what a two-party contest
+    node would need. Nothing here is multi-navigator today: the opponent is a
+    strategy inside this game state, not a second cursor.
 
     .. storytangl-topic::
        :topics: multi_lane, open_link

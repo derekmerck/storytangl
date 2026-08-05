@@ -96,14 +96,25 @@ def first_paragraph(text: str) -> str:
 
     paragraphs: list[str] = []
     block: list[str] = []
+    in_topic_fence = False
     for raw_line in text.splitlines():
         line = raw_line.strip()
+        # A MyST topic directive is a fenced block; skip through its closing
+        # fence so the delimiter never becomes the section summary. The rst
+        # form has no closing delimiter and needs only the opening skip.
+        if in_topic_fence:
+            if line.startswith("```"):
+                in_topic_fence = False
+            continue
+        if line.startswith("```{storytangl-topic}"):
+            in_topic_fence = True
+            continue
         if not line:
             if block:
                 paragraphs.append(" ".join(block))
                 block = []
             continue
-        if line.startswith(".. storytangl-topic::") or line.startswith("```{storytangl-topic}"):
+        if line.startswith(".. storytangl-topic::"):
             continue
         if line.startswith(":") and block == []:
             continue
@@ -224,6 +235,8 @@ def classify_source(path: Path, repo_root: Path) -> tuple[str, DevTopicFacet, De
         return "note", "notes", "mentions"
     if path.name == "__init__.py":
         return "doc_section", "overview", "documents"
+    if path.suffix.lower() == ".py":
+        return "doc_section", "code", "defines"
     return "doc_section", "notes", "mentions"
 
 

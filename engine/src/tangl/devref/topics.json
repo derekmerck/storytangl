@@ -361,8 +361,7 @@
       "journal channel",
       "per-cursor",
       "hot-seat",
-      "navigator role",
-      "focalization"
+      "navigator role"
     ],
     "layer": "vm",
     "short_description": "Several navigators traversing one shared fabula: N cursors, N journal channels, per-participant visibility, and cross-lane coordination above follow.",

@@ -122,6 +122,48 @@ class Annotated:
     assert module_hits, "annotated module docstring should produce a module artifact"
     assert symbol_hits, "annotated class docstring should link its symbol artifact"
 
+    # The declared classification must survive onto the artifact, not just the
+    # topic link, since find/map report the artifact's own facet and relation.
+    assert module_hits[0].facet == "code"
+    assert module_hits[0].relation == "defines"
+    assert module_hits[0].summary.startswith("Annotated module")
+
+
+def test_myst_topic_fence_is_not_summarized_as_a_section(tmp_path) -> None:
+    """A MyST directive must not leave its closing fence as the summary."""
+
+    repo_root = _mini_repo(tmp_path)
+    db_path = tmp_path / "mini.sqlite3"
+    _write(
+        repo_root / "docs" / "src" / "design" / "fenced.md",
+        """
+# Fenced
+
+## Annotated Section
+
+```{storytangl-topic}
+:topics: entity
+:facets: design
+:relation: documents
+```
+
+The real opening paragraph.
+""".strip()
+        + "\n",
+    )
+
+    build_index(repo_root=repo_root, db_path=db_path, incremental=False)
+
+    hits = [
+        artifact
+        for artifact in search_topics("entity", db_path=db_path).artifacts
+        if artifact.source_path.endswith("design/fenced.md")
+    ]
+
+    assert hits
+    assert all("```" not in artifact.summary for artifact in hits)
+    assert any(artifact.summary.startswith("The real opening paragraph") for artifact in hits)
+
 
 def test_unannotated_plain_module_produces_no_module_artifact(tmp_path) -> None:
     """Annotation is the opt-in; ordinary modules stay symbol-only."""
