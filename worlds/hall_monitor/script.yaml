@@ -55,3 +55,22 @@ scenes:
         kind: "hall_monitor.domain.HallMonitorConsequenceBlock"
         content: |
           The attendance office has filed one note from the morning shift.
+        actions:
+          - text: "Meet the returning student"
+            successor: returning_student
+
+      returning_student:
+        kind: "hall_monitor.domain.HallMonitorReturnBlock"
+        content: |
+          A student waits at the hall desk with new paperwork.
+        continues:
+          - successor: return_complete
+            trigger: last
+            predicate: game_won
+          - successor: return_complete
+            trigger: last
+            predicate: game_lost
+
+      return_complete:
+        content: |
+          The final bell rings across the now-quiet hall.

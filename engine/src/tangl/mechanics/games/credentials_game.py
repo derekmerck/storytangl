@@ -195,6 +195,10 @@ class CredentialCase(Unstructurable):
     packet_manager: AssemblyCredentialPacketManager = Field(
         json_schema_extra={"include": True, "unstructurable": True},
     )
+    prior_case_results: list["CredentialCaseResult"] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True},
+    )
 
     # Authored override; None means "derive from the rules".
     correct_disposition: CredentialDisposition | None = None
@@ -262,6 +266,9 @@ class CredentialCaseResult(BaseModelPlus):
     unjustified: bool = False
     discovered_findings: dict[str, str] = Field(default_factory=dict)
     packet_findings: dict[str, str] = Field(default_factory=dict)
+
+
+CredentialCase.model_rebuild(_types_namespace={"CredentialCaseResult": CredentialCaseResult})
 
 
 def _default_roster() -> list[CredentialCase]:

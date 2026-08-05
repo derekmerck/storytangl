@@ -18,6 +18,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from uuid import UUID
 
 from pydantic import Field
 
@@ -39,6 +40,7 @@ from tangl.mechanics.credentials import (
 from .credentials_factory import build_valid, degrade, render_narrative
 from .credentials_game import (
     CredentialCase,
+    CredentialCaseResult,
     CredentialDisposition,
     CredentialsGame,
     derive_defects,
@@ -73,6 +75,8 @@ class ScenarioOffer(Unstructurable):
     presented_documents_override: dict[str, str] | None = None
     hidden_facts_override: dict[str, str] | None = None
     packet_hidden_facts_override: dict[str, str] | None = None
+    bearer_id: UUID | None = None
+    prior_case_results: list[CredentialCaseResult] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -335,7 +339,9 @@ def materialize(
         contraband=list(offer.contraband),
         owner=owner or object(),
         catalog=catalog,
+        bearer_id=offer.bearer_id,
     )
+    case.prior_case_results = list(offer.prior_case_results)
     degrade(case, offer.failure_modes)
     defects = derive_defects(case.packet_manager, rules)
     (narrative_renderer or render_narrative)(case, defects)

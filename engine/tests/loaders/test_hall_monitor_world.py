@@ -239,3 +239,74 @@ class TestHallMonitorWorld:
         ledger.get_journal()
         ledger.get_journal()
         assert len(block.consequences) == 1
+
+    def test_attendance_note_prepares_a_returning_bearer_with_prior_receipt(self) -> None:
+        graph, ledger = _started_shift()
+        source = ledger.cursor
+        source_game = source.game
+        first_packet = source_game.active_case.packet_manager
+        bearer_id = first_packet.bearer_id
+
+        _inspect(ledger, "doctor's note")
+        _choose(ledger, "Send back to class")
+        first_result = source_game.case_results[0].model_dump(mode="python")
+        _finish_shift_correctly(ledger)
+        assert ledger.cursor.label == "victory"
+
+        subjects_before_return = sum(
+            isinstance(item, HasSimpleLook)
+            for item in graph.members.values()
+        )
+        _choose(ledger, "Read the attendance note")
+        assert ledger.cursor.label == "attendance_note"
+
+        returning = graph.find_one(Selector(label="returning_student"))
+        assert returning is not None
+        returning_game = returning.game
+        returning_case = returning_game.active_case
+        returning_packet = returning_case.packet_manager
+        assert returning_packet is not first_packet
+        assert returning_packet.bearer_id == bearer_id
+        assert returning_case.prior_case_results == source_game.case_results[:1]
+        assert not any(case.prior_case_results for case in source_game.materialized[1:])
+        assert sum(isinstance(item, HasSimpleLook) for item in graph.members.values()) == (
+            subjects_before_return
+        )
+        assert {
+            component.uid for component in returning_packet.document_components()
+        }.isdisjoint(component.uid for component in first_packet.document_components())
+
+        restored = Graph.structure(graph.unstructure())
+        restored_source = restored.find_one(Selector(label="morning_shift"))
+        restored_attendance = restored.find_one(Selector(label="attendance_note"))
+        restored_returning = restored.find_one(Selector(label="returning_student"))
+        assert restored_source is not None
+        assert restored_attendance is not None
+        assert restored_returning is not None
+        restored_case = restored_returning.game.active_case
+        assert restored_case.packet_manager.bearer_id == bearer_id
+        assert restored_case.prior_case_results[0].model_dump(mode="python") == first_result
+
+        restored_subject_count = sum(
+            isinstance(item, HasSimpleLook)
+            for item in restored.members.values()
+        )
+
+        bearer = restored.get(bearer_id)
+        assert isinstance(bearer, HasSimpleLook)
+        bearer.label = "Zapp"
+        bearer.look.hair_color = HairColor.BLUE
+
+        restored_ledger = Ledger.from_graph(restored, entry_id=restored_attendance.uid)
+        assert sum(isinstance(item, HasSimpleLook) for item in restored.members.values()) == (
+            restored_subject_count
+        )
+        _choose(restored_ledger, "Meet the returning student")
+        assert restored_ledger.cursor is restored_returning
+        assert "Zapp, with blue hair, returns" in _journal_text(restored_ledger)
+
+        _inspect(restored_ledger, "doctor's note")
+        _choose(restored_ledger, "Allow onward")
+        assert restored_returning.game.case_results[0].correct is True
+        assert len(restored_returning.game.case_results) == 1
+        assert restored_source.game.case_results[0].model_dump(mode="python") == first_result

@@ -347,17 +347,24 @@ def materialize_packet(
     possessions: list[ContrabandItem],
     label_prefix: str,
     catalog: TokenCatalog[CredentialDefinition] | None = None,
+    bearer_id: UUID | None = None,
 ) -> CredentialPacketManager:
     """Create an owner-bound graph packet from a factory's value-shaped output."""
 
+    resolved_bearer_id = bearer_id or uuid4()
     manager = CredentialPacketManager(
         region=region,
         purpose=purpose,
         possessions=list(possessions),
+        bearer_id=resolved_bearer_id,
     )
-    bearer = manager.materialize_subject(f"{label_prefix}:bearer")
-    manager.bearer_id = bearer.uid
     manager.bind_owner(owner)
+    if bearer_id is None and manager._owner_registry() is None:
+        bearer = HasSimpleLook(uid=resolved_bearer_id, label=f"{label_prefix}:bearer")
+    else:
+        bearer = manager.resolve_subject(resolved_bearer_id)
+        if bearer_id is None:
+            bearer.label = f"{label_prefix}:bearer"
     id_subject = bearer
     if id_card is not None and id_card.status is CredentialStatus.WRONG_HOLDER:
         id_subject = manager.materialize_subject(f"{label_prefix}:id-subject")

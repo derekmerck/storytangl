@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Iterable, Sequence
+from uuid import UUID
 
 from tangl.core import TokenCatalog
 from tangl.mechanics.credentials import (
@@ -58,6 +59,7 @@ def build_valid(
     contraband: Sequence[IndicationId] = (),
     owner: object | None = None,
     catalog: TokenCatalog[CredentialDefinition] | None = None,
+    bearer_id: UUID | None = None,
 ) -> CredentialCase:
     """Assemble a fully valid packet for ``purpose`` (+ declared contraband).
 
@@ -112,6 +114,7 @@ def build_valid(
             possessions=possessions,
             label_prefix=candidate_name,
             catalog=catalog,
+            bearer_id=bearer_id,
         ),
     )
 
