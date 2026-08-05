@@ -202,7 +202,9 @@ class MediaFragment(ContentFragment, extra="allow"):
     """Media fragment that defers dereference and transport shaping to service."""
 
     content_type: MediaDataType = MediaDataType.MEDIA
-    content: Pathlike | bytes | str | dict | MediaRIT
+    content: MediaRIT | Pathlike | bytes | str | dict = Field(
+        json_schema_extra={"unstructurable": True},
+    )
     content_format: ContentFormatType
     staging_hints: StagingHints | None = None
     media_role: str | None = None

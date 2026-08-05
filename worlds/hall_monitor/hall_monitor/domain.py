@@ -9,15 +9,17 @@ from tangl.core import Selector
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.credentials import (
+    CREDENTIAL_ID_SLOT,
     CredentialDefinition,
     CredentialStatus,
     FailureMode,
     Restrictions,
     RestrictionLevel,
 )
-from tangl.mechanics.presence.look import HasSimpleLook
+from tangl.mechanics.presence.look import HairColor, HasSimpleLook
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
+    CredentialCase,
     CredentialCaseResult,
     CredentialDisposition,
     CredentialPresentationProfile,
@@ -126,6 +128,7 @@ _HALL_FAILURES = (
     FailureMode.EXPIRED_ID,
     FailureMode.FAKE_ID,
 )
+_MEDIA_WITNESS_CASE_INDEX = 1
 
 
 def _special_student() -> ScenarioOffer:
@@ -150,6 +153,18 @@ def _special_student() -> ScenarioOffer:
     )
 
 
+def _media_witness_student() -> ScenarioOffer:
+    """Return the fixed visual subject-mismatch encounter for this world."""
+
+    return ScenarioOffer(
+        target_disposition=CredentialDisposition.ARREST,
+        candidate_name="Rowan Vale",
+        region="lower",
+        purpose="medicine",
+        failure_modes=[FailureMode.FAKE_ID],
+    )
+
+
 def _hall_offers(
     *,
     encounters: int,
@@ -158,18 +173,21 @@ def _hall_offers(
 ) -> list[ScenarioOffer]:
     """Generate one configured school shift through the shared roster funnel."""
 
-    return generate_roster(
+    pinned = [_special_student(), _media_witness_student()]
+    if encounters <= len(pinned):
+        return pinned[:encounters]
+    sampled = generate_roster(
         ShiftSpec(
             rules=Restrictions.from_map(HALL_RULES),
-            encounters=encounters,
+            encounters=encounters - len(pinned),
             origin_distribution={"upper": 0.4, "lower": 0.4, "exchange": 0.2},
             disposition_distribution=disposition_distribution,
             purpose_pool=("academic", "activity", "off_campus"),
             allowed_failure_modes=_HALL_FAILURES,
-            pinned=(_special_student(),),
             seed=seed,
         )
     )
+    return [*pinned, *sampled]
 
 
 class HallMonitorCredentialsGame(CredentialsGame):
@@ -182,6 +200,21 @@ class HallMonitorCredentialsGame(CredentialsGame):
     presentation: CredentialPresentationProfile = Field(
         default_factory=lambda: HALL_PRESENTATION.model_copy(deep=True)
     )
+    def prepare_case(self, case_index: int) -> CredentialCase:
+        """Materialize the world-owned visual mismatch with distinct live looks."""
+
+        case = super().prepare_case(case_index)
+        if case_index != _MEDIA_WITNESS_CASE_INDEX:
+            return case
+
+        bearer = case.packet_manager.resolve_subject(case.packet_manager.bearer_id)
+        id_card = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+        id_subject = case.packet_manager.resolve_subject(id_card.subject_id)
+        if id_subject.uid == bearer.uid:
+            raise ValueError("Hall Monitor media witness requires a mismatched ID subject")
+        bearer.look.hair_color = HairColor.RED
+        id_subject.look.hair_color = HairColor.BLONDE
+        return case
 
 
 class HallMonitorConsequence(BaseModelPlus):

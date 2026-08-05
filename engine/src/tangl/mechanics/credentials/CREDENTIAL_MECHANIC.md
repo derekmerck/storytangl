@@ -373,7 +373,10 @@ PLANNING without changing the active case. UPDATE then selects the already
 prepared successor; it does not JIT-provision presentation. The text
 ``PieceFragment`` remains unconditional, and an ordinary associated
 ``MediaFragment`` appears only when the complete card is resolved. Complete
-authored replacements suppress that generated card.
+authored replacements suppress that generated card. Hall Monitor now exercises
+that path as a visual witness: a red-haired presenter and a blond, distinct
+document subject are projected through the ordinary candidate prose and card
+portrait surfaces without exposing the resulting subject-mismatch defect.
 Authored alternatives/replacements and world-scoped media selection remain the
 next slice. Credentials must consume the resulting ``MediaSpec →
 MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not invent a

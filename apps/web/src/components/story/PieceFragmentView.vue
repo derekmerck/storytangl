@@ -52,6 +52,8 @@ const pieceKind = computed(() => {
   const kind = stringValue(props.fragment.kind)
   return kind ? readableValue(kind) : undefined
 })
+
+const lookDescription = computed(() => stringValue(props.fragment.properties?.look_description))
 </script>
 
 <template>
@@ -62,6 +64,7 @@ const pieceKind = computed(() => {
   >
     <span class="piece-label">{{ pieceLabel }}</span>
     <span v-if="pieceKind" class="piece-meta">{{ pieceKind }}</span>
+    <span v-if="lookDescription" class="piece-description">{{ lookDescription }}</span>
     <span v-if="displayState" class="piece-state" data-testid="piece-state">
       {{ displayState }}
     </span>
@@ -103,7 +106,8 @@ const pieceKind = computed(() => {
 }
 
 .piece-meta,
-.piece-state {
+.piece-state,
+.piece-description {
   border-radius: 4px;
   color: rgb(var(--v-theme-on-surface-variant));
   font-size: 0.75rem;
@@ -113,6 +117,10 @@ const pieceKind = computed(() => {
 
 .piece-meta {
   background: rgba(var(--v-theme-surface-variant), 0.62);
+}
+
+.piece-description {
+  flex-basis: 100%;
 }
 
 .piece-state {

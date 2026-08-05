@@ -221,6 +221,7 @@ def _resolve_fallback_rit(
 def _base_payload(fragment: MediaFragment, *, scope: str, media_type: MediaDataType | None) -> dict[str, Any]:
     source_id = getattr(fragment, "source_id", None)
     return {
+        "uid": str(fragment.uid),
         "fragment_type": "media",
         "media_role": getattr(fragment, "media_role", None),
         "text": getattr(fragment, "text", None),
