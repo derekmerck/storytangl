@@ -7,7 +7,7 @@
 :related: journal, presence, credentials, media, widget, open_link
 ```
 
-**Document Version:** 0.7
+**Document Version:** 0.8
 **Status:** DESIGN — proposed coarse-grid nouns (`Vantage`, `Observation`), a
 description protocol over them, and a strawman prose pipeline. Not a migration plan.
 *v0.2: three-stage prose pipeline (self-description / observation / realization),
@@ -31,7 +31,18 @@ direction corrected -- describe() is the leaf, render_text_as the controller; th
 observation fold needs its own on_observe task (do_render_text is typed str|None);
 both journal records preserved (semantic provenance AND experienced syuzhet), with
 re-rendering as replacement+tombstone rather than silent regeneration; unreliability
-separated from omniscience in non-goals.*
+separated from omniscience in non-goals. v0.8 (third review pass): opacity replaced by
+NONINTERFERENCE (inference from visible evidence is expected; dependence on hidden state
+is the leak); describe() is a local leaf taking only a detail hint while the controller
+owns vantage and child recursion via render_as; Vantage is request-scoped context
+referencing observer/scope/knowledge, not cursor identity or grammatical person;
+referring expressions split into vantage-selects-identity then discourse-selects-form
+(known names no longer suppress pronouns); ladder recast as four independent axes where
+only realization quality soft-fails; composition de-specified to ordered collection with
+arbitration deferred to a second consumer; type boundary downgraded to auditable
+chokepoint with the condition for it to become structural; three-way record split
+(graph = meaning, fragment = experience, observation = optional snapshot); LLM is a
+realization backend, not a constraint; DispatchLayer.DOMAIN (invented) corrected.*
 **Relevant layers:** `tangl.lang` (noun protocol), `tangl.story` (vantage, dispatch),
 `tangl.mechanics.presence` / `.credentials` / `.sandbox` (consumers),
 `tangl.journal` (downstream output).
@@ -86,7 +97,7 @@ story. Each step below adds exactly one constraint to the *same* authored source
 | tone / register | you open the door **brusquely** and find a girl wearing a pair of **worn** blue pants waiting **anxiously** for you |
 | PoV + tense (2nd present → 3rd past) | **he opened** the door brusquely and **found** a girl wearing worn blue pants waiting for **him** |
 
-Each rung is one more constraint over one authored string, which is why they compose
+Each step is one more constraint over one authored string, which is why they compose
 rather than multiply. The last two are not qualitatively harder than the first two —
 they are the same substitution with a different constraint source.
 
@@ -97,18 +108,21 @@ they are the same substitution with a different constraint source.
 Three layers, each with one job:
 
 ```text
-observe(vantage)   -> data    : what is perceptible from here (the redaction boundary)
-describe(vantage,  -> prose   : how that reads, at a requested level of detail
-         detail)
-nominal(vantage)   -> phrase  : how the thing is referred to, given what is known
+observe(subject, vantage) -> data    what is perceptible from here (the disclosure step)
+describe(detail=...)      -> prose   an object's LOCAL default contribution
+nominal(...)              -> phrase  how a thing is referred to in this mention
 ```
 
-**`describe()` is the primary and expected surface.** Prose is assembled from
-`describe()` calls; an implementation may be raw text or a Jinja template. The
-existing 14 `describe()` sites stay valid.
+**Vantage never reaches the leaf.** `describe()` stays the object's local, default
+semantic prose contribution — it may accept a `detail` *hint* (`nominal | short |
+extended`), which is a rendering request, but it does not take a vantage and does not
+consult story state. The existing 14 `describe()` sites stay valid as written.
 
-**`observe()` is opt-in.** A concept implements it only when its perceptibility is
-genuinely vantage-dependent. `describe()` consults it when present.
+**The controller owns perspective and recursion.** `render_text_as` / `render_as`
+applies observation, runs the authority chain, walks children, and bounds recursion via
+`TextRenderSession`. Children are reached **through `render_as`**, not by a leaf calling
+`child.describe()` directly — otherwise per-child authority overrides and the recursion
+bound are silently bypassed.
 
 **Call direction — `describe()` is the leaf, not the controller.** This matches the
 live code (`render_look_text` / `render_outfit_text` are `@on_render_text` handlers that
@@ -120,27 +134,23 @@ render_text_as(target, aspect, ctx)        story/presentation.py — the control
         └─▶ target.describe(...)           the object's LOCAL default prose leaf
 ```
 
-- **`describe()`** is one object's local/default semantic prose contribution. It knows
-  its own content and its components; it does not orchestrate.
-- **`render_text_as`** is the story-aware controller: it applies observation, runs the
-  authority dispatch, and bounds recursion via `TextRenderSession`. Authored overrides
-  and vantage gating attach here, not inside `describe()`.
-
-A `describe()` leaf's default content resolution order:
+The controller's resolution order (not the leaf's):
 
 ```text
-1. self.observe(vantage)              — if implemented, render from the observation
-2. [c.describe(vantage) for c in self.components]   — else compose children
+1. observe(target, vantage)        if the subject participates in disclosure
+2. dispatch on_render_text         authority chain picks the source
+3. target.describe(detail=...)     local default leaf, if no override wins
+4. render_as(child, ...)           recurse per child THROUGH the controller
 ```
 
-So `assembly.describe()` works unchanged today, and gains vantage-gating the moment
-that assembly grows an `observe()`. Adoption is strictly opt-in per concept, and no
-parallel rendering path is introduced: the controller, the authority chain, and the
+So `assembly.describe()` works unchanged today, and gains vantage-gating when the
+controller starts observing it — no signature change to the leaf. Adoption is opt-in per
+concept, and no parallel rendering path appears: controller, authority chain, and
 recursion bound are all the ones that already exist.
 
 ### Detail levels
 
-`describe(vantage, detail)` where detail ∈ `nominal | short | extended`. Recurring
+`describe(detail=...)` where detail ∈ `nominal | short | extended`. Recurring
 mentions need not be exhaustive: first sighting may be `extended`, later references
 `nominal`. Detail is a *rendering* request, not a disclosure control — it may never
 widen what `observe()` permitted.
@@ -152,14 +162,33 @@ widen what `observe()` permitted.
 > **Vantage** — the epistemic position a projection is rendered from: what is
 > perceptible, and what is known, at a point in the story.
 
-**Default: third-person limited, pinned at the current cursor position.** Each
-namespace carries its own vantage, which is what makes multi-reader work fall out
-rather than require a mechanism: two readers on one graph are two cursors, therefore
-two namespaces, therefore two vantages over the same state.
+**Vantage is request-scoped context, not an identity and not a grammatical mode.** It
+*references* three things rather than owning them:
 
-Vantage carries **knowledge state**, not only sightlines. Whether a concept's name is
-known is part of the vantage, which is what lets `actor.nominal(vantage)` return
-*"a guy with a backpack"* or *"Dave"* from the same actor.
+```text
+observer         whose perspective this is (the focalizer)
+spatial scope    what is currently in view / reachable
+knowledge        persistent per-observer knowledge state, held as concept state
+```
+
+**Default binding: limited to what the current observer knows at the cursor's scope.**
+That is where a vantage is normally *derived* from — but it is not identical to a cursor
+and does not own the knowledge store:
+
+- two readers may share one cursor;
+- one reader may change focalizer mid-scene without moving;
+- narrator knowledge is durable concept state keyed by narrator, so it outlives any
+  single request while a vantage does not.
+
+Multi-reader still falls out cheaply — distinct observers yield distinct vantages over
+one graph — it just isn't a one-to-one identity with cursor or namespace.
+
+**"Limited" here is epistemic, not grammatical.** Whether narration says *I / you / they*
+is `PoV` (see below); whether the narration is *restricted to one observer's knowledge*
+is vantage. The two commonly move together and are still separate axes.
+
+Knowledge state is what lets `nominal()` return *"a guy with a backpack"* or *"Dave"* for
+the same actor — the vantage supplies the answer, the knowledge store holds it.
 
 ### Deliberate misuses that validate the shape
 
@@ -186,15 +215,23 @@ Normalizing raw state into typed observations, aggregating components, and repor
 invariant is about information flow, not about which operations are allowed:
 
 ```text
-soundness    every claim in observe(vantage) is true of the underlying state
-             — it may abstract, aggregate, generalize, or re-type, but never invent
+soundness         every claim in observe(...) is true of the underlying state
+                  — it may abstract, aggregate, generalize, or re-type, but never invent
 
-opacity      no fact excluded by the vantage is recoverable from the output
-             — abstraction may lose detail; it may not smuggle it
+noninterference   the projection is computed ONLY from permitted inputs and does not
+                  encode excluded state — vary a hidden fact with permitted inputs
+                  held constant, and the output must not change
 ```
 
-Set-subtraction is one way to satisfy both. Abstraction ("a silhouette"), aggregation
+Set subtraction is one way to satisfy both. Abstraction ("a silhouette"), aggregation
 (component union), and re-typing (raw state → `ValidityObservation`) are others.
+
+**Noninterference, explicitly not non-inference.** A player *is supposed to* infer
+hidden correctness from permitted evidence — in credentials that is the entire game, and
+in correlated data non-inference is unachievable anyway. Inference from legitimately
+visible evidence is expected and desirable. The leak is *dependence*: a projection whose
+content varies with hidden validity or expected disposition, even if no excluded fact is
+stated outright.
 
 This is the decision that keeps the disclosure guarantee meaningful. If observations
 could carry vantage-relative falsehood, "nothing downstream of `observe()` consults
@@ -234,8 +271,8 @@ exist, the controller does not:
 |---|---|---|
 | `proper_noun.name()` | the bare proper name | `PersonalName.name()` ✔ |
 | `noun.nominal(vantage)` | referring phrase, knowledge-gated | `Nominal` + `DeterminativeType`/`DetHandler` exist; no vantage ✘ |
-| `noun.describe(vantage, detail)` | prose rendering | convention exists across mechanics; no vantage/detail ✘ |
-| `noun.observe(vantage)` | perceptible data | credentials-local only ✘ |
+| `noun.describe(detail=...)` | local default prose leaf | convention exists across mechanics; no detail hint ✘ |
+| `observe(subject, vantage)` | perceptible data (controller-invoked) | credentials-local only ✘ |
 | `noun.pronoun(type)` | pronoun for a slot | `pronoun(pt, pov, gens)` ✔ |
 | `noun.conjugate(verb, tense)` | agreement | `conjugate(pov)` ✔ |
 
@@ -284,7 +321,7 @@ produce one prose segment:
 | Stage | Question | Input → output | Owner | Status |
 |---|---|---|---|---|
 | **1 · Self-description** | what is there to say about this thing, at this detail? | concept + detail → content | world / domain author | ✔ exists (14 `describe()` sites, text or Jinja) |
-| **2 · Observation** | what of that is perceptible and known *from here*? | + vantage → `Observation` | engine (this doc) | ◐ credentials + presence only |
+| **2 · Observation** | what of that is perceptible and known *from here*? | + vantage → `Observation` | engine (this doc) | ◐ credentials only (presence has related visibility/description behaviour, no formal `Observation`) |
 | **3 · Realization** | how does this thing enter *this* sentence, under current constraints? | + role + discourse + constraints → phrase / rewritten clause | `tangl.lang` + a rephrase layer | ◐ phrase generators exist; selection policy does not; a full rewrite pipeline exists in `scratch/` |
 
 This is the standard natural-language-generation decomposition (content determination
@@ -335,27 +372,34 @@ meet.
 
 Deliberately naive, obviously improvable, good enough to stop reinvention:
 
-Two *orthogonal* predicates decide this, so a flat ladder gets it wrong — ownership and
-salience are independent of first-vs-subsequent mention. Ordered by precedence:
+This is **two decisions, not one ladder** — which is exactly why vantage and discourse
+context were separated above. Collapsing them is what makes a known name suppress
+pronouns forever (*"Dave … Dave … Dave"*).
+
+**Decision 1 — vantage selects the permitted lexical identity.** What may this observer
+call the subject at all?
 
 ```text
-known_name(vantage, x)        vantage knows the proper name
-owned_by_subject(x)           possessed by the current discourse subject
-first_mention(discourse, x)   not yet mentioned in this segment
-sole_salient(discourse, x)    only active referent matching gender/number in window
-
-1. known_name                       -> PersonalName.name()   "Dave"
-2. owned_by_subject                 -> Nominal.ppdet()       "her coat"
-3. not first_mention AND sole_salient -> pronoun(...)        "it"
-4. first_mention                    -> Nominal.idet()        "a brass key"
-5. otherwise (subsequent)           -> Nominal.ddet()        "the brass key"
+known_name(vantage, x)   ->  identity = PROPER    ("Dave")
+otherwise                ->  identity = ANONYMOUS (a Nominal: "a girl with blue pants")
 ```
 
-Rules 4 and 5 are the exhaustive fallback pair, so the discriminating checks must
-precede them. Rule 3 is the classic ambiguity trap and is deliberately conjunctive:
-never pronominalize a first mention, and only when exactly one active referent matches
-— otherwise fall through to rule 5. Naive, but it fails safe (a redundant
-`"the brass key"` is merely clunky; a wrong `"it"` is unreadable).
+**Decision 2 — discourse context and grammatical role select the realization form**,
+within whatever identity decision 1 permitted:
+
+```text
+not first_mention AND sole_salient  ->  pronoun(...)        "he" / "it"
+owned_by_subject                    ->  Nominal.ppdet()     "her coat"
+first_mention                       ->  PROPER: name()      "Dave"
+                                        ANON:   idet()      "a brass key"
+otherwise (subsequent)              ->  PROPER: name()      "Dave"
+                                        ANON:   ddet()      "the brass key"
+```
+
+So a known person can still pronominalize on an unambiguous subsequent mention, and an
+unknown one still moves indefinite → definite. Pronominalization stays deliberately
+conjunctive — never a first mention, and only when exactly one active referent matches —
+so it fails safe: a redundant *"the brass key"* is clunky, a wrong *"it"* is unreadable.
 
 Detail level modulates *within* a choice — `nominal` picks the shortest form, `extended`
 admits more adjectives and quantifiers — but never overrides vantage.
@@ -401,10 +445,10 @@ worth keeping:
 | **Skin** | domain diction over identical structure | issue #220 narrative skins |
 
 Same parse, same rewrite, different constraint. That means narrative skins, vantage
-gating, and PoV switching are **not three features** — and **issue #241 (LLM journal
-smoothing) is a fifth constraint source**, not a separate layer. It also stays
-structurally safe: every one of these runs *downstream of* `observe()`, so none can
-widen disclosure.
+gating, and PoV switching are **not three features**. Issue #241 (LLM journal smoothing)
+is not a fifth constraint — a model is a realization **backend**; the tone/smoothing
+policy handed to it is the constraint. Every constraint here runs *downstream of*
+`observe()`, so none widens disclosure.
 
 ### Prior art: `scratch/discourse/refrazer/`
 
@@ -448,45 +492,50 @@ name for the selection policy identified as missing above: which of `idet` / `dd
 document is one. Notably, the two categories that *were* built are the two with
 external services to lean on; the razor is the part that was always going to be ours.
 
-### Adoption ladder — a defined floor, optional rungs
+### Four independent axes — not a degradation ladder
 
-**It starts with converting raw strings into fragments, and is built out from there
-with whatever tooling is wanted.** That floor is the only commitment; every rung above
-it is optional, independently adoptable, and degrades to the rung below.
+An earlier draft framed these as rungs where each degrades to the one below. That is
+wrong in a way that matters: **vantage gating does not depend on name lifting, an LLM
+does not depend on deterministic NLP, and a disclosure-sensitive projection must not
+"degrade" to ungated prose.** Calling a safety downgrade graceful degradation is how
+leaks get shipped.
 
-| Rung | What it does | Needs | Status |
-|---|---|---|---|
-| **0 · Fragments** | raw authored string → `ContentFragment` | nothing | ✔ today |
-| **1 · Templates** | explicit substitution — `{{ role.jane.name() }}` | Jinja (present) | ✔ today |
-| **2 · Compile-time lift** | author writes `Jane`; the compiler rewrites it to `{{ role.jane.name() }}` against the declared cast | name matching, no parser | lowest-cost rung |
-| **3 · Vantage re-realization** | referring expressions gated by knowledge | `observe()` + discourse tracking | this doc |
-| **4 · Deterministic NLP** | tone, register, PoV/tense over parsed prose | parser + `refrazer` machinery | experimental |
-| **5 · LLM refinement** | final polish over already-determined content | model access (#241) | proposal |
+They are four independent choices:
 
-**Rung 2 is the lowest-cost rung**, and it is *detangl easy mode*: with a declared
-cast you can lift `Jane` → `{{ role.jane.name() }}` by matching names, no parsing
-required. It buys the first two rows of the escalation table (role rebinding) for
-nearly nothing (sequencing is an implementation decision, not part of this design), keeps authored prose readable, and produces exactly the templates rung
-1 already renders.
+| Axis | Options | Note |
+|---|---|---|
+| **Authored source form** | raw string · explicit template · compile-time lifted | what the author writes |
+| **Disclosure projection** | none · vantage-gated | **safety axis — never soft-fails** |
+| **Realization backend** | template · deterministic NLP · model | quality axis — may soft-fail |
+| **Durable output** | `ContentFragment` (+ optional observation snapshot) | what persists |
 
-Graceful degradation is the property that makes this safe to build incrementally: no
-parser available → you still have rung 2; no model available → you still have rung 4.
-Prose quality degrades; nothing breaks. This is the same "additive and soft-failing"
-posture the widget contract takes toward media.
+**Only realization quality may soft-fail.** No parser or no model available → prose gets
+plainer. That is fine. But a story whose content is disclosure-sensitive may not fall
+back to ungated rendering; if the projection cannot run, the correct behaviour is to
+fail, not to narrate more than the observer knows.
+
+**The floor is still real:** raw string → `ContentFragment` (axis 1 = raw, axis 2 = none,
+axis 3 = template) is the only commitment, and it is what exists today. Everything else
+is opt-in per axis.
+
+**Compile-time lifting is the cheapest single move**, and it is *detangl easy mode*: with
+a declared cast you can lift `Jane` → `{{ role.jane.name() }}` by matching names, no
+parser required. It buys role rebinding for nearly nothing and keeps authored prose
+readable. Note it is independent of vantage gating — either can be adopted first.
 
 ### What LLMs change (and what they sharpen)
 
 Most of the machinery above predates practical LLM rewriting. Stanza is itself a small
 task-specific learned model — the same family, differing in scale and generality — so
 the useful distinction is not neural-vs-rules but **structured reproducible output vs.
-generated text**. Given a model, the ladder shifts:
+generated text**. Given a model, the realization axis shifts:
 
-- **Rung 4 largely collapses.** Parse → un-substitute → re-substitute, sense
+- **The deterministic-NLP option largely collapses.** Parse → un-substitute → re-substitute, sense
   substitution, and conjugation lookup were mechanical means to an end a model now
   reaches directly. External conjugation/dictionary services are hard to justify.
-- **Rungs 0–2 matter *more*.** A model cannot know that `john` is bound to jane this
+- **Source form and disclosure matter *more*.** A model cannot know that `john` is bound to jane this
   playthrough, or that the viewer has not met her. That is story state, not language.
-  Referent binding stays ours; the declared-cast lift (rung 2) is unaffected.
+  Referent binding stays ours; compile-time declared-cast lifting is unaffected.
 - **Stage 2 becomes load-bearing rather than optional.** **An LLM cannot be redacted
   after the fact.** Given full state and asked to describe a scene, it will disclose —
   helpfully, not maliciously. So `observe()` stops being a correctness nicety and
@@ -497,12 +546,19 @@ generated text**. Given a model, the ladder shifts:
 fabula-invariance never required identical discourse — replay-as-reskin explicitly wants
 different words for the same events. The constraint that follows is narrow:
 
-> **Two durable records, different jobs.** Observations and referents are the durable
-> *semantic provenance*; `ContentFragment.content` is the durable *syuzhet* — the prose
-> the reader actually experienced.
+> **Three records, three jobs.** *Authoritative semantics* live in graph state, case
+> receipts, and referenced concepts with their provenance. *Experience* lives in
+> `ContentFragment.content` — the prose the reader actually read. An *`Observation` is a
+> transient projection*, optionally snapshotted when audit or exact replay needs a record
+> of what was disclosed.
 
-Both persist. The journal contract is unchanged: realized prose is stored as the
-historical projection, and **ordinary retrieval returns what was read, never a silent
+An earlier draft called observations "the durable semantic provenance." That
+overreached: an observation is deliberately **narrowed**, so it cannot be the authority
+for meaning. Meaning stays with the graph and its receipts; the observation records only
+what was shown.
+
+The journal contract is unchanged: realized prose is stored as the historical
+projection, and **ordinary retrieval returns what was read, never a silent
 regeneration**. Scrolling back must not quietly reword the past.
 
 Re-rendering is therefore an explicit operation, not a retrieval side effect. Replay,
@@ -512,8 +568,7 @@ what the reader saw, and the fact that it was later re-realized, both survive.
 
 The failure mode to avoid is narrower than "don't store prose": it is letting generated
 prose become the *only* record of an event — a fact that exists in the text and nowhere
-in the graph. Keep observations authoritative for meaning and fragments authoritative
-for experience, and a model is simply the fifth constraint source.
+in the graph. Keep the graph authoritative for meaning and fragments authoritative for experience. A model is then simply one realization backend among several.
 
 ### What that fixes about the dependency question
 
@@ -550,36 +605,51 @@ on_observe / do_observe    a future story-dispatch task returning Observation da
 on_render_text             existing, str | None — prose only, unchanged
 ```
 
-An outfit-aware fold registers on `on_observe` at `DispatchLayer.DOMAIN`, superseding
-the shipped commutative union at the application layer. No new registration *mechanism*
+An outfit-aware fold registers on `on_observe` at a layer above the shipped default —
+`AUTHOR` or `USER` for world-supplied overrides, given the real ladder is
+`GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL` and the shipped fold sits at
+`APPLICATION`. (An earlier draft cited a `DOMAIN` layer, which does not exist.) No new registration *mechanism*
 — but a new *task*, because the type contracts genuinely differ. Keeping the two tasks
 separate is also what makes the observation/prose type boundary real rather than
 nominal.
 
-### Merge contract for the union
+### Composition: start ordered, defer arbitration
 
-"Union" needs a key, since composed observations are heterogeneous:
+An earlier draft specified a full merge scheme — key of
+`(subject_id, observation_type, aspect)`, scope-distance arbitration, stable `source_id`
+sort. That was **over-specified for one consumer**: the base `Observation` shape has not
+been chosen, today's credential observations carry none of those identity fields, and
+they preserve authored order. Writing generic arbitration before a second consumer
+exhibits the same collision is exactly the premature generalization this codebase
+otherwise resists.
+
+Start with the minimum that is actually forced:
 
 ```text
-merge key   : (subject_id, observation_type, aspect)
-duplicates  : same key from multiple children -> keep the nearest-scope contributor
-              (the arbitration order already used for grants), then stable-sort by
-              source_id for determinism
-disjoint    : different keys accumulate; no coercion between Observation subtypes
+boundary     a typed Observable surface: observe(subject, vantage) -> Observation
+collection   deterministic ORDERED collection over children (authored order preserved)
+folding      concrete domains filter or fold via a distinct on_observe task
 ```
 
-Subtypes never merge into one another — a `ValidityObservation` and an
-`AttestationObservation` about the same document coexist as separate entries. Only
-identical keys contend, and contention resolves by scope distance rather than by
-arrival order, so composition stays replay-stable.
+Deterministic ordering is enough for replay stability, and authored order is what the
+existing credential observations already rely on. **Extract generic arbitration only
+when a second consumer demonstrates the same collision** — and let that consumer's real
+collision choose the key, rather than guessing it now.
 
 ---
 
 ## Why this matters: disclosure becomes a type boundary
 
-The load-bearing consequence. If `describe()` consumes only `Observation`s, prose
-**cannot** leak hidden state — a leak has to occur inside `observe()`, which is one
-auditable place per concept.
+The load-bearing consequence — stated at the strength it actually holds. If realization
+consumes only `Observation`s, a leak must occur inside `observe()`: **one auditable
+chokepoint per concept** rather than a property to re-check at every prose site.
+
+**Today that is a chokepoint, not a type-enforced guarantee.** `on_render_text` handlers
+receive the original `caller` and a `PhaseCtx` exposing the graph, so a handler *can*
+re-acquire the raw subject and inspect hidden state after an `Observation` was produced.
+"Cannot leak" becomes structurally true only when realization is handed the
+disclosure-safe `Observation` plus a suitably bounded rendering context, without the raw
+subject in reach. That is the target; until then the honest claim is auditability.
 
 This converts a rule that people must remember into a structure that holds by
 construction:
@@ -663,7 +733,8 @@ count.
   consumer justifies better ones.
 - Not a commitment to a parser. Stanza and spaCy are both candidates; the pipeline only
   requires POS + dependency head + referent resolution from whatever is chosen.
-- Not a required stack. Rung 0 (string -> fragment) is the only commitment; rungs 2-5
-  are independently optional and each degrades to the rung below.
-- Generated prose is never the durable record. Whatever renders -- template, parser, or
-  model -- the stored artifact is the observation/fragment it rendered from.
+- Not a degradation ladder. The four axes are independent; only realization *quality*
+  soft-fails. Disclosure gating never degrades -- if the projection cannot run, fail
+  rather than narrate beyond the observer's knowledge.
+- Generated prose is not the authority for *meaning*, but it IS durably stored as the
+  experienced record. See "Durable records" above for the three-way split.
