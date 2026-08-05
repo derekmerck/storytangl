@@ -13,6 +13,7 @@ const drawer = ref(true)
 const statusRefreshKey = ref(0)
 const infoAffordances = ref<InfoAffordance[]>([])
 const infoState = ref<InfoState | null>(null)
+const clientReady = ref(false)
 const store = useStore()
 const display = useDisplay()
 
@@ -28,6 +29,7 @@ onMounted(async () => {
       console.error('Failed to initialize authentication:', error)
     }
   }
+  clientReady.value = true
 })
 
 const toggleDrawer = () => {
@@ -95,36 +97,40 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
 
 <template>
   <v-app id="webtangl">
-    <AppNavbar @toggle-drawer="toggleDrawer" />
+    <template v-if="clientReady">
+      <AppNavbar @toggle-drawer="toggleDrawer" />
 
-    <v-navigation-drawer
-      v-model="drawer"
-      :permanent="isDesktop"
-      width="260"
-      border="0"
-    >
-      <v-list density="compact">
-        <v-list-item>
-          <v-list-item-title class="text-h6">Status</v-list-item-title>
-        </v-list-item>
-      </v-list>
-      <v-divider class="mb-2" />
-      <StoryStatus
-        :refresh-key="statusRefreshKey"
-        :info-affordances="infoAffordances"
-        :info-state="infoState"
-      />
-    </v-navigation-drawer>
+      <v-navigation-drawer
+        v-model="drawer"
+        :permanent="isDesktop"
+        width="260"
+        border="0"
+      >
+        <v-list density="compact">
+          <v-list-item>
+            <v-list-item-title class="text-h6">Status</v-list-item-title>
+          </v-list-item>
+        </v-list>
+        <v-divider class="mb-2" />
+        <StoryStatus
+          :refresh-key="statusRefreshKey"
+          :info-affordances="infoAffordances"
+          :info-state="infoState"
+        />
+      </v-navigation-drawer>
 
-    <v-main>
-      <v-container class="py-6" fluid>
-        <v-row justify="center">
-          <v-col cols="12" lg="9">
-            <StoryFlow @story-update="handleStoryUpdate" />
-          </v-col>
-        </v-row>
-        <AppFooter />
-      </v-container>
-    </v-main>
+      <v-main>
+        <v-container class="py-6" fluid>
+          <v-row justify="center">
+            <v-col cols="12" lg="9">
+              <StoryFlow @story-update="handleStoryUpdate" />
+            </v-col>
+          </v-row>
+          <AppFooter />
+        </v-container>
+      </v-main>
+    </template>
+
+    <v-progress-linear v-else color="primary" indeterminate />
   </v-app>
 </template>

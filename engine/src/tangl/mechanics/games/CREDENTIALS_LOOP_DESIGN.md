@@ -1184,6 +1184,22 @@ bearer's current graph presentation at use time.
 This is deliberately one-story, one-authored-return proof. It is not a
 candidate dossier, recurrence scheduler, or cross-session identity system.
 
+### Hall Monitor playable vertical (landed 2026-08-05)
+
+The reference service and web client now witness the complete disclosure
+contract. The client receives packet/document text, public inspection findings,
+and labelled actions; it does not receive expected disposition, validity truth,
+or a credentials-specific widget. When a generated card is absent, pending, or
+unavailable, the text and piece fragments remain the decision floor.
+
+The Hall Monitor runbook records the complete observable arc: a rules-correct
+harsh ruling and rules-incorrect compassionate ruling lead to distinct later
+world-authored inhaler facts, and only consequence-producing paths offer the
+prepared same-bearer return. The client gates initial reads on authentication
+and disables prior transcript choices so a player acts only on the current
+frontier. See `worlds/hall_monitor/README.md` for the repeatable local pass and
+remaining service/client friction.
+
 A procedural candidate today is generated for one shift and disappears at
 terminal. A *real* checkpoint story wants candidates to return: the
 procedurally-sampled traveler you wrongly admitted on day 1 walks back through

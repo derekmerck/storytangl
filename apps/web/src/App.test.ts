@@ -6,6 +6,7 @@ import * as directives from 'vuetify/directives'
 import { setActivePinia, createPinia } from 'pinia'
 
 import App from '@/App.vue'
+import { useStore } from '@/store'
 import { HttpResponse, http, server } from '@tests/setup'
 import { crossroadsRuntimeEnvelope, sandboxInfoAffordances, sandboxInfoState } from '@tests/fixtures'
 
@@ -40,6 +41,29 @@ describe('App.vue', () => {
     expect(wrapper.find('.v-navigation-drawer').exists()).toBe(true)
     expect(wrapper.find('.v-main').exists()).toBe(true)
     expect(wrapper.find('.v-footer').exists()).toBe(true)
+  })
+
+  it('waits for authentication before mounting API-backed children', async () => {
+    let resolveAuthentication: (() => void) | undefined
+    const store = useStore()
+    store.user_secret = 'delayed-secret'
+    vi.spyOn(store, 'getApiKey').mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveAuthentication = resolve
+        }),
+    )
+
+    const wrapper = mountApp()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="storyflow-progress"]').exists()).toBe(false)
+    expect(wrapper.find('.v-app-bar').exists()).toBe(false)
+
+    resolveAuthentication?.()
+    await flushPromises()
+
+    expect(wrapper.find('.v-app-bar').exists()).toBe(true)
   })
 
   it('toggles drawer when menu clicked', async () => {
