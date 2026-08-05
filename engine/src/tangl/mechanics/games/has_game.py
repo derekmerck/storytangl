@@ -51,10 +51,15 @@ class HasGame:
     strategy inside this game state, not a second cursor.
 
     .. storytangl-topic::
-       :topics: multi_lane, open_link
+       :topics: open_link
        :facets: code
        :relation: demonstrates
        :related: traversal, provisioning
+
+    .. storytangl-topic::
+       :topics: multi_lane
+       :facets: code
+       :relation: mentions
     """
 
     _game_class: ClassVar[type[Game]] = Game

@@ -11,10 +11,15 @@ vocabulary "Cursors and journal channels" contract leaves the coordination
 design open.
 
 .. storytangl-topic::
-   :topics: ledger, multi_lane
+   :topics: ledger
    :facets: code
    :relation: defines
    :related: journal, frame, widget
+
+.. storytangl-topic::
+   :topics: multi_lane
+   :facets: code
+   :relation: mentions
 """
 
 from __future__ import annotations
