@@ -250,7 +250,8 @@ What shipped:
   reserved seams for Phase A (`region`/`purpose`/`contraband`) and Phase C
   (`whitelist`/`blacklist`/`bribe_offer`).
 - **`CredentialCaseResult`** -- an auditable record per disposition (chosen vs.
-  expected, correct, findings).
+  expected, correct, findings), including the completed case index and canonical
+  packet bearer UUID for world-owned attribution.
 - **`shift_complete` + `evaluate()`** own shift terminality; `advance_case()`
   resets only per-case working state; `pass_threshold` defaults to strict
   all-correct.
@@ -1157,6 +1158,18 @@ gatekeeping kernel**.
 
 ## Beyond the phased roadmap: cross-shift continuity and recurring candidates
 
+### World-authored consequence return (landed 2026-08-04)
+
+`CredentialCaseResult` is a mechanical receipt, not a moral or narrative
+judgment. A world authority may inspect one newly committed receipt during
+UPDATE, record an idempotent world fact attributed to its `case_index` and
+`bearer_id`, and reveal that fact on a genuinely later beat. It must not add the
+fact to the frontier or namespace already assembled for the disposition turn.
+
+Hall Monitor is the worked proof: Mira Quill's medical-note decision records a
+school-specific inhaler outcome, then an attendance-note action reveals it on a
+later turn. Credentials itself still owns only evaluation and scoring.
+
 A procedural candidate today is generated for one shift and disappears at
 terminal. A *real* checkpoint story wants candidates to return: the
 procedurally-sampled traveler you wrongly admitted on day 1 walks back through
@@ -1167,9 +1180,10 @@ today.
 
 The seams already exist; persistence is the missing piece:
 
-- **Identity persistence.** A `CredentialCaseResult` already captures one
-  decided candidate. Continuity needs a stable *candidate id* (and the option
-  to persist a materialized `CredentialCase` snapshot keyed to that id).
+- **Identity persistence.** A `CredentialCaseResult` already carries the
+  graph-bound packet bearer UUID for its decided case. Cross-shift continuity
+  still needs a stable *candidate id* that outlives that materialized packet
+  (and the option to persist a `CredentialCase` snapshot keyed to that id).
 - **Recurrence as an authored offer.** A recurring candidate is a normal
   `ScenarioOffer` whose payload carries prior `CredentialCaseResult`s alongside
   the current packet and any narrative overrides.

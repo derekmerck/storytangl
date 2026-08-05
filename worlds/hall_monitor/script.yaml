@@ -39,7 +39,18 @@ scenes:
       victory:
         content: |
           The morning bell settles the halls. Every student was handled correctly.
+        actions:
+          - text: "Read the attendance note"
+            successor: attendance_note
 
       defeat:
         content: |
           The passing period ends with an unresolved mistake on the attendance sheet.
+        actions:
+          - text: "Read the attendance note"
+            successor: attendance_note
+
+      attendance_note:
+        kind: "hall_monitor.domain.HallMonitorConsequenceBlock"
+        content: |
+          The attendance office has filed one note from the morning shift.

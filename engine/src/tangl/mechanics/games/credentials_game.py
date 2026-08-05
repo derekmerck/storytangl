@@ -250,6 +250,8 @@ class CredentialCase(Unstructurable):
 class CredentialCaseResult(BaseModelPlus):
     """Auditable record of one dispositioned candidate."""
 
+    case_index: int
+    bearer_id: uuid.UUID
     candidate_name: str
     chosen_disposition: CredentialDisposition
     expected_disposition: CredentialDisposition
@@ -1722,6 +1724,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         game.case_results.append(
             CredentialCaseResult(
+                case_index=game.case_index,
+                bearer_id=case.packet_manager.bearer_id,
                 candidate_name=case.candidate_name,
                 chosen_disposition=chosen,
                 expected_disposition=expected,
