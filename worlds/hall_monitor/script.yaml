@@ -55,9 +55,6 @@ scenes:
         kind: "hall_monitor.domain.HallMonitorConsequenceBlock"
         content: |
           The attendance office has filed one note from the morning shift.
-        actions:
-          - text: "Meet the returning student"
-            successor: returning_student
 
       returning_student:
         kind: "hall_monitor.domain.HallMonitorReturnBlock"

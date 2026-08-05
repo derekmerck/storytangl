@@ -18,6 +18,9 @@ from tangl.mechanics.games.credentials_roster import materialize
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode, StoryGraph
 from tangl.vm import Ledger
+from tangl.vm.dispatch import do_provision
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _repo_worlds_dir() -> Path:
@@ -259,6 +262,7 @@ class TestHallMonitorWorld:
         )
         _choose(ledger, "Read the attendance note")
         assert ledger.cursor.label == "attendance_note"
+        assert any(action.text == "Meet the returning student" for action in _actions(ledger))
 
         returning = graph.find_one(Selector(label="returning_student"))
         assert returning is not None
@@ -276,13 +280,14 @@ class TestHallMonitorWorld:
             component.uid for component in returning_packet.document_components()
         }.isdisjoint(component.uid for component in first_packet.document_components())
 
-        restored = Graph.structure(graph.unstructure())
+        restored = StoryGraph.structure(graph.unstructure())
         restored_source = restored.find_one(Selector(label="morning_shift"))
         restored_attendance = restored.find_one(Selector(label="attendance_note"))
         restored_returning = restored.find_one(Selector(label="returning_student"))
         assert restored_source is not None
         assert restored_attendance is not None
         assert restored_returning is not None
+        assert restored_source.consequences
         restored_case = restored_returning.game.active_case
         assert restored_case.packet_manager.bearer_id == bearer_id
         assert restored_case.prior_case_results[0].model_dump(mode="python") == first_result
@@ -298,6 +303,19 @@ class TestHallMonitorWorld:
         bearer.look.hair_color = HairColor.BLUE
 
         restored_ledger = Ledger.from_graph(restored, entry_id=restored_attendance.uid)
+        planning_ctx = PhaseCtx(
+            graph=restored,
+            cursor_id=restored_attendance.uid,
+            current_phase=ResolutionPhase.PLANNING,
+        )
+        do_provision(restored_attendance, ctx=planning_ctx)
+        do_provision(restored_attendance, ctx=planning_ctx)
+        returning_actions = [
+            action
+            for action in _actions(restored_ledger)
+            if action.text == "Meet the returning student"
+        ]
+        assert len(returning_actions) == 1
         assert sum(isinstance(item, HasSimpleLook) for item in restored.members.values()) == (
             restored_subject_count
         )
@@ -310,3 +328,19 @@ class TestHallMonitorWorld:
         assert restored_returning.game.case_results[0].correct is True
         assert len(restored_returning.game.case_results) == 1
         assert restored_source.game.case_results[0].model_dump(mode="python") == first_result
+
+    def test_arrest_does_not_offer_or_prepare_a_returning_student(self) -> None:
+        graph, ledger = _started_shift()
+
+        _inspect(ledger, "doctor's note")
+        _choose(ledger, "Send to the office")
+        _finish_shift_correctly(ledger)
+        assert ledger.cursor.label == "defeat"
+
+        _choose(ledger, "Read the attendance note")
+        assert ledger.cursor.label == "attendance_note"
+        assert all(action.text != "Meet the returning student" for action in _actions(ledger))
+
+        returning = graph.find_one(Selector(label="returning_student"))
+        assert returning is not None
+        assert returning.game_state is None

@@ -29,7 +29,7 @@ from tangl.mechanics.games.credentials_roster import (
     ShiftSpec,
     generate_roster,
 )
-from tangl.story import Block, on_journal
+from tangl.story import Action, Block, on_journal
 from tangl.story.presentation import render_text_as
 from tangl.vm import on_provision, on_update
 from tangl.vm.ctx import VmPhaseCtx
@@ -311,31 +311,41 @@ def prepare_hall_monitor_return(
         HallMonitorReturnBlock,
     ):
         raise LookupError("Hall Monitor return topology is incomplete")
-    if return_block.game_state is not None or not source.consequences:
+    if not source.consequences:
         return None
 
     consequence = source.consequences[-1]
-    prior_result = source.game.case_results[consequence.source_case_index]
-    if prior_result.bearer_id != consequence.bearer_id:
-        raise ValueError("Hall Monitor consequence does not match its source receipt")
-
-    return_block.game_state = HallMonitorCredentialsGame(
-        roster=[],
-        offers=[
-            ScenarioOffer(
-                target_disposition=CredentialDisposition.PASS,
-                region="lower",
-                purpose="medicine",
-                candidate_name="Returning student",
-                bearer_id=consequence.bearer_id,
-                prior_case_results=[prior_result],
-                presented_documents_override={
-                    "student ID": "A current student identification card.",
-                    "doctor's note": "A fresh nurse-signed note for an inhaler.",
-                },
-            )
-        ]
-    )
+    if return_block.game_state is None:
+        prior_result = source.game.case_results[consequence.source_case_index]
+        if prior_result.bearer_id != consequence.bearer_id:
+            raise ValueError("Hall Monitor consequence does not match its source receipt")
+        return_block.game_state = HallMonitorCredentialsGame(
+            roster=[],
+            offers=[
+                ScenarioOffer(
+                    target_disposition=CredentialDisposition.PASS,
+                    region="lower",
+                    purpose="medicine",
+                    candidate_name="Returning student",
+                    bearer_id=consequence.bearer_id,
+                    prior_case_results=[prior_result],
+                    presented_documents_override={
+                        "student ID": "A current student identification card.",
+                        "doctor's note": "A fresh nurse-signed note for an inhaler.",
+                    },
+                )
+            ]
+        )
+    if not any(
+        caller.edges_out(Selector(has_kind=Action, successor_id=return_block.uid)),
+    ):
+        Action(
+            registry=caller.graph,
+            predecessor_id=caller.uid,
+            successor_id=return_block.uid,
+            text="Meet the returning student",
+            tags={"dynamic", "hall_monitor_return"},
+        )
     return None
 
 
