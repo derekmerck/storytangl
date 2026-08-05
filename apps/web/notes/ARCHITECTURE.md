@@ -64,6 +64,7 @@
 │  │  useStore()                                                │ │
 │  │  - current_world_uid                                       │ │
 │  │  - current_world_info                                      │ │
+│  │  - current_user                                             │ │
 │  │  - user_secret                                             │ │
 │  │  - user_api_key                                            │ │
 │  └────────────────────────────────────────────────────────────┘ │
@@ -80,6 +81,11 @@
 │  │  - $debug / $verbose - Dev flags                           │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
+
+`App.vue` gates authenticated story children until the browser player session
+has been created or restored. `playerSession.ts` owns the local recovery
+codename; the complete transport contract is in
+[Player Session Bootstrap](PLAYER_SESSION_BOOTSTRAP.md).
 
 ═══════════════════════════════════════════════════════════════════
                          TYPE SYSTEM FLOW

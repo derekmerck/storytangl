@@ -59,6 +59,7 @@ release bump.
 
 **Documentation references:**
 - `apps/web/notes/ARCHITECTURE.md` - System design
+- `apps/web/notes/PLAYER_SESSION_BOOTSTRAP.md` - Browser player-session contract
 - `apps/web/AGENTS.md` - Coding conventions
 - `apps/web/notes/TESTING_PATTERNS.md` - Test recipes
 - `apps/web/notes/SETUP_GUIDE.md` - Installation details
