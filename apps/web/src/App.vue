@@ -14,22 +14,30 @@ const statusRefreshKey = ref(0)
 const infoAffordances = ref<InfoAffordance[]>([])
 const infoState = ref<InfoState | null>(null)
 const clientReady = ref(false)
+const authenticationError = ref(false)
 const store = useStore()
 const display = useDisplay()
 
 const isDesktop = computed(() => display.mdAndUp.value)
 
-onMounted(async () => {
-  drawer.value = isDesktop.value
-
+const initializeClient = async () => {
+  clientReady.value = false
+  authenticationError.value = false
   if (store.user_secret) {
     try {
       await store.getApiKey()
     } catch (error) {
       console.error('Failed to initialize authentication:', error)
+      authenticationError.value = true
+      return
     }
   }
   clientReady.value = true
+}
+
+onMounted(() => {
+  drawer.value = isDesktop.value
+  void initializeClient()
 })
 
 const toggleDrawer = () => {
@@ -97,7 +105,24 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
 
 <template>
   <v-app id="webtangl">
-    <template v-if="clientReady">
+    <v-main v-if="authenticationError">
+      <v-container class="py-6" fluid>
+        <v-alert data-testid="authentication-error" type="error" variant="tonal">
+          Unable to authenticate with the story service.
+          <template #append>
+            <v-btn
+              data-testid="authentication-retry"
+              variant="text"
+              @click="initializeClient"
+            >
+              Retry
+            </v-btn>
+          </template>
+        </v-alert>
+      </v-container>
+    </v-main>
+
+    <template v-else-if="clientReady">
       <AppNavbar @toggle-drawer="toggleDrawer" />
 
       <v-navigation-drawer

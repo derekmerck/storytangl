@@ -66,6 +66,27 @@ describe('App.vue', () => {
     expect(wrapper.find('.v-app-bar').exists()).toBe(true)
   })
 
+  it('keeps API-backed children unmounted after failed authentication until retry', async () => {
+    const store = useStore()
+    store.user_secret = 'invalid-secret'
+    vi.spyOn(store, 'getApiKey')
+      .mockRejectedValueOnce(new Error('Unauthorized'))
+      .mockResolvedValueOnce()
+
+    const wrapper = mountApp()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="authentication-error"]').exists()).toBe(true)
+    expect(wrapper.find('.v-app-bar').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="authentication-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="authentication-error"]').exists()).toBe(false)
+    expect(wrapper.find('.v-app-bar').exists()).toBe(true)
+    expect(store.getApiKey).toHaveBeenCalledTimes(2)
+  })
+
   it('toggles drawer when menu clicked', async () => {
     const wrapper = mountApp()
     await flushPromises()
