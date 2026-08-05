@@ -7,7 +7,7 @@
 :related: journal, presence, credentials, media, widget, open_link
 ```
 
-**Document Version:** 0.5
+**Document Version:** 0.6
 **Status:** DESIGN — proposed coarse-grid nouns (`Vantage`, `Observation`), a
 description protocol over them, and a strawman prose pipeline. Not a migration plan.
 *v0.2: three-stage prose pipeline (self-description / observation / realization),
@@ -20,7 +20,12 @@ write prose, not template soup) with the worked constraint-escalation example; a
 ladder with a rung-0 floor (raw string -> fragment) and graceful degradation; rung 2
 (declared-cast compile-time lift) named as the cheapest next step. v0.5: LLM impact —
 rung 4 collapses, rungs 0-2 and stage 2 sharpen (a model cannot be redacted after the
-fact); durable record is the observation, generated prose is a projection.*
+fact); durable record is the observation, generated prose is a projection. v0.6 (PR #350
+review): Observation defined as redacted truth (never belief; distortion is a separate
+authored layer); lang/story dependency inverted via a VantageLike protocol; describe()
+and the non-commutative fold anchored to the existing render_text_as / on_render_text /
+BehaviorRegistry dispatch; observation merge key defined; referring-expression rules
+made mutually exclusive; PoV example corrected.*
 **Relevant layers:** `tangl.lang` (noun protocol), `tangl.story` (vantage, dispatch),
 `tangl.mechanics.presence` / `.credentials` / `.sandbox` (consumers),
 `tangl.journal` (downstream output).
@@ -107,7 +112,15 @@ Default `describe()` resolution order:
 ```
 
 So `assembly.describe()` works unchanged today, and gains vantage-gating the moment
-that assembly grows an `observe()`. Migration cost is near zero and strictly opt-in.
+that assembly grows an `observe()`. Adoption is strictly opt-in per concept.
+
+**`describe()` is not a new controller — it routes through the existing prose
+dispatch.** Text realization goes through `story/presentation.py::render_text_as`
+(which already dispatches `on_render_text` / `do_render_text` over the ordinary
+authority chain) and composes under `prose/rendering.py::TextRenderSession` for bounded
+recursion. Concretely: `observe()` supplies *what* may be said, and the existing
+`on_render_text` chain decides *how it reads*. No parallel rendering path is
+introduced, and no new registration mechanism is required.
 
 ### Detail levels
 
@@ -142,11 +155,39 @@ A good coarse noun should support uses it was not designed for. Three that fall 
 - **Narrative mode switch.** Moving from second-person to third-omniscient reveals
   everyone's tattoos under their clothes: same graph, same `describe()` calls, a
   vantage with no occlusion.
-- **Unreliable narration.** A vantage that reports confidently but wrongly is a
-  vantage with a lossy or lying filter, not a special narrator subsystem.
+- **Unreliable narration.** A narrator who reports confidently but wrongly. See the
+  truth-vs-belief decision below: this is *not* simply a lossy vantage.
 
-That these are configurations rather than features is the argument that `Vantage` is a
-real noun and not a parameter.
+That the first two are configurations rather than features is the argument that
+`Vantage` is a real noun and not a parameter.
+
+### Observation is redacted truth, not belief
+
+An `Observation` is **true content, narrowed** — never false content. `observe(vantage)`
+is a *filter*, and the only operation it may perform is removal:
+
+```text
+observe(vantage) ⊆ the true state.   It may omit. It may not invent or alter.
+```
+
+This is the decision that keeps the disclosure guarantee meaningful. If observations
+could carry vantage-relative falsehood, "nothing downstream of `observe()` consults
+hidden state" would no longer imply "downstream output is trustworthy," and replay,
+audit, and the type boundary all become murky. It also honours the standing principle
+that the engine guarantees determinism but never invents semantics — a lie is *authored
+content*, not an engine-inferred filter.
+
+Consequences:
+
+- **Redaction and distortion are different layers.** Two observers seeing the same fact
+  at different detail is redaction (this mechanism). A narrator asserting something
+  false is authored, explicitly marked, and sits *downstream* of `observe()` as a
+  distortion pass — never inside it.
+- **Belief, when modelled, is state — not a vantage mode.** "What Jane thinks is in the
+  box" is a fact about Jane's beliefs, observable in the ordinary way. It is not
+  `observe()` returning something untrue.
+- **Durable records stay objective.** A stored observation is a true-but-narrowed view,
+  so replay and audit can rely on it.
 
 ### Vantage vs. PoV — adjacent, not the same
 
@@ -175,6 +216,27 @@ exist, the controller does not:
 `Observation` is the missing member of a family that was already designed. That is
 evidence for promotion rather than invention: the shape was predicted, the subcalls
 were built, and the connective noun was the piece left out.
+
+### Dependency direction: `lang` must not import `story`
+
+`Vantage` is Story state, but the noun protocol lives in `tangl.lang` — so a naive
+`nominal(vantage)` signature would invert the layering. `tangl.lang` currently imports
+nothing from `tangl.story`, and that stays true.
+
+Resolution is ordinary dependency inversion: **`lang` declares a minimal structural
+protocol; `story` owns the concrete type and satisfies it.**
+
+```text
+tangl.lang    VantageLike(Protocol)   — only what realization needs:
+                                        knows_name(subject) -> bool
+                                        pov  -> PoV
+                                        gens(subject) -> Gens
+tangl.story   Vantage                 — full epistemic state; satisfies VantageLike
+```
+
+`lang` therefore never learns about cursors, namespaces, or perception; it learns only
+the three questions a referring expression actually asks. This also answers open
+question 4 below: `nominal()` stays in `lang`, `Vantage` stays in `story`.
 
 ---
 
@@ -247,18 +309,27 @@ meet.
 
 Deliberately naive, obviously improvable, good enough to stop reinvention:
 
+Two *orthogonal* predicates decide this, so a flat ladder gets it wrong — ownership and
+salience are independent of first-vs-subsequent mention. Ordered by precedence:
+
 ```text
-1. vantage knows the proper name        -> PersonalName.name()        "Dave"
-2. else first mention in this segment   -> Nominal.idet()             "a brass key"
-3. else subsequent mention              -> Nominal.ddet()             "the brass key"
-4. else owned by the discourse subject  -> Nominal.ppdet()            "her coat"
-5. else sole salient referent matching
-   gender/number in the recent window   -> pronoun(...)               "it"
+known_name(vantage, x)        vantage knows the proper name
+owned_by_subject(x)           possessed by the current discourse subject
+first_mention(discourse, x)   not yet mentioned in this segment
+sole_salient(discourse, x)    only active referent matching gender/number in window
+
+1. known_name                       -> PersonalName.name()   "Dave"
+2. owned_by_subject                 -> Nominal.ppdet()       "her coat"
+3. not first_mention AND sole_salient -> pronoun(...)        "it"
+4. first_mention                    -> Nominal.idet()        "a brass key"
+5. otherwise (subsequent)           -> Nominal.ddet()        "the brass key"
 ```
 
-Rule 5 is the classic referring-expression ambiguity trap: pronominalize only when
-exactly one active referent matches, otherwise fall back to rule 3. Naive, but it fails
-safe (a redundant `"the brass key"` is merely clunky; a wrong `"it"` is unreadable).
+Rules 4 and 5 are the exhaustive fallback pair, so the discriminating checks must
+precede them. Rule 3 is the classic ambiguity trap and is deliberately conjunctive:
+never pronominalize a first mention, and only when exactly one active referent matches
+— otherwise fall through to rule 5. Naive, but it fails safe (a redundant
+`"the brass key"` is merely clunky; a wrong `"it"` is unreadable).
 
 Detail level modulates *within* a choice — `nominal` picks the shortest form, `extended`
 admits more adjectives and quantifiers — but never overrides vantage.
@@ -272,7 +343,9 @@ Most story prose is **authored, then rewritten to fit the current pass** — not
 from semantics. The authored line says *"Jane came in."* This pass needs:
 
 - *"a girl with blue pants came in"* — vantage: Jane is not yet known;
-- *"a girl with blue pants comes in"* — and the narration is second-person present.
+- *"a girl with blue pants comes in"* — and this pass narrates in the present tense.
+  (The clause subject stays third-person; only the *narration frame* is second-person,
+  which is why tense and person move independently.)
 
 So the operation is a round trip, not a render:
 
@@ -359,15 +432,15 @@ it is optional, independently adoptable, and degrades to the rung below.
 |---|---|---|---|
 | **0 · Fragments** | raw authored string → `ContentFragment` | nothing | ✔ today |
 | **1 · Templates** | explicit substitution — `{{ role.jane.name() }}` | Jinja (present) | ✔ today |
-| **2 · Compile-time lift** | author writes `Jane`; the compiler rewrites it to `{{ role.jane.name() }}` against the declared cast | name matching, no parser | ← cheapest next step |
+| **2 · Compile-time lift** | author writes `Jane`; the compiler rewrites it to `{{ role.jane.name() }}` against the declared cast | name matching, no parser | lowest-cost rung |
 | **3 · Vantage re-realization** | referring expressions gated by knowledge | `observe()` + discourse tracking | this doc |
 | **4 · Deterministic NLP** | tone, register, PoV/tense over parsed prose | parser + `refrazer` machinery | experimental |
 | **5 · LLM refinement** | final polish over already-determined content | model access (#241) | proposal |
 
-**Rung 2 is the high-value cheap one**, and it is *detangl easy mode*: with a declared
+**Rung 2 is the lowest-cost rung**, and it is *detangl easy mode*: with a declared
 cast you can lift `Jane` → `{{ role.jane.name() }}` by matching names, no parsing
 required. It buys the first two rows of the escalation table (role rebinding) for
-nearly nothing, keeps authored prose readable, and produces exactly the templates rung
+nearly nothing (sequencing is an implementation decision, not part of this design), keeps authored prose readable, and produces exactly the templates rung
 1 already renders.
 
 Graceful degradation is the property that makes this safe to build incrementally: no
@@ -424,12 +497,33 @@ An observation composes from its parts:
 assembly.observe(v)  ->  default: union of [c.observe(v) for c in components]
 ```
 
-**Union is the commutative default; specialized managers own non-commutative folds.**
+**Union is the commutative default; a domain handler owns any non-commutative fold.**
 Coverage masking is exactly where union is wrong — a tattoo under a coat must not
-appear — so `OutfitManager.observe()` overrides with its coverage fold. This is the
-posture already settled in `../mechanics/assembly/COMPONENT_DESIGN.md`: the general
-layer does the commutative fold and a registered manager owns anything else. No new
-conflict machinery is introduced.
+appear — so outfit-aware composition overrides it. This is the posture already settled
+in `../mechanics/assembly/COMPONENT_DESIGN.md`.
+
+**The override is an ordinary dispatch handler, not a new registration path.** There is
+no separate "manager registry": an outfit-aware fold registers on the existing
+`on_render_text` / `BehaviorRegistry` chain at `DispatchLayer.DOMAIN`, and the shipped
+commutative union is the application-level default it supersedes. Same mechanism every
+other handler uses; nothing new to wire.
+
+### Merge contract for the union
+
+"Union" needs a key, since composed observations are heterogeneous:
+
+```text
+merge key   : (subject_id, observation_type, aspect)
+duplicates  : same key from multiple children -> keep the nearest-scope contributor
+              (the arbitration order already used for grants), then stable-sort by
+              source_id for determinism
+disjoint    : different keys accumulate; no coercion between Observation subtypes
+```
+
+Subtypes never merge into one another — a `ValidityObservation` and an
+`AttestationObservation` about the same document coexist as separate entries. Only
+identical keys contend, and contention resolves by scope distance rather than by
+arrival order, so composition stays replay-stable.
 
 ---
 
@@ -496,8 +590,9 @@ count.
 3. **Where does vantage come from at a call site** — an explicit argument, or read
    from `ctx`/namespace? Sandbox darkness is ns-predicate driven today; multi-lane
    forces an explicit answer.
-4. **Does `nominal()` belong to lang or story?** It needs vantage (a story concept)
-   and determiners (a lang concept).
+4. *(resolved — see "Dependency direction" above: `nominal()` stays in `lang` against a
+   `VantageLike` protocol; `Vantage` stays in `story`.)* Remaining: what the minimal
+   protocol surface actually is — `knows_name` / `pov` / `gens` is a first guess.
 5. **Retrofit shape for `SandboxVisibilityRule`** — does it become a vantage filter, or
    stay a facet-style `hider` whose *result* is an observation?
 
