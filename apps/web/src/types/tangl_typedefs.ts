@@ -89,7 +89,7 @@ export interface UserInfo {
   user_id: string
   user_secret: string
   created_dt: string
-  last_played_dt: string
+  last_played_dt?: string | null
   worlds_played: string[]
   stories_finished: number
   turns_played: number
@@ -97,8 +97,9 @@ export interface UserInfo {
 }
 
 export interface UserSecretResponse {
-  user_id: string
+  api_key: string
   user_secret: string
+  user_id?: string
 }
 
 /**

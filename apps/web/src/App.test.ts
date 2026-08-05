@@ -18,6 +18,7 @@ describe('App.vue', () => {
     setActivePinia(createPinia())
     vi.unstubAllEnvs()
     vi.stubEnv('VITE_DEFAULT_API_URL', DEFAULT_API_URL)
+    vi.stubEnv('VITE_DEFAULT_USER_SECRET', 'dev-secret-123')
     vi.resetModules()
     vi.spyOn(window, 'open').mockImplementation(() => null)
   })
@@ -47,7 +48,7 @@ describe('App.vue', () => {
     let resolveAuthentication: (() => void) | undefined
     const store = useStore()
     store.user_secret = 'delayed-secret'
-    vi.spyOn(store, 'getApiKey').mockImplementation(
+    vi.spyOn(store, 'authenticateWithSecret').mockImplementation(
       () =>
         new Promise<void>((resolve) => {
           resolveAuthentication = resolve
@@ -66,25 +67,51 @@ describe('App.vue', () => {
     expect(wrapper.find('.v-app-bar').exists()).toBe(true)
   })
 
-  it('keeps API-backed children unmounted after failed authentication until retry', async () => {
+  it('keeps API-backed children at the gate when an existing secret is invalid', async () => {
     const store = useStore()
     store.user_secret = 'invalid-secret'
-    vi.spyOn(store, 'getApiKey')
-      .mockRejectedValueOnce(new Error('Unauthorized'))
-      .mockResolvedValueOnce()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    server.use(
+      http.get(`${DEFAULT_API_URL}/user/info`, () =>
+        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 }),
+      ),
+    )
 
     const wrapper = mountApp()
     await flushPromises()
 
     expect(wrapper.find('[data-testid="authentication-error"]').exists()).toBe(true)
     expect(wrapper.find('.v-app-bar').exists()).toBe(false)
+  })
 
-    await wrapper.find('[data-testid="authentication-retry"]').trigger('click')
+  it('mounts API-backed children after authenticating an existing secret', async () => {
+    const store = useStore()
+    store.user_secret = ''
+
+    const wrapper = mountApp()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="authentication-error"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="authentication-secret"] input').setValue('valid-secret')
+    await wrapper.find('[data-testid="authentication-existing"]').trigger('click')
+    await flushPromises()
+
     expect(wrapper.find('.v-app-bar').exists()).toBe(true)
-    expect(store.getApiKey).toHaveBeenCalledTimes(2)
+    expect(store.current_user?.user_id).toBe('test-user-id')
+  })
+
+  it('creates a user before mounting API-backed children', async () => {
+    const store = useStore()
+    store.user_secret = ''
+
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="authentication-secret"] input').setValue('new-secret')
+    await wrapper.find('[data-testid="authentication-create"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.v-app-bar').exists()).toBe(true)
+    expect(store.user_secret).toBe('new-secret')
   })
 
   it('toggles drawer when menu clicked', async () => {

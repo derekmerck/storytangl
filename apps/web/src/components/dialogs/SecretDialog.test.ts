@@ -112,7 +112,9 @@ describe('SecretDialog', () => {
     expect(dialog.emitted('update:modelValue')?.[0]).toEqual([false])
   })
 
-  it('calls store.setApiKey when save clicked', async () => {
+  it('rotates the authenticated user secret when save clicked', async () => {
+    const store = useStore()
+    await store.authenticateWithSecret(store.user_secret)
     const wrapper = mountDialog(true)
     await flushPromises()
     await nextTick()
@@ -127,7 +129,6 @@ describe('SecretDialog', () => {
     await saveButton?.trigger('click')
     await flushPromises()
 
-    const store = useStore()
     expect(store.user_secret).toBe('new-secret')
     expect(dialog.emitted('update:modelValue')).toBeTruthy()
   })

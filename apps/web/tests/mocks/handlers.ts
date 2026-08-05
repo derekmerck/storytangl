@@ -8,6 +8,7 @@ import {
 import {
   mockSystemInfo,
   mockUpdatedSecretResponse,
+  mockUserInfo,
   mockUserSecretResponse,
   mockWorldInfo,
   mockWorldList,
@@ -19,7 +20,6 @@ const apiBase = (import.meta.env?.VITE_DEFAULT_API_URL ?? 'http://localhost:8000
 )
 
 type UserWorldRequest = { uid?: string }
-type UserSecretRequest = { secret?: string }
 type StoryDoRequest = {
   edge_id?: unknown
   find_edge?: { kind?: unknown; command?: unknown }
@@ -73,11 +73,26 @@ export const handlers = [
     return HttpResponse.json(mockUserSecretResponse)
   }),
 
-  http.put(`${apiBase}/user/secret`, async ({ request }) => {
-    const body = (await request.json()) as UserSecretRequest | null
+  http.get(`${apiBase}/user/info`, () => {
+    return HttpResponse.json(mockUserInfo)
+  }),
+
+  http.post(`${apiBase}/user/create`, ({ request }) => {
+    const secret = new URL(request.url).searchParams.get('secret')
+    return HttpResponse.json({
+      ...mockUserSecretResponse,
+      user_secret: secret ?? mockUserSecretResponse.user_secret,
+    })
+  }),
+
+  http.put(`${apiBase}/user/secret`, ({ request }) => {
+    const secret = new URL(request.url).searchParams.get('secret')
+    if (!secret || request.headers.get('X-Api-Key') !== mockUserSecretResponse.api_key) {
+      return HttpResponse.json({ detail: 'Invalid secret rotation request' }, { status: 400 })
+    }
     return HttpResponse.json({
       ...mockUpdatedSecretResponse,
-      secret: body?.secret ?? mockUpdatedSecretResponse.secret,
+      user_secret: secret,
     })
   }),
 ]

@@ -100,8 +100,11 @@ const worldStyle = (world: WorldList[number]): CSSProperties => {
           </v-btn>
         </template>
         <v-list density="compact">
+          <v-list-item v-if="store.current_user">
+            <v-list-item-title>{{ store.current_user.user_id }}</v-list-item-title>
+          </v-list-item>
           <v-list-item @click="showSecretDialog = true">
-            <v-list-item-title>Set Secret</v-list-item-title>
+            <v-list-item-title>Change Secret</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>

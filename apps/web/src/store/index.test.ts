@@ -52,18 +52,20 @@ describe('Store', () => {
     expect(store.current_world_info?.world_id).toBe('new_world')
   })
 
-  it('gets API key from user secret', async () => {
+  it('authenticates a persisted user from a user secret', async () => {
     const store = useStore()
-    await store.getApiKey()
+    await store.authenticateWithSecret(store.user_secret)
 
     const { $http } = useGlobal()
+    expect(store.current_user?.user_id).toBe('test-user-id')
     expect(store.user_api_key).toBeDefined()
     expect($http.value.defaults.headers.common['X-Api-Key']).toBe(store.user_api_key)
   })
 
-  it('sets new API key when secret changes', async () => {
+  it('rotates the authenticated user secret through the query-parameter route', async () => {
     const store = useStore()
-    await store.setApiKey('new-secret-123')
+    await store.authenticateWithSecret(store.user_secret)
+    await store.rotateSecret('new-secret-123')
 
     const { $http } = useGlobal()
     expect(store.user_secret).toBe('new-secret-123')

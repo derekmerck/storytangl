@@ -36,7 +36,7 @@ const save = async () => {
 
   loading.value = true
   try {
-    await store.setApiKey(secret.value)
+    await store.rotateSecret(secret.value)
     close()
   } catch (error) {
     console.error('Failed to set API key:', error)
@@ -49,12 +49,12 @@ const save = async () => {
 <template>
   <v-dialog :model-value="modelValue" max-width="480" persistent>
     <v-card>
-      <v-card-title>Set User Secret</v-card-title>
+      <v-card-title>Change User Secret</v-card-title>
       <v-card-text>
         <v-text-field
           v-model="secret"
           label="User Secret"
-          hint="Enter your user secret to authenticate"
+          hint="Choose a new secret for the current user"
           persistent-hint
           :disabled="loading"
           autofocus

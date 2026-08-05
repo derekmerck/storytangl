@@ -13,26 +13,47 @@ const drawer = ref(true)
 const statusRefreshKey = ref(0)
 const infoAffordances = ref<InfoAffordance[]>([])
 const infoState = ref<InfoState | null>(null)
-const clientReady = ref(false)
-const authenticationError = ref(false)
+const clientState = ref<'initializing' | 'needs-auth' | 'ready'>('initializing')
+const authenticationError = ref<string | null>(null)
+const authenticationSecret = ref('')
 const store = useStore()
 const display = useDisplay()
 
 const isDesktop = computed(() => display.mdAndUp.value)
 
-const initializeClient = async () => {
-  clientReady.value = false
-  authenticationError.value = false
-  if (store.user_secret) {
-    try {
-      await store.getApiKey()
-    } catch (error) {
-      console.error('Failed to initialize authentication:', error)
-      authenticationError.value = true
-      return
-    }
+const authenticate = async (action: (secret: string) => Promise<void>) => {
+  if (!authenticationSecret.value) {
+    authenticationError.value = 'Enter a user secret.'
+    return
   }
-  clientReady.value = true
+
+  clientState.value = 'initializing'
+  authenticationError.value = null
+  try {
+    await action(authenticationSecret.value)
+    clientState.value = 'ready'
+  } catch (error) {
+    console.error('Failed to initialize authentication:', error)
+    authenticationError.value = 'Unable to authenticate with the story service.'
+    clientState.value = 'needs-auth'
+  }
+}
+
+const useExistingSecret = async () => {
+  await authenticate((secret) => store.authenticateWithSecret(secret))
+}
+
+const createUser = async () => {
+  await authenticate((secret) => store.createUser(secret))
+}
+
+const initializeClient = async () => {
+  authenticationSecret.value = store.user_secret
+  if (!authenticationSecret.value) {
+    clientState.value = 'needs-auth'
+    return
+  }
+  await useExistingSecret()
 }
 
 onMounted(() => {
@@ -105,24 +126,46 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
 
 <template>
   <v-app id="webtangl">
-    <v-main v-if="authenticationError">
+    <v-main v-if="clientState === 'needs-auth'">
       <v-container class="py-6" fluid>
-        <v-alert data-testid="authentication-error" type="error" variant="tonal">
-          Unable to authenticate with the story service.
-          <template #append>
-            <v-btn
-              data-testid="authentication-retry"
-              variant="text"
-              @click="initializeClient"
+        <v-card class="mx-auto" max-width="480">
+          <v-card-title>Connect to StoryTangl</v-card-title>
+          <v-card-text>
+            <p class="mb-4">Use an existing user secret or create a new local user.</p>
+            <v-text-field
+              v-model="authenticationSecret"
+              data-testid="authentication-secret"
+              label="User Secret"
+              type="password"
+            />
+            <v-alert
+              v-if="authenticationError"
+              data-testid="authentication-error"
+              density="compact"
+              type="error"
+              variant="tonal"
             >
-              Retry
+              {{ authenticationError }}
+            </v-alert>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn
+              data-testid="authentication-existing"
+              variant="text"
+              @click="useExistingSecret"
+            >
+              Use Existing Secret
             </v-btn>
-          </template>
-        </v-alert>
+            <v-spacer />
+            <v-btn data-testid="authentication-create" color="primary" @click="createUser">
+              Create User
+            </v-btn>
+          </v-card-actions>
+        </v-card>
       </v-container>
     </v-main>
 
-    <template v-else-if="clientReady">
+    <template v-else-if="clientState === 'ready'">
       <AppNavbar @toggle-drawer="toggleDrawer" />
 
       <v-navigation-drawer

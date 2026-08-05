@@ -1,18 +1,14 @@
 import { defineStore } from 'pinia'
 
-import type { WorldInfo } from '@/types'
+import type { UserInfo, UserSecretResponse, WorldInfo } from '@/types'
 import { useGlobal } from '@/composables/globals'
 
 interface StoreState {
   current_world_uid: string
   current_world_info?: WorldInfo
+  current_user?: UserInfo
   user_secret: string
   user_api_key?: string
-}
-
-interface ApiKeyResponse {
-  secret: string
-  api_key: string
 }
 
 const { $http, makeMediaDict } = useGlobal()
@@ -49,20 +45,49 @@ export const useStore = defineStore('main', {
       this.current_world_info = world
     },
 
-    async getApiKey() {
-      const response = await $http.value.get<ApiKeyResponse>('/system/secret', {
-        params: { secret: this.user_secret },
+    async authenticateWithSecret(secret: string) {
+      delete $http.value.defaults.headers.common['X-Api-Key']
+      const response = await $http.value.get<UserSecretResponse>('/system/secret', {
+        params: { secret },
       })
-
-      this.user_secret = response.data.secret
-      this.user_api_key = response.data.api_key
       $http.value.defaults.headers.common['X-Api-Key'] = response.data.api_key
+
+      try {
+        const user = await $http.value.get<UserInfo>('/user/info')
+        this.current_user = user.data
+      } catch (error) {
+        delete $http.value.defaults.headers.common['X-Api-Key']
+        throw error
+      }
+
+      this.user_secret = response.data.user_secret
+      this.user_api_key = response.data.api_key
     },
 
-    async setApiKey(secret: string) {
-      const response = await $http.value.put<ApiKeyResponse>('/user/secret', { secret })
+    async createUser(secret: string) {
+      const response = await $http.value.post<UserSecretResponse>('/user/create', undefined, {
+        params: { secret },
+      })
+      $http.value.defaults.headers.common['X-Api-Key'] = response.data.api_key
+      try {
+        const user = await $http.value.get<UserInfo>('/user/info')
 
-      this.user_secret = response.data.secret
+        this.current_user = user.data
+      } catch (error) {
+        delete $http.value.defaults.headers.common['X-Api-Key']
+        throw error
+      }
+
+      this.user_secret = response.data.user_secret
+      this.user_api_key = response.data.api_key
+    },
+
+    async rotateSecret(secret: string) {
+      const response = await $http.value.put<UserSecretResponse>('/user/secret', undefined, {
+        params: { secret },
+      })
+
+      this.user_secret = response.data.user_secret
       this.user_api_key = response.data.api_key
       $http.value.defaults.headers.common['X-Api-Key'] = response.data.api_key
     },
