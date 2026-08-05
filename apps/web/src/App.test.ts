@@ -67,9 +67,22 @@ describe('App.vue', () => {
     expect(wrapper.find('.v-app-bar').exists()).toBe(true)
   })
 
+  it('restores the browser-local player secret before any configured default', async () => {
+    const store = useStore()
+    store.user_secret = 'configured-secret'
+    localStorage.setItem('storytangl.player-secret', 'returning-secret')
+    vi.spyOn(store, 'authenticateWithSecret').mockResolvedValue()
+
+    mountApp()
+    await flushPromises()
+
+    expect(store.authenticateWithSecret).toHaveBeenCalledWith('returning-secret')
+  })
+
   it('keeps API-backed children at the gate when an existing secret is invalid', async () => {
     const store = useStore()
-    store.user_secret = 'invalid-secret'
+    store.user_secret = ''
+    localStorage.setItem('storytangl.player-secret', 'invalid-secret')
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     server.use(
       http.get(`${DEFAULT_API_URL}/user/info`, () =>
@@ -82,14 +95,24 @@ describe('App.vue', () => {
 
     expect(wrapper.find('[data-testid="authentication-error"]').exists()).toBe(true)
     expect(wrapper.find('.v-app-bar').exists()).toBe(false)
+    expect(localStorage.getItem('storytangl.player-secret')).toBeNull()
   })
 
   it('mounts API-backed children after authenticating an existing secret', async () => {
     const store = useStore()
     store.user_secret = ''
+    localStorage.setItem('storytangl.player-secret', 'invalid-secret')
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    server.use(
+      http.get(`${DEFAULT_API_URL}/user/info`, () =>
+        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 }),
+      ),
+    )
 
     const wrapper = mountApp()
     await flushPromises()
+
+    server.resetHandlers()
 
     await wrapper.find('[data-testid="authentication-secret"] input').setValue('valid-secret')
     await wrapper.find('[data-testid="authentication-existing"]').trigger('click')
@@ -99,19 +122,16 @@ describe('App.vue', () => {
     expect(store.current_user?.user_id).toBe('test-user-id')
   })
 
-  it('creates a user before mounting API-backed children', async () => {
+  it('silently creates and stores a player on first visit', async () => {
     const store = useStore()
     store.user_secret = ''
 
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.find('[data-testid="authentication-secret"] input').setValue('new-secret')
-    await wrapper.find('[data-testid="authentication-create"]').trigger('click')
-    await flushPromises()
-
     expect(wrapper.find('.v-app-bar').exists()).toBe(true)
-    expect(store.user_secret).toBe('new-secret')
+    expect(store.user_secret).not.toBe('')
+    expect(localStorage.getItem('storytangl.player-secret')).toBe(store.user_secret)
   })
 
   it('toggles drawer when menu clicked', async () => {

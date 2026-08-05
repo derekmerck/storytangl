@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import type { UserInfo, UserSecretResponse, WorldInfo } from '@/types'
 import { useGlobal } from '@/composables/globals'
+import { savePlayerSecret } from '@/playerSession'
 
 interface StoreState {
   current_world_uid: string
@@ -62,9 +63,10 @@ export const useStore = defineStore('main', {
 
       this.user_secret = response.data.user_secret
       this.user_api_key = response.data.api_key
+      savePlayerSecret(this.user_secret)
     },
 
-    async createUser(secret: string) {
+    async ensurePlayer(secret: string) {
       const response = await $http.value.post<UserSecretResponse>('/user/create', undefined, {
         params: { secret },
       })
@@ -80,6 +82,7 @@ export const useStore = defineStore('main', {
 
       this.user_secret = response.data.user_secret
       this.user_api_key = response.data.api_key
+      savePlayerSecret(this.user_secret)
     },
 
     async rotateSecret(secret: string) {
@@ -90,6 +93,7 @@ export const useStore = defineStore('main', {
       this.user_secret = response.data.user_secret
       this.user_api_key = response.data.api_key
       $http.value.defaults.headers.common['X-Api-Key'] = response.data.api_key
+      savePlayerSecret(this.user_secret)
     },
   },
 })

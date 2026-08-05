@@ -422,3 +422,14 @@ def test_user_world_and_system_methods_return_typed_models(
 
     system_info = manager.get_system_info()
     assert system_info.engine
+
+
+def test_create_user_restores_an_existing_recovery_secret(
+    manager: ServiceManager,
+    persistence,
+) -> None:
+    first = manager.create_user(secret="recovery-secret")
+    second = manager.create_user(secret="recovery-secret")
+
+    assert first.details["user_id"] == second.details["user_id"]
+    assert len([item for item in persistence.values() if isinstance(item, User)]) == 1

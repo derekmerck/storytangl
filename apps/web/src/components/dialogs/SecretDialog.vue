@@ -28,6 +28,10 @@ const close = () => {
   emit('update:modelValue', false)
 }
 
+const copySecret = async () => {
+  await navigator.clipboard.writeText(secret.value)
+}
+
 const save = async () => {
   if (!secret.value) {
     close()
@@ -49,18 +53,21 @@ const save = async () => {
 <template>
   <v-dialog :model-value="modelValue" max-width="480" persistent>
     <v-card>
-      <v-card-title>Change User Secret</v-card-title>
+      <v-card-title>Recovery Secret</v-card-title>
       <v-card-text>
         <v-text-field
           v-model="secret"
-          label="User Secret"
-          hint="Choose a new secret for the current user"
+          label="Recovery Secret"
+          hint="Keep this secret to recover the current player on another browser"
           persistent-hint
           :disabled="loading"
           autofocus
         />
       </v-card-text>
       <v-card-actions>
+        <v-btn variant="text" @click="copySecret" :disabled="loading">
+          Copy
+        </v-btn>
         <v-spacer />
         <v-btn variant="text" @click="close" :disabled="loading">
           Cancel

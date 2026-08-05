@@ -19,7 +19,8 @@ from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.hash_secret import key_for_secret
 from tangl.vm.runtime.ledger import Ledger
 
-from .exceptions import AuthMismatchError
+from .auth import user_id_by_key
+from .exceptions import AuthMismatchError, InvalidOperationError
 from ._user_support import parse_bool_flag, parse_datetime_field
 from .diagnostics import diagnostics_from_codec_state, diagnostics_from_compile_issues
 from .dispatch import do_advertise_info_channels, do_get_story_info
@@ -646,7 +647,16 @@ class ServiceManager:
         operation_id="user.create",
     )
     def create_user(self, *, secret: str | None = None, **kwargs: Any) -> RuntimeInfo:
-        """Create and persist a service user."""
+        """Create or restore the service user named by a recovery secret."""
+
+        persistence = self._require_persistence()
+        if isinstance(secret, str) and secret:
+            existing = user_id_by_key(key_for_secret(secret), persistence)
+            if existing is not None:
+                return RuntimeInfo.ok(
+                    message="User restored",
+                    user_id=str(existing.user_id),
+                )
 
         user = User(**kwargs)
         if isinstance(secret, str) and secret:
@@ -677,6 +687,9 @@ class ServiceManager:
             secret = kwargs.pop("secret", None)
             api_key: str | None = None
             if isinstance(secret, str) and secret:
+                existing = user_id_by_key(key_for_secret(secret), self._require_persistence())
+                if existing is not None and existing.user_id != user_id:
+                    raise InvalidOperationError("Recovery secret belongs to a different user")
                 user.set_secret(secret)
                 api_key = key_for_secret(secret)
 

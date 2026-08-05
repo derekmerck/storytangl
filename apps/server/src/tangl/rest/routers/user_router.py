@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from tangl.config import settings
@@ -10,7 +12,7 @@ from tangl.rest.dependencies_gateway import (
     resolve_user_auth,
 )
 from tangl.service import ServiceManager
-from tangl.service.exceptions import AccessDeniedError, AuthMismatchError
+from tangl.service.exceptions import AccessDeniedError, AuthMismatchError, InvalidOperationError
 from tangl.service.response import RuntimeInfo, UserInfo, UserSecret
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -34,7 +36,11 @@ def _call_service_method(
 @router.get("/info")
 async def get_user_info(
     service_manager: ServiceManager = Depends(get_service_manager),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    api_key: UniqueLabel = Header(
+        alias="X-API-Key",
+        example=key_for_secret(settings.client.secret),
+        default=None,
+    ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserInfo:
     """Return profile information for the authenticated user."""
@@ -65,7 +71,10 @@ async def create_user(
         raise HTTPException(status_code=500, detail="Failed to create user")
     if created.status != "ok":
         raise HTTPException(status_code=500, detail=created.message or "Failed to create user")
-    return service_manager.get_key_for_secret(secret=secret)
+    credentials = service_manager.get_key_for_secret(secret=secret)
+    return credentials.model_copy(
+        update={"user_id": UUID(str(created.details["user_id"]))},
+    )
 
 
 @router.put("/world")
@@ -79,7 +88,11 @@ async def set_user_world():
 async def update_user_secret(
     service_manager: ServiceManager = Depends(get_service_manager),
     user_locks=Depends(get_user_locks),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    api_key: UniqueLabel = Header(
+        alias="X-API-Key",
+        example=key_for_secret(settings.client.secret),
+        default=None,
+    ),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
@@ -89,13 +102,16 @@ async def update_user_secret(
     user_auth = resolve_user_auth(api_key, service_manager=service_manager)
     require_service_access("update_user", user_auth=user_auth)
     async with user_locks[user_auth.user_id]:
-        _call_service_method(
-            service_manager,
-            "update_user",
-            user_id=user_auth.user_id,
-            user_auth=user_auth,
-            secret=secret,
-        )
+        try:
+            _call_service_method(
+                service_manager,
+                "update_user",
+                user_id=user_auth.user_id,
+                user_auth=user_auth,
+                secret=secret,
+            )
+        except InvalidOperationError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     return UserSecret(
         user_secret=secret,
         api_key=key_for_secret(secret),
@@ -106,7 +122,11 @@ async def update_user_secret(
 @router.delete("/drop")
 async def drop_user(
     service_manager: ServiceManager = Depends(get_service_manager),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    api_key: UniqueLabel = Header(
+        alias="X-API-Key",
+        example=key_for_secret(settings.client.secret),
+        default=None,
+    ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> RuntimeInfo:
     """Remove the authenticated user and purge persisted resources."""

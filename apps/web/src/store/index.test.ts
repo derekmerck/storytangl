@@ -60,6 +60,7 @@ describe('Store', () => {
     expect(store.current_user?.user_id).toBe('test-user-id')
     expect(store.user_api_key).toBeDefined()
     expect($http.value.defaults.headers.common['X-Api-Key']).toBe(store.user_api_key)
+    expect(localStorage.getItem('storytangl.player-secret')).toBe(store.user_secret)
   })
 
   it('rotates the authenticated user secret through the query-parameter route', async () => {
@@ -71,5 +72,6 @@ describe('Store', () => {
     expect(store.user_secret).toBe('new-secret-123')
     expect(store.user_api_key).toBeDefined()
     expect($http.value.defaults.headers.common['X-Api-Key']).toBe(store.user_api_key)
+    expect(localStorage.getItem('storytangl.player-secret')).toBe('new-secret-123')
   })
 })

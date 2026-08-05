@@ -11,6 +11,7 @@ import { useStore } from '@/store'
 
 const emit = defineEmits<{
   'toggle-drawer': []
+  'recover-player': []
 }>()
 
 const { $http, remapURL } = useGlobal()
@@ -105,6 +106,9 @@ const worldStyle = (world: WorldList[number]): CSSProperties => {
           </v-list-item>
           <v-list-item @click="showSecretDialog = true">
             <v-list-item-title>Change Secret</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="emit('recover-player')">
+            <v-list-item-title>Switch or Recover Player</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>

@@ -7,6 +7,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import StoryStatus from '@/components/StoryStatus.vue'
 import StoryFlow from '@/components/story/StoryFlow.vue'
 import type { InfoAffordance, InfoState, RuntimeEnvelope } from '@/types'
+import { clearPlayerSecret, createPlayerSecret, loadPlayerSecret } from '@/playerSession'
 import { useStore } from '@/store'
 
 const drawer = ref(true)
@@ -40,20 +41,35 @@ const authenticate = async (action: (secret: string) => Promise<void>) => {
 }
 
 const useExistingSecret = async () => {
+  await authenticate((secret) => store.ensurePlayer(secret))
+}
+
+const startNewPlayer = async () => {
+  authenticationSecret.value = createPlayerSecret()
+  await authenticate((secret) => store.ensurePlayer(secret))
+}
+
+const restoreStoredPlayer = async () => {
   await authenticate((secret) => store.authenticateWithSecret(secret))
 }
 
-const createUser = async () => {
-  await authenticate((secret) => store.createUser(secret))
-}
-
 const initializeClient = async () => {
-  authenticationSecret.value = store.user_secret
+  const storedSecret = loadPlayerSecret()
+  authenticationSecret.value = storedSecret ?? store.user_secret
   if (!authenticationSecret.value) {
-    clientState.value = 'needs-auth'
+    await startNewPlayer()
     return
   }
-  await useExistingSecret()
+  await restoreStoredPlayer()
+  if (clientState.value !== 'ready' && storedSecret) {
+    clearPlayerSecret()
+  }
+}
+
+const recoverPlayer = () => {
+  authenticationSecret.value = ''
+  authenticationError.value = null
+  clientState.value = 'needs-auth'
 }
 
 onMounted(() => {
@@ -129,13 +145,13 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
     <v-main v-if="clientState === 'needs-auth'">
       <v-container class="py-6" fluid>
         <v-card class="mx-auto" max-width="480">
-          <v-card-title>Connect to StoryTangl</v-card-title>
+          <v-card-title>Recover Player</v-card-title>
           <v-card-text>
-            <p class="mb-4">Use an existing user secret or create a new local user.</p>
+            <p class="mb-4">Use a recovery secret from another browser, or start a new player.</p>
             <v-text-field
               v-model="authenticationSecret"
               data-testid="authentication-secret"
-              label="User Secret"
+              label="Recovery Secret"
               type="password"
             />
             <v-alert
@@ -154,11 +170,11 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
               variant="text"
               @click="useExistingSecret"
             >
-              Use Existing Secret
+              Use Recovery Secret
             </v-btn>
             <v-spacer />
-            <v-btn data-testid="authentication-create" color="primary" @click="createUser">
-              Create User
+            <v-btn data-testid="authentication-create" color="primary" @click="startNewPlayer">
+              Start New Player
             </v-btn>
           </v-card-actions>
         </v-card>
@@ -166,7 +182,7 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
     </v-main>
 
     <template v-else-if="clientState === 'ready'">
-      <AppNavbar @toggle-drawer="toggleDrawer" />
+      <AppNavbar @toggle-drawer="toggleDrawer" @recover-player="recoverPlayer" />
 
       <v-navigation-drawer
         v-model="drawer"
