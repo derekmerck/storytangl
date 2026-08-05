@@ -218,7 +218,12 @@ def _resolve_fallback_rit(
     return None
 
 
-def _base_payload(fragment: MediaFragment, *, scope: str, media_type: MediaDataType | None) -> dict[str, Any]:
+def _base_payload(
+    fragment: MediaFragment,
+    *,
+    scope: str,
+    media_type: MediaDataType | str | None,
+) -> dict[str, Any]:
     source_id = getattr(fragment, "source_id", None)
     return {
         "uid": str(fragment.uid),
@@ -227,7 +232,9 @@ def _base_payload(fragment: MediaFragment, *, scope: str, media_type: MediaDataT
         "text": getattr(fragment, "text", None),
         "source_id": str(source_id) if source_id is not None else None,
         "scope": scope,
-        "media_type": media_type.value if media_type is not None else None,
+        "media_type": (
+            media_type.value if isinstance(media_type, MediaDataType) else media_type
+        ),
         "content_format": getattr(fragment, "content_format", None),
     }
 
@@ -446,19 +453,14 @@ def media_fragment_to_payload(
                 system_media_root=system_media_root,
             )
 
-        source_id = getattr(fragment, "source_id", None)
-        payload: dict[str, Any] = {
-            "fragment_type": "media",
-            "media_role": getattr(fragment, "media_role", None),
-            "text": getattr(fragment, "text", None),
-            "source_id": str(source_id) if source_id is not None else None,
-            "scope": scope,
-            "content_format": fragment.content_format,
-        }
+        payload = _base_payload(
+            fragment,
+            scope=scope,
+            media_type=getattr(fragment.content_type, "value", fragment.content_type),
+        )
 
         if fragment.content_format == "url":
             payload["url"] = str(fragment.content)
-            payload["media_type"] = getattr(fragment.content_type, "value", fragment.content_type)
             return payload
 
         if fragment.content_format == "data":
@@ -467,16 +469,12 @@ def media_fragment_to_payload(
                 payload["data"] = b64encode(content).decode("ascii")
             else:
                 payload["data"] = content
-            payload["media_type"] = getattr(fragment.content_type, "value", fragment.content_type)
             return payload
 
         if fragment.content_format == "json" and isinstance(fragment.content, dict):
-            payload.update(fragment.content)
-            payload["media_type"] = getattr(fragment.content_type, "value", fragment.content_type)
-            return payload
+            return {**fragment.content, **payload}
 
         payload["content"] = fragment.content
-        payload["media_type"] = getattr(fragment.content_type, "value", fragment.content_type)
         return payload
 
     if getattr(fragment, "fragment_type", None) == "media" and hasattr(fragment, "payload"):

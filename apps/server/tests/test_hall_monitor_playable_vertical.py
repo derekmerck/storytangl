@@ -58,6 +58,7 @@ def _fragments(payload: dict[str, object], fragment_type: str) -> list[dict[str,
 def hall_monitor_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, dict[str, str]]]:
     """Serve the compiled repository Hall Monitor world through FastAPI."""
 
+    monkeypatch.setattr("tangl.utils.shelved2.SHELVED_CACHE_ENABLED", False)
     monkeypatch.setattr(
         "tangl.service.world_registry.get_world_dirs",
         lambda: [_repo_worlds_dir()],

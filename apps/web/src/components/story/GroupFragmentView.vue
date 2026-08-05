@@ -8,15 +8,10 @@ import type {
   MediaStoryFragment,
   StoryFragment,
 } from '@/types'
-import {
-  fragmentText,
-  isMediaFragment,
-  isPieceFragment,
-  mediaContentUrl,
-} from './fragmentUtils'
+import { fragmentText, isMediaFragment, mediaContentUrl } from './fragmentUtils'
 import { mediaRole } from './fragmentViewUtils'
 import MediaFragmentView from './MediaFragmentView.vue'
-import PieceFragmentView from './PieceFragmentView.vue'
+import PieceMediaGroupView from './PieceMediaGroupView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
 import ZoneFragmentView from './ZoneFragmentView.vue'
 
@@ -64,16 +59,6 @@ const mediaUrl = (fragment: MediaStoryFragment): string | undefined => {
 const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefined =>
   media.find((item) => mediaRole(item) === 'avatar_im')
 
-const associatedPiece = computed(() =>
-  groupType.value === 'piece_media'
-    ? groupMembers.value.find(isPieceFragment)
-    : undefined,
-)
-const associatedMedia = computed(() =>
-  groupType.value === 'piece_media'
-    ? groupMembers.value.filter(isMediaFragment)
-    : [],
-)
 </script>
 
 <template>
@@ -114,18 +99,11 @@ const associatedMedia = computed(() =>
       :fragments="fragments"
     />
 
-    <section v-else-if="groupType === 'piece_media'" class="piece-media-group">
-      <PieceFragmentView
-        v-if="associatedPiece"
-        :fragment="associatedPiece"
-      />
-      <MediaFragmentView
-        v-for="media in associatedMedia"
-        :key="media.uid"
-        :fragment="media"
-        compact
-      />
-    </section>
+    <PieceMediaGroupView
+      v-else-if="groupType === 'piece_media'"
+      :group="group"
+      :fragments="fragments"
+    />
 
     <div v-else-if="groupType === 'status_sidecar'" class="kv-strip">
       <span v-for="member in groupMembers" :key="member.uid">
@@ -149,13 +127,6 @@ const associatedMedia = computed(() =>
   border-left: 3px solid rgba(var(--v-theme-primary), 0.45);
   margin: 8px 16px;
   padding-left: 12px;
-}
-
-.piece-media-group {
-  align-items: flex-start;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .dialog-line {

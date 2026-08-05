@@ -89,7 +89,7 @@ describe('StoryBlock', () => {
     expect(img.props('src')).toBe('https://example.com/portrait.svg')
   })
 
-  it('renders published presence prose and associated piece media', () => {
+  it('renders published presence prose and associated piece media', (): void => {
     const fragments: Record<string, StoryFragment> = {
       candidate: {
         uid: 'candidate',

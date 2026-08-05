@@ -200,6 +200,7 @@ class HallMonitorCredentialsGame(CredentialsGame):
     presentation: CredentialPresentationProfile = Field(
         default_factory=lambda: HALL_PRESENTATION.model_copy(deep=True)
     )
+
     def prepare_case(self, case_index: int) -> CredentialCase:
         """Materialize the world-owned visual mismatch with distinct live looks."""
 
