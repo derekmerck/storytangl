@@ -15,6 +15,7 @@ from tangl.mechanics.credentials import (
     Restrictions,
     RestrictionLevel,
 )
+from tangl.mechanics.presence.look import HasSimpleLook
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
     CredentialDisposition,
@@ -28,6 +29,7 @@ from tangl.mechanics.games.credentials_roster import (
     generate_roster,
 )
 from tangl.story import Block, on_journal
+from tangl.story.presentation import render_text_as
 from tangl.vm import on_update
 from tangl.vm.ctx import VmPhaseCtx
 
@@ -192,7 +194,6 @@ class HallMonitorConsequence(BaseModelPlus):
 
     source_case_index: int
     bearer_id: UUID
-    candidate_name: str
     outcome: Literal["inhaler_withheld", "inhaler_allowed"]
 
 
@@ -272,7 +273,6 @@ def record_hall_monitor_consequence(
         HallMonitorConsequence(
             source_case_index=result.case_index,
             bearer_id=result.bearer_id,
-            candidate_name=result.candidate_name,
             outcome=outcome,
         )
     )
@@ -292,13 +292,19 @@ def render_hall_monitor_consequence(
     if not isinstance(source, HallMonitorBlock) or not source.consequences:
         return None
     consequence = source.consequences[-1]
+    bearer = caller.graph.get(consequence.bearer_id)
+    if not isinstance(bearer, HasSimpleLook):
+        raise LookupError(f"Hall Monitor bearer {consequence.bearer_id} is not present")
+    name = bearer.get_label()
+    presence = render_text_as(bearer, "presence_description", ctx=ctx)
+    subject = f"{name}, {presence}," if presence else name
     if consequence.outcome == "inhaler_withheld":
         content = (
-            f"{consequence.candidate_name} was sent back to class. Their inhaler remained "
-            "at the hall desk while the nurse's unsigned note was checked."
+            f"{subject} was sent back to class. Their inhaler remained at the "
+            "hall desk while the nurse's unsigned note was checked."
         )
     else:
-        content = f"{consequence.candidate_name} reached the nurse's office with their inhaler."
+        content = f"{subject} reached the nurse's office with their inhaler."
     return ContentFragment(
         content=content,
         source_id=consequence.bearer_id,

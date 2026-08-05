@@ -1168,8 +1168,8 @@ fact to the frontier or namespace already assembled for the disposition turn.
 
 Hall Monitor is the worked proof: its authored medical-note encounter records a
 school-specific inhaler outcome, then an attendance-note action projects that
-outcome with the receipt's recorded candidate label on a later turn. Credentials
-itself still owns only evaluation and scoring.
+outcome with the bearer's current graph-owned presentation on a later turn.
+Credentials itself still owns only evaluation and scoring.
 
 A procedural candidate today is generated for one shift and disappears at
 terminal. A *real* checkpoint story wants candidates to return: the

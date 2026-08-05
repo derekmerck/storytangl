@@ -12,6 +12,7 @@ from tangl.mechanics.credentials import (
     CredentialDefinition,
     FailureMode,
 )
+from tangl.mechanics.presence.look import HairColor, HasSimpleLook
 from tangl.mechanics.games.credentials_game import CredentialDisposition, derive_disposition
 from tangl.mechanics.games.credentials_roster import materialize
 from tangl.service.world_registry import WorldRegistry
@@ -45,14 +46,10 @@ def _inspect(ledger: Ledger, target: str) -> None:
     )
 
 
-def _started_shift(*, pinned_candidate_name: str | None = None) -> tuple[StoryGraph, Ledger]:
+def _started_shift() -> tuple[StoryGraph, Ledger]:
     world = WorldCompiler().compile(WorldBundle.load(_hall_monitor_root()))
     result = world.create_story("hall_monitor", init_mode=InitMode.EAGER)
     ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
-    if pinned_candidate_name is not None:
-        block = result.graph.find_one(Selector(label="morning_shift"))
-        assert block is not None
-        block.game.offers[0].candidate_name = pinned_candidate_name
     _choose(ledger, "Monitor the morning halls")
     return result.graph, ledger
 
@@ -179,7 +176,7 @@ class TestHallMonitorWorld:
         assert game.active_case is prepared[0]
 
     def test_hall_monitor_records_and_later_reveals_harsh_inhaler_outcome(self) -> None:
-        graph, ledger = _started_shift(pinned_candidate_name="Ren Ito")
+        graph, ledger = _started_shift()
         block = ledger.cursor
         game = block.game
         bearer_id = game.active_case.packet_manager.bearer_id
@@ -193,9 +190,13 @@ class TestHallMonitorWorld:
         assert len(block.consequences) == 1
         consequence = block.consequences[0]
         assert consequence.bearer_id == bearer_id
-        assert consequence.candidate_name == "Ren Ito"
         assert consequence.outcome == "inhaler_withheld"
         assert "remained at the hall desk" not in _journal_text(ledger)
+
+        bearer = graph.get(bearer_id)
+        assert isinstance(bearer, HasSimpleLook)
+        bearer.label = "Zapp"
+        bearer.look.hair_color = HairColor.BLUE
 
         _finish_shift_correctly(ledger)
         assert ledger.cursor.label == "victory"
@@ -203,7 +204,7 @@ class TestHallMonitorWorld:
         _choose(ledger, "Read the attendance note")
 
         assert ledger.cursor.label == "attendance_note"
-        assert "Ren Ito was sent back to class" in _journal_text(ledger)
+        assert "Zapp, with blue hair, was sent back to class" in _journal_text(ledger)
 
         restored = Graph.structure(graph.unstructure())
         restored_block = restored.find_one(Selector(label="morning_shift"))
@@ -233,7 +234,7 @@ class TestHallMonitorWorld:
         _finish_shift_correctly(ledger)
         assert ledger.cursor.label == "defeat"
         _choose(ledger, "Read the attendance note")
-        assert "Mira Quill reached the nurse's office" in _journal_text(ledger)
+        assert "reached the nurse's office with their inhaler" in _journal_text(ledger)
 
         ledger.get_journal()
         ledger.get_journal()

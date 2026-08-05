@@ -13,6 +13,6 @@ mediation, disposition resolution, scoring, and persistence.
 
 Hall Monitor also demonstrates world-authored consequence return. Its recurring
 Mira Quill medical-note case records a durable, bearer-attributed inhaler outcome
-after UPDATE, but reveals it only from the later attendance-note beat. The
-credentials mechanic supplies the case receipt; it does not decide the school
-meaning or change scoring.
+after UPDATE, but reveals it only from the later attendance-note beat using the
+bearer's then-current graph presentation. The credentials mechanic supplies the
+case receipt; it does not decide the school meaning or change scoring.
