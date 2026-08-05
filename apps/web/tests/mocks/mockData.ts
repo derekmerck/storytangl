@@ -22,13 +22,23 @@ export const mockWorldInfo: WorldInfo = {
 }
 
 export const mockUserSecretResponse = {
-  secret: 'dev-secret-123',
+  user_secret: 'dev-secret-123',
   api_key: 'mock-api-key-123',
 }
 
 export const mockUpdatedSecretResponse = {
-  secret: 'updated-secret-456',
+  user_secret: 'updated-secret-456',
   api_key: 'updated-api-key-456',
+}
+
+export const mockUserInfo = {
+  user_id: 'test-user-id',
+  user_secret: 'dev-secret-123',
+  created_dt: '2026-01-01T00:00:00Z',
+  last_played_dt: '2026-01-01T00:00:00Z',
+  worlds_played: [],
+  stories_finished: 0,
+  turns_played: 0,
 }
 
 export const mockSystemInfo = {

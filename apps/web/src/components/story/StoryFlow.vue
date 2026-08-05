@@ -250,13 +250,13 @@ const doCommand = async (command: string) => {
     </div>
 
     <StoryBlock
-      v-for="scene in scenes"
+      v-for="(scene, index) in scenes"
       :key="scene.key"
       ref="sceneRefs"
       :scene="scene"
       :fragments="fragmentRegistry"
       :metadata="scene.metadata"
-      :disabled="loading"
+      :disabled="loading || index !== scenes.length - 1"
       @doAction="doAction"
     />
 

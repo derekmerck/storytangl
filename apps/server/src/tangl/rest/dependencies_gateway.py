@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from tangl.rest.dependencies import get_persistence
 from tangl.service import ServiceAccess, ServiceManager, UserAuthInfo, build_service_manager, user_id_by_key
+from tangl.service.world_registry import clear_discovered_world_registries
 
 _service_manager: ServiceManager | None = None
 _user_locks: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -91,4 +92,4 @@ def reset_service_manager_for_testing() -> None:
     _service_manager = None
     _user_locks.clear()
     _api_key_index.clear()
-
+    clear_discovered_world_registries()

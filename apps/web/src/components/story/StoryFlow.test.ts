@@ -219,6 +219,10 @@ describe('StoryFlow', () => {
 
     const scenes = wrapper.findAllComponents(StoryBlock)
     expect(scenes.length).toBeGreaterThan(initialCount)
+    expect(scenes[0]!.props('disabled')).toBe(true)
+    const latestScene = scenes[scenes.length - 1]
+    expect(latestScene).toBeDefined()
+    expect(latestScene!.props('disabled')).toBe(false)
     expect(wrapper.text()).toContain('The stranger slides the folded vellum')
     expect(wrapper.findAll('[data-testid="interrupt-ux-event"]')).toHaveLength(1)
     expect(wrapper.emitted('storyUpdate')!.length).toBeGreaterThanOrEqual(2)

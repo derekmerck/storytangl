@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 _MANUAL_WORLDS: dict[str, World] = {}
+_DISCOVERED_REGISTRIES: dict[tuple[Path, ...], "WorldRegistry"] = {}
 
 
 def _get_world_dirs() -> list[Path]:
@@ -64,13 +65,23 @@ def clear_manual_worlds() -> None:
     _MANUAL_WORLDS.clear()
 
 
+def clear_discovered_world_registries() -> None:
+    """Clear cached discovered registries between isolated service runs."""
+
+    _DISCOVERED_REGISTRIES.clear()
+
+
 def resolve_world(world_id: str) -> World:
     """Resolve a world from manual overrides or configured registries."""
 
     if world_id in _MANUAL_WORLDS:
         return _MANUAL_WORLDS[world_id]
 
-    registry = WorldRegistry()
+    world_dirs = tuple(_get_world_dirs())
+    registry = _DISCOVERED_REGISTRIES.get(world_dirs)
+    if registry is None:
+        registry = WorldRegistry(list(world_dirs))
+        _DISCOVERED_REGISTRIES[world_dirs] = registry
     world = registry.get_world(world_id)
     if not isinstance(world, World):
         raise TypeError(f"Expected Story world for '{world_id}', got {type(world)!r}")

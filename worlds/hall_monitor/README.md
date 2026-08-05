@@ -21,3 +21,60 @@ The attendance note also prepares one authored return encounter. That encounter
 uses a fresh packet with the same graph-owned bearer UUID and receives the first
 case receipt as semantic prior context. Its recognition prose resolves the
 bearer's current presence only when the return is entered.
+
+## Playable-vertical acceptance
+
+The playable invariant is that a player can understand a school-paperwork
+decision without being told the evaluator's answer: inspect Mira Quill's note,
+make a ruling from its visible missing signature, and later understand the
+world-authored inhaler consequence and return encounter.
+
+The worked vertical has parity at these surfaces:
+
+- **Mechanical:** the credentials loop scores the ruling; the Hall Monitor
+  authority records only an attributable receipt-derived consequence.
+- **Narrative:** the attendance note exposes the later school-specific outcome,
+  and the return resolves the current presentation of the same bearer.
+- **Text/media floor:** packet and document prose remains sufficient when no
+  generated card is available; media is additive rather than a prerequisite for
+  deciding.
+- **Playable client:** the reference web client renders packet pieces,
+  inspection findings, and public action labels without receiving an expected
+  disposition or hidden validity field.
+
+### Repeatable local pass
+
+Start the service and client in separate terminals. The client is a rendering
+witness; create the local session through the documented REST API first.
+
+```bash
+poetry run tangl-serve
+curl -X POST 'http://127.0.0.1:8000/api/v2/user/create?secret=dev-secret-123'
+curl -X POST \
+  'http://127.0.0.1:8000/api/v2/story/story/create?world_id=hall_monitor&init_mode=EAGER' \
+  -H "X-API-Key: $(curl -s 'http://127.0.0.1:8000/api/v2/system/secret?secret=dev-secret-123' | jq -r .api_key)"
+cd apps/web
+VITE_DEFAULT_API_URL=http://127.0.0.1:8000/api/v2 \
+VITE_DEFAULT_WORLD=hall_monitor \
+VITE_DEFAULT_USER_SECRET=dev-secret-123 \
+yarn dev
+```
+
+In the browser, enter the morning shift, inspect the doctor’s note, and choose
+one of the public rulings. A rules-correct `Send back to class` path reveals the
+inhaler outcome at the attendance note and offers `Meet the returning student`.
+An incorrect compassionate `Allow onward` path produces the contrasting
+world-authored outcome without changing the underlying score rule. An arrest
+does not offer a return. The return is an ordinary new credential encounter:
+its packet is fresh, while its bearer is the same live graph subject.
+
+### Current framework friction
+
+- The REST creation route is currently `/story/story/create`; the web client
+  consumes an existing session rather than owning session/world selection.
+- The web client gates API-backed components until authentication completes and
+  disables prior transcript choices, so the current live frontier remains the
+  only submit surface.
+- Service world resolution reuses one compiled world per configured directory
+  set. This prevents repeated service reads from recompiling the same singleton
+  world during media and journal delivery.

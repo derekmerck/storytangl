@@ -7,14 +7,17 @@ import pytest
 from tangl.persistence import PersistenceManagerFactory
 from tangl.renpy import RenPyChoice, RenPySessionBridge
 from tangl.service import build_service_manager
+from tangl.service.world_registry import clear_discovered_world_registries
 from tangl.story.fabula.world import World
 
 
 @pytest.fixture(autouse=True)
 def reset_worlds() -> None:
+    clear_discovered_world_registries()
     World.clear_instances()
     yield
     World.clear_instances()
+    clear_discovered_world_registries()
 
 
 def _service_manager():

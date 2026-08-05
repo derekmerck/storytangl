@@ -192,6 +192,15 @@ and returns concrete user identity plus privilege state.
 Writeback metadata is likewise authoritative for deciding whether a method
 should persist user/session state on exit.
 
+### Browser player-session bootstrap
+
+The web client owns a deliberately small, codename-backed persistence
+capability: the server stores a derived secret hash and stable user UUID, while
+the browser retains the plaintext codename needed to restore that user. The
+derived API key is request transport, not a second identity. See the canonical
+[player-session bootstrap note](../../../../apps/web/notes/PLAYER_SESSION_BOOTSTRAP.md)
+for create-or-restore, rotation, and explicitly deferred security policy.
+
 ## World Support
 
 `WorldRegistry` is the canonical world discovery/loading path.
