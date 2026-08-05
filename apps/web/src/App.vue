@@ -7,7 +7,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import StoryStatus from '@/components/StoryStatus.vue'
 import StoryFlow from '@/components/story/StoryFlow.vue'
 import type { InfoAffordance, InfoState, RuntimeEnvelope } from '@/types'
-import { clearPlayerSecret, createPlayerSecret, loadPlayerSecret } from '@/playerSession'
+import { clearPlayerSecret, loadPlayerSecret } from '@/playerSession'
 import { useStore } from '@/store'
 
 const drawer = ref(true)
@@ -22,16 +22,11 @@ const display = useDisplay()
 
 const isDesktop = computed(() => display.mdAndUp.value)
 
-const authenticate = async (action: (secret: string) => Promise<void>) => {
-  if (!authenticationSecret.value) {
-    authenticationError.value = 'Enter a user secret.'
-    return
-  }
-
+const bootstrapPlayer = async (action: () => Promise<void>) => {
   clientState.value = 'initializing'
   authenticationError.value = null
   try {
-    await action(authenticationSecret.value)
+    await action()
     clientState.value = 'ready'
   } catch (error) {
     console.error('Failed to initialize authentication:', error)
@@ -41,16 +36,19 @@ const authenticate = async (action: (secret: string) => Promise<void>) => {
 }
 
 const useExistingSecret = async () => {
-  await authenticate((secret) => store.ensurePlayer(secret))
+  if (!authenticationSecret.value) {
+    authenticationError.value = 'Enter a recovery secret.'
+    return
+  }
+  await bootstrapPlayer(() => store.ensurePlayer(authenticationSecret.value))
 }
 
 const startNewPlayer = async () => {
-  authenticationSecret.value = createPlayerSecret()
-  await authenticate((secret) => store.ensurePlayer(secret))
+  await bootstrapPlayer(() => store.ensurePlayer())
 }
 
 const restoreStoredPlayer = async () => {
-  await authenticate((secret) => store.authenticateWithSecret(secret))
+  await bootstrapPlayer(() => store.authenticateWithSecret(authenticationSecret.value))
 }
 
 const initializeClient = async () => {

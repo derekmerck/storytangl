@@ -12,6 +12,3 @@ export const savePlayerSecret = (secret: string): void => {
 export const clearPlayerSecret = (): void => {
   localStorage.removeItem(PLAYER_SECRET_KEY)
 }
-
-/** Create a transport secret for a first-visit player. */
-export const createPlayerSecret = (): string => crypto.randomUUID()

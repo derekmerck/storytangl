@@ -66,9 +66,9 @@ export const useStore = defineStore('main', {
       savePlayerSecret(this.user_secret)
     },
 
-    async ensurePlayer(secret: string) {
+    async ensurePlayer(secret?: string) {
       const response = await $http.value.post<UserSecretResponse>('/user/create', undefined, {
-        params: { secret },
+        params: secret ? { secret } : undefined,
       })
       $http.value.defaults.headers.common['X-Api-Key'] = response.data.api_key
       try {

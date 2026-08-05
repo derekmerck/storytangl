@@ -16,6 +16,7 @@ from tangl.journal.fragments import ChoiceFragment, PieceFragment
 from tangl.persistence import PersistenceManager
 from tangl.story import InitMode, World, do_find_edges
 from tangl.type_hints import Identifier, UnstructuredData
+from tangl.utils.get_code_name import get_code_name
 from tangl.utils.hash_secret import key_for_secret
 from tangl.vm.runtime.ledger import Ledger
 
@@ -650,22 +651,24 @@ class ServiceManager:
         """Create or restore the service user named by a recovery secret."""
 
         persistence = self._require_persistence()
+        if not secret:
+            secret = get_code_name()
+            while user_id_by_key(key_for_secret(secret), persistence) is not None:
+                secret = get_code_name()
         if isinstance(secret, str) and secret:
             existing = user_id_by_key(key_for_secret(secret), persistence)
             if existing is not None:
                 return RuntimeInfo.ok(
                     message="User restored",
                     user_id=str(existing.user_id),
+                    user_secret=secret,
                 )
 
         user = User(**kwargs)
         if isinstance(secret, str) and secret:
             user.set_secret(secret)
         self._save(user)
-        return RuntimeInfo.ok(
-            message="User created",
-            user_id=str(user.uid),
-        )
+        return RuntimeInfo.ok(message="User created", user_id=str(user.uid), user_secret=secret)
 
     @service_method(
         access=ServiceAccess.CLIENT,

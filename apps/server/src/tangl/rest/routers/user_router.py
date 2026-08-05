@@ -71,7 +71,8 @@ async def create_user(
         raise HTTPException(status_code=500, detail="Failed to create user")
     if created.status != "ok":
         raise HTTPException(status_code=500, detail=created.message or "Failed to create user")
-    credentials = service_manager.get_key_for_secret(secret=secret)
+    user_secret = str(created.details["user_secret"])
+    credentials = service_manager.get_key_for_secret(secret=user_secret)
     return credentials.model_copy(
         update={"user_id": UUID(str(created.details["user_id"]))},
     )

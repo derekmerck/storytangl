@@ -34,6 +34,16 @@ def test_create_user_restores_one_user_for_a_recovery_secret(client: TestClient)
     assert first.json()["user_id"] == second.json()["user_id"]
 
 
+def test_create_user_assigns_a_recovery_codename_when_none_is_supplied(client: TestClient) -> None:
+    created = client.post("user/create")
+    restored = client.post("user/create", params={"secret": created.json()["user_secret"]})
+
+    assert created.status_code == 200
+    assert created.json()["user_secret"]
+    assert restored.status_code == 200
+    assert restored.json()["user_id"] == created.json()["user_id"]
+
+
 def test_secret_rotation_rejects_another_players_recovery_secret(client: TestClient) -> None:
     first = client.post("user/create", params={"secret": "first-secret"})
     second = client.post("user/create", params={"secret": "second-secret"})
