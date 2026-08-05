@@ -7,7 +7,7 @@
 :related: journal, presence, credentials, media, widget, open_link
 ```
 
-**Document Version:** 0.6
+**Document Version:** 0.7
 **Status:** DESIGN — proposed coarse-grid nouns (`Vantage`, `Observation`), a
 description protocol over them, and a strawman prose pipeline. Not a migration plan.
 *v0.2: three-stage prose pipeline (self-description / observation / realization),
@@ -25,7 +25,13 @@ review): Observation defined as redacted truth (never belief; distortion is a se
 authored layer); lang/story dependency inverted via a VantageLike protocol; describe()
 and the non-commutative fold anchored to the existing render_text_as / on_render_text /
 BehaviorRegistry dispatch; observation merge key defined; referring-expression rules
-made mutually exclusive; PoV example corrected.*
+made mutually exclusive; PoV example corrected. v0.7 (second review pass): observe()
+is a truth-preserving PROJECTION (soundness + opacity), not set subtraction; call
+direction corrected -- describe() is the leaf, render_text_as the controller; the
+observation fold needs its own on_observe task (do_render_text is typed str|None);
+both journal records preserved (semantic provenance AND experienced syuzhet), with
+re-rendering as replacement+tombstone rather than silent regeneration; unreliability
+separated from omniscience in non-goals.*
 **Relevant layers:** `tangl.lang` (noun protocol), `tangl.story` (vantage, dispatch),
 `tangl.mechanics.presence` / `.credentials` / `.sandbox` (consumers),
 `tangl.journal` (downstream output).
@@ -104,7 +110,23 @@ existing 14 `describe()` sites stay valid.
 **`observe()` is opt-in.** A concept implements it only when its perceptibility is
 genuinely vantage-dependent. `describe()` consults it when present.
 
-Default `describe()` resolution order:
+**Call direction — `describe()` is the leaf, not the controller.** This matches the
+live code (`render_look_text` / `render_outfit_text` are `@on_render_text` handlers that
+call `caller.describe()`), and inverting it would recurse:
+
+```text
+render_text_as(target, aspect, ctx)        story/presentation.py — the controller
+  └─▶ on_render_text handlers              authority chain selects the source
+        └─▶ target.describe(...)           the object's LOCAL default prose leaf
+```
+
+- **`describe()`** is one object's local/default semantic prose contribution. It knows
+  its own content and its components; it does not orchestrate.
+- **`render_text_as`** is the story-aware controller: it applies observation, runs the
+  authority dispatch, and bounds recursion via `TextRenderSession`. Authored overrides
+  and vantage gating attach here, not inside `describe()`.
+
+A `describe()` leaf's default content resolution order:
 
 ```text
 1. self.observe(vantage)              — if implemented, render from the observation
@@ -112,15 +134,9 @@ Default `describe()` resolution order:
 ```
 
 So `assembly.describe()` works unchanged today, and gains vantage-gating the moment
-that assembly grows an `observe()`. Adoption is strictly opt-in per concept.
-
-**`describe()` is not a new controller — it routes through the existing prose
-dispatch.** Text realization goes through `story/presentation.py::render_text_as`
-(which already dispatches `on_render_text` / `do_render_text` over the ordinary
-authority chain) and composes under `prose/rendering.py::TextRenderSession` for bounded
-recursion. Concretely: `observe()` supplies *what* may be said, and the existing
-`on_render_text` chain decides *how it reads*. No parallel rendering path is
-introduced, and no new registration mechanism is required.
+that assembly grows an `observe()`. Adoption is strictly opt-in per concept, and no
+parallel rendering path is introduced: the controller, the authority chain, and the
+recursion bound are all the ones that already exist.
 
 ### Detail levels
 
@@ -161,14 +177,24 @@ A good coarse noun should support uses it was not designed for. Three that fall 
 That the first two are configurations rather than features is the argument that
 `Vantage` is a real noun and not a parameter.
 
-### Observation is redacted truth, not belief
+### Observation is truth-preserving, not belief
 
-An `Observation` is **true content, narrowed** — never false content. `observe(vantage)`
-is a *filter*, and the only operation it may perform is removal:
+An `Observation` carries **true content** — never false content. But `observe(vantage)`
+is a *truth-preserving projection over permitted inputs*, **not** set subtraction.
+Normalizing raw state into typed observations, aggregating components, and reporting
+*"a silhouette"* instead of a person are all transformations, and all legitimate. The
+invariant is about information flow, not about which operations are allowed:
 
 ```text
-observe(vantage) ⊆ the true state.   It may omit. It may not invent or alter.
+soundness    every claim in observe(vantage) is true of the underlying state
+             — it may abstract, aggregate, generalize, or re-type, but never invent
+
+opacity      no fact excluded by the vantage is recoverable from the output
+             — abstraction may lose detail; it may not smuggle it
 ```
+
+Set-subtraction is one way to satisfy both. Abstraction ("a silhouette"), aggregation
+(component union), and re-typing (raw state → `ValidityObservation`) are others.
 
 This is the decision that keeps the disclosure guarantee meaningful. If observations
 could carry vantage-relative falsehood, "nothing downstream of `observe()` consults
@@ -471,12 +497,23 @@ generated text**. Given a model, the ladder shifts:
 fabula-invariance never required identical discourse — replay-as-reskin explicitly wants
 different words for the same events. The constraint that follows is narrow:
 
-> The durable record is the observation / fragment. Generated prose is a projection over
-> it, never the stored artifact.
+> **Two durable records, different jobs.** Observations and referents are the durable
+> *semantic provenance*; `ContentFragment.content` is the durable *syuzhet* — the prose
+> the reader actually experienced.
 
-Store generated text as the journal and replay breaks; store the semantic fragment and
-render at display time, and a model is simply the fifth constraint source, behaving like
-the other four.
+Both persist. The journal contract is unchanged: realized prose is stored as the
+historical projection, and **ordinary retrieval returns what was read, never a silent
+regeneration**. Scrolling back must not quietly reword the past.
+
+Re-rendering is therefore an explicit operation, not a retrieval side effect. Replay,
+reskin, and retcon **produce replacement fragments and tombstone the superseded ones**
+— the same provenance-bearing tombstone discipline used elsewhere — so the record of
+what the reader saw, and the fact that it was later re-realized, both survive.
+
+The failure mode to avoid is narrower than "don't store prose": it is letting generated
+prose become the *only* record of an event — a fact that exists in the text and nowhere
+in the graph. Keep observations authoritative for meaning and fragments authoritative
+for experience, and a model is simply the fifth constraint source.
 
 ### What that fixes about the dependency question
 
@@ -502,11 +539,22 @@ Coverage masking is exactly where union is wrong — a tattoo under a coat must 
 appear — so outfit-aware composition overrides it. This is the posture already settled
 in `../mechanics/assembly/COMPONENT_DESIGN.md`.
 
-**The override is an ordinary dispatch handler, not a new registration path.** There is
-no separate "manager registry": an outfit-aware fold registers on the existing
-`on_render_text` / `BehaviorRegistry` chain at `DispatchLayer.DOMAIN`, and the shipped
-commutative union is the application-level default it supersedes. Same mechanism every
-other handler uses; nothing new to wire.
+**The override is an ordinary dispatch handler — but it cannot ride the text hook.**
+`do_render_text` is typed to `str | None` and raises `TypeError` on anything else, so a
+fold returning `Observation` data must **not** overload `on_render_text`. The correct
+shape reuses the same `BehaviorRegistry` with its own task:
+
+```text
+on_observe / do_observe    a future story-dispatch task returning Observation data
+                           (same registry, same authority layers, distinct task)
+on_render_text             existing, str | None — prose only, unchanged
+```
+
+An outfit-aware fold registers on `on_observe` at `DispatchLayer.DOMAIN`, superseding
+the shipped commutative union at the application layer. No new registration *mechanism*
+— but a new *task*, because the type contracts genuinely differ. Keeping the two tasks
+separate is also what makes the observation/prose type boundary real rather than
+nominal.
 
 ### Merge contract for the union
 
@@ -602,8 +650,10 @@ count.
 
 - Not a migration plan. Existing `describe()` implementations remain valid and
   unchanged; `observe()` is opt-in per concept.
-- Not a narrator subsystem. Unreliable/omniscient narration are vantage
-  configurations, not new machinery.
+- Not a narrator subsystem. **Omniscience** is a vantage configuration (a vantage with
+  no occlusion). **Unreliability is not** — false or distorted narration is the separate
+  authored distortion/revoicing layer downstream of `observe()`, per the
+  truth-preserving rule above.
 - Not a fragment channel. Observations feed descriptions, which feed journal
   fragments, which remain the only narrative output surface.
 - Not a merge of facets and observations (rule vs. result).
