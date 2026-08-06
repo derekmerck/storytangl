@@ -220,7 +220,10 @@ class MediaFragment(ContentFragment, extra="allow"):
         payload = dict(data)
         content = payload.get("content")
         if payload.get("content_format") == "rit" and isinstance(content, MediaRIT):
-            payload.setdefault("rit_id", content.uid)
+            rit_id = payload.get("rit_id")
+            if rit_id is not None and UUID(str(rit_id)) != content.uid:
+                raise ValueError("MediaRIT content and rit_id must refer to the same resource")
+            payload["rit_id"] = content.uid
         return payload
 
     def unstructure(self) -> UnstructuredData:
@@ -245,6 +248,8 @@ class MediaFragment(ContentFragment, extra="allow"):
         payload = dict(data)
         if payload.get("content_format") == "rit" and "content" not in payload:
             rit_id = payload.get("rit_id")
+            if rit_id is None:
+                raise ValueError("Restoring RIT media fragments requires a RIT reference")
             if _ctx is None:
                 raise ValueError("Restoring RIT media fragments requires an owning graph")
             if not isinstance(rit_id, UUID):
@@ -258,7 +263,10 @@ class MediaFragment(ContentFragment, extra="allow"):
     def evolve(self, **updates: Any) -> Self:
         """Copy a live fragment without serializing its graph-owned RIT."""
 
-        return self.model_copy(update=updates)
+        data = {**self.__dict__, **(self.__pydantic_extra__ or {}), **updates}
+        if "content" in updates and "rit_id" not in updates:
+            data["rit_id"] = None
+        return type(self).model_validate(data)
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:

@@ -64,6 +64,43 @@ def test_media_fragment_rit_round_trip_requires_an_owning_graph():
         MediaFragment.structure(payload)
 
 
+def test_rit_media_fragment_requires_a_persisted_reference():
+    """Reference-form RIT media cannot be restored without its RIT identifier."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+    payload = fragment.unstructure()
+    payload.pop("rit_id")
+
+    with pytest.raises(ValueError, match="requires a RIT reference"):
+        MediaFragment.structure(payload)
+
+
+def test_rit_media_fragment_normalizes_and_validates_its_reference():
+    """Live RIT content and persisted identity must always agree."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    matching = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+        rit_id=rit.uid,
+    )
+
+    assert matching.rit_id == rit.uid
+    with pytest.raises(ValueError, match="must refer to the same resource"):
+        MediaFragment(
+            content=rit,
+            content_type=MediaDataType.VECTOR,
+            content_format="rit",
+            rit_id=MediaRIT(data="other", data_type=MediaDataType.VECTOR).uid,
+        )
+
+
 def test_rit_media_fragment_evolves_without_losing_its_live_resource():
     """Step stamping preserves the graph-owned resource during live execution."""
 
@@ -79,6 +116,25 @@ def test_rit_media_fragment_evolves_without_losing_its_live_resource():
     assert evolved.content is rit
     assert evolved.rit_id == rit.uid
     assert evolved.step == 4
+
+
+def test_rit_media_fragment_evolution_revalidates_changed_content():
+    """Changing the live RIT recaptures its reference and rejects conflicts."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    replacement = MediaRIT(data="<svg id='replacement'/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+
+    evolved = fragment.evolve(content=replacement)
+
+    assert evolved.content is replacement
+    assert evolved.rit_id == replacement.uid
+    with pytest.raises(ValueError, match="must refer to the same resource"):
+        fragment.evolve(content=replacement, rit_id=rit.uid)
 
 
 def test_ledger_round_trip_rebinds_media_fragment_to_the_restored_rit():
