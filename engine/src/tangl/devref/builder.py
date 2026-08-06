@@ -15,6 +15,13 @@ from pathlib import Path
 from typing import Any
 
 from .annotations import extract_storytangl_topic_annotations
+from .issues import (
+    ISSUE_CACHE_RELPATH,
+    is_governing,
+    issue_cache_path,
+    load_issue_cache,
+    topic_labels,
+)
 from .models import (
     BuildReport,
     DevTopicFacet,
@@ -321,6 +328,11 @@ def iter_source_paths(repo_root: Path) -> list[Path]:
     found: set[Path] = set()
     for pattern in patterns:
         found.update(path for path in repo_root.glob(pattern) if path.is_file())
+    # The issue snapshot is a build source like any other file, so tracking it
+    # in the manifest is what makes a refreshed snapshot invalidate incrementally.
+    cache_path = issue_cache_path(repo_root)
+    if cache_path.is_file():
+        found.add(cache_path)
     return sorted(
         path for path in found
         if "__pycache__" not in path.parts and ".pytest_cache" not in path.parts
@@ -516,6 +528,49 @@ def extract_text_source(path: Path, source_hash: str, repo_root: Path) -> list[E
     return artifacts
 
 
+def extract_issue_source(path: Path, source_hash: str) -> list[ExtractedArtifact]:
+    """Extract one artifact per ``devref:``-labelled issue in the snapshot.
+
+    Each artifact carries the issue URL as its source path, so ``find`` and
+    ``pack`` hand back something addressable rather than the snapshot file.
+    Issue bodies are prose written against GitHub, not against the repository
+    tree, so no cross-artifact link metadata is derived from their links.
+    """
+
+    artifacts: list[ExtractedArtifact] = []
+    for issue in load_issue_cache(path).issues:
+        topic_ids = topic_labels(issue.labels)
+        if not topic_ids:
+            continue
+        governing = is_governing(issue.labels)
+        facet: DevTopicFacet = "governance" if governing else "notes"
+        relation: DevTopicRelation = "governs" if governing else "mentions"
+        annotation = TopicAnnotation(topics=topic_ids, facets=[facet], relation=relation)
+        artifacts.append(
+            ExtractedArtifact(
+                source_path=issue.url,
+                source_hash=source_hash,
+                artifact_key=f"issue:{issue.number}",
+                title=f"#{issue.number} {issue.title}",
+                kind="issue",
+                facet=facet,
+                relation=relation,
+                anchor=f"issue-{issue.number}",
+                summary=summarize_text(first_paragraph(issue.body) or issue.title),
+                content=issue.body,
+                metadata={
+                    "annotations": [annotation.model_dump(mode="python")],
+                    "related_paths": [],
+                    "symbol_refs": [],
+                    "issue_number": issue.number,
+                    "issue_state": issue.state,
+                    "issue_labels": issue.labels,
+                },
+            )
+        )
+    return artifacts
+
+
 def extract_source_file(
     path: Path,
     source_hash: str,
@@ -525,6 +580,8 @@ def extract_source_file(
 ) -> tuple[list[ExtractedArtifact], list[ExtractedSymbol]]:
     """Extract all supported artifacts and symbols from one source path."""
 
+    if path.relative_to(repo_root).as_posix() == ISSUE_CACHE_RELPATH:
+        return extract_issue_source(path, source_hash), []
     if path.suffix.lower() == ".py":
         return extract_python_source(
             path,
@@ -822,7 +879,13 @@ def build_index(
                 used_fts=used_fts,
             )
         build_mode = "incremental"
-        db.delete_source_paths(tuple(sorted(set(changed_paths + removed_paths))))
+        stale_paths = set(changed_paths) | set(removed_paths)
+        db.delete_source_paths(tuple(sorted(stale_paths)))
+        # Issue artifacts are keyed by GitHub URL rather than by the snapshot
+        # path, so path-based deletion cannot reach them: refreshing or dropping
+        # the snapshot clears the whole kind before the survivors are re-read.
+        if ISSUE_CACHE_RELPATH in stale_paths:
+            db.delete_artifact_kinds(("issue",))
 
     extracted_artifacts: list[ExtractedArtifact] = []
     extracted_symbols: list[ExtractedSymbol] = []

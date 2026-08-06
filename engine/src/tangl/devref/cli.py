@@ -10,7 +10,8 @@ import typer
 import yaml
 from pydantic import BaseModel
 
-from .builder import DEFAULT_DB_PATH, build_index
+from .builder import DEFAULT_DB_PATH, REPO_ROOT, build_index
+from .issues import issue_cache_path, load_issue_cache, sync_issues
 from .query import build_context_pack, get_topic_map, search_topics
 from .storage import DevRefDatabase
 
@@ -56,6 +57,27 @@ def build_command(
     """Build or refresh the local dev topic index."""
 
     report = build_index(db_path=db or DEFAULT_DB_PATH, incremental=not full)
+    _render(report, output_format=output_format)
+
+
+@app.command("sync-issues")
+def sync_issues_command(
+    limit: int = typer.Option(500, help="Maximum number of issues to request from GitHub."),
+    state: str = typer.Option("all", help="Issue state to fetch: open, closed, or all."),
+    output_format: FormatOption = "yaml",
+) -> None:
+    """Refresh the offline snapshot of ``devref:``-labelled issues.
+
+    This is the only devref command that reaches the network. It writes
+    ``tmp/devref/issues.json``; ``build`` reads whatever snapshot is on disk,
+    so the build itself stays offline and deterministic.
+    """
+
+    try:
+        report = sync_issues(REPO_ROOT, limit=limit, state=state)
+    except (OSError, RuntimeError) as exc:
+        typer.secho(f"Could not sync issues: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
     _render(report, output_format=output_format)
 
 
@@ -119,6 +141,8 @@ def status_command(
         state = "schema_only"
     elif built:
         state = "built"
+    cache_path = issue_cache_path(REPO_ROOT)
+    issue_cache = load_issue_cache(cache_path) if cache_path.exists() else None
     payload = {
         "db_path": str(database.path),
         "exists": exists,
@@ -132,6 +156,10 @@ def status_command(
         "symbols": database.symbol_count() if has_schema else 0,
         "topic_links": database.topic_link_count() if has_schema else 0,
         "artifact_links": database.artifact_link_count() if has_schema else 0,
+        "issue_cache_path": str(cache_path),
+        "issue_cache_synced_at": issue_cache.generated_at.isoformat() if issue_cache else None,
+        "issues_cached": len(issue_cache.issues) if issue_cache else 0,
+        "issues_indexed": database.artifact_kind_count("issue") if has_schema else 0,
     }
     _render(payload, output_format=output_format)
 
