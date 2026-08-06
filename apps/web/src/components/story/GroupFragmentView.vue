@@ -11,6 +11,7 @@ import type {
 import { fragmentText, isMediaFragment, mediaContentUrl } from './fragmentUtils'
 import { mediaRole } from './fragmentViewUtils'
 import MediaFragmentView from './MediaFragmentView.vue'
+import PieceMediaGroupView from './PieceMediaGroupView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
 import ZoneFragmentView from './ZoneFragmentView.vue'
 
@@ -57,6 +58,7 @@ const mediaUrl = (fragment: MediaStoryFragment): string | undefined => {
 
 const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefined =>
   media.find((item) => mediaRole(item) === 'avatar_im')
+
 </script>
 
 <template>
@@ -93,6 +95,12 @@ const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefine
 
     <ZoneFragmentView
       v-else-if="groupType === 'zone'"
+      :group="group"
+      :fragments="fragments"
+    />
+
+    <PieceMediaGroupView
+      v-else-if="groupType === 'piece_media'"
       :group="group"
       :fragments="fragments"
     />

@@ -754,8 +754,28 @@ class Ledger(Entity):
                 return [_coerce_kind_refs(item) for item in value]
             return value
 
+        def _bind_media_fragment_refs(output_data: UnstructuredData, graph: Graph) -> None:
+            """Bind persisted RIT media records to their restored graph resource."""
+
+            for record in output_data.get("members", []):
+                if (
+                    not isinstance(record, dict)
+                    or record.get("fragment_type") != "media"
+                    or record.get("content_format") != "rit"
+                    or "rit_id" not in record
+                    or "content" in record
+                ):
+                    continue
+                rit_id = _coerce_uuid(record["rit_id"])
+                rit = graph.get(rit_id)
+                if rit is None:
+                    raise LookupError(f"Media fragment RIT {rit_id} is not present in the graph")
+                record["content"] = rit
+
         graph = Graph.structure(_coerce_kind_refs(data["graph"]))
-        output_stream = OrderedRegistry.structure(_coerce_kind_refs(data.get("output_stream", {})))
+        output_data = _coerce_kind_refs(data.get("output_stream", {}))
+        _bind_media_fragment_refs(output_data, graph)
+        output_stream = OrderedRegistry.structure(output_data, _ctx=graph)
 
         return cls(
             uid=_coerce_uuid(data["uid"]),

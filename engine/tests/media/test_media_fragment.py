@@ -2,7 +2,14 @@
 
 from base64 import b64encode
 
+import pytest
+
+from tangl.core import Graph
 from tangl.journal.media import MediaFragment, StagingHints
+from tangl.media import MediaDataType
+from tangl.media.media_resource import MediaRITStatus, MediaResourceInventoryTag as MediaRIT
+from tangl.service.media import media_fragment_to_payload
+from tangl.vm import Ledger
 
 def test_media_fragment_with_url():
     # Test media fragment with URL
@@ -37,3 +44,182 @@ def test_media_fragment_with_binary_data():
     # Binary should be properly encoded
     assert serialized["content"] != binary_data
     assert serialized["content"] == b64encode(binary_data).decode("utf-8")
+
+
+def test_media_fragment_rit_round_trip_requires_an_owning_graph():
+    """A standalone persisted fragment cannot fabricate a graph-owned RIT."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+
+    payload = fragment.unstructure()
+
+    assert payload["rit_id"] == rit.uid
+    assert "content" not in payload
+    with pytest.raises(ValueError, match="requires an owning graph"):
+        MediaFragment.structure(payload)
+
+
+def test_rit_media_fragment_requires_a_persisted_reference():
+    """Reference-form RIT media cannot be restored without its RIT identifier."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+    payload = fragment.unstructure()
+    payload.pop("rit_id")
+
+    with pytest.raises(ValueError, match="requires a RIT reference"):
+        MediaFragment.structure(payload)
+
+
+def test_rit_media_fragment_normalizes_and_validates_its_reference():
+    """Live RIT content and persisted identity must always agree."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    matching = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+        rit_id=rit.uid,
+    )
+
+    assert matching.rit_id == rit.uid
+    with pytest.raises(ValueError, match="must refer to the same resource"):
+        MediaFragment(
+            content=rit,
+            content_type=MediaDataType.VECTOR,
+            content_format="rit",
+            rit_id=MediaRIT(data="other", data_type=MediaDataType.VECTOR).uid,
+        )
+
+
+def test_rit_media_fragment_evolves_without_losing_its_live_resource():
+    """Step stamping preserves the graph-owned resource during live execution."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+
+    evolved = fragment.evolve(step=4)
+
+    assert evolved.content is rit
+    assert evolved.rit_id == rit.uid
+    assert evolved.step == 4
+
+
+def test_rit_media_fragment_evolution_revalidates_changed_content():
+    """Changing the live RIT recaptures its reference and rejects conflicts."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    replacement = MediaRIT(data="<svg id='replacement'/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+
+    evolved = fragment.evolve(content=replacement)
+
+    assert evolved.content is replacement
+    assert evolved.rit_id == replacement.uid
+    with pytest.raises(ValueError, match="must refer to the same resource"):
+        fragment.evolve(content=replacement, rit_id=rit.uid)
+
+
+def test_ledger_round_trip_rebinds_media_fragment_to_the_restored_rit():
+    """Persisted journal media observes the restored graph resource lifecycle."""
+
+    graph = Graph()
+    start = graph.add_node(label="start")
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    graph.add(rit)
+    ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+    ledger.output_stream.append(fragment)
+
+    restored = Ledger.structure(ledger.unstructure())
+    restored_fragment = next(
+        item for item in restored.output_stream.values() if isinstance(item, MediaFragment)
+    )
+    restored_rit = restored.graph.get(rit.uid)
+
+    assert restored_fragment.content is restored_rit
+    restored_rit.status = MediaRITStatus.PENDING
+    assert media_fragment_to_payload(restored_fragment) is None
+
+
+def test_ledger_round_trip_preserves_legacy_inline_rit_media():
+    """Pre-reference journal records retain their inline media payload on restore."""
+
+    graph = Graph()
+    start = graph.add_node(label="start")
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    graph.add(rit)
+    ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+    ledger.output_stream.append(fragment)
+
+    payload = ledger.unstructure()
+    record = next(
+        item
+        for item in payload["output_stream"]["members"]
+        if item.get("fragment_type") == "media"
+    )
+    record["content"] = rit.unstructure()
+    record.pop("rit_id")
+
+    restored = Ledger.structure(payload)
+    restored_fragment = next(
+        item for item in restored.output_stream.values() if isinstance(item, MediaFragment)
+    )
+
+    assert isinstance(restored_fragment.content, MediaRIT)
+    assert restored_fragment.content.data == "<svg/>"
+
+
+@pytest.mark.parametrize(
+    ("content_format", "content", "expected_key"),
+    [
+        ("url", "https://example.com/card.svg", "url"),
+        ("data", b"card-data", "data"),
+        ("json", {"url": "https://example.com/card.svg"}, "url"),
+        ("xml", "<svg/>", "content"),
+    ],
+)
+def test_direct_media_payloads_keep_fragment_uid(
+    content_format: str,
+    content: str | bytes | dict[str, str],
+    expected_key: str,
+) -> None:
+    """Every direct media transport shape preserves the fragment relationship ID."""
+
+    fragment = MediaFragment(
+        content=content,
+        content_type=MediaDataType.VECTOR,
+        content_format=content_format,
+    )
+
+    payload = media_fragment_to_payload(fragment)
+
+    assert payload is not None
+    assert payload["uid"] == str(fragment.uid)
+    assert expected_key in payload

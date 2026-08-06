@@ -10,12 +10,12 @@ from __future__ import annotations
 from base64 import b64encode
 from collections.abc import Mapping
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Literal, Self
 from uuid import UUID
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
 
-from tangl.core import BaseFragment, Registry, Selector
+from tangl.core import BaseFragment, Graph, Registry, Selector
 from tangl.journal.intent import Accepts, Blocker, KvRow, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
@@ -202,12 +202,71 @@ class MediaFragment(ContentFragment, extra="allow"):
     """Media fragment that defers dereference and transport shaping to service."""
 
     content_type: MediaDataType = MediaDataType.MEDIA
-    content: Pathlike | bytes | str | dict | MediaRIT
+    content: MediaRIT | Pathlike | bytes | str | dict
     content_format: ContentFormatType
+    rit_id: UUID | None = None
     staging_hints: StagingHints | None = None
     media_role: str | None = None
     scope: str | None = "world"
     fragment_type: Literal["media"] = "media"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _capture_rit_reference(cls, data: Any) -> Any:
+        """Record graph-owned RIT identity while fresh fragments carry the object."""
+
+        if not isinstance(data, dict):
+            return data
+        payload = dict(data)
+        content = payload.get("content")
+        if payload.get("content_format") == "rit" and isinstance(content, MediaRIT):
+            rit_id = payload.get("rit_id")
+            if rit_id is not None and UUID(str(rit_id)) != content.uid:
+                raise ValueError("MediaRIT content and rit_id must refer to the same resource")
+            payload["rit_id"] = content.uid
+        return payload
+
+    def unstructure(self) -> UnstructuredData:
+        """Persist generated media as a graph RIT reference, never a detached copy."""
+
+        data = super().unstructure()
+        if self.content_format == "rit":
+            if self.rit_id is None:
+                raise ValueError("RIT media fragments require a MediaRIT reference")
+            data.pop("content", None)
+            data["rit_id"] = self.rit_id
+        return data
+
+    @classmethod
+    def structure(
+        cls,
+        data: UnstructuredData,
+        _ctx: Graph | None = None,
+    ) -> "MediaFragment":
+        """Rebind persisted RIT media through the restored owning graph."""
+
+        payload = dict(data)
+        if payload.get("content_format") == "rit" and "content" not in payload:
+            rit_id = payload.get("rit_id")
+            if rit_id is None:
+                raise ValueError("Restoring RIT media fragments requires a RIT reference")
+            if _ctx is None:
+                raise ValueError("Restoring RIT media fragments requires an owning graph")
+            if not isinstance(rit_id, UUID):
+                rit_id = UUID(str(rit_id))
+            rit = _ctx.get(rit_id)
+            if not isinstance(rit, MediaRIT):
+                raise LookupError(f"Media fragment RIT {rit_id} is not present in the graph")
+            payload["content"] = rit
+        return super().structure(payload, _ctx=_ctx)
+
+    def evolve(self, **updates: Any) -> Self:
+        """Copy a live fragment without serializing its graph-owned RIT."""
+
+        data = {**self.__dict__, **(self.__pydantic_extra__ or {}), **updates}
+        if "content" in updates and "rit_id" not in updates:
+            data["rit_id"] = None
+        return type(self).model_validate(data)
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:

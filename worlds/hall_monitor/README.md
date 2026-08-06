@@ -38,6 +38,10 @@ The worked vertical has parity at these surfaces:
 - **Text/media floor:** packet and document prose remains sufficient when no
   generated card is available; media is additive rather than a prerequisite for
   deciding.
+- **Visual witness:** the second fixed encounter presents Rowan Vale with red
+  hair while the generated student-ID card depicts its distinct blond recorded
+  subject. The ordinary subject-binding defect remains undisclosed until the
+  player inspects or verifies the ID.
 - **Playable client:** the reference web client renders packet pieces,
   inspection findings, and public action labels without receiving an expected
   disposition or hidden validity field.

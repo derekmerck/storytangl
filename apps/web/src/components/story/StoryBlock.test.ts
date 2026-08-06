@@ -89,6 +89,47 @@ describe('StoryBlock', () => {
     expect(img.props('src')).toBe('https://example.com/portrait.svg')
   })
 
+  it('renders published presence prose and associated piece media', (): void => {
+    const fragments: Record<string, StoryFragment> = {
+      candidate: {
+        uid: 'candidate',
+        fragment_type: 'piece',
+        piece_id: 'candidate-1',
+        kind: 'candidate',
+        content: 'Rowan Vale',
+        properties: { look_description: 'with red hair' },
+      },
+      identity: {
+        uid: 'identity',
+        fragment_type: 'piece',
+        piece_id: 'student-id',
+        kind: 'document',
+        content: 'Student ID',
+      },
+      card: {
+        uid: 'card',
+        fragment_type: 'media',
+        content: 'https://example.com/student-id.svg',
+        content_format: 'url',
+        media_role: 'credential_card',
+      },
+      relation: {
+        uid: 'relation',
+        fragment_type: 'group',
+        group_type: 'piece_media',
+        member_ids: ['identity', 'card'],
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['candidate', 'relation'])
+    const image = wrapper.findComponent({ name: 'VImg' })
+
+    expect(wrapper.text()).toContain('Rowan Vale')
+    expect(wrapper.text()).toContain('with red hair')
+    expect(wrapper.find('.piece-media-group').exists()).toBe(true)
+    expect(image.props('src')).toBe('https://example.com/student-id.svg')
+  })
+
   it('renders pending RIT media placeholders', () => {
     const fragments: Record<string, StoryFragment> = {
       media: {
