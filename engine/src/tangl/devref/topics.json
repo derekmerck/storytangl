@@ -346,7 +346,8 @@
       "replay",
       "open_link",
       "sandbox",
-      "widget"
+      "widget",
+      "observation"
     ]
   },
   {
@@ -431,7 +432,8 @@
     "related_topic_ids": [
       "assembly",
       "media",
-      "open_link"
+      "open_link",
+      "observation"
     ]
   },
   {
@@ -468,7 +470,8 @@
     "short_description": "Staged picking/inspection game: visible evidence vs hidden truth, mediation moves, disposition/penalty policy.",
     "related_topic_ids": [
       "assembly",
-      "dispatch"
+      "dispatch",
+      "observation"
     ]
   },
   {
@@ -485,7 +488,8 @@
     "short_description": "Media dependency/resource model and media-as-affordance attachment (pre-decided media bound on first sighting).",
     "related_topic_ids": [
       "open_link",
-      "presence"
+      "presence",
+      "observation"
     ]
   },
   {
@@ -522,7 +526,8 @@
     "short_description": "Backend-authored widget vocabulary: fragments, accepts, ui_hints, blockers, and projected state rendered by clients.",
     "related_topic_ids": [
       "journal",
-      "frame"
+      "frame",
+      "observation"
     ]
   },
   {
@@ -557,6 +562,28 @@
     "short_description": "Standalone catalog/sampler for names/regions/cultures built on Singleton catalogs; world-extensible.",
     "related_topic_ids": [
       "singleton"
+    ]
+  },
+  {
+    "topic_id": "observation",
+    "display_name": "Observation & Vantage",
+    "aliases": [
+      "vantage",
+      "observe",
+      "describe",
+      "perceptibility",
+      "referring expression",
+      "prose rendering",
+      "disclosure"
+    ],
+    "layer": "story",
+    "short_description": "Epistemic projection: what is perceptible from a vantage, how it is described at a level of detail, and how referring expressions are realized.",
+    "related_topic_ids": [
+      "journal",
+      "presence",
+      "credentials",
+      "media",
+      "widget"
     ]
   }
 ]
