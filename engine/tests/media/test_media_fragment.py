@@ -64,6 +64,23 @@ def test_media_fragment_rit_round_trip_requires_an_owning_graph():
         MediaFragment.structure(payload)
 
 
+def test_rit_media_fragment_evolves_without_losing_its_live_resource():
+    """Step stamping preserves the graph-owned resource during live execution."""
+
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+
+    evolved = fragment.evolve(step=4)
+
+    assert evolved.content is rit
+    assert evolved.rit_id == rit.uid
+    assert evolved.step == 4
+
+
 def test_ledger_round_trip_rebinds_media_fragment_to_the_restored_rit():
     """Persisted journal media observes the restored graph resource lifecycle."""
 
@@ -88,6 +105,39 @@ def test_ledger_round_trip_rebinds_media_fragment_to_the_restored_rit():
     assert restored_fragment.content is restored_rit
     restored_rit.status = MediaRITStatus.PENDING
     assert media_fragment_to_payload(restored_fragment) is None
+
+
+def test_ledger_round_trip_preserves_legacy_inline_rit_media():
+    """Pre-reference journal records retain their inline media payload on restore."""
+
+    graph = Graph()
+    start = graph.add_node(label="start")
+    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    graph.add(rit)
+    ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
+    fragment = MediaFragment(
+        content=rit,
+        content_type=MediaDataType.VECTOR,
+        content_format="rit",
+    )
+    ledger.output_stream.append(fragment)
+
+    payload = ledger.unstructure()
+    record = next(
+        item
+        for item in payload["output_stream"]["members"]
+        if item.get("fragment_type") == "media"
+    )
+    record["content"] = rit.unstructure()
+    record.pop("rit_id")
+
+    restored = Ledger.structure(payload)
+    restored_fragment = next(
+        item for item in restored.output_stream.values() if isinstance(item, MediaFragment)
+    )
+
+    assert isinstance(restored_fragment.content, MediaRIT)
+    assert restored_fragment.content.data == "<svg/>"
 
 
 @pytest.mark.parametrize(

@@ -762,6 +762,8 @@ class Ledger(Entity):
                     not isinstance(record, dict)
                     or record.get("fragment_type") != "media"
                     or record.get("content_format") != "rit"
+                    or "rit_id" not in record
+                    or "content" in record
                 ):
                     continue
                 rit_id = _coerce_uuid(record["rit_id"])

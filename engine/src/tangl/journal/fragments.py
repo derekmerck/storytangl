@@ -10,12 +10,12 @@ from __future__ import annotations
 from base64 import b64encode
 from collections.abc import Mapping
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Literal, Self
 from uuid import UUID
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
 
-from tangl.core import BaseFragment, Registry, Selector
+from tangl.core import BaseFragment, Graph, Registry, Selector
 from tangl.journal.intent import Accepts, Blocker, KvRow, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
@@ -235,22 +235,30 @@ class MediaFragment(ContentFragment, extra="allow"):
         return data
 
     @classmethod
-    def structure(cls, data: UnstructuredData, _ctx: Any = None) -> "MediaFragment":
+    def structure(
+        cls,
+        data: UnstructuredData,
+        _ctx: Graph | None = None,
+    ) -> "MediaFragment":
         """Rebind persisted RIT media through the restored owning graph."""
 
         payload = dict(data)
         if payload.get("content_format") == "rit" and "content" not in payload:
-            graph = getattr(_ctx, "graph", _ctx)
             rit_id = payload.get("rit_id")
-            if graph is None or not hasattr(graph, "get"):
+            if _ctx is None:
                 raise ValueError("Restoring RIT media fragments requires an owning graph")
             if not isinstance(rit_id, UUID):
                 rit_id = UUID(str(rit_id))
-            rit = graph.get(rit_id)
+            rit = _ctx.get(rit_id)
             if not isinstance(rit, MediaRIT):
                 raise LookupError(f"Media fragment RIT {rit_id} is not present in the graph")
             payload["content"] = rit
         return super().structure(payload, _ctx=_ctx)
+
+    def evolve(self, **updates: Any) -> Self:
+        """Copy a live fragment without serializing its graph-owned RIT."""
+
+        return self.model_copy(update=updates)
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:
