@@ -259,9 +259,12 @@ def test_sync_issues_writes_a_snapshot_the_builder_can_read(tmp_path, monkeypatc
         ]
 
     monkeypatch.setattr(issues_module, "fetch_issues", fake_fetch)
-    report = sync_issues(repo_root, limit=50, state="open")
+    report = sync_issues(repo_root, limit=50)
 
+    # Open by default: retrieval never shows an issue's state, so closed work
+    # would read as outstanding.
     assert captured == {"root": repo_root, "limit": 50, "state": "open"}
+    assert report.truncated is False
     assert report.cache_path == str(repo_root / ISSUE_CACHE_RELPATH)
     assert report.fetched == 3
     # Only devref-labelled issues are cached, whether or not the topic resolves.
@@ -273,6 +276,49 @@ def test_sync_issues_writes_a_snapshot_the_builder_can_read(tmp_path, monkeypatc
     hits = _issue_hits("entity", db_path)
 
     assert [artifact.title for artifact in hits] == ["#108 Ownership is unclear"]
+
+
+def test_sync_issues_flags_a_full_page_as_truncated(tmp_path, monkeypatch) -> None:
+    """A page that comes back full may have dropped issues, so say so."""
+
+    repo_root = _repo(tmp_path)
+    monkeypatch.setattr(
+        issues_module,
+        "fetch_issues",
+        lambda root, *, limit, state: [
+            {
+                "number": number,
+                "title": f"Item {number}",
+                "body": "",
+                "state": "OPEN",
+                "url": f"https://github.com/derekmerck/storytangl/issues/{number}",
+                "labels": [{"name": "devref:entity"}],
+            }
+            for number in range(limit)
+        ],
+    )
+
+    assert sync_issues(repo_root, limit=3).truncated is True
+    assert sync_issues(repo_root, limit=500).truncated is True
+
+
+def test_sync_issues_leaves_the_previous_snapshot_intact_when_it_fails(tmp_path, monkeypatch) -> None:
+    """An interrupted sync must not strand truncated JSON the builder chokes on."""
+
+    repo_root = _repo(tmp_path, [_issue(111, "Original entry", ["devref:entity"])])
+    cache_path = repo_root / ISSUE_CACHE_RELPATH
+    original = cache_path.read_text(encoding="utf-8")
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("gh issue list failed with exit code 1: interrupted")
+
+    monkeypatch.setattr(issues_module, "fetch_issues", explode)
+
+    with pytest.raises(RuntimeError):
+        sync_issues(repo_root)
+
+    assert cache_path.read_text(encoding="utf-8") == original
+    assert not list(cache_path.parent.glob("*.tmp"))
 
 
 def test_fetch_issues_reports_a_failing_gh_invocation(tmp_path, monkeypatch) -> None:

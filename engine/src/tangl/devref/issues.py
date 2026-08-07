@@ -124,8 +124,13 @@ def fetch_issues(repo_root: Path, *, limit: int, state: str) -> list[dict[str, A
     return json.loads(result.stdout)
 
 
-def sync_issues(repo_root: Path, *, limit: int = 500, state: str = "all") -> IssueSyncReport:
-    """Refresh the offline issue snapshot that the builder indexes."""
+def sync_issues(repo_root: Path, *, limit: int = 500, state: str = "open") -> IssueSyncReport:
+    """Refresh the offline issue snapshot that the builder indexes.
+
+    Only open issues are captured by default. Retrieval surfaces an issue's
+    title and topics but not its state, so indexing closed work would present
+    finished business as outstanding. Pass ``state="all"`` for archaeology.
+    """
 
     payload = fetch_issues(repo_root, limit=limit, state=state)
     records = [
@@ -138,8 +143,19 @@ def sync_issues(repo_root: Path, *, limit: int = 500, state: str = "all") -> Iss
     target = issue_cache_path(repo_root)
     target.parent.mkdir(parents=True, exist_ok=True)
     cache = IssueCache(generated_at=datetime.now(UTC), issues=records)
-    target.write_text(cache.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    # Write through a sibling and rename, so an interrupted sync leaves the
+    # previous snapshot intact rather than truncated JSON the builder cannot read.
+    staged = target.with_suffix(".json.tmp")
+    staged.write_text(cache.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    staged.replace(target)
 
+    truncated = len(payload) >= limit
+    if truncated:
+        logger.warning(
+            "GitHub returned the full requested page of %d issues; the snapshot may be "
+            "incomplete. Re-run with a higher --limit.",
+            limit,
+        )
     known_topic_ids = {topic.topic_id for topic in load_topics()}
     seen = sorted({topic_id for record in records for topic_id in topic_labels(record.labels)})
     unknown = [topic_id for topic_id in seen if topic_id not in known_topic_ids]
@@ -153,6 +169,7 @@ def sync_issues(repo_root: Path, *, limit: int = 500, state: str = "all") -> Iss
         cache_path=str(target),
         fetched=len(payload),
         indexed=len(records),
+        truncated=truncated,
         topics=[topic_id for topic_id in seen if topic_id in known_topic_ids],
         unknown_topics=unknown,
     )

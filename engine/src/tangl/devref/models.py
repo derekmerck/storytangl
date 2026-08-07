@@ -207,6 +207,7 @@ class IssueSyncReport(BaseModelPlus):
     cache_path: str
     fetched: int
     indexed: int
+    truncated: bool = False
     topics: list[str] = Field(default_factory=list)
     unknown_topics: list[str] = Field(default_factory=list)
 

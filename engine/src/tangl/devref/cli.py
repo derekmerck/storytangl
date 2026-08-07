@@ -63,10 +63,14 @@ def build_command(
 @app.command("sync-issues")
 def sync_issues_command(
     limit: int = typer.Option(500, help="Maximum number of issues to request from GitHub."),
-    state: str = typer.Option("all", help="Issue state to fetch: open, closed, or all."),
+    state: str = typer.Option(
+        "open",
+        help="Issue state to fetch: open, closed, or all. Retrieval does not show "
+        "state, so indexing closed issues presents finished work as outstanding.",
+    ),
     output_format: FormatOption = "yaml",
 ) -> None:
-    """Refresh the offline snapshot of ``devref:``-labelled issues.
+    """Refresh the offline snapshot of open ``devref:``-labelled issues.
 
     This is the only devref command that reaches the network. It writes
     ``tmp/devref/issues.json``; ``build`` reads whatever snapshot is on disk,
