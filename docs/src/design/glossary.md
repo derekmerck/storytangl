@@ -131,11 +131,44 @@ that distinction.
 |------|----------|------------|----------------|
 | **Behavior** | plugin | Callable registered for a specific task at a specific priority | `core.behavior.Behavior` |
 | **Task** | hook point | Named extension point in the pipeline (e.g., `validate_edge`, `render_journal`) | Task name string |
-| **Priority** | ordering | Execution order within a task: EARLY → NORMAL → LATE | `HandlerPriority` enum |
-| **Layer** | override scope | Dispatch tier: SYSTEM < APPLICATION < DOMAIN < INSTANCE | `DispatchLayer` enum |
+| **Priority** | ordering | Execution order within a task, applied *after* layer: FIRST → EARLY → NORMAL → LATE → LAST | `Priority` enum (`core.behavior`) |
+| **Layer** | override scope **and** visibility scope | Two orthogonal meanings — see *Dispatch layers* below. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
 | **Aggregation mode** | fold strategy | How multiple handler results combine: `all_true`, `gather`, `merge`, `first`, `last` | `AggregationMode` enum |
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
+
+### Dispatch layers carry two orthogonal meanings
+
+`DispatchLayer` is usually read as ordering alone. It is also an **isolation scope**, and
+choosing a layer is therefore an authoring decision about visibility, not only about
+override precedence.
+
+```text
+GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL
+```
+
+**1 · Execution order.** Layer sorts before per-layer `Priority`. `LOCAL` sorts *last*
+so it can observe and aggregate what earlier layers produced.
+
+**2 · Visibility scope.** Handlers reach a call through the authority chain assembled by
+`BehaviorRegistry` from `ctx.get_authorities()` (`core.behavior`), which cascades
+graph → world:
+
+| Layer | Scope | Meaning |
+|---|---|---|
+| `APPLICATION` | process-wide once imported | **available everywhere, not used everywhere.** A shipped mechanic registers here; a world that never imports it never loads it, and it stays dead code in that process |
+| `AUTHOR` | world-private | supplied by one world, reached only via that world's authority chain; other worlds do not see it |
+| `USER` / `LOCAL` | narrower still | per-session and per-call overrides, applied last |
+
+**Consequence authors should know:** an `APPLICATION`-level registration made *by a
+world* becomes visible to every other world in the same process. In a single-world
+process this is harmless. In a multi-tenant process it is an export — deliberate if you
+meant it, and your responsibility if you did not. Register world-specific behaviour at
+`AUTHOR` to keep it private.
+
+**Related invariant:** the engine wires no mechanics. Mechanics register themselves on
+import, and worlds choose which to import — see
+[CANON_AND_REALIZATION.md](CANON_AND_REALIZATION.md).
 
 ## Content and Presentation
 
