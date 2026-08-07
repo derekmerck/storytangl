@@ -64,13 +64,18 @@ VITE_DEFAULT_USER_SECRET=dev-secret-123 \
 yarn dev
 ```
 
-In the browser, enter the morning shift, inspect the doctor’s note, and choose
-one of the public rulings. A rules-correct `Send back to class` path reveals the
-inhaler outcome at the attendance note and offers `Meet the returning student`.
-An incorrect compassionate `Allow onward` path produces the contrasting
-world-authored outcome without changing the underlying score rule. An arrest
-does not offer a return. The return is an ordinary new credential encounter:
-its packet is fresh, while its bearer is the same live graph subject.
+In the browser, first meet Tess Alder and inspect her incomplete medical waiver.
+You may retain that visible document at the desk or settle her case normally.
+Later, Mira Quill has no medical waiver: without the retained document, the
+ordinary deny/compassionate branches remain available and no reissue action
+appears. With the retained document, the authorized reissue completes the same
+component and issues it into Mira's fresh packet; the ordinary credential
+evaluator then derives `PASS`. A rules-correct `Send back to class` path still
+reveals the inhaler outcome at the attendance note and offers `Meet the
+returning student`. An incorrect compassionate `Allow onward` path produces the
+contrasting world-authored outcome without changing the underlying score rule.
+An arrest does not offer a return. The return is an ordinary new credential
+encounter: its packet is fresh, while its bearer is the same live graph subject.
 
 ### Current framework friction
 

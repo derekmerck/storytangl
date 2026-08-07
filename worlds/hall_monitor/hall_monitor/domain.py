@@ -29,6 +29,7 @@ from tangl.mechanics.games.credentials_game import (
     CredentialsMove,
     CredentialsGame,
     CredentialsGameHandler,
+    derive_defects,
 )
 from tangl.mechanics.games.enums import RoundResult
 from tangl.mechanics.transaction import (
@@ -142,6 +143,7 @@ _HALL_FAILURES = (
 )
 _MEDIA_WITNESS_CASE_INDEX = 1
 _WAIVER_CASE_INDEX = 0
+_INHALER_CASE_INDEX = 2
 HALL_DESK_CUSTODY_SLOT = "retained_documents"
 
 
@@ -257,7 +259,7 @@ class HallMonitorCredentialsGame(CredentialsGame):
         json_schema_extra={"include": True},
     )
     waiver_case_index: int = _WAIVER_CASE_INDEX
-    inhaler_case_index: int = 2
+    inhaler_case_index: int = _INHALER_CASE_INDEX
     waiver_reissue_authorized: bool = True
 
     def bind_component_managers(self, owner: object) -> None:
@@ -376,7 +378,7 @@ class HallMonitorCredentialsHandler(CredentialsGameHandler):
         receipt = offer.accept()
         game.transaction_receipts.append(receipt)
         detail["outcome"] = "waiver_retained"
-        detail["component_id"] = component.uid
+        detail["component_id"] = str(component.uid)
         return RoundResult.CONTINUE
 
     def _reissue_waiver(
@@ -430,9 +432,13 @@ class HallMonitorCredentialsHandler(CredentialsGameHandler):
             ],
         )
         receipt = offer.accept()
+        game.presentation.render_case(
+            game.active_case,
+            derive_defects(packet, game.restriction_map),
+        )
         game.transaction_receipts.append(receipt)
         detail["outcome"] = "waiver_reissued"
-        detail["component_id"] = component.uid
+        detail["component_id"] = str(component.uid)
         return RoundResult.CONTINUE
 
     def _prose_fragments(
@@ -476,7 +482,7 @@ class HallMonitorBlock(HasGame, Block):
         }
     )
     seed: int = 20260719
-    inhaler_case_index: int = 2
+    inhaler_case_index: ClassVar[int] = _INHALER_CASE_INDEX
     consequences: list[HallMonitorConsequence] = Field(
         default_factory=list,
         json_schema_extra={"include": True},
@@ -487,6 +493,8 @@ class HallMonitorBlock(HasGame, Block):
 
     @model_validator(mode="after")
     def _configure_game(self) -> HallMonitorBlock:
+        if self.encounters < 3:
+            raise ValueError("Hall Monitor requires waiver, media, and Mira encounters")
         if self.game_state is None:
             self.game_state = HallMonitorCredentialsGame(
                 roster=[],
@@ -638,7 +646,7 @@ def render_hall_monitor_consequence(
     if consequence.outcome == "inhaler_withheld":
         content = (
             f"{subject} was sent back to class. Their inhaler remained at the "
-            "hall desk while the nurse's unsigned note was checked."
+            "hall desk while the missing medical waiver was recorded."
         )
     else:
         content = f"{subject} reached the nurse's office with their inhaler."

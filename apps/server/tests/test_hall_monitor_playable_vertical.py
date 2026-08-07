@@ -105,7 +105,7 @@ def test_hall_monitor_inspection_survives_http_session_reload(
     assert entered.status_code == 200
     entered_payload = entered.json()
     entered_text = json.dumps(entered_payload)
-    assert "Mira Quill steps forward." in entered_text
+    assert "Tess Alder steps forward." in entered_text
     assert "doctor's note" in entered_text
     assert "correct_disposition" not in entered_text
 
@@ -119,7 +119,7 @@ def test_hall_monitor_inspection_survives_http_session_reload(
     )
     assert inspected.status_code == 200
     inspected_text = json.dumps(inspected.json())
-    assert "The required nurse signature is missing." in inspected_text
+    assert "The required teacher signature is missing." in inspected_text
     assert "Send back to class" in inspected_text
     assert "correct_disposition" not in inspected_text
 
@@ -133,8 +133,8 @@ def test_hall_monitor_inspection_survives_http_session_reload(
     reloaded = client.get("story/update", headers=headers)
     assert reloaded.status_code == 200
     reloaded_text = json.dumps(reloaded.json())
-    assert "Mira Quill steps forward." in reloaded_text
-    assert "The required nurse signature is missing." in reloaded_text
+    assert "Tess Alder steps forward." in reloaded_text
+    assert "The required teacher signature is missing." in reloaded_text
 
 
 def test_hall_monitor_delivers_subject_mismatch_card_without_hidden_truth(

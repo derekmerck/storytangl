@@ -151,6 +151,13 @@ class TestHallMonitorWorld:
             )
             assert derive_disposition(case.packet_manager, game.restriction_map) is offer.target_disposition
 
+    def test_hall_monitor_requires_all_three_authored_encounters(self) -> None:
+        graph, _ = _started_shift()
+        block = graph.find_one(Selector(label="morning_shift"))
+
+        with pytest.raises(ValueError, match="requires waiver, media, and Mira"):
+            type(block)(encounters=2)
+
     def test_school_projection_and_full_shift_keep_the_shared_loop(self) -> None:
         _, ledger = _started_shift()
         first_case = ledger.cursor.game.active_case
@@ -215,6 +222,7 @@ class TestHallMonitorWorld:
         assert len(game.transaction_receipts) == 1
 
         _choose(ledger, "Send back to class")
+        tess_result = game.case_results[0].model_dump(mode="python")
         _advance_to_inhaler_case(ledger)
         mira_packet = game.active_case.packet_manager
         assert not mira_packet.get_slot(CREDENTIAL_PACKET_SLOT)
@@ -230,14 +238,25 @@ class TestHallMonitorWorld:
         assert completed[0].subject_id == mira_packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
         assert game.expected_disposition(game.active_case) is CredentialDisposition.PASS
         assert len(game.transaction_receipts) == 2
+        move_detail = game.transaction_receipts[1].details[0]
+        assert isinstance(move_detail, dict)
+        assert str(move_detail["asset_id"]) == str(waiver_id)
+
+        _inspect(ledger, "doctor's note")
+        reissued_text = _journal_text(ledger)
+        assert "Valid for this period" in reissued_text
+        assert "signature line is blank" not in reissued_text
+        assert game.case_results[0].model_dump(mode="python") == tess_result
 
         restored = Graph.structure(graph.unstructure())
         restored_game = restored.find_one(Selector(label="morning_shift")).game
-        restored_waiver = restored_game.active_case.packet_manager.get_slot(
-            CREDENTIAL_PACKET_SLOT
-        )[0]
+        restored_packet = restored_game.active_case.packet_manager
+        restored_waiver = restored_packet.get_slot(CREDENTIAL_PACKET_SLOT)[0]
         assert restored_waiver.uid == waiver_id
+        assert restored_waiver.status is CredentialStatus.VALID
+        assert restored_waiver.subject_id == restored_packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
         assert len(restored_game.transaction_receipts) == 2
+        assert restored_game.case_results[0].model_dump(mode="python") == tess_result
 
     def test_mira_has_no_reissue_action_without_the_retained_waiver(self) -> None:
         _, ledger = _started_shift()
