@@ -23,6 +23,7 @@ from tangl.core import TokenCatalog
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
+    CREDENTIAL_UNPRESENTED_SLOT,
     ContrabandItem,
     CredentialComponent,
     CredentialDefect,
@@ -173,6 +174,7 @@ def apply_failure(mode: FailureMode, case: CredentialCase) -> None:
                 id_component = id_components[0]
                 if mode is FailureMode.MISSING_ID:
                     case.packet_manager.unassign(CREDENTIAL_ID_SLOT, id_component)
+                    case.packet_manager.assign(CREDENTIAL_UNPRESENTED_SLOT, id_component)
                 elif mode is FailureMode.EXPIRED_ID:
                     id_component.status = CredentialStatus.EXPIRED
                 else:

@@ -34,6 +34,9 @@ world custody and return under explicit authority: reissue restores its native
 ``VALID`` status and subject binding, so the ordinary evaluator and existing
 validity presentation derive the renewed document state without a second expiry
 calculation.
+The response-window proof adds a separate unpresented packet slot: missing
+native components remain graph-owned but do not participate in visible document
+or evaluator projection until an explicit response move presents them.
 **Scope:** the *global* credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.

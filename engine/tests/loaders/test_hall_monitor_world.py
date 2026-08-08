@@ -13,6 +13,7 @@ from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
+    CREDENTIAL_UNPRESENTED_SLOT,
     CredentialDefinition,
     CredentialStatus,
     FailureMode,
@@ -231,7 +232,7 @@ class TestHallMonitorWorld:
         mira_packet = game.active_case.packet_manager
         assert not mira_packet.get_slot(CREDENTIAL_PACKET_SLOT)
 
-        _inspect(ledger, "student ID")
+        _inspect(ledger, "inhaler")
         assert "Complete and issue the medical waiver" in [
             action.label for action in _actions(ledger)
         ]
@@ -241,14 +242,24 @@ class TestHallMonitorWorld:
         assert completed == [waiver]
         assert completed[0].uid == waiver_id
         assert completed[0].status is CredentialStatus.VALID
-        assert completed[0].subject_id == mira_packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
+        assert completed[0].subject_id == mira_packet.bearer_id
         assert not game.desk_custody.get_slot(_DESK_CUSTODY_SLOT)
-        assert game.expected_disposition(game.active_case) is CredentialDisposition.PASS
+        assert game.expected_disposition(game.active_case) is CredentialDisposition.DENY
         assert len(game.transaction_receipts) == 2
         move_detail = game.transaction_receipts[1].details[0]
         assert isinstance(move_detail, dict)
         assert str(move_detail["asset_id"]) == str(waiver_id)
 
+        before_response = Graph.structure(graph.unstructure())
+        pre_response_game = before_response.find_one(
+            Selector(label="morning_shift")
+        ).game
+        pre_response_packet = pre_response_game.active_case.packet_manager
+        assert not pre_response_packet.get_slot(CREDENTIAL_ID_SLOT)
+        assert len(pre_response_packet.get_slot(CREDENTIAL_UNPRESENTED_SLOT)) == 1
+
+        _choose(ledger, "Request student ID")
+        assert game.expected_disposition(game.active_case) is CredentialDisposition.PASS
         _inspect(ledger, "doctor's note")
         reissued_text = _journal_text(ledger)
         assert "Valid for this period" in reissued_text
@@ -261,9 +272,11 @@ class TestHallMonitorWorld:
         restored_waiver = restored_packet.get_slot(CREDENTIAL_PACKET_SLOT)[0]
         assert restored_waiver.uid == waiver_id
         assert restored_waiver.status is CredentialStatus.VALID
-        assert restored_waiver.subject_id == restored_packet.get_slot(
-            CREDENTIAL_ID_SLOT
-        )[0].subject_id
+        assert restored_waiver.subject_id == restored_packet.bearer_id
+        restored_id = restored_packet.get_slot(CREDENTIAL_ID_SLOT)[0]
+        assert restored_id.subject_id == restored_packet.bearer_id
+        assert not restored_packet.get_slot(CREDENTIAL_UNPRESENTED_SLOT)
+        assert restored_game.finding_status["id"] == "cleared"
         assert len(restored_game.transaction_receipts) == 2
         assert restored_game.case_results[0].model_dump(mode="python") == tess_result
 
@@ -271,7 +284,7 @@ class TestHallMonitorWorld:
         _, ledger = _started_shift()
         _advance_to_inhaler_case(ledger)
 
-        _inspect(ledger, "student ID")
+        _inspect(ledger, "inhaler")
 
         assert "Complete and issue the medical waiver" not in [
             action.label for action in _actions(ledger)
@@ -308,7 +321,7 @@ class TestHallMonitorWorld:
         _choose(ledger, "Send back to class")
         _advance_to_inhaler_case(ledger)
         packet = game.active_case.packet_manager
-        _inspect(ledger, "student ID")
+        _inspect(ledger, "inhaler")
 
         def fail_late() -> None:
             raise RuntimeError("late failure")

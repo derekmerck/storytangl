@@ -155,9 +155,9 @@ def _special_student() -> ScenarioOffer:
         candidate_name="Mira Quill",
         region="lower",
         purpose="medicine",
-        failure_modes=[FailureMode.MISSING_PERMIT],
+        failure_modes=[FailureMode.MISSING_PERMIT, FailureMode.MISSING_ID],
         presented_documents_override={
-            "student ID": "A laminated lower-school student identification card.",
+            "inhaler": "An inhaler case is held openly at the student's side.",
         },
         packet_hidden_facts_override={
             "packet consistency": "The student's papers do not satisfy the hall rules.",
@@ -311,6 +311,11 @@ class HallMonitorCredentialsHandler(CredentialsGameHandler):
                     moves.append(
                         CredentialsMove(kind="reissue_waiver", target=str(component.uid))
                     )
+        if game.case_index == game.inhaler_case_index and not any(
+            component.indication == "medicine"
+            for component in game.active_case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
+        ):
+            moves = [move for move in moves if move.kind != "request_id"]
         return moves
 
     def get_move_label(self, game: HallMonitorCredentialsGame, move: CredentialsMove) -> str:
@@ -318,6 +323,8 @@ class HallMonitorCredentialsHandler(CredentialsGameHandler):
             return "Retain the medical waiver"
         if move.kind == "reissue_waiver":
             return "Complete and issue the medical waiver"
+        if move.kind == "request_id":
+            return "Request student ID"
         return super().get_move_label(game, move)
 
     def resolve_move_kind(
@@ -400,13 +407,12 @@ class HallMonitorCredentialsHandler(CredentialsGameHandler):
         if component is None:
             raise ValueError("The submitted waiver is not in desk custody")
         packet = game.active_case.packet_manager
-        id_card = packet.get_slot(CREDENTIAL_ID_SLOT)[0]
         original_status = component.status
         original_subject_id = component.subject_id
 
         def apply_completion() -> None:
             component.status = CredentialStatus.VALID
-            component.subject_id = id_card.subject_id
+            component.subject_id = packet.bearer_id
 
         def undo_completion() -> None:
             component.status = original_status
@@ -452,7 +458,15 @@ class HallMonitorCredentialsHandler(CredentialsGameHandler):
         if action == "retain_waiver":
             return [ContentFragment(content="You retain the medical waiver at the hall desk.")]
         if action == "reissue_waiver":
-            return [ContentFragment(content="You complete and issue the medical waiver.")]
+            return [
+                ContentFragment(content="You complete and issue the medical waiver."),
+                ContentFragment(content="Here is a pass; you'll need your ID to use it."),
+            ]
+        if action == "request_id" and notes.get("outcome") == "id_request_complied":
+            return [
+                ContentFragment(content="You request Mira's student ID."),
+                ContentFragment(content="That's okay; I have it here."),
+            ]
         return super()._prose_fragments(game, last_round, action, target, notes)
 
 

@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pytest
 
 from tangl.core import Graph
 from tangl.journal.fragments import ContentFragment, PieceFragment
-from tangl.mechanics.credentials import CREDENTIAL_ID_SLOT, materialize_packet
+from tangl.mechanics.credentials import (
+    CREDENTIAL_ID_SLOT,
+    CREDENTIAL_UNPRESENTED_SLOT,
+    CredentialComponent,
+    FailureMode,
+    RestrictionLevel,
+    Restrictions,
+    materialize_packet,
+)
 from tangl.mechanics.games import (
     CredentialStatus,
     CredentialToken,
@@ -15,11 +25,15 @@ from tangl.mechanics.games import (
     Indication,
     Region,
 )
+from tangl.mechanics.games.credentials_factory import build_valid, degrade
 from tangl.mechanics.games.credentials_game import (
     CredentialPresentationProfile,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
+    Finding,
+    FindingKey,
+    derive_disposition,
 )
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.mechanics.games.handlers import inject_game_context
@@ -80,6 +94,105 @@ def test_presentation_requires_text_for_every_invalid_status() -> None:
 
 class TestCredentialsCore:
     """Core shift behavior without the VM."""
+
+    @staticmethod
+    def _missing_id_game(
+        response: Literal["comply", "refuse"],
+    ) -> tuple[CredentialsGame, CredentialsGameHandler, CredentialComponent]:
+        restrictions = Restrictions.from_map(
+            {Region.LOCAL: {Indication.TRAVEL: RestrictionLevel.WITH_ID}}
+        )
+        case = build_valid(
+            Region.LOCAL,
+            Indication.TRAVEL,
+            restrictions,
+            candidate_name="Mara",
+        )
+        native_id = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+        degrade(case, [FailureMode.MISSING_ID])
+        case.id_request_response = response
+        game = CredentialsGame(roster=[case], restriction_map=restrictions)
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        return game, handler, native_id
+
+    def test_request_id_compliance_restores_the_native_component(self) -> None:
+        game, handler, native_id = self._missing_id_game("comply")
+
+        first_moves = handler.get_available_moves(game)
+        assert handler.get_available_moves(game) == first_moves
+        assert [move.kind for move in first_moves].count("request_id") == 1
+        assert game.active_case.packet_manager.get_slot(
+            CREDENTIAL_UNPRESENTED_SLOT
+        ) == [native_id]
+        assert (
+            derive_disposition(game.active_case.packet_manager, game.restriction_map)
+            is CredentialDisposition.DENY
+        )
+
+        handler.receive_move(game, ("request_id", ""))
+
+        assert game.active_case.packet_manager.get_slot(CREDENTIAL_ID_SLOT) == [
+            native_id
+        ]
+        assert not game.active_case.packet_manager.get_slot(CREDENTIAL_UNPRESENTED_SLOT)
+        assert game.finding_status[FindingKey.ID] == Finding.CLEARED
+        assert game.last_round is not None
+        assert game.last_round.notes["outcome"] == "id_request_complied"
+        assert game.last_round.notes["component_id"] == str(native_id.uid)
+        assert (
+            derive_disposition(game.active_case.packet_manager, game.restriction_map)
+            is CredentialDisposition.PASS
+        )
+        assert not any(
+            move.kind == "request_id" for move in handler.get_available_moves(game)
+        )
+        assert any(move.kind == "decide" for move in handler.get_available_moves(game))
+
+    def test_request_id_refusal_keeps_the_native_component_unpresented(self) -> None:
+        game, handler, native_id = self._missing_id_game("refuse")
+
+        first_moves = handler.get_available_moves(game)
+        assert handler.get_available_moves(game) == first_moves
+        assert [move.kind for move in first_moves].count("request_id") == 1
+
+        handler.receive_move(game, ("request_id", ""))
+
+        assert not game.active_case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
+        assert game.active_case.packet_manager.get_slot(
+            CREDENTIAL_UNPRESENTED_SLOT
+        ) == [native_id]
+        assert game.finding_status[FindingKey.ID] == Finding.REFUSED
+        assert game.last_round is not None
+        assert game.last_round.notes["outcome"] == "id_request_refused"
+        assert (
+            derive_disposition(game.active_case.packet_manager, game.restriction_map)
+            is CredentialDisposition.DENY
+        )
+        assert not any(
+            move.kind == "request_id" for move in handler.get_available_moves(game)
+        )
+        assert any(move.kind == "decide" for move in handler.get_available_moves(game))
+
+    def test_id_response_repair_supplies_justification_for_remaining_denial(self) -> None:
+        restrictions = Restrictions.from_map(
+            {Region.LOCAL: {Indication.TRAVEL: RestrictionLevel.WITH_PERMIT}}
+        )
+        case = build_valid(Region.LOCAL, Indication.TRAVEL, restrictions)
+        degrade(case, [FailureMode.MISSING_ID, FailureMode.MISSING_PERMIT])
+        game = CredentialsGame(
+            roster=[case],
+            restriction_map=restrictions,
+            no_evidence_penalty=1,
+        )
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, ("request_id", ""))
+        handler.receive_move(game, ("decide", "deny"))
+
+        assert game.case_results[0].correct is True
+        assert game.case_results[0].unjustified is False
 
     def test_inspect_reveals_hidden_finding(self) -> None:
         game, handler = _ready_game()
@@ -306,6 +419,43 @@ class TestCredentialsIntegration:
             "Inspect a document",
             choice_payload={"piece_ids": [f"{game.case_index}:{target}"]},
         )
+
+    def test_empty_packet_enters_the_response_window_in_live_provisioning(self) -> None:
+        restrictions = Restrictions.from_map(
+            {Region.LOCAL: {Indication.TRAVEL: RestrictionLevel.WITH_ID}}
+        )
+        case = build_valid(Region.LOCAL, Indication.TRAVEL, restrictions)
+        degrade(case, [FailureMode.MISSING_ID])
+
+        graph = Graph(label="credential_id_response")
+        intro = graph.add_node(kind=Block, label="intro")
+        victory = graph.add_node(kind=Block, label="victory")
+        defeat = graph.add_node(kind=Block, label="defeat")
+        block = CredentialsBlock.create_game_block(
+            graph=graph,
+            game_class=CredentialsGame,
+            handler_class=CredentialsGameHandler,
+            victory_dest=victory,
+            defeat_dest=defeat,
+            label="checkpoint",
+        )
+        block.game.roster = [case]
+        block.game.restriction_map = restrictions
+        block.game_handler.setup(block.game)
+        assert block.game.current_stage == "packet"
+
+        ChoiceEdge(
+            graph=graph,
+            predecessor_id=intro.uid,
+            successor_id=block.uid,
+            label="Open the gate ledger",
+        )
+        ledger = Ledger.from_graph(graph=graph, entry_id=intro.uid)
+        ledger.resolve_choice(next(edge.uid for edge in intro.edges_out()))
+
+        assert "Request ID" in self._labels(ledger)
+        self._choose(ledger, "Request ID")
+        assert "Choose pass" in self._labels(ledger)
 
     def test_walk_full_roster_to_victory(self) -> None:
         graph = Graph(label="credential_shift")
