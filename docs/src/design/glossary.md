@@ -203,9 +203,14 @@ to `seq` — the monotonic registration counter, last key of `sort_key` — so a
 **first registered wins**, which is the expected declaration-order reading. The rare
 override and the ordinary case are served by one rule.
 
-The practical consequence is only that *abstention is the contract*: a redirect handler
-that has no opinion must return `None`, not a default edge. Returning something
-unconditionally at an early layer silently claims every traversal.
+The practical consequence is that *abstention is the contract*: a redirect handler with
+no opinion must return `None`, not a default edge. Returning something unconditionally at
+an early layer silently claims every traversal.
+
+One consequence is worth knowing before choosing a layer: the declarative
+`trigger_phase` edge scanner is itself a `SYSTEM`-layer handler, so it preempts anything
+registered at `APPLICATION`. A redirect meant to trump story-level ones belongs at
+`GLOBAL`. See [Redirect precedence](traversal/NAV_DESIGN.md#redirect-precedence-who-claims-the-jump).
 
 **Folds select results; they do not gate execution.** Every matching handler in the
 assembled chain runs, whatever the fold. All live sites drain the receipt iterator
