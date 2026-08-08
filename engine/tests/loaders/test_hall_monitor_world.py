@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from pathlib import Path
 from uuid import uuid4
 
@@ -19,7 +18,11 @@ from tangl.mechanics.credentials import (
     FailureMode,
 )
 from tangl.mechanics.presence.look import HairColor, HasSimpleLook
-from tangl.mechanics.transaction import CallbackCommitment, TransactionOffer
+from tangl.mechanics.transaction import (
+    CallbackCommitment,
+    TransactionOffer,
+    TransactionReceipt,
+)
 from tangl.mechanics.games.credentials_game import CredentialDisposition, derive_disposition
 from tangl.mechanics.games.credentials_roster import materialize
 from tangl.service.world_registry import WorldRegistry
@@ -28,6 +31,9 @@ from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
+
+
+_DESK_CUSTODY_SLOT = "retained_documents"
 
 
 def _repo_worlds_dir() -> Path:
@@ -70,12 +76,6 @@ def _journal_text(ledger: Ledger) -> str:
         for fragment in ledger.get_journal()
         if isinstance(fragment.content, str)
     )
-
-
-def _desk_custody_slot() -> str:
-    """Load the world-owned custody slot after the bundle has imported its domain."""
-
-    return import_module("hall_monitor.domain").HALL_DESK_CUSTODY_SLOT
 
 
 def _finish_shift_correctly(ledger: Ledger) -> None:
@@ -221,7 +221,7 @@ class TestHallMonitorWorld:
             action.label for action in _actions(ledger)
         ]
         _choose(ledger, "Retain the medical waiver")
-        assert game.desk_custody.get_slot(_desk_custody_slot()) == [waiver]
+        assert game.desk_custody.get_slot(_DESK_CUSTODY_SLOT) == [waiver]
         assert not game.active_case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
         assert len(game.transaction_receipts) == 1
 
@@ -232,7 +232,9 @@ class TestHallMonitorWorld:
         assert not mira_packet.get_slot(CREDENTIAL_PACKET_SLOT)
 
         _inspect(ledger, "student ID")
-        assert "Complete and issue the medical waiver" in [action.label for action in _actions(ledger)]
+        assert "Complete and issue the medical waiver" in [
+            action.label for action in _actions(ledger)
+        ]
         _choose(ledger, "Complete and issue the medical waiver")
 
         completed = mira_packet.get_slot(CREDENTIAL_PACKET_SLOT)
@@ -240,7 +242,7 @@ class TestHallMonitorWorld:
         assert completed[0].uid == waiver_id
         assert completed[0].status is CredentialStatus.VALID
         assert completed[0].subject_id == mira_packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
-        assert not game.desk_custody.get_slot(_desk_custody_slot())
+        assert not game.desk_custody.get_slot(_DESK_CUSTODY_SLOT)
         assert game.expected_disposition(game.active_case) is CredentialDisposition.PASS
         assert len(game.transaction_receipts) == 2
         move_detail = game.transaction_receipts[1].details[0]
@@ -313,7 +315,7 @@ class TestHallMonitorWorld:
 
         original_accept = TransactionOffer.accept
 
-        def accept_with_late_failure(offer: TransactionOffer):
+        def accept_with_late_failure(offer: TransactionOffer) -> TransactionReceipt:
             if offer.label == "complete medical waiver":
                 offer.commitments.append(CallbackCommitment(label="fail late", apply=fail_late))
             return original_accept(offer)
@@ -323,7 +325,7 @@ class TestHallMonitorWorld:
         with pytest.raises(RuntimeError, match="late failure"):
             _choose(ledger, "Complete and issue the medical waiver")
 
-        assert game.desk_custody.get_slot(_desk_custody_slot()) == [waiver]
+        assert game.desk_custody.get_slot(_DESK_CUSTODY_SLOT) == [waiver]
         assert not packet.get_slot(CREDENTIAL_PACKET_SLOT)
         assert waiver.status is original_status
         assert waiver.subject_id == original_subject_id
