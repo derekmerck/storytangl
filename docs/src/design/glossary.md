@@ -137,34 +137,38 @@ that distinction.
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
 
-### Dispatch layers carry two orthogonal meanings
+### Layers order; registries scope
 
-`DispatchLayer` is usually read as ordering alone. It is also an **isolation scope**, and
-choosing a layer is therefore an authoring decision about visibility, not only about
-override precedence.
+Two **independent** axes, commonly conflated because the layer *names* suggest scopes.
+They are not scopes.
 
-```text
-GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL
-```
+**1 · Registry membership determines visibility.** A behaviour is reachable when the
+registry holding it is in the assembled chain. `BehaviorRegistry.chain_execute_all`
+assembles registries from explicit arguments, then `ctx.get_authorities()` (which
+cascades graph → world, with `World.get_authorities()` returning the world's own
+`dispatch` registry plus any extra authorities), then inline behaviours — deduplicated by
+identity. Handlers from *all* assembled registries are then pooled together.
 
-**1 · Execution order.** Layer sorts before per-layer `Priority`. `LOCAL` sorts *last*
-so it can observe and aggregate what earlier layers produced.
+**2 · `DispatchLayer` determines order only.** It is simply the first element of
+`Behavior.sort_key` — `(dispatch_layer, priority, wants_exact_kind, seq)` — applied across
+that pooled set. It confers no visibility of any kind. `LOCAL` sorts last so it can
+observe and aggregate what earlier layers produced.
 
-**2 · Visibility scope.** Handlers reach a call through the authority chain assembled by
-`BehaviorRegistry` from `ctx.get_authorities()` (`core.behavior`), which cascades
-graph → world:
-
-| Layer | Scope | Meaning |
+| Where it is registered | Visible | Layer's role there |
 |---|---|---|
-| `APPLICATION` | process-wide once imported | **available everywhere, not used everywhere.** A shipped mechanic registers here; a world that never imports it never loads it, and it stays dead code in that process |
-| `AUTHOR` | world-private | supplied by one world, reached only via that world's authority chain; other worlds do not see it |
-| `USER` / `LOCAL` | narrower still | per-session and per-call overrides, applied last |
+| shared module registry (e.g. `story_dispatch`) | everywhere that registry is consulted | ordering only — an `AUTHOR`-layer handler here is still global, just sorted later |
+| a world's own `dispatch` registry | only when that world's authorities are in the chain | ordering only — a `SYSTEM`-layer handler here is still world-private, just sorted first |
 
-**Consequence authors should know:** an `APPLICATION`-level registration made *by a
-world* becomes visible to every other world in the same process. In a single-world
-process this is harmless. In a multi-tenant process it is an export — deliberate if you
-meant it, and your responsibility if you did not. Register world-specific behaviour at
-`AUTHOR` to keep it private.
+**The practical trap.** The module-level decorators (`@on_render_text`, `@on_gather_ns`,
+…) register into the **shared** story registry. Passing `dispatch_layer=AUTHOR` to one of
+them does **not** make a handler world-private — it only makes it sort later. To get
+world-privacy, register into the world's own registry. `worlds/composed_beat_demo` is a
+live example of the ordering use: its `AUTHOR`-layer namespace override wins because it
+sorts after the application default, not because it is scoped.
+
+Compounding this, `BehaviorRegistry.default_dispatch_layer` is `APPLICATION`, so a
+registration that omits the layer gets `APPLICATION` **regardless of which registry it
+lands in** — which is exactly how the two axes come to look like one.
 
 **Related invariant:** the engine wires no mechanics. Mechanics register themselves on
 import, and worlds choose which to import — see

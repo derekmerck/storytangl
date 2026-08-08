@@ -116,10 +116,12 @@ import mechanics" and ended with a stronger, testable law:
 > which mechanics to import**. Story knows only that it calls `x`; anything wishing to
 > participate registers with `x` and produces something `x`-shaped.
 
-Note what did *not* change: presence is still legitimately an APPLICATION-layer mechanic,
-because application scope means *available everywhere*, not *used everywhere*. A world
-that never imports presence never loads it, and a single-world server can run with it as
-dead code. The defect was never the layer — it was who caused the import.
+Note what did *not* change: presence is still legitimately a *shipped default mechanic*
+whose handlers land in the shared story registry, and that is fine — a world that never
+imports presence never loads it, and a single-world server can run with it as dead code.
+The defect was never the layer, nor even the shared registry; it was **who caused the
+import**. (Layer confers no visibility at all — see *Layers order; registries scope* in
+the [glossary](glossary.md).)
 
 ## Review rhythm
 
