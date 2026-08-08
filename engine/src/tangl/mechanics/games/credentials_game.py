@@ -1212,9 +1212,12 @@ class CredentialsGame(PickingGame):
         else:
             self.shift_complete = True
 
-        self.current_stage = (
-            "documents" if not self.shift_complete and self.presented_documents else "packet"
-        )
+        if self.shift_complete:
+            self.current_stage = "packet"
+        elif not self.offers or len(self.materialized) > self.case_index:
+            self.current_stage = "documents" if self.presented_documents else "packet"
+        else:
+            self.current_stage = "documents"
         self.inspected_targets = []
         self.revealed_findings = {}
         self.inspected_packet_targets = []
@@ -1266,11 +1269,13 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     game_cls: ClassVar[type[Game]] = CredentialsGame
 
     def on_setup(self, game: CredentialsGame) -> None:
-        """Prepare the first sampled packet before move provisioning begins."""
+        """Prepare graph-owned offers, without sampling an unresolved lazy roster."""
 
         if game.has_component_manager_owner and game.offers:
-            game.prepare_case(game.case_index)
-        if not game.presented_documents:
+            case = game.prepare_case(game.case_index)
+            if not case.presented_documents:
+                game.current_stage = "packet"
+        elif not game.offers and not game.presented_documents:
             game.current_stage = "packet"
 
     def provision_presentation(self, game: CredentialsGame, *, ctx: VmPhaseCtx) -> None:
@@ -1283,6 +1288,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             indices.append(game.case_index + 1)
         for case_index in indices:
             case = game.prepare_case(case_index)
+            if case_index == game.case_index and not case.presented_documents:
+                game.current_stage = "packet"
             self._provision_case_presentation(
                 game,
                 case=case,
