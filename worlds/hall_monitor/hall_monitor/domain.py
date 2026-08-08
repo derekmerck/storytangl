@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import ClassVar, Literal
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -10,12 +10,15 @@ from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
+    CREDENTIAL_PACKET_SLOT,
+    CredentialComponent,
     CredentialDefinition,
     CredentialStatus,
     FailureMode,
     Restrictions,
     RestrictionLevel,
 )
+from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.presence.look import HairColor, HasSimpleLook
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.credentials_game import (
@@ -23,8 +26,18 @@ from tangl.mechanics.games.credentials_game import (
     CredentialCaseResult,
     CredentialDisposition,
     CredentialPresentationProfile,
+    CredentialsMove,
     CredentialsGame,
     CredentialsGameHandler,
+    derive_defects,
+)
+from tangl.mechanics.games.enums import RoundResult
+from tangl.mechanics.transaction import (
+    AssetMoveCommitment,
+    CallbackCommitment,
+    ComponentSlotAssetHolder,
+    TransactionOffer,
+    TransactionReceipt,
 )
 from tangl.mechanics.games.credentials_roster import (
     ScenarioOffer,
@@ -129,6 +142,9 @@ _HALL_FAILURES = (
     FailureMode.FAKE_ID,
 )
 _MEDIA_WITNESS_CASE_INDEX = 1
+_WAIVER_CASE_INDEX = 0
+_INHALER_CASE_INDEX = 2
+HALL_DESK_CUSTODY_SLOT = "retained_documents"
 
 
 def _special_student() -> ScenarioOffer:
@@ -139,13 +155,9 @@ def _special_student() -> ScenarioOffer:
         candidate_name="Mira Quill",
         region="lower",
         purpose="medicine",
-        failure_modes=[FailureMode.UNSEALED_PERMIT],
+        failure_modes=[FailureMode.MISSING_PERMIT],
         presented_documents_override={
             "student ID": "A laminated lower-school student identification card.",
-            "doctor's note": "A doctor's note for an inhaler, lacking the nurse's signature.",
-        },
-        hidden_facts_override={
-            "doctor's note": "The required nurse signature is missing.",
         },
         packet_hidden_facts_override={
             "packet consistency": "The student's papers do not satisfy the hall rules.",
@@ -165,6 +177,22 @@ def _media_witness_student() -> ScenarioOffer:
     )
 
 
+def _waiver_student() -> ScenarioOffer:
+    """Return the earlier incomplete waiver that Hall Monitor may retain."""
+
+    return ScenarioOffer(
+        target_disposition=CredentialDisposition.DENY,
+        candidate_name="Tess Alder",
+        region="lower",
+        purpose="medicine",
+        failure_modes=[FailureMode.UNSEALED_PERMIT],
+        presented_documents_override={
+            "student ID": "A laminated lower-school student identification card.",
+            "doctor's note": "A nurse waiver awaiting its completed signature.",
+        },
+    )
+
+
 def _hall_offers(
     *,
     encounters: int,
@@ -173,7 +201,7 @@ def _hall_offers(
 ) -> list[ScenarioOffer]:
     """Generate one configured school shift through the shared roster funnel."""
 
-    pinned = [_special_student(), _media_witness_student()]
+    pinned = [_waiver_student(), _media_witness_student(), _special_student()]
     if encounters <= len(pinned):
         return pinned[:encounters]
     sampled = generate_roster(
@@ -190,6 +218,28 @@ def _hall_offers(
     return [*pinned, *sampled]
 
 
+def _is_document(component: CredentialComponent) -> bool:
+    return component.document_kind == "document"
+
+
+class HallMonitorDeskCustodyManager(ComponentManager[CredentialComponent]):
+    """Hall Monitor's durable desk custody for retained credential documents.
+
+    Why
+    ---
+    The retained waiver remains a graph-owned credential component while it is
+    no longer in its first candidate's packet.
+    """
+
+    slots: ClassVar[dict[str, Slot]] = {
+        HALL_DESK_CUSTODY_SLOT: Slot.for_predicate(
+            HALL_DESK_CUSTODY_SLOT,
+            _is_document,
+            max_count=1,
+        ),
+    }
+
+
 class HallMonitorCredentialsGame(CredentialsGame):
     """School-specific credentials shift with the bounded school catalog."""
 
@@ -200,6 +250,23 @@ class HallMonitorCredentialsGame(CredentialsGame):
     presentation: CredentialPresentationProfile = Field(
         default_factory=lambda: HALL_PRESENTATION.model_copy(deep=True)
     )
+    desk_custody: HallMonitorDeskCustodyManager = Field(
+        default_factory=HallMonitorDeskCustodyManager,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+    transaction_receipts: list[TransactionReceipt] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True},
+    )
+    waiver_case_index: int = _WAIVER_CASE_INDEX
+    inhaler_case_index: int = _INHALER_CASE_INDEX
+    waiver_reissue_authorized: bool = True
+
+    def bind_component_managers(self, owner: object) -> None:
+        """Bind both candidate packets and the world-owned custody manager."""
+
+        super().bind_component_managers(owner)
+        self.desk_custody.bind_owner(owner)
 
     def prepare_case(self, case_index: int) -> CredentialCase:
         """Materialize the world-owned visual mismatch with distinct live looks."""
@@ -216,6 +283,177 @@ class HallMonitorCredentialsGame(CredentialsGame):
         bearer.look.hair_color = HairColor.RED
         id_subject.look.hair_color = HairColor.BLONDE
         return case
+
+
+class HallMonitorCredentialsHandler(CredentialsGameHandler):
+    """Add Hall Monitor's narrow custody and authorized-reissue actions.
+
+    Why
+    ---
+    The world owns when a visible document may be retained and reissued; the
+    shared credential game continues to own evaluation and scoring.
+    """
+
+    def get_available_moves(self, game: HallMonitorCredentialsGame) -> list[CredentialsMove]:
+        moves = super().get_available_moves(game)
+        if game.current_stage == "documents":
+            return moves
+
+        if game.case_index == game.waiver_case_index:
+            for component in game.active_case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT):
+                if component.indication == "medicine":
+                    moves.append(
+                        CredentialsMove(kind="retain_waiver", target=str(component.uid))
+                    )
+        elif game.case_index == game.inhaler_case_index and game.waiver_reissue_authorized:
+            for component in game.desk_custody.get_slot(HALL_DESK_CUSTODY_SLOT):
+                if component.indication == "medicine":
+                    moves.append(
+                        CredentialsMove(kind="reissue_waiver", target=str(component.uid))
+                    )
+        return moves
+
+    def get_move_label(self, game: HallMonitorCredentialsGame, move: CredentialsMove) -> str:
+        if move.kind == "retain_waiver":
+            return "Retain the medical waiver"
+        if move.kind == "reissue_waiver":
+            return "Complete and issue the medical waiver"
+        return super().get_move_label(game, move)
+
+    def resolve_move_kind(
+        self,
+        kind: str,
+        game: HallMonitorCredentialsGame,
+        player_move: CredentialsMove,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        if kind == "retain_waiver":
+            return self._retain_waiver(game, player_move.target, detail)
+        if kind == "reissue_waiver":
+            return self._reissue_waiver(game, player_move.target, detail)
+        return super().resolve_move_kind(kind, game, player_move, detail)
+
+    @staticmethod
+    def _active_waiver(
+        game: HallMonitorCredentialsGame,
+        component_id: str,
+    ) -> CredentialComponent | None:
+        return next(
+            (
+                component
+                for component in game.active_case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
+                if str(component.uid) == component_id and component.indication == "medicine"
+            ),
+            None,
+        )
+
+    def _retain_waiver(
+        self,
+        game: HallMonitorCredentialsGame,
+        component_id: str,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        if game.case_index != game.waiver_case_index:
+            raise ValueError("Medical waiver retention is not available for this candidate")
+        component = self._active_waiver(game, component_id)
+        if component is None:
+            raise ValueError("The submitted waiver is not visible in this packet")
+        offer = TransactionOffer(
+            label="retain medical waiver",
+            commitments=[
+                AssetMoveCommitment(
+                    giver=ComponentSlotAssetHolder(
+                        game.active_case.packet_manager,
+                        CREDENTIAL_PACKET_SLOT,
+                    ),
+                    receiver=ComponentSlotAssetHolder(
+                        game.desk_custody,
+                        HALL_DESK_CUSTODY_SLOT,
+                    ),
+                    asset=component,
+                    label="retain medical waiver",
+                ),
+            ],
+        )
+        receipt = offer.accept()
+        game.transaction_receipts.append(receipt)
+        detail["outcome"] = "waiver_retained"
+        detail["component_id"] = str(component.uid)
+        return RoundResult.CONTINUE
+
+    def _reissue_waiver(
+        self,
+        game: HallMonitorCredentialsGame,
+        component_id: str,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        if game.case_index != game.inhaler_case_index or not game.waiver_reissue_authorized:
+            raise ValueError("Medical waiver reissue is not authorized here")
+        component = next(
+            (
+                item
+                for item in game.desk_custody.get_slot(HALL_DESK_CUSTODY_SLOT)
+                if str(item.uid) == component_id and item.indication == "medicine"
+            ),
+            None,
+        )
+        if component is None:
+            raise ValueError("The submitted waiver is not in desk custody")
+        packet = game.active_case.packet_manager
+        id_card = packet.get_slot(CREDENTIAL_ID_SLOT)[0]
+        original_status = component.status
+        original_subject_id = component.subject_id
+
+        def apply_completion() -> None:
+            component.status = CredentialStatus.VALID
+            component.subject_id = id_card.subject_id
+
+        def undo_completion() -> None:
+            component.status = original_status
+            component.subject_id = original_subject_id
+
+        offer = TransactionOffer(
+            label="complete medical waiver",
+            commitments=[
+                CallbackCommitment(
+                    label="complete medical waiver",
+                    apply=apply_completion,
+                    undo=undo_completion,
+                ),
+                AssetMoveCommitment(
+                    giver=ComponentSlotAssetHolder(game.desk_custody, HALL_DESK_CUSTODY_SLOT),
+                    receiver=ComponentSlotAssetHolder(
+                        game.active_case.packet_manager,
+                        CREDENTIAL_PACKET_SLOT,
+                    ),
+                    asset=component,
+                    label="issue medical waiver",
+                ),
+            ],
+        )
+        receipt = offer.accept()
+        game.presentation.render_case(
+            game.active_case,
+            derive_defects(packet, game.restriction_map),
+        )
+        game.transaction_receipts.append(receipt)
+        detail["outcome"] = "waiver_reissued"
+        detail["component_id"] = str(component.uid)
+        return RoundResult.CONTINUE
+
+    def _prose_fragments(
+        self,
+        game: HallMonitorCredentialsGame,
+        last_round: object,
+        action: str,
+        target: str,
+        notes: dict[str, object],
+    ) -> list[ContentFragment]:
+        if action == "retain_waiver":
+            return [ContentFragment(content="You retain the medical waiver at the hall desk.")]
+        if action == "reissue_waiver":
+            return [ContentFragment(content="You complete and issue the medical waiver.")]
+        return super()._prose_fragments(game, last_round, action, target, notes)
 
 
 class HallMonitorConsequence(BaseModelPlus):
@@ -244,20 +482,23 @@ class HallMonitorBlock(HasGame, Block):
         }
     )
     seed: int = 20260719
-    inhaler_case_index: int = 0
+    inhaler_case_index: ClassVar[int] = _INHALER_CASE_INDEX
     consequences: list[HallMonitorConsequence] = Field(
         default_factory=list,
         json_schema_extra={"include": True},
     )
 
     _game_class = HallMonitorCredentialsGame
-    _game_handler_class = CredentialsGameHandler
+    _game_handler_class = HallMonitorCredentialsHandler
 
     @model_validator(mode="after")
     def _configure_game(self) -> HallMonitorBlock:
+        if self.encounters < 3:
+            raise ValueError("Hall Monitor requires waiver, media, and Mira encounters")
         if self.game_state is None:
             self.game_state = HallMonitorCredentialsGame(
                 roster=[],
+                inhaler_case_index=self.inhaler_case_index,
                 offers=_hall_offers(
                     encounters=self.encounters,
                     disposition_distribution=self.disposition_distribution,
@@ -405,7 +646,7 @@ def render_hall_monitor_consequence(
     if consequence.outcome == "inhaler_withheld":
         content = (
             f"{subject} was sent back to class. Their inhaler remained at the "
-            "hall desk while the nurse's unsigned note was checked."
+            "hall desk while the missing medical waiver was recorded."
         )
     else:
         content = f"{subject} reached the nurse's office with their inhaler."
