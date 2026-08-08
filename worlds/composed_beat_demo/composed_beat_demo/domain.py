@@ -36,7 +36,7 @@ class BeatBlock(Block):
 
 @on_gather_ns(wants_caller_kind=BeatBlock, wants_exact_kind=False)
 def contribute_default_porter_chunk(*, caller, ctx, **_kw):
-    """APPLICATION-scope default for the named ``porter_greeting`` chunk."""
+    """APPLICATION-layer default for the named ``porter_greeting`` chunk."""
     return {"porter_greeting": "The porter waves you through without looking up."}
 
 
@@ -46,7 +46,14 @@ def contribute_default_porter_chunk(*, caller, ctx, **_kw):
     dispatch_layer=DispatchLayer.AUTHOR,
 )
 def contribute_author_porter_chunk(*, caller, ctx, **_kw):
-    """AUTHOR-scope override of ``porter_greeting`` — the later layer wins."""
+    """AUTHOR-layer override of ``porter_greeting`` — the later layer wins.
+
+    Layer is ordering, not isolation: this handler wins because ``AUTHOR`` sorts
+    after ``APPLICATION`` in ``Behavior.sort_key``, not because it is scoped to
+    this world. Both handlers register into the same process-global story
+    registry, so both are visible to every story in the process. Visibility comes
+    from which registry is in the dispatch chain, never from the layer value.
+    """
     return {"porter_greeting": "Old Maro looks up from his ledger and grins."}
 
 
