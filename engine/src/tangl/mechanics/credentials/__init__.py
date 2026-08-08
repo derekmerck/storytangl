@@ -3,6 +3,7 @@
 from .assembly import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
+    CREDENTIAL_UNPRESENTED_SLOT,
     CredentialComponent,
     CredentialComponentToken,
     CredentialDefinition,
@@ -55,6 +56,7 @@ __all__ = [
     "CONTRABAND",
     "CREDENTIAL_ID_SLOT",
     "CREDENTIAL_PACKET_SLOT",
+    "CREDENTIAL_UNPRESENTED_SLOT",
     "CredentialComponent",
     "CredentialComponentToken",
     "CredentialAttestationObservation",

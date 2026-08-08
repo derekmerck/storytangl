@@ -18,6 +18,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -77,6 +78,7 @@ class ScenarioOffer(Unstructurable):
     packet_hidden_facts_override: dict[str, str] | None = None
     bearer_id: UUID | None = None
     prior_case_results: list[CredentialCaseResult] = Field(default_factory=list)
+    id_request_response: Literal["comply", "refuse"] = "comply"
 
 
 @dataclass(frozen=True)
@@ -342,6 +344,7 @@ def materialize(
         bearer_id=offer.bearer_id,
     )
     case.prior_case_results = list(offer.prior_case_results)
+    case.id_request_response = offer.id_request_response
     degrade(case, offer.failure_modes)
     defects = derive_defects(case.packet_manager, rules)
     (narrative_renderer or render_narrative)(case, defects)
