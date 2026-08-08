@@ -235,7 +235,7 @@ class HallMonitorDeskCustodyManager(ComponentManager[CredentialComponent]):
         HALL_DESK_CUSTODY_SLOT: Slot.for_predicate(
             HALL_DESK_CUSTODY_SLOT,
             _is_document,
-            max_count=100,
+            max_count=1,
         ),
     }
 

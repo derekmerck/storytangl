@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,12 +19,7 @@ from tangl.mechanics.credentials import (
     FailureMode,
 )
 from tangl.mechanics.presence.look import HairColor, HasSimpleLook
-from tangl.mechanics.transaction import (
-    AssetMoveCommitment,
-    CallbackCommitment,
-    ComponentSlotAssetHolder,
-    TransactionOffer,
-)
+from tangl.mechanics.transaction import CallbackCommitment, TransactionOffer
 from tangl.mechanics.games.credentials_game import CredentialDisposition, derive_disposition
 from tangl.mechanics.games.credentials_roster import materialize
 from tangl.service.world_registry import WorldRegistry
@@ -74,6 +70,12 @@ def _journal_text(ledger: Ledger) -> str:
         for fragment in ledger.get_journal()
         if isinstance(fragment.content, str)
     )
+
+
+def _desk_custody_slot() -> str:
+    """Load the world-owned custody slot after the bundle has imported its domain."""
+
+    return import_module("hall_monitor.domain").HALL_DESK_CUSTODY_SLOT
 
 
 def _finish_shift_correctly(ledger: Ledger) -> None:
@@ -215,9 +217,11 @@ class TestHallMonitorWorld:
         waiver_id = waiver.uid
 
         _inspect(ledger, "doctor's note")
-        assert "Retain the medical waiver" in [action.label for action in _actions(ledger)]
+        assert "Retain the medical waiver" in [
+            action.label for action in _actions(ledger)
+        ]
         _choose(ledger, "Retain the medical waiver")
-        assert game.desk_custody.get_slot("retained_documents") == [waiver]
+        assert game.desk_custody.get_slot(_desk_custody_slot()) == [waiver]
         assert not game.active_case.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT)
         assert len(game.transaction_receipts) == 1
 
@@ -236,6 +240,7 @@ class TestHallMonitorWorld:
         assert completed[0].uid == waiver_id
         assert completed[0].status is CredentialStatus.VALID
         assert completed[0].subject_id == mira_packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
+        assert not game.desk_custody.get_slot(_desk_custody_slot())
         assert game.expected_disposition(game.active_case) is CredentialDisposition.PASS
         assert len(game.transaction_receipts) == 2
         move_detail = game.transaction_receipts[1].details[0]
@@ -254,7 +259,9 @@ class TestHallMonitorWorld:
         restored_waiver = restored_packet.get_slot(CREDENTIAL_PACKET_SLOT)[0]
         assert restored_waiver.uid == waiver_id
         assert restored_waiver.status is CredentialStatus.VALID
-        assert restored_waiver.subject_id == restored_packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
+        assert restored_waiver.subject_id == restored_packet.get_slot(
+            CREDENTIAL_ID_SLOT
+        )[0].subject_id
         assert len(restored_game.transaction_receipts) == 2
         assert restored_game.case_results[0].model_dump(mode="python") == tess_result
 
@@ -282,7 +289,10 @@ class TestHallMonitorWorld:
         with pytest.raises(ValueError, match="not visible"):
             handler._retain_waiver(game, str(uuid4()), {})
 
-    def test_late_reissue_failure_rolls_back_completion_and_custody_move(self) -> None:
+    def test_late_reissue_failure_rolls_back_completion_and_custody_move(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """The transaction rail reverses both legs when a later commitment fails."""
 
         _, ledger = _started_shift()
@@ -296,35 +306,24 @@ class TestHallMonitorWorld:
         _choose(ledger, "Send back to class")
         _advance_to_inhaler_case(ledger)
         packet = game.active_case.packet_manager
-        id_subject_id = packet.get_slot(CREDENTIAL_ID_SLOT)[0].subject_id
-
-        def complete() -> None:
-            waiver.status = CredentialStatus.VALID
-            waiver.subject_id = id_subject_id
-
-        def undo() -> None:
-            waiver.status = original_status
-            waiver.subject_id = original_subject_id
+        _inspect(ledger, "student ID")
 
         def fail_late() -> None:
             raise RuntimeError("late failure")
 
-        offer = TransactionOffer(
-            commitments=[
-                CallbackCommitment(label="complete waiver", apply=complete, undo=undo),
-                AssetMoveCommitment(
-                    giver=ComponentSlotAssetHolder(game.desk_custody, "retained_documents"),
-                    receiver=ComponentSlotAssetHolder(packet, CREDENTIAL_PACKET_SLOT),
-                    asset=waiver,
-                ),
-                CallbackCommitment(label="fail late", apply=fail_late),
-            ]
-        )
+        original_accept = TransactionOffer.accept
+
+        def accept_with_late_failure(offer: TransactionOffer):
+            if offer.label == "complete medical waiver":
+                offer.commitments.append(CallbackCommitment(label="fail late", apply=fail_late))
+            return original_accept(offer)
+
+        monkeypatch.setattr(TransactionOffer, "accept", accept_with_late_failure)
 
         with pytest.raises(RuntimeError, match="late failure"):
-            offer.accept()
+            _choose(ledger, "Complete and issue the medical waiver")
 
-        assert game.desk_custody.get_slot("retained_documents") == [waiver]
+        assert game.desk_custody.get_slot(_desk_custody_slot()) == [waiver]
         assert not packet.get_slot(CREDENTIAL_PACKET_SLOT)
         assert waiver.status is original_status
         assert waiver.subject_id == original_subject_id
