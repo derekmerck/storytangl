@@ -83,9 +83,16 @@ class AggregationMode(Enum):
     called; the mode picks among the results that come back. A behavior abstains by
     returning ``None``, which keeps its receipt for audit but drops it from reduction.
 
-    Note that :attr:`FIRST` and :attr:`LAST` read the dispatch ladder in opposite
-    directions: under ``LAST`` a ``LOCAL`` handler overrides earlier layers, while under
-    ``FIRST`` it is reached only if every earlier layer abstained.
+    :attr:`FIRST` and :attr:`LAST` read the dispatch ladder in opposite directions, by
+    design — they encode different kinds of decision:
+
+    - ``LAST`` is *refinement*: every layer contributes and the most specific one stands,
+      so ``LOCAL`` sorting last is what makes an override possible.
+    - ``FIRST`` is *interception*: the first authority to claim the decision takes it, so
+      ``GLOBAL`` sorting first gives the broadest authority first refusal. Used for
+      redirects (``get_prereqs`` / ``get_postreqs``), where a rare application-wide
+      redirect should trump story-level ones, and same-layer peers fall through to
+      registration order. A handler with no opinion must return ``None``.
     """
     FIRST = "first_result"       # First non-None wins (earliest layer)
     LAST = PIPE = "last_result"  # Last non-None wins (latest layer overrides)

@@ -174,7 +174,15 @@ lands in** — which is exactly how the first two axes come to look like one.
 
 **3 · The fold decides who wins.** Sorting fixes the *sequence*; the aggregator chosen at
 the `do_*` site fixes what that sequence *means*. "Later wins" is a property of the fold,
-not of the ladder — and under `first_result` **the ladder inverts**:
+not of the ladder. The two single-winner folds encode two different **kinds of decision**,
+and they read the ladder in opposite directions on purpose:
+
+- **Refinement** (`last_result`) — every layer contributes and the most specific one
+  stands. Later layers *see* what earlier ones produced, so `LOCAL` sorting last is what
+  makes an override possible.
+- **Interception** (`first_result`) — the first authority to claim the decision takes it,
+  and nothing downstream can un-claim it. Here `GLOBAL` sorting first is exactly right:
+  the broadest authority gets first refusal.
 
 | Fold | Winner | Effect on the ladder | Live tasks |
 |---|---|---|---|
@@ -184,11 +192,20 @@ not of the ladder — and under `first_result` **the ladder inverts**:
 | `gather_results` | no winner — collects | order sets list order | `provision_node`, `apply_update` |
 | `merge_results` | no winner — flattens | lists concatenate in order; on dict-key collision **later wins** (`ChainMap` over reversed results) | `do_create`, step dispatch |
 
-So a claim like "the `LOCAL` handler overrides the others" is only true for a
-`last_result` task. Registering a `LOCAL` prereq handler expecting it to override the
-default gets the opposite: `get_prereqs` folds with `first_result`, so the earliest
-non-`None` result wins and the `LOCAL` handler is reached only if everything before it
-abstained.
+So "the `LOCAL` handler overrides the others" is only true for a `last_result` task.
+
+**Why redirects intercept.** `get_prereqs` / `get_postreqs` return an optional redirect
+edge, which is a *claim on where the traversal goes next* — not a value to refine. An
+application-wide redirect is rare, but when one exists it should trump any story-level
+redirect, and interception gives that for free without a precedence table. Meanwhile the
+common case is several redirects registered at the **same** layer, where the fold degrades
+to `seq` — the monotonic registration counter, last key of `sort_key` — so among peers
+**first registered wins**, which is the expected declaration-order reading. The rare
+override and the ordinary case are served by one rule.
+
+The practical consequence is only that *abstention is the contract*: a redirect handler
+that has no opinion must return `None`, not a default edge. Returning something
+unconditionally at an early layer silently claims every traversal.
 
 **Folds select results; they do not gate execution.** Every matching handler in the
 assembled chain runs, whatever the fold. All live sites drain the receipt iterator
