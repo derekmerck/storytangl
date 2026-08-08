@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pytest
 
 from tangl.core import Graph
 from tangl.journal.fragments import ContentFragment, PieceFragment
-from tangl.mechanics.credentials import CREDENTIAL_ID_SLOT, materialize_packet
+from tangl.mechanics.credentials import (
+    CREDENTIAL_ID_SLOT,
+    CREDENTIAL_UNPRESENTED_SLOT,
+    CredentialComponent,
+    FailureMode,
+    RestrictionLevel,
+    Restrictions,
+    materialize_packet,
+)
 from tangl.mechanics.games import (
     CredentialStatus,
     CredentialToken,
@@ -15,11 +25,15 @@ from tangl.mechanics.games import (
     Indication,
     Region,
 )
+from tangl.mechanics.games.credentials_factory import build_valid, degrade
 from tangl.mechanics.games.credentials_game import (
     CredentialPresentationProfile,
     CredentialDisposition,
     CredentialsGame,
     CredentialsGameHandler,
+    Finding,
+    FindingKey,
+    derive_disposition,
 )
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.mechanics.games.handlers import inject_game_context
@@ -80,6 +94,84 @@ def test_presentation_requires_text_for_every_invalid_status() -> None:
 
 class TestCredentialsCore:
     """Core shift behavior without the VM."""
+
+    @staticmethod
+    def _missing_id_game(
+        response: Literal["comply", "refuse"],
+    ) -> tuple[CredentialsGame, CredentialsGameHandler, CredentialComponent]:
+        restrictions = Restrictions.from_map(
+            {Region.LOCAL: {Indication.TRAVEL: RestrictionLevel.WITH_ID}}
+        )
+        case = build_valid(
+            Region.LOCAL,
+            Indication.TRAVEL,
+            restrictions,
+            candidate_name="Mara",
+        )
+        native_id = case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)[0]
+        degrade(case, [FailureMode.MISSING_ID])
+        case.id_request_response = response
+        game = CredentialsGame(roster=[case], restriction_map=restrictions)
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+        game.current_stage = "packet"
+        return game, handler, native_id
+
+    def test_request_id_compliance_restores_the_native_component(self) -> None:
+        game, handler, native_id = self._missing_id_game("comply")
+
+        first_moves = handler.get_available_moves(game)
+        assert handler.get_available_moves(game) == first_moves
+        assert [move.kind for move in first_moves].count("request_id") == 1
+        assert game.active_case.packet_manager.get_slot(
+            CREDENTIAL_UNPRESENTED_SLOT
+        ) == [native_id]
+        assert (
+            derive_disposition(game.active_case.packet_manager, game.restriction_map)
+            is CredentialDisposition.DENY
+        )
+
+        handler.receive_move(game, ("request_id", ""))
+
+        assert game.active_case.packet_manager.get_slot(CREDENTIAL_ID_SLOT) == [
+            native_id
+        ]
+        assert not game.active_case.packet_manager.get_slot(CREDENTIAL_UNPRESENTED_SLOT)
+        assert game.finding_status[FindingKey.ID] == Finding.VERIFIED
+        assert game.last_round is not None
+        assert game.last_round.notes["outcome"] == "id_request_complied"
+        assert game.last_round.notes["component_id"] == str(native_id.uid)
+        assert (
+            derive_disposition(game.active_case.packet_manager, game.restriction_map)
+            is CredentialDisposition.PASS
+        )
+        assert not any(
+            move.kind == "request_id" for move in handler.get_available_moves(game)
+        )
+
+    def test_request_id_refusal_keeps_the_native_component_unpresented(self) -> None:
+        game, handler, native_id = self._missing_id_game("refuse")
+
+        first_moves = handler.get_available_moves(game)
+        assert handler.get_available_moves(game) == first_moves
+        assert [move.kind for move in first_moves].count("request_id") == 1
+
+        handler.receive_move(game, ("request_id", ""))
+
+        assert not game.active_case.packet_manager.get_slot(CREDENTIAL_ID_SLOT)
+        assert game.active_case.packet_manager.get_slot(
+            CREDENTIAL_UNPRESENTED_SLOT
+        ) == [native_id]
+        assert game.finding_status[FindingKey.ID] == Finding.REFUSED
+        assert game.last_round is not None
+        assert game.last_round.notes["outcome"] == "id_request_refused"
+        assert (
+            derive_disposition(game.active_case.packet_manager, game.restriction_map)
+            is CredentialDisposition.DENY
+        )
+        assert not any(
+            move.kind == "request_id" for move in handler.get_available_moves(game)
+        )
 
     def test_inspect_reveals_hidden_finding(self) -> None:
         game, handler = _ready_game()

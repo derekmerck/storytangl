@@ -23,6 +23,7 @@ from .domain import (
 
 CREDENTIAL_ID_SLOT = "id"
 CREDENTIAL_PACKET_SLOT = "credentials"
+CREDENTIAL_UNPRESENTED_SLOT = "unpresented"
 _DEFAULT_DOCUMENT_KINDS = ("id", "document")
 
 
@@ -100,6 +101,10 @@ def _is_packet_document(component: CredentialComponentToken) -> bool:
     return component.document_kind != "id"
 
 
+def _is_credential(component: CredentialComponentToken) -> bool:
+    return component.document_kind in _DEFAULT_DOCUMENT_KINDS
+
+
 class CredentialPacketManager(ComponentManager[CredentialComponent]):
     """Owner-bound packet manager over credential graph components."""
 
@@ -112,6 +117,11 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
         CREDENTIAL_PACKET_SLOT: Slot.for_predicate(
             CREDENTIAL_PACKET_SLOT,
             _is_packet_document,
+            max_count=100,
+        ),
+        CREDENTIAL_UNPRESENTED_SLOT: Slot.for_predicate(
+            CREDENTIAL_UNPRESENTED_SLOT,
+            _is_credential,
             max_count=100,
         ),
     }
@@ -426,6 +436,7 @@ def materialize_packet(
 __all__ = [
     "CREDENTIAL_ID_SLOT",
     "CREDENTIAL_PACKET_SLOT",
+    "CREDENTIAL_UNPRESENTED_SLOT",
     "CredentialComponent",
     "CredentialComponentToken",
     "CredentialDefinition",

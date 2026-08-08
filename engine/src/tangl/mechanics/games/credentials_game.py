@@ -45,13 +45,13 @@ from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as Me
 from tangl.mechanics.credentials.assembly import (
     CREDENTIAL_ID_SLOT,
     CREDENTIAL_PACKET_SLOT,
+    CREDENTIAL_UNPRESENTED_SLOT,
     CredentialComponent,
     CredentialDefinition,
     CredentialPacketManager as AssemblyCredentialPacketManager,
     default_credential_catalog,
     materialize_packet,
 )
-
 from tangl.mechanics.credentials import (
     DEFAULT_RESTRICTIONS,
     ContrabandItem,
@@ -73,6 +73,11 @@ from tangl.mechanics.credentials import (
     credential_card_composition_spec,
     credential_card_portrait_spec,
     credential_card_text_spec,
+)
+from tangl.mechanics.transaction import (
+    AssetMoveCommitment,
+    ComponentSlotAssetHolder,
+    TransactionOffer,
 )
 from tangl.prose import TextRenderSession
 from tangl.story.presentation import render_text_as
@@ -207,6 +212,7 @@ class CredentialCase(Unstructurable):
     whitelist: bool = False
     blacklist: bool = False
     bribe_offer: int = 0
+    id_request_response: Literal["comply", "refuse"] = "comply"
 
     # ----- Discovery API ----------------------------------------------------
     # The only surface the game loop and derive_disposition may use to ask the
@@ -373,6 +379,7 @@ class Finding:
     DECLARED = "declared"    # contraband voluntarily disclosed
     TOO_LATE = "too_late"    # disclosure after a confirming search; no rescue
     YIELDED = "yielded"      # contraband surrendered
+    REFUSED = "refused"      # candidate declined a requested response
 
 
 class FindingKey:
@@ -390,7 +397,9 @@ class FindingKey:
 # recovered contraband (YIELDED). A plain VERIFIED (checked, sound) is not adverse
 # evidence, so it is excluded. Behavioral evidence (a declined search, a bribe
 # attempt) extends this set in Phase B.3.
-_EVIDENCE_FINDINGS = frozenset({Finding.CONFIRMED, Finding.CLEARED, Finding.YIELDED})
+_EVIDENCE_FINDINGS = frozenset(
+    {Finding.CONFIRMED, Finding.CLEARED, Finding.YIELDED, Finding.REFUSED}
+)
 
 
 # Time cost of each action, in shift-budget units. Cheap probes (a glance at a
@@ -1402,6 +1411,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         # verify_id: offer whenever an id is presented and not yet verified.
         if case.id_status() is not None and FindingKey.ID not in game.finding_status:
             moves.append(CredentialsMove(kind="verify_id", target=""))
+        if self._id_required_and_absent(game) and FindingKey.ID not in game.finding_status:
+            moves.append(CredentialsMove(kind="request_id", target=""))
         # request_search: single move, once per case.
         if FindingKey.SEARCH not in game.finding_status:
             moves.append(CredentialsMove(kind="request_search", target=""))
@@ -1414,6 +1425,17 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if FindingKey.RELINQUISH not in game.finding_status and self._has_declared_contraband(game):
             moves.append(CredentialsMove(kind="request_relinquish", target=""))
         return moves
+
+    @staticmethod
+    def _id_required_and_absent(game: CredentialsGame) -> bool:
+        """Whether visible packet state lacks an ID required by today's rules."""
+
+        level = game.restriction_map.level_for(
+            game.active_case.get_region(),
+            game.active_case.get_purpose(),
+            RestrictionLevel.ANONYMOUS,
+        )
+        return level.requires_id and game.active_case.id_status() is None
 
     @staticmethod
     def _request_document_indications(case: CredentialCase) -> list[IndicationId]:
@@ -1532,6 +1554,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             )
         if move.kind == "verify_id":
             return "Verify identity"
+        if move.kind == "request_id":
+            return "Request ID"
         if move.kind == "request_search":
             return "Request search"
         if move.kind == "request_disclosure":
@@ -1774,6 +1798,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
             return self._resolve_request_document(game, player_move.target, detail)
         if kind == "verify_id":
             return self._resolve_verify_id(game, detail)
+        if kind == "request_id":
+            return self._resolve_request_id(game, detail)
         if kind == "request_search":
             return self._resolve_request_search(game, detail)
         if kind == "request_disclosure":
@@ -1781,6 +1807,44 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if kind == "request_relinquish":
             return self._resolve_request_relinquish(game, detail)
         return super().resolve_move_kind(kind, game, player_move, detail)
+
+    def _resolve_request_id(
+        self,
+        game: CredentialsGame,
+        detail: dict[str, object],
+    ) -> RoundResult:
+        """Request one native but currently unpresented identity component."""
+
+        if not self._id_required_and_absent(game):
+            detail["outcome"] = "id_request_not_applicable"
+            return RoundResult.CONTINUE
+        case = game.active_case
+        manager = case.packet_manager
+        id_components = manager.get_slot(CREDENTIAL_UNPRESENTED_SLOT)
+        id_card = next((item for item in id_components if item.document_kind == "id"), None)
+        if case.id_request_response == "comply" and id_card is not None:
+            TransactionOffer(
+                label="present id",
+                commitments=[
+                    AssetMoveCommitment(
+                        giver=ComponentSlotAssetHolder(manager, CREDENTIAL_UNPRESENTED_SLOT),
+                        receiver=ComponentSlotAssetHolder(manager, CREDENTIAL_ID_SLOT),
+                        asset=id_card,
+                        label="present id",
+                    ),
+                ],
+            ).accept()
+            game.finding_status[FindingKey.ID] = Finding.VERIFIED
+            detail["outcome"] = "id_request_complied"
+            detail["component_id"] = str(id_card.uid)
+            game.presentation.render_case(
+                case,
+                derive_defects(manager, game.restriction_map, game.finding_status),
+            )
+        else:
+            game.finding_status[FindingKey.ID] = Finding.REFUSED
+            detail["outcome"] = "id_request_refused"
+        return RoundResult.CONTINUE
 
     def _resolve_request_document(
         self,
@@ -2037,6 +2101,17 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                 line = "The id matches the bearer."
             return [
                 ContentFragment(content="You verify the bearer's identity."),
+                ContentFragment(content=line),
+            ]
+        if action == "request_id":
+            if notes.get("outcome") == "id_request_complied":
+                line = "The candidate produces their identification."
+            elif notes.get("outcome") == "id_request_refused":
+                line = "The candidate does not produce identification."
+            else:
+                line = "There is no identification to request."
+            return [
+                ContentFragment(content="You request the candidate's identification."),
                 ContentFragment(content=line),
             ]
         if action == "request_search":
