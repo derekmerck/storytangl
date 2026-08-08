@@ -145,9 +145,13 @@ def sync_issues(repo_root: Path, *, limit: int = 500, state: str = "open") -> Is
     cache = IssueCache(generated_at=datetime.now(UTC), issues=records)
     # Write through a sibling and rename, so an interrupted sync leaves the
     # previous snapshot intact rather than truncated JSON the builder cannot read.
+    # A successful rename consumes the sibling, so the cleanup only fires on failure.
     staged = target.with_suffix(".json.tmp")
-    staged.write_text(cache.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    staged.replace(target)
+    try:
+        staged.write_text(cache.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        staged.replace(target)
+    finally:
+        staged.unlink(missing_ok=True)
 
     truncated = len(payload) >= limit
     if truncated:

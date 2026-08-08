@@ -302,19 +302,40 @@ def test_sync_issues_flags_a_full_page_as_truncated(tmp_path, monkeypatch) -> No
     assert sync_issues(repo_root, limit=500).truncated is True
 
 
-def test_sync_issues_leaves_the_previous_snapshot_intact_when_it_fails(tmp_path, monkeypatch) -> None:
-    """An interrupted sync must not strand truncated JSON the builder chokes on."""
+def test_sync_issues_survives_a_failure_after_the_snapshot_is_staged(tmp_path, monkeypatch) -> None:
+    """The staged write only earns its keep if a *late* failure cannot corrupt the snapshot.
+
+    Failing the fetch would prove nothing, since no file is written that early.
+    The interesting moment is after the replacement is on disk but before it is
+    swapped in, which is exactly what a direct write would have already clobbered.
+    """
 
     repo_root = _repo(tmp_path, [_issue(111, "Original entry", ["devref:entity"])])
     cache_path = repo_root / ISSUE_CACHE_RELPATH
     original = cache_path.read_text(encoding="utf-8")
 
-    def explode(*args, **kwargs):
-        raise RuntimeError("gh issue list failed with exit code 1: interrupted")
+    monkeypatch.setattr(
+        issues_module,
+        "fetch_issues",
+        lambda root, *, limit, state: [
+            {
+                "number": 112,
+                "title": "Replacement entry",
+                "body": "",
+                "state": "OPEN",
+                "url": "https://github.com/derekmerck/storytangl/issues/112",
+                "labels": [{"name": "devref:entity"}],
+            }
+        ],
+    )
 
-    monkeypatch.setattr(issues_module, "fetch_issues", explode)
+    def failing_replace(self: Path, target: Path) -> Path:
+        assert self.read_text(encoding="utf-8"), "the staged snapshot should exist by now"
+        raise OSError("rename interrupted")
 
-    with pytest.raises(RuntimeError):
+    monkeypatch.setattr(Path, "replace", failing_replace)
+
+    with pytest.raises(OSError, match="rename interrupted"):
         sync_issues(repo_root)
 
     assert cache_path.read_text(encoding="utf-8") == original
