@@ -132,7 +132,8 @@ that distinction.
 | **Behavior** | plugin | Callable registered for a specific task at a specific priority | `core.behavior.Behavior` |
 | **Task** | hook point | Named extension point in the pipeline (e.g., `validate_edge`, `render_journal`) | Task name string |
 | **Priority** | ordering | Execution order within a task, applied *after* layer: FIRST → EARLY → NORMAL → LATE → LAST | `Priority` enum (`core.behavior`) |
-| **Layer** | override scope **and** visibility scope | Two orthogonal meanings — see *Dispatch layers* below. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
+| **Layer** | ordering band | Execution order only — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
+| **Authority chain** | visibility scope | Which registries are in play for a call — assembled by `chain_execute_all` from explicit args, `ctx.get_authorities()` (graph → world), then inline. **This** is what scopes a handler | `BehaviorRegistry.chain_execute_all`, `World.get_authorities()` |
 | **Aggregation mode** | fold strategy | How multiple handler results combine: `all_true`, `gather`, `merge`, `first`, `last` | `AggregationMode` enum |
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |

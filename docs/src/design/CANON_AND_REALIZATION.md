@@ -23,10 +23,16 @@ the fix is to separate the registers so canon has nothing to rot.
 | **Realization** | where this codebase currently makes it true | constantly — and should be **generated**, not hand-maintained |
 | **Residue** | transitional paths, compatibility shims, migrations in flight | yes, by design — it is scheduled for deletion |
 
-Canon is implementation-free by construction. Realization is a map produced from the
-index (`tangl-devref`), not a column an author keeps up to date. Residue is tracked
-because it is operationally live, and excluded from the algebra because it is not part
-of what the system *is*.
+Canon is implementation-free by construction. Residue is tracked because it is
+operationally live, and excluded from the algebra because it is not part of what the
+system *is*.
+
+**Realization should be generated rather than hand-maintained — this is the target, not
+today's state.** `tangl-devref` indexes symbols and topic-annotated artifacts, which is
+what makes generation *feasible*; it does not yet map canonical claims onto symbols.
+`map` returns a topic's indexed artifacts, nothing more. Closing that gap is the
+proposed `devref audit` (issue #282 lineage), and until it exists the realization column
+is maintained by hand and will keep drifting.
 
 ## The negotiation
 
@@ -57,9 +63,12 @@ Naming them matters because two are mechanical and one is not:
 | A public symbol or behaviour exists that canon never mentions | realization pressing up | apply the promotion gate |
 | Both exist and disagree on meaning | genuine negotiation | judgment; the expensive, rare case |
 
-The first two are detectable by tooling — the index already stores symbols. Automating
-them does not remove the review; it **concentrates** the review on the third class,
-which is the only one that needs a person.
+The first two are *mechanizable* — the index already stores symbols, so a checker could
+verify referenced symbols exist and surface public symbols canon never mentions. No such
+command exists yet, and prose references would need to be annotated (or restricted to a
+recognizable form) for it to work. When it does exist, automating those two will not
+remove the review; it will **concentrate** the review on the third class, which is the
+only one that needs a person.
 
 ### The upward admission test
 
@@ -79,12 +88,18 @@ Residue is important now and irrelevant to the algebra. That implies something s
 than a label: **residue must be unreachable from a canon read.** Otherwise a future
 reader — human or agent — takes it as precedent.
 
-The failure mode is live in the tree. `ARCHITECTURE.md:446` states that `World` is a
-singleton `TraversableGraphFactory` subclass, which is true (`story/fabula/world.py:205`).
-`ARCHITECTURE.md:590` forbids "any wrapper layer that pretends `World` is already a
-`GraphFactory` subclass **when it is not**." That prohibition was residue — a guardrail
-for a migration — and it outlived the migration that made it moot. It now sits
-canon-shaped, 144 lines from the canon it contradicts.
+The specimen this note was written from: `ARCHITECTURE.md` stated that `World` is a
+singleton `TraversableGraphFactory` subclass — true (`story/fabula/world.py:205`) — while
+144 lines later forbidding "any wrapper layer that pretends `World` is already a
+`GraphFactory` subclass **when it is not**." That prohibition was residue, a guardrail for
+a migration, and it outlived the migration that made it moot. Sitting canon-shaped and
+unmarked, it contradicted the canon above it. A neighbouring transitional bullet had the
+same defect, describing the label-based world round-trip as a *pending* migration when it
+is in fact the designed consequence of singleton identity.
+
+**Both were repaired in the change that introduced this note** — canon decay, fixed
+mechanically, which is the whole point. A method note that identifies live decay and
+declines to repair it is arguing against itself.
 
 Residue belongs in a marked section (ARCHITECTURE's "Transitional Seams" is the right
 shape), never inline with canon, and always with the condition that retires it.
@@ -106,22 +121,31 @@ from the mechanics side and imports only `on_render_text` from story — the sam
 correct direction, already in the tree.
 
 **The finding.** The imports were residue (type-checking artifacts) covering a real
-defect: story was *wiring* a mechanic on behalf of every world. Because worlds are the
+defect: story *wires* a mechanic on behalf of every world. Because worlds are the
 composition root, importing `story` should not transitively load presence.
 
 **The result — canon sharpened, not merely upheld.** We began with "story must not
 import mechanics" and ended with a stronger, testable law:
 
-> **The engine wires nothing.** Mechanics register themselves on import; **worlds choose
-> which mechanics to import**. Story knows only that it calls `x`; anything wishing to
-> participate registers with `x` and produces something `x`-shaped.
+> **Engine layers do not wire optional mechanics.** Engine layers legitimately register
+> their own system handlers — VM and story both do, deliberately. What they must not do
+> is wire *optional* mechanics on another party's behalf. Mechanics register themselves
+> on import; **worlds choose which mechanics to import**. Story knows only that it calls
+> `x`; anything wishing to participate registers with `x` and produces something
+> `x`-shaped.
 
-Note what did *not* change: presence is still legitimately a *shipped default mechanic*
-whose handlers land in the shared story registry, and that is fine — a world that never
-imports presence never loads it, and a single-world server can run with it as dead code.
-The defect was never the layer, nor even the shared registry; it was **who caused the
-import**. (Layer confers no visibility at all — see *Layers order; registries scope* in
-the [glossary](glossary.md).)
+**Status: the law is stated, the code does not yet satisfy it.** `story/presentation.py`
+still imports presence at HEAD, so a world that never imports presence still loads it
+through story. The de-wiring — relocating those five `@on_render_text` handlers into
+`mechanics/presence/` — is a pending follow-up, and it needs a sweep of worlds currently
+inheriting presence rendering for free.
+
+Note what is *not* the defect: presence is legitimately a *shipped default mechanic*
+whose handlers land in the shared story registry, and that is fine. Once de-wired, a world
+that never imports presence will not load it, and a single-world server can run with it as
+dead code. The defect is neither the layer nor the shared registry — it is **who causes
+the import**. (Layer confers no visibility at all — see *Layers order; registries scope*
+in the [glossary](glossary.md).)
 
 ## Review rhythm
 
