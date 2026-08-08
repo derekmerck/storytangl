@@ -131,11 +131,49 @@ that distinction.
 |------|----------|------------|----------------|
 | **Behavior** | plugin | Callable registered for a specific task at a specific priority | `core.behavior.Behavior` |
 | **Task** | hook point | Named extension point in the pipeline (e.g., `validate_edge`, `render_journal`) | Task name string |
-| **Priority** | ordering | Execution order within a task: EARLY → NORMAL → LATE | `HandlerPriority` enum |
-| **Layer** | override scope | Dispatch tier: SYSTEM < APPLICATION < DOMAIN < INSTANCE | `DispatchLayer` enum |
+| **Priority** | ordering | Execution order within a task, applied *after* layer: FIRST → EARLY → NORMAL → LATE → LAST | `Priority` enum (`core.behavior`) |
+| **Layer** | ordering band | Execution order only — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
+| **Authority chain** | visibility scope | Which registries are in play for a call — assembled by `chain_execute_all` from explicit args, `ctx.get_authorities()` (graph → world), then inline. **This** is what scopes a handler | `BehaviorRegistry.chain_execute_all`, `World.get_authorities()` |
 | **Aggregation mode** | fold strategy | How multiple handler results combine: `all_true`, `gather`, `merge`, `first`, `last` | `AggregationMode` enum |
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
+
+### Layers order; registries scope
+
+Two **independent** axes, commonly conflated because the layer *names* suggest scopes.
+They are not scopes.
+
+**1 · Registry membership determines visibility.** A behaviour is reachable when the
+registry holding it is in the assembled chain. `BehaviorRegistry.chain_execute_all`
+assembles registries from explicit arguments, then `ctx.get_authorities()` (which
+cascades graph → world, with `World.get_authorities()` returning the world's own
+`dispatch` registry plus any extra authorities), then inline behaviours — deduplicated by
+identity. Handlers from *all* assembled registries are then pooled together.
+
+**2 · `DispatchLayer` determines order only.** It is simply the first element of
+`Behavior.sort_key` — `(dispatch_layer, priority, wants_exact_kind, seq)` — applied across
+that pooled set. It confers no visibility of any kind. `LOCAL` sorts last so it can
+observe and aggregate what earlier layers produced.
+
+| Where it is registered | Visible | Layer's role there |
+|---|---|---|
+| shared module registry (e.g. `story_dispatch`) | everywhere that registry is consulted | ordering only — an `AUTHOR`-layer handler here is still global, just sorted later |
+| a world's own `dispatch` registry | only when that world's authorities are in the chain | ordering only — a `SYSTEM`-layer handler here is still world-private, just sorted first |
+
+**The practical trap.** The module-level decorators (`@on_render_text`, `@on_gather_ns`,
+…) register into the **shared** story registry. Passing `dispatch_layer=AUTHOR` to one of
+them does **not** make a handler world-private — it only makes it sort later. To get
+world-privacy, register into the world's own registry. `worlds/composed_beat_demo` is a
+live example of the ordering use: its `AUTHOR`-layer namespace override wins because it
+sorts after the application default, not because it is scoped.
+
+Compounding this, `BehaviorRegistry.default_dispatch_layer` is `APPLICATION`, so a
+registration that omits the layer gets `APPLICATION` **regardless of which registry it
+lands in** — which is exactly how the two axes come to look like one.
+
+**Related invariant:** the engine wires no mechanics. Mechanics register themselves on
+import, and worlds choose which to import — see
+[CANON_AND_REALIZATION.md](CANON_AND_REALIZATION.md).
 
 ## Content and Presentation
 

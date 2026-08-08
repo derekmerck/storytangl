@@ -75,7 +75,7 @@ channel per assertion. Mapping:
 | Channel | Demo element |
 | --- | --- |
 | data-scope chunk override | `dock_mood` in story vs block `locals:` |
-| handler-scope chunk override | `porter_greeting`, APPLICATION vs AUTHOR `gather_ns` |
+| dispatch-order chunk override | `porter_greeting`, APPLICATION vs AUTHOR `gather_ns` |
 | conditional render enrichment | Maro's reaction, gated on `reputation` |
 | cross-phase enrichment | manifest incident injected during UPDATE |
 | composition | slot ordering, fog substitution, beat overlay |

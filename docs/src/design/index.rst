@@ -15,6 +15,7 @@ See also
 
    story/philosophy
    SIMPLIFICATION_SPEC
+   CANON_AND_REALIZATION
 
    core/CONTENT_ADDRESSABLE
    core/DEREF_DESIGN
