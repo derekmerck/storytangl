@@ -168,6 +168,20 @@ class DevRefDatabase:
                     chunk,
                 )
 
+    def delete_artifact_kinds(self, kinds: Iterable[str]) -> None:
+        """Remove every artifact of the given kinds.
+
+        Kind-scoped deletion is how a source whose artifacts are not addressed
+        by repo path, such as the GitHub issue snapshot, is re-ingested cleanly.
+        """
+
+        values = tuple(kinds)
+        if not values:
+            return
+        placeholders = ", ".join("?" for _ in values)
+        with self.connect() as conn:
+            conn.execute(f"DELETE FROM artifacts WHERE kind IN ({placeholders})", values)
+
     def upsert_topics(self, topics: list[TopicDefinition], *, normalize_alias) -> None:
         with self.connect() as conn:
             conn.execute("DELETE FROM topic_aliases")
@@ -360,6 +374,11 @@ class DevRefDatabase:
         if not self.table_exists("artifacts"):
             return 0
         return self.scalar("SELECT COUNT(*) FROM artifacts")
+
+    def artifact_kind_count(self, kind: str) -> int:
+        if not self.table_exists("artifacts"):
+            return 0
+        return self.scalar("SELECT COUNT(*) FROM artifacts WHERE kind = ?", (kind,))
 
     def symbol_count(self) -> int:
         if not self.table_exists("symbols"):

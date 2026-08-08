@@ -17,17 +17,20 @@ Key Features
 API
 ---
 - :func:`build_index` - Build or refresh the local SQLite index.
+- :func:`sync_issues` - Refresh the offline GitHub issue snapshot.
 - :func:`search_topics` - Search topics and ranked artifacts.
 - :func:`get_topic_map` - Show one topic with related topics and artifacts.
 - :func:`build_context_pack` - Assemble a compact context pack for agents.
 """
 
 from .builder import build_index
+from .issues import sync_issues
 from .models import (
     ArtifactHit,
     BuildReport,
     ContextPack,
     ContextPackItem,
+    IssueSyncReport,
     SearchResponse,
     TopicDefinition,
     TopicHit,
@@ -41,6 +44,7 @@ __all__ = [
     "BuildReport",
     "ContextPack",
     "ContextPackItem",
+    "IssueSyncReport",
     "SearchResponse",
     "TopicDefinition",
     "TopicHit",
@@ -50,4 +54,5 @@ __all__ = [
     "get_topic_map",
     "load_topics",
     "search_topics",
+    "sync_issues",
 ]

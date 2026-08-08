@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -180,6 +181,35 @@ class ExtractedSymbol(BaseModelPlus):
     line: int | None = None
     signature: str | None = None
     summary: str = ""
+
+
+class IssueRecord(BaseModelPlus):
+    """One GitHub issue captured in the offline devref issue snapshot."""
+
+    number: int
+    title: str
+    body: str = ""
+    state: str = ""
+    url: str = ""
+    labels: list[str] = Field(default_factory=list)
+
+
+class IssueCache(BaseModelPlus):
+    """Offline snapshot of ``devref:``-labelled issues read by the builder."""
+
+    generated_at: datetime
+    issues: list[IssueRecord] = Field(default_factory=list)
+
+
+class IssueSyncReport(BaseModelPlus):
+    """Summary of one issue-snapshot refresh."""
+
+    cache_path: str
+    fetched: int
+    indexed: int
+    truncated: bool = False
+    topics: list[str] = Field(default_factory=list)
+    unknown_topics: list[str] = Field(default_factory=list)
 
 
 class BuildConfig(BaseModelPlus):

@@ -217,6 +217,14 @@ full type map and rationale.**
   `poetry run tangl-devref build`, then use `tangl-devref find`, `map`, or `pack`
   for compact context around concepts such as `phase_ctx`, `provisioning`, or
   `journal`. The index lives under `tmp/devref/` and is disposable.
+- `tangl-devref sync-issues` folds GitHub issues into that index by their
+  `devref:<topic>` labels, so `map <topic>` returns the governing design docs,
+  the key code, and the open issues together. It captures open issues only:
+  retrieval shows an issue's title and topics but not its state, so indexing
+  closed work would present finished business as outstanding. Pass
+  `--state all` when you specifically want that history. It is the only devref
+  command that reaches the network; `build` only reads the snapshot it leaves in
+  `tmp/devref/issues.json`, and indexes no issues when that file is absent.
 - The legacy `scripts/dump_code.py` script predates the curated Repomix bundles;
   prefer `repomix_bundle.py` or `tangl-devref` unless you specifically need the
   older dump format.
