@@ -276,7 +276,7 @@ class TestHallMonitorWorld:
         restored_id = restored_packet.get_slot(CREDENTIAL_ID_SLOT)[0]
         assert restored_id.subject_id == restored_packet.bearer_id
         assert not restored_packet.get_slot(CREDENTIAL_UNPRESENTED_SLOT)
-        assert restored_game.finding_status["id"] == "verified"
+        assert restored_game.finding_status["id"] == "cleared"
         assert len(restored_game.transaction_receipts) == 2
         assert restored_game.case_results[0].model_dump(mode="python") == tess_result
 

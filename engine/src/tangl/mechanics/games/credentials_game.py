@@ -1212,7 +1212,9 @@ class CredentialsGame(PickingGame):
         else:
             self.shift_complete = True
 
-        self.current_stage = "documents"
+        self.current_stage = (
+            "documents" if not self.shift_complete and self.presented_documents else "packet"
+        )
         self.inspected_targets = []
         self.revealed_findings = {}
         self.inspected_packet_targets = []
@@ -1268,6 +1270,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
 
         if game.has_component_manager_owner and game.offers:
             game.prepare_case(game.case_index)
+        if not game.presented_documents:
+            game.current_stage = "packet"
 
     def provision_presentation(self, game: CredentialsGame, *, ctx: VmPhaseCtx) -> None:
         """Prepare the current and sequential successor card frontiers."""
@@ -1834,7 +1838,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     ),
                 ],
             ).accept()
-            game.finding_status[FindingKey.ID] = Finding.VERIFIED
+            game.finding_status[FindingKey.ID] = Finding.CLEARED
             detail["outcome"] = "id_request_complied"
             detail["component_id"] = str(id_card.uid)
             game.presentation.render_case(

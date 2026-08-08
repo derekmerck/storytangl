@@ -114,7 +114,6 @@ class TestCredentialsCore:
         game = CredentialsGame(roster=[case], restriction_map=restrictions)
         handler = CredentialsGameHandler()
         handler.setup(game)
-        game.current_stage = "packet"
         return game, handler, native_id
 
     def test_request_id_compliance_restores_the_native_component(self) -> None:
@@ -137,7 +136,7 @@ class TestCredentialsCore:
             native_id
         ]
         assert not game.active_case.packet_manager.get_slot(CREDENTIAL_UNPRESENTED_SLOT)
-        assert game.finding_status[FindingKey.ID] == Finding.VERIFIED
+        assert game.finding_status[FindingKey.ID] == Finding.CLEARED
         assert game.last_round is not None
         assert game.last_round.notes["outcome"] == "id_request_complied"
         assert game.last_round.notes["component_id"] == str(native_id.uid)
@@ -148,6 +147,7 @@ class TestCredentialsCore:
         assert not any(
             move.kind == "request_id" for move in handler.get_available_moves(game)
         )
+        assert any(move.kind == "decide" for move in handler.get_available_moves(game))
 
     def test_request_id_refusal_keeps_the_native_component_unpresented(self) -> None:
         game, handler, native_id = self._missing_id_game("refuse")
@@ -172,6 +172,27 @@ class TestCredentialsCore:
         assert not any(
             move.kind == "request_id" for move in handler.get_available_moves(game)
         )
+        assert any(move.kind == "decide" for move in handler.get_available_moves(game))
+
+    def test_id_response_repair_supplies_justification_for_remaining_denial(self) -> None:
+        restrictions = Restrictions.from_map(
+            {Region.LOCAL: {Indication.TRAVEL: RestrictionLevel.WITH_PERMIT}}
+        )
+        case = build_valid(Region.LOCAL, Indication.TRAVEL, restrictions)
+        degrade(case, [FailureMode.MISSING_ID, FailureMode.MISSING_PERMIT])
+        game = CredentialsGame(
+            roster=[case],
+            restriction_map=restrictions,
+            no_evidence_penalty=1,
+        )
+        handler = CredentialsGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, ("request_id", ""))
+        handler.receive_move(game, ("decide", "deny"))
+
+        assert game.case_results[0].correct is True
+        assert game.case_results[0].unjustified is False
 
     def test_inspect_reveals_hidden_finding(self) -> None:
         game, handler = _ready_game()
@@ -398,6 +419,43 @@ class TestCredentialsIntegration:
             "Inspect a document",
             choice_payload={"piece_ids": [f"{game.case_index}:{target}"]},
         )
+
+    def test_empty_packet_enters_the_response_window_in_live_provisioning(self) -> None:
+        restrictions = Restrictions.from_map(
+            {Region.LOCAL: {Indication.TRAVEL: RestrictionLevel.WITH_ID}}
+        )
+        case = build_valid(Region.LOCAL, Indication.TRAVEL, restrictions)
+        degrade(case, [FailureMode.MISSING_ID])
+
+        graph = Graph(label="credential_id_response")
+        intro = graph.add_node(kind=Block, label="intro")
+        victory = graph.add_node(kind=Block, label="victory")
+        defeat = graph.add_node(kind=Block, label="defeat")
+        block = CredentialsBlock.create_game_block(
+            graph=graph,
+            game_class=CredentialsGame,
+            handler_class=CredentialsGameHandler,
+            victory_dest=victory,
+            defeat_dest=defeat,
+            label="checkpoint",
+        )
+        block.game.roster = [case]
+        block.game.restriction_map = restrictions
+        block.game_handler.setup(block.game)
+        assert block.game.current_stage == "packet"
+
+        ChoiceEdge(
+            graph=graph,
+            predecessor_id=intro.uid,
+            successor_id=block.uid,
+            label="Open the gate ledger",
+        )
+        ledger = Ledger.from_graph(graph=graph, entry_id=intro.uid)
+        ledger.resolve_choice(next(edge.uid for edge in intro.edges_out()))
+
+        assert "Request ID" in self._labels(ledger)
+        self._choose(ledger, "Request ID")
+        assert "Choose pass" in self._labels(ledger)
 
     def test_walk_full_roster_to_victory(self) -> None:
         graph = Graph(label="credential_shift")
