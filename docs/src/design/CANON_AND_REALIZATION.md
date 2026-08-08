@@ -144,7 +144,7 @@ Note what is *not* the defect: presence is legitimately a *shipped default mecha
 whose handlers land in the shared story registry, and that is fine. Once de-wired, a world
 that never imports presence will not load it, and a single-world server can run with it as
 dead code. The defect is neither the layer nor the shared registry — it is **who causes
-the import**. (Layer confers no visibility at all — see *Layers order; registries scope*
+the import**. (Layer confers no visibility at all — see *Layers order; registries scope; folds decide*
 in the [glossary](glossary.md).)
 
 ## Review rhythm

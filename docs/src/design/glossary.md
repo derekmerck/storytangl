@@ -134,14 +134,15 @@ that distinction.
 | **Priority** | ordering | Execution order within a task, applied *after* layer: FIRST → EARLY → NORMAL → LATE → LAST | `Priority` enum (`core.behavior`) |
 | **Layer** | ordering band | Execution order only — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
 | **Authority chain** | visibility scope | Which registries are in play for a call — assembled by `chain_execute_all` from explicit args, `ctx.get_authorities()` (graph → world), then inline. **This** is what scopes a handler | `BehaviorRegistry.chain_execute_all`, `World.get_authorities()` |
-| **Aggregation mode** | fold strategy | How multiple handler results combine: `all_true`, `gather`, `merge`, `first`, `last` | `AggregationMode` enum |
+| **Fold** (aggregation) | reduction strategy | How the receipts of a task reduce to one result. Chosen **per task at the `do_*` site**, not by the handlers. Decides *who wins* — see below | `CallReceipt.first_result` / `last_result` / `all_true` / `gather_results` / `merge_results`; `AggregationMode` enum names them |
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
 
-### Layers order; registries scope
+### Layers order; registries scope; folds decide
 
-Two **independent** axes, commonly conflated because the layer *names* suggest scopes.
-They are not scopes.
+Three **independent** axes. The first two are commonly conflated because the layer
+*names* suggest scopes — they are not scopes. The third is missed entirely: order alone
+never determines who wins.
 
 **1 · Registry membership determines visibility.** A behaviour is reachable when the
 registry holding it is in the assembled chain. `BehaviorRegistry.chain_execute_all`
@@ -169,7 +170,38 @@ sorts after the application default, not because it is scoped.
 
 Compounding this, `BehaviorRegistry.default_dispatch_layer` is `APPLICATION`, so a
 registration that omits the layer gets `APPLICATION` **regardless of which registry it
-lands in** — which is exactly how the two axes come to look like one.
+lands in** — which is exactly how the first two axes come to look like one.
+
+**3 · The fold decides who wins.** Sorting fixes the *sequence*; the aggregator chosen at
+the `do_*` site fixes what that sequence *means*. "Later wins" is a property of the fold,
+not of the ladder — and under `first_result` **the ladder inverts**:
+
+| Fold | Winner | Effect on the ladder | Live tasks |
+|---|---|---|---|
+| `last_result` | last non-`None` | `LOCAL` beats `GLOBAL` — the override reading | `do_add_item`, `do_get_item`, `finalize_step`, `do_render_text`, media spec adaptation |
+| `first_result` | first non-`None` | **`GLOBAL` beats `LOCAL` — inverted** | `get_prereqs`, `get_postreqs` |
+| `all_true` | no winner — gate | order does not affect the outcome | `validate_edge` |
+| `gather_results` | no winner — collects | order sets list order | `provision_node`, `apply_update` |
+| `merge_results` | no winner — flattens | lists concatenate in order; on dict-key collision **later wins** (`ChainMap` over reversed results) | `do_create`, step dispatch |
+
+So a claim like "the `LOCAL` handler overrides the others" is only true for a
+`last_result` task. Registering a `LOCAL` prereq handler expecting it to override the
+default gets the opposite: `get_prereqs` folds with `first_result`, so the earliest
+non-`None` result wins and the `LOCAL` handler is reached only if everything before it
+abstained.
+
+**Folds select results; they do not gate execution.** Every matching handler in the
+assembled chain runs, whatever the fold. All live sites drain the receipt iterator
+through varargs (`CallReceipt.first_result(*receipts)`), so `first_result` is a *selection*
+over completed calls, not an early exit — side effects of later handlers still happen.
+The way a handler declines is to **return `None`**: its receipt is retained for audit but
+takes no part in the reduction.
+
+*Realization note.* `AggregationMode` and `CallReceipt.aggregate()` are exported and unit
+tested but have no live production call site — every `do_*` calls the `CallReceipt`
+classmethods directly, and the `PhaseSpec` table that would have consumed the enum is
+commented out in `vm/resolution_phase.py`. Treat the enum as the vocabulary for these
+folds, not as the dispatch path.
 
 **Related invariant:** the engine wires no mechanics. Mechanics register themselves on
 import, and worlds choose which to import — see

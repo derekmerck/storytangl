@@ -77,9 +77,18 @@ class RuntimeCtx(DispatchCtx, Protocol):
 
 
 class AggregationMode(Enum):
-    """How to reduce multiple receipts to a result."""
-    FIRST = "first_result"       # Early-exit, first wins
-    LAST = PIPE = "last_result"  # Composite result
+    """How to reduce multiple receipts to a result.
+
+    Selection only — no mode gates execution. Every matching behavior in the chain is
+    called; the mode picks among the results that come back. A behavior abstains by
+    returning ``None``, which keeps its receipt for audit but drops it from reduction.
+
+    Note that :attr:`FIRST` and :attr:`LAST` read the dispatch ladder in opposite
+    directions: under ``LAST`` a ``LOCAL`` handler overrides earlier layers, while under
+    ``FIRST`` it is reached only if every earlier layer abstained.
+    """
+    FIRST = "first_result"       # First non-None wins (earliest layer)
+    LAST = PIPE = "last_result"  # Last non-None wins (latest layer overrides)
     ALL_TRUE = "all_true"        # Validation gate
     GATHER = "gather_results"    # Collect all
     MERGE = "merge_results"      # Flatten/combine, later wins
