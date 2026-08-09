@@ -43,6 +43,7 @@ def navigation_assistant(frame: Frame) -> ChoiceEdge | None:
         return choices[0]
     return None
 ```
+(redirect-precedence)=
 ## Redirect precedence: who claims the jump
 
 Both phases fold with `first_result` (see *Layers order; registries scope; folds decide*

@@ -210,7 +210,7 @@ an early layer silently claims every traversal.
 One consequence is worth knowing before choosing a layer: the declarative
 `trigger_phase` edge scanner is itself a `SYSTEM`-layer handler, so it preempts anything
 registered at `APPLICATION`. A redirect meant to trump story-level ones belongs at
-`GLOBAL`. See [Redirect precedence](traversal/NAV_DESIGN.md#redirect-precedence-who-claims-the-jump).
+`GLOBAL`. See {ref}`Redirect precedence <redirect-precedence>`.
 
 **Folds select results; they do not gate execution.** Every matching handler in the
 assembled chain runs, whatever the fold. All live sites drain the receipt iterator
