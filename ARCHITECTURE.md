@@ -564,10 +564,13 @@ infrastructure.
   In core, `graph.factory` means singleton graph authority. In story,
   `StoryGraph.factory` is still used as a template-registry back-pointer for
   runtime scope recovery. Do not assume those surfaces are unified.
-- **World round-tripping is still label-based shim logic.** `StoryGraph`
-  currently serializes `world` as a label reference and restores it through
-  `World.get_instance(...)`. This exists because world has not yet been moved
-  onto the singleton graph-authority pattern.
+- **World round-trips by label, and that is the designed behaviour.**
+  `StoryGraph` serializes `world` as a label reference and restores it through
+  `World.get_instance(...)`. This follows from the singleton authority model:
+  `GraphFactory` is a `Singleton`, `World` is a `TraversableGraphFactory`
+  subclass, so world identity *is* `(World, label)`. Treat this as a seam only
+  in the sense that `StoryGraph.factory` and `Graph.factory` still differ (see
+  above) — not as a pending migration.
 - **Some VM/provider hooks are still story-colored.** Use existing seams
   carefully, but do not extend them into a parallel discovery framework.
 
@@ -587,5 +590,3 @@ infrastructure.
 - No custom reference-tracking serializers for `Singleton`s.
 - No second speculative VM factory layer beyond `TraversableGraphFactory`
   without a concrete new use case.
-- No wrapper layer that pretends `World` is already a `GraphFactory`
-  subclass when it is not.

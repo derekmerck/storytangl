@@ -131,11 +131,103 @@ that distinction.
 |------|----------|------------|----------------|
 | **Behavior** | plugin | Callable registered for a specific task at a specific priority | `core.behavior.Behavior` |
 | **Task** | hook point | Named extension point in the pipeline (e.g., `validate_edge`, `render_journal`) | Task name string |
-| **Priority** | ordering | Execution order within a task: EARLY → NORMAL → LATE | `HandlerPriority` enum |
-| **Layer** | override scope | Dispatch tier: SYSTEM < APPLICATION < DOMAIN < INSTANCE | `DispatchLayer` enum |
-| **Aggregation mode** | fold strategy | How multiple handler results combine: `all_true`, `gather`, `merge`, `first`, `last` | `AggregationMode` enum |
+| **Priority** | ordering | Execution order within a task, applied *after* layer: FIRST → EARLY → NORMAL → LATE → LAST | `Priority` enum (`core.behavior`) |
+| **Layer** | ordering band | Execution order only — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
+| **Authority chain** | visibility scope | Which registries are in play for a call — assembled by `chain_execute_all` from explicit args, `ctx.get_authorities()` (graph → world), then inline. **This** is what scopes a handler | `BehaviorRegistry.chain_execute_all`, `World.get_authorities()` |
+| **Fold** (aggregation) | reduction strategy | How the receipts of a task reduce to one result. Chosen **per task at the `do_*` site**, not by the handlers. Decides *who wins* — see below | `CallReceipt.first_result` / `last_result` / `all_true` / `gather_results` / `merge_results`; `AggregationMode` enum names them |
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
+
+### Layers order; registries scope; folds decide
+
+Three **independent** axes. The first two are commonly conflated because the layer
+*names* suggest scopes — they are not scopes. The third is missed entirely: order alone
+never determines who wins.
+
+**1 · Registry membership determines visibility.** A behaviour is reachable when the
+registry holding it is in the assembled chain. `BehaviorRegistry.chain_execute_all`
+assembles registries from explicit arguments, then `ctx.get_authorities()` (which
+cascades graph → world, with `World.get_authorities()` returning the world's own
+`dispatch` registry plus any extra authorities), then inline behaviours — deduplicated by
+identity. Handlers from *all* assembled registries are then pooled together.
+
+**2 · `DispatchLayer` determines order only.** It is simply the first element of
+`Behavior.sort_key` — `(dispatch_layer, priority, wants_exact_kind, seq)` — applied across
+that pooled set. It confers no visibility of any kind. `LOCAL` sorts last so it can
+observe and aggregate what earlier layers produced.
+
+| Where it is registered | Visible | Layer's role there |
+|---|---|---|
+| shared module registry (e.g. `story_dispatch`) | everywhere that registry is consulted | ordering only — an `AUTHOR`-layer handler here is still global, just sorted later |
+| a world's own `dispatch` registry | only when that world's authorities are in the chain | ordering only — a `SYSTEM`-layer handler here is still world-private, just sorted first |
+
+**The practical trap.** The module-level decorators (`@on_render_text`, `@on_gather_ns`,
+…) register into the **shared** story registry. Passing `dispatch_layer=AUTHOR` to one of
+them does **not** make a handler world-private — it only makes it sort later. To get
+world-privacy, register into the world's own registry. `worlds/composed_beat_demo` is a
+live example of the ordering use: its `AUTHOR`-layer namespace override wins because it
+sorts after the application default, not because it is scoped.
+
+Compounding this, `BehaviorRegistry.default_dispatch_layer` is `APPLICATION`, so a
+registration that omits the layer gets `APPLICATION` **regardless of which registry it
+lands in** — which is exactly how the first two axes come to look like one.
+
+**3 · The fold decides who wins.** Sorting fixes the *sequence*; the aggregator chosen at
+the `do_*` site fixes what that sequence *means*. "Later wins" is a property of the fold,
+not of the ladder. The two single-winner folds encode two different **kinds of decision**,
+and they read the ladder in opposite directions on purpose:
+
+- **Refinement** (`last_result`) — every layer contributes and the most specific one
+  stands. Later layers *see* what earlier ones produced, so `LOCAL` sorting last is what
+  makes an override possible.
+- **Interception** (`first_result`) — the first authority to claim the decision takes it,
+  and nothing downstream can un-claim it. Here `GLOBAL` sorting first is exactly right:
+  the broadest authority gets first refusal.
+
+| Fold | Winner | Effect on the ladder | Live tasks |
+|---|---|---|---|
+| `last_result` | last non-`None` | `LOCAL` beats `GLOBAL` — the override reading | `do_add_item`, `do_get_item`, `finalize_step`, `do_render_text`, media spec adaptation |
+| `first_result` | first non-`None` | **`GLOBAL` beats `LOCAL` — inverted** | `get_prereqs`, `get_postreqs` |
+| `all_true` | no winner — gate | order does not affect the outcome | `validate_edge` |
+| `gather_results` | no winner — collects | order sets list order | `provision_node`, `apply_update` |
+| `merge_results` | no winner — flattens | lists concatenate in order; on dict-key collision **later wins** (`ChainMap` over reversed results) | `do_create`, step dispatch |
+
+So "the `LOCAL` handler overrides the others" is only true for a `last_result` task.
+
+**Why redirects intercept.** `get_prereqs` / `get_postreqs` return an optional redirect
+edge, which is a *claim on where the traversal goes next* — not a value to refine. An
+application-wide redirect is rare, but when one exists it should trump any story-level
+redirect, and interception gives that for free without a precedence table. Meanwhile the
+common case is several redirects registered at the **same** layer, where the fold degrades
+to `seq` — the monotonic registration counter, last key of `sort_key` — so among peers
+**first registered wins**, which is the expected declaration-order reading. The rare
+override and the ordinary case are served by one rule.
+
+The practical consequence is that *abstention is the contract*: a redirect handler with
+no opinion must return `None`, not a default edge. Returning something unconditionally at
+an early layer silently claims every traversal.
+
+One consequence is worth knowing before choosing a layer: the declarative
+`trigger_phase` edge scanner is itself a `SYSTEM`-layer handler, so it preempts anything
+registered at `APPLICATION`. A redirect meant to trump story-level ones belongs at
+`GLOBAL`. See {ref}`Redirect precedence <redirect-precedence>`.
+
+**Folds select results; they do not gate execution.** Every matching handler in the
+assembled chain runs, whatever the fold. All live sites drain the receipt iterator
+through varargs (`CallReceipt.first_result(*receipts)`), so `first_result` is a *selection*
+over completed calls, not an early exit — side effects of later handlers still happen.
+The way a handler declines is to **return `None`**: its receipt is retained for audit but
+takes no part in the reduction.
+
+*Realization note.* `AggregationMode` and `CallReceipt.aggregate()` are exported and unit
+tested but have no live production call site — every `do_*` calls the `CallReceipt`
+classmethods directly, and the `PhaseSpec` table that would have consumed the enum is
+commented out in `vm/resolution_phase.py`. Treat the enum as the vocabulary for these
+folds, not as the dispatch path.
+
+**Related invariant:** the engine wires no mechanics. Mechanics register themselves on
+import, and worlds choose which to import — see
+[CANON_AND_REALIZATION.md](CANON_AND_REALIZATION.md).
 
 ## Content and Presentation
 
