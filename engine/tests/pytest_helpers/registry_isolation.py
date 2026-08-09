@@ -64,8 +64,17 @@ def restore_shared_behavior_registries() -> Iterator[None]:
       would break every later test that loads the same world. Import-time
       registration is once-per-process by design, whenever the import happens.
 
-    Callers that deliberately import a registering module inside the block are
-    therefore responsible for removing its handlers themselves.
+    Known limitation. The exemption keys on the handler's defining module, not on
+    a registration timestamp, so it is loose in one direction: a handler defined
+    in a module first imported inside the block is kept even when the *test body*
+    is what registered it (``import probe; on_gather_ns(probe.handler)``).
+    Tightening that needs a registration-time hook — patching
+    ``BehaviorRegistry.add``, which ``_wrap_inline`` already bypasses at
+    ``core/behavior.py:396``, plus an import-depth flag on every test — which is a
+    lot of global machinery for a pattern nothing in the tree uses. Callers that
+    deliberately import a registering module inside the block are responsible for
+    removing its handlers themselves; the contract test in
+    ``test_registry_isolation.py`` does exactly that.
     """
     registries = shared_behavior_registries()
     snapshots = [(registry, set(registry.members)) for registry in registries]
