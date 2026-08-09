@@ -201,7 +201,15 @@ class HasIdentity(BaseModelPlus):
 
     @is_identifier
     def id_hash(self) -> Hash:
-        # distinct from value_hash, content_hash
+        """Runtime identity digest — **process-local by design, never persist it**.
+
+        Distinct from :meth:`value_hash` and ``content_hash``, which *are* stable
+        across processes. This keys on the class object, so the digest varies run to
+        run; that is harmless because it backs :meth:`eq_by_id` (and therefore
+        ``__eq__``), where both sides are computed in the same interpreter.
+
+        See the hash stability contract in ``design/core/CONTENT_ADDRESSABLE.md``.
+        """
         # this _is_ frozen, so we could make this a cached- or shelved-property
         return hashing_func(self.__class__, self.uid)
 

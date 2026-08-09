@@ -49,6 +49,12 @@ def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
         elif isinstance(item, dict):
             item_bytes = json.dumps(item, default=str, sort_keys=True).encode('utf-8')
         else:
+            # NB: Python's hash() is id-based for classes and randomized per process
+            # for str-containing tuples, frozensets, etc. Anything reaching this branch
+            # is therefore PROCESS-LOCAL. Callers needing a durable digest must pass
+            # bytes/int/str, or a dict (serialized with default=str, so a class object
+            # inside one becomes a stable string). See Entity.id_hash for the one
+            # deliberate consumer.
             item_bytes = hash(item).to_bytes(8, byteorder="big", signed=True)
         hasher.update(item_bytes)
     return hasher.digest()

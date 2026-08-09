@@ -145,7 +145,11 @@ class Singleton(Entity):
 
     @is_identifier
     def id_hash(self) -> bytes:
-        """Return identity hash keyed by concrete class and label."""
+        """Return identity hash keyed by concrete class and label.
+
+        Process-local by design — keys on the class object, so it varies run to run.
+        Never persist it; use a content hash for durable keys.
+        """
         return hashing_func(self.__class__, self.label)
 
     def __hash__(self) -> int:

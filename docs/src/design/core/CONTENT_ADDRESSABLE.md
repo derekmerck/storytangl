@@ -208,3 +208,32 @@ receipt = BuildReceipt(
 - MediaResourceInventoryTag - Example using ContentAddressable
 - BaseScriptItem - Templates using ContentAddressable
 - Registry - Content-based lookups
+
+## Hash stability contract
+
+Three hashes exist on entities and they do **not** share a portability guarantee.
+Knowing which is which matters before any of them is written down.
+
+| Hash | Keys on | Stable across processes | Safe to persist |
+|---|---|---|---|
+| `content_hash()` | `get_hashable_content()` | **yes** | yes |
+| `value_hash()` | `unstructure()` | **yes** | yes |
+| `id_hash()` | concrete class + `uid` (or `label` for singletons) | **no — by design** | **no** |
+
+`content_hash` and `value_hash` are stable because their inputs are dicts, and
+`hashing_func` serializes dicts with `json.dumps(..., default=str, sort_keys=True)` — so
+the class object inside them becomes a stable string, and key order is normalized.
+
+`id_hash` passes the class object as a *top-level* argument, which falls through to
+Python's built-in `hash()`. That is id-based for classes and randomized per process for
+several other types, so the digest differs run to run. This is not a defect: `id_hash`
+backs `HasIdentity.__eq__` via `eq_by_id`, both sides of a comparison are computed in the
+same interpreter, and the variation cancels exactly. It is *runtime identity*, not
+content identity.
+
+**The invariant that follows:** never persist an `id_hash`, never transmit one between
+processes, and never use one as a durable key. Note that `id_hash` is marked
+`@is_identifier`, so it appears in `get_identifiers()` — meaning it can reach an
+identifier index (`GraphFactory.by_identifier`) or a namespace payload. Those are rebuilt
+in-process and so are fine; a serialized one would not be. If a durable content key is
+needed, use `content_hash`.
