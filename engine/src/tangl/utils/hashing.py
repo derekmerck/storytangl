@@ -23,7 +23,8 @@ logger.debug( f"Hashing with salt: {HASHING_SALT}" )
 # deterministic. That is the right place for it — only unstructurable (value-like)
 # data reaches this function normally, which is exactly the domain where sorting is
 # well defined. The `else` branch below is therefore the only non-deterministic path,
-# and its one deliberate consumer is Entity.id_hash.
+# and its deliberate consumers are HasIdentity.id_hash and Singleton.id_hash,
+# both of which pass self.__class__ and are process-local by design.
 
 def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
 
@@ -55,8 +56,8 @@ def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
             # for str-containing tuples, frozensets, etc. Anything reaching this branch
             # is therefore PROCESS-LOCAL. Callers needing a durable digest must pass
             # bytes/int/str, or a dict (serialized with default=str, so a class object
-            # inside one becomes a stable string). See Entity.id_hash for the one
-            # deliberate consumer.
+            # inside one becomes a stable string). The deliberate consumers are
+            # HasIdentity.id_hash and Singleton.id_hash.
             item_bytes = hash(item).to_bytes(8, byteorder="big", signed=True)
         hasher.update(item_bytes)
     return hasher.digest()

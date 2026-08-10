@@ -4,6 +4,7 @@ import logging
 from typing import Any, Callable, ClassVar, Iterator, Optional, Self, Type
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
+from pydantic.functional_serializers import SerializerFunctionWrapHandler
 from pydantic.fields import FieldInfo
 
 from tangl.type_hints import StringMap
@@ -63,7 +64,7 @@ class BaseModelPlus(BaseModel):
     """
 
     @model_serializer(mode="wrap")
-    def _sort_set_fields(self, handler, info):
+    def _sort_set_fields(self, handler: SerializerFunctionWrapHandler, info) -> Any:
         """Serialize set-valued fields as sorted lists, in every dump mode.
 
         Sets have no defined iteration order, and for sets of strings that order
@@ -78,7 +79,11 @@ class BaseModelPlus(BaseModel):
         and normalizing afterward leaves the handler's own rules untouched.
 
         The live attribute decides what to sort, not the dumped value, because JSON
-        mode has already listified the set by the time we see it.
+        mode has already listified the set by the time we see it. That means walking
+        *fields* rather than output keys: under ``by_alias=True`` the dumped key is the
+        alias, and ``getattr(self, alias)`` finds nothing. ``BaseScriptItem`` both
+        defaults to ``by_alias=True`` and carries aliased set fields
+        (``req_ancestor_tags``), so keying off the output name silently skipped it.
 
         Sorting by ``str`` is deterministic for the value-like members these sets
         actually hold (str, enum, UUID, int). It is **not** a general guarantee: a
@@ -87,11 +92,17 @@ class BaseModelPlus(BaseModel):
         ``design/core/CONTENT_ADDRESSABLE.md``.
         """
         data = handler(self)
-        if isinstance(data, dict):
-            for key, dumped in data.items():
-                raw = getattr(self, key, None)
-                if isinstance(raw, (set, frozenset)) and isinstance(dumped, (set, frozenset, list, tuple)):
-                    data[key] = sorted(dumped, key=str)
+        if not isinstance(data, dict):
+            return data
+        for name, field in type(self).model_fields.items():
+            raw = getattr(self, name, None)
+            if not isinstance(raw, (set, frozenset)):
+                continue
+            # the field may appear under its own name or either alias
+            for key in (name, field.serialization_alias, field.alias):
+                if key in data and isinstance(data[key], (set, frozenset, list, tuple)):
+                    data[key] = sorted(data[key], key=str)
+                    break
         return data
 
     @classmethod

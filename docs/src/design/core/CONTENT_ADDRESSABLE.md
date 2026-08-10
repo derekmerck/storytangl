@@ -216,7 +216,7 @@ Knowing which is which matters before any of them is written down.
 
 | Hash | Keys on | Stable across processes | Safe to persist |
 |---|---|---|---|
-| `content_hash()` | `get_hashable_content()` | **yes** | yes |
+| `content_hash()` | `get_hashable_content()` | **yes, for the supported input domain** (below) | yes |
 | `value_hash()` | `unstructure()` | **yes** | yes |
 | `id_hash()` | concrete class + `uid` (or `label` for singletons) | **no — by design** | **no** |
 
@@ -234,6 +234,26 @@ Two normalizations are both required, and each closes a real gap:
 
 The second was added late and is easy to lose again: it is a model serializer, so
 anything bypassing `model_dump` bypasses it too.
+
+### `content_hash` depends on what `get_hashable_content()` returns
+
+`value_hash` is safe by construction: it is built on `unstructure()`, so it always passes
+through `model_dump` and therefore through the set sorting above.
+
+`content_hash` is not, because `get_hashable_content()` is an **override point** that may
+return a raw field rather than an unstructured mapping — `Record` returns its `content`,
+`payload`, or `data` value directly. What it returns determines stability:
+
+| Returned | Result |
+|---|---|
+| `dict`, `str`, `bytes`, `int` | stable — the supported domain |
+| `set` | **raises** `TypeError: unhashable type` — fails loudly, which is fine |
+| `frozenset`, `tuple`, arbitrary object | **silently process-local** — the digest changes every run |
+
+The in-tree implementations all return safe values (`EntityTemplate` returns a dict of
+unstructured payload; `MediaResourceInventoryTag` returns bytes). The hazard is a future
+override returning a `frozenset` or `tuple`, which produces no error and no test failure
+in a single process. When adding one, return an unstructured mapping.
 
 ### The scope of the set guarantee
 

@@ -172,3 +172,92 @@ class TestIdHashIsDeliberatelyProcessLocal:
         as_string = {d.split()[1] for d in digests.values()}
         assert len(as_class) > 1, "class-object hashing should be process-local"
         assert len(as_string) == 1, "string hashing must be stable"
+
+
+class TestAliasedSetFields:
+    """Regression: ``by_alias=True`` dumps must sort too.
+
+    The first version of the serializer keyed off the *output* key and called
+    ``getattr(self, key)``. Under ``by_alias=True`` the output key is the alias, so the
+    lookup found nothing and the set was left unsorted. ``BaseScriptItem`` both defaults
+    to ``by_alias=True`` and carries aliased set fields, so this was live.
+    """
+
+    ALIASED = """
+        from pydantic import Field
+        from tangl.core._pydantic import BaseModelPlus
+
+        class Aliased(BaseModelPlus):
+            req_ancestor_tags: set[str] = Field(default_factory=set, alias="ancestor_tags")
+
+        m = Aliased(ancestor_tags={"zulu", "alpha", "mike", "delta"})
+        print(m.model_dump(by_alias=True)["ancestor_tags"])
+    """
+
+    def test_aliased_set_field_sorts_under_by_alias(self):
+        dumps = {seed: _run_under_seed(self.ALIASED, seed) for seed in SEEDS}
+        assert set(dumps.values()) == {"['alpha', 'delta', 'mike', 'zulu']"}, dumps
+
+    def test_real_script_model_sorts_its_aliased_tags(self):
+        dumps = {
+            seed: _run_under_seed(
+                """
+                import tangl.ir.core_ir.base_script_model as m
+                cls = next(
+                    c for c in vars(m).values()
+                    if isinstance(c, type) and "req_ancestor_tags" in getattr(c, "model_fields", {})
+                )
+                d = cls(ancestor_tags={"zulu", "alpha", "mike", "delta"}).model_dump()
+                print(d.get("ancestor_tags", d.get("req_ancestor_tags")))
+                """,
+                seed,
+            )
+            for seed in SEEDS
+        }
+        assert set(dumps.values()) == {"['alpha', 'delta', 'mike', 'zulu']"}, dumps
+
+
+class TestContentHashInputDomain:
+    """``get_hashable_content()`` is an override point; its return type decides stability.
+
+    Unlike ``value_hash``, ``content_hash`` does not necessarily pass through
+    ``model_dump``, so the set sorting does not protect it. These pin the documented
+    domain in ``CONTENT_ADDRESSABLE.md`` so the hazard stays visible.
+    """
+
+    def test_supported_returns_are_stable(self):
+        for body, label in (
+            ("print(Record(content={'k': 'v'}).content_hash().hex())", "dict"),
+            ("print(Record(content='plain').content_hash().hex())", "str"),
+        ):
+            digests = {
+                seed: _run_under_seed(f"from tangl.core import Record\n{body}", seed)
+                for seed in SEEDS
+            }
+            assert len(set(digests.values())) == 1, f"{label} content should be stable"
+
+    def test_raw_set_fails_loudly_rather_than_silently(self):
+        from tangl.core import Record
+
+        with pytest.raises(TypeError, match="unhashable"):
+            Record(content={"a", "b"}).content_hash()
+
+    @pytest.mark.parametrize("literal", ["frozenset({'a','b','c'})", "('x','y')"])
+    def test_frozenset_and_tuple_are_silently_process_local(self, literal):
+        """Documents the hazard rather than fixing it — see CONTENT_ADDRESSABLE.md.
+
+        If this ever starts passing, the input domain widened; update the doc rather
+        than deleting the test.
+        """
+        digests = {
+            seed: _run_under_seed(
+                f"from tangl.core import Record\n"
+                f"print(Record(content={literal}).content_hash().hex())",
+                seed,
+            )
+            for seed in SEEDS
+        }
+        assert len(set(digests.values())) > 1, (
+            f"{literal} content is now stable across processes; the documented input "
+            "domain in CONTENT_ADDRESSABLE.md needs updating"
+        )
