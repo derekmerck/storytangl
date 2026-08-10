@@ -108,11 +108,11 @@ shape), never inline with canon, and always with the condition that retires it.
 
 The most useful negotiations sharpen canon rather than merely confirming it.
 
-**The signal.** `story/presentation.py` imports `tangl.mechanics.presence`. Read
-naively against the four-layer DAG (`core ← vm ← story ← service`), this is realization
-saying the layer model is wrong — 20 sites import `mechanics → story`, and here is
-`story → mechanics` in the other direction. That reading would have amended canon to
-admit eight layers.
+**The pre-#368 signal.** `story/presentation.py` imported
+`tangl.mechanics.presence`. Read naively against the four-layer DAG
+(`core ← vm ← story ← service`), this was realization saying the layer model was wrong
+— 20 sites import `mechanics → story`, and here was `story → mechanics` in the other
+direction. That reading would have amended canon to admit eight layers.
 
 **The examination.** The three imports exist for one purpose: supplying concrete types
 to `wants_caller_kind=` on five `@on_render_text` registrations. There is no functional
@@ -134,18 +134,18 @@ import mechanics" and ended with a stronger, testable law:
 > `x`; anything wishing to participate registers with `x` and produces something
 > `x`-shaped.
 
-**Status: the law is stated, the code does not yet satisfy it.** `story/presentation.py`
-still imports presence at HEAD, so a world that never imports presence still loads it
-through story. The de-wiring — relocating those five `@on_render_text` handlers into
-`mechanics/presence/` — is a pending follow-up, and it needs a sweep of worlds currently
-inheriting presence rendering for free.
+**Status: landed through #368.** `story/presentation.py` now contains only the generic
+controller. Presence owns and registers its five `@on_render_text` handlers through
+`mechanics/presence/presentation.py`, while Credentials explicitly activates that
+intrinsic dependency for its bound-subject rendering.
 
-Note what is *not* the defect: presence is legitimately a *shipped default mechanic*
-whose handlers land in the shared story registry, and that is fine. Once de-wired, a world
-that never imports presence will not load it, and a single-world server can run with it as
-dead code. The defect is neither the layer nor the shared registry — it is **who causes
-the import**. (Layer confers no visibility at all — see *Layers order; registries scope; folds decide*
-in the [glossary](glossary.md).)
+Note what is *not* the defect: Presence is legitimately a *shipped reusable mechanic*
+whose handlers may register in the shared Story registry once explicitly activated. A world
+that neither selects Presence nor a mechanic with an intrinsic Presence dependency does not
+load it, and a single-world server can run with it as dead code. The defect was neither the
+layer nor the shared registry — it was **who caused activation**. (Layer confers no
+visibility at all — see *Layers order; registries scope; folds decide* in the
+[glossary](glossary.md).)
 
 ## Review rhythm
 
