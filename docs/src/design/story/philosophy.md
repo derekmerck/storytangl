@@ -422,9 +422,9 @@ the same underlying fabula, each with its own visibility, perspective, and
 decision policy, while the service/presentation layer remains free to surface
 one lane, several lanes, or a stitched cross-reference view.
 
-**Implementation:** Creator → `StoryCompiler` + `Materializer`;
+**Implementation:** Creator → `StoryCompiler` + `WorldBuilder`;
 Navigator → `Frame` + `Ledger` (user choices drive `follow_edge`);
-Presenter → `GatewayHooks` + render profiles in the service layer.
+Presenter → typed journal fragments + an application/client presentation adapter.
 
 ---
 

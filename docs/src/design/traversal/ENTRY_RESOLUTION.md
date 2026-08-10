@@ -16,7 +16,7 @@ stories.
 The system needs a clean way to express this without:
 
 - polluting `Ledger` with domain-specific routing logic
-- requiring `RuntimeController` to know anthology conventions
+- requiring `ServiceManager` to know anthology conventions
 - re-running the compiler or materializer for each user
 
 ---
@@ -77,28 +77,6 @@ user-bound story creation.
 ## World Implementation Sketch
 
 ```python
-def create_story(
-    self,
-    story_label: str,
-    *,
-    init_mode: InitMode = InitMode.EAGER,
-    namespace: dict | None = None,
-) -> StoryInitResult:
-    materializer = StoryMaterializer()
-    result = materializer.create_story(
-        bundle=self.bundle,
-        story_label=story_label,
-        init_mode=init_mode,
-        world=self,
-    )
-
-    if namespace is not None:
-        override_uid = self._resolve_entry_override(result.graph, namespace)
-        if override_uid is not None:
-            result.graph.initial_cursor_id = override_uid
-
-    return result
-
 def _resolve_entry_override(
     self,
     graph: StoryGraph,
@@ -160,8 +138,8 @@ ledger owns traversal state after initialization.
   graph returned from `create_story`.
 - No ledger mutation: the ledger is initialized after override has already been
   applied.
-- Domain logic stays in the domain package: `World` and service controllers
-  expose only the seam.
+- Domain logic stays in the domain package: `World` exposes the override seam;
+  Service only forwards the initialization namespace.
 - Namespace shape stays open: `{"user": User}` is the minimum useful contract.
 - Compile-time default is always present: a missing resolver is not an error.
 

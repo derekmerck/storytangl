@@ -36,6 +36,32 @@ Each layer has a `_DESIGN.md` file in its source directory that describes
 the intended shape in detail. Read the relevant one before adding or
 modifying modules in that layer.
 
+### Extension Packages and World Composition
+
+`tangl.mechanics` is not a fifth engine layer. It contains optional feature
+packages that extend the Story/VM/Core vocabulary through the same public
+types and dispatch seams used by authored content. A mechanic may depend on
+Story, VM, Core, and another mechanic that it intrinsically builds on; an
+engine layer must not import an optional mechanic to wire it on an author's
+behalf.
+
+The authored `World` is the top-level composition root. Its domain package:
+
+- imports the top-level mechanics that world adopts;
+- supplies world-specific policy, catalogs, templates, resources, and special
+  classes or handlers;
+- places private behavior in world-owned registries exposed through the
+  world's authority chain.
+
+A mechanic owns its transitive mechanic dependencies. For example, Credentials
+may activate Presence when credential rendering intrinsically requires bearer
+descriptions; every consuming world need not repeat that dependency.
+
+Do not confuse package composition, registry reach, and dispatch order.
+Registry membership plus the runtime authority chain determine which handlers
+are visible. `DispatchLayer` and priority only order the handlers assembled
+from those registries.
+
 
 ---
 
@@ -389,9 +415,10 @@ Today it adds:
 - template lineage maps from runtime entities back to templates
 - runtime wiring markers
 
-`StoryGraph` is currently a **transitional** graph subtype: it still carries
-story-specific back-pointers and it currently overrides `get_authorities()` to
-prepend `story_dispatch` and then cascade to the attached world.
+`StoryGraph.get_authorities()` prepends `story_dispatch` and then delegates to
+the ordinary graph/factory authority chain. Its `world` property is a
+convenience view over the bound factory when that factory is a `World`; it is
+not a second authority back-pointer.
 
 ### Episode Types (`story/episode/`)
 
@@ -464,6 +491,10 @@ What `World` does today:
 phase, but runtime story creation no longer depends on it as the active
 authority.
 
+Because `World` is a singleton factory, graph persistence records the bound
+factory in constructor form and restores the same live world identity by
+`(kind, label)`.
+
 ### ScriptManager (`story/fabula/script_manager.py`)
 
 A runtime facade over compiled templates.
@@ -490,40 +521,48 @@ Story participates in VM execution by exposing `story_dispatch` through
 
 ## Service — Lifecycle and Transport
 
-Service manages application lifecycle: persistence, endpoint dispatch,
-access control, and response shaping.
+Service manages application lifecycle: persistence-backed users and ledgers,
+access control, world loading, explicit story operations, and typed response
+shaping.
 
-### Orchestrator (`service/orchestrator.py`)
+### ServiceManager (`service/service_manager.py`)
 
-Registers controllers and resolves endpoint calls by name. On execute:
-hydrate resources such as `User`, `Ledger`, and `Frame` from persistence,
-call the method, and persist mutations back.
+The canonical public service object. Its explicit methods implement use cases
+such as story creation and advancement, story-info projection, user management,
+and world/system inspection.
 
-### ApiEndpoint (`service/api_endpoint.py`)
+`ServiceSession` is the live user/ledger/frame bundle opened for one operation.
+`ServiceManager.open_session(...)` loads or derives those resources and applies
+the method's writeback policy on exit.
 
-Metadata annotation on controller methods: access level, method type, and
-response type.
+### Service Method Metadata (`service/service_method.py`)
 
-### Controllers (`service/controllers/`)
+`@service_method(...)` attaches bounded metadata to manager methods: access
+class, context class, writeback policy, blocking hint, and optional capability
+or operation identifiers. Adapters use this metadata for routing and policy;
+it does not replace the direct Python method implementation.
 
-- **RuntimeController** — create_story, resolve_choice, get_journal,
-  get_available_choices, get_story_info, jump_to_node
-- **WorldController** — list_worlds, compile_world, get_world_info
-- **SystemController** — system status
-- **UserController** — user management
+### Bootstrap and Remote Parity
 
-### Gateway (`service/gateway.py`)
+`build_service_manager(...)` constructs either the local `ServiceManager` or a
+transport-backed `RemoteServiceManager`. Remote mode implements the supported
+REST subset through the same manager-shaped API; it is not a second lifecycle
+or persistence model.
 
-Wraps the orchestrator with inbound/outbound hook pipelines and render-profile
-handling.
+`WorldRegistry` is the service-owned discovery and loading surface for worlds.
+Service decides when a world is available, but the world owns its narrative and
+mechanic policy.
 
 ### Response Contract
 
-Service returns one of two things:
+Story-session methods return `RuntimeEnvelope`, carrying the real journal
+fragments plus runtime metadata and advisory UX events. Informational reads
+return typed models such as `ProjectedState`, `UserInfo`, `WorldInfo`, and
+`SystemInfo`; mutation acknowledgements return `RuntimeInfo`.
 
-- **Fragment response** — a list or envelope of `BaseFragment` records plus
-  runtime metadata
-- **Info response** — a typed payload inheriting from `InfoModel`
+Service does not invent mechanics or maintain a parallel fragment shape.
+CLI/REST adapters delegate to manager methods and own transport-specific
+serialization or presentation.
 
 
 ---
@@ -556,21 +595,14 @@ travel beside the journal stream on `RuntimeEnvelope.ux_events`.
 These are real current seams, but they are not invitations to add parallel
 infrastructure.
 
-- **Core factory vs. story world authority.** Core now has
-  `GraphFactory` as a singleton graph authority plus eager topology
-  materializer. Story still uses `World`, `StoryMaterializer`, and
-  `StoryGraph` back-pointers for runtime policy and scope recovery.
-- **`StoryGraph.factory` is not yet the same thing as `Graph.factory`.**
-  In core, `graph.factory` means singleton graph authority. In story,
-  `StoryGraph.factory` is still used as a template-registry back-pointer for
-  runtime scope recovery. Do not assume those surfaces are unified.
-- **World round-trips by label, and that is the designed behaviour.**
-  `StoryGraph` serializes `world` as a label reference and restores it through
-  `World.get_instance(...)`. This follows from the singleton authority model:
-  `GraphFactory` is a `Singleton`, `World` is a `TraversableGraphFactory`
-  subclass, so world identity *is* `(World, label)`. Treat this as a seam only
-  in the sense that `StoryGraph.factory` and `Graph.factory` still differ (see
-  above) — not as a pending migration.
+- **StoryGraph compatibility aliases.** The canonical authority is
+  `StoryGraph.factory`, inherited from `Graph` and normally bound to a
+  singleton `World`. `StoryGraph.world`, `world_ref`, and the story
+  materialization override setters remain compatibility surfaces around that
+  model; do not build a second graph/world authority path from them.
+- **Compiled-bundle compatibility.** `World.bundle` remains a loader/build
+  artifact alias while runtime template and authority access comes directly
+  from the `World` factory.
 - **Some VM/provider hooks are still story-colored.** Use existing seams
   carefully, but do not extend them into a parallel discovery framework.
 

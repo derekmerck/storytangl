@@ -12,7 +12,8 @@ Each family keeps a broad top-level identity such as ``games`` or
 - **Attachment points**: where does it plug into compiler, VM, media, or service flow?
 - **Appearance**: what does it project outward as?
 
-The current mechanics resurrection work also uses a common internal layer model:
+The current mechanics work also uses common review facets. These organize one
+family's responsibilities; they are not additional engine layers:
 
 - **Kernel**: pure deterministic rule logic
 - **Domain**: semantic catalogs and vocabulary bindings
