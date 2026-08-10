@@ -28,7 +28,7 @@ from tangl.story import World
 
 world_registry = BehaviorRegistry(
     label="weather.world",
-    default_dispatch_layer=DispatchLayer.APPLICATION,
+    default_dispatch_layer=DispatchLayer.AUTHOR,
 )
 
 
@@ -78,10 +78,13 @@ world = World.from_script_data(
 
 1. Return explicit registries or groups from world facets; avoid mutating global
    dispatch registries in tests unless the behavior is truly shared.
-2. Keep world authorities focused on runtime behavior. Use template/media scope
+2. Registry membership determines reach; dispatch layer determines precedence. A
+   world-owned handler may explicitly select another layer without becoming visible
+   outside that world's authority chain.
+3. Keep world authorities focused on runtime behavior. Use template/media scope
    hooks for lookup data instead of squeezing that data through dispatch tasks.
-3. Use ``frame.local_behaviors`` or ``ledger.local_behaviors`` for short-lived
+4. Use ``frame.local_behaviors`` or ``ledger.local_behaviors`` for short-lived
    experiments and test overrides rather than adding new global handlers.
-4. Treat the old materialize-task docs and ``MaterializationContext`` examples as
+5. Treat the old materialize-task docs and ``MaterializationContext`` examples as
    retired. The current story materializer is organized as explicit passes, not
    a public per-phase dispatch bus.

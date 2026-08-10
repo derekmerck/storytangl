@@ -51,12 +51,13 @@ in the [glossary](../glossary.md)). Redirects **intercept**: the first handler t
 an edge claims the traversal, and nothing downstream can un-claim it. A handler with no
 opinion must return `None`.
 
-That makes the dispatch layer a statement about **whose concern preempts whose**.
+That makes the dispatch layer a statement about **whose concern preempts whose**. The
+registry containing the handler independently determines where that concern is visible.
 
-**Application-wide — preemptive, indifferent to local state.** *"You have seen all the
-content; here is how to subscribe for updates."* It does not matter where the player was
-going; they are going to the outro. The condition is orthogonal to the fiction and
-dominates it.
+**Hard interception — explicitly `GLOBAL`.** *"You have seen all the content; here is how
+to subscribe for updates."* If it must dominate even VM trigger handling, its handler
+opts into `GLOBAL`. Register it in an application registry for application-wide reach or
+in a world registry for the same precedence within that world only.
 
 **World — conditional, and abstains when its condition does not hold.** *"The bridge
 collapses under your weight and you tumble into the abyss"* when the crossing
@@ -65,7 +66,7 @@ takes the regular crossing. The redirect is a legitimate alternate destination, 
 failure — that is what distinguishes it from `validate_edge`, which folds with `all_true`
 and **blocks** the move rather than substituting a different one.
 
-### The layer that actually preempts is `GLOBAL`, not `APPLICATION`
+### VM trigger scanning is a `SYSTEM` concern
 
 The declarative surface above — edges carrying `trigger_phase` — is itself implemented as
 a handler: `follow_triggered_prereqs` / `follow_triggered_postreqs` in
@@ -75,17 +76,16 @@ a handler: `follow_triggered_prereqs` / `follow_triggered_postreqs` in
 
 | Order | Handler | Claims when |
 |---|---|---|
-| `GLOBAL` (0) | *(nothing registered today)* | — |
+| `GLOBAL` (0) | explicit hard intercepts | whenever their own condition and registry reach apply |
 | `SYSTEM` (1) | `follow_triggered_prereqs` | **any** authored `trigger_phase` edge whose guard passes |
-| `APPLICATION` (2) | app-wide redirects | only if no trigger edge fired |
-| `AUTHOR` (3)+ | world/world-instance handlers | only if nothing above claimed |
+| `APPLICATION` (2) | ordinary application handlers | only if nothing above claimed |
+| `AUTHOR` (3)+ | ordinary world and instance handlers | only if nothing above claimed |
 
-So an app-wide outro registered at `DispatchLayer.APPLICATION` is **preempted by any
-authored trigger edge** — the bridge would win over the outro, which inverts the intent.
-A redirect that must genuinely trump story-level ones has to register at
-`DispatchLayer.GLOBAL`, the only band below `SYSTEM`.
+An outro registered at `APPLICATION` is therefore preempted by a matching declarative
+trigger edge. That is intentional: broad registry reach does not imply hard precedence.
+A redirect that must dominate the trigger scanner explicitly selects `GLOBAL`.
 
-This is the layer-name trap again: "application-wide" describes *reach*, and the layer
-named `APPLICATION` does not deliver it here because the declarative trigger-edge scanner
-sits below it. Worlds that express their redirects as `trigger_phase` edges (the normal
-path) are effectively redirecting at `SYSTEM`.
+The edge itself remains authored content; interpreting its `trigger_phase` is the VM's
+`SYSTEM` behavior. Conversely, a world-owned handler may select `SYSTEM` or `GLOBAL` for
+exceptional precedence and remains world-private because its registry, not its layer,
+controls reach.

@@ -132,7 +132,7 @@ that distinction.
 | **Behavior** | plugin | Callable registered for a specific task at a specific priority | `core.behavior.Behavior` |
 | **Task** | hook point | Named extension point in the pipeline (e.g., `validate_edge`, `render_journal`) | Task name string |
 | **Priority** | ordering | Execution order within a task, applied *after* layer: FIRST → EARLY → NORMAL → LATE → LAST | `Priority` enum (`core.behavior`) |
-| **Layer** | ordering band | Execution order only — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
+| **Layer** | precedence band | Conventional ownership altitude and execution order — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
 | **Authority chain** | visibility scope | Which registries are in play for a call — assembled by `chain_execute_all` from explicit args, `ctx.get_authorities()` (graph → world), then inline. **This** is what scopes a handler | `BehaviorRegistry.chain_execute_all`, `World.get_authorities()` |
 | **Fold** (aggregation) | reduction strategy | How the receipts of a task reduce to one result. Chosen **per task at the `do_*` site**, not by the handlers. Decides *who wins* — see below | `CallReceipt.first_result` / `last_result` / `all_true` / `gather_results` / `merge_results`; `AggregationMode` enum names them |
 | **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
@@ -140,9 +140,10 @@ that distinction.
 
 ### Layers order; registries scope; folds decide
 
-Three **independent** axes. The first two are commonly conflated because the layer
-*names* suggest scopes — they are not scopes. The third is missed entirely: order alone
-never determines who wins.
+Three **independent** axes. A layer name identifies the concern a handler conventionally
+represents and its normal place in the precedence ladder; it does not make that handler
+visible at that scope. The fold is independent again: order alone never determines who
+wins.
 
 **1 · Registry membership determines visibility.** A behaviour is reachable when the
 registry holding it is in the assembled chain. `BehaviorRegistry.chain_execute_all`
@@ -151,15 +152,25 @@ cascades graph → world, with `World.get_authorities()` returning the world's o
 `dispatch` registry plus any extra authorities), then inline behaviours — deduplicated by
 identity. Handlers from *all* assembled registries are then pooled together.
 
-**2 · `DispatchLayer` determines order only.** It is simply the first element of
+**2 · `DispatchLayer` determines precedence order.** It is the first element of
 `Behavior.sort_key` — `(dispatch_layer, priority, wants_exact_kind, seq)` — applied across
-that pooled set. It confers no visibility of any kind. `LOCAL` sorts last so it can
-observe and aggregate what earlier layers produced.
+that pooled set. The names provide the conventional ownership vocabulary below, but
+confer no visibility. A behavior may explicitly choose a different band without leaving
+its registry's reach.
+
+| Band | Conventional concern |
+|---|---|
+| `GLOBAL` | universally applicable engine concern; earliest ordinary band |
+| `SYSTEM` | engine and subsystem infrastructure |
+| `APPLICATION` | StoryTangl or another application such as Detangl |
+| `AUTHOR` | world/domain-authored behavior |
+| `USER` | one concrete story graph, ledger, or journal instance |
+| `LOCAL` | inline behavior supplied for one function resolution |
 
 | Where it is registered | Visible | Layer's role there |
 |---|---|---|
-| shared module registry (e.g. `story_dispatch`) | everywhere that registry is consulted | ordering only — an `AUTHOR`-layer handler here is still global, just sorted later |
-| a world's own `dispatch` registry | only when that world's authorities are in the chain | ordering only — a `SYSTEM`-layer handler here is still world-private, just sorted first |
+| shared module registry (e.g. `story_dispatch`) | everywhere that registry is consulted | an `AUTHOR`-layer handler here is still shared, just sorted later |
+| a world's own `dispatch` registry | only when that world's authorities are in the chain | a `SYSTEM`- or `GLOBAL`-layer handler here is still world-private, just sorted earlier |
 
 **The practical trap.** The module-level decorators (`@on_render_text`, `@on_gather_ns`,
 …) register into the **shared** story registry. Passing `dispatch_layer=AUTHOR` to one of
@@ -168,21 +179,22 @@ world-privacy, register into the world's own registry. `worlds/composed_beat_dem
 live example of the ordering use: its `AUTHOR`-layer namespace override wins because it
 sorts after the application default, not because it is scoped.
 
-Compounding this, `BehaviorRegistry.default_dispatch_layer` is `APPLICATION`, so a
-registration that omits the layer gets `APPLICATION` **regardless of which registry it
-lands in** — which is exactly how the first two axes come to look like one.
+Each registry supplies its normal default band, and each registration may override it.
+A bare `BehaviorRegistry` defaults to `APPLICATION`; subsystem and object-owned
+registries should choose the default appropriate to their owner rather than relying on
+the bare default accidentally.
 
 **3 · The fold decides who wins.** Sorting fixes the *sequence*; the aggregator chosen at
 the `do_*` site fixes what that sequence *means*. "Later wins" is a property of the fold,
 not of the ladder. The two single-winner folds encode two different **kinds of decision**,
 and they read the ladder in opposite directions on purpose:
 
-- **Refinement** (`last_result`) — every layer contributes and the most specific one
-  stands. Later layers *see* what earlier ones produced, so `LOCAL` sorting last is what
-  makes an override possible.
+- **Refinement** (`last_result`) — every layer contributes and the last non-`None` result
+  stands. `LOCAL` sorting last is what makes a local replacement win; seeing earlier
+  results requires a separate explicit composition contract.
 - **Interception** (`first_result`) — the first authority to claim the decision takes it,
   and nothing downstream can un-claim it. Here `GLOBAL` sorting first is exactly right:
-  the broadest authority gets first refusal.
+  the earliest conventional concern gets first refusal.
 
 | Fold | Winner | Effect on the ladder | Live tasks |
 |---|---|---|---|
@@ -195,22 +207,22 @@ and they read the ladder in opposite directions on purpose:
 So "the `LOCAL` handler overrides the others" is only true for a `last_result` task.
 
 **Why redirects intercept.** `get_prereqs` / `get_postreqs` return an optional redirect
-edge, which is a *claim on where the traversal goes next* — not a value to refine. An
-application-wide redirect is rare, but when one exists it should trump any story-level
-redirect, and interception gives that for free without a precedence table. Meanwhile the
-common case is several redirects registered at the **same** layer, where the fold degrades
-to `seq` — the monotonic registration counter, last key of `sort_key` — so among peers
-**first registered wins**, which is the expected declaration-order reading. The rare
-override and the ordinary case are served by one rule.
+edge, which is a *claim on where the traversal goes next* — not a value to refine. The
+first concern to claim it wins. Reach and precedence remain separate: putting a handler
+in a shared registry makes it broadly visible but does not move it earlier, while putting
+a `GLOBAL` handler in a world registry moves it earlier without making it visible outside
+that world. Among peers at the **same** layer, the fold degrades to `seq` — the monotonic
+registration counter, last key of `sort_key` — so **first registered wins**.
 
 The practical consequence is that *abstention is the contract*: a redirect handler with
 no opinion must return `None`, not a default edge. Returning something unconditionally at
 an early layer silently claims every traversal.
 
-One consequence is worth knowing before choosing a layer: the declarative
-`trigger_phase` edge scanner is itself a `SYSTEM`-layer handler, so it preempts anything
-registered at `APPLICATION`. A redirect meant to trump story-level ones belongs at
-`GLOBAL`. See {ref}`Redirect precedence <redirect-precedence>`.
+The declarative `trigger_phase` edge scanner is a `SYSTEM`-layer handler because
+interpreting authored trigger data is VM infrastructure. It therefore preempts ordinary
+`APPLICATION` and `AUTHOR` handlers. A redirect that must hard-intercept even system
+trigger handling opts into `GLOBAL`; its registry still determines where it is visible.
+See {ref}`Redirect precedence <redirect-precedence>`.
 
 **Folds select results; they do not gate execution.** Every matching handler in the
 assembled chain runs, whatever the fold. All live sites drain the receipt iterator

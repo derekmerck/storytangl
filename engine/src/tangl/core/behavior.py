@@ -89,10 +89,11 @@ class AggregationMode(Enum):
     - ``LAST`` is *refinement*: every layer contributes and the most specific one stands,
       so ``LOCAL`` sorting last is what makes an override possible.
     - ``FIRST`` is *interception*: the first authority to claim the decision takes it, so
-      ``GLOBAL`` sorting first gives the broadest authority first refusal. Used for
-      redirects (``get_prereqs`` / ``get_postreqs``), where a rare application-wide
-      redirect should trump story-level ones, and same-layer peers fall through to
-      registration order. A handler with no opinion must return ``None``.
+      ``GLOBAL`` sorting first gives an explicit hard intercept first refusal. Used for
+      redirects (``get_prereqs`` / ``get_postreqs``), where declarative trigger scanning
+      is a ``SYSTEM`` concern and a redirect that must preempt it opts into ``GLOBAL``.
+      Same-layer peers fall through to registration order. A handler with no opinion
+      must return ``None``.
     """
     FIRST = "first_result"       # First non-None wins (earliest layer)
     LAST = PIPE = "last_result"  # Last non-None wins (latest layer overrides)

@@ -10,11 +10,10 @@ Existing tests cover the pieces in isolation — layer sorting, authority-chain 
 *combination*: several simultaneous redirect claims at different layers, conditional
 abstention, and an assertion about which destination actually wins.
 
-These are **characterization tests**. They pin current behaviour, including the defect
-in issue #360 (the ``SYSTEM``-layer trigger-edge scanner preempts ``APPLICATION``).
-``test_system_trigger_edge_preempts_application_handler`` is the one that is expected to
-change if #360 moves the scanner's layer; it is marked so it is found rather than
-mechanically "fixed".
+These are **contract tests**. They pin registry reach independently from dispatch order:
+the ``SYSTEM`` trigger-edge scanner preempts ``APPLICATION`` by design, while an explicit
+``GLOBAL`` claim can hard-intercept it. A handler's layer never changes which authority
+chains can see its registry.
 """
 
 from __future__ import annotations
@@ -141,12 +140,10 @@ class TestTriggerEdgePrecedence:
     def test_system_trigger_edge_preempts_application_handler(
         self, graph, crossing, null_ctx, scanner
     ):
-        """CHARACTERIZATION — pins the issue #360 defect.
+        """The VM's declarative trigger scanner claims before application handlers.
 
-        The authored bridge-collapse trigger edge beats the application-wide outro,
-        because the scanner registers at SYSTEM (1) and SYSTEM sorts before
-        APPLICATION (2). This is the inverse of the intended precedence. **Expected to
-        change if #360 relocates the scanner** — update deliberately, do not "fix".
+        The edge carries authored data, but the scanner interpreting ``trigger_phase``
+        is VM infrastructure registered at SYSTEM (1), before APPLICATION (2).
         """
         origin, regular, collapse, outro = crossing
         to_outro = _edge(graph, predecessor_id=origin.uid, successor_id=outro.uid)
@@ -161,13 +158,13 @@ class TestTriggerEdgePrecedence:
                    dispatch_layer=DispatchLayer.APPLICATION)
 
         result = do_prereqs(origin, ctx=null_ctx)
-        assert result is to_collapse, "the bridge currently beats the outro"
+        assert result is to_collapse, "the SYSTEM trigger scanner beats APPLICATION"
         assert result.successor.get_label() == "abyss"
 
     def test_global_handler_beats_system_trigger_edge(
         self, graph, crossing, null_ctx, scanner
     ):
-        """The documented workaround: GLOBAL is the band that actually preempts."""
+        """GLOBAL is the intentional hard-interception band."""
         origin, regular, collapse, outro = crossing
         to_outro = _edge(graph, predecessor_id=origin.uid, successor_id=outro.uid)
         _edge(
@@ -317,10 +314,30 @@ class TestScopingPatterns:
             "registry membership scopes it — a different world never sees this handler"
         )
 
+    def test_global_layer_in_world_registry_remains_world_private(
+        self, graph, crossing, ctx_factory
+    ):
+        """An explicit layer override changes precedence, never registry reach."""
+        origin, regular, collapse, outro = crossing
+        to_outro = _edge(graph, predecessor_id=origin.uid, successor_id=outro.uid)
+
+        world = _world_registry()
+        world.register(
+            func=_claim(to_outro, layer=DispatchLayer.GLOBAL),
+            task="get_prereqs",
+            dispatch_layer=DispatchLayer.GLOBAL,
+        )
+
+        assert do_prereqs(origin, ctx=ctx_factory(registries=[world])) is to_outro
+        assert do_prereqs(
+            origin,
+            ctx=ctx_factory(registries=[_world_registry("other_world")]),
+        ) is None
+
     def test_any_choice_in_any_world_to_system_interruption(
         self, graph, crossing, ctx_factory
     ):
-        """A shared handler at GLOBAL — preempts everything, in every world."""
+        """A shared registry supplies broad reach; GLOBAL supplies hard precedence."""
         origin, regular, collapse, outro = crossing
         to_outro = _edge(graph, predecessor_id=origin.uid, successor_id=outro.uid)
 
@@ -370,7 +387,7 @@ class TestScopingPatterns:
 
 
 def test_trigger_scanner_registers_at_system_layer(scanner):
-    """If this fails, issue #360 was acted on and the matrix above needs re-reading."""
+    """Declarative trigger interpretation remains VM infrastructure."""
     registered = [
         b for b in vm_dispatch.find_all(Selector(task="get_prereqs"))
         if b.func is follow_triggered_prereqs
