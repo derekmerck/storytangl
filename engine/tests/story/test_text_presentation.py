@@ -9,6 +9,7 @@ import pytest
 
 from tangl.core import BehaviorRegistry, DispatchLayer
 from tangl.lang.body_parts import BodyPart, BodyRegion
+import tangl.mechanics.presence.presentation  # noqa: F401
 from tangl.mechanics.presence.look import (
     HairColor,
     HairStyle,

@@ -134,11 +134,10 @@ import mechanics" and ended with a stronger, testable law:
 > `x`; anything wishing to participate registers with `x` and produces something
 > `x`-shaped.
 
-**Status: the law is stated, the code does not yet satisfy it.** `story/presentation.py`
-still imports presence at HEAD, so a world that never imports presence still loads it
-through story. The de-wiring — relocating those five `@on_render_text` handlers into
-`mechanics/presence/` — is a pending follow-up, and it needs a sweep of worlds currently
-inheriting presence rendering for free.
+**Status: landed through #368.** `story/presentation.py` now contains only the generic
+controller. Presence owns and registers its five `@on_render_text` handlers through
+`mechanics/presence/presentation.py`, while Credentials explicitly activates that
+intrinsic dependency for its bound-subject rendering.
 
 Note what is *not* the defect: presence is legitimately a *shipped default mechanic*
 whose handlers land in the shared story registry, and that is fine. Once de-wired, a world

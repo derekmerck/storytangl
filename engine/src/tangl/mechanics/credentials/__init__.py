@@ -36,6 +36,9 @@ from .domain import (
     Restrictions,
 )
 
+# Credentials requires Presence for bound bearer and document-subject rendering.
+import tangl.mechanics.presence.presentation  # noqa: F401
+
 # Register the credential-owned default text presentation handlers.
 from .presentation import (
     CredentialAttestationObservation,
