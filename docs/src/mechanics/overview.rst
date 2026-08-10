@@ -26,12 +26,14 @@ Current family status
 ---------------------
 
 - ``games``: reference integrated mechanic family
-- ``progression``: strong kernel/runtime foundation
-- ``assembly``: constrained optimization foundation
+- ``progression``: integrated training/challenge/growth foundation
+- ``assembly`` and ``transaction``: shared component and writeback foundations
 - ``demographics``: profile/domain facet under modernization
 - ``presence/wearable`` and ``presence/ornaments``: reusable presence primitives
-- ``presence/look``: redesign target with a first explicit description/media payload facade
-- ``sandbox`` and ``credentials``: incubating compositions
+- ``presence/look``: integrated semantic text/portrait projection foundation
+- ``sandbox``: integrated spatial/activity vertical
+- ``credentials``: worked convergence capstone
+- ``simulation``: deterministic operational-model foundation
 
 See also
 --------
