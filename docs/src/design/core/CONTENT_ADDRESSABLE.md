@@ -220,16 +220,42 @@ Knowing which is which matters before any of them is written down.
 | `value_hash()` | `unstructure()` | **yes** | yes |
 | `id_hash()` | concrete class + `uid` (or `label` for singletons) | **no — by design** | **no** |
 
-`content_hash` and `value_hash` are stable because their inputs are dicts, and
-`hashing_func` serializes dicts with `json.dumps(..., default=str, sort_keys=True)` — so
-the class object inside them becomes a stable string, and key order is normalized.
+### Why the first two are stable
+
+Two normalizations are both required, and each closes a real gap:
+
+1. **Dict key order** — `hashing_func` serializes dicts with
+   `json.dumps(..., default=str, sort_keys=True)`. `sort_keys` normalizes key order, and
+   `default=str` turns the class object stored under `kind` into a stable string.
+2. **Set member order** — `BaseModelPlus._sort_set_fields` serializes every set-valued
+   field as a **sorted list**. Without it, `tags` (a `set[Tag]` on every entity) made
+   `value_hash` differ on every run, because set iteration order for strings varies
+   between processes under hash randomization.
+
+The second was added late and is easy to lose again: it is a model serializer, so
+anything bypassing `model_dump` bypasses it too.
+
+### The scope of the set guarantee
+
+Sorting uses `key=str`, which is deterministic for **value-like members** — `str`, `int`,
+`enum`, `UUID`. It is *not* a general guarantee about sets: a set of objects relying on
+the default `repr` sorts by memory address and stays unstable.
+
+That narrow scope is sufficient rather than lucky. Only *unstructurable* data reaches the
+hash path normally, and unstructurable is precisely the domain where sorting is well
+defined. The set-valued model fields in the tree today are all value-like:
+`tags`, `req_ancestor_tags` / `forbid_ancestor_tags`, `countries`, and
+`required_connection_slots`. Ordered collections such as `member_ids: list[UUID]` were
+never affected.
+
+### Why `id_hash` is deliberately unstable
 
 `id_hash` passes the class object as a *top-level* argument, which falls through to
-Python's built-in `hash()`. That is id-based for classes and randomized per process for
-several other types, so the digest differs run to run. This is not a defect: `id_hash`
-backs `HasIdentity.__eq__` via `eq_by_id`, both sides of a comparison are computed in the
-same interpreter, and the variation cancels exactly. It is *runtime identity*, not
-content identity.
+Python's built-in `hash()`. That is id-based for classes, so the digest differs run to
+run. This is not a defect: `id_hash` backs `HasIdentity.__eq__` via `eq_by_id`, both
+sides of a comparison are computed in the same interpreter, and the variation cancels
+exactly. It is *runtime identity*, not content identity, and it never reaches
+persistence — `unstructure()` does not emit it.
 
 **The invariant that follows:** never persist an `id_hash`, never transmit one between
 processes, and never use one as a durable key. Note that `id_hash` is marked

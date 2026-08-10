@@ -18,10 +18,12 @@ logger.setLevel(logging.WARNING)
 
 logger.debug( f"Hashing with salt: {HASHING_SALT}" )
 
-# todo: this hashing is not stable for set insertion order even if the sets
-#       contain the same items, they will present as different strings under
-#       different insertion orders (dicts get sorted tho).  Probably not worth
-#       the extra complexity to fix.
+# Set ordering is normalized upstream: BaseModelPlus._sort_set_fields serializes
+# set-valued fields as sorted lists, so unstructured data arrives here already
+# deterministic. That is the right place for it — only unstructurable (value-like)
+# data reaches this function normally, which is exactly the domain where sorting is
+# well defined. The `else` branch below is therefore the only non-deterministic path,
+# and its one deliberate consumer is Entity.id_hash.
 
 def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
 

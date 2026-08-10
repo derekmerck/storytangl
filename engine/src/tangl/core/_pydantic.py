@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, ClassVar, Iterator, Optional, Self, Type
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer
 from pydantic.fields import FieldInfo
 
 from tangl.type_hints import StringMap
@@ -27,6 +27,8 @@ class BaseModelPlus(BaseModel):
     - :meth:`_schema_matches` combines both into a single value map.
     - :meth:`force_set` writes directly to ``__dict__`` for controlled bypasses
       on frozen models.
+    - Set-valued fields serialize as **sorted lists** so dumps and the hashes
+      derived from them are deterministic — see :meth:`_sort_set_fields`.
 
     Example:
         >>> class F(BaseModelPlus):
@@ -59,6 +61,38 @@ class BaseModelPlus(BaseModel):
         >>> f.x
         99
     """
+
+    @model_serializer(mode="wrap")
+    def _sort_set_fields(self, handler, info):
+        """Serialize set-valued fields as sorted lists, in every dump mode.
+
+        Sets have no defined iteration order, and for sets of strings that order
+        varies between processes under hash randomization. Since ``unstructure()``
+        is built on ``model_dump`` and the hashes are built on ``unstructure()``, an
+        unsorted set field made ``value_hash`` differ on every run — and ``tags`` is
+        on every entity, so this reached almost everything.
+
+        This runs at the *model* level rather than per field: a wildcard
+        ``field_serializer`` intercepts each field individually and breaks
+        ``exclude_defaults`` propagation into nested models. Wrapping the whole dump
+        and normalizing afterward leaves the handler's own rules untouched.
+
+        The live attribute decides what to sort, not the dumped value, because JSON
+        mode has already listified the set by the time we see it.
+
+        Sorting by ``str`` is deterministic for the value-like members these sets
+        actually hold (str, enum, UUID, int). It is **not** a general guarantee: a
+        set of objects using the default ``repr`` sorts by memory address and stays
+        unstable. See the hash stability contract in
+        ``design/core/CONTENT_ADDRESSABLE.md``.
+        """
+        data = handler(self)
+        if isinstance(data, dict):
+            for key, dumped in data.items():
+                raw = getattr(self, key, None)
+                if isinstance(raw, (set, frozenset)) and isinstance(dumped, (set, frozenset, list, tuple)):
+                    data[key] = sorted(dumped, key=str)
+        return data
 
     @classmethod
     def _match_methods(cls, **criteria) -> Iterator[str]:

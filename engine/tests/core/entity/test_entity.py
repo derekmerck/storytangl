@@ -175,7 +175,9 @@ class TestIncludeMarkerRoundTrip:
         entity.marked.add("acquired")  # in place; field never reassigned
 
         data = entity.unstructure()
-        assert data["marked"] == {"acquired"}
+        # set fields serialize as sorted lists so dumps are deterministic; the
+        # round-trip below is the actual contract, not the wire shape
+        assert data["marked"] == ["acquired"]
 
         restored = Entity.structure(data)
         assert restored.marked == {"acquired"}
