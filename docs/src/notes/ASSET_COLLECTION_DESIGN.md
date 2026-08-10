@@ -14,7 +14,8 @@ This document defines a **generic asset collection framework** at the story (app
 - **Inventories** - unconstrained discrete asset collections (bag of items)
 - **Loadouts** - constrained discrete asset collections with slots/validation (outfits, vehicles, credentials)
 
-Domain-specific implementations (wearables, vehicle parts, documents) are **author-layer mechanics** that build on these application-layer primitives.
+Domain-specific implementations (wearables, vehicle parts, documents) are
+**world-adopted mechanics** that build on these shared primitives.
 
 ---
 
@@ -1013,7 +1014,7 @@ if player.inventory.count() < player.inventory.max_items:
 
 ```python
 # See OutfitManager, VehicleManager examples in previous docs
-# These are author-layer implementations in tangl.mechanics
+# These are world-adopted implementations in tangl.mechanics
 ```
 
 ---

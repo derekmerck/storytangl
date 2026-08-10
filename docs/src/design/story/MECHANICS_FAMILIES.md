@@ -2,7 +2,7 @@ Mechanics Families
 ==================
 
 **Status:** 🟡 ACTIVE ARCHITECTURE NOTE  
-**Layer:** author-layer capability families under `tangl.mechanics`
+**Posture:** optional, world-adopted extension families under `tangl.mechanics`
 
 ---
 
@@ -21,14 +21,15 @@ Mechanics remain grouped by broad **families** at the package level:
 - `presence`
 - later: `sandbox`, `credentials`, other world- or plugin-provided families
 
-Within each family, we reason about implementation through a common internal
-layer model rather than by forcing a filesystem reorganization up front.
+Within each family, we reason about implementation through a common set of
+facets rather than by forcing a filesystem reorganization up front. These are
+review lenses, not additional engine layers.
 
 ---
 
-## Internal Layers
+## Family Facets
 
-Each mechanic family should describe which of these layers it implements and
+Each mechanic family should describe which of these facets it implements and
 which are intentionally absent:
 
 ### 1. Kernel

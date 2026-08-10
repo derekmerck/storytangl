@@ -212,6 +212,11 @@ for create-or-restore, rotation, and explicitly deferred security policy.
 - Media delivery is implementation-specific service support, not part of the
   portable service nucleus.
 
+World domain code is the authored composition root. It selects top-level
+mechanics and provides domain policy, catalogs, templates, resources, and
+special handlers. Service discovers and opens the resulting world; it neither
+imports those mechanics nor reconstructs their policy at the transport layer.
+
 ## What Service Does Not Define
 
 Service does not define:
@@ -221,6 +226,7 @@ Service does not define:
 - graph/entity base types
 - persistence backend implementations
 - transport routing or serialization formats
+- mechanic selection or world-domain policy
 
 Service is the lifecycle and contract layer over the engine, not a second
 runtime.

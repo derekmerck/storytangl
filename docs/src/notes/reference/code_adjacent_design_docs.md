@@ -7,7 +7,7 @@ design section over time.
 
 ## Status
 
-- Last reviewed: March 17, 2026
+- Last reviewed: August 10, 2026
 - Migration status: active
 
 ## Current inventory
@@ -15,7 +15,6 @@ design section over time.
 - `engine/src/tangl/core/CORE_DESIGN.md`
 - `engine/src/tangl/media/MEDIA_DESIGN.md`
 - `engine/src/tangl/mechanics/games/GAME_MECHANICS_DESIGN.md`
-- `engine/src/tangl/service/SERVICE_DESIGN.md`
 - `engine/src/tangl/story/STORY_DESIGN.md`
 - `engine/src/tangl/vm/VM_DESIGN.md`
 - `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md`
@@ -26,3 +25,9 @@ design section over time.
 - Leave temporary migration or implementation notes in `docs/src/notes/`.
 - Update API pages so subsystem reference pages point at the canonical design
   page instead of this inventory once the migration is complete.
+
+## Migrated
+
+- Service architecture is now summarized in
+  `docs/src/design/service/SERVICE_DESIGN.md`; the source-adjacent service note
+  remains its implementation companion rather than the only published entry.
