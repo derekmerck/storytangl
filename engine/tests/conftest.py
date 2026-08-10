@@ -101,3 +101,19 @@ def clear_story_world_instances() -> None:
     yield
     World.clear_instances()
     clear_discovered_world_registries()
+
+
+@pytest.fixture(autouse=True)
+def isolate_behavior_registries() -> None:
+    """Undo handler registrations a test *body* makes against shared registries.
+
+    Module-level decorators (``@on_gather_ns``, ``@on_render_text``,
+    ``@vm_dispatch.register``, ...) register into process-global singletons, so a
+    test that registers a handler otherwise keeps it live for every test that
+    follows. See `pytest_helpers.registry_isolation` for what is snapshotted and
+    why import-time registration is exempt.
+    """
+    from pytest_helpers.registry_isolation import restore_shared_behavior_registries
+
+    with restore_shared_behavior_registries():
+        yield
