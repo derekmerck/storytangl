@@ -38,7 +38,7 @@ async def get_user_info(
     service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(
         alias="X-API-Key",
-        example=key_for_secret(settings.client.secret),
+        examples=[key_for_secret(settings.client.secret)],
         default=None,
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
@@ -59,7 +59,7 @@ async def get_user_info(
 @router.post("/create")
 async def create_user(
     service_manager: ServiceManager = Depends(get_service_manager),
-    secret: str = Query(example=settings.client.secret, default=None),
+    secret: str = Query(examples=[settings.client.secret], default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
     """Create a user and return the secret metadata for clients."""
@@ -91,10 +91,10 @@ async def update_user_secret(
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         alias="X-API-Key",
-        example=key_for_secret(settings.client.secret),
+        examples=[key_for_secret(settings.client.secret)],
         default=None,
     ),
-    secret: str = Query(example=settings.client.secret, default=None),
+    secret: str = Query(examples=[settings.client.secret], default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
     """Update the secret for the authenticated user and surface the new API key."""
@@ -125,7 +125,7 @@ async def drop_user(
     service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(
         alias="X-API-Key",
-        example=key_for_secret(settings.client.secret),
+        examples=[key_for_secret(settings.client.secret)],
         default=None,
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),

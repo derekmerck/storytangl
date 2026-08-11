@@ -1,5 +1,10 @@
 # Cost Model & Offer Selection
 
+> **Historical guidance.** The live resolver no longer uses this fixed numeric
+> cost model or emits phase-level `PlanningReceipt` / `BuildReceipt` records.
+> See [PROVISIONING.md](PROVISIONING.md) for the current deterministic offer
+> ordering and diagnostics contract.
+
 ## Overview
 Provisioning now uses a deterministic cost model so planners can justify every choice. Each offer
 reports its **base cost** (operation type) and a **proximity modifier** derived from the graph

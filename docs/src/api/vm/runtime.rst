@@ -18,7 +18,7 @@ time.
 
 .. rubric:: Related notes
 
-- :doc:`../../notes/migration/v38-phase1-review`
+- :doc:`Historical v38 phase-one review <../../notes/migration/v38-phase1-review>`
 
 Core runtime types
 ------------------

@@ -3,7 +3,11 @@ Concept Provisioning Design
 
 **Document Version:** 2.1
 **Last Updated:** December 2025
-**Status:** ✅ IMPLEMENTATION COMPLETE
+**Status:** HISTORICAL DESIGN RECORD — this document captures the December 2025
+provisioning model and uses retired names such as `GraphProvisioner`, fixed
+`ProvisionCost` values, and planning receipts. It is not the current runtime
+contract. See [Provisioning Pipeline](../planning/PROVISIONING.md) and
+[Open Links](../planning/AFFORDANCE_MODEL.md).
 
 ## Core Philosophy
 
@@ -1529,9 +1533,9 @@ templates:
 
 ---
 
-## Implementation Status
+## Historical Implementation Snapshot
 
-### All Core Features: ✅ COMPLETE
+### Features reported complete in the December 2025 model
 
 Verified implementations:
 - Template registry with scope filtering

@@ -7,13 +7,14 @@
 :related: media, open_link, credentials, token
 ```
 
-**Status:** DESIGN + FIRST IMPLEMENTATION SLICE. The question is how to avoid a family
-of parallel systems that all look like "components attached to a body/vehicle/entity,
-with slots, visibility, constraints, and projections."
+**Status:** IMPLEMENTED FOUNDATION + ACTIVE GENERALIZATION. Outfit and wardrobe
+managers use the shared owner-bound assembly path; presence text and portrait
+projections are active consumers, including credential-card composition. Ornament
+coverage and the broader body-attachment unification remain open design work.
 
-> Issue tracking: see the "Presence / body-attachment unification" issue and the
-> assembly-core issues (#131 umbrella → #194/#195/#196). This doc holds the *what
-> and why*; the issues hold the *where-next*.
+> Current issue tracking: #283. The earlier assembly issues #131 and
+> #194/#195/#196 are closed implementation history. This doc holds the *what and
+> why*; the open issue holds the remaining where-next.
 
 ## Implementation status
 

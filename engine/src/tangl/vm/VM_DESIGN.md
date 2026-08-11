@@ -95,9 +95,9 @@ redirect, in which case `follow_edge` loops from the top on the new target):
 | Phase | Role | Aggregation |
 |-------|------|-------------|
 | VALIDATE | Is this movement legal? Gate on all-true. | all_true |
-| PLANNING | Provision this node's frontier dependencies. | gather |
+| PLANNING | Provision this node's frontier dependencies. | in-place; returns `None` |
 | PREREQS | Auto-redirect? Container descent? | first_result → edge |
-| UPDATE | Mutate state for arrival. | gather |
+| UPDATE | Mutate state for arrival. | in-place; returns `None` |
 | JOURNAL | Emit content fragments. | merge (all contributions) |
 | FINALIZE | Commit step record, emit patch. | last_result → patch |
 | POSTREQS | Continuation redirect? | first_result → edge |
@@ -390,8 +390,9 @@ the VM dispatch surface.
 
 **Aggregation modes match phase semantics.** PREREQS and POSTREQS use `first_result`
 (first redirect wins, subsequent handlers skipped). VALIDATE uses `all_true` (all
-handlers must pass). JOURNAL uses merge (all handler contributions combined). UPDATE and
-PLANNING use gather (all results collected). These are not arbitrary choices — they
+handlers must pass). JOURNAL uses merge (all handler contributions combined). PLANNING
+and UPDATE execute all matching handlers but require `None` returns; their
+effects are committed in place. These are not arbitrary choices — they
 follow from what each phase does.
 
 **Domain subphases use the same dispatch hygiene.** When a mechanics or story package

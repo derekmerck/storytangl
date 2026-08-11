@@ -344,7 +344,7 @@ async def create_story(
 async def get_story_update(
     service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(
-        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+        ..., alias="X-API-Key", examples=[key_for_secret(settings.client.secret)]
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
     limit: int = Query(default=0, ge=0),
@@ -382,7 +382,7 @@ async def do_story_action(
     service_manager: ServiceManager = Depends(get_service_manager),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+        ..., alias="X-API-Key", examples=[key_for_secret(settings.client.secret)]
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
@@ -410,7 +410,7 @@ async def do_story_action(
 async def get_story_info(
     service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(
-        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+        ..., alias="X-API-Key", examples=[key_for_secret(settings.client.secret)]
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
     kind: str | None = Query(default=None, description="Projected-state channel kind."),
@@ -452,7 +452,7 @@ async def reset_story(
     service_manager: ServiceManager = Depends(get_service_manager),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+        ..., alias="X-API-Key", examples=[key_for_secret(settings.client.secret)]
     ),
     archive: bool = Query(default=False, description="Retain the ledger if true."),
     render_profile: str = Query(default="raw", description="Response rendering profile."),

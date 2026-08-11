@@ -38,7 +38,7 @@ async def get_worlds(
 @router.get("/secret")
 async def get_key_for_secret(
     service_manager: ServiceManager = Depends(get_service_manager),
-    secret: str = Query(example=settings.client.secret, default=None),
+    secret: str = Query(examples=[settings.client.secret], default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
     """Encode ``secret`` as an API key for clients."""
