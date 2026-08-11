@@ -1,52 +1,26 @@
 # Credential Mechanic — Design Note
 
-**Status:** PLANNED for the global document/media mechanic; Phases 7–9 landed the
-game-facing packet-authority cutover, transient shared defect vocabulary, and
-graph-bound bearer/document subject references (2026-07-20/22). Phase 12 adds a
-text-only identity-document projection through the shared story presentation
-chain; it resolves the bound presence subject but does not evaluate validity,
-compose a card, or produce media. Phase 13 adds a text-only packet projection
-that composes the packet's assigned document components through the same chain,
-without findings, JOURNAL, or game-owned presentation labels. Phase 14 invokes
-those projections from the credentials game's JOURNAL path through scenario
-arrival and packet templates, while preserving the existing typed candidate,
-packet, document, choice, and finding surfaces. Phase 15 makes the packet
-manager's ordered components the shared inventory for recursive packet prose
-and targetable document pieces, with scenario-authored document text supplied
-as an explicit replacement. Compatibility-only visible items remain separate,
-and Phase 16 adds the first concrete visible document part: a profile-owned,
-immutable issuer attestation observation. The ordinary, missing, and alternate visible forms
-project neutrally into the recursive text description and the matching piece's
-``visible_parts`` payload, without exposing a credential finding or disposition.
-A scenario-authored complete document replacement remains self-contained and
-does not append generated parts. Phase 17 adds a second concrete visible part:
-validity wording selected from the definition's existing ``valid_period`` and
-the component status. The narrow two-value union preserves ordered, neutral
-attestation-plus-validity prose and ``visible_parts`` without evaluating a
-credential from presentation output. This text/JOURNAL/interactive floor is
-sufficient to discuss a separate media-compositor integration plan; credentials
-will not create placeholder cards or a private forge. Media Slices A–C landed
-through PR #326, D1–D3 landed the presentation-safe
-``CredentialCardProjection`` and its one-level card-media requests, and Slice E
-adds lifecycle-safe provisioning plus JOURNAL association for eligible ID cards.
-Hall Monitor also proves one component-owned document can move through durable
-world custody and return under explicit authority: reissue restores its native
-``VALID`` status and subject binding, so the ordinary evaluator and existing
-validity presentation derive the renewed document state without a second expiry
-calculation.
-The response-window proof adds a separate unpresented packet slot: missing
-native components remain graph-owned but do not participate in visible document
-or evaluator projection until an explicit response move presents them.
-**Scope:** the *global* credential mechanic — `Credential → Document → Media`,
+**Status:** LANDED as the shared credential assembly, projection, and game-facing
+mechanic. One owner-bound packet manager carries graph-owned bearer/document
+components through defect derivation, mediation, recursive text, typed document
+pieces, presentation-safe card projection, media provisioning, and JOURNAL
+association. Hall Monitor proves durable document custody and authorized reissue,
+world-authored consequence return, recurring bearers, and a disclosure-safe
+request-ID response window. Missing native components remain graph-owned in an
+unpresented slot and enter visible evaluation only after an explicit response.
+The sections below describe the current contract and its deferred work, not a
+remaining implementation sequence. Advanced appearance comparison, authored
+media alternatives, broader response/bluffing policy, and malfeasance remain
+separate follow-ups.
+**Scope:** the shared credential mechanic — `Credential → Document → Media`,
 with carrier/bearer binding — that the credentials checkpoint **game**
 (`tangl.mechanics.games.credentials_game`) becomes one consumer of.
 **Relation to other docs:**
-- `tangl.mechanics.games.CREDENTIALS_LOOP_DESIGN.md` — the *game* layer (roster
-  shift, restriction map, disposition derivation, mediation). This note is its
-  global-mechanic counterpart; the game points *up* to here.
-- `CREDENTIAL_ASSEMBLY_RETROFIT.md` — the migration plan for turning the current
-  game-layer packet-manager bridge into the shared assembly/component-manager
-  pattern.
+- `tangl.mechanics.games.CREDENTIALS_LOOP_DESIGN.md` — the game consumer (roster
+  shift, restriction map, disposition derivation, mediation). This note defines
+  the shared mechanic that consumer adopts.
+- `CREDENTIAL_ASSEMBLY_RETROFIT.md` — implementation history for the completed
+  assembly/component-manager migration.
 - `tangl.media.MEDIA_DESIGN.md` — the spec→adapt→create→provision pipeline this
   builds on.
 - `tangl.mechanics.presence` (`look/look.py`) — the bearer-portrait projection
@@ -56,7 +30,7 @@ with carrier/bearer binding — that the credentials checkpoint **game**
 
 ---
 
-## 1 · Why this is global, not game-specific
+## 1 · Why this is shared, not game-specific
 
 The credentials *game* is one skin. The primitives underneath it are a reusable
 pattern that recurs well outside a checkpoint: the player's own papers in
@@ -76,7 +50,7 @@ with **carrier binding** threaded through every layer.
 
 ---
 
-## 2 · The three layers
+## 2 · Three semantic representations
 
 ### Credential
 An attestation: issuer / indication (purpose or contraband) / validity status.
@@ -93,12 +67,15 @@ A credential rendered as a concrete document type. Two carrier modes:
   the id when `permit.subject_id == id.subject_id`.
 
 ### Media — the visible card
-A `CredentialCardSpec(MediaSpec)` composes the card: frame + seal(issuer,
-validity) + text(name, indication, dates) + **bearer portrait**. Built on the
-existing `MediaSpec` two-phase `adapt → create` contract, resolved through
-`MediaSpecProvisioner`, attached as a `MediaFragment` on the document's
-`PieceFragment` (which Bridge.1 already emits). Content-addressed → dedupe +
-caching + reproducibility (adapted-spec hash) for free.
+`CredentialCardProjection` exposes only presentation-safe card fields. It
+requests a renderer-neutral `PortraitSpec` for eligible presence-bound cards and
+a `PrintableTextSpec`; once all requested children resolve, a one-level
+`CompositionSpec` requests the card RIT. There is no placeholder or later
+replacement: a missing or pending child yields no parent CREATE offer, so the
+ordinary text piece remains the presentation floor. When the children are
+resolved, their content hashes determine the composite identity and the emitted
+`MediaFragment` is associated with the document's `PieceFragment` through a new
+`GroupFragment`. Media identity and availability never become validity authority.
 
 ---
 
@@ -191,18 +168,16 @@ consumer (large wearable inventories, many layers). They share the registry +
 strategy framework; credentials is the simplest thing that proves it.
 
 **The one hard rule:** route through the media framework — `MediaSpec →
-MediaSpecProvisioner → MediaRIT → MediaFragment`. The journal-integration path for
-a *single produced RIT already exists* (a handler emits `MediaFragment(content=
-rit)`; the service dereferences it), and a composite is just a RIT, so it rides
-the same path. The genuine gap is only the *composition framework* (registries +
-strategies). If credentials hand-rolls its own composition **and** its own journal
-emission outside this, we duplicate exactly the plumbing paperdolls also need.
+MediaSpecProvisioner → MediaRIT → MediaFragment`. The landed one-level
+`CompositionSpec` proves that a composite is just another RIT and rides the same
+journal path. The remaining gap is broader catalog-driven composition strategies,
+not credential-card provisioning. If credentials hand-rolls a richer composition
+or journal channel, it duplicates plumbing that paperdolls and other media
+consumers also need.
 
-> **Dependency, flagged:** the registry + strategy refactor is a **media-subsystem
-> design decision**, not a credentials one. Credentials should *consume* it, not
-> drive a big media refactor on its own schedule. Phase D therefore depends on at
-> least a minimal composition-strategy surface existing; worth its own media-layer
-> design note / issue rather than being smuggled in through this mechanic.
+> **Boundary:** broader registry + strategy work is a media-subsystem decision,
+> not a credentials extension. Credentials consumes the minimal shared compositor
+> and should not force a general media DAG or catalog abstraction into this package.
 
 ### Acquiring the portrait RIT (three modes)
 
@@ -242,35 +217,36 @@ So the holder-match check graduates: a same-base-identity / mutable-trait
 difference is mitigatable; a different-base-identity difference is a crime, no
 matter what claim accompanies it. This needs presence to distinguish **base
 identity** (immutable) from **mutable presentation** — advanced presence
-degradation, and a game-layer mediation outcome (a presence-aware extension of
+degradation, and a game-consumer mediation outcome (a presence-aware extension of
 B.2). Deferred; noted here because it is the reason the presence projection must
 separate identity from presentation.
 
 ---
 
-## 4 · Default projections + the override model ("template for the template")
+## 4 · Forward-looking default styling and override policy
 
-`tangl.mechanics.credentials` ships **default projections** so a bare credential
-renders a working card with no world-specific authoring:
+The landed proof supplies neutral text and one-level composition for eligible
+presence-bound cards, including their portrait child, not a complete styled
+credential catalog. A future default styling package may let a bare credential
+render a conventional card with:
 
 - a default card frame (SVG primitives),
 - a small seal set (valid / wrong / missing variants, SVG),
 - a default text/date layout,
 - a placeholder portrait silhouette (when no bearer look is available).
 
-A world or game **overrides by data, not code**: region names, seal designs,
-permit/indication catalog, card styling are provided as configuration, and the
-default projection machinery consumes them as guidance. The credentials demo game
-supplies its regions, seals, and permit types; the machinery "just does its
-thing." This is the *template for the template* — engine defaults prove the
-projection and are the copy-and-reskin starting point (Lethesford University →
-any institution).
+A world or game should **override by data, not code**: region names, seal designs,
+permit/indication catalog, and card styling would be provided as configuration.
+Credential worlds already supply semantic regions, issuers, and document types;
+future styling should consume those bounded world catalogs rather than inventing
+a second credential truth model. This is the *template for the template* — a
+working neutral projection becomes the copy-and-reskin starting point.
 
 ---
 
-## 5 · Media policy: three tiers, raster stays out of the engine repo
+## 5 · Forward-looking media tiers
 
-Same `MediaDep`, three provisioning tiers:
+The shared request/provisioning path can eventually support three content tiers:
 
 1. **Engine SVG defaults** — deterministic, repo-safe, `FAST_SYNC` via
    `svg_forge` (frame/seal/text as SVG; portrait an `<image>` ref). The test and
@@ -347,57 +323,40 @@ worth naming, not worth gating the media work on.
 
 ---
 
-## 7 · Staged plan (media spec is the forcing function)
+## 7 · Landed composition and current boundary
 
-### Assembly and presentation floor landed
+The shared credentials package owns the domain vocabulary and canonical
+assembly-backed packet path. `CredentialCase` carries one owner-bound
+`CredentialPacketManager`; offer arrival materializes it from the selected
+catalog before the encounter becomes active. Defect derivation, mediation,
+recursive text, document pieces, and card projection all read that same
+graph-owned component state.
 
-The shared credentials package now owns the credential domain vocabulary and the
-canonical assembly-backed packet path. `CredentialCase` now requires
-`tangl.mechanics.credentials.CredentialPacketManager`, an owner-bound manager over
-graph credential components; disposition derivation reads that concrete manager.
-Offer arrival materializes the manager from the selected catalog before gameplay,
-so the roster/game/demo paths share graph-backed packet identity.
+Eligible ID cards request a Presence-owned portrait and generic printable text,
+then provision one resolved `CompositionSpec` parent during frontier PLANNING.
+The text `PieceFragment` remains unconditional. A `MediaFragment` appears only
+when the complete card resolves, and a `GroupFragment(group_type="piece_media")`
+associates the two without overloading provenance. Complete authored document
+replacements suppress generated card content before projection.
 
-Phases 7–17 now cover graph-token packet authority, bearer/subject binding,
-transient defect mediation, recursive text projection, JOURNAL delivery,
-component-backed pieces, and two ordered visible document observations. This is
-the complete text/JOURNAL/interactive floor. It deliberately does not compose a
-card or generate media.
+Hall Monitor exercises the path as a disclosure-safe visual witness: the live
+candidate and recorded document subject project independently, while neither
+the portrait nor card exposes the evaluator's subject-mismatch finding. The
+same world also proves a component moving through desk custody, being restored
+to native validity and rebound to a bearer, and later entering the ordinary
+evaluator without a parallel date or waiver algorithm.
 
-Media Slices A–C landed through PR #326, including the minimal one-level
-compositor. D1 adds the credentials-owned, presentation-safe
-``CredentialCardProjection`` from the canonical document-render calculation;
-it still does not provision or emit media. The next slice needs a generic
-printable text/vector child before a credential card can compose meaningful
-content. D2 supplies that media-owned generic child but does not consume a
-credential projection. D3 proves that one projection can request a recorded
-subject portrait and printable text, then compose their resolved RITs into one
-presentation-safe ID card. Its media-owned ``credential_card`` text profile
-wraps the safe observation wording into the fixed card-text layout and elides
-only overflowing execution lines; the complete projection remains in the
-derivation payload. Slice E provisions its portrait and printable-text children
-before the one-level parent, including the sequential successor frontier during
-PLANNING without changing the active case. UPDATE then selects the already
-prepared successor; it does not JIT-provision presentation. The text
-``PieceFragment`` remains unconditional, and an ordinary associated
-``MediaFragment`` appears only when the complete card is resolved. Complete
-authored replacements suppress that generated card. Hall Monitor now exercises
-that path as a visual witness: a red-haired presenter and a blond, distinct
-document subject are projected through the ordinary candidate prose and card
-portrait surfaces without exposing the resulting subject-mismatch defect.
-Authored alternatives/replacements and world-scoped media selection remain the
-next slice. Credentials must consume the resulting ``MediaSpec →
-MediaSpecProvisioner → MediaRIT → MediaFragment`` path; it must not invent a
-packet sheet, recursive DAG, credential forge, catalog abstraction, or parallel
-JOURNAL media channel.
+Credentials must continue to consume the shared `MediaSpec →
+MediaSpecProvisioner → MediaRIT → MediaFragment` path. It does not own a packet
+sheet, recursive media DAG, credential forge, or parallel JOURNAL channel.
 
 ---
 
 ## 8 · Open questions
 
-- **Portrait pool keying.** Phase 9 materializes a minimal `HasSimpleLook` subject
-  per procedural candidate. The remaining question is how a world later maps
-  those stable subject ids to reusable portrait-pool entries.
+- **Portrait pool keying.** Procedural candidates carry stable `HasSimpleLook`
+  subjects. The remaining question is how a world maps those subject ids to
+  reusable portrait-pool entries.
 - **Broader RIT catalog + composition-strategy surface (media-layer, §3a step
   0).** The minimal one-level ``CompositionSpec`` compositor landed in PR #326.
   What remains open is generalizing the legacy `svg_forge` catalog-assembler and
@@ -405,7 +364,3 @@ JOURNAL media channel.
   interchangeable composition strategies. Recipe/spec format (layer list +
   transforms + strategy + content-addressing) remains a media concern;
   paperdolls, not credentials, are the likely forcing consumer.
-- **Journal integration of composed media.** The single-RIT path exists
-  (`MediaFragment(content=rit)` → service deref). Confirm a composite RIT rides
-  the same path unchanged (it should — a composite is just a RIT), so neither
-  credentials nor paperdolls invent a second journal channel.

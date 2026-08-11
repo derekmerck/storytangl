@@ -19,7 +19,10 @@ Mechanics remain grouped by broad **families** at the package level:
 - `assembly`
 - `demographics`
 - `presence`
-- later: `sandbox`, `credentials`, other world- or plugin-provided families
+- `sandbox`
+- `credentials`
+- `simulation`
+- other world- or plugin-provided families
 
 Within each family, we reason about implementation through a common set of
 facets rather than by forcing a filesystem reorganization up front. These are
@@ -100,7 +103,7 @@ Thin author-facing surfaces that expose the family ergonomically.
 - future `HasOutfit`, `HasCredentials`, etc.
 
 The facade should stay thin. The real logic belongs in kernel, runtime, render,
-and writeback layers.
+and writeback facets.
 
 ---
 
@@ -139,7 +142,7 @@ Where does the family plug into the system?
 - namespace contribution
 - VM phase hooks
 - media adapters
-- orchestrator or service response shaping
+- service response delivery
 
 ### Appearance
 
@@ -165,7 +168,7 @@ describe StoryTangl subsystems in general:
 
 A **fully supported mechanic family** should satisfy all of the following:
 
-1. It declares which internal layers it implements.
+1. It declares which family facets it implements.
 2. It can be described clearly through the review lens above.
 3. Randomness is explicit and controllable.
 4. Writeback is explicit rather than hidden inside opaque side effects.
@@ -176,9 +179,9 @@ A **fully supported mechanic family** should satisfy all of the following:
 Not every current family is fully supported yet. During this pass we use a
 broader classification:
 
-- **Reference**: strongest current integrated example
+- **Reference**: strongest current end-to-end or capstone example
+- **Integrated**: exercised through its intended runtime and presentation seams
 - **Foundation**: reusable kernel/runtime or domain surface, not fully integrated
-- **Redesign**: valuable intent, but current shape should not be extended blindly
 - **Incubating**: active design direction, not yet engine contract
 - **Archive**: idea inventory only
 
@@ -201,25 +204,34 @@ Review lens:
 - **Attachment points:** VM phase handlers plus namespace injection
 - **Appearance:** interactive choices and round recap fragments
 
-### `progression` — Foundation
+### `progression` — Integrated
 
 Why it stays:
 
 - strong kernel and runtime primitives
 - clear stat system, task, handler, and outcome surfaces
 
+Current proof:
+
+- `HasTraining` and `HasStatChallenge` attach growth and evaluation to ordinary
+  story blocks;
+- *Coronate the Regent* proves durable stats, wallet costs, situational effects,
+  training receipts, and later challenge consequences in one playable world.
+
 Current gap:
 
-- render and writeback are still thinner than the family wants long-term
+- general progression presentation remains modest and world-authored;
+- inventory grants and shops are not progression responsibilities.
 
 Review lens:
 
 - **Shape:** stat systems, stats, tasks, effects, contexts
 - **Behavior:** competency math, modifier aggregation, task resolution
-- **Attachment points:** currently mostly direct library use
-- **Appearance:** still modest and mostly caller-defined
+- **Attachment points:** story block mixins, UPDATE handlers, namespace state,
+  and ordinary branch predicates
+- **Appearance:** typed challenge/training results plus world-authored narrative
 
-### `assembly` — Foundation
+### `assembly` — Foundation (shared component instrument)
 
 Why it stays:
 
@@ -233,6 +245,22 @@ Review lens:
 - **Behavior:** assignment, validation, resource constraint checking
 - **Attachment points:** facet-style embedded containers on entities
 - **Appearance:** generally projected by higher-level families
+
+### `transaction` — Foundation (shared writeback instrument)
+
+Why it stays:
+
+- it gives cross-family asset and component moves an explicit preflight,
+  commitment, rollback, and receipt shape;
+- Credentials custody and assembly assignment prove it without turning it into
+  an inventory, shop, or economy engine.
+
+Review lens:
+
+- **Shape:** transaction offers, commitments, asset-holder adapters, receipts
+- **Behavior:** validate, accept, commit, roll back on late failure
+- **Attachment points:** called by world/mechanic UPDATE policy
+- **Appearance:** normally projected by the consuming mechanic
 
 ### `demographics` — Foundation, first modernization spike
 
@@ -267,36 +295,66 @@ Review lens:
 - **Attachment points:** future loadout and appearance surfaces
 - **Appearance:** item or body-detail description
 
-### `presence/look` — Redesign
+### `presence/look` — Integrated
 
-Why it stays, but under redesign:
+Current proof:
 
-- the intended appearance layer is strong
-- the current implementation still needs broader render/media intersections
-  cleaned up even after the first facade rescue
+- `Look`, `HasSimpleLook`, and `HasLook` provide deterministic semantic state;
+- Presence-owned text handlers recursively compose body, outfit, and ornaments;
+- renderer-neutral portrait requests feed the shared media path;
+- Credentials consumes Presence for bound-subject prose and portraits without
+  moving identity truth into the renderer.
 
-Required direction:
+Current gap:
 
-- keep the new deterministic description surface and structured media payload
-  contract, then continue separating richer render/media intersections from the
-  body-trait profile itself
-- stop depending on example-only assembly code
-- keep it thin enough to act as a facade over better runtime and projection
-  surfaces
+- richer paperdoll selection/composition belongs to the media/presence follow-up,
+  not to the semantic Look model;
+- mutable-versus-intrinsic appearance comparison remains a later mechanic.
 
-### `sandbox` — Incubating
+### `sandbox` — Integrated
 
-Direction:
+Current proof:
 
-- schedule + namespace + fanout + redirects
-- not a standalone traversal subsystem
+- location, fixture, asset, mob, schedule, visibility, time, and story-info
+  surfaces compose through ordinary Story/VM traversal;
+- *Adventure Sandbox Slice* proves dynamic movement, carried assets, hazards,
+  magic words, treasure custody/scoring, and projected map/status information.
 
-### `credentials` — Incubating
+Current gap:
 
-Direction:
+- several Adventure-specific affordance overlays remain intentionally
+  world-owned;
+- a fuller scheduled mobile-actor/companion proof remains future demo work.
 
-- game kernel + asset collection + render + writeback
-- not a direct legacy port target
+### `simulation` — Foundation
+
+Current proof:
+
+- deterministic queue/calendar primitives attach through ordinary registry,
+  game, namespace, and journal surfaces;
+- `ed_queue_demo` exercises the first operational queue vertical.
+
+### `credentials` — Reference (worked capstone)
+
+Current proof:
+
+- one owner-bound packet manager carries graph-owned credential components;
+- catalogs, scenario offers, rules, defects, mediation, scoring, and dispositions
+  remain separate;
+- recursive text, typed pieces, presentation-safe card projection, provisioned
+  portrait/text composition, and JOURNAL media association share one semantic
+  source;
+- Hall Monitor proves custody and authorized reissue, consequence return,
+  recurring bearers, and a disclosure-safe request-ID response window;
+- the same kernel supports border and school scenario types without setting
+  nouns in the evaluator.
+
+Current gap:
+
+- broader refusal/bluffing, cross-candidate inventory, bribery, and malfeasance
+  remain explicit later extensions, not missing foundations;
+- authored media alternatives and richer catalog selection remain media/world
+  policy follow-ups.
 
 ### `scratch/mechanics` — Archive
 
@@ -356,6 +414,14 @@ Convergence does not require every family to share one base class or generic
 manager. Each family keeps its own kernel and specialized folds while exchanging
 compatible identity, discovery, interaction, commitment, receipt, and projection
 artifacts through the existing runtime lifecycle.
+
+The **collapse rule** is deliberately stricter than code reuse: collapse two
+nouns only when both their mechanism and authored intent coincide. A credential
+packet and an outfit may both use owner-bound component managers, but inspection
+evidence and worn appearance are not therefore one mechanic. Share the assembly,
+transaction, projection, or resolution instrument; preserve domain nouns whose
+meaning, policy, or consequence differs. Similar implementation alone justifies
+reuse, not ontological merger.
 
 ### Mechanics as pressure systems
 
@@ -482,11 +548,13 @@ realization.
 
 Mechanics are world-agnostic kernels. They define durable state, operations,
 resolution, and interchange artifacts without assuming a particular setting or
-presentation. A world adopts a mechanic by exposing the catalogs, providers, and
-behavior authorities that the mechanic may use. World domain logic may specialize
-the mechanic with subclasses, additional handlers, or modified policy, but those
+presentation. A world's domain package adopts top-level mechanics through explicit
+imports and exposes the catalogs, providers, and behavior authorities those
+mechanics may use. A mechanic owns intrinsic dependencies on other mechanics;
+worlds need not restate that transitive graph. World domain logic may specialize a
+mechanic with subclasses, additional handlers, or modified policy, but those
 changes remain local to that world's authority surface rather than mutating the
-global mechanic.
+shared mechanic.
 
 Adoption has four authored/runtime layers:
 
@@ -540,10 +608,14 @@ combines durable component identity, visible evidence, hidden truth, inspection
 findings, holder bindings, provenance, generated media, contextual choices,
 phase purity, replay, and persistence.
 
-Phase 8 gives the family a shared, transient `CredentialDefect` vocabulary.
-The packet manager and mediated game state derive defects; policy folds them into
-pass/deny/arrest; renderers consume the same observations without owning a second
-status interpretation.
+The landed family uses transient `CredentialDefect` observations between packet
+truth and scenario policy. The packet manager and mediated game state derive
+defects; policy folds them into pass/deny/arrest; renderers consume
+presentation-safe observations without owning a second status interpretation.
+The same components can move through world custody, return to a later packet,
+or remain graph-owned but unpresented until an explicit response makes them
+visible. Historical findings remain attributable to the earlier encounter while
+later state changes project normally from current truth.
 
 Its central hidden-information rule is:
 
@@ -552,8 +624,10 @@ Its central hidden-information rule is:
 
 Components contribute state and facet vocabulary. The credentials game handler
 continues to own menus, time costs, validation, mediation, and disclosure.
-Planning must not mutate graph state; graph-backed materialization belongs at a
-setup or UPDATE boundary.
+Frontier provisioning may materialize the next selectable encounter during
+PLANNING; inspection reads and JOURNAL rendering do not mutate it. UPDATE commits
+the selected move and any explicit transaction or response before the next
+frontier is presented.
 
 ### Demonstration worlds as conformance surfaces
 
@@ -599,6 +673,103 @@ chopshop makes reimplementation choices concrete without pretending that narrati
 fidelity is a single number. Persistent friction shared by several exemplars is
 evidence for a missing coordinate; one-off residual is often exactly where authored
 specificity belongs.
+
+### Current decomposition records
+
+These records describe the current proofs, not promised parity.
+
+#### Hall Monitor and Credential Gate — one credential grammar, distinct worlds
+
+- **Source inspiration:** checkpoint inspection in *Papers, Please*, reskinned as
+  school hall enforcement with passes, uniforms, medicine, and records.
+- **Experiential invariant:** inspect what was presented, act under changing rules,
+  and feel the difference between procedurally correct, compassionate, costly, and
+  harmful decisions.
+- **Pressure structure:** sampled candidates, visible documents, hidden validity,
+  an attention budget, evidence-sensitive scoring, disposition penalties, durable
+  custody, later consequences, and returning bearers.
+- **StoryTangl mapping:** credential catalogs and packet assembly; scenario offers
+  and rule sets; defect derivation and mediation moves; transactions for retained
+  and reissued documents; Presence-backed prose/portraits; typed pieces, card media,
+  journal fragments, and story-info projection.
+- **Deliberate approximation:** a short deterministic shift replaces the original's
+  long economy and calendar; the school world emphasizes one authored inhaler
+  dilemma and its aftermath.
+- **Bespoke residual and friction:** Hall Monitor owns its custody permissions,
+  reissue wording, consequence facts, return topology, and request-ID sequencing.
+  Generic bluffing, bribery, planting, and cross-candidate locker play remain
+  unimplemented extensions.
+- **Parity status:** mechanically playable through the service/API vertical with
+  text fallback, a card-media witness, persistence/reload, waiver transfer and
+  rollback, consequence return, and recurrence. Generic response-window tests
+  additionally prove identical precommit availability for compliant and refusing
+  ID responses.
+
+#### RPS Tavern and Bag-RPS Pit — small kernels as resolution grammars
+
+- **Source inspiration:** ordinary rock-paper-scissors and an aggregate-force
+  variant where a player commits a bounded reserve rather than one symbol.
+- **Experiential invariant:** the player reads a compact strategic vocabulary,
+  commits a move, sees a legible result, and reaches a story consequence without
+  the world reimplementing the game loop.
+- **Pressure structure:** opponent strategy, best-of scoring or limited reserves,
+  commitment size, round history, win/loss routing, and authored stakes.
+- **StoryTangl mapping:** `HasGame`, specialized `RpsGame`/`BagRpsGame` kernels and
+  handlers, ordinary provisioned actions, round records, journal recap, and
+  terminal continues.
+- **Deliberate approximation:** the tavern's gold and ale are narrative stakes,
+  not yet wallet transactions; the pit is a deterministic conformance puzzle,
+  not a broad tactics game.
+- **Bespoke residual and friction:** each world supplies only its game subtype,
+  opponent policy, and surrounding prose. Rich tells, injuries, wagers, and
+  durable opponent relationships would belong to a composing world.
+- **Parity status:** both worlds compile and play through their focused loader
+  tests, proving one facade can host distinct kernels without erasing them.
+
+#### Adventure Sandbox Slice — spatial state as opportunity fan-out
+
+- **Source inspiration:** the non-parser mechanical core of *Colossal Cave
+  Adventure*: rooms, inventory, fixtures, magic words, hazards, treasure, and
+  ambient actors.
+- **Experiential invariant:** where the player is, what is present, and what the
+  player carries should change available actions without every room enumerating
+  the full cross-product.
+- **Pressure structure:** location topology, fixture state, visibility and light,
+  carried assets, movement hazards, discoveries, treasure custody, score, time,
+  and projected map/status information.
+- **StoryTangl mapping:** sandbox locations/scopes, compiled asset facets,
+  transactions, ordinary `Action` fan-out, namespace and story-info providers,
+  plus world-owned affordance overlays for magic travel, hazards, and deposit.
+- **Deliberate approximation:** a bounded cave slice demonstrates the grammar
+  rather than reproducing the original map, parser, probabilities, and puzzle set.
+- **Bespoke residual and friction:** Adventure-specific cleanup tags, treasure
+  accounting, magic-anchor policy, and movement rewriting remain in the world.
+  A fuller scheduled pirate/dwarf or capability-bearing companion is still a
+  future conformance case.
+- **Parity status:** the loader vertical proves dynamic movement, stateful
+  fixtures, inventory-conditioned actions, treasure transfer/scoring, hazards,
+  magic-word discovery, and disclosed story-info.
+
+#### Coronate the Regent — progression as durable preparation
+
+- **Source inspiration:** compact court-management stories where limited weeks of
+  training, spending, and social choices determine later audiences and crises.
+- **Experiential invariant:** an early preparation choice should change a later
+  challenge through durable character state rather than a duplicate passage flag.
+- **Pressure structure:** finite opportunities, stats, governed skills, mood-based
+  growth modifiers, stamina and coin, training receipts, social consequences, and
+  a lethal dragon challenge with an equipment-based override.
+- **StoryTangl mapping:** a world `Player` composed with `HasStats`/`HasWallet`,
+  `HasTraining` and `HasStatChallenge` blocks, `SituationalEffect`, ordinary
+  predicates, and journaled story outcomes.
+- **Deliberate approximation:** four scripted weeks and pinned rolls make causal
+  paths reproducible; it is a mechanics proof rather than an open-ended court sim.
+- **Bespoke residual and friction:** world-local grant blocks still apply flags,
+  inventory, and purchase cost. That is acceptable story policy, though a future
+  shop/transaction composition could replace the purchase stanza if another world
+  needs the same intent.
+- **Parity status:** focused world and situational tests prove growth, wallet state,
+  mood effects, challenge routing, and sword-forced success.
 
 Each world should exercise one or two pieces of the shared vocabulary before later
 worlds compose a broader range:
@@ -685,24 +856,20 @@ grammars** rather than just “minigames.”
 
 ---
 
-## Current Implementation Priorities
+## Convergence Follow-ups
 
-1. Complete: token catalogs are explicit bounded collections exposed by a world
-   authority; scenario types select a local catalog reference without naming or
-   searching a world.
-2. Complete: one combined world exposes both border and school catalogs, while two
-   separately loaded worlds remain isolated even when local catalog and item ids
-   collide.
-3. Complete: the Hall Monitor conformance scenario exercises the four-layer
-   world/type/instance/encounter model without credentials-specific engine vocabulary.
-4. Retire credential compatibility fields now that the manager-backed border and
-   hall-monitor paths have been exercised both separately and in one world.
-5. Complete: normalize credential defects as a shared derived vocabulary; retain
-   presence and media projection as the next credential integration.
-6. Reconcile vehicle and loadout vocabulary with assembly, transactions, and
-   progression.
-7. Extend the Adventure sandbox with one scheduled mobile actor and one
-   capability-bearing companion contribution, without world-specific choice
-   projection branches.
-8. Exercise the combined vocabulary, sandbox traversal, and activity hubs in
-   the robot chopshop flow.
+Credentials now serves as a worked composition rather than pending foundation.
+Its remaining bluffing, malfeasance, inventory, and authored-media extensions
+should proceed only when a concrete scenario needs them.
+
+The next cross-family proofs are:
+
+1. reconcile vehicle and loadout vocabulary with assembly, transactions, and
+   progression;
+2. extend Adventure Sandbox with one scheduled mobile actor and one
+   capability-bearing companion contribution without a room-specific choice
+   cross-product;
+3. exercise the combined vocabulary, sandbox traversal, and activity hubs in
+   the robot chopshop flow;
+4. add a decomposition record whenever a substantial demo becomes a claimed
+   conformance surface.
