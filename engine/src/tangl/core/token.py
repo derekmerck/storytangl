@@ -1,5 +1,11 @@
 """Graph node wrappers over frozen singleton referents.
 
+.. storytangl-topic::
+   :topics: token
+   :facets: code
+   :relation: defines
+   :related: singleton, graph, assembly
+
 Tokens combine immutable singleton definitions with mutable node-local overlay state.
 Subscribing ``Token[SomeSingleton]`` creates and caches a dynamic Pydantic wrapper class
 that materializes fields marked ``instance_var=True`` as local token fields.

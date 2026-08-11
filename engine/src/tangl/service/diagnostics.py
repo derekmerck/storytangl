@@ -1,4 +1,15 @@
-"""Normalize authoring diagnostics for service and REST surfaces."""
+"""Normalize authoring diagnostics for service and REST surfaces.
+
+.. storytangl-topic::
+   :topics: authoring_validation
+   :facets: code
+   :relation: defines
+   :related: provisioning, codec, widget
+
+Codec loss, compilation findings, initialization failures, and runtime blockers
+remain owned by their source systems. This module only projects them into the
+shared :class:`~tangl.service.response.AuthoringDiagnostic` service shape.
+"""
 
 from __future__ import annotations
 

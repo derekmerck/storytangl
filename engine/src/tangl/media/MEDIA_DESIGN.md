@@ -1,5 +1,12 @@
 # tangl.media — Design Notes
 
+```{storytangl-topic}
+:topics: media
+:facets: overview, design
+:relation: defines
+:related: journal, widget, prose, presence
+```
+
 > Status: Current contract
 > Authority: Canonical journal fragment types live in `tangl.journal.fragments`; `tangl.journal.media` remains a compatibility re-export surface.
 >

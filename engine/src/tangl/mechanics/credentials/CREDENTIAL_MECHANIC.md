@@ -1,5 +1,12 @@
 # Credential Mechanic — Design Note
 
+```{storytangl-topic}
+:topics: credentials
+:facets: overview, design
+:relation: defines
+:related: assembly, games, transaction, prose, media, presence
+```
+
 **Status:** LANDED as the shared credential assembly, projection, and game-facing
 mechanic. One owner-bound packet manager carries graph-owned bearer/document
 components through defect derivation, mediation, recursive text, typed document
