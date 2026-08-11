@@ -58,8 +58,6 @@
     "display_name": "Graph",
     "aliases": [
       "graphs",
-      "node",
-      "edge",
       "subgraph",
       "HierarchicalNode",
       "tangl.core.Graph"
@@ -232,7 +230,6 @@
     "aliases": [
       "ledgers",
       "cursor",
-      "journal",
       "call stack",
       "tangl.vm.runtime.ledger.Ledger"
     ],
@@ -294,8 +291,7 @@
       "Resolver",
       "Requirement",
       "Dependency",
-      "ProvisionOffer",
-      "planning"
+      "ProvisionOffer"
     ],
     "layer": "vm",
     "short_description": "Frontier dependency satisfaction and scope-aware offer resolution during planning.",
@@ -459,19 +455,78 @@
     "topic_id": "credentials",
     "display_name": "Credentials",
     "aliases": [
-      "picking",
-      "inspection",
-      "packet",
-      "PickingGame",
-      "document check",
-      "disposition"
+      "credential packet",
+      "document inspection",
+      "credential catalog",
+      "CredentialComponent",
+      "CredentialDefect"
     ],
     "layer": "mechanics",
-    "short_description": "Staged picking/inspection game: visible evidence vs hidden truth, mediation moves, disposition/penalty policy.",
+    "short_description": "Assembly-backed bearer and document packets with normalized defects, mediation, and disclosure-safe presentation projections.",
     "related_topic_ids": [
       "assembly",
       "dispatch",
-      "observation"
+      "observation",
+      "games",
+      "transaction",
+      "prose"
+    ]
+  },
+  {
+    "topic_id": "games",
+    "display_name": "Game Mechanics",
+    "aliases": [
+      "game mechanic",
+      "re-entrant game",
+      "GameHandler",
+      "HasGame",
+      "PickingGame",
+      "tangl.mechanics.games"
+    ],
+    "layer": "mechanics",
+    "short_description": "Re-entrant interactive blocks that provision moves, resolve rounds, emit results, and return to the wider story frontier.",
+    "related_topic_ids": [
+      "credentials",
+      "progression",
+      "transaction",
+      "journal"
+    ]
+  },
+  {
+    "topic_id": "progression",
+    "display_name": "Progression",
+    "aliases": [
+      "stat challenge",
+      "challenge resolution",
+      "HasStats",
+      "Probit-d20",
+      "tangl.mechanics.progression"
+    ],
+    "layer": "mechanics",
+    "short_description": "Stats, challenges, modifiers, outcomes, and explicit durable growth for authored narrative pressure systems.",
+    "related_topic_ids": [
+      "games",
+      "assembly",
+      "transaction"
+    ]
+  },
+  {
+    "topic_id": "transaction",
+    "display_name": "Transactions",
+    "aliases": [
+      "TransactionOffer",
+      "transaction commitment",
+      "offer acceptance",
+      "custody transfer",
+      "transaction receipt"
+    ],
+    "layer": "mechanics",
+    "short_description": "Preflighted multi-leg commitments with explicit acceptance, rollback, writeback, and receipts.",
+    "related_topic_ids": [
+      "assembly",
+      "provisioning",
+      "credentials",
+      "progression"
     ]
   },
   {
@@ -485,11 +540,12 @@
       "media synthesis"
     ],
     "layer": "media",
-    "short_description": "Media dependency/resource model and media-as-affordance attachment (pre-decided media bound on first sighting).",
+    "short_description": "Content-addressed resource inventory, provisioning, selection or creation, and JOURNAL-facing media presentation.",
     "related_topic_ids": [
       "open_link",
       "presence",
-      "observation"
+      "observation",
+      "prose"
     ]
   },
   {
@@ -536,8 +592,6 @@
     "aliases": [
       "twine",
       "twee",
-      "import",
-      "export",
       "round-trip",
       "LossRecord",
       "graph codec"
@@ -583,7 +637,45 @@
       "presence",
       "credentials",
       "media",
-      "widget"
+      "widget",
+      "prose"
+    ]
+  },
+  {
+    "topic_id": "prose",
+    "display_name": "Prose Rendering",
+    "aliases": [
+      "episode-to-syuzhet",
+      "recursive text rendering",
+      "TextRenderSession",
+      "render_text_as",
+      "dialog micro-block"
+    ],
+    "layer": "prose",
+    "short_description": "Text realization and discourse helpers that turn presentation-safe story inputs into narrative JOURNAL fragments.",
+    "related_topic_ids": [
+      "journal",
+      "observation",
+      "presence",
+      "media",
+      "lang"
+    ]
+  },
+  {
+    "topic_id": "lang",
+    "display_name": "Language Utilities",
+    "aliases": [
+      "linguistic utilities",
+      "pronoun inflection",
+      "verb conjugation",
+      "personal names",
+      "point of view"
+    ],
+    "layer": "utilities",
+    "short_description": "Low-level naming, inflection, conjugation, and point-of-view helpers used by prose and demographic systems.",
+    "related_topic_ids": [
+      "prose",
+      "demographics"
     ]
   }
 ]

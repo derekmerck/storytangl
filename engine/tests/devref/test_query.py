@@ -66,3 +66,35 @@ def test_get_topic_map_returns_related_topics_and_artifacts(devref_db_path) -> N
     assert topic_map.topic.topic_id == "phase_ctx"
     assert {item.topic_id for item in topic_map.related_topics} >= {"frame", "ledger"}
     assert topic_map.artifacts
+
+
+def test_manual_topic_facets_drive_find_map_and_pack(devref_db_path) -> None:
+    """Topic-relative annotations override filename-derived note classification."""
+
+    expected_path = "engine/src/tangl/mechanics/progression/README.md"
+
+    search = search_topics("progression overview", db_path=devref_db_path, limit=8)
+    search_hit = next(item for item in search.artifacts if item.source_path == expected_path)
+    assert (search_hit.facet, search_hit.relation) == ("overview", "defines")
+
+    topic_map = get_topic_map("progression", db_path=devref_db_path, limit=8)
+    map_hit = next(item for item in topic_map.artifacts if item.source_path == expected_path)
+    assert (map_hit.facet, map_hit.relation) == ("overview", "defines")
+
+    pack = build_context_pack(
+        ["progression"],
+        facets=["overview"],
+        db_path=devref_db_path,
+        limit=8,
+    )
+    pack_hit = next(item for item in pack.items if item.source_path == expected_path)
+    assert (pack_hit.facet, pack_hit.relation) == ("overview", "defines")
+
+    notes_pack = build_context_pack(
+        ["progression"],
+        facets=["notes"],
+        db_path=devref_db_path,
+        limit=50,
+    )
+    assert len(notes_pack.items) < 50
+    assert all(item.title != "Probit-d20" for item in notes_pack.items)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tangl.devref.builder import build_index
+from tangl.devref.builder import build_index, iter_source_paths
 from tangl.devref.query import search_topics
 
 
@@ -242,3 +242,18 @@ class SideEffect:
 
     assert report.symbols > 0
     assert not marker_path.exists()
+
+
+def test_source_collection_includes_code_adjacent_markdown_and_rst(tmp_path) -> None:
+    """Package contracts need not adopt a filename suffix to enter devref."""
+
+    repo_root = _mini_repo(tmp_path)
+    markdown = repo_root / "engine" / "src" / "tangl" / "mechanic" / "README.md"
+    rst = repo_root / "engine" / "src" / "tangl" / "mechanic" / "CONTRACT.rst"
+    _write(markdown, "# Mechanic\n")
+    _write(rst, "Mechanic\n========\n")
+
+    paths = set(iter_source_paths(repo_root))
+
+    assert markdown in paths
+    assert rst in paths

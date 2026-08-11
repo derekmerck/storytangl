@@ -1,5 +1,12 @@
 # Episode-to-Syuzhet Rendering
 
+```{storytangl-topic}
+:topics: prose
+:facets: overview, design
+:relation: defines
+:related: journal, observation, presence, media, lang
+```
+
 > **Status:** Current rendering contract with explicitly marked extension points
 > **Scope:** The episode-to-syuzhet transformation assembled across namespace
 > gathering, typed presentation adapters, JOURNAL emission and composition,

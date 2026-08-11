@@ -1,5 +1,12 @@
 # Game Mechanics Design
 
+```{storytangl-topic}
+:topics: games
+:facets: overview, design
+:relation: defines
+:related: credentials, progression, transaction, journal
+```
+
 **Status:** CURRENT REFERENCE + ACTIVE FAMILY EXPANSION  
 **Scope:** the `tangl.mechanics.games` family, its Layer 3 VM integration, and the
 future game shapes still worth preserving as design intent  

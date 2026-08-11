@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from .builder import DEFAULT_DB_PATH, FACET_PRIORITY, build_index, normalize_text
 from .models import (
@@ -10,6 +11,7 @@ from .models import (
     ContextPack,
     ContextPackItem,
     DevTopicFacet,
+    DevTopicRelation,
     SearchResponse,
     TopicDefinition,
     TopicGraphLink,
@@ -18,6 +20,24 @@ from .models import (
 )
 from .storage import DevRefDatabase
 from .topics import load_topics
+
+
+RELATION_PRIORITY: dict[DevTopicRelation, int] = {
+    "defines": 60,
+    "governs": 50,
+    "documents": 40,
+    "tests": 30,
+    "demonstrates": 20,
+    "mentions": 10,
+}
+
+
+class _TopicLink(NamedTuple):
+    topic_id: str
+    facet: DevTopicFacet
+    relation: DevTopicRelation
+    evidence_source: str
+    weight: float
 
 
 def _ensure_db(db_path: str | Path | None) -> DevRefDatabase:
@@ -103,6 +123,26 @@ def _fts_scores(db: DevRefDatabase, terms: list[str]) -> dict[int, float]:
     return {row["artifact_id"]: max(0.0, 20.0 - float(row["rank"])) for row in rows}
 
 
+def _topic_link(row: sqlite3.Row) -> _TopicLink:
+    return _TopicLink(
+        topic_id=row["topic_id"],
+        facet=row["topic_facet"],
+        relation=row["topic_relation"],
+        evidence_source=row["evidence_source"],
+        weight=float(row["weight"]),
+    )
+
+
+def _group_topic_rows(
+    rows: list[sqlite3.Row],
+) -> list[tuple[sqlite3.Row, list[_TopicLink]]]:
+    grouped: dict[int, tuple[sqlite3.Row, list[_TopicLink]]] = {}
+    for row in rows:
+        item = grouped.setdefault(row["artifact_id"], (row, []))
+        item[1].append(_topic_link(row))
+    return list(grouped.values())
+
+
 def _all_artifact_hits(db: DevRefDatabase) -> dict[int, dict[str, Any]]:
     rows = db.load_rows(
         """
@@ -118,6 +158,8 @@ def _all_artifact_hits(db: DevRefDatabase) -> dict[int, dict[str, Any]]:
             artifacts.content,
             artifacts.qualified_name,
             artifact_topics.topic_id,
+            artifact_topics.facet AS topic_facet,
+            artifact_topics.relation AS topic_relation,
             artifact_topics.evidence_source,
             artifact_topics.weight
         FROM artifacts
@@ -140,6 +182,7 @@ def _all_artifact_hits(db: DevRefDatabase) -> dict[int, dict[str, Any]]:
                 "summary": row["summary"],
                 "content": row["content"],
                 "qualified_name": row["qualified_name"],
+                "topic_links": [],
                 "topic_ids": [],
                 "evidence_sources": [],
                 "link_weight": 0.0,
@@ -147,11 +190,42 @@ def _all_artifact_hits(db: DevRefDatabase) -> dict[int, dict[str, Any]]:
             },
         )
         if row["topic_id"] is not None:
+            item["topic_links"].append(_topic_link(row))
             item["topic_ids"].append(row["topic_id"])
             item["evidence_sources"].append(row["evidence_source"])
             item["link_weight"] += float(row["weight"])
             item["max_weight"] = max(item["max_weight"], float(row["weight"]))
     return grouped
+
+
+def _best_topic_link(links: list[_TopicLink]) -> _TopicLink:
+    """Choose one topic-relative classification for a returned artifact."""
+
+    return max(
+        links,
+        key=lambda link: (
+            link.weight,
+            FACET_PRIORITY[link.facet],
+            RELATION_PRIORITY[link.relation],
+            link.topic_id,
+        ),
+    )
+
+
+def _classifying_topic_links(links: list[_TopicLink]) -> list[_TopicLink]:
+    """Let manual annotations replace inferred classification for one topic."""
+
+    manual_topics = {
+        link.topic_id
+        for link in links
+        if link.evidence_source == "manual_annotation"
+    }
+    return [
+        link
+        for link in links
+        if link.evidence_source == "manual_annotation"
+        or link.topic_id not in manual_topics
+    ]
 
 
 def _facet_bonus(facet: DevTopicFacet) -> float:
@@ -177,8 +251,6 @@ def search_topics(
     results: list[ArtifactHit] = []
     normalized_terms = [normalize_text(term) for term in terms]
     for artifact in artifact_rows.values():
-        if requested_facets and artifact["facet"] not in requested_facets:
-            continue
         title_norm = normalize_text(artifact["title"])
         summary_norm = normalize_text(artifact["summary"])
         qname_norm = normalize_text(artifact["qualified_name"] or "")
@@ -190,6 +262,10 @@ def search_topics(
         ):
             lexical = 25.0
         topic_bonus = 0.0
+        topic_links = _classifying_topic_links(artifact["topic_links"])
+        matching_links = [
+            link for link in topic_links if link.topic_id in matched_topic_ids
+        ]
         if matched_topic_ids:
             overlap = matched_topic_ids.intersection(artifact["topic_ids"])
             if not overlap:
@@ -199,15 +275,37 @@ def search_topics(
                 topic_bonus = 60.0 + 10.0 * len(overlap)
         elif lexical <= 0 and artifact["link_weight"] <= 0:
             continue
-        score = artifact["max_weight"] + topic_bonus + lexical + _facet_bonus(artifact["facet"])
+
+        effective_links = matching_links if matching_links else topic_links
+        if requested_facets:
+            effective_links = [
+                link for link in effective_links if link.facet in requested_facets
+            ]
+            if not effective_links:
+                # Unlinked artifacts may still match their file-level facet;
+                # topic-linked artifacts must match one of their own links.
+                if topic_links or artifact["facet"] not in requested_facets:
+                    continue
+
+        if effective_links and (matched_topic_ids or requested_facets):
+            best_link = _best_topic_link(effective_links)
+            facet = best_link.facet
+            relation = best_link.relation
+            link_weight = max(link.weight for link in effective_links)
+        else:
+            facet = artifact["facet"]
+            relation = artifact["relation"]
+            link_weight = artifact["max_weight"]
+
+        score = link_weight + topic_bonus + lexical + _facet_bonus(facet)
         score += fts_scores.get(artifact["artifact_id"], 0.0)
         results.append(
             ArtifactHit(
                 artifact_id=artifact["artifact_id"],
                 title=artifact["title"],
                 kind=artifact["kind"],
-                facet=artifact["facet"],
-                relation=artifact["relation"],
+                facet=facet,
+                relation=relation,
                 source_path=artifact["source_path"],
                 line=artifact["line"],
                 summary=artifact["summary"],
@@ -258,34 +356,49 @@ def get_topic_map(
             artifacts.line,
             artifacts.summary,
             artifacts.qualified_name,
-            SUM(artifact_topics.weight) AS weight,
-            GROUP_CONCAT(artifact_topics.evidence_source) AS evidence_sources
+            artifact_topics.topic_id,
+            artifact_topics.facet AS topic_facet,
+            artifact_topics.relation AS topic_relation,
+            artifact_topics.evidence_source,
+            artifact_topics.weight
         FROM artifacts
         JOIN artifact_topics ON artifact_topics.artifact_id = artifacts.artifact_id
         WHERE artifact_topics.topic_id = ?
-        GROUP BY artifacts.artifact_id
-        ORDER BY weight DESC, artifacts.title ASC
-        LIMIT ?
+        ORDER BY artifacts.artifact_id
         """,
-        (topic_id, limit),
+        (topic_id,),
     )
-    artifacts = [
-        ArtifactHit(
-            artifact_id=row["artifact_id"],
-            title=row["title"],
-            kind=row["kind"],
-            facet=row["facet"],
-            relation=row["relation"],
-            source_path=row["source_path"],
-            line=row["line"],
-            summary=row["summary"],
-            score=float(row["weight"]) + _facet_bonus(row["facet"]),
-            topic_ids=[topic_id],
-            evidence_sources=sorted(set((row["evidence_sources"] or "").split(","))) if row["evidence_sources"] else [],
-            qualified_name=row["qualified_name"],
+    artifacts: list[ArtifactHit] = []
+    for row, links in _group_topic_rows(rows):
+        links = _classifying_topic_links(links)
+        best_link = _best_topic_link(links)
+        score = sum(link.weight for link in links)
+        score += _facet_bonus(best_link.facet)
+        artifacts.append(
+            ArtifactHit(
+                artifact_id=row["artifact_id"],
+                title=row["title"],
+                kind=row["kind"],
+                facet=best_link.facet,
+                relation=best_link.relation,
+                source_path=row["source_path"],
+                line=row["line"],
+                summary=row["summary"],
+                score=score,
+                topic_ids=[topic_id],
+                evidence_sources=sorted({link.evidence_source for link in links}),
+                qualified_name=row["qualified_name"],
+            )
         )
-        for row in rows
-    ]
+    artifacts.sort(
+        key=lambda item: (
+            -item.score,
+            -FACET_PRIORITY[item.facet],
+            item.title.lower(),
+            item.source_path,
+        )
+    )
+    artifacts = artifacts[:limit]
     artifact_ids = tuple(item.artifact_id for item in artifacts)
     links: list[TopicGraphLink] = []
     if artifact_ids:
@@ -330,42 +443,45 @@ def build_context_pack(
     params: tuple[Any, ...]
     query = f"""
         SELECT
+            artifacts.artifact_id,
             artifacts.title,
-            artifacts.facet,
-            artifacts.relation,
             artifacts.source_path,
             artifacts.line,
             artifacts.summary,
             artifacts.qualified_name,
-            GROUP_CONCAT(DISTINCT artifact_topics.topic_id) AS topic_ids,
-            SUM(artifact_topics.weight) AS weight
+            artifact_topics.topic_id,
+            artifact_topics.facet AS topic_facet,
+            artifact_topics.relation AS topic_relation,
+            artifact_topics.evidence_source,
+            artifact_topics.weight
         FROM artifacts
         JOIN artifact_topics ON artifact_topics.artifact_id = artifacts.artifact_id
         WHERE artifact_topics.topic_id IN ({placeholders})
     """
     params = tuple(topic_ids)
-    if facets:
-        facet_placeholders = ", ".join("?" for _ in facets)
-        query += f" AND artifacts.facet IN ({facet_placeholders})"
-        params = params + tuple(facets)
-    query += """
-        GROUP BY artifacts.artifact_id
-        ORDER BY artifacts.title ASC
-    """
+    query += " ORDER BY artifacts.artifact_id"
     rows = db.load_rows(query, params)
-    items = [
-        ContextPackItem(
-            title=row["title"],
-            facet=row["facet"],
-            relation=row["relation"],
-            source_path=row["source_path"],
-            line=row["line"],
-            summary=row["summary"],
-            topic_ids=sorted(set((row["topic_ids"] or "").split(","))) if row["topic_ids"] else [],
-            qualified_name=row["qualified_name"],
+
+    items: list[ContextPackItem] = []
+    for row, links in _group_topic_rows(rows):
+        links = _classifying_topic_links(links)
+        if facets:
+            links = [link for link in links if link.facet in facets]
+        if not links:
+            continue
+        best_link = _best_topic_link(links)
+        items.append(
+            ContextPackItem(
+                title=row["title"],
+                facet=best_link.facet,
+                relation=best_link.relation,
+                source_path=row["source_path"],
+                line=row["line"],
+                summary=row["summary"],
+                topic_ids=sorted({link.topic_id for link in links}),
+                qualified_name=row["qualified_name"],
+            )
         )
-        for row in rows
-    ]
     items.sort(
         key=lambda item: (
             -FACET_PRIORITY[item.facet],

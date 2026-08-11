@@ -1,6 +1,12 @@
 # tangl/core/runtime_op.py
 """Portable runtime expression wrappers for query, predicate, and effect operations.
 
+.. storytangl-topic::
+   :topics: runtime_op
+   :facets: code
+   :relation: defines
+   :related: dispatch, traversal, phase_ctx
+
 The runtime-op family is intentionally small and serializable:
 
 - :class:`RuntimeOp` stores the expression string and exposes eval/exec helpers.

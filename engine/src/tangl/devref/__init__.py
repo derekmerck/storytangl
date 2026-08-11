@@ -21,6 +21,15 @@ API
 - :func:`search_topics` - Search topics and ranked artifacts.
 - :func:`get_topic_map` - Show one topic with related topics and artifacts.
 - :func:`build_context_pack` - Assemble a compact context pack for agents.
+
+Notes
+-----
+Each topic in ``topics.json`` should have at least one manual annotation on its
+canonical document or package module; governing artifacts normally use
+``defines``. Prefer qualified or multi-word aliases. A bare common noun is
+appropriate only when that topic owns the concept; aliases such as ``node``,
+``planning``, or ``import`` otherwise pull unrelated artifacts into the result
+set.
 """
 
 from .builder import build_index

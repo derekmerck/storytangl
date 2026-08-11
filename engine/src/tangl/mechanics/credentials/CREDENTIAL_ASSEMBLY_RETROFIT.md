@@ -1,10 +1,10 @@
 # Credential Packet Assembly Retrofit
 
 ```{storytangl-topic}
-:topics: credentials, assembly, transaction, games
-:facets: design, planning
-:relation: proposes
-:related: component, provision, vm, media
+:topics: assembly, transaction, games
+:facets: design, notes
+:relation: documents
+:related: open_link, provisioning, media
 ```
 
 **Status:** PARTIALLY IMPLEMENTED. The first retrofit slice landed the global

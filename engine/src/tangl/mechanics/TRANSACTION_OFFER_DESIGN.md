@@ -1,10 +1,10 @@
 # Transaction Offers and Commitments
 
 ```{storytangl-topic}
-:topics: association, transaction, provision
-:facets: design, notes
+:topics: transaction, provisioning, assembly
+:facets: overview, design
 :relation: defines
-:related: assembly, assets, provisioning, credentials
+:related: credentials, progression, games
 ```
 
 **Status:** FIRST HELPER LANDED — `tangl.mechanics.transaction` provides an

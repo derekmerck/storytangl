@@ -1,5 +1,12 @@
 # Sandbox Mechanics Design
 
+```{storytangl-topic}
+:topics: sandbox
+:facets: overview, design
+:relation: defines
+:related: open_link, traversal, journal, games
+```
+
 **Status:** IMPLEMENTED FIRST-SPIKE + ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,

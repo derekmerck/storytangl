@@ -1,5 +1,11 @@
-Probit-d20
-==========
+# Probit-d20
+
+```{storytangl-topic}
+:topics: progression
+:facets: overview, design
+:relation: defines
+:related: games, transaction, assembly
+```
 
 **Probit-d20** is a generic "rules-light" rpg stat system with intuitive ability and challenge ranks tied to the statistical normal distribution.
 
