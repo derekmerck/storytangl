@@ -10,6 +10,10 @@
 **Document Version:** 0.8
 **Status:** DESIGN — proposed coarse-grid nouns (`Vantage`, `Observation`), a
 description protocol over them, and a strawman prose pipeline. Not a migration plan.
+The current rendering and output contracts remain
+`docs/src/design/story/EPISODE_SYUZHET_RENDERING.md` and
+`docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`; this note proposes an
+optional semantic projection before those landed seams.
 *v0.2: three-stage prose pipeline (self-description / observation / realization),
 discourse-context-vs-vantage split, strawman referring-expression selection policy.
 v0.3: stage 3 corrected to constrained RE-realization of authored prose (parse →
@@ -43,7 +47,7 @@ arbitration deferred to a second consumer; type boundary downgraded to auditable
 chokepoint with the condition for it to become structural; three-way record split
 (graph = meaning, fragment = experience, observation = optional snapshot); LLM is a
 realization backend, not a constraint; DispatchLayer.DOMAIN (invented) corrected.*
-**Relevant layers:** `tangl.lang` (noun protocol), `tangl.story` (vantage, dispatch),
+**Relevant packages and surfaces:** `tangl.lang` (noun protocol), `tangl.story` (vantage, dispatch),
 `tangl.mechanics.presence` / `.credentials` / `.sandbox` (consumers),
 `tangl.journal` (downstream output).
 

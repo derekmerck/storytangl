@@ -20,9 +20,9 @@
 > backend. This note describes the implemented
 > architecture and the design commitments for the still-evolving creator layer.
 >
-> The package-level architecture is canonical here. Broader design documents
-> under `docs/src/design/` remain useful for subsystem history, rationale, and
-> roadmap details, even where some older terminology survives.
+> The package-level architecture is canonical here. The public entry point at
+> `docs/src/design/MEDIA_DESIGN.md` summarizes the cross-package pipeline and
+> points here rather than maintaining a duplicate media specification.
 
 ---
 
@@ -543,7 +543,7 @@ aggregation for creation) are commitments; specific forge backends are not.
 
 | Document | Location | Status |
 |----------|----------|--------|
-| Detailed media subsystem design | `docs/src/design/MEDIA_DESIGN.md` | Current detailed design, but some older terminology is historical |
+| Public media entry point | `docs/src/design/MEDIA_DESIGN.md` | Current summary and canonical pointer |
 | Generative media design | `docs/src/design/GENERATIVE_MEDIA_DESIGN.md` | Current active implementation/design note |
 | Media resurrection plan | `docs/notes/media_resurrection_plan.md` | Current execution plan |
 | Media client contract | `docs/notes/media_client.md` | Current (JSON fragment examples) |

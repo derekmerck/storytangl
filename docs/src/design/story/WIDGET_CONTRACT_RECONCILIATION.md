@@ -4,14 +4,15 @@
 **Companion to:** `STORYTANGL_WIDGET_VOCAB.md` v1.6
 **Companion to:** `bundles/<name>/EXTENSIONS.md` (Tier P3 genre layers)
 
-This document tracks **implementation status** across the three layers
-named in spec §0.7:
+This document tracks **implementation status** across the presentation-contract
+views named in spec §0.7. These are not StoryTangl engine layers:
 
-| Layer | Document | Role |
+| Surface | Authority | Role |
 |---|---|---|
-| **L1 — UI Vocabulary** | `STORYTANGL_WIDGET_VOCAB.md` + `bundles/<name>/EXTENSIONS.md` | Target-truth. What data shapes the player-facing client needs. The spec evolves here; everything else chases. |
-| **L2 — API Transport** | `API_SPEC.md` (forthcoming; derived from this doc) | REST endpoints (and other wire transport) routing L1 needs to L3 capabilities. Optional layer — CLI ports skip it. |
-| **L3 — Engine Capabilities** | `ENGINE_CAPABILITIES.md` (forthcoming; derived from this doc) | Python callables that produce the data L1 wants. The current engine's actual surface. |
+| **UI vocabulary** | `STORYTANGL_WIDGET_VOCAB.md` + bundle extensions | Target-truth for player-facing shapes. |
+| **Reference renderers** | web, CLI, Tk, Ren'Py, and other conformance ports | Concrete realization and accessibility evidence. |
+| **Service/transport** | service response and fragment-stream contracts | Optional DTO/REST/remote delivery; embedded clients may skip it. |
+| **Engine capabilities** | live journal, story, and service types/callables | What the current engine can actually emit. |
 
 **The spec is target-truth.** This document is the honest reality
 check. The two are intentionally allowed to disagree during a
@@ -22,25 +23,26 @@ chases) works.
 
 ## How to read this doc
 
-Each surface in the spec gets a row in one of the §-numbered tables
-below. The four status columns per row:
+Each surface in the spec gets a row in one of the §-numbered tables below.
+The main tables track the target, reference clients, and engine implementation;
+§E records service/transport explicitly where an address-space boundary matters.
 
 | Column | What it tracks |
 |---|---|
-| **Spec tier (L1)** | `Tier S` / `Tier P1` / `Tier P2` / `Tier P3` per the vocab spec. The contract commitment. |
+| **Spec tier** | `Tier S` / `Tier P1` / `Tier P2` / `Tier P3` per the vocab spec. The contract commitment. |
 | **Reference clients** | What `apps/web/` and the reference CLI/Tk ports ship today. Values: `done`, `partial`, `not_started`, `n/a`. |
-| **Engine backend (L3)** | What `engine/` ships today. Values: same as L2, plus `untyped` (works but with `dict[str, Any]` rather than typed Pydantic). |
+| **Engine backend** | What `engine/` ships today. Values also include `untyped` for a working but untyped surface. |
 | **Plan** | One-line forward direction. Empty when the row is settled across columns. |
 
-A row is **settled** when all three implementation columns match the
-spec's tier commitment. A row with mismatched columns is in
+A row is **settled** when its **Reference clients** and **Engine backend**
+results satisfy the **Spec tier** commitment. **Plan** records remaining work;
+it is not an implementation-result column. A row with mismatched results is in
 **negotiation** — that's fine; the doc just makes the gap visible.
 
-**Sequence of work, per the inversion strategy.** UI vocabulary
-leads (commit the target shape in the spec), the reference UI
-catches up next (against fixtures, even with dummy data), then the
-engine + API expose capabilities that match. The CLI port skips L2
-entirely and consumes L3 directly via an in-process shim.
+**Sequence of work, per the inversion strategy.** UI vocabulary leads, a
+reference renderer exercises the shape, and engine plus optional transport
+expose matching capabilities. CLI and embedded ports consume the engine-native
+contract directly.
 
 ---
 
@@ -148,10 +150,10 @@ surfaces and ignores these enrichments.
 
 ---
 
-## §E — API transport (Layer 2)
+## §E — Service and API transport
 
 The API surface is intentionally underspecified at the contract
-level — the spec commits to the data shapes (L1), and the API
+level — the spec commits to the data shapes, and the API
 chooses how to route them. This table is what the engine team
 implements.
 
@@ -165,11 +167,12 @@ implements.
 | `/auth/keys` (CRUD) | various | API key lifecycle | not_started | see auth thread |
 | `/auth/revoke` | POST | revoke a key | not_started | see auth thread |
 
-**CLI port and L2.** The CLI port does not call any of these
+**CLI port and transport.** The CLI port does not call any of these
 endpoints. It consumes `engine/`'s Python surface directly via an
 in-process shim — typically a thin wrapper around
-`ServiceManager.do_action()` / `get_envelope()` / `get_projected_state()`.
-The L2 column is therefore not blocking for CLI conformance.
+`ServiceManager.create_story()` / `get_story_update()` / `resolve_choice()` /
+`get_story_info()`.
+The transport surface is therefore not blocking for CLI conformance.
 
 ---
 
@@ -220,7 +223,7 @@ others.
   generated VM resolver diagnostics are normalized at the story/journal
   boundary without exposing VM blocker objects as the UI contract.
 
-### 2026-06 — backend fragment-contract audit (L2/L3 update)
+### 2026-06 — backend fragment-contract audit (service/engine update)
 
 - Pinned service-created runtime envelopes as independent fragments rather
   than legacy display blocks. **Impact:** choice fragment `uid` and action
@@ -243,7 +246,7 @@ others.
   auth, routing, JSON transcription, render profiles, and media transport
   policy.
 
-### 2026-05 — spec v1.5 (L1 update only)
+### 2026-05 — spec v1.5 (vocabulary update only)
 
 - Adopted the v1.4 genre-audit additions: journal-as-narrative,
   per-cursor projection of shared state, and the genre extension index.
@@ -270,17 +273,17 @@ others.
   future ports have a concrete command-feedback fixture without promoting the
   whole wireframe bundle to gating conformance.
 
-### 2026-05 — spec v1.3 (L1 update only)
+### 2026-05 — spec v1.3 (vocabulary update only)
 
-- Reverted `accepts.kind="select"` rename → `pieces`. **Impact:** L2/L3
+- Reverted `accepts.kind="select"` rename → `pieces`. **Impact:** transport and engine
   may continue using `pieces`; no migration needed.
 - Demoted §1.5 cursors and §1.6 info channels to Tier P1. **Impact:**
-  none on L2/L3 directly; clarifies that current single-cursor behavior
+  none on transport or engine directly; clarifies that current single-cursor behavior
   is settled, multi-cursor is target.
 - Replaced `GET /story/info/{kind}` with query-descriptor model.
-  **Impact:** L2 evolves the `/story/info` endpoint; no L1 break since
+  **Impact:** transport evolves the `/story/info` endpoint; no vocabulary break since
   the v1.2 URL form was never shipped.
-- Added §0.7 three-layer architecture. **Impact:** this document
+- Added §0.7 presentation-contract views. **Impact:** this document
   exists.
 - EXTENSIONS.md swept `tokens → pieces`. **Impact:** carwars Tier P3
   conventions now consistent with main spec.
@@ -316,7 +319,7 @@ others.
   against portable JSON fixtures and proposal fixtures instead of copying the
   Vue shell.
 
-### 2026-05 — engine current (L3 baseline)
+### 2026-05 — engine current (engine baseline)
 
 - Engine emits typed `Accepts`, `UIHints`, and `Blocker` models from
   `tangl.journal.intent`.
@@ -362,9 +365,9 @@ renders it.
 
 ## §I — Forward-looking sequence
 
-This is the **inversion plan** the project committed to: UI leads,
-API + engine chase. Each step's deliverable is a single PR-shaped
-change to the named layer.
+This is the **inversion plan** the project committed to: UI vocabulary leads,
+reference renderers exercise it, and service plus engine follow. Each step's
+deliverable is a single PR-shaped change to the named contract surface.
 
 **Phase 1 — Stabilize spec.**
 
@@ -372,7 +375,7 @@ change to the named layer.
 - ✅ Spec v1.6 direct/find-edge requests and non-journal UX events.
 - ✅ EXTENSIONS.md swept to `pieces`.
 - ✅ Tier P3 extension docs imported and vetted for current demo genres.
-- ✅ This reconciliation doc as the three-layer spine.
+- ✅ This reconciliation doc as the presentation-contract spine.
 
 **Phase 2 — Reference UI catches up.** Wireframes remain v1.5 visual
 references; webapp behavior aligns to v1.6.

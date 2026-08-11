@@ -21,9 +21,18 @@ client presentation.
   dereferencing such as media payload shaping.
 - Clients own layout, widgets, accessibility mapping, and graceful fallback.
 
+The gathered rendering namespace stops before this boundary. Service receives
+typed fragments and supplementary projected-state models; it does not receive a
+semantic namespace to flatten, reinterpret, or turn into a parallel story model.
+
 The service layer must not invent a parallel fragment hierarchy. Unknown
 fragments remain `BaseFragment` values with their original payload preserved so
 clients and remote managers can degrade safely.
+
+Engine-native `MediaFragment` values may still carry `MediaRIT` content. Service
+dereferencing projects that reference into a resolved, pending, failed,
+fallback, path, URL, or inline transport payload according to the render
+profile. That is delivery shaping, not journal composition or media selection.
 
 ## RuntimeEnvelope
 

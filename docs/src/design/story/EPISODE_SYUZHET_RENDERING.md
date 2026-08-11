@@ -1,42 +1,30 @@
 # Episode-to-Syuzhet Rendering
 
-> **Status:** Active design reference
-> **Scope:** The rendering phase that transforms an invoked episode and its
-> current namespace into narrative, dialog, fragments, presentation hints, and
-> downstream content requirements.
+> **Status:** Current rendering contract with explicitly marked extension points
+> **Scope:** The episode-to-syuzhet transformation assembled across namespace
+> gathering, typed presentation adapters, JOURNAL emission and composition,
+> media provisioning, service delivery, and client presentation. “Rendering”
+> here names that transformation space, not one additional VM phase.
 
-**Implementation status:** Phase 10.1 provides the text-only floor:
-``TextRenderSession`` renders bounded recursive Jinja text against a
-``PhaseCtx`` namespace and carries ephemeral discourse state. It is not yet a
-general content request or JOURNAL adapter. Phase 11 adds the text-specific
-``tangl.story.presentation.render_text_as(...)`` invocation seam: it selects a
-``str`` source through ``story_dispatch``, exposes that resolver to recursive
-text templates, and ships replaceable presence defaults. It remains separate
-from fragment and media products. Phase 12 adds one credential-owned
-``document_description`` adapter: an identity document resolves its bound
-subject through its packet manager and recursively projects that presence,
-without interpreting credential validity or rendering a packet.
-Phase 13 adds a credential-owned ``inspection_description`` adapter that
-recursively composes a packet's ordered identity and ordinary documents, with
-explicit child bindings and no JOURNAL, media, or disposition interpretation.
-Phase 14 makes credentials the first vertical JOURNAL consumer: game-owned
-arrival and packet templates invoke those text adapters through the live phase
-context, then emit attributed ``ContentFragment`` values before the existing
-candidate, packet-zone, and document-piece surfaces. The templates disclose
-only ordinary appearance and visible documents; findings and disposition remain
-on their committed interaction paths. Phase 15 converges packet prose and
-targetable credential pieces on the packet manager's ordered components and
-the same ``document_description`` adapter. Scenario-authored complete document
-text remains an explicit replacement, while compatibility-only visible items
-such as baggage remain separate pieces. Phase 16 adds one immutable, typed
-issuer-attestation observation to the same recursive projection: profile-owned
-neutral wording becomes both document prose and a structured ``visible_parts``
-entry on the corresponding piece. A complete authored document replacement owns
-its content and does not append generated parts; media composition remains
-deferred. Phase 17 adds a second concrete validity observation and a narrow
-union of those two heterogeneous leaves. The packet/document projection now
-proves ordered text and structured interactive evidence are the same transient
-presentation product; media integration remains a separate next discussion.
+**Implementation status:** the text and fragment floor is landed.
+``TextRenderSession`` performs bounded recursive Jinja rendering against a
+``PhaseCtx`` namespace and carries ephemeral discourse state.
+``tangl.story.presentation.render_text_as(...)`` selects one named textual
+aspect through Story dispatch; explicit authored content is a complete
+replacement. Presence and Credentials register their own adapters, and the
+credentials vertical proves recursive person, document, packet, and encounter
+text without moving validity or disposition authority into presentation.
+
+Story JOURNAL handlers emit ordered typed fragments for content, media, and
+choices. The optional ``compose_journal`` fold transforms that merged batch
+before service projection. Credentials additionally proves the non-text path:
+a presentation-safe card projection requests portrait and printable-text media,
+provisioning resolves those requests into a composed ``MediaRIT``, and JOURNAL
+emits an associated ``MediaFragment`` beside the ordinary text and piece floor.
+
+There is no universal persistent ``ContentRequest`` or renderer-result union.
+Observation/vantage policy, broad revoicing, richer structural syuzhet adapters,
+and media catalog strategy remain proposals or separate follow-ups.
 
 ## Purpose
 
@@ -50,11 +38,19 @@ namespace, stable referents, lifecycle timing, dispatch, and provenance that
 specialized content adapters need.
 
 ```text
-episode + phase-assembled namespace + presentation request
-    -> content adapter
-    -> typed content product
-    -> journal or another downstream adapter
+episode + phase-assembled namespace
+    -> typed presentation adapter
+    -> narrative fragment or downstream resource specification
+    -> JOURNAL fragment stream
+    -> ordered composition
+    -> service delivery
+    -> client presentation
 ```
+
+Narrative and dialog enter the JOURNAL as fragments. A downstream resource
+specification such as ``MediaSpec`` first resolves to a resource and then
+re-enters the same narrative output surface as ``MediaFragment``. It is not a
+parallel client-delivery channel.
 
 ## The rendering namespace
 
@@ -74,7 +70,7 @@ must not search process-global state or reach into unrelated worlds.
 
 ## Content requests and adapters
 
-A request identifies a target and presentation role:
+The landed text seam identifies a target and named aspect:
 
 ```text
 target: person
@@ -90,14 +86,15 @@ target: speaker
 aspect: dialog_line
 ```
 
-Different adapters should retain typed results rather than converge on an
-untyped universal result:
+Other adapter families retain their own typed contracts rather than converging
+on an untyped universal request or result:
 
 ```python
-render_text(...) -> str
-render_fragments(...) -> list[BaseFragment]
-adapt_media_spec(...) -> MediaSpec
-resolve_media(...) -> MediaRIT
+render_text_as(...) -> str
+JOURNAL handlers -> list[BaseFragment]
+media projection/adaptation -> MediaSpec
+media provisioning -> MediaRIT
+JOURNAL media handler -> MediaFragment
 ```
 
 An author-facing `render_as(...)` may provide pleasant common vocabulary, but it
@@ -275,23 +272,31 @@ The caller still asks only for the appropriate RIT. The resolver decides
 whether to return a direct artifact, select an existing one, reuse a non-stale
 cached result, invoke a forge, or return a pending or fallback result.
 
-## Near-term implementation implication
+## Current boundary and next proofs
 
-The next slice should remain narrative-focused:
+The current framework deliberately stops short of blessing one universal
+content IR. Text presentation, JOURNAL composition, and media provisioning use
+different typed products while sharing the gathered namespace, stable
+referents, dispatch authorities, provenance, and final fragment stream.
 
-1. Establish the smallest typed content-request and adapter-invocation seam
-   using `PhaseCtx` and existing dispatch.
-2. Exercise literal, templated, and recursively composed narrative.
-3. Prove one structural journal/syuzhet adapter alongside Rejinja so Jinja does
-   not become the universal contract.
-4. Render a simple presence manager, then an assembled `HasLook`.
-5. Render one credential document, then a multi-document packet.
-6. Preserve source and entity attribution in final journal fragments.
-7. Defer actual media selection, generation, SVG or raster concerns, and forge
-   overhaul.
+Generic dispatch ``PIPE`` remains a separate deferred pruning question. This
+contract neither blesses nor removes it: the landed rendering path uses named
+namespace enrichment and an explicit ordered fragment fold, while other
+consumers may still justify pipe-style aggregation independently.
 
-The north star is a flexible episode-to-syuzhet transformation space.
-Credentials and presence are demanding examples of it, not owners of bespoke
+Future work should be driven by a concrete second consumer:
+
+1. A structural syuzhet adapter may prove graph or slot-based composition beside
+   recursive text without replacing ``compose_journal``.
+2. Observation/vantage may graduate when a world needs disclosure policy that
+   cannot be expressed by current scoped namespace and presentation adapters.
+3. Revoicing may graduate when exact replay, localization, or point-of-view
+   conversion supplies behavioral fixtures.
+4. Richer media selection and composition remain media concerns; they consume
+   semantic projections rather than becoming story truth.
+
+The north star remains a flexible episode-to-syuzhet transformation space.
+Credentials and Presence are demanding examples of it, not owners of bespoke
 presentation systems.
 
 ## Related contracts
@@ -300,3 +305,5 @@ presentation systems.
 - [Journal Compose Contract](JOURNAL_COMPOSE_CONTRACT.md)
 - [Presence/Prose Contract Spike](PRESENCE_PROSE_CONTRACT.md)
 - [Generative Media Design](../GENERATIVE_MEDIA_DESIGN.md)
+- [Fragment Stream Contract](../service/FRAGMENT_STREAM_CONTRACT.md)
+- [Service Architecture](../service/SERVICE_DESIGN.md)

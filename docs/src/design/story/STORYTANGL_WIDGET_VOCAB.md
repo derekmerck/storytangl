@@ -1,7 +1,10 @@
 # StoryTangl Widget Vocabulary
 
 **Version:** v1.6 · supersedes v1.5
-**Layer:** UI Vocabulary (Layer 1 of 3). **Implementation status** across reference clients (Layer 2: web/CLI/Tk), API transport, and engine backend (Layer 3) is tracked in `WIDGET_CONTRACT_RECONCILIATION.md`. **This document is target-truth.**
+**Contract surface:** player-facing vocabulary. **Implementation status** across
+reference clients, optional service/transport, and engine capabilities is tracked
+in `WIDGET_CONTRACT_RECONCILIATION.md`. These are presentation-contract views,
+not StoryTangl engine layers. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
 **Source of truth (for engine model alignment):**
 - `tangl.journal.fragments` (fragment types, presentation hints)
@@ -164,27 +167,26 @@ across CLI / web / Godot / Ren'Py without losing expressiveness. The
 constraints in §0.2 and §5 are downstream consequences of this design
 choice.
 
-### 0.7 Three-layer architecture
+### 0.7 Presentation contract surfaces
 
-This document is **Layer 1** of a three-layer separation:
+The presentation contract is reviewed through four views. They are not the
+cardinal engine layers and do not imply four runtime hops:
 
-| Layer | Document | What it specifies |
+| Surface | Authority | What it specifies |
 |---|---|---|
-| **L1 — UI Vocabulary** | this doc (`STORYTANGL_WIDGET_VOCAB.md`) + `bundles/<name>/EXTENSIONS.md` | What data shapes the player-facing client needs, and at what levels of expressiveness. Target-truth. |
-| **L2 — API Transport** | `API_SPEC.md` (forthcoming) | REST endpoints (and other transport mechanisms) that route L1 data needs to L3 capabilities. Optional. Clients sharing an address space with the engine (CLI, embedded ports) skip this layer entirely. |
-| **L3 — Engine Capabilities** | `ENGINE_CAPABILITIES.md` (forthcoming) | Python callables that produce the data L1 wants. Ground truth of what's implementable in the current engine. |
+| **UI vocabulary** | this doc + `bundles/<name>/EXTENSIONS.md` | Target data shapes and expressiveness tiers. |
+| **Reference renderers** | web, CLI, Tk, Ren'Py, and other conformance ports | Concrete accessible realizations and parity evidence. |
+| **Service/transport** | `RuntimeEnvelope`, fragment DTOs, REST/remote adapters | Optional delivery across an address-space boundary; embedded and CLI ports may skip it. |
+| **Engine capabilities** | `tangl.journal`, `tangl.story`, and `tangl.service` public types | The live typed output the engine can produce. |
 
-Per-surface, the three layers MAY be at different states. A typed
-`PiecesAccepts` may be Tier P1 in this spec, partial in the API, and
-freshly typed in the engine — all simultaneously, all
-during a settling phase. **`WIDGET_CONTRACT_RECONCILIATION.md` tracks
-per-surface status across the three layers.** When a row in the
-reconciliation tracker reads "implemented" across all three columns,
-the surface is settled.
+Each view may be at a different state. A typed `PiecesAccepts` may be Tier P1
+in this spec, implemented by one client, transported by the service, and newly
+typed in the engine at the same time. `WIDGET_CONTRACT_RECONCILIATION.md`
+records those differences without turning a target widget into backend truth.
 
-The negotiation direction is **UI-out**: the spec proposes target
-contract; the API and engine chase. CLI ports skip L2 and call L3
-directly (in-process or via whatever shim a port chooses).
+The negotiation direction is **UI-out**: the vocabulary proposes a target;
+reference renderers, service transport, and engine capabilities converge on it.
+CLI and embedded ports may consume engine-native envelopes directly.
 
 ### 0.8 Journal as narrative
 
@@ -368,7 +370,7 @@ differs.
 > contract makes no commitment about turn ordering or simultaneous input
 > — those are bundle concerns.
 
-**Status (L1):** committed target contract. **Status (L3):**
+**Status (vocabulary):** committed target contract. **Status (engine):**
 single-cursor today; multi-cursor channel routing is a proposed extension
 awaiting an MVP author. The vocabulary commits to the framing; current
 engine and reference UI behave as if there is one cursor.
@@ -474,10 +476,10 @@ cheap.
 > player MAY query. Info channels are **discovery hints, not mandatory
 > client UI**.
 
-**Status (L1):** promoted Tier S contract. **Status (L2):** reference webapp
+**Status (vocabulary):** promoted Tier S contract. **Status (reference client):** webapp
 implements `info_affordances` with `query` descriptors against `/story/info`,
 and the CLI reference floor exposes the same affordances through `?` /
-slash-command output. **Status (L3):** engine defines typed `InfoAffordance`,
+slash-command output. **Status (engine):** defines typed `InfoAffordance`,
 `InfoState`, and `StoryInfoRequest` models, advertises available channels on
 runtime envelopes, and routes `/story/info` through the service-info dispatch
 surface. Fine-grained dirty-kind tracking remains conservative in v1.
@@ -1442,7 +1444,7 @@ Four contract points:
    descriptor however it wants; clients pass it back without inspecting
    contents. **The contract surface is the `InfoAffordance.query` shape
    in §1.6, not the URL routing here** — the transport may evolve (POST
-   body, separate endpoint per kind, etc.) without breaking L1
+   body, separate endpoint per kind, etc.) without breaking the vocabulary
    vocabulary clients, as long as the query descriptor is honored. The
    v1.2 draft proposal of `GET /story/info/{kind}` was rejected in
    v1.2.1 review because the URL-path approach baked `kind` into the

@@ -5,10 +5,9 @@ Presence/Prose Contract Spike
 > Authority: Current `compose_journal` rules live in `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`; this note remains the spike record for presence/prose integration.
 > Current contract: see `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md` for the live journal-composition boundary and `engine/src/tangl/story/STORY_DESIGN.md` for current story runtime layering.
 
-**Last Updated:** March 2026  
-**Scope:** story concept scaffolding plus contract tests; active block rendering
-remains `format_map`-based, with a small opt-in JOURNAL composition consumer
-for explicit dialog markup
+**Scope:** partially landed prose and presence integration. Ordinary authored
+block content remains `format_map`-based; named recursive text presentation and
+opt-in JOURNAL dialog composition are active parallel seams.
 
 ## Why This Spike Exists
 
@@ -35,8 +34,13 @@ subsystem yet.
 - Persistent session state lives on `Ledger`.
 - `render_block_content()` currently renders block text through namespace
   assembly plus `str.format_map`, not Jinja or concept-driven prose filters.
-- A lightweight `tangl.prose` package now hosts dialog and micro-block parsing
-  helpers, while the broader prose subsystem remains future work.
+- `render_text_as()` is the active named-aspect controller beside that block
+  renderer. `TextRenderSession` provides bounded recursive Jinja rendering and
+  ephemeral discourse state; Presence owns the default body, outfit, ornament,
+  and bundled-presence handlers that register with Story dispatch.
+- A lightweight `tangl.prose` package hosts recursive text rendering plus dialog
+  and micro-block parsing helpers. Observation/vantage, broad revoicing, and a
+  general prose subsystem remain future work.
 - Raw JOURNAL emission and post-merge composition are now distinct seams:
   - `render_journal` emits raw fragments,
   - `compose_journal` can replace the merged fragment batch afterward.
@@ -146,18 +150,23 @@ The migration path should stay parallel and opt-in first.
   Concepts and facets publish their own local symbol maps there.
 - `ctx.get_ns(node)` remains the assembled scope accessor.
   Runtime code renders against the gathered view built by `do_gather_ns`.
-- Presence facets are exposed to JOURNAL in two explicit opt-in ways:
-  - prose via namespace symbols consumed by the current `format_map` path,
-  - media via explicit `block.media` entries with `source_kind="facet"`.
+- Presence participates in presentation through explicit public seams:
+  - namespace symbols consumed by ordinary `format_map` block content,
+  - named `render_text_as()` handlers for recursive presence descriptions,
+  - renderer-neutral portrait specs consumed by media provisioning,
+  - and legacy explicit `block.media` facet entries where still authored.
 - Role and setting namespace publication remain backward-compatible.
   `villain` still resolves to the provider actor, while additive aliases such
   as `villain_role`, `place_setting`, `role_edges`, and `setting_edges`
   expose role/setting carriers for separate epistemic state.
-- The current `format_map` path remains the live renderer.
+- The current `format_map` path remains the ordinary block-content renderer;
+  `TextRenderSession` is the landed recursive renderer for explicitly requested
+  aspects.
 - Future voice/discourse behavior should target the post-merge
   `compose_journal` seam rather than making mechanics objects own prose policy.
-- A future Jinja-based prose renderer should sit beside it first, prove itself,
-  and only replace it once it is a clear superset.
+- Recursive Jinja therefore remains parallel and opt-in. It should replace the
+  ordinary block renderer only if a concrete consumer proves it a clear
+  superset.
 - `PhaseCtx` metadata already provides the first-pass narrator selection bridge
   through `narrator_key`; no ledger schema change is required.
 - Richer chapter or section labeling is deferred; when revived it should build
@@ -179,8 +188,9 @@ The proof should demonstrate:
 - narrator-key isolation via `ctx.get_meta()["narrator_key"]`,
 - additive role/setting aliases preserving actor-versus-role knowledge
   distinction,
-- and the current engine truth that live story rendering is still
-  `PhaseCtx.get_ns(node)` plus `format_map`.
+- and the current engine truth that ordinary block prose is
+  `PhaseCtx.get_ns(node)` plus `format_map`, while named aspects may use
+  `render_text_as()` plus `TextRenderSession`.
 
 These tests are intentionally self-contained. They prove the contract shape
 without claiming that the full prose subsystem already exists.
@@ -204,20 +214,13 @@ The current first pass now includes:
 6. Those attributed dialog fragments can now carry resolved speaker identity,
    style hints, and optional look-derived `dialog_im` payloads when the speaker
    object exposes the relevant hooks.
-7. A broader unification with media is intentionally deferred. If prose,
-   dialog, and media all converge on the same pattern of invoking
-   request-specific entity contribution hooks against the gathered namespace,
-   the next step should be a small shared contribution protocol or typed
-   request object, not an eager generalization of `compose_journal` into a
-   nested or DAG-style dispatch framework.
+7. Presence and Credentials now prove text and media adapters independently
+   visiting the same semantic state. They share namespace, referents, and final
+   fragment delivery, not a universal adapter result or a generalized
+   `compose_journal` DAG.
 
-If this grows beyond concept-local bookkeeping later, the next phase should
-decide whether to build:
-
-1. a real prose renderer entry point in parallel with the current block
-   content handler, or
-2. author/world-level composition handlers over the new `compose_journal`
-   seam for lighter-weight voice and grouping work.
-
-Until then, the engine should keep treating this as a design target proven by
-tests, not as an active published runtime subsystem.
+If this grows beyond concept-local bookkeeping, the next consumer should choose
+between richer named text adapters, author/world-level `compose_journal`
+handlers, or the proposed observation/vantage boundary. The broader narrator
+and revoicing system remains a design target; the smaller rendering and dialog
+seams above are active runtime contracts.
