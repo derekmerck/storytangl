@@ -34,8 +34,9 @@ The main tables track the target, reference clients, and engine implementation;
 | **Engine backend** | What `engine/` ships today. Values also include `untyped` for a working but untyped surface. |
 | **Plan** | One-line forward direction. Empty when the row is settled across columns. |
 
-A row is **settled** when all three implementation columns match the
-spec's tier commitment. A row with mismatched columns is in
+A row is **settled** when its **Reference clients** and **Engine backend**
+results satisfy the **Spec tier** commitment. **Plan** records remaining work;
+it is not an implementation-result column. A row with mismatched results is in
 **negotiation** — that's fine; the doc just makes the gap visible.
 
 **Sequence of work, per the inversion strategy.** UI vocabulary leads, a
@@ -169,7 +170,8 @@ implements.
 **CLI port and transport.** The CLI port does not call any of these
 endpoints. It consumes `engine/`'s Python surface directly via an
 in-process shim — typically a thin wrapper around
-`ServiceManager.do_action()` / `get_envelope()` / `get_projected_state()`.
+`ServiceManager.create_story()` / `get_story_update()` / `resolve_choice()` /
+`get_story_info()`.
 The transport surface is therefore not blocking for CLI conformance.
 
 ---

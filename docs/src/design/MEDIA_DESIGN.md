@@ -18,11 +18,9 @@ not own story truth, narrative policy, journal ordering, transport URLs, or
 client layout.
 
 ```text
-semantic story or mechanic state
-    -> presentation-safe projection
-    -> renderer-neutral MediaSpec
-    -> optional backend-specific adapted spec
-    -> provisioned content-addressed MediaRIT
+authored id/path -----> inventory lookup -----------+
+authored inline data -> direct or registered RIT ---+-> selected or provisioned MediaRIT
+semantic projection -> MediaSpec -> adapt/create ---+
     -> MediaFragment in the JOURNAL stream
     -> service dereference
     -> client presentation
@@ -32,12 +30,17 @@ Those stages are intentionally distinct:
 
 - A **semantic projection** exposes only the story facts appropriate for
   presentation. It remains owned by Story, a mechanic, or world domain logic.
-- A **``MediaSpec``** states what resource should be selected or created without
-  becoming semantic authority.
+- A **``MediaSpec``** is optional. It states what generated, adapted, or
+  composed resource should be selected or created without becoming semantic
+  authority. Authored identifiers, paths, inventory aliases, and inline data
+  use the direct or inventory provisioners without manufacturing a spec.
 - **Adaptation and creation** are media/backend concerns. A proof backend such
   as DiceBear is replaceable and should not leak into Story, Presence, or
   Credentials.
-- A **``MediaRIT``** is the graph-owned, content-addressed resource reference.
+- A **``MediaRIT``** is the content-addressed resource reference. Static assets
+  may remain authoritative in system- or world-scoped inventory registries;
+  accepting a dependency may produce a graph-local copy when the story needs
+  one. ``MediaRIT`` is ``RegistryAware``, not inherently a graph item.
 - A **``MediaFragment``** places that resource in the sole narrative output
   stream, with role and presentation hints but without client-specific URLs.
 - **Service** dereferences the RIT into a transport-safe resolved, pending,
