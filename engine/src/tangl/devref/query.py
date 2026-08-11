@@ -282,6 +282,8 @@ def search_topics(
                 link for link in effective_links if link.facet in requested_facets
             ]
             if not effective_links:
+                # Unlinked artifacts may still match their file-level facet;
+                # topic-linked artifacts must match one of their own links.
                 if topic_links or artifact["facet"] not in requested_facets:
                     continue
 

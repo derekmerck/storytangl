@@ -96,4 +96,5 @@ def test_manual_topic_facets_drive_find_map_and_pack(devref_db_path) -> None:
         db_path=devref_db_path,
         limit=50,
     )
+    assert len(notes_pack.items) < 50
     assert all(item.title != "Probit-d20" for item in notes_pack.items)
