@@ -77,6 +77,11 @@ The public payload vocabulary is typed:
   `WorldInfo`, and `SystemInfo`;
 - mutation acknowledgements return `RuntimeInfo`.
 
+The native envelope preserves engine fragment types. `RuntimeEnvelope.to_dto()`
+projects them through the journal DTO contract, and transport adapters may
+dereference `MediaRIT` content according to their media render profile. Neither
+step reruns story rendering or invents a second fragment hierarchy.
+
 Service does not translate fragments into a second narrative representation.
 Transport adapters own wire serialization, media URL shaping, and other
 client-specific presentation.

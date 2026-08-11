@@ -7,6 +7,11 @@
 fragments after raw JOURNAL handlers run and before service projection or client
 rendering begins.
 
+Namespace enrichment is upstream of this seam. It gives renderers named semantic
+inputs; it is not a second output stream and is not serialized wholesale for a
+client to interpret. Renderers turn the relevant inputs into typed fragments,
+and composition operates only on that ordered fragment batch.
+
 ## Current Runtime Contract
 
 - `render_journal` handlers produce ordered raw fragments.
@@ -26,6 +31,9 @@ rendering begins.
 - Handler results are still mirrored onto `ctx.results` for observability,
   but chaining no longer requires inspecting them: write each handler against
   the `fragments` it receives.
+- The resulting batch remains the sole narrative output. Resource specifications
+  such as `MediaSpec` must resolve and return through an ordinary fragment rather
+  than bypassing JOURNAL.
 
 ## Reference Transform
 
@@ -109,7 +117,8 @@ journal-splice orchestration are not yet a normal runtime workflow.
 
 ## Placement Rules
 
-- VM render: produce raw ordered fragment contributions
+- namespace gathering: expose bounded semantic inputs to adapters
+- VM/Story JOURNAL render: produce raw ordered fragment contributions
 - story `compose_journal`: normalize and enrich the fragment stream
 - service projection: convert engine-native fragments and projected-state models into transport-ready payloads
 - client render: ignore unsupported fragment kinds safely and apply client-specific presentation policy

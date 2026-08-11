@@ -94,7 +94,8 @@ that do not return a story fragment batch.
 
 ## ResponseType.MEDIA
 
-**Use when:** Endpoint returns binary/media content.
+**Use when:** A direct resource endpoint returns binary/media content rather
+than advancing or reading a story-session fragment stream.
 
 **Return type:** `MediaFragment` (at native layer)
 
@@ -110,6 +111,9 @@ that do not return a story fragment batch.
 
 **Status:** Active. Current service surfaces already include world-media
 responses, and gateway/transport layers may further adapt those payloads.
+Media embedded in story output remains a `MediaFragment` inside
+`ResponseType.RUNTIME_ENVELOPE`; it does not switch the whole response to this
+type or create a parallel narrative channel.
 
 ---
 
