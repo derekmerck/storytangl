@@ -14,8 +14,9 @@ The top-level package organization stays broad and family-oriented:
 - `demographics`
 - `presence`
 - `sandbox`
+- `credentials`
 - `simulation`
-- later: `credentials`, other world- or plugin-provided families
+- other world- or plugin-provided families
 
 Within each family, the preferred design lens is:
 
@@ -77,11 +78,23 @@ are using it systematically.
 
 - **Games**: the clearest current integrated family. It spans kernel, runtime,
   projection, and limited writeback via VM hooks and the `HasGame` facade.
+- **Credentials**: the worked convergence capstone. Credential Gate and Hall
+  Monitor compose assembly, games, transactions, Presence, text/media
+  projection, custody, recurrence, response, and durable consequence.
 
-### Foundation
+### Integrated
 
 - **Progression**: integrated stat, training, challenge, situational-effect, and
   durable growth foundation, exercised by *Coronate the Regent*.
+- **Presence / Look**: deterministic semantic appearance, recursive text
+  rendering, and renderer-neutral portrait requests. Rich paperdoll composition
+  remains a media/presence follow-up.
+- **Sandbox**: location, fixture, asset, mob, schedule, visibility, story-info,
+  and dynamic affordance surfaces exercised by *Adventure Sandbox Slice*. It
+  remains ordinary Story/VM traversal, not a parallel subsystem.
+
+### Foundation
+
 - **Assembly**: owner-bound component, slot, connection, and budget foundation
   used by credentials, presence, and vehicle examples.
 - **Transaction offers**: cross-family writeback helper for preflighted,
@@ -91,22 +104,10 @@ are using it systematically.
   cleaner v38-facing surface.
 - **Presence / Wearable** and **Presence / Ornaments**: reusable presence/runtime
   primitives for outfit and appearance flows.
-- **Presence / Look**: deterministic semantic appearance, recursive text
-  rendering, and renderer-neutral portrait requests. Rich paperdoll composition
-  remains a media/presence follow-up.
 - **Simulation**: small operational-simulation kernels that attach through
   ordinary mechanics and VM seams. The first proof is a deterministic queueing
   model that uses a mutable core `Registry` as a future-event list, `HasGame`
   for re-entrant actions, and normal journal fragments for observation.
-
-### Integrated Verticals
-
-- **Sandbox**: location, fixture, asset, mob, schedule, visibility, story-info,
-  and dynamic affordance surfaces exercised by *Adventure Sandbox Slice*. It
-  remains ordinary Story/VM traversal, not a parallel subsystem.
-- **Credentials**: the worked convergence capstone. Credential Gate and Hall
-  Monitor compose assembly, games, transactions, Presence, text/media
-  projection, custody, recurrence, response, and durable consequence.
 
 ### Archive
 

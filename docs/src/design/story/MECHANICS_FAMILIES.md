@@ -19,7 +19,10 @@ Mechanics remain grouped by broad **families** at the package level:
 - `assembly`
 - `demographics`
 - `presence`
-- later: `sandbox`, `credentials`, other world- or plugin-provided families
+- `sandbox`
+- `credentials`
+- `simulation`
+- other world- or plugin-provided families
 
 Within each family, we reason about implementation through a common set of
 facets rather than by forcing a filesystem reorganization up front. These are
