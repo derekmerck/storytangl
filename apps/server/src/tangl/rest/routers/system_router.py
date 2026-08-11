@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from tangl.config import settings
 from tangl.rest.dependencies_gateway import get_service_manager, require_service_access
 from tangl.service import ServiceManager
 from tangl.service.response import SystemInfo, UserSecret, WorldInfo
@@ -38,7 +37,7 @@ async def get_worlds(
 @router.get("/secret")
 async def get_key_for_secret(
     service_manager: ServiceManager = Depends(get_service_manager),
-    secret: str = Query(examples=[settings.client.secret], default=None),
+    secret: str = Query(examples=["example-user-secret"], default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
     """Encode ``secret`` as an API key for clients."""

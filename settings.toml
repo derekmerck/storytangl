@@ -6,7 +6,7 @@ persistence =   "native_in_mem"
 [service.paths]
 worlds      = [ "@path ./worlds/" ]
 client_dist =   "@path ./client/dist/"
-story_media =   "@path ./data/media/"
+story_media =   "@path ./tmp/media/"
 docs        =   "@path ./docs/_build/"
-user_data   =   "@path ./data/user/"
-cache_data  =   "@path ./data/tmp/"
+user_data   =   "@path ./tmp/user/"
+cache_data  =   "@path ./tmp/cache/"

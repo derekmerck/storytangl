@@ -57,8 +57,9 @@ bindings in place and must return `None`; there is no phase-level
 
 ## Matching and ranking
 
-`Resolver.gather_offers(...)` produces one deterministic ordered set. The
-current sort key prefers, in order:
+`Resolver.gather_offers(...)` produces one deterministic ordered set.
+`tangl.vm.provision.matching.offer_sort_key()` is the canonical ranking
+contract and prefers, in order:
 
 1. provisioning policy tier (`EXISTING`, `UPDATE`, `CLONE`, `CREATE`, then
    debug stubs);
@@ -79,13 +80,18 @@ use.
 Templates become graph entities through the normal `EntityTemplate` and graph
 factory materialization path. Provider identity is stored on the requirement by
 UUID, and graph round trips restore that reference through the owning registry.
-Offer callbacks, transient candidate objects, and preview-only stubs are not
-durable graph state.
+Offer callbacks, transient candidate objects, and unaccepted preview offers are
+not durable graph state. When an explicitly allowed STUB offer is accepted, its
+provider is added to the graph and linked like any other accepted provider; the
+link therefore survives graph persistence.
 
 Planning reads may preview whether a requirement is viable, but ordinary setup
-and rendering must not accidentally materialize lazy candidates. Runtime
-creation belongs at the PLANNING boundary; committed non-topological state
-changes belong in UPDATE.
+and rendering must not accidentally materialize lazy candidates. Provider and
+template materialization normally belongs at the PLANNING boundary. The bounded
+exception is an explicitly episode-latent destination: if a presented action
+still carries a deferred destination plan, selecting it may provision that
+destination before traversal. Entities created as consequences, and other
+committed non-topological state changes, belong in UPDATE.
 
 ## Related contracts
 

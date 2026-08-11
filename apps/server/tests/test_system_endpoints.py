@@ -1,9 +1,19 @@
+import json
 
 import pytest
 from fastapi.testclient import TestClient
 
 from tangl.config import settings
-from tangl.utils.hash_secret import uuid_for_secret, key_for_secret
+from tangl.utils.hash_secret import key_for_secret
+
+
+def test_openapi_does_not_publish_configured_credentials(client: TestClient) -> None:
+    schema = json.dumps(client.app.openapi())
+
+    if settings.client.secret in schema:
+        pytest.fail("OpenAPI schema contains the configured client secret")
+    if key_for_secret(settings.client.secret) in schema:
+        pytest.fail("OpenAPI schema contains the derived client key")
 
 
 def test_system_get_info(client: TestClient):

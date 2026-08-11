@@ -752,8 +752,10 @@ call, not a hook invocation.
 Every source of non-determinism in the VM is either eliminated or seeded:
 
 - `random` is seeded from `hashing_func(graph.value_hash(), cursor.uid, step_base)`
-- Offer selection is deterministic given a fixed offer list (no tie-breaking by insertion
-  order in the current implementation — priority + distance give a total order)
+- Offer selection is deterministic given a fixed offer list. The canonical
+  `offer_sort_key()` ends with the offer creation sequence, which provides a
+  stable final tie-break after policy, scope, caller distance, exact-kind,
+  specificity, and priority ranking.
 - Namespace assembly is deterministic (ancestor chain is a tree, traversal order is fixed)
 
 Replay works by re-running `resolve_choice` with the same sequence of chosen edges

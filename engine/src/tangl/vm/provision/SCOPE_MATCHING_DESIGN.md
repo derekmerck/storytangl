@@ -336,11 +336,16 @@ def offer_sort_key(offer):
         policy_tier(offer.policy),
         offer.scope_distance,           # prefer closer scope matches
         offer.distance_from_caller,     # then closer graph proximity
+        0 if offer.exact_kind_match else 1,
         -offer.specificity,
         offer.priority,
         offer.seq,
     )
 ```
+
+The executable and canonical full ranking contract is
+`tangl.vm.provision.matching.offer_sort_key()`. This excerpt shows where scope
+affinity participates in that key.
 
 `TemplateProvisioner` computes admission + distance during offer
 generation. Offers that fail admission are not emitted. Offers for
