@@ -1,7 +1,7 @@
 `tangl.mechanics.sandbox`
 =========================
 
-`tangl.mechanics.sandbox` is the incubating family for dynamic scene-location
+`tangl.mechanics.sandbox` is the integrated family for dynamic scene-location
 hubs.
 
 The package does not introduce a second interaction model. Sandbox is a
