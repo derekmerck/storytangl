@@ -13,7 +13,7 @@ dependencies.
 
 .. rubric:: Related notes
 
-- :doc:`../../notes/audits/vm38-doc-audit`
+- :doc:`Historical vm38 audit <../../notes/audits/vm38-doc-audit>`
 - :doc:`../../notes/reference/code_adjacent_design_docs`
 
 Constraint types

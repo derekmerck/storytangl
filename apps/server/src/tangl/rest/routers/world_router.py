@@ -13,7 +13,7 @@ router = APIRouter(tags=["World"])
 @router.get("/{world_id}/info")
 async def get_world_info(
     service_manager: ServiceManager = Depends(get_service_manager),
-    world_id: str = Path(example="my_world"),
+    world_id: str = Path(examples=["my_world"]),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> WorldInfo:
     """Return metadata describing ``world_id``."""

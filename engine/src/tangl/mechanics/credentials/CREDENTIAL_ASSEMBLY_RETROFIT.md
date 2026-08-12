@@ -7,39 +7,24 @@
 :related: open_link, provisioning, media
 ```
 
-**Status:** PARTIALLY IMPLEMENTED. The first retrofit slice landed the global
-credentials domain import surface, graph-backed credential components, an
-owner-bound assembly packet manager, and a `CredentialCase` bridge behind the
-existing disposition protocol. Phase 5 now materializes sampled offers into an
-authoritative packet manager at setup and case-advance boundaries, and persists
-the hosted game through the normal constructor-form graph path. Phase 6a landed the
-pure credential-token facet bridge, and Phase 6b landed its first consumer:
-`CredentialsGameHandler` derives the existing `request_document` move from the exact
-`choice / giver / request_document` facet on a manager-backed document. The handler
-remains the choice and resolution authority; flat cases remain a temporary fallback.
-Phase 6c landed the corrected catalog authority: generic authored definitions and open
-origin/indication ids compile into named, bounded token catalogs exposed by the bound
-world. A scenario type selects one world-local catalog, and packet materialization
-searches only that catalog rather than a game-owned world namespace or the global
-Singleton population. Qualified definition labels remain an internal persistence detail.
-Phase 6d landed as the real Hall Monitor conformance vertical: a bespoke scenario type
-selects the school catalog, a script-configured shift narrows it to one scenario
-instance, and generated plus pinned student encounters reuse the same logical packet,
-disposition, handler, and persistence path under a school-specific projection.
-Phase 6e then proves the same authority boundary inside one compiled world: distinct
-border and school scenario types each select their own local catalog, policy, and
-presentation while sharing the credentials game and handler lifecycle. Phase 7
-completed the authority cutover: every runtime `CredentialCase` now requires one
-owner-bound assembly packet manager; offer materialization creates it directly with
-the selected catalog; and the flat case fields, packet protocol, game-layer manager,
-and enum compatibility module are gone. Gate and Hall Monitor retain their authored
-wording as narrative overrides on ordinary offers. Phase 8 adds transient,
-normalized `CredentialDefect` observations: the shared domain owns their vocabulary,
-the credentials game derives them from the manager plus mediated findings, and the
-three checkpoint dispositions fold that one result. Renderers consume those defects
-rather than independently interpreting document status.
-Expression narrative beyond that first skin seam, contraband graph identity, and
-document-identity receipts remain future slices.
+**Status:** LANDED RETROFIT RECORD. The current credential assembly, projection,
+media, and game-facing contract is summarized in `CREDENTIAL_MECHANIC.md`. This
+document preserves the reasoning and implementation sequence that produced it;
+prospective wording inside completed phase sections is historical unless the
+section explicitly names a remaining extension.
+
+The cutover now requires every runtime `CredentialCase` to own one graph-backed
+`CredentialPacketManager`. World-local catalogs and scenario types narrow the
+available definitions and policy; facet-backed moves, normalized
+`CredentialDefect` observations, presentation-safe text/card projections,
+presence-bound portraits, and JOURNAL media association all consume that same
+packet state. The flat case fields, packet protocol, game-layer manager, and
+enum compatibility module described by early phases are retired.
+
+Remaining extensions include richer response/consequence loops, cross-encounter
+custody and malfeasance, advanced presence-degradation mediation, and broader
+authored media alternatives. They are additions to the landed packet contract,
+not unfinished compatibility-cutover work.
 
 **Dependency:** the owner-bound manager and wardrobe transaction substrate provides the
 storage and offer semantics this retrofit relies on: `ComponentManager` stores
@@ -402,8 +387,8 @@ Acceptance:
 **Superseded by Phase 7.** The temporary optional-manager/flat-field bridge below
 is retained only as implementation history.
 
-Status: landed. `CredentialCase` can carry the new manager while retaining flat fields
-as compatibility inputs.
+Historical status: this bridge landed and was then removed by Phase 7. Current
+`CredentialCase` instances require the manager and have no flat compatibility inputs.
 
 Recommended temporary shape:
 
@@ -433,13 +418,13 @@ Acceptance:
 **Superseded by Phase 7.** Arrival materialization now creates the manager directly;
 there is no value-shaped case to convert or clear.
 
-Status: landed for sampled offers. Factory generation remains value-based and
-deterministic. A hosted game materializes its arriving offer into graph credential
-components and an owner-bound packet manager during setup or case advance; planning
-only reads that prepared manager. The source case clears its flat packet fields once
-the manager becomes authoritative. `HasGame.game_state` now persists through the
-normal `unstructure()` / `structure()` path, so the embedded manager and its component
-references survive graph restore.
+Historical status: this setup/update staging rule was superseded by the normal
+one-step-ahead VM frontier contract. Current setup prepares the active graph-owned
+case; the credentials PLANNING presentation hook prepares the current and sequential
+successor cases before their choices are shown. Inspection and JOURNAL rendering read
+that prepared state without materializing it. `HasGame.game_state` persists through
+the normal `unstructure()` / `structure()` path, so the embedded manager and its
+component references survive graph restore.
 
 Keep `build_valid()` and `degrade()` value-based initially. Convert their output into
 an owned packet manager at the committed case-arrival boundary, then migrate game-loop
@@ -451,8 +436,8 @@ Important rule: generation remains "start correct, then degrade."
 Acceptance:
 
 - sampled offers still materialize to their target disposition;
-- graph components are created and registered during setup or UPDATE, never on the
-  first PLANNING read;
+- graph components are prepared by setup or the explicit one-step-ahead PLANNING
+  presentation hook, never by inspection or JOURNAL rendering;
 - failure modes mutate credential components or packet membership, not parallel flat
   lists once the owned manager becomes authoritative;
 - narrative rendering reads packet/credential components through projection helpers.

@@ -12,7 +12,7 @@ contributions.
 
 .. rubric:: Related notes
 
-- :doc:`../../notes/audits/core38-doc-audit`
+- :doc:`Historical core38 audit <../../notes/audits/core38-doc-audit>`
 
 Core concept types
 ------------------

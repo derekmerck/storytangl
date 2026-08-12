@@ -8,8 +8,15 @@
 ```
 
 **Document Version:** 1.0
-**Status:** DESIGN — the bridge spec that routes the assembly/component work
-*through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of beside it.
+**Status:** IMPLEMENTED FOUNDATION + ACTIVE EXTENSIONS — owner-bound component
+managers, connector association, transaction integration, outfit/wardrobe,
+vehicle, and credential-packet consumers are landed. The broader facet and
+body-attachment generalizations remain design guidance rather than a second
+runtime mechanism.
+
+The original design revisions below record how the assembly/component work was
+routed *through* the facet generalization (`MU_AFFORDANCES.md` v0.3) instead of
+beside it.
 *v0.2: facet discriminator split into `channel` (relevance) + `facet_type`
 (giver/changer/hider); trinary mapped onto the open-link duality. v0.3: evaluation
 order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with the
@@ -67,9 +74,10 @@ mutates something else. A vehicle garage proof uses component assignment as one
 commitment inside a multi-leg offer, while the manager still owns slot legality
 and persisted identity.
 
-Follow-up retrofit targets remain open: credential packets, domain vehicle managers
-such as CarWars adapters, robot assemblies, and any world-specific full-graph outfit
-manager such as a future `SharedOutfit` / `FashionShowActor` demo.
+The credential packet retrofit is now a landed proof consumer. Remaining extension
+targets include domain vehicle managers such as CarWars adapters, robot assemblies,
+and any world-specific full-graph outfit manager such as a future `SharedOutfit` /
+`FashionShowActor` demo.
 
 ---
 

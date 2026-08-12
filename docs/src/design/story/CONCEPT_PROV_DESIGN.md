@@ -3,7 +3,11 @@ Concept Provisioning Design
 
 **Document Version:** 2.1
 **Last Updated:** December 2025
-**Status:** ✅ IMPLEMENTATION COMPLETE
+**Status:** HISTORICAL DESIGN RECORD — this document captures the December 2025
+provisioning model and uses retired names such as `GraphProvisioner`, fixed
+`ProvisionCost` values, and planning receipts. It is not the current runtime
+contract. See [Provisioning Pipeline](../planning/PROVISIONING.md) and
+[Open Links](../planning/AFFORDANCE_MODEL.md).
 
 ## Core Philosophy
 
@@ -1529,9 +1533,10 @@ templates:
 
 ---
 
-## Implementation Status
+Historical Implementation Snapshot
+----------------------------------
 
-### All Core Features: ✅ COMPLETE
+**Features reported complete in the December 2025 model**
 
 Verified implementations:
 - Template registry with scope filtering
@@ -1541,13 +1546,14 @@ Verified implementations:
 - World._wire_roles() and ._wire_settings() functional
 - Test coverage in test_world_materialization.py
 
-Current runtime behavior wires role and setting edges with attached requirements, leaving
-all provisioning to the planning phase:
+The December 2025 implementation wired role and setting edges with attached
+requirements, leaving provisioning to its planning phase:
 
-- GraphProvisioner binds existing affordances that satisfy the requirement.
-- TemplateProvisioner materializes nodes from templates when no affordance is available.
+- `GraphProvisioner` bound existing affordances that satisfied the requirement.
+- `TemplateProvisioner` materialized nodes from templates when no affordance was
+  available.
 
-World creation does not pre-link destinations. The compiler remains lean and the virtual
-machine owns provisioning. A future optimization could add a `pre_plan=True` flag on the
-VM to pre-run planning for faster traversal; this would remain outside the World
-builder.
+In that model, world creation did not pre-link destinations and the VM owned
+provisioning. This is a historical implementation snapshot, not current
+authority. See [Provisioning Pipeline](../planning/PROVISIONING.md) for the
+active contract.

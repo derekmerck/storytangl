@@ -22,9 +22,9 @@ current pipeline.
 The pipeline phases in causal order:
 
 - **VALIDATE** — is the movement legal? (all_true)
-- **PLANNING** — provision this node + frontier for availability (gather)
+- **PLANNING** — provision this node + frontier in place (handlers return `None`)
 - **PREREQS** — auto-redirect? container descent? (first_result → edge)
-- **UPDATE** — mutate state for arrival (gather)
+- **UPDATE** — mutate state for arrival in place (handlers return `None`)
 - **JOURNAL** — emit content fragments (merge all handler contributions)
 - **FINALIZE** — commit step record, emit patch (last_result → patch)
 - **POSTREQS** — continuation redirect? (first_result → edge)

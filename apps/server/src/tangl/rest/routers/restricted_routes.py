@@ -6,13 +6,11 @@ from fastapi import Body, Depends, Header, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from tangl.config import settings
 from tangl.rest.dependencies_gateway import (
     get_user_locks,
     resolve_user_auth,
 )
 from tangl.type_hints import UniqueLabel
-from tangl.utils.hash_secret import key_for_secret
 
 from .story_router import router as story_router
 from .system_router import router as system_router
@@ -40,11 +38,11 @@ def _not_implemented_response(endpoint_name: str) -> JSONResponse:
 async def goto_story_block(
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        example=key_for_secret(settings.client.secret),
+        examples=["example-api-key"],
         default=None,
         alias="X-API-Key",
     ),
-    block_id: UniqueLabel = Query(example="scene_1/block_1"),
+    block_id: UniqueLabel = Query(examples=["scene_1/block_1"]),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Jump the active frame to ``block_id``."""
@@ -58,7 +56,7 @@ async def goto_story_block(
 async def inspect_story_node(
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        example=key_for_secret(settings.client.secret),
+        examples=["example-api-key"],
         default=None,
         alias="X-API-Key",
     ),
@@ -80,7 +78,7 @@ async def check_expression(
     request: DebugExprRequest = Body(...),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        example=key_for_secret(settings.client.secret),
+        examples=["example-api-key"],
         default=None,
         alias="X-API-Key",
     ),
@@ -98,7 +96,7 @@ async def apply_effect_post(
     request: DebugExprRequest = Body(...),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        example=key_for_secret(settings.client.secret),
+        examples=["example-api-key"],
         default=None,
         alias="X-API-Key",
     ),
@@ -116,7 +114,7 @@ async def apply_effect_put(
     request: DebugExprRequest = Body(...),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
-        example=key_for_secret(settings.client.secret),
+        examples=["example-api-key"],
         default=None,
         alias="X-API-Key",
     ),

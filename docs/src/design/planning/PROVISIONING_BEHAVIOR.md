@@ -1,5 +1,10 @@
 # Provisioning Behavior for Authors
 
+> **Historical guidance.** This note documents the retired fixed-cost,
+> `GraphProvisioner`, and planning-receipt model. It is retained as migration
+> context, not current authoring guidance. See [PROVISIONING.md](PROVISIONING.md)
+> and [AFFORDANCE_MODEL.md](AFFORDANCE_MODEL.md) for the live contract.
+
 ## Why it Matters
 When you reference actors or locations from scripts, the VM has to decide whether to reuse an
 existing entity or create a new one. Understanding that decision helps you predict narrative

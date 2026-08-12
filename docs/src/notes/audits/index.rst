@@ -1,7 +1,9 @@
 Audit Notes
 ===========
 
-Documentation audits and gap reviews used to drive targeted cleanup work.
+Historical documentation audits and gap reviews retained as migration evidence.
+They do not define the current public contract; use the API and design sections
+for current authority.
 
 .. toctree::
    :maxdepth: 1

@@ -12,7 +12,7 @@ Traversable node and edge types that define the story cursor vocabulary.
 
 .. rubric:: Related notes
 
-- :doc:`../../notes/migration/v38-parity-matrix`
+- :doc:`Historical v38 parity matrix <../../notes/migration/v38-parity-matrix>`
 
 Episode nodes
 -------------

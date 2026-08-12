@@ -1,5 +1,12 @@
 # Journal Compose Contract
 
+```{storytangl-topic}
+:topics: journal
+:facets: overview, design
+:relation: defines
+:related: prose, media, widget, observation
+```
+
 > Status: Current contract
 > Authority: This note defines the current `compose_journal` contract alongside `engine/src/tangl/vm/dispatch.py` and `engine/src/tangl/journal/fragments.py`.
 
