@@ -37,7 +37,7 @@ use these terms, they mean *exactly* what's defined here.
 |------|----------|------------|----------------|
 | **Fabula** | possibility space | The complete graph of events, characters, and relationships — all possible stories | `StoryGraph` after compilation |
 | **Episodic process** | execution | Cursor-driven traversal that collapses fabula into a specific story | `Frame.follow_edge()` pipeline |
-| **Syuzhet** | output trace | The linear journal of content fragments as experienced by the reader | `Journal` / `OrderedRegistry` |
+| **Syuzhet** | output trace | The linear journal of content fragments as experienced by the reader | `OrderedRegistry` of `BaseFragment` (`tangl.journal`) — there is no `Journal` class |
 | **Block** | instruction | Traversable structural node that generates content when visited | `story.episode.Block` |
 | **Scene** | function | Structural subgraph containing blocks, with local roles and settings | `story.episode.Scene` |
 | **Action** | branch | Traversable edge representing a player choice between blocks | `story.episode.Action` |
@@ -75,7 +75,7 @@ use these terms, they mean *exactly* what's defined here.
 
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
-| **Requirement** | package.json line | Declarative specification of what a dependency edge needs | `ProvisionRequirement` |
+| **Requirement** | package.json line | Declarative specification of what a dependency edge needs | `Requirement` (`vm.provision.requirement`) — is-a `Selector` |
 | **Offer** | candidate package | A proposed binding that could satisfy a requirement | `ProvisionOffer` |
 | **Resolver** | package manager | Walks open dependencies, gathers offers, selects bindings by policy | `vm.provision.Resolver` |
 | **Provisioner** | provider strategy | Concrete strategy for generating offers (find, create, template, clone) | `FindProvisioner`, `TemplateProvisioner`, etc. |
@@ -135,7 +135,7 @@ that distinction.
 | **Layer** | precedence band | Conventional ownership altitude and execution order — the first key of `Behavior.sort_key`. Confers no visibility. Ladder: GLOBAL < SYSTEM < APPLICATION < AUTHOR < USER < LOCAL | `DispatchLayer` enum (`core.behavior`) |
 | **Authority chain** | visibility scope | Which registries are in play for a call — assembled by `chain_execute_all` from explicit args, `ctx.get_authorities()` (graph → world), then inline. **This** is what scopes a handler | `BehaviorRegistry.chain_execute_all`, `World.get_authorities()` |
 | **Fold** (aggregation) | reduction strategy | How the receipts of a task reduce to one result. Chosen **per task at the `do_*` site**, not by the handlers. Decides *who wins* — see below | `CallReceipt.first_result` / `last_result` / `all_true` / `gather_results` / `merge_results`; `AggregationMode` enum names them |
-| **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `JobReceipt` |
+| **Receipt** | audit record | Record of what a handler did: blame_id, result, timing | `CallReceipt` (`core.behavior`) |
 | **on_* / do_*** | event / handler | Hook pair: `on_*` fires registered behaviors; `do_*` is the task implementation | `dispatch.py` in each layer |
 
 ### Layers order; registries scope; folds decide
@@ -256,7 +256,7 @@ import, and worlds choose which to import — see
 | **Choice fragment** | menu item | Available action with caption, availability status, and blocker diagnostics | `ChoiceFragment` |
 | **Media fragment** | asset reference | Pointer to media content (image, audio) with staging hints | `MediaFragment` |
 | **Journal** | narrative log | Ordered sequence of fragments constituting the syuzhet so far | `OrderedRegistry` |
-| **RIT** | inventory tag | Resource Inventory Tag — content-addressed reference to a media asset | `MediaRIT` |
+| **RIT** | inventory tag | Resource Inventory Tag — content-addressed reference to a media asset | `MediaResourceInventoryTag` (`media.media_resource`), often imported as `MediaRIT` |
 | **Render profile** | Accept header | Client capability declaration guiding fragment → presentation transformation | Service-layer configuration |
 | **Staging hints** | CSS-like metadata | Rendering suggestions (orientation, placement, z-index) for media fragments | `StagingHints` |
 
@@ -273,7 +273,7 @@ import, and worlds choose which to import — see
 | **World** | source distribution | Singleton factory holding scripts, templates, and handlers for a story domain | `story.World` |
 | **Script** | source code | YAML (or other format) defining structural and conceptual content | Authored `.yaml` files |
 | **Compiler** | front-end | Transforms scripts into a world bundle (graph template + registries) | `StoryCompiler` |
-| **Materializer** | linker | Instantiates a live story graph from a compiled world bundle | `Materializer` |
+| **Materializer** | linker | Instantiates a live story graph from a compiled world bundle | `StoryMaterializer` (`story.fabula.materializer`) |
 | **Template** | class definition | Prototype data for creating new node instances during provisioning | Template registries |
 | **Vocabulary bank** | word list | Themed word/phrase collections for procedural prose generation | Namespace contributors |
 
@@ -283,7 +283,7 @@ import, and worlds choose which to import — see
 |------|----------|------------|----------------|
 | **Singleton** | immutable constant | Named, immutable entity serializable by reference | `core.singleton.Singleton` |
 | **Token** | wrapped constant | Graph-attachable wrapper adding mutable instance state to a singleton | `core.singleton.Token` |
-| **Domain** | library / plugin | Named scope contributing variables, handlers, and templates | `core.domain.Domain` |
+| **Domain** | library / plugin | Named scope contributing variables, handlers, and templates. **A module, not a class** — the bundle manifest names `domain_module`, and registration happens on import | `WorldCompiler.load_domain_module` (`loaders.compiler`); no `Domain` type exists |
 | **Scope layer** | stack frame | Local `get_ns()` maps plus gather-time overlays contributed by a domain or subgraph | Namespace assembly during `do_gather_ns` |
 | **Source / Sink** | entry / exit | Dominator and post-dominator nodes of a subgraph scope | Subgraph structural properties |
 
