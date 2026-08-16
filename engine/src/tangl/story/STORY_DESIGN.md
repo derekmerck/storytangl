@@ -116,6 +116,13 @@ side effect of ordinary concept mutation.
 - entry-template references
 - compile issues and source/codec metadata
 
+World bundles select their source codec in `world.yaml`. Before decode, the
+compiler imports the bundle's trusted domain module once; that module may expose
+`get_story_codecs()` to contribute codecs for that bundle only. The local
+contributions overlay the application's built-in registry without changing it,
+then lower their private source representation directly to cardinal story data.
+The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
+
 That compiled bundle is a build-time artifact. `WorldBuilder` copies the
 surviving fields onto `World` and wires in adjunct resources such as:
 
