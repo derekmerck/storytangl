@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import Enum
 from importlib import import_module
+from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from tangl.core import Entity, EntityTemplate, Selector, TemplateRegistry
 from tangl.core.template import TemplateGroup
@@ -327,6 +331,62 @@ def _coerce_text(value: Any) -> str | None:
     return text or None
 
 
+def _template_mapping_key(
+    template: EntityTemplate,
+    *,
+    parent: TemplateGroup | None = None,
+) -> str:
+    """Return the authored mapping key represented by one template label."""
+
+    label = template.get_label()
+    if parent is None:
+        return label
+    prefix = f"{parent.get_label()}."
+    if not label.startswith(prefix):
+        raise ValueError(f"Template {label!r} is not scoped beneath {parent.get_label()!r}")
+    return label.removeprefix(prefix)
+
+
+def _insert_decompiled_template(
+    templates: dict[str, dict[str, Any]],
+    *,
+    key: str,
+    data: dict[str, Any],
+) -> None:
+    """Insert one emitted template while preserving distinct compiled identities."""
+
+    if key in templates:
+        raise ValueError(f"Cannot decompile templates with duplicate key {key!r}")
+    templates[key] = data
+
+
+def _decompile_source_value(value: Any) -> Any:
+    """Convert decompiled constructor-form values into portable source values."""
+
+    if isinstance(value, type):
+        return f"{value.__module__}.{value.__qualname__}"
+    if isinstance(value, Enum):
+        return _decompile_source_value(value.value)
+    if isinstance(value, UUID | Path):
+        return str(value)
+    if isinstance(value, Mapping):
+        normalized: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_key = str(key)
+            if normalized_key in normalized:
+                raise ValueError(
+                    f"Cannot decompile mapping with colliding key {normalized_key!r}",
+                )
+            normalized[normalized_key] = _decompile_source_value(item)
+        return dict(sorted(normalized.items()))
+    if isinstance(value, list | tuple):
+        return [_decompile_source_value(item) for item in value]
+    if isinstance(value, set | frozenset):
+        items = [_decompile_source_value(item) for item in value]
+        return sorted(items, key=repr)
+    return value
+
+
 @dataclass(slots=True)
 class StoryTemplateBundle:
     """StoryTemplateBundle()
@@ -396,6 +456,7 @@ class StoryCompiler:
     API
     ---
     - :meth:`compile` is the supported public entry point.
+    - :meth:`decompile` projects a compiled bundle into cardinal story data.
     """
 
     @staticmethod
@@ -649,6 +710,100 @@ class StoryCompiler:
             codec_id=codec_id,
         )
 
+    def decompile(self, bundle: StoryTemplateBundle) -> dict[str, Any]:
+        """Project compiled templates into deterministic cardinal story data.
+
+        This canonical authoring form deliberately preserves story semantics,
+        not original source-file placement or section sugar. Codecs may encode
+        the returned mapping into their own source formats later.
+        """
+
+        root = next(
+            template
+            for template in bundle.template_registry.values()
+            if isinstance(template, TemplateGroup) and template.parent is None
+        )
+        metadata = _decompile_source_value(bundle.metadata)
+        if bundle.entry_template_ids and "start_at" not in metadata:
+            metadata["start_at"] = (
+                bundle.entry_template_ids[0]
+                if len(bundle.entry_template_ids) == 1
+                else list(bundle.entry_template_ids)
+            )
+
+        data: dict[str, Any] = {
+            "label": root.payload.get_label(),
+            "metadata": metadata,
+        }
+        if bundle.locals:
+            data["globals"] = _decompile_source_value(bundle.locals)
+
+        actors: dict[str, dict[str, Any]] = {}
+        locations: dict[str, dict[str, Any]] = {}
+        scenes: dict[str, dict[str, Any]] = {}
+        templates: dict[str, dict[str, Any]] = {}
+        for child in root.members():
+            child_data = self._decompile_template(child)
+            child_key = _template_mapping_key(child)
+            if isinstance(child.payload, Actor):
+                _insert_decompiled_template(actors, key=child_key, data=child_data)
+            elif isinstance(child.payload, Location):
+                _insert_decompiled_template(locations, key=child_key, data=child_data)
+            elif isinstance(child.payload, Scene):
+                _insert_decompiled_template(
+                    scenes,
+                    key=child_key,
+                    data=self._decompile_scene(child, child_data),
+                )
+            else:
+                _insert_decompiled_template(templates, key=child_key, data=child_data)
+
+        if templates:
+            data["templates"] = templates
+        if actors:
+            data["actors"] = actors
+        if locations:
+            data["locations"] = locations
+        if scenes:
+            data["scenes"] = scenes
+        return data
+
+    def _decompile_scene(
+        self,
+        scene: TemplateGroup,
+        scene_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        scene_data.pop("templates", None)
+        blocks: dict[str, dict[str, Any]] = {}
+        templates: dict[str, dict[str, Any]] = {}
+        for child in scene.members():
+            child_data = self._decompile_template(child)
+            child_key = _template_mapping_key(child, parent=scene)
+            if isinstance(child.payload, Block):
+                _insert_decompiled_template(blocks, key=child_key, data=child_data)
+            else:
+                _insert_decompiled_template(templates, key=child_key, data=child_data)
+        if blocks:
+            scene_data["blocks"] = blocks
+        if templates:
+            scene_data["templates"] = templates
+        return scene_data
+
+    def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
+        data = _decompile_source_value(EntityTemplate.decompile(template))
+        if isinstance(template, TemplateGroup):
+            children = list(template.members())
+            if children:
+                templates: dict[str, dict[str, Any]] = {}
+                for child in children:
+                    _insert_decompiled_template(
+                        templates,
+                        key=_template_mapping_key(child, parent=template),
+                        data=self._decompile_template(child),
+                    )
+                data["templates"] = templates
+        return data
+
     def _compile_section(
         self,
         *,
@@ -764,8 +919,11 @@ class StoryCompiler:
         normalized: list[dict[str, Any]] = []
         for spec in specs:
             payload = dict(spec)
-            authored = payload.get("authored_successor_ref")
-            if not (isinstance(authored, str) and authored):
+            inferred = payload.get("successor_is_inferred") is True
+            authored = None if inferred else payload.get("authored_successor_ref")
+            if inferred:
+                payload.pop("authored_successor_ref", None)
+            elif not (isinstance(authored, str) and authored):
                 authored = payload.get("successor_ref")
                 if authored is None:
                     authored = (
