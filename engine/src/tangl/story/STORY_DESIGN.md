@@ -123,6 +123,11 @@ contributions overlay the application's built-in registry without changing it,
 then lower their private source representation directly to cardinal story data.
 The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
 
+`StoryCompiler.decompile()` is the inverse semantic projection: it recovers a
+portable, deterministic cardinal mapping from a compiled template bundle for a
+later codec to encode. It canonicalizes hierarchy and payload kinds rather than
+recreating original file placement, section sugar, or diagnostic provenance.
+
 That compiled bundle is a build-time artifact. `WorldBuilder` copies the
 surviving fields onto `World` and wires in adjunct resources such as:
 

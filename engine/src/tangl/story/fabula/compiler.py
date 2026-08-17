@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import Enum
 from importlib import import_module
+from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from tangl.core import Entity, EntityTemplate, Selector, TemplateRegistry
 from tangl.core.template import TemplateGroup
@@ -327,6 +331,34 @@ def _coerce_text(value: Any) -> str | None:
     return text or None
 
 
+def _template_payload_label(template: EntityTemplate) -> str:
+    """Return the payload label used as a canonical authored mapping key."""
+
+    return str(template.payload.get_label())
+
+
+def _decompile_source_value(value: Any) -> Any:
+    """Convert decompiled constructor-form values into portable source values."""
+
+    if isinstance(value, type):
+        return f"{value.__module__}.{value.__qualname__}"
+    if isinstance(value, Enum):
+        return _decompile_source_value(value.value)
+    if isinstance(value, UUID | Path):
+        return str(value)
+    if isinstance(value, Mapping):
+        return {
+            str(key): _decompile_source_value(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    if isinstance(value, list | tuple):
+        return [_decompile_source_value(item) for item in value]
+    if isinstance(value, set | frozenset):
+        items = [_decompile_source_value(item) for item in value]
+        return sorted(items, key=repr)
+    return value
+
+
 @dataclass(slots=True)
 class StoryTemplateBundle:
     """StoryTemplateBundle()
@@ -396,6 +428,7 @@ class StoryCompiler:
     API
     ---
     - :meth:`compile` is the supported public entry point.
+    - :meth:`decompile` projects a compiled bundle into cardinal story data.
     """
 
     @staticmethod
@@ -649,6 +682,92 @@ class StoryCompiler:
             codec_id=codec_id,
         )
 
+    def decompile(self, bundle: StoryTemplateBundle) -> dict[str, Any]:
+        """Project compiled templates into deterministic cardinal story data.
+
+        This canonical authoring form deliberately preserves story semantics,
+        not original source-file placement or section sugar. Codecs may encode
+        the returned mapping into their own source formats later.
+        """
+
+        root = next(
+            template
+            for template in bundle.template_registry.values()
+            if isinstance(template, TemplateGroup) and template.parent is None
+        )
+        metadata = _decompile_source_value(bundle.metadata)
+        if bundle.entry_template_ids and "start_at" not in metadata:
+            metadata["start_at"] = (
+                bundle.entry_template_ids[0]
+                if len(bundle.entry_template_ids) == 1
+                else list(bundle.entry_template_ids)
+            )
+
+        data: dict[str, Any] = {
+            "label": _template_payload_label(root),
+            "metadata": metadata,
+        }
+        if bundle.locals:
+            data["globals"] = _decompile_source_value(bundle.locals)
+
+        actors: dict[str, dict[str, Any]] = {}
+        locations: dict[str, dict[str, Any]] = {}
+        scenes: dict[str, dict[str, Any]] = {}
+        templates: dict[str, dict[str, Any]] = {}
+        for child in root.members():
+            child_data = self._decompile_template(child)
+            child_label = _template_payload_label(child)
+            if isinstance(child.payload, Actor):
+                actors[child_label] = child_data
+            elif isinstance(child.payload, Location):
+                locations[child_label] = child_data
+            elif isinstance(child.payload, Scene):
+                scenes[child_label] = self._decompile_scene(child, child_data)
+            else:
+                templates[child_label] = child_data
+
+        if templates:
+            data["templates"] = templates
+        if actors:
+            data["actors"] = actors
+        if locations:
+            data["locations"] = locations
+        if scenes:
+            data["scenes"] = scenes
+        return data
+
+    def _decompile_scene(
+        self,
+        scene: TemplateGroup,
+        scene_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        scene_data.pop("templates", None)
+        blocks: dict[str, dict[str, Any]] = {}
+        templates: dict[str, dict[str, Any]] = {}
+        for child in scene.members():
+            child_data = self._decompile_template(child)
+            child_label = _template_payload_label(child)
+            if isinstance(child.payload, Block):
+                blocks[child_label] = child_data
+            else:
+                templates[child_label] = child_data
+        if blocks:
+            scene_data["blocks"] = blocks
+        if templates:
+            scene_data["templates"] = templates
+        return scene_data
+
+    def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
+        data = _decompile_source_value(EntityTemplate.decompile(template))
+        if isinstance(template, TemplateGroup):
+            children = list(template.members())
+            if children:
+                data["templates"] = {
+                    _template_payload_label(child): self._decompile_template(child)
+                    for child in children
+                }
+        return data
+
     def _compile_section(
         self,
         *,
@@ -764,8 +883,11 @@ class StoryCompiler:
         normalized: list[dict[str, Any]] = []
         for spec in specs:
             payload = dict(spec)
-            authored = payload.get("authored_successor_ref")
-            if not (isinstance(authored, str) and authored):
+            inferred = payload.get("successor_is_inferred") is True
+            authored = None if inferred else payload.get("authored_successor_ref")
+            if inferred:
+                payload.pop("authored_successor_ref", None)
+            elif not (isinstance(authored, str) and authored):
                 authored = payload.get("successor_ref")
                 if authored is None:
                     authored = (

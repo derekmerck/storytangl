@@ -63,6 +63,7 @@ def _write_codec_bundle(
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from tangl.loaders import DecodeResult, LossKind, LossRecord, WorldBundle
 
@@ -104,9 +105,9 @@ class LocalCodec:
         self,
         *,
         bundle: WorldBundle,
-        runtime_data: dict,
+        runtime_data: dict[str, Any],
         story_key: str | None,
-        codec_state: dict | None = None,
+        codec_state: dict[str, Any] | None = None,
     ) -> dict[str, str]:
         _ = bundle, runtime_data, story_key, codec_state
         raise NotImplementedError
