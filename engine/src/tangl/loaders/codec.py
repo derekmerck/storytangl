@@ -156,11 +156,11 @@ class NearNativeYamlCodec:
     ) -> dict[str, str]:
         script_paths = (codec_state or {}).get("script_paths")
         if script_paths:
-            target = Path(script_paths[0])
+            target = Path(script_paths[0]).resolve()
             try:
-                rel_path = str(target.relative_to(bundle.bundle_root))
+                rel_path = target.relative_to(bundle.bundle_root.resolve()).as_posix()
             except ValueError:
-                rel_path = target.name or "script.yaml"
+                rel_path = "script.yaml"
         else:
             rel_path = "script.yaml"
         content = yaml.safe_dump(runtime_data, sort_keys=False, allow_unicode=True)

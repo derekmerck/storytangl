@@ -5,6 +5,7 @@ import sys
 from typing import Any, Callable
 
 from tangl.story.fabula import StoryCompiler, World, WorldBuilder
+from tangl.story.fabula.compiler import StoryTemplateBundle
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult, StoryCodec
@@ -225,15 +226,43 @@ class WorldCompiler:
 
         return worlds
 
+    def encode(
+        self,
+        bundle: WorldBundle,
+        story_bundle: StoryTemplateBundle,
+        story_key: str | None = None,
+    ) -> dict[str, str]:
+        """Encode one compiled story bundle without writing source files."""
+
+        domain_adjuncts = self._load_domain_adjuncts(bundle)
+        local_codecs = domain_adjuncts.story_codecs if domain_adjuncts is not None else {}
+        manifest_codec = self._resolve_story_codec(
+            bundle.get_story_codec(story_key),
+            local_codecs=local_codecs,
+        )
+        codec = self._resolve_story_codec(
+            story_bundle.codec_id or bundle.get_story_codec(story_key),
+            local_codecs=local_codecs,
+        )
+        if story_bundle.codec_id is not None and codec.codec_id != manifest_codec.codec_id:
+            raise ValueError(
+                "Compiled story codec "
+                f"{story_bundle.codec_id!r} disagrees with manifest codec "
+                f"{bundle.get_story_codec(story_key)!r}",
+            )
+
+        return codec.encode(
+            bundle=bundle,
+            runtime_data=self.story_compiler.decompile(story_bundle),
+            story_key=story_key,
+            codec_state=story_bundle.codec_state,
+        )
+
     def _build_world_facets(
         self,
         bundle: WorldBundle,
     ) -> tuple[Any | None, Any | None, Any]:
-        domain_facet: Any | None = None
-        domain_module = self._get_domain_module(bundle)
-        if domain_module:
-            domain_facet = _WorldDomainAdjuncts()
-            self.domain_compiler.load_into(domain_module, domain_facet)
+        domain_facet = self._load_domain_adjuncts(bundle)
 
         assets_facet = _WorldAssetsFacet()
         self.asset_compiler.load_into(
@@ -248,6 +277,14 @@ class WorldCompiler:
         )
         return domain_facet, assets_facet, resources_facet
 
+    def _load_domain_adjuncts(self, bundle: WorldBundle) -> _WorldDomainAdjuncts | None:
+        domain_module = self._get_domain_module(bundle)
+        if domain_module is None:
+            return None
+        domain_adjuncts = _WorldDomainAdjuncts()
+        self.domain_compiler.load_into(domain_module, domain_adjuncts)
+        return domain_adjuncts
+
     def _decode_story_data(
         self,
         *,
@@ -259,11 +296,17 @@ class WorldCompiler:
 
         script_paths = bundle.get_script_paths(story_key)
         codec_id = bundle.get_story_codec(story_key)
-        codec = (local_codecs or {}).get(codec_id)
-        if codec is None:
-            codec = self.codec_registry.get(codec_id)
+        codec = self._resolve_story_codec(codec_id, local_codecs=local_codecs)
 
         return codec.decode(bundle=bundle, script_paths=script_paths, story_key=story_key)
+
+    def _resolve_story_codec(
+        self,
+        codec_id: str,
+        *,
+        local_codecs: dict[str, StoryCodec] | None = None,
+    ) -> StoryCodec:
+        return (local_codecs or {}).get(codec_id) or self.codec_registry.get(codec_id)
 
     @staticmethod
     def _propagate_loss_records(decode_result: DecodeResult) -> None:

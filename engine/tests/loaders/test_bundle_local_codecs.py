@@ -109,8 +109,8 @@ class LocalCodec:
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
     ) -> dict[str, str]:
-        _ = bundle, runtime_data, story_key, codec_state
-        raise NotImplementedError
+        _ = bundle, story_key, codec_state
+        return {{"local.story": runtime_data["label"]}}
 
 
 def get_story_codecs() -> dict[str, LocalCodec]:
@@ -176,3 +176,12 @@ def test_anthology_reuses_one_domain_codec_contribution(tmp_path: Path) -> None:
     assert anthology["first"].metadata["title"] == "anthology:first"
     assert anthology["second"].metadata["title"] == "anthology:second"
     assert domain_module.CODEC_CONTRIBUTION_CALLS == 1
+
+
+def test_world_compiler_encodes_with_bundle_local_codec(tmp_path: Path) -> None:
+    _write_codec_bundle(tmp_path, label="local_encode", variant="encode")
+    bundle = WorldRegistry([tmp_path]).bundles["local_encode"]
+    compiler = WorldCompiler()
+    world = compiler.compile(bundle)
+
+    assert compiler.encode(bundle, world.bundle) == {"local.story": "local_encode"}
