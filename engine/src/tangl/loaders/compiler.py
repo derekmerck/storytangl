@@ -7,8 +7,8 @@ from typing import Any, Callable
 from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 
 from .bundle import WorldBundle
-from .codec import CodecRegistry, DecodeResult
-from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
+from .codec import CodecRegistry, DecodeResult, StoryCodec
+from .compilers import AssetCompiler, DomainCompiler, MediaCompiler
 
 
 class _WorldDomainAdjuncts:
@@ -22,6 +22,7 @@ class _WorldDomainAdjuncts:
         self._story_info_projector_factories: list[Callable[[], Any]] = []
         self.modules: list[Any] = []
         self.class_registry: dict[str, Any] = {}
+        self.story_codecs: dict[str, StoryCodec] = {}
 
     def load_domain_module(self, domain_module: str) -> None:
         module = importlib.import_module(domain_module)
@@ -36,6 +37,10 @@ class _WorldDomainAdjuncts:
         get_story_info_projector = getattr(module, "get_story_info_projector", None)
         if callable(get_story_info_projector):
             self._story_info_projector_factories.append(get_story_info_projector)
+
+        get_story_codecs = getattr(module, "get_story_codecs", None)
+        if callable(get_story_codecs):
+            self.story_codecs.update(get_story_codecs())
 
         try:
             from tangl.core import Entity
@@ -76,14 +81,12 @@ class WorldCompiler:
 
     def __init__(
         self,
-        script_compiler: ScriptCompiler | None = None,
         asset_compiler: AssetCompiler | None = None,
         domain_compiler: DomainCompiler | None = None,
         media_compiler: MediaCompiler | None = None,
         story_compiler: StoryCompiler | None = None,
         codec_registry: CodecRegistry | None = None,
     ) -> None:
-        self.script_compiler = script_compiler or ScriptCompiler()
         self.asset_compiler = asset_compiler or AssetCompiler()
         self.domain_compiler = domain_compiler or DomainCompiler()
         self.media_compiler = media_compiler or MediaCompiler()
@@ -97,7 +100,12 @@ class WorldCompiler:
     ) -> World:
         base_metadata = bundle.manifest.metadata.copy()
 
-        decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+        domain_adjuncts, assets_facet, resources_facet = self._build_world_facets(bundle)
+        decode_result = self._decode_story_data(
+            bundle=bundle,
+            story_key=story_key,
+            local_codecs=domain_adjuncts.story_codecs if domain_adjuncts is not None else {},
+        )
         self._propagate_loss_records(decode_result)
         script_data = decode_result.story_data
         codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
@@ -115,7 +123,6 @@ class WorldCompiler:
             default_title = bundle.manifest.story_label(story_key)
         script_metadata.setdefault("title", default_title)
 
-        domain_adjuncts, assets_facet, resources_facet = self._build_world_facets(bundle)
         story_bundle = self.story_compiler.compile(
             script_data,
             source_map=decode_result.source_map,
@@ -155,7 +162,15 @@ class WorldCompiler:
 
         worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
-            decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+            decode_result = self._decode_story_data(
+                bundle=bundle,
+                story_key=story_key,
+                local_codecs=(
+                    world_domain_adjuncts.story_codecs
+                    if world_domain_adjuncts is not None
+                    else {}
+                ),
+            )
             self._propagate_loss_records(decode_result)
             script_data = decode_result.story_data
             codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
@@ -238,65 +253,15 @@ class WorldCompiler:
         *,
         bundle: WorldBundle,
         story_key: str | None,
+        local_codecs: dict[str, StoryCodec] | None = None,
     ) -> DecodeResult:
-        """Decode source files into runtime-ready script data.
-
-        Notes
-        -----
-        During migration we preserve an escape hatch for custom script compilers
-        that expose ``load_from_path``. This keeps research bundles usable while
-        codecs are being ported to the new explicit interface.
-        """
+        """Decode source files into runtime-ready script data."""
 
         script_paths = bundle.get_script_paths(story_key)
         codec_id = bundle.get_story_codec(story_key)
-        if hasattr(self.script_compiler, "load_from_path") and not bundle.manifest.is_story_codec_explicit(story_key):
-            merged: dict[str, Any] = {}
-            for script_path in script_paths:
-                loaded = self.script_compiler.load_from_path(script_path)
-                if not isinstance(loaded, dict):
-                    msg = f"Custom script compiler returned non-mapping for {script_path}"
-                    raise ValueError(msg)
-                merged |= loaded
-            return DecodeResult(
-                story_data=merged,
-                source_map={"__source_files__": []},
-                codec_state={
-                    "codec_id": "script_compiler_bridge",
-                    "script_paths": [str(path) for path in script_paths],
-                    "story_key": story_key,
-                },
-                warnings=[
-                    "Using legacy script compiler loading bridge; "
-                    "set manifest codec explicitly to disable this fallback."
-                ],
-            )
-
-        try:
+        codec = (local_codecs or {}).get(codec_id)
+        if codec is None:
             codec = self.codec_registry.get(codec_id)
-        except ValueError:
-            if hasattr(self.script_compiler, "load_from_path"):
-                merged: dict[str, Any] = {}
-                for script_path in script_paths:
-                    loaded = self.script_compiler.load_from_path(script_path)
-                    if not isinstance(loaded, dict):
-                        msg = f"Custom script compiler returned non-mapping for {script_path}"
-                        raise ValueError(msg)
-                    merged |= loaded
-                return DecodeResult(
-                    story_data=merged,
-                    source_map={"__source_files__": []},
-                    codec_state={
-                        "codec_id": "script_compiler_bridge",
-                        "script_paths": [str(path) for path in script_paths],
-                        "story_key": story_key,
-                    },
-                    warnings=[
-                        "Using legacy script compiler loading bridge; "
-                        "define a manifest codec for deterministic decode semantics."
-                    ],
-                )
-            raise
 
         return codec.decode(bundle=bundle, script_paths=script_paths, story_key=story_key)
 

@@ -10,7 +10,7 @@ from .codec import (
     SourceRef,
     StoryCodec,
 )
-from .compiler import WorldCompiler, ScriptCompiler
+from .compiler import WorldCompiler
 from .manifest import StorySourceSpec, UniqueLabel, WorldManifest
 
 __all__ = [
@@ -25,6 +25,5 @@ __all__ = [
     "NearNativeYamlCodec",
     "CodecRegistry",
     "WorldCompiler",
-    "ScriptCompiler",
     "WorldManifest",
 ]

@@ -173,7 +173,8 @@ class CodecRegistry:
     Notes
     -----
     The first pass only ships a near-native YAML codec. External codecs can be
-    registered by tooling or domain packages without changing loader internals.
+    registered by application tooling. World-domain codecs stay bundle-local and
+    overlay this registry only while their own bundle is compiled.
     """
 
     def __init__(self) -> None:

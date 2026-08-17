@@ -1,7 +1,9 @@
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 from tangl.rest.app import app
+from tangl.utils import shelved2
 
 # from tests.conftest import my_script_data
 # from tests.story.conftest import world
@@ -28,6 +30,14 @@ def world():
         metadata=script_manager.get_story_metadata(),
     )
 
+
+@pytest.fixture(autouse=True)
+def disable_shelved_cache_for_http_tests(monkeypatch: MonkeyPatch) -> None:
+    """Keep process-global SQLite shelves out of per-test ASGI portal threads."""
+
+    monkeypatch.setattr(shelved2, "SHELVED_CACHE_ENABLED", False)
+
+
 @pytest.fixture
-def client():
+def client() -> TestClient:
     return TestClient(app, base_url="http://test/api/v2/")
