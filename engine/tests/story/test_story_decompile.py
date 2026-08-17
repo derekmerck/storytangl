@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import yaml
+from pytest import raises
 
 from tangl.core import Selector
 from tangl.story import Actor, Block, Location
@@ -149,6 +150,57 @@ def test_decompile_makes_inferred_and_multiple_entries_explicit() -> None:
 
     assert inferred["metadata"]["start_at"] == "intro.start"
     assert multiple["metadata"]["start_at"] == ["intro.first", "intro.second"]
+
+
+def test_decompile_preserves_template_keys_separate_from_payload_labels() -> None:
+    source = {
+        "label": "keyed",
+        "metadata": {"start_at": "scene_key.block_key"},
+        "scenes": {
+            "scene_key": {
+                "label": "scene_payload",
+                "blocks": {
+                    "block_key": {
+                        "label": "block_payload",
+                        "actions": [{"text": "Next", "successor": "next_key"}],
+                        "templates": {
+                            "nested.key": {"label": "nested_payload"},
+                        },
+                    },
+                    "next_key": {"label": "shared_payload"},
+                    "other_key": {"label": "shared_payload"},
+                },
+                "templates": {
+                    "scene_template_key": {"label": "scene_template_payload"},
+                },
+            }
+        },
+    }
+
+    canonical, recanonical = _decompile_twice(source)
+    restored = StoryCompiler().compile(canonical)
+
+    scene = canonical["scenes"]["scene_key"]
+    assert canonical == recanonical
+    assert scene["label"] == "scene_payload"
+    assert scene["blocks"]["block_key"]["label"] == "block_payload"
+    assert set(scene["blocks"]) == {"block_key", "next_key", "other_key"}
+    assert set(scene["templates"]) == {"scene_template_key"}
+    assert set(scene["blocks"]["block_key"]["templates"]) == {"nested.key"}
+    assert restored.entry_template_ids == ["scene_key.block_key"]
+    assert restored.issues == []
+
+
+def test_decompile_rejects_portable_mapping_key_collisions() -> None:
+    bundle = StoryCompiler().compile(
+        {
+            "label": "colliding_globals",
+            "globals": {1: "integer", "1": "text"},
+        }
+    )
+
+    with raises(ValueError, match="colliding key '1'"):
+        StoryCompiler().decompile(bundle)
 
 
 def test_reference_world_decompiles_to_stable_cardinal_data() -> None:

@@ -331,10 +331,33 @@ def _coerce_text(value: Any) -> str | None:
     return text or None
 
 
-def _template_payload_label(template: EntityTemplate) -> str:
-    """Return the payload label used as a canonical authored mapping key."""
+def _template_mapping_key(
+    template: EntityTemplate,
+    *,
+    parent: TemplateGroup | None = None,
+) -> str:
+    """Return the authored mapping key represented by one template label."""
 
-    return str(template.payload.get_label())
+    label = template.get_label()
+    if parent is None:
+        return label
+    prefix = f"{parent.get_label()}."
+    if not label.startswith(prefix):
+        raise ValueError(f"Template {label!r} is not scoped beneath {parent.get_label()!r}")
+    return label.removeprefix(prefix)
+
+
+def _insert_decompiled_template(
+    templates: dict[str, dict[str, Any]],
+    *,
+    key: str,
+    data: dict[str, Any],
+) -> None:
+    """Insert one emitted template while preserving distinct compiled identities."""
+
+    if key in templates:
+        raise ValueError(f"Cannot decompile templates with duplicate key {key!r}")
+    templates[key] = data
 
 
 def _decompile_source_value(value: Any) -> Any:
@@ -347,10 +370,15 @@ def _decompile_source_value(value: Any) -> Any:
     if isinstance(value, UUID | Path):
         return str(value)
     if isinstance(value, Mapping):
-        return {
-            str(key): _decompile_source_value(item)
-            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
-        }
+        normalized: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_key = str(key)
+            if normalized_key in normalized:
+                raise ValueError(
+                    f"Cannot decompile mapping with colliding key {normalized_key!r}",
+                )
+            normalized[normalized_key] = _decompile_source_value(item)
+        return dict(sorted(normalized.items()))
     if isinstance(value, list | tuple):
         return [_decompile_source_value(item) for item in value]
     if isinstance(value, set | frozenset):
@@ -704,7 +732,7 @@ class StoryCompiler:
             )
 
         data: dict[str, Any] = {
-            "label": _template_payload_label(root),
+            "label": root.payload.get_label(),
             "metadata": metadata,
         }
         if bundle.locals:
@@ -716,15 +744,19 @@ class StoryCompiler:
         templates: dict[str, dict[str, Any]] = {}
         for child in root.members():
             child_data = self._decompile_template(child)
-            child_label = _template_payload_label(child)
+            child_key = _template_mapping_key(child)
             if isinstance(child.payload, Actor):
-                actors[child_label] = child_data
+                _insert_decompiled_template(actors, key=child_key, data=child_data)
             elif isinstance(child.payload, Location):
-                locations[child_label] = child_data
+                _insert_decompiled_template(locations, key=child_key, data=child_data)
             elif isinstance(child.payload, Scene):
-                scenes[child_label] = self._decompile_scene(child, child_data)
+                _insert_decompiled_template(
+                    scenes,
+                    key=child_key,
+                    data=self._decompile_scene(child, child_data),
+                )
             else:
-                templates[child_label] = child_data
+                _insert_decompiled_template(templates, key=child_key, data=child_data)
 
         if templates:
             data["templates"] = templates
@@ -746,11 +778,11 @@ class StoryCompiler:
         templates: dict[str, dict[str, Any]] = {}
         for child in scene.members():
             child_data = self._decompile_template(child)
-            child_label = _template_payload_label(child)
+            child_key = _template_mapping_key(child, parent=scene)
             if isinstance(child.payload, Block):
-                blocks[child_label] = child_data
+                _insert_decompiled_template(blocks, key=child_key, data=child_data)
             else:
-                templates[child_label] = child_data
+                _insert_decompiled_template(templates, key=child_key, data=child_data)
         if blocks:
             scene_data["blocks"] = blocks
         if templates:
@@ -762,10 +794,14 @@ class StoryCompiler:
         if isinstance(template, TemplateGroup):
             children = list(template.members())
             if children:
-                data["templates"] = {
-                    _template_payload_label(child): self._decompile_template(child)
-                    for child in children
-                }
+                templates: dict[str, dict[str, Any]] = {}
+                for child in children:
+                    _insert_decompiled_template(
+                        templates,
+                        key=_template_mapping_key(child, parent=template),
+                        data=self._decompile_template(child),
+                    )
+                data["templates"] = templates
         return data
 
     def _compile_section(
