@@ -40,7 +40,7 @@ def _write_bundle(
     if len(script_names) == 1:
         scripts_value = script_names[0]
     else:
-        scripts_value = "\n".join(f"  - {name}" for name in script_names)
+        scripts_value = "\n" + "\n".join(f"  - {name}" for name in script_names)
 
     (root / "world.yaml").write_text(
         (
@@ -62,6 +62,56 @@ def _decode_bundle(bundle: WorldBundle):
         script_paths=bundle.get_script_paths(),
         story_key=None,
     )
+
+
+def _simple_runtime_data() -> dict[str, object]:
+    return {
+        "label": "twine_unit",
+        "metadata": {"title": "The Unit Tower", "start_at": "world.start"},
+        "scenes": {
+            "world": {
+                "kind": "tangl.story.episode.scene.Scene",
+                "label": "world",
+                "blocks": {
+                    "start": {
+                        "kind": "tangl.story.episode.block.Block",
+                        "label": "start",
+                        "content": "Choose.",
+                        "tags": ["entry"],
+                        "actions": [
+                            {
+                                "text": "Enter",
+                                "successor_ref": "world.inside",
+                                "authored_successor_ref": "Stale Target",
+                                "successor_is_absolute": False,
+                            }
+                        ],
+                    },
+                    "inside": {
+                        "kind": "tangl.story.episode.block.Block",
+                        "label": "inside",
+                        "content": "Inside.",
+                    },
+                },
+            }
+        },
+    }
+
+
+def _simple_codec_state() -> dict[str, object]:
+    return {
+        "story_format": "Twine 2",
+        "story_format_version": "2.0",
+        "passages": [
+            {"slug": "inside", "name": "Inside", "ordinal": 2, "meta": {}},
+            {
+                "slug": "start",
+                "name": "Start Here",
+                "ordinal": 1,
+                "meta": {"position": "0,0"},
+            },
+        ],
+    }
 
 
 class TestTwineHelpers:
@@ -343,7 +393,7 @@ Done.
 
 
 class TestTwineCodecRegistry:
-    """Tests for bundled codec registration and import-only behavior."""
+    """Tests for bundled codec registration and strict export behavior."""
 
     def test_registry_resolves_all_twine_aliases_to_same_instance(self) -> None:
         registry = CodecRegistry()
@@ -354,11 +404,113 @@ class TestTwineCodecRegistry:
         assert registry.get("twee3_1_0") is codec
         assert codec.codec_id == "twee3_1_0"
 
-    def test_encode_is_explicitly_unsupported_in_v1(self) -> None:
-        with pytest.raises(NotImplementedError, match="decode-only"):
+    def test_encode_normalizes_simple_passages_and_uses_current_successor(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        bundle = _write_bundle(
+            tmp_path,
+            scripts={"story.twee": ":: Start\nOld."},
+        )
+
+        emitted = TwineCodec().encode(
+            bundle=bundle,
+            runtime_data=_simple_runtime_data(),
+            story_key=None,
+            codec_state=_simple_codec_state(),
+        )
+
+        assert emitted == {
+            "story.twee": """:: StoryTitle
+The Unit Tower
+
+:: StoryData
+{
+  "format": "Twine 2",
+  "format-version": "2.0",
+  "start": "Start Here"
+}
+
+:: Start Here [entry] {"position":"0,0"}
+Choose.
+
+[[Enter->Inside]]
+
+:: Inside
+Inside.
+"""
+        }
+
+    def test_encode_appends_new_blocks_in_structural_key_order(self, tmp_path: Path) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        data = _simple_runtime_data()
+        blocks = data["scenes"]["world"]["blocks"]
+        blocks["after"] = {
+            "kind": "tangl.story.episode.block.Block",
+            "label": "after",
+            "content": "After.",
+        }
+
+        emitted = TwineCodec().encode(
+            bundle=bundle,
+            runtime_data=data,
+            story_key=None,
+            codec_state=_simple_codec_state(),
+        )["story.twee"]
+
+        assert emitted.index(":: Start Here") < emitted.index(":: Inside") < emitted.index(":: after")
+
+    @pytest.mark.parametrize(
+        ("codec_state", "mutation", "match"),
+        [
+            ({"loss_records": [{"feature": "macro"}]}, None, "decode loss records"),
+            ({}, ("start", "effects", ["self.graph.locals['x'] = 1"]), "controls"),
+            ({}, ("start", "is_anonymous", True), "generated block"),
+        ],
+    )
+    def test_encode_rejects_lossy_or_non_simple_shapes(
+        self,
+        tmp_path: Path,
+        codec_state: dict[str, object],
+        mutation: tuple[str, str, object] | None,
+        match: str,
+    ) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        data = _simple_runtime_data()
+        if mutation is not None:
+            block, field, value = mutation
+            data["scenes"]["world"]["blocks"][block][field] = value
+
+        with pytest.raises(ValueError, match=match):
             TwineCodec().encode(
-                bundle=None,
-                runtime_data={},
+                bundle=bundle,
+                runtime_data=data,
                 story_key=None,
-                codec_state=None,
+                codec_state={**_simple_codec_state(), **codec_state},
+            )
+
+    def test_encode_rejects_multi_file_or_unsafe_manifest_paths(self, tmp_path: Path) -> None:
+        bundle = _write_bundle(
+            tmp_path,
+            scripts={"first.twee": ":: Start\nOne.", "second.twee": ":: End\nTwo."},
+        )
+        with pytest.raises(ValueError, match="multiple declared script paths"):
+            TwineCodec().encode(
+                bundle=bundle,
+                runtime_data=_simple_runtime_data(),
+                story_key=None,
+                codec_state=_simple_codec_state(),
+            )
+
+        (bundle.bundle_root / "world.yaml").write_text(
+            "label: twine_unit\ncodec: twee3_1_0\nscripts: ../outside.twee\n",
+            encoding="utf-8",
+        )
+        unsafe_bundle = WorldBundle.load(bundle.bundle_root)
+        with pytest.raises(ValueError, match="stay inside the bundle"):
+            TwineCodec().encode(
+                bundle=unsafe_bundle,
+                runtime_data=_simple_runtime_data(),
+                story_key=None,
+                codec_state=_simple_codec_state(),
             )

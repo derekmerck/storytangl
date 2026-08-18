@@ -8,7 +8,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
-from tangl.loaders.codec import DecodeResult, LossKind, LossRecord, SourceRef
+from tangl.loaders.codec import (
+    DecodeResult,
+    LossKind,
+    LossRecord,
+    SourceRef,
+    single_manifest_output_path,
+)
 
 if TYPE_CHECKING:
     from tangl.loaders.bundle import WorldBundle
@@ -106,7 +112,7 @@ class IfBranch:
 
 
 class TwineCodec:
-    """Decode a small Twee 3 subset into StoryTangl near-native story data."""
+    """Translate the strict lossless Twee 3 passage/link subset."""
 
     codec_id = "twee3_1_0"
 
@@ -265,10 +271,280 @@ class TwineCodec:
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
     ) -> dict[str, str]:
-        _ = bundle, runtime_data, story_key, codec_state
-        raise NotImplementedError(
-            "TwineCodec.encode() is not supported in v1; this codec is decode-only."
+        """Encode one canonical simple-world mapping as normalized Twee 3."""
+
+        state = codec_state or {}
+        _reject_lossy_state(state)
+        blocks, start_key = _simple_world_blocks(runtime_data)
+        passages = _twine_passages(blocks=blocks, start_key=start_key, codec_state=state)
+        title = _twine_title(runtime_data)
+        story_data = _twine_story_data(start_name=passages[start_key]["name"], codec_state=state)
+        rendered = _render_twee(title=title, story_data=story_data, passages=passages)
+        output_path = single_manifest_output_path(
+            bundle=bundle,
+            story_key=story_key,
+            format_name="Twee",
+            default_name="script.twee",
         )
+        return {output_path: rendered}
+
+
+def _reject_lossy_state(codec_state: dict[str, Any]) -> None:
+    if codec_state.get("loss_records"):
+        raise ValueError("Lossless Twee export requires an artifact with no decode loss records.")
+
+
+def _simple_world_blocks(runtime_data: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], str]:
+    for section in ("actors", "locations", "templates", "globals"):
+        if runtime_data.get(section):
+            raise ValueError(f"Lossless Twee export does not support root {section}.")
+
+    scenes = runtime_data.get("scenes")
+    if not isinstance(scenes, dict) or set(scenes) != {"world"}:
+        raise ValueError("Lossless Twee export requires exactly one scene named 'world'.")
+    scene = scenes["world"]
+    if not isinstance(scene, dict):
+        raise ValueError("Lossless Twee export supports only ordinary blocks in the world scene.")
+    _validate_simple_scene(scene)
+
+    blocks = scene.get("blocks")
+    if not isinstance(blocks, dict):
+        raise ValueError("Lossless Twee export requires world.blocks mapping.")
+    normalized_blocks: dict[str, dict[str, Any]] = {}
+    for key, block in blocks.items():
+        if not isinstance(key, str) or not isinstance(block, dict):
+            raise ValueError("Lossless Twee export requires named block mappings.")
+        _validate_simple_block(key, block)
+        normalized_blocks[key] = block
+
+    metadata = runtime_data.get("metadata")
+    start_ref = metadata.get("start_at") if isinstance(metadata, dict) else None
+    if not isinstance(start_ref, str) or not start_ref.startswith("world."):
+        raise ValueError("Lossless Twee export requires exactly one world start entry.")
+    start_key = start_ref.removeprefix("world.")
+    if not start_key or start_key not in normalized_blocks:
+        raise ValueError("Lossless Twee export start entry must name a current world block.")
+    return normalized_blocks, start_key
+
+
+def _validate_simple_scene(scene: dict[str, Any]) -> None:
+    unsupported = {
+        name
+        for name in ("templates", "roles", "settings", "availability", "effects")
+        if scene.get(name)
+    }
+    if unsupported:
+        raise ValueError(
+            "Lossless Twee export does not support world scene controls: "
+            f"{', '.join(sorted(unsupported))}.",
+        )
+    allowed = {"kind", "label", "blocks"}
+    extras = set(scene) - allowed
+    if extras:
+        raise ValueError(
+            "Lossless Twee export does not support world scene fields: "
+            f"{', '.join(sorted(extras))}.",
+        )
+    if scene.get("kind") not in (None, "tangl.story.episode.scene.Scene"):
+        raise ValueError("Lossless Twee export requires an ordinary world Scene.")
+    if scene.get("label", "world") != "world":
+        raise ValueError("Lossless Twee export requires the world scene label to be 'world'.")
+
+
+def _validate_simple_block(key: str, block: dict[str, Any]) -> None:
+    if block.get("is_anonymous") or block.get("_is_anonymous"):
+        raise ValueError(f"Lossless Twee export does not support generated block {key!r}.")
+    unsupported = {
+        name
+        for name in (
+            "effects",
+            "availability",
+            "continues",
+            "redirects",
+            "roles",
+            "settings",
+            "media",
+        )
+        if block.get(name)
+    }
+    if unsupported:
+        raise ValueError(
+            f"Lossless Twee export does not support block {key!r} controls: "
+            f"{', '.join(sorted(unsupported))}.",
+        )
+    allowed = {
+        "kind",
+        "label",
+        "content",
+        "tags",
+        "actions",
+        "is_anonymous",
+        "_is_anonymous",
+    }
+    extras = set(block) - allowed
+    if extras:
+        raise ValueError(
+            f"Lossless Twee export does not support block {key!r} fields: "
+            f"{', '.join(sorted(extras))}.",
+        )
+    if block.get("kind") not in (None, "tangl.story.episode.block.Block"):
+        raise ValueError(f"Lossless Twee export requires ordinary Block passage {key!r}.")
+    if block.get("label", key) != key:
+        raise ValueError(
+            f"Lossless Twee export requires block label {key!r} to match its structural key.",
+        )
+    if not isinstance(block.get("content", ""), str):
+        raise ValueError(f"Lossless Twee export requires text content for block {key!r}.")
+    tags = block.get("tags", [])
+    if not isinstance(tags, list) or not all(
+        isinstance(tag, str) and tag and not any(char.isspace() for char in tag)
+        for tag in tags
+    ):
+        raise ValueError(f"Lossless Twee export requires string tags for block {key!r}.")
+    actions = block.get("actions", [])
+    if not isinstance(actions, list):
+        raise ValueError(f"Lossless Twee export requires an action list for block {key!r}.")
+    for action in actions:
+        _validate_simple_action(key, action)
+
+
+def _validate_simple_action(block_key: str, action: Any) -> None:
+    if not isinstance(action, dict):
+        raise ValueError(
+            f"Lossless Twee export requires mapping actions in block {block_key!r}.",
+        )
+    allowed = {
+        "text",
+        "successor_ref",
+        "authored_successor_ref",
+        "successor_is_absolute",
+        "successor_is_inferred",
+    }
+    extras = set(action) - allowed
+    if extras:
+        raise ValueError(
+            f"Lossless Twee export does not support action controls in block {block_key!r}: "
+            f"{', '.join(sorted(extras))}.",
+        )
+    if not isinstance(action.get("text"), str) or not action["text"]:
+        raise ValueError(f"Lossless Twee export requires action text in block {block_key!r}.")
+    if not isinstance(action.get("successor_ref"), str) or not action["successor_ref"]:
+        raise ValueError(f"Lossless Twee export requires action successors in block {block_key!r}.")
+
+
+def _twine_passages(
+    *,
+    blocks: dict[str, dict[str, Any]],
+    start_key: str,
+    codec_state: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    prior_passages = codec_state.get("passages", [])
+    if not isinstance(prior_passages, list):
+        raise ValueError("Lossless Twee export requires list-form passage codec state.")
+    prior_by_slug: dict[str, dict[str, Any]] = {}
+    for passage in prior_passages:
+        if not isinstance(passage, dict):
+            raise ValueError("Lossless Twee export requires mapping passage codec state.")
+        slug = passage.get("slug")
+        name = passage.get("name")
+        if not isinstance(slug, str) or not isinstance(name, str):
+            raise ValueError("Lossless Twee passage state requires slug and name strings.")
+        if slug in prior_by_slug:
+            raise ValueError(f"Lossless Twee export has duplicate passage state for {slug!r}.")
+        prior_by_slug[slug] = passage
+
+    ordered_keys = [
+        slug
+        for slug, _ in sorted(
+            prior_by_slug.items(),
+            key=lambda item: (item[1].get("ordinal", 0), item[0]),
+        )
+        if slug in blocks
+    ]
+    ordered_keys.extend(sorted(set(blocks) - set(ordered_keys)))
+
+    passages: dict[str, dict[str, Any]] = {}
+    names: set[str] = set()
+    for key in ordered_keys:
+        state = prior_by_slug.get(key, {})
+        name = state.get("name", key)
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"Lossless Twee export requires a passage name for {key!r}.")
+        if name in names:
+            raise ValueError(f"Lossless Twee export produced duplicate passage name {name!r}.")
+        names.add(name)
+        meta = state.get("meta", {})
+        if not isinstance(meta, dict):
+            raise ValueError(f"Lossless Twee export requires mapping header metadata for {key!r}.")
+        passages[key] = {
+            "name": name,
+            "tags": blocks[key].get("tags", []),
+            "meta": meta,
+            "content": blocks[key].get("content", ""),
+            "actions": blocks[key].get("actions", []),
+        }
+    if start_key not in passages:
+        raise ValueError("Lossless Twee export start entry was not emitted.")
+    return passages
+
+
+def _twine_title(runtime_data: dict[str, Any]) -> str:
+    metadata = runtime_data.get("metadata")
+    title = metadata.get("title") if isinstance(metadata, dict) else None
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("Lossless Twee export requires metadata.title.")
+    return title.strip()
+
+
+def _twine_story_data(*, start_name: str, codec_state: dict[str, Any]) -> dict[str, str]:
+    story_data = {"start": start_name}
+    for state_key, output_key in (
+        ("story_format", "format"),
+        ("story_format_version", "format-version"),
+    ):
+        value = codec_state.get(state_key)
+        if isinstance(value, str) and value:
+            story_data[output_key] = value
+    return story_data
+
+
+def _render_twee(
+    *,
+    title: str,
+    story_data: dict[str, str],
+    passages: dict[str, dict[str, Any]],
+) -> str:
+    sections = [
+        ":: StoryTitle\n" + title,
+        ":: StoryData\n" + json.dumps(story_data, indent=2, sort_keys=True),
+    ]
+    name_by_key = {key: passage["name"] for key, passage in passages.items()}
+    for passage in passages.values():
+        header = f":: {passage['name']}"
+        if passage["tags"]:
+            header += " [" + " ".join(passage["tags"]) + "]"
+        if passage["meta"]:
+            header += " " + json.dumps(passage["meta"], sort_keys=True, separators=(",", ":"))
+        body_parts = [passage["content"].strip()] if passage["content"].strip() else []
+        links = [_render_link(action, name_by_key=name_by_key) for action in passage["actions"]]
+        if links:
+            body_parts.append("\n".join(links))
+        sections.append(header + ("\n" + "\n\n".join(body_parts) if body_parts else ""))
+    return "\n\n".join(sections) + "\n"
+
+
+def _render_link(action: dict[str, Any], *, name_by_key: dict[str, str]) -> str:
+    successor_ref = action["successor_ref"]
+    if not successor_ref.startswith("world."):
+        raise ValueError(f"Lossless Twee action successor must stay in world scene: {successor_ref!r}.")
+    target_key = successor_ref.removeprefix("world.")
+    target_name = name_by_key.get(target_key)
+    if target_name is None:
+        raise ValueError(f"Lossless Twee action successor has no current passage: {successor_ref!r}.")
+    text = action["text"]
+    if text == target_name:
+        return f"[[{target_name}]]"
+    return f"[[{text}->{target_name}]]"
 
 
 def _parse_twee(*, source: str, path: Path, start_ordinal: int) -> list[RawPassage]:
