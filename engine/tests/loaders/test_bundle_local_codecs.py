@@ -22,6 +22,7 @@ def _write_codec_bundle(
     label: str,
     variant: str,
     anthology: bool = False,
+    codec_key: str = "local_codec",
 ) -> str:
     """Write one trusted world domain that contributes a private codec."""
 
@@ -35,10 +36,10 @@ def _write_codec_bundle(
                 f"domain_module: {module_name}",
                 "stories:",
                 "  first:",
-                "    codec: local_codec",
+                f"    codec: {codec_key}",
                 "    scripts: first.local",
                 "  second:",
-                "    codec: local_codec",
+                f"    codec: {codec_key}",
                 "    scripts: second.local",
             ]
         )
@@ -48,7 +49,7 @@ def _write_codec_bundle(
             [
                 f"label: {label}",
                 f"domain_module: {module_name}",
-                "codec: local_codec",
+                f"codec: {codec_key}",
                 "scripts: story.local",
             ]
         )
@@ -116,7 +117,7 @@ class LocalCodec:
 def get_story_codecs() -> dict[str, LocalCodec]:
     global CODEC_CONTRIBUTION_CALLS
     CODEC_CONTRIBUTION_CALLS += 1
-    return {{"local_codec": LocalCodec()}}
+    return {{"{codec_key}": LocalCodec()}}
 ''',
         encoding="utf-8",
     )
@@ -179,7 +180,12 @@ def test_anthology_reuses_one_domain_codec_contribution(tmp_path: Path) -> None:
 
 
 def test_world_compiler_encodes_with_bundle_local_codec(tmp_path: Path) -> None:
-    _write_codec_bundle(tmp_path, label="local_encode", variant="encode")
+    _write_codec_bundle(
+        tmp_path,
+        label="local_encode",
+        variant="encode",
+        codec_key="local_alias",
+    )
     bundle = WorldRegistry([tmp_path]).bundles["local_encode"]
     compiler = WorldCompiler()
     world = compiler.compile(bundle)

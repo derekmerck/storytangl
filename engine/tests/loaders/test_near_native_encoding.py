@@ -56,28 +56,18 @@ def test_reference_world_encodes_to_a_canonical_near_native_fixed_point(tmp_path
     assert compiler.story_compiler.decompile(recompiled.bundle) == canonical
 
 
-def test_near_native_encode_uses_only_safe_relative_output_paths(tmp_path: Path) -> None:
+def test_near_native_encode_uses_the_manifest_path_despite_stale_codec_state(
+    tmp_path: Path,
+) -> None:
     bundle = _write_bundle(tmp_path / "safe_paths", label="safe_paths")
     codec = NearNativeYamlCodec()
     runtime_data = {"label": "safe_paths", "scenes": {}}
 
-    in_bundle = codec.encode(
-        bundle=bundle,
-        runtime_data=runtime_data,
-        story_key=None,
-        codec_state={"script_paths": [str(bundle.bundle_root / "scripts/story.yaml")]},
-    )
-    unsafe = codec.encode(
+    stale = codec.encode(
         bundle=bundle,
         runtime_data=runtime_data,
         story_key=None,
         codec_state={"script_paths": [str(tmp_path / "foreign.yaml")]},
-    )
-    escaped = codec.encode(
-        bundle=bundle,
-        runtime_data=runtime_data,
-        story_key=None,
-        codec_state={"script_paths": ["../foreign.yaml"]},
     )
     absent = codec.encode(
         bundle=bundle,
@@ -85,11 +75,53 @@ def test_near_native_encode_uses_only_safe_relative_output_paths(tmp_path: Path)
         story_key=None,
     )
 
-    assert in_bundle.keys() == {"scripts/story.yaml"}
-    assert unsafe.keys() == {"script.yaml"}
-    assert escaped.keys() == {"script.yaml"}
-    assert absent.keys() == {"script.yaml"}
+    assert stale.keys() == {"scripts/story.yaml"}
+    assert absent.keys() == {"scripts/story.yaml"}
     assert runtime_data == {"label": "safe_paths", "scenes": {}}
+
+
+def test_near_native_encode_rejects_unsafe_or_multi_file_manifest_paths(
+    tmp_path: Path,
+) -> None:
+    codec = NearNativeYamlCodec()
+    runtime_data = {"label": "unsafe_paths", "scenes": {}}
+    multi_file = _write_bundle(tmp_path / "multi_file", label="multi_file")
+    (multi_file.bundle_root / "world.yaml").write_text(
+        "label: multi_file\nscripts:\n  - scripts/first.yaml\n  - scripts/second.yaml\n",
+        encoding="utf-8",
+    )
+    multi_file = WorldBundle.load(multi_file.bundle_root)
+    escaped = _write_bundle(tmp_path / "escaped_path", label="escaped_path")
+    (escaped.bundle_root / "world.yaml").write_text(
+        "label: escaped_path\nscripts: ../foreign.yaml\n",
+        encoding="utf-8",
+    )
+    escaped = WorldBundle.load(escaped.bundle_root)
+    absolute = _write_bundle(tmp_path / "absolute_path", label="absolute_path")
+    (absolute.bundle_root / "world.yaml").write_text(
+        f"label: absolute_path\nscripts: {tmp_path / 'foreign.yaml'}\n",
+        encoding="utf-8",
+    )
+    absolute = WorldBundle.load(absolute.bundle_root)
+
+    with raises(ValueError, match="multiple declared script paths"):
+        codec.encode(
+            bundle=multi_file,
+            runtime_data=runtime_data,
+            story_key=None,
+        )
+    with raises(ValueError, match="stay inside the bundle"):
+        codec.encode(
+            bundle=escaped,
+            runtime_data=runtime_data,
+            story_key=None,
+        )
+    with raises(ValueError, match="stay inside the bundle"):
+        codec.encode(
+            bundle=absolute,
+            runtime_data=runtime_data,
+            story_key=None,
+        )
 
 
 def test_encode_rejects_a_compiled_codec_that_disagrees_with_the_manifest(

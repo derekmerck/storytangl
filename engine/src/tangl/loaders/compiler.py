@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 from tangl.story.fabula.compiler import StoryTemplateBundle
@@ -10,6 +10,9 @@ from tangl.story.fabula.compiler import StoryTemplateBundle
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult, StoryCodec
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler
+
+if TYPE_CHECKING:
+    from tangl.media.media_resource.resource_manager import ResourceManager
 
 
 class _WorldDomainAdjuncts:
@@ -236,19 +239,16 @@ class WorldCompiler:
 
         domain_adjuncts = self._load_domain_adjuncts(bundle)
         local_codecs = domain_adjuncts.story_codecs if domain_adjuncts is not None else {}
-        manifest_codec = self._resolve_story_codec(
-            bundle.get_story_codec(story_key),
-            local_codecs=local_codecs,
-        )
+        manifest_codec_key = bundle.get_story_codec(story_key)
         codec = self._resolve_story_codec(
-            story_bundle.codec_id or bundle.get_story_codec(story_key),
+            manifest_codec_key,
             local_codecs=local_codecs,
         )
-        if story_bundle.codec_id is not None and codec.codec_id != manifest_codec.codec_id:
+        if story_bundle.codec_id not in (None, manifest_codec_key, codec.codec_id):
             raise ValueError(
                 "Compiled story codec "
                 f"{story_bundle.codec_id!r} disagrees with manifest codec "
-                f"{bundle.get_story_codec(story_key)!r}",
+                f"{manifest_codec_key!r}",
             )
 
         return codec.encode(
@@ -261,7 +261,11 @@ class WorldCompiler:
     def _build_world_facets(
         self,
         bundle: WorldBundle,
-    ) -> tuple[Any | None, Any | None, Any]:
+    ) -> tuple[
+        _WorldDomainAdjuncts | None,
+        _WorldAssetsFacet,
+        ResourceManager | None,
+    ]:
         domain_facet = self._load_domain_adjuncts(bundle)
 
         assets_facet = _WorldAssetsFacet()
