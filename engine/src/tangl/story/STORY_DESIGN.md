@@ -127,6 +127,11 @@ The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
 portable, deterministic cardinal mapping from a compiled template bundle for a
 later codec to encode. It canonicalizes hierarchy and payload kinds rather than
 recreating original file placement, section sugar, or diagnostic provenance.
+`WorldCompiler.encode(bundle, story_bundle, story_key=None)` resolves the
+bundle's matching codec, including its local domain contribution, and returns
+safe manifest-declared source-path content without writing or materializing a
+graph. Near-native encoding currently rejects multi-file stories rather than
+inventing a source repartitioning or manifest-rewrite policy.
 
 That compiled bundle is a build-time artifact. `WorldBuilder` copies the
 surviving fields onto `World` and wires in adjunct resources such as:

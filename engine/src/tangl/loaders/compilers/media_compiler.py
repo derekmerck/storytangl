@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from tangl.media.media_resource.resource_manager import ResourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +20,7 @@ class MediaCompiler:
         organization_hints: dict | None = None,
         *,
         index_handlers: Iterable[Any] = (),
-    ):
+    ) -> ResourceManager | None:
         try:
             from tangl.media.media_resource.resource_manager import ResourceManager
         except ModuleNotFoundError:  # pragma: no cover - optional dependency

@@ -154,15 +154,19 @@ class NearNativeYamlCodec:
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
     ) -> dict[str, str]:
-        script_paths = (codec_state or {}).get("script_paths")
-        if script_paths:
-            target = Path(script_paths[0])
-            try:
-                rel_path = str(target.relative_to(bundle.bundle_root))
-            except ValueError:
-                rel_path = target.name or "script.yaml"
-        else:
+        _ = codec_state
+        scripts = bundle.manifest.get_story_scripts(story_key)
+        if not scripts:
             rel_path = "script.yaml"
+        elif len(scripts) > 1:
+            raise ValueError(
+                "Canonical near-native export does not support multiple declared script paths.",
+            )
+        else:
+            target = Path(scripts[0])
+            if target.is_absolute() or ".." in target.parts:
+                raise ValueError(f"Near-native script path must stay inside the bundle: {target}")
+            rel_path = target.as_posix()
         content = yaml.safe_dump(runtime_data, sort_keys=False, allow_unicode=True)
         return {rel_path: content}
 
