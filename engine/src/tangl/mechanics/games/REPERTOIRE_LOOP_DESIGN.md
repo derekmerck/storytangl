@@ -132,68 +132,144 @@ as_response:
 ```
 
 Four declaration sites fold into **two relations over ordered (call, response)
-pairs** — positive and negative. Catalog load normalizes them into one directed
-index so runtime resolution is a lookup.
+pairs** — positive and negative. Criteria are ordinary `Selector`s; `has_tags`,
+`is_instance`, and attribute comparisons already work, so this introduces no new
+predicate language.
 
-Criteria are ordinary `Selector`s. `has_tags`, `is_instance`, and attribute
-comparisons already work; this introduces no new predicate language.
+### The composed dominance schedule
+
+The catalog index is a **base layer, not final authority**. The authoritative
+artifact for one contest is a settled schedule composed at the boundary:
+
+```text
+base catalog relations
++ imported catalog extensions
++ world rules
++ scenario rules
++ badge-local contributions
+────────────────────────────────
+concrete DominanceSchedule
+        ↓ PREREQS snapshot
+CallResponseGame
+```
+
+A contribution is uniform regardless of source:
+
+```yaml
+call_selector:     { has_tags: [insult] }
+response_selector: { has_identifier: beaujolais }
+result: match
+layer: LOCAL
+source_id: beaujolais
+```
+
+One shape covers phrase-definition relations, imported catalog extensions,
+scenario-wide rule changes, a badge-local mutation, a debugging token that beats
+everything, and an environmental modifier that disables a phrase family. A world
+can import a base catalog and compose a new schedule over it without editing the
+original.
+
+This resolves what looked like a contradiction between a precompiled index and
+mutable badges: the index is an optimization of the base layer, and per-contest
+truth is the composed snapshot.
+
+**Composition is the existing contribution idiom, not new machinery.** Gathering
+layered contributions and folding them into a settled artifact is what
+`chain_execute_all` over `BehaviorRegistry` does, and `contribute_ns`,
+`contribute_roles`, `contribute_settings`, and
+`contribute_sandbox_inventory_helpers` are all instances of the pattern. A
+`contribute_dominance` handler at PREREQS is one more.
+
+**Scope the schedule to the participating badges.** Compose over the player's
+snapshot × the opponent's snapshot, not the whole catalog. A cross-product over
+a 200-phrase catalog is 40,000 entries; over two eight-badge repertoires it is
+sixty-four. So the game holds something genuinely small:
+
+```python
+dominance: dict[tuple[PhraseId, PhraseId], MatchResult]
+```
+
+Two ordered steps, both at PREREQS: snapshot participating badge ids, then
+compose the schedule over just those pairs.
+
+**`MatchResult` carries its contributing `source_id`.** Cheap, and it makes both
+diagnostics and narration able to say *why* — "matched by: beaujolais" — rather
+than only *whether*.
+
+**The settled snapshot is what makes replay exact.** The engine is
+event-sourced, and a playthrough must be reproducible from a snapshot plus the
+choice log. If dominance were resolved by inspecting live world state during
+each round, replay would depend on world state at every step. Composing once at
+PREREQS puts the schedule in the ledger, so the contest replays deterministically
+no matter what the world does afterward. This is the strongest argument for the
+boundary — stronger than handler purity.
+
+**And it is projectable.** A sixty-four-entry matrix scoped to this contest is
+something `story_info` can actually render: what you hold, what it answers, what
+answered you. Monkey Island players kept notes on paper. Making the schedule an
+inspectable artifact is what turns an opaque quiz into a legible puzzle, and it
+costs nothing extra because the snapshot already exists.
 
 ### Resolution rules
-
-Three rules, and they matter more than they look:
 
 1. **Default is miss.** An undeclared pairing fails. Matches must be positively
    declared. Without this, coverage analysis is meaningless and unrelated tags
    accidentally succeed.
 
-2. **Precedence is declared, for now.** Each declaration carries an explicit
-   rank, and **a badge-local override outranks its catalog declaration** for the
-   same reason `DispatchLayer.LOCAL` sorts last — the local layer exists to
-   observe and override the global one. At equal rank, negative beats positive.
+2. **Layer ordering is `DispatchLayer`, not a new rank enum.** The contribution
+   sources above already map onto the existing cascade — GLOBAL, SYSTEM,
+   APPLICATION, AUTHOR, USER, LOCAL — whose own comment explains that "local
+   sorts _later_ in execution priority so it can observe and aggregate globals."
+   A badge-local contribution therefore outranks its catalog declaration for the
+   documented structural reason, not as a special case, and `Priority` orders
+   within a layer. At equal layer and priority, negative beats positive.
 
-   This is a first-implementation choice, not a settled principle. The engine
-   already has a richer model for exactly this problem, and it is the obvious
-   thing to borrow if declared ranks prove too blunt: `offer_sort_key()` in
+   Whether that is ultimately enough is open. `offer_sort_key()` in
    `vm/provision/matching.py` resolves competing provisioning offers with a
    deterministic tuple blending declared tiers, computed distance
-   (`scope_distance`, `distance_from_caller`), and a computed
-   `score_selector_specificity` whose own docstring calls it "CSS-like."
+   (`scope_distance`, `distance_from_caller`), and a `score_selector_specificity`
+   its own docstring calls "CSS-like." If declared layers prove too blunt, that
+   is the shape to copy. Start with layers and deterministic negative precedence;
+   let a real catalog say whether more is warranted.
 
-   So the open question is whether dominance contradictions are best resolved by
-   *rules* or by *closest / most-likely match with rules as distance measures*.
-   Rules-only is fine to start. If the answer turns out to be distance, the shape
-   to copy already exists.
-
-3. **Equal-rank contradiction is surfaced, not silently resolved.** Declaring
+3. **Equal-layer contradiction is surfaced, not silently resolved.** Declaring
    from both ends is what makes the catalog extensible; it is also what makes
    contradiction possible.
+
+### Three failure modes, only one of which is a miss
+
+Composition and resolution must distinguish these. Collapsing them weakens a
+real invariant:
+
+```text
+valid phrase, no declared relation  → miss
+phrase unknown to this world catalog → unavailable or miss, by explicit policy
+missing token or Singleton referent  → integrity error; fail loudly
+```
+
+`Token` construction requires its referent to exist, and `ComponentManager`
+raises `KeyError("Component ... is not available through the owner registry")`
+when an assignment cannot be resolved. Those invariants stay. Arbitrary code can
+always violate them, but that is not a reason to weaken them, and a valid
+extension API should preserve catalog and reference integrity.
+
+The schedule boundary makes this easier rather than harder: a dynamically added
+token with no matching contribution simply produces no schedule entries and
+misses, while a broken reference fails at snapshot time — before the contest
+starts, not mid-exchange.
 
 ### Diagnostics are an authoring aid, not a gate
 
 A tag-derived many-to-many relation is a rule system, and two authors adding
 tags independently will produce matches neither intended. A catalog-load pass
-should report:
+should report unwinnable calls, dead-weight badges, and ambiguous pairs.
 
-- calls with zero valid responses in the world catalog (unwinnable)
-- badges with zero coverage (dead weight)
-- equal-rank contradictions (ambiguous)
-
-But **preflight cannot be authoritative here**, and the design must not lean on
-it. Nothing stops a world from programmatically injecting a badge that was never
-in the catalog, or tombstoning a catalog member mid-story. Either can introduce
-a fresh contradiction, or trivialize an existing resolution, after load has
-already run.
-
-Two consequences the runtime must actually honor:
-
-- **Resolution tolerates unknown badges.** This is where *default is miss* earns
-  its keep: an injected badge with no declared relations simply loses, which is
-  the safe failure. Injection can never accidentally manufacture a win.
-- **The relation index tolerates dangling references.** A tombstoned member
-  degrades to "no declared relation" rather than raising.
-
-So this is a diagnostic surface in the spirit of #286 / #205 — worth having, and
-never a correctness guarantee.
+But **preflight cannot be authoritative**, and the design must not lean on it.
+Worlds legitimately inject tokens and contribute rules after load. Composition
+is where correctness actually lands, and the composed schedule is the thing
+worth inspecting — which, being contest-scoped and small, it can be. Load-time
+diagnostics stay useful in the spirit of #286 / #205, without pretending to be a
+guarantee.
 
 ### Initiative, and the no-legal-move floor
 
@@ -256,15 +332,13 @@ No new phase, fragment type, graph primitive, or protocol.
 ### Two reward channels, separated by catalog type
 
 An earlier draft collapsed these, saying the player learns a badge by losing and
-then spends it. Badges are not spent.
+then spends it.
 
 The two channels are **different catalogs distinguished by type**, not two roles
 within one catalog:
 
-- **Competence** — phrase badges. Durable, normally non-consumable. Granted by
-  *exposure*: any phrase actually deployed against you may become yours, per
-  world policy. A badge can gate an offer without being consumed. A world that
-  treats some technique as expendable is running a variant rule.
+- **Competence** — phrase badges. Granted by *exposure*: any phrase actually
+  deployed against you may become yours, per world policy.
 - **Prizes** — their own catalog of spendable, tradable tokens. Granted by
   *winning*. These participate in the trading and unlock shell through
   `tangl.mechanics.transaction`, whose design doc already enumerates Held Token
@@ -272,8 +346,9 @@ within one catalog:
 
 A phrase is one kind of badge-like token; a prize can be anything — a token from
 another catalog, a variable flag, a newly minted concept. Modeling prizes as
-spendable tokens with their own catalog is the simplest first cut and keeps the
-transaction rails doing what they already do.
+spendable tokens with their own catalog is the simplest first cut for the
+reference world. It is a good default, not a prohibition on phrase badges ever
+being wagers or trade goods.
 
 ```text
 lose → learn something
@@ -284,35 +359,61 @@ prize → unlock or trade for another opportunity
 
 Grind losses, not wins.
 
+### Mechanic capability versus demo policy
+
+These are separate statements and the note keeps them apart:
+
+```text
+mechanic capability:
+    badge ownership may change through explicit transactions
+
+reference-world policy:
+    learned phrases are awarded idempotently and retained permanently
+```
+
+`RepertoireManager` stays a full owner-bound `ComponentManager`, and transactions
+can move its contents. The reference repartee world exposes an **award-only
+facade** over it and never removes a badge — but that is the demo's policy, not a
+limitation of the mechanic. Persistent graph identity and permanent retention are
+different questions, and a badge with stable identity can equally be retained,
+exhausted, consumed on use, stolen, wagered, transferred, confiscated, or
+upgraded with further relation contributions.
+
 ### The reward policy is a hookable shell-level handler
 
 Acquisition is **not** kernel behavior. It belongs to the plot/shell layer as an
 ordinary dispatch-registered aftermath handler, and it is expected to change
 without touching the contest flow.
 
-The first implementation should be whatever is easiest — most likely "award the
-phrase that beat you." What matters is that swapping the policy never reaches
-into the kernel. Worlds should be able to express things well outside that
-default:
+The reference implementation should be the cheapest thing that works — most
+likely "award the phrase that beat you," idempotently. What matters is that
+swapping the policy never reaches into the kernel. Forgetting on a win, tiered
+learning on a loss, theft, and consumption are all expressible as aftermath
+policies using explicit transactions; none of them are demo behavior, and none of
+them should be structurally excluded.
 
-- winning makes you *forget* something
-- losing teaches only the winning retort
-- losing teaches the winning retort plus every retort ranked below your best
-
-Those are illustrations of the range, not proposals. Their only real requirement
-is on the evidence: the round record has to be rich enough that a policy nobody
-has written yet can still be computed from it. That is the practical argument
-for the field set below — richer than the default policy needs, deliberately.
+Their only real requirement is on the evidence: the round record has to be rich
+enough that a policy nobody has written yet can still be computed from it. That
+is the practical argument for the field set below — deliberately richer than the
+reference policy needs.
 
 ### Exposure is recorded, never inferred
 
-The round record must identify what was actually presented:
+The round record identifies what was actually said:
 
-- prompt phrase id
-- response phrase id actually deployed
-- whether it matched
-- any explicitly revealed correct response
-- initiative before and after
+```text
+call_phrase_id
+response_phrase_id
+matched
+match_source_id            # which contribution decided it
+additional_exposed_phrase_ids
+initiative_before
+initiative_after
+```
+
+There is deliberately no "correct response" field. In a many-to-many dominance
+graph several responses may answer a call and none is canonical; that phrasing
+was residue from the discarded quiz model.
 
 `RoundRecord.notes` carries this; JOURNAL renders it; the shell-level aftermath
 handler applies progression idempotently, guarded the way
@@ -320,16 +421,13 @@ handler applies progression idempotently, guarded the way
 
 Two things this rules out, both deliberately:
 
-Two things this rules out, both deliberately:
-
 - **Do not infer exposure from win/loss.** An outcome-keyed record cannot
   express red-paperclip acquisition at all, since the whole point is that losing
   teaches. This is a schema commitment, not an interface style — it survives the
   decision below to defer protocols.
-- **Do not derive progression by rereading rendered journal prose.** An unspoken
-  correct answer must not become learned merely because the engine knew it.
-  Disclosure stays honest when acquisition reads structured evidence of what was
-  actually said.
+- **Do not derive progression by rereading rendered journal prose.** A phrase the
+  engine knew about but nobody spoke must not become learned. Disclosure stays
+  honest when acquisition reads structured evidence of what was actually said.
 
 ### No protocols yet
 
@@ -413,33 +511,51 @@ it is deliberately off the critical path.
 
 ## Build order
 
-1. Pure `CallResponseGame` with a fixed phrase set: role capability, directed
-   matching, initiative, structured round notes, ordinary CLI journal output.
-2. `PhraseType` / `PhraseBadge` / owner-bound `RepertoireManager`; a world
-   PREREQS handler snapshots selected badge ids into the contest.
+1. Pure `CallResponseGame` over a fixed phrase set and a hand-written schedule:
+   role capability, directed matching, initiative, structured round notes,
+   ordinary CLI journal output.
+2. `PhraseType` / `PhraseBadge` / owner-bound `RepertoireManager`; a
+   `contribute_dominance` PREREQS handler snapshots participating badge ids and
+   composes the schedule over just those pairs.
 3. Shell-level aftermath handler reads exposure records and idempotently awards
    badges; the policy is swappable without touching steps 1-2.
-4. Winning an opponent grants a prize token from its own catalog, or a durable
-   world consequence.
-5. Plot-level opponents and locations gate on repertoire and prize holdings.
-6. Sword Master analogue: unfamiliar call text mapped to already-earned badges.
+4. Winning grants a prize token from its own catalog, or a durable world
+   consequence.
+5. Opponents and locations gate on repertoire and prize holdings.
+6. Sword Master analogue: unfamiliar calls onto already-earned badges.
 7. Richer expressions and presentation, only after the CLI vertical is complete.
 
-Steps 1 and 2 are independently testable, which is the check that L1 and L2 are
-really orthogonal.
+Steps 1 and 2 must be independently testable — that is the check that L1 and L2
+are really orthogonal.
 
----
+### Two seam tests, built now
+
+The reference world exercises only immutable catalog relations, retained player
+badges, fixed opponent repertoires, award-on-loss, and prize-on-win. Two small
+conformance tests keep the obvious variants from being boxed out without
+building any of them:
+
+- **Contribution override.** A world-local `beaujolais` contribution at
+  `DispatchLayer.LOCAL` overrides an imported base schedule and answers every
+  call tagged `insult`.
+- **Ownership transfer.** A transaction moves a phrase badge between
+  repertoires, and the next contest's snapshot reflects the new owner.
+
+Neither is demo behavior. They exist to prove the seam is real.
 
 ## Open questions
 
-1. **Contradiction resolution: rules or distance?** Declared ranks are the
-   first cut. Whether contradictions are better resolved as closest/most-likely
-   match — with the rules themselves acting as distance measures, in the shape of
-   `offer_sort_key()` — is genuinely open and should be decided by a real catalog
-   rather than in advance.
+1. **Is layer ordering enough?** `DispatchLayer` plus deterministic negative
+   precedence is the first cut. Whether contradictions ultimately want
+   closest/most-likely resolution — rules acting as distance measures, in the
+   shape of `offer_sort_key()` — should be decided by a real catalog rather than
+   in advance. Not worth holding anything for.
 2. **Does an aftermath grant every witnessed phrase, or only the one that beat
-   you?** A world policy, not a kernel decision. The first world should pick the
-   cheapest thing that works.
+   you?** A world policy, not a kernel decision. The reference world should pick
+   the cheapest thing that works.
+3. **Does the composed schedule get journaled, or only projected?** It is small
+   enough to serialize per contest, which would make replay self-describing; it
+   may also be enough to recompose it from the snapshot inputs.
 
 Deferred as potential second consumers rather than open design: sequence prompts
 (Simon-says), and partial or near-miss scoring. Binary semantic matching is
