@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any, Protocol
 
 import yaml
@@ -118,10 +118,26 @@ def single_manifest_output_path(
             "script paths.",
         )
 
-    target = Path(scripts[0])
-    if target.is_absolute() or ".." in target.parts:
-        raise ValueError(f"{format_name.capitalize()} script path must stay inside the bundle: {target}")
-    return target.as_posix()
+    raw_target = scripts[0]
+    posix_target = PurePosixPath(raw_target)
+    windows_target = PureWindowsPath(raw_target)
+    if (
+        not raw_target
+        or raw_target in {".", "./", ".\\"}
+        or any(
+            target.is_absolute()
+            or bool(target.anchor)
+            or bool(target.drive)
+            or ".." in target.parts
+            for target in (posix_target, windows_target)
+        )
+    ):
+        raise ValueError(
+            f"{format_name.capitalize()} script path must stay inside the bundle: {raw_target}",
+        )
+    if "\\" in raw_target:
+        return windows_target.as_posix()
+    return posix_target.as_posix()
 
 
 class NearNativeYamlCodec:

@@ -27,6 +27,8 @@ FEATURE_MACROS_DISPLAY = "macros:display"
 FEATURE_MACROS_DISPLAY_SHORT = "macros:display_shorthand"
 FEATURE_MACROS_UNKNOWN = "macros:unknown"
 FEATURE_SPECIAL_PASSAGE = "passages:special"
+FEATURE_HEADER_METADATA = "passages:header_metadata"
+FEATURE_STORY_DATA_FIELD = "story_data:unsupported_field"
 ISSUE_DANGLING_LINK = "source:dangling_link"
 ISSUE_DUPLICATE_PASSAGE = "source:duplicate_passage"
 ISSUE_INVALID_START = "source:invalid_start"
@@ -91,6 +93,7 @@ class RawPassage:
     body: str
     path: str
     ordinal: int
+    header_meta_valid: bool = True
 
 
 @dataclass(slots=True, frozen=True)
@@ -112,7 +115,33 @@ class IfBranch:
 
 
 class TwineCodec:
-    """Translate the strict lossless Twee 3 passage/link subset."""
+    """Translate the strict lossless Twee 3 passage/link subset.
+
+    Why
+    ---
+    Twee is a source projection over cardinal story data. This codec preserves
+    the simple passage/link subset without treating source text as runtime state.
+
+    Key Features
+    ------------
+    * Decodes passages, title, metadata, and simple links into cardinal data.
+    * Encodes only a validated, zero-loss simple-world projection.
+
+    API
+    ---
+    - :meth:`decode` lowers supported Twee source.
+    - :meth:`encode` emits normalized Twee content without writing files.
+
+    Notes
+    -----
+    Macros, generated controls, and ambiguous source delimiters are rejected by
+    strict export rather than escaped or emitted lossily.
+
+    See also
+    --------
+    :class:`tangl.loaders.compiler.WorldCompiler`
+        Owns the cardinal compile/decompile export pipeline.
+    """
 
     codec_id = "twee3_1_0"
 
@@ -275,7 +304,12 @@ class TwineCodec:
 
         state = codec_state or {}
         _reject_lossy_state(state)
-        blocks, start_key = _simple_world_blocks(runtime_data)
+        blocks, start_key = _simple_world_blocks(
+            runtime_data,
+            bundle=bundle,
+            story_key=story_key,
+            codec_id=self.codec_id,
+        )
         passages = _twine_passages(blocks=blocks, start_key=start_key, codec_state=state)
         title = _twine_title(runtime_data)
         story_data = _twine_story_data(start_name=passages[start_key]["name"], codec_state=state)
@@ -294,10 +328,32 @@ def _reject_lossy_state(codec_state: dict[str, Any]) -> None:
         raise ValueError("Lossless Twee export requires an artifact with no decode loss records.")
 
 
-def _simple_world_blocks(runtime_data: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], str]:
-    for section in ("actors", "locations", "templates", "globals"):
-        if runtime_data.get(section):
-            raise ValueError(f"Lossless Twee export does not support root {section}.")
+def _simple_world_blocks(
+    runtime_data: dict[str, Any],
+    *,
+    bundle: "WorldBundle",
+    story_key: str | None,
+    codec_id: str,
+) -> tuple[dict[str, dict[str, Any]], str]:
+    allowed_root = {"label", "metadata", "scenes"}
+    extra_root = set(runtime_data) - allowed_root
+    if extra_root:
+        raise ValueError(
+            "Lossless Twee export does not support root fields: "
+            f"{', '.join(sorted(extra_root))}.",
+        )
+    expected_label = bundle.manifest.story_label(story_key)
+    if runtime_data.get("label") != expected_label:
+        raise ValueError(
+            "Lossless Twee export requires the cardinal label to match the target bundle: "
+            f"{expected_label!r}.",
+        )
+
+    metadata = _validate_twine_metadata(
+        runtime_data.get("metadata"),
+        manifest_metadata=bundle.manifest.metadata,
+        codec_id=codec_id,
+    )
 
     scenes = runtime_data.get("scenes")
     if not isinstance(scenes, dict) or set(scenes) != {"world"}:
@@ -317,14 +373,36 @@ def _simple_world_blocks(runtime_data: dict[str, Any]) -> tuple[dict[str, dict[s
         _validate_simple_block(key, block)
         normalized_blocks[key] = block
 
-    metadata = runtime_data.get("metadata")
-    start_ref = metadata.get("start_at") if isinstance(metadata, dict) else None
+    start_ref = metadata.get("start_at")
     if not isinstance(start_ref, str) or not start_ref.startswith("world."):
         raise ValueError("Lossless Twee export requires exactly one world start entry.")
     start_key = start_ref.removeprefix("world.")
     if not start_key or start_key not in normalized_blocks:
         raise ValueError("Lossless Twee export start entry must name a current world block.")
     return normalized_blocks, start_key
+
+
+def _validate_twine_metadata(
+    metadata: Any,
+    *,
+    manifest_metadata: dict[str, Any],
+    codec_id: str,
+) -> dict[str, Any]:
+    if not isinstance(metadata, dict):
+        raise ValueError("Lossless Twee export requires metadata mapping.")
+    for key, value in metadata.items():
+        if key in {"title", "start_at"}:
+            continue
+        if key == "codec_id":
+            if value != codec_id:
+                raise ValueError("Lossless Twee export requires the Twine codec identifier.")
+            continue
+        if manifest_metadata.get(key) != value or key not in manifest_metadata:
+            raise ValueError(
+                "Lossless Twee export cannot preserve metadata outside the target manifest: "
+                f"{key!r}.",
+            )
+    return metadata
 
 
 def _validate_simple_scene(scene: dict[str, Any]) -> None:
@@ -393,11 +471,17 @@ def _validate_simple_block(key: str, block: dict[str, Any]) -> None:
         raise ValueError(
             f"Lossless Twee export requires block label {key!r} to match its structural key.",
         )
-    if not isinstance(block.get("content", ""), str):
+    content = block.get("content", "")
+    if not isinstance(content, str):
         raise ValueError(f"Lossless Twee export requires text content for block {key!r}.")
+    _validate_content(content, block_key=key)
     tags = block.get("tags", [])
     if not isinstance(tags, list) or not all(
-        isinstance(tag, str) and tag and not any(char.isspace() for char in tag)
+        isinstance(tag, str)
+        and tag
+        and not any(char.isspace() for char in tag)
+        and "[" not in tag
+        and "]" not in tag
         for tag in tags
     ):
         raise ValueError(f"Lossless Twee export requires string tags for block {key!r}.")
@@ -428,8 +512,13 @@ def _validate_simple_action(block_key: str, action: Any) -> None:
         )
     if not isinstance(action.get("text"), str) or not action["text"]:
         raise ValueError(f"Lossless Twee export requires action text in block {block_key!r}.")
+    _validate_action_text(action["text"], block_key=block_key)
     if not isinstance(action.get("successor_ref"), str) or not action["successor_ref"]:
         raise ValueError(f"Lossless Twee export requires action successors in block {block_key!r}.")
+    if action.get("successor_is_absolute") or action.get("successor_is_inferred"):
+        raise ValueError(
+            f"Lossless Twee export requires explicit relative successors in block {block_key!r}.",
+        )
 
 
 def _twine_passages(
@@ -449,6 +538,7 @@ def _twine_passages(
         name = passage.get("name")
         if not isinstance(slug, str) or not isinstance(name, str):
             raise ValueError("Lossless Twee passage state requires slug and name strings.")
+        _validate_passage_name(name, block_key=slug)
         if slug in prior_by_slug:
             raise ValueError(f"Lossless Twee export has duplicate passage state for {slug!r}.")
         prior_by_slug[slug] = passage
@@ -470,12 +560,11 @@ def _twine_passages(
         name = state.get("name", key)
         if not isinstance(name, str) or not name:
             raise ValueError(f"Lossless Twee export requires a passage name for {key!r}.")
+        _validate_passage_name(name, block_key=key)
         if name in names:
             raise ValueError(f"Lossless Twee export produced duplicate passage name {name!r}.")
         names.add(name)
-        meta = state.get("meta", {})
-        if not isinstance(meta, dict):
-            raise ValueError(f"Lossless Twee export requires mapping header metadata for {key!r}.")
+        meta = _validate_header_metadata(state.get("meta", {}), block_key=key)
         passages[key] = {
             "name": name,
             "tags": blocks[key].get("tags", []),
@@ -493,7 +582,59 @@ def _twine_title(runtime_data: dict[str, Any]) -> str:
     title = metadata.get("title") if isinstance(metadata, dict) else None
     if not isinstance(title, str) or not title.strip():
         raise ValueError("Lossless Twee export requires metadata.title.")
+    if any(line.startswith("::") for line in title.splitlines()):
+        raise ValueError("Lossless Twee title cannot contain a passage header.")
     return title.strip()
+
+
+def _validate_passage_name(name: str, *, block_key: str) -> None:
+    if (
+        not name
+        or any(char in name for char in ("\n", "\r", "[", "]", "{", "}", "|"))
+        or "::" in name
+        or "->" in name
+        or _is_special_passage(name)
+    ):
+        raise ValueError(
+            "Lossless Twee export cannot represent passage name for block "
+            f"{block_key!r}: {name!r}.",
+        )
+
+
+def _validate_action_text(text: str, *, block_key: str) -> None:
+    if any(token in text for token in ("\n", "\r", "[", "]", "|", "->")):
+        raise ValueError(
+            f"Lossless Twee export cannot represent action text in block {block_key!r}.",
+        )
+
+
+def _validate_content(content: str, *, block_key: str) -> None:
+    if (
+        any(line.startswith("::") for line in content.splitlines())
+        or any(token in content for token in ("[[", "]]", "<<", ">>"))
+    ):
+        raise ValueError(
+            "Lossless Twee export cannot represent control delimiters in block "
+            f"{block_key!r} content.",
+        )
+
+
+def _validate_header_metadata(meta: Any, *, block_key: str) -> dict[str, Any]:
+    if not isinstance(meta, dict):
+        raise ValueError(
+            f"Lossless Twee export requires mapping header metadata for {block_key!r}.",
+        )
+    try:
+        normalized = json.loads(json.dumps(meta, sort_keys=True, separators=(",", ":")))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Lossless Twee export requires JSON header metadata for {block_key!r}.",
+        ) from exc
+    if normalized != meta:
+        raise ValueError(
+            f"Lossless Twee export requires portable header metadata for {block_key!r}.",
+        )
+    return normalized
 
 
 def _twine_story_data(*, start_name: str, codec_state: dict[str, Any]) -> dict[str, str]:
@@ -536,11 +677,17 @@ def _render_twee(
 def _render_link(action: dict[str, Any], *, name_by_key: dict[str, str]) -> str:
     successor_ref = action["successor_ref"]
     if not successor_ref.startswith("world."):
-        raise ValueError(f"Lossless Twee action successor must stay in world scene: {successor_ref!r}.")
+        raise ValueError(
+            "Lossless Twee action successor must stay in world scene: "
+            f"{successor_ref!r}.",
+        )
     target_key = successor_ref.removeprefix("world.")
     target_name = name_by_key.get(target_key)
     if target_name is None:
-        raise ValueError(f"Lossless Twee action successor has no current passage: {successor_ref!r}.")
+        raise ValueError(
+            "Lossless Twee action successor has no current passage: "
+            f"{successor_ref!r}.",
+        )
     text = action["text"]
     if text == target_name:
         return f"[[{target_name}]]"
@@ -560,7 +707,7 @@ def _parse_twee(*, source: str, path: Path, start_ordinal: int) -> list[RawPassa
 
         tags_raw = (match.group("tags") or "").strip()
         tags = [tag for tag in tags_raw.split() if tag]
-        meta = _parse_header_meta(match.group("meta"))
+        meta, header_meta_valid = _parse_header_meta(match.group("meta"))
 
         passages.append(
             RawPassage(
@@ -570,22 +717,25 @@ def _parse_twee(*, source: str, path: Path, start_ordinal: int) -> list[RawPassa
                 body=body,
                 path=str(path),
                 ordinal=start_ordinal + index,
+                header_meta_valid=header_meta_valid,
             )
         )
 
     return passages
 
 
-def _parse_header_meta(raw_meta: str | None) -> dict[str, Any]:
+def _parse_header_meta(raw_meta: str | None) -> tuple[dict[str, Any], bool]:
     if not raw_meta:
-        return {}
+        return {}, True
 
     try:
         parsed = json.loads(raw_meta)
     except json.JSONDecodeError:
-        return {}
+        return {}, False
 
-    return parsed if isinstance(parsed, dict) else {}
+    if not isinstance(parsed, dict):
+        return {}, False
+    return parsed, True
 
 
 def _merge_passages(passages: list[RawPassage]) -> tuple[list[RawPassage], list[LossRecord]]:
@@ -617,6 +767,16 @@ def _extract_story_metadata(passages: list[RawPassage]) -> tuple[StoryMetadata, 
     loss_records: list[LossRecord] = []
 
     for passage in passages:
+        if not passage.header_meta_valid:
+            loss_records.append(
+                LossRecord(
+                    kind=LossKind.SOURCE_INTEGRITY,
+                    feature=FEATURE_HEADER_METADATA,
+                    passage=passage.name,
+                    excerpt=_trim_excerpt(passage.name),
+                    note="Passage header metadata must be a JSON object.",
+                )
+            )
         if passage.name == "StoryTitle":
             title = passage.body.strip() or title
             continue
@@ -639,6 +799,18 @@ def _extract_story_metadata(passages: list[RawPassage]) -> tuple[StoryMetadata, 
                 )
             )
             continue
+
+        supported_keys = {"name", "start", "format", "format-version"}
+        for key in sorted(set(data) - supported_keys):
+            loss_records.append(
+                LossRecord(
+                    kind=LossKind.UNSUPPORTED_FEATURE,
+                    feature=FEATURE_STORY_DATA_FIELD,
+                    passage="StoryData",
+                    excerpt=_trim_excerpt(key),
+                    note="StoryData fields outside the strict normalized subset are ignored.",
+                )
+            )
 
         if title is None:
             raw_title = data.get("name")

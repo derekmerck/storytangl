@@ -13,8 +13,10 @@ import pytest
 
 from tangl.loaders import CodecRegistry, LossKind, WorldBundle
 from tangl.loaders.codecs.twine import (
+    FEATURE_HEADER_METADATA,
     FEATURE_MACROS_IF,
     FEATURE_SPECIAL_PASSAGE,
+    FEATURE_STORY_DATA_FIELD,
     ISSUE_DANGLING_LINK,
     ISSUE_DUPLICATE_PASSAGE,
     ISSUE_INVALID_STORY_DATA,
@@ -262,6 +264,34 @@ Hello.
         assert any(record.feature == ISSUE_INVALID_STORY_DATA for record in result.loss_records)
         assert result.story_data["metadata"]["start_at"] == "world.start"
 
+    def test_decode_records_unsupported_story_data_fields_as_loss(self, tmp_path: Path) -> None:
+        bundle = _write_bundle(
+            tmp_path,
+            scripts={
+                "story.twee": """
+:: StoryData
+{"start":"Start","ifid":"a-preserved-id"}
+
+:: Start
+Hello.
+                """
+            },
+        )
+
+        result = _decode_bundle(bundle)
+
+        assert any(record.feature == FEATURE_STORY_DATA_FIELD for record in result.loss_records)
+
+    def test_decode_records_invalid_header_metadata_as_loss(self, tmp_path: Path) -> None:
+        bundle = _write_bundle(
+            tmp_path,
+            scripts={"story.twee": ":: Start {not json}\nHello."},
+        )
+
+        result = _decode_bundle(bundle)
+
+        assert any(record.feature == FEATURE_HEADER_METADATA for record in result.loss_records)
+
     def test_decode_reports_unsupported_special_passages(self, tmp_path: Path) -> None:
         bundle = _write_bundle(
             tmp_path,
@@ -441,6 +471,20 @@ Inside.
 """
         }
 
+        (bundle.bundle_root / "story.twee").write_text(
+            emitted["story.twee"],
+            encoding="utf-8",
+        )
+        redecoded = _decode_bundle(bundle)
+        assert redecoded.loss_records == []
+        assert redecoded.story_data["scenes"]["world"]["blocks"]["start_here"]["actions"] == [
+            {
+                "text": "Enter",
+                "successor_ref": "inside",
+                "authored_successor_ref": "Inside",
+            }
+        ]
+
     def test_encode_appends_new_blocks_in_structural_key_order(self, tmp_path: Path) -> None:
         bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
         data = _simple_runtime_data()
@@ -458,7 +502,11 @@ Inside.
             codec_state=_simple_codec_state(),
         )["story.twee"]
 
-        assert emitted.index(":: Start Here") < emitted.index(":: Inside") < emitted.index(":: after")
+        assert (
+            emitted.index(":: Start Here")
+            < emitted.index(":: Inside")
+            < emitted.index(":: after")
+        )
 
     @pytest.mark.parametrize(
         ("codec_state", "mutation", "match"),
@@ -466,6 +514,9 @@ Inside.
             ({"loss_records": [{"feature": "macro"}]}, None, "decode loss records"),
             ({}, ("start", "effects", ["self.graph.locals['x'] = 1"]), "controls"),
             ({}, ("start", "is_anonymous", True), "generated block"),
+            ({}, ("start", "content", "[[not plain text]]"), "control delimiters"),
+            ({}, ("start", "content", ":: Another"), "control delimiters"),
+            ({}, ("start", "tags", ["bad]tag"]), "string tags"),
         ],
     )
     def test_encode_rejects_lossy_or_non_simple_shapes(
@@ -489,6 +540,128 @@ Inside.
                 codec_state={**_simple_codec_state(), **codec_state},
             )
 
+    @pytest.mark.parametrize(
+        ("field", "value", "match"),
+        [
+            ("text", "bad->text", "action text"),
+            ("successor_is_absolute", True, "explicit relative"),
+            ("successor_is_inferred", True, "explicit relative"),
+        ],
+    )
+    def test_encode_rejects_ambiguous_action_forms(
+        self,
+        tmp_path: Path,
+        field: str,
+        value: object,
+        match: str,
+    ) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        data = _simple_runtime_data()
+        data["scenes"]["world"]["blocks"]["start"]["actions"][0][field] = value
+
+        with pytest.raises(ValueError, match=match):
+            TwineCodec().encode(
+                bundle=bundle,
+                runtime_data=data,
+                story_key=None,
+                codec_state=_simple_codec_state(),
+            )
+
+    @pytest.mark.parametrize(
+        ("state_name", "fallback_key"),
+        [("StoryData", None), ("bad[passage]", None), (None, "StoryTitle")],
+    )
+    def test_encode_rejects_ambiguous_or_special_passage_names(
+        self,
+        tmp_path: Path,
+        state_name: str | None,
+        fallback_key: str | None,
+    ) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        data = _simple_runtime_data()
+        state = _simple_codec_state()
+        if state_name is not None:
+            state["passages"][0]["name"] = state_name
+        if fallback_key is not None:
+            state["passages"] = []
+            data["scenes"]["world"]["blocks"][fallback_key] = data["scenes"]["world"]["blocks"].pop(
+                "inside",
+            )
+            data["scenes"]["world"]["blocks"][fallback_key]["label"] = fallback_key
+
+        with pytest.raises(ValueError, match="passage name"):
+            TwineCodec().encode(
+                bundle=bundle,
+                runtime_data=data,
+                story_key=None,
+                codec_state=state,
+            )
+
+    def test_encode_rejects_unknown_or_changed_unpreserved_metadata(self, tmp_path: Path) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        data = _simple_runtime_data()
+        data["unexpected"] = True
+        with pytest.raises(ValueError, match="root fields"):
+            TwineCodec().encode(
+                bundle=bundle,
+                runtime_data=data,
+                story_key=None,
+                codec_state=_simple_codec_state(),
+            )
+
+    @pytest.mark.parametrize(
+        ("title", "meta", "match"),
+        [
+            ("Safe\n:: Injected", None, "passage header"),
+            (None, {"position": object()}, "JSON header metadata"),
+        ],
+    )
+    def test_encode_rejects_unrenderable_title_or_header_metadata(
+        self,
+        tmp_path: Path,
+        title: str | None,
+        meta: dict[str, object] | None,
+        match: str,
+    ) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        data = _simple_runtime_data()
+        state = _simple_codec_state()
+        if title is not None:
+            data["metadata"]["title"] = title
+        if meta is not None:
+            state["passages"][0]["meta"] = meta
+
+        with pytest.raises(ValueError, match=match):
+            TwineCodec().encode(
+                bundle=bundle,
+                runtime_data=data,
+                story_key=None,
+                codec_state=state,
+            )
+
+        manifest_path = bundle.bundle_root / "world.yaml"
+        manifest_path.write_text(
+            "label: twine_unit\ncodec: twee3_1_0\nscripts: story.twee\nmetadata:\n  author: Unit\n",
+            encoding="utf-8",
+        )
+        manifest_bundle = WorldBundle.load(bundle.bundle_root)
+        data = _simple_runtime_data()
+        data["metadata"]["author"] = "Unit"
+        assert TwineCodec().encode(
+            bundle=manifest_bundle,
+            runtime_data=data,
+            story_key=None,
+            codec_state=_simple_codec_state(),
+        )
+        data["metadata"]["author"] = "Changed"
+        with pytest.raises(ValueError, match="target manifest"):
+            TwineCodec().encode(
+                bundle=manifest_bundle,
+                runtime_data=data,
+                story_key=None,
+                codec_state=_simple_codec_state(),
+            )
+
     def test_encode_rejects_multi_file_or_unsafe_manifest_paths(self, tmp_path: Path) -> None:
         bundle = _write_bundle(
             tmp_path,
@@ -501,6 +674,45 @@ Inside.
                 story_key=None,
                 codec_state=_simple_codec_state(),
             )
+
+    @pytest.mark.parametrize(
+        "script_path",
+        ["\\outside.twee", "C:\\outside.twee", "C:outside.twee", "..\\outside.twee"],
+    )
+    def test_encode_rejects_cross_platform_unsafe_manifest_paths(
+        self,
+        tmp_path: Path,
+        script_path: str,
+    ) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        (bundle.bundle_root / "world.yaml").write_text(
+            f"label: twine_unit\ncodec: twee3_1_0\nscripts: {script_path}\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError, match="stay inside the bundle"):
+            TwineCodec().encode(
+                bundle=WorldBundle.load(bundle.bundle_root),
+                runtime_data=_simple_runtime_data(),
+                story_key=None,
+                codec_state=_simple_codec_state(),
+            )
+
+    def test_encode_normalizes_safe_windows_relative_manifest_path(self, tmp_path: Path) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
+        (bundle.bundle_root / "world.yaml").write_text(
+            "label: twine_unit\ncodec: twee3_1_0\nscripts: scripts\\\\story.twee\n",
+            encoding="utf-8",
+        )
+
+        emitted = TwineCodec().encode(
+            bundle=WorldBundle.load(bundle.bundle_root),
+            runtime_data=_simple_runtime_data(),
+            story_key=None,
+            codec_state=_simple_codec_state(),
+        )
+
+        assert emitted.keys() == {"scripts/story.twee"}
 
         (bundle.bundle_root / "world.yaml").write_text(
             "label: twine_unit\ncodec: twee3_1_0\nscripts: ../outside.twee\n",
