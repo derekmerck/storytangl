@@ -11,8 +11,8 @@
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
-add-only repertoire that supplies its moves, and the acquisition shell around
-both
+owner-bound repertoire that supplies its moves, and the acquisition shell
+around both
 **Prior art:** *Monkey Island* insult swordfighting; "one red paperclip" trade-up
 arbitrage. In-package: `SiegeRpsGame` (initiative), `RpsGame` (directed
 dominance), `AggregateForceGame` (bounded reserve as game state),
@@ -92,7 +92,7 @@ it (`Wearable = Token._create_wrapper_cls(WearableType, "Wearable")`):
 ```text
 PhraseType(Singleton)          immutable catalog truth: text, roles, tags, relations
 PhraseBadge = Token[PhraseType]  graph-owned earned instance, delegates + overrides
-RepertoireManager(ComponentManager[PhraseBadge])   owner-bound, add-only
+RepertoireManager(ComponentManager[PhraseBadge])   owner-bound collection
 ```
 
 `Token` gives exactly the semantics wanted: reads delegate to the frozen
@@ -108,9 +108,11 @@ persistent, UUID-assigned, rebound through the owner's registry, matching
 `OutfitManager`, `WardrobeManager`, `CredentialPacketManager`, and
 `VehicleLoadout`. One large `known_phrases` slot.
 
-Its domain-facing API exposes **`award()` only**, even though `ComponentManager`
-supports removal internally. Membership is durable, awards are idempotent,
-duplicates are disallowed, and ordinary play never consumes a badge.
+The mechanic exposes ordinary `ComponentManager` ownership changes, so badges can
+be transferred, wagered, or confiscated by explicit transaction. The **reference
+world** layers an award-only facade over that: awards are idempotent, duplicates
+are disallowed, and its play never removes a badge. That is a world policy, not a
+property of the mechanic — see "Mechanic capability versus demo policy" below.
 
 ### The dominance relation
 
@@ -202,8 +204,8 @@ choice log. If dominance were resolved by inspecting live world state during
 each round, replay would depend on world state at every step. Composing once at
 PREREQS pins it for the whole contest, so the exchange replays deterministically
 no matter what the world does afterward. This is the strongest argument for the
-boundary — stronger than handler purity. What the ledger actually stores is the
-schedule's hash rather than its contents; see below.
+boundary — stronger than handler purity. The schedule is persisted as game state
+so that replay does not depend on recomposing it; see below.
 
 **And it is projectable.** A sixty-four-entry matrix scoped to this contest is
 something `story_info` can actually render: what you hold, what it answers, what
@@ -211,49 +213,66 @@ answered you. Monkey Island players kept notes on paper. Making the schedule an
 inspectable artifact is what turns an opaque quiz into a legible puzzle, and it
 costs nothing extra because the snapshot already exists.
 
-### Schedules are cached and hash-verified, not journaled
+### The schedule is persisted as game state, not cached
 
-A dominance schedule is generally **static across a whole game** — the catalog
-does not change, and most worlds contribute rules once. Writing one into the
-journal per exchange would be a large amount of duplicated bytes to preserve
-something that almost never varies.
-
-So schedules are computed on demand, content-hashed, and cached. What the record
-keeps is the *hash*, not the schedule:
+The composed schedule is written onto `CallResponseGame` at PREREQS and lives
+there for the contest:
 
 ```text
-compose schedule
-  → content hash
-    → cache lookup keyed on (participating badge ids, active contributions)
-      → contest resolves against the cached schedule
-        → record stores schedule hash + engine version
+PREREQS:
+  snapshot participating badge ids
+  gather and fold contributions
+  persist concrete DominanceSchedule on CallResponseGame
+  optionally record schedule_hash + composer version for diagnostics
+
+resolution:
+  pure handler reads the persisted schedule
 ```
 
-On replay the schedule is recomposed from the same inputs and its hash compared
-to the stored one. A mismatch is a **reproduction error** and should be flagged
-as one, not silently accepted. The engine-version stamp — `tangl.info.__version__`,
-already surfaced through `SystemInfo` — separates "the engine changed" from "the
-composition is nondeterministic," which are very different bugs.
+This needs no new machinery. `Game` is an `Entity`, so it is ordinary graph
+state on the constructor-form persistence path, and `Ledger` already snapshots
+and checkpoints (`checkpoint_cadence`, `save_snapshot`, `make_checkpoint`).
+`AggregateForceGame.player_opening_reserve` is the same move already made —
+a snapshot persisted as game state.
 
-`HasContent` is the primitive: a `DominanceSchedule(HasContent)` implements
-`get_hashable_content()` and inherits `content_hash()` plus compare-by-content.
-`EntityFactory` is the hash-and-cache precedent, holding `hash_by_uid` and
-`materialized_by_hash` and computing `template_hash()` once per template.
+**A hash alone is not enough, and this is the deciding argument.** A stored hash
+*detects* that recomposition diverged; it cannot *reproduce* the original
+contest. If a world updates its catalog, imports a revised base, or the composer
+changes between sessions, every saved contest becomes flagged-but-unreplayable.
+Persisting the concrete schedule means the exchange replays exactly regardless of
+later drift.
 
-**Hash the composed output, not the contribution inputs.** This matters more
-than it looks. #307 is an open bug establishing that durable hashing needs one
-canonical stable serialization, because structurally unordered values — `set`,
-`frozenset` — do not serialize deterministically across `PYTHONHASHSEED`.
-Contributions are exactly that shape: their selectors carry `has_tags`, and tags
-are sets. Hashing contributions directly would make this design depend on #307
-landing first.
+It is also the smaller design. An external cache needs a lifecycle — keying,
+invalidation, eviction — that nothing else in the contest requires, and the pure
+handler gains a dependency it otherwise does not have. Caching can wait until
+measurements justify it.
 
-The composed schedule has no such problem. It is a flat mapping from ordered
-`(call_id, response_id)` pairs to an outcome and a source id — no sets, no
-arbitrary objects. Defining `get_hashable_content()` as that mapping in sorted
-key order is deterministic by construction, sidesteps the unordered-value
-problem entirely, and stays a good citizen of the contract #307 is trying to
-establish rather than working around it.
+The obvious objection is serialization cost, and it does not bite: the schedule
+is written once at PREREQS and never mutated, so it is diff-stable across
+checkpoints, and a contest-scoped schedule is tens of entries rather than a
+catalog cross-product.
+
+Note this does **not** mean writing a schedule into the journal per exchange.
+That would duplicate a largely static artifact many times over. Persisting it
+once as game state is a different and much smaller thing.
+
+**The hash survives as a diagnostic.** Recording `schedule_hash` plus
+`tangl.info.__version__` (already surfaced through `SystemInfo`) still tells you
+that a world's rules drifted since a contest was played, and separates "the
+engine changed" from "composition is nondeterministic." It is simply no longer
+the reproduction mechanism.
+
+`HasContent` is the primitive if that hash is wanted: a
+`DominanceSchedule(HasContent)` implements `get_hashable_content()` and inherits
+`content_hash()`. **Hash the composed output, not the contribution inputs.** #307
+establishes that durable hashing needs canonical stable serialization, because
+`set` and `frozenset` do not serialize deterministically across
+`PYTHONHASHSEED` — and contributions are exactly that shape, since their
+selectors carry `has_tags` and tags are sets. The composed schedule is a flat
+mapping from ordered `(call_id, response_id)` pairs to an outcome and a source
+id; hashing it in sorted key order is deterministic by construction. Since the
+hash is diagnostic rather than load-bearing, this is a convenience rather than a
+dependency either way.
 
 ### Resolution rules
 
@@ -277,9 +296,12 @@ establish rather than working around it.
    is the shape to copy. Start with layers and deterministic negative precedence;
    let a real catalog say whether more is warranted.
 
-3. **Equal-layer contradiction is surfaced, not silently resolved.** Declaring
-   from both ends is what makes the catalog extensible; it is also what makes
-   contradiction possible.
+3. **Equal-layer contradiction is diagnosed, then deterministically resolved.**
+   Declaring from both ends is what makes the catalog extensible; it is also what
+   makes contradiction possible. Both halves matter: the conflict is reported so
+   an author can see it, *and* negative precedence settles it so the contest has
+   executable semantics. Diagnosing without resolving would leave the kernel
+   without an answer at runtime.
 
 ### Three failure modes, only one of which is a miss
 
@@ -511,8 +533,15 @@ The player has never heard that call. The old badge applies anyway, because the
 new catalog item declares the relationship. Nothing is patched at runtime, and a
 learned badge never needs to know every future call that may recognize it.
 
-Extension is monotonic in both directions: a later expansion can add a response
-effective against old calls without editing the old catalog.
+*Base-catalog declarations* extend monotonically in both directions: a later
+expansion can add a response effective against old calls, or a call answered by
+old responses, without editing the existing catalog.
+
+The composed schedule is deliberately **not** monotonic. Higher layers exist
+precisely so a world or scenario can negate or override a relationship the base
+catalog declares — that is what makes `beaujolais`, and disabling a phrase
+family, expressible at all. Monotonicity is a property of additive catalog
+authoring, not of composition.
 
 ### "Better" is not a number
 
