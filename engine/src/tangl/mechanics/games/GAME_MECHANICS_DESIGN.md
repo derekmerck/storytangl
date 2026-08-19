@@ -239,6 +239,13 @@ That gives the aggregate-force family at least two distinct archetypes:
 Useful balance knobs in that second form include reserve depth, reserve width,
 initiative advantage, reinforcement cost, and posture-dependent payout.
 
+A third archetype sits alongside those two: a **call-response** or
+follow-the-leader form, where one side issues a prompt and the other must play
+the response keyed to it from a set they have accumulated. It recombines
+`SiegeRpsGame`'s initiative model with `PickingGame`'s keyed-answer table, and
+its interesting pressure comes from an orthogonal acquisition shell rather than
+from the grammar itself. See `REPERTOIRE_LOOP_DESIGN.md`.
+
 These are worth keeping because they stress different aspects of the family:
 
 - richer runtime state
