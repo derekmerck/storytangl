@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tangl.loaders import CodecRegistry, LossKind, LossRecord, WorldBundle
+from tangl.loaders import CodecRegistry, EncodeResult, LossKind, LossRecord, WorldBundle
 from tangl.loaders.codec import DecodeResult, NearNativeYamlCodec
 from tangl.loaders.compiler import WorldCompiler
 
@@ -63,7 +63,7 @@ class _LossyCodec:
         runtime_data: dict,
         story_key: str | None,
         codec_state: dict | None = None,
-    ) -> dict[str, str]:
+    ) -> EncodeResult:
         _ = bundle, runtime_data, story_key, codec_state
         raise NotImplementedError
 
@@ -98,6 +98,24 @@ class TestLossReportingTypes:
         result = DecodeResult(story_data={})
 
         assert result.loss_records == []
+
+    def test_encode_result_defaults_are_independent(self) -> None:
+        first = EncodeResult()
+        second = EncodeResult()
+        first.artifacts["story.yaml"] = "one"
+        first.warnings.append("warning")
+        first.loss_records.append(
+            LossRecord(
+                kind=LossKind.AUTHORING_DEBT,
+                feature="source:test",
+                passage="start",
+                excerpt="test",
+            )
+        )
+
+        assert second.artifacts == {}
+        assert second.warnings == []
+        assert second.loss_records == []
 
     def test_near_native_yaml_codec_emits_no_loss_records(self, tmp_path: Path) -> None:
         bundle = _write_world(
@@ -167,4 +185,3 @@ scripts: story.fake
             },
         ]
         json.dumps(world.bundle.codec_state)
-

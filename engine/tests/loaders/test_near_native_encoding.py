@@ -34,7 +34,7 @@ def test_reference_world_encodes_to_a_canonical_near_native_fixed_point(tmp_path
     canonical = compiler.story_compiler.decompile(world.bundle)
     original_source = (reference_root / "script.yaml").read_text(encoding="utf-8")
 
-    emitted = compiler.encode(bundle, world.bundle)
+    emitted = compiler.encode(bundle, world.bundle).artifacts
 
     output_root = tmp_path / "reference"
     output_root.mkdir()
@@ -75,8 +75,10 @@ def test_near_native_encode_uses_the_manifest_path_despite_stale_codec_state(
         story_key=None,
     )
 
-    assert stale.keys() == {"scripts/story.yaml"}
-    assert absent.keys() == {"scripts/story.yaml"}
+    assert stale.artifacts.keys() == {"scripts/story.yaml"}
+    assert absent.artifacts.keys() == {"scripts/story.yaml"}
+    assert stale.warnings == stale.loss_records == []
+    assert absent.warnings == absent.loss_records == []
     assert runtime_data == {"label": "safe_paths", "scenes": {}}
 
 

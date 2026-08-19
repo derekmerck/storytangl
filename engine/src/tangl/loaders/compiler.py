@@ -8,7 +8,7 @@ from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 from tangl.story.fabula.compiler import StoryTemplateBundle
 
 from .bundle import WorldBundle
-from .codec import CodecRegistry, DecodeResult, StoryCodec
+from .codec import CodecRegistry, DecodeResult, EncodeResult, StoryCodec
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler
 
 if TYPE_CHECKING:
@@ -234,7 +234,7 @@ class WorldCompiler:
         bundle: WorldBundle,
         story_bundle: StoryTemplateBundle,
         story_key: str | None = None,
-    ) -> dict[str, str]:
+    ) -> EncodeResult:
         """Encode one compiled story bundle without writing source files."""
 
         domain_adjuncts = self._load_domain_adjuncts(bundle)

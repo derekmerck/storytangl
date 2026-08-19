@@ -66,7 +66,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from tangl.loaders import DecodeResult, LossKind, LossRecord, WorldBundle
+from tangl.loaders import DecodeResult, EncodeResult, LossKind, LossRecord, WorldBundle
 
 CODEC_CONTRIBUTION_CALLS = 0
 
@@ -109,9 +109,9 @@ class LocalCodec:
         runtime_data: dict[str, Any],
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
-    ) -> dict[str, str]:
+    ) -> EncodeResult:
         _ = bundle, story_key, codec_state
-        return {{"local.story": runtime_data["label"]}}
+        return EncodeResult(artifacts={{"local.story": runtime_data["label"]}})
 
 
 def get_story_codecs() -> dict[str, LocalCodec]:
@@ -190,4 +190,4 @@ def test_world_compiler_encodes_with_bundle_local_codec(tmp_path: Path) -> None:
     compiler = WorldCompiler()
     world = compiler.compile(bundle)
 
-    assert compiler.encode(bundle, world.bundle) == {"local.story": "local_encode"}
+    assert compiler.encode(bundle, world.bundle).artifacts == {"local.story": "local_encode"}

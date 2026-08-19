@@ -129,8 +129,9 @@ later codec to encode. It canonicalizes hierarchy and payload kinds rather than
 recreating original file placement, section sugar, or diagnostic provenance.
 `WorldCompiler.encode(bundle, story_bundle, story_key=None)` resolves the
 bundle's matching codec, including its local domain contribution, and returns
-safe manifest-declared source-path content without writing or materializing a
-graph. Near-native encoding and the strict Twee 3 exporter both reject
+an ``EncodeResult`` containing safe manifest-declared source artifacts and
+structured diagnostics, without writing or materializing a graph. Near-native
+encoding and the strict Twee 3 exporter both reject
 multi-file stories rather than inventing a source repartitioning or
 manifest-rewrite policy. The Twee exporter supports one ordinary ``world``
 scene of non-anonymous blocks with text and simple actions, preserving passage

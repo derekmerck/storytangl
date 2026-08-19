@@ -213,7 +213,7 @@ class TestTwineReferenceWorld:
             (reference_root / "world.yaml").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
-        for relative_path, content in emitted.items():
+        for relative_path, content in emitted.artifacts.items():
             target = output_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
@@ -222,10 +222,10 @@ class TestTwineReferenceWorld:
         recompiled = WorldCompiler().compile(WorldBundle.load(output_root))
         reemitted = WorldCompiler().encode(WorldBundle.load(output_root), recompiled.bundle)
 
-        assert emitted.keys() == {"story.twee"}
+        assert emitted.artifacts.keys() == {"story.twee"}
         assert (reference_root / "story.twee").read_text(encoding="utf-8") == original
         assert compiler.story_compiler.decompile(recompiled.bundle) == canonical
-        assert reemitted == emitted
+        assert reemitted.artifacts == emitted.artifacts
 
     def test_world_compiler_encodes_through_a_twine_manifest_alias(self, tmp_path: Path) -> None:
         root = tmp_path / "twine_alias"
@@ -245,7 +245,7 @@ class TestTwineReferenceWorld:
         emitted = compiler.encode(bundle, world.bundle)
 
         assert world.bundle.codec_id == "twee3_1_0"
-        assert emitted.keys() == {"story.twee"}
+        assert emitted.artifacts.keys() == {"story.twee"}
 
 
 class TestTwineLossPropagation:

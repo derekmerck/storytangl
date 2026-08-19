@@ -57,6 +57,36 @@ class DecodeResult:
     loss_records: list[LossRecord] = field(default_factory=list)
 
 
+@dataclass(slots=True)
+class EncodeResult:
+    """EncodeResult()
+
+    Why
+    ---
+    Source projection can produce diagnostics independently of compilation, so
+    callers need one result object rather than an unadorned artifact mapping.
+
+    Key Features
+    ------------
+    * Carries relative source artifacts without writing them.
+    * Keeps codec warnings and structured loss records available to the owner.
+
+    API
+    ---
+    - :attr:`artifacts` maps relative source paths to text.
+    - :attr:`warnings` and :attr:`loss_records` report projection diagnostics.
+
+    Notes
+    -----
+    The compiler returns source content and any codec-owned diagnostics without
+    writing files or choosing a partial-export policy.
+    """
+
+    artifacts: dict[str, str] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    loss_records: list[LossRecord] = field(default_factory=list)
+
+
 class StoryCodec(Protocol):
     """Protocol for world format codecs.
 
@@ -85,13 +115,14 @@ class StoryCodec(Protocol):
         runtime_data: dict[str, Any],
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
-    ) -> dict[str, str]:
+    ) -> EncodeResult:
         """Encode runtime data back to on-disk representation.
 
         Returns
         -------
-        dict[str, str]
-            Mapping of relative paths to file content.
+        EncodeResult
+            Source artifacts plus structured codec diagnostics. Writing remains
+            outside the compiler.
         """
 
 
@@ -198,7 +229,7 @@ class NearNativeYamlCodec:
         runtime_data: dict[str, Any],
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
-    ) -> dict[str, str]:
+    ) -> EncodeResult:
         _ = codec_state
         rel_path = single_manifest_output_path(
             bundle=bundle,
@@ -207,7 +238,7 @@ class NearNativeYamlCodec:
             default_name="script.yaml",
         )
         content = yaml.safe_dump(runtime_data, sort_keys=False, allow_unicode=True)
-        return {rel_path: content}
+        return EncodeResult(artifacts={rel_path: content})
 
 
 class CodecRegistry:
