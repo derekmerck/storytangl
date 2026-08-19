@@ -782,14 +782,16 @@ worlds compose a broader range:
   without mutating the shared kernel;
 - the logical-adder reskin exercises the same underlying logic through different
   content and feeling;
-- the separate Twine-loader demo remains a codec surface while round-trip
-  fidelity and loss tracking mature; later it should support an explicit parity
-  comparison rather than replace the canonical reskin;
+- the separate Twine-loader demo proves a strict normalized round trip for the
+  supported simple-world subset, with unsupported constructs reported as loss
+  rather than silently approximated; richer source fidelity remains a codec
+  concern rather than a replacement for the canonical reskin;
 - the sandbox / Colossal Cave world exercises movement among location nodes,
   location-driven activity fan-out, presence, mobile roles, and declarative
   capability-conditioned opportunities;
 - the CarWars worlds exercise vehicle assembly, inventory, repair, loadouts,
-  transactions, racing, and combat.
+  transactions, racing, and combat; their compact passages loader is the next
+  concrete target for a world-local codec over the shared cardinal boundary.
 
 The eventual robot chopshop is the comprehensive integration target. It is a
 capstone because one graph-owned assembly feeds several mechanics, not merely
