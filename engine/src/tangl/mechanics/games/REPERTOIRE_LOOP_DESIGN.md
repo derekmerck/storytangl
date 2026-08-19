@@ -146,35 +146,54 @@ Three rules, and they matter more than they look:
    declared. Without this, coverage analysis is meaningless and unrelated tags
    accidentally succeed.
 
-2. **Precedence is declared, not computed.** `Selector` is a pure boolean —
-   `matches()` returns `bool`, and there is no match-distance or specificity
-   score anywhere in core. Ordering in this repository comes from declared
-   `Priority` and `DispatchLayer` enums. Follow that: each declaration carries an
-   explicit rank, and **a badge-local override outranks its catalog
-   declaration** for the same reason `DispatchLayer.LOCAL` sorts last — the
-   local layer exists to observe and override the global one. At equal rank,
-   negative beats positive.
+2. **Precedence is declared, for now.** Each declaration carries an explicit
+   rank, and **a badge-local override outranks its catalog declaration** for the
+   same reason `DispatchLayer.LOCAL` sorts last — the local layer exists to
+   observe and override the global one. At equal rank, negative beats positive.
 
-   Computed specificity is deliberately rejected. It is the classic source of
-   surprise in cascading rule systems, and declared precedence is legible in a
-   way criteria-counting is not.
+   This is a first-implementation choice, not a settled principle. The engine
+   already has a richer model for exactly this problem, and it is the obvious
+   thing to borrow if declared ranks prove too blunt: `offer_sort_key()` in
+   `vm/provision/matching.py` resolves competing provisioning offers with a
+   deterministic tuple blending declared tiers, computed distance
+   (`scope_distance`, `distance_from_caller`), and a computed
+   `score_selector_specificity` whose own docstring calls it "CSS-like."
 
-3. **Equal-rank contradiction is a load-time diagnostic, not a silent pick.**
-   Declaring from both ends is what makes the catalog extensible; it is also
-   what makes contradiction possible. Surface it.
+   So the open question is whether dominance contradictions are best resolved by
+   *rules* or by *closest / most-likely match with rules as distance measures*.
+   Rules-only is fine to start. If the answer turns out to be distance, the shape
+   to copy already exists.
 
-### Catalog-load diagnostics
+3. **Equal-rank contradiction is surfaced, not silently resolved.** Declaring
+   from both ends is what makes the catalog extensible; it is also what makes
+   contradiction possible.
+
+### Diagnostics are an authoring aid, not a gate
 
 A tag-derived many-to-many relation is a rule system, and two authors adding
-tags independently will produce matches neither intended. The normalizer should
-report:
+tags independently will produce matches neither intended. A catalog-load pass
+should report:
 
 - calls with zero valid responses in the world catalog (unwinnable)
 - badges with zero coverage (dead weight)
 - equal-rank contradictions (ambiguous)
 
-This is ordinary authoring validation and belongs with #286 / #205, not in a
-private checker.
+But **preflight cannot be authoritative here**, and the design must not lean on
+it. Nothing stops a world from programmatically injecting a badge that was never
+in the catalog, or tombstoning a catalog member mid-story. Either can introduce
+a fresh contradiction, or trivialize an existing resolution, after load has
+already run.
+
+Two consequences the runtime must actually honor:
+
+- **Resolution tolerates unknown badges.** This is where *default is miss* earns
+  its keep: an injected badge with no declared relations simply loses, which is
+  the safe failure. Injection can never accidentally manufacture a win.
+- **The relation index tolerates dangling references.** A tombstoned member
+  degrades to "no declared relation" rather than raising.
+
+So this is a diagnostic surface in the spirit of #286 / #205 — worth having, and
+never a correctness guarantee.
 
 ### Initiative, and the no-legal-move floor
 
@@ -234,19 +253,27 @@ No new phase, fragment type, graph primitive, or protocol.
 
 ## L2 · The acquisition shell
 
-### Two reward channels, kept separate
+### Two reward channels, separated by catalog type
 
 An earlier draft collapsed these, saying the player learns a badge by losing and
 then spends it. Badges are not spent.
 
-- **Competence** — durable, normally non-consumable. Granted by *exposure*: any
-  phrase actually deployed against you may become yours, per world policy. A
-  badge can gate an offer without being consumed. A world that treats some
-  technique as expendable is running a variant rule.
-- **Prizes** — one-time and tangible. Granted by *winning*: a trophy, an access
-  route, a relationship change, a plot token. These participate in the trading
-  and unlock shell through `tangl.mechanics.transaction`, whose design doc
-  already enumerates Held Token and Catalog Provision source modes.
+The two channels are **different catalogs distinguished by type**, not two roles
+within one catalog:
+
+- **Competence** — phrase badges. Durable, normally non-consumable. Granted by
+  *exposure*: any phrase actually deployed against you may become yours, per
+  world policy. A badge can gate an offer without being consumed. A world that
+  treats some technique as expendable is running a variant rule.
+- **Prizes** — their own catalog of spendable, tradable tokens. Granted by
+  *winning*. These participate in the trading and unlock shell through
+  `tangl.mechanics.transaction`, whose design doc already enumerates Held Token
+  and Catalog Provision source modes.
+
+A phrase is one kind of badge-like token; a prize can be anything — a token from
+another catalog, a variable flag, a newly minted concept. Modeling prizes as
+spendable tokens with their own catalog is the simplest first cut and keeps the
+transaction rails doing what they already do.
 
 ```text
 lose → learn something
@@ -256,6 +283,26 @@ prize → unlock or trade for another opportunity
 ```
 
 Grind losses, not wins.
+
+### The reward policy is a hookable shell-level handler
+
+Acquisition is **not** kernel behavior. It belongs to the plot/shell layer as an
+ordinary dispatch-registered aftermath handler, and it is expected to change
+without touching the contest flow.
+
+The first implementation should be whatever is easiest — most likely "award the
+phrase that beat you." What matters is that swapping the policy never reaches
+into the kernel. Worlds should be able to express things well outside that
+default:
+
+- winning makes you *forget* something
+- losing teaches only the winning retort
+- losing teaches the winning retort plus every retort ranked below your best
+
+Those are illustrations of the range, not proposals. Their only real requirement
+is on the evidence: the round record has to be rich enough that a policy nobody
+has written yet can still be computed from it. That is the practical argument
+for the field set below — richer than the default policy needs, deliberately.
 
 ### Exposure is recorded, never inferred
 
@@ -267,8 +314,11 @@ The round record must identify what was actually presented:
 - any explicitly revealed correct response
 - initiative before and after
 
-`RoundRecord.notes` carries this; JOURNAL renders it; a world aftermath handler
-applies progression idempotently.
+`RoundRecord.notes` carries this; JOURNAL renders it; the shell-level aftermath
+handler applies progression idempotently, guarded the way
+`apply_colony_victory_aftermath` guards with `caller.locals`.
+
+Two things this rules out, both deliberately:
 
 Two things this rules out, both deliberately:
 
@@ -367,8 +417,10 @@ it is deliberately off the critical path.
    matching, initiative, structured round notes, ordinary CLI journal output.
 2. `PhraseType` / `PhraseBadge` / owner-bound `RepertoireManager`; a world
    PREREQS handler snapshots selected badge ids into the contest.
-3. World aftermath reads actual exposure records and idempotently awards badges.
-4. Winning an opponent grants one unique prize or durable world consequence.
+3. Shell-level aftermath handler reads exposure records and idempotently awards
+   badges; the policy is swappable without touching steps 1-2.
+4. Winning an opponent grants a prize token from its own catalog, or a durable
+   world consequence.
 5. Plot-level opponents and locations gate on repertoire and prize holdings.
 6. Sword Master analogue: unfamiliar call text mapped to already-earned badges.
 7. Richer expressions and presentation, only after the CLI vertical is complete.
@@ -380,15 +432,14 @@ really orthogonal.
 
 ## Open questions
 
-1. **Contradiction severity.** Equal-rank contradictions are a load-time
-   diagnostic, but hard error versus warning is undecided. Error is more honest;
-   warning keeps large catalogs editable. Leaning error at world preflight,
-   warning at incremental authoring.
+1. **Contradiction resolution: rules or distance?** Declared ranks are the
+   first cut. Whether contradictions are better resolved as closest/most-likely
+   match — with the rules themselves acting as distance measures, in the shape of
+   `offer_sort_key()` — is genuinely open and should be decided by a real catalog
+   rather than in advance.
 2. **Does an aftermath grant every witnessed phrase, or only the one that beat
-   you?** Both are defensible world policies. The record supports either; the
-   default should be chosen by the first world rather than the kernel.
-3. **Do prizes and badges share a catalog?** A prize is a token too. Whether
-   they are one catalog with different roles or two is unresolved.
+   you?** A world policy, not a kernel decision. The first world should pick the
+   cheapest thing that works.
 
 Deferred as potential second consumers rather than open design: sequence prompts
 (Simon-says), and partial or near-miss scoring. Binary semantic matching is
