@@ -271,8 +271,10 @@ import, and worlds choose which to import — see
 | Term | Metaphor | Definition | Implementation |
 |------|----------|------------|----------------|
 | **World** | source distribution | Singleton factory holding scripts, templates, and handlers for a story domain | `story.World` |
-| **Script** | source code | YAML (or other format) defining structural and conceptual content | Authored `.yaml` files |
-| **Compiler** | front-end | Transforms scripts into a world bundle (graph template + registries) | `StoryCompiler` |
+| **Source artifact** | source code | A codec-owned authored projection such as near-native YAML, Twee, a passages file, or a document vault | World-manifest paths interpreted by `StoryCodec` |
+| **Cardinal story data** | portable AST | Format-neutral key/value story mapping shared by codecs and the story compiler | `DecodeResult.story_data`; `StoryCompiler.decompile()` output |
+| **Story codec** | front-end/back-end | Lowers authored source to cardinal story data and may project cardinal data back to source artifacts | `StoryCodec`, `DecodeResult`, `EncodeResult` |
+| **Compiler** | optimizer/linker | Compiles cardinal story data into templates and deterministically decompiles templates back to the cardinal boundary | `StoryCompiler` |
 | **Materializer** | linker | Instantiates a live story graph from a compiled world bundle | `StoryMaterializer` (`story.fabula.materializer`) |
 | **Template** | class definition | Prototype data for creating new node instances during provisioning | Template registries |
 | **Vocabulary bank** | word list | Themed word/phrase collections for procedural prose generation | Namespace contributors |

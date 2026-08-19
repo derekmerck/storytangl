@@ -137,8 +137,30 @@ manifest-rewrite policy. The Twee exporter supports one ordinary ``world``
 scene of non-anonymous blocks with text and simple actions, preserving passage
 names, order, tags, header metadata, and format hints from codec state. Its
 output is normalized rather than byte-identical; artifacts with import loss or
-unrepresentable controls fail explicitly. Lossy export reporting, source
-residue, and source spans remain deferred under issue #188.
+unrepresentable controls fail explicitly.
+
+### Codec and Interchange Status
+
+The minimum viable interchange spine is landed. Bundle-local codecs can lower
+their own structured source directly to cardinal story data; deterministic
+decompilation returns compiled templates to that same cardinal boundary; and
+near-native YAML plus the strict simple-world Twee subset prove normalized
+semantic fixed points through ``DecodeResult`` and ``EncodeResult``. Codec
+losses also persist into the authoring-diagnostics path and prevent strict
+Twee export.
+
+The remaining work is tracked by issue #382 and should be driven by real source
+formats rather than a speculative universal codec framework. The immediate
+target is to retrofit the CarWars passages loader, or an equivalently
+nontrivial demo-world side-loader, as a proper world-local codec. That proof
+should precede broader work on per-operation fidelity vocabulary, explicit
+lossy-export policy, opaque foreign-syntax residue, richer directory or archive
+source roots, deterministic multi-file repartitioning, and source-span or
+concrete-syntax support for same-file rewriting.
+
+Strict export remains the default. A codec must not silently emit artifacts
+after discarding information, and foreign source syntax must not leak into the
+cardinal story vocabulary merely to make a particular format round-trip.
 
 That compiled bundle is a build-time artifact. `WorldBuilder` copies the
 surviving fields onto `World` and wires in adjunct resources such as:

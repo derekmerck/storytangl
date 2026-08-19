@@ -183,22 +183,29 @@ still requires an explicit migration or reinterpretation.
 The fabula/episodic/syuzhet separation maps directly to a compiler pipeline:
 
 ```
-Front-end:  Scripts (YAML, Twee, Ink...)
-               ↓ parse + compile
-IR:         StoryTemplateBundle / compiled template graph (the fabula)
-               ↓ traverse + resolve
-Back-end:   Journal Fragments (the syuzhet)
-               ↓ render
-Output:     CLI / Web / PDF / ...
+Source:       YAML, Twee, passages, document vaults, ...
+                 ↓ codec-owned structural decode
+Cardinal:     portable story mapping
+                 ↓ compile              ↑ deterministic decompile
+Fabula IR:    StoryTemplateBundle / compiled template graph
+                 ↓ traverse + resolve
+Syuzhet:      Journal fragments
+                 ↓ render
+Presentation: CLI / Web / PDF / ...
+
+Cardinal data  → codec-owned encode → normalized source artifacts
 ```
 
 Like LLVM's intermediate representation, the story graph is a **universal
 substrate** that captures narrative intent while abstracting away both the
 source format and the target medium.
 
-This is why transpilers between interactive fiction formats are architecturally
-natural: a Twine file and a StoryTangl YAML script are different front-ends
-compiling to the same IR.  The graph doesn't care where it came from.
+This is why interchange between interactive-fiction formats is architecturally
+natural: a Twine file and a StoryTangl YAML script are different projections
+through the same cardinal boundary. The compiled graph does not care where its
+content came from, while each codec remains responsible for reporting what its
+source representation preserved, normalized, approximated, or could not
+express.
 
 And like a compiler, the engine's phases are **deterministic, ordered passes**
 over the IR.  Each phase has a defined contract (what it reads, what it may
