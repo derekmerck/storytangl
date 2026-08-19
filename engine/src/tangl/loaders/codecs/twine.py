@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from tangl.loaders.codec import (
     DecodeResult,
+    EncodeResult,
     LossKind,
     LossRecord,
     SourceRef,
@@ -299,7 +300,7 @@ class TwineCodec:
         runtime_data: dict[str, Any],
         story_key: str | None,
         codec_state: dict[str, Any] | None = None,
-    ) -> dict[str, str]:
+    ) -> EncodeResult:
         """Encode one canonical simple-world mapping as normalized Twee 3."""
 
         state = codec_state or {}
@@ -320,7 +321,7 @@ class TwineCodec:
             format_name="Twee",
             default_name="script.twee",
         )
-        return {output_path: rendered}
+        return EncodeResult(artifacts={output_path: rendered})
 
 
 def _reject_lossy_state(codec_state: dict[str, Any]) -> None:

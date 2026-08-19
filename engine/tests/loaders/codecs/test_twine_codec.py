@@ -450,7 +450,7 @@ class TestTwineCodecRegistry:
             codec_state=_simple_codec_state(),
         )
 
-        assert emitted == {
+        assert emitted.artifacts == {
             "story.twee": """:: StoryTitle
 The Unit Tower
 
@@ -470,9 +470,10 @@ Choose.
 Inside.
 """
         }
+        assert emitted.warnings == emitted.loss_records == []
 
         (bundle.bundle_root / "story.twee").write_text(
-            emitted["story.twee"],
+            emitted.artifacts["story.twee"],
             encoding="utf-8",
         )
         redecoded = _decode_bundle(bundle)
@@ -500,7 +501,7 @@ Inside.
             runtime_data=data,
             story_key=None,
             codec_state=_simple_codec_state(),
-        )["story.twee"]
+        ).artifacts["story.twee"]
 
         assert (
             emitted.index(":: Start Here")
@@ -623,7 +624,7 @@ Inside.
             runtime_data=data,
             story_key=None,
             codec_state=_simple_codec_state(),
-        )
+        ).artifacts
         data["metadata"]["author"] = "Changed"
         with pytest.raises(ValueError, match="target manifest"):
             TwineCodec().encode(
@@ -752,7 +753,7 @@ Inside.
             codec_state=_simple_codec_state(),
         )
 
-        assert emitted.keys() == {"scripts/story.twee"}
+        assert emitted.artifacts.keys() == {"scripts/story.twee"}
 
         (bundle.bundle_root / "world.yaml").write_text(
             "label: twine_unit\ncodec: twee3_1_0\nscripts: ../outside.twee\n",

@@ -4,6 +4,7 @@ from .bundle import WorldBundle
 from .codec import (
     CodecRegistry,
     DecodeResult,
+    EncodeResult,
     LossKind,
     LossRecord,
     NearNativeYamlCodec,
@@ -19,6 +20,7 @@ __all__ = [
     "WorldBundle",
     "SourceRef",
     "DecodeResult",
+    "EncodeResult",
     "LossKind",
     "LossRecord",
     "StoryCodec",
