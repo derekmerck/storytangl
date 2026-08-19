@@ -16,7 +16,7 @@ from tangl.mechanics.games import (
     TaskSpec,
 )
 from tangl.story import Block
-from tangl.vm import on_prereqs
+from tangl.vm import VmPhaseCtx, on_prereqs
 
 
 FORCE_TYPES = ("rock", "paper", "scissors")
@@ -63,6 +63,13 @@ class ColonyContestBlock(HasGame, Block):
     _game_class = ColonyContestGame
     _game_handler_class = BagRpsGameHandler
 
+    def prepare_game(self, *, ctx: VmPhaseCtx) -> None:
+        """Snapshot shell force immediately before accepted contest setup."""
+
+        shell = _find_shell(ctx.graph)
+        self.game.player_opening_reserve = _force_profile_from_resources(shell.game.resources)
+        self.locals["shell_id"] = shell.uid
+
 
 class ColonyVictoryAftermathBlock(Block):
     """Victory aftermath block for the raid."""
@@ -95,23 +102,6 @@ def _force_profile_from_resources(resources: dict[str, int]) -> dict[str, int]:
 def _write_back_force(shell: ColonyShellBlock, contest: ColonyContestBlock) -> None:
     for label in FORCE_TYPES:
         shell.game.resources[label] = contest.game.player_reserve.get(label, 0)
-
-
-@on_prereqs(
-    wants_caller_kind=ColonyContestBlock,
-    wants_exact_kind=False,
-    priority=Priority.FIRST,
-)
-def prepare_colony_contest(*, caller, ctx, **_kw):
-    """Snapshot shell force into the contest spike before setup."""
-
-    if not isinstance(caller, ColonyContestBlock):
-        return None
-
-    shell = _find_shell(caller.graph)
-    caller.game.player_opening_reserve = _force_profile_from_resources(shell.game.resources)
-    caller.locals["shell_id"] = shell.uid
-    return None
 
 
 @on_prereqs(

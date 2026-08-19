@@ -330,6 +330,12 @@ class PhaseCtx:
 
         return self._ns_cache[uid]
 
+    def invalidate_namespaces(self) -> None:
+        """Discard namespace views after an in-place UPDATE mutation."""
+
+        self._ns_cache.clear()
+        self._ns_inflight.clear()
+
     def get_location_entity_groups(self) -> list[Iterable]:
         """Entity pools ordered by runtime location distance from cursor."""
         cursor = self.cursor

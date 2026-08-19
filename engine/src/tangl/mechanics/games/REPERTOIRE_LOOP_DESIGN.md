@@ -51,7 +51,7 @@ P   presentation        CLI floor -> richer media                (orthogonal)
 
 L1 and L2 are orthogonal. A contest is playable against a fixed phrase set with
 no economy; an acquisition economy works with any spike. They meet through the
-ordinary PREREQS-snapshot / aftermath-writeback boundary that
+ordinary accepted-entry UPDATE preparation / aftermath-writeback boundary that
 `worlds/colony_loop` already demonstrates — **not** through new protocols. Only
 a world composes them, the way credentials composes inspection, evidence,
 mediation, and disposition into one encounter.
@@ -151,7 +151,7 @@ base catalog relations
 + badge-local contributions
 ────────────────────────────────
 concrete DominanceSchedule
-        ↓ PREREQS snapshot
+        ↓ accepted-entry UPDATE snapshot
 CallResponseGame
 ```
 
@@ -180,7 +180,7 @@ layered contributions and folding them into a settled artifact is what
 `chain_execute_all` over `BehaviorRegistry` does, and `contribute_ns`,
 `contribute_roles`, `contribute_settings`, and
 `contribute_sandbox_inventory_helpers` are all instances of the pattern. A
-`contribute_dominance` handler at PREREQS is one more.
+`prepare_game(ctx)` contribution at accepted-entry UPDATE is one more.
 
 **Scope the schedule to the participating badges.** Compose over the player's
 snapshot × the opponent's snapshot, not the whole catalog. A cross-product over
@@ -191,7 +191,7 @@ sixty-four. So the game holds something genuinely small:
 dominance: dict[tuple[PhraseId, PhraseId], MatchResult]
 ```
 
-Two ordered steps, both at PREREQS: snapshot participating badge ids, then
+Two ordered accepted-entry UPDATE steps: snapshot participating badge ids, then
 compose the schedule over just those pairs.
 
 **`MatchResult` carries its contributing `source_id`.** Cheap, and it makes both
@@ -202,7 +202,7 @@ than only *whether*.
 event-sourced, and a playthrough must be reproducible from a snapshot plus the
 choice log. If dominance were resolved by inspecting live world state during
 each round, replay would depend on world state at every step. Composing once at
-PREREQS pins it for the whole contest, so the exchange replays deterministically
+Accepted-entry preparation pins it for the whole contest, so the exchange replays deterministically
 no matter what the world does afterward. This is the strongest argument for the
 boundary — stronger than handler purity. The schedule is persisted as game state
 so that replay does not depend on recomposing it; see below.
@@ -215,11 +215,11 @@ costs nothing extra because the snapshot already exists.
 
 ### The schedule is persisted as game state, not cached
 
-The composed schedule is written onto `CallResponseGame` at PREREQS and lives
+The composed schedule is written onto `CallResponseGame` during accepted-entry UPDATE and lives
 there for the contest:
 
 ```text
-PREREQS:
+accepted-entry UPDATE preparation:
   snapshot participating badge ids
   gather and fold contributions
   persist concrete DominanceSchedule on CallResponseGame
@@ -248,7 +248,7 @@ handler gains a dependency it otherwise does not have. Caching can wait until
 measurements justify it.
 
 The obvious objection is serialization cost, and it does not bite: the schedule
-is written once at PREREQS and never mutated, so it is diff-stable across
+is written once during accepted-entry UPDATE preparation and never mutated, so it is diff-stable across
 checkpoints, and a contest-scoped schedule is tens of entries rather than a
 catalog cross-product.
 
@@ -375,14 +375,14 @@ is kernel logic. The shell/spike boundary already answers this:
 
 ```text
 actor repertoire
-  → world PREREQS handler snapshots playable badge ids
+  → world ``prepare_game(ctx)`` snapshots playable badge ids
     → CallResponseGame holds that bounded set
       → pure GameHandler provisions moves from it
 ```
 
 `worlds/colony_loop` demonstrates the complete pattern, both directions:
-`prepare_colony_contest` runs `@on_prereqs(..., priority=Priority.FIRST)` and
-writes `caller.game.player_opening_reserve` before setup; the aftermath blocks
+`ColonyContestBlock.prepare_game()` writes
+`caller.game.player_opening_reserve` immediately before setup; the aftermath blocks
 read the contest game, write back to the shell, and guard re-entry with
 `caller.locals["aftermath_applied"]`. Bounded-set-as-game-state is likewise the
 family idiom, not a workaround — see `AggregateForceGame.player_reserve`.
@@ -589,7 +589,7 @@ it is deliberately off the critical path.
    role capability, directed matching, initiative, structured round notes,
    ordinary CLI journal output.
 2. `PhraseType` / `PhraseBadge` / owner-bound `RepertoireManager`; a
-   `contribute_dominance` PREREQS handler snapshots participating badge ids and
+   `prepare_game(ctx)` snapshots participating badge ids and
    composes the schedule over just those pairs.
 3. Shell-level aftermath handler reads exposure records and idempotently awards
    badges; the policy is swappable without touching steps 1-2.

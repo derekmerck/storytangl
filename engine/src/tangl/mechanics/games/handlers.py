@@ -3,24 +3,22 @@ from __future__ import annotations
 """VM phase handlers for game mechanics integration."""
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
     ResolutionPhase as P,
-    is_first_visit,
     on_gather_ns,
     on_journal,
-    on_prereqs,
     on_provision,
     on_update,
 )
-from tangl.vm.dispatch import dispatch
 
 from .has_game import HasGame
 
 if TYPE_CHECKING:
     from tangl.vm import VmPhaseCtx as Context
+    from tangl.vm.runtime.frame import PhaseCtx
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +34,7 @@ def _clear_dynamic_game_actions(cursor: HasGame, *, ctx: Context) -> None:
     from tangl.core import Selector
     from tangl.story import Action
 
-    graph = getattr(cursor, "graph", None)
-    if graph is None:
-        return
+    graph = cursor.graph
 
     for edge in list(cursor.edges_out(Selector(has_kind=Action, trigger_phase=None))):
         if _has_tags(edge, "dynamic", "fanout", "game"):
@@ -71,93 +67,16 @@ def _build_game_actions(cursor: HasGame) -> list[Any]:
     return actions
 
 
-def _ctx_frame(ctx: Any) -> Any | None:
-    """Return legacy frame from context when available."""
-    return getattr(ctx, "_frame", None)
+def _ctx_selected_payload(ctx: Context) -> Any:
+    """Return the selected edge payload for the current VM turn."""
+
+    return ctx.selected_payload
 
 
-def _ctx_cursor_history(ctx: Any) -> list[Any] | None:
-    """Resolve cursor-history-like data from legacy frame when present."""
-    frame = _ctx_frame(ctx)
-    history = getattr(frame, "cursor_history", None) if frame is not None else None
-    return history if isinstance(history, list) else None
+def _invalidate_game_namespace(ctx: Context) -> None:
+    """Clear the concrete phase cache after a game UPDATE mutation."""
 
-
-def _ctx_selected_payload(ctx: Any) -> Any:
-    """Extract selected payload from VM/legacy context and frame bridges."""
-    payload = getattr(ctx, "selected_payload", None)
-    if payload is not None:
-        return payload
-
-    payload = getattr(ctx, "incoming_payload", None)
-    if payload is not None:
-        return payload
-
-    frame = _ctx_frame(ctx)
-    if frame is not None:
-        selected_edge = getattr(frame, "selected_edge", None)
-        if selected_edge is not None:
-            payload = getattr(selected_edge, "payload", None)
-            if payload is not None:
-                return payload
-
-    selected_edge = getattr(ctx, "selected_edge", None)
-    if selected_edge is not None:
-        return getattr(selected_edge, "payload", None)
-
-    incoming_edge = getattr(ctx, "incoming_edge", None)
-    if incoming_edge is not None:
-        return getattr(incoming_edge, "payload", None)
-
-    return None
-
-
-@dispatch.register(task=P.PREREQS, caller=HasGame)
-@on_prereqs(wants_caller_kind=HasGame, wants_exact_kind=False)
-def setup_game_on_first_visit(
-    cursor: HasGame | None = None,
-    *,
-    caller: HasGame | None = None,
-    ctx: Context,
-    **kwargs: Any,
-):
-    """
-    Initialize the embedded game when the block is first visited.
-
-    Runs during :data:`~tangl.vm.resolution_phase.ResolutionPhase.PREREQS` to
-    ensure the game is ready before move provisioning. Uses the shared cursor
-    history to detect first entry and calls ``setup`` on the handler when the
-    game has not yet transitioned to READY.
-
-    Returns
-    -------
-    None
-        This handler never redirects traversal.
-    """
-
-    cursor = cursor if isinstance(cursor, HasGame) else caller
-    if not isinstance(cursor, HasGame):
-        return None
-
-    cursor_history = _ctx_cursor_history(ctx)
-    if cursor_history is not None:
-        if not is_first_visit(cursor.uid, cursor_history):
-            return None
-    elif cursor.game.phase == GamePhase.READY:
-        # VM contexts do not expose frame history directly; phase is enough
-        # to prevent repeated setup in steady-state traversal.
-        return None
-
-    logger.debug("First visit to %s; initializing game", cursor.get_label())
-
-    if cursor.game.phase != GamePhase.READY:
-        cursor.game_handler.setup(cursor.game)
-        cursor.locals["game_initialized"] = True
-
-    return None
-
-
-@dispatch.register(task=P.PLANNING, caller=HasGame)
+    cast("PhaseCtx", ctx).invalidate_namespaces()
 @on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
 def provision_game_moves(
     cursor: HasGame | None = None,
@@ -188,27 +107,26 @@ def provision_game_moves(
     if not isinstance(cursor, HasGame):
         return []
 
-    runtime_planning = getattr(ctx, "current_phase", None) == P.PLANNING
-
-    _clear_dynamic_game_actions(cursor, ctx=ctx)
-
-    if cursor.game.phase != GamePhase.READY:
-        if runtime_planning:
-            logger.debug(
-                "Planning reached %s before game setup; initializing inline",
-                cursor.get_label(),
-            )
-            cursor.game_handler.setup(cursor.game)
-            cursor.locals["game_initialized"] = True
-        else:
-            logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
-            return []
+    if cursor.game_handler.dynamic_move_projection:
+        _clear_dynamic_game_actions(cursor, ctx=ctx)
 
     if cursor.game.phase != GamePhase.READY:
-        return None if runtime_planning else []
+        if (
+            cursor.game.phase is GamePhase.PENDING
+            and ctx.current_phase is P.PLANNING
+        ):
+            # Planning may prove and materialize the next challenge frontier
+            # (for example, credential packet presentation) without accepting
+            # or initializing its embedded game state.
+            cursor.game_handler.provision_presentation(cursor.game, ctx=ctx)
+        logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
+        return None if ctx.current_phase is P.PLANNING else []
 
-    if runtime_planning:
+    if ctx.current_phase is P.PLANNING:
         cursor.game_handler.provision_presentation(cursor.game, ctx=ctx)
+
+    if not cursor.game_handler.dynamic_move_projection:
+        return None if ctx.current_phase is P.PLANNING else []
 
     moves = cursor.game_handler.get_provisioned_moves(cursor.game)
 
@@ -222,12 +140,11 @@ def provision_game_moves(
     # VM PLANNING handlers are side-effect-only: returning non-None results
     # causes do_provision() to raise. Keep list-return behavior for direct calls
     # used by tests and helper utilities outside the live frame pipeline.
-    if runtime_planning:
+    if ctx.current_phase is P.PLANNING:
         return None
     return actions
 
 
-@dispatch.register(task=P.UPDATE, caller=HasGame)
 @on_update(wants_caller_kind=HasGame, wants_exact_kind=False)
 def process_game_move(
     cursor: HasGame | None = None,
@@ -254,6 +171,14 @@ def process_game_move(
     cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):
         return None
+
+    if cursor.game.phase is GamePhase.PENDING:
+        cursor.prepare_game(ctx=ctx)
+        cursor.game_handler.setup(cursor.game)
+        _invalidate_game_namespace(ctx)
+        if cursor.game_handler.dynamic_move_projection:
+            _clear_dynamic_game_actions(cursor, ctx=ctx)
+            _build_game_actions(cursor)
 
     payload = _ctx_selected_payload(ctx)
     if not isinstance(payload, dict):
@@ -289,30 +214,27 @@ def process_game_move(
         cursor.game.round,
     )
 
-    # Context namespaces cache values per cursor; refresh so POSTREQ predicates
-    # read the updated game_* flags from :func:`inject_game_context`.
-    # The VM caches namespaces per follow-edge hop; clear after UPDATE so
-    # POSTREQS sees fresh game_* flags in the same pipeline pass.
-    ns_cache = getattr(ctx, "_ns_cache", None)
-    if isinstance(ns_cache, dict):
-        ns_cache.clear()
-    ns_inflight = getattr(ctx, "_ns_inflight", None)
-    if isinstance(ns_inflight, set):
-        ns_inflight.clear()
+    _invalidate_game_namespace(ctx)
 
-    _clear_dynamic_game_actions(cursor, ctx=ctx)
-    if cursor.game.phase == GamePhase.READY and not cursor.game.result.is_terminal:
+    if cursor.game_handler.dynamic_move_projection:
+        _clear_dynamic_game_actions(cursor, ctx=ctx)
+    if (
+        cursor.game_handler.dynamic_move_projection
+        and cursor.game.phase is GamePhase.READY
+        and not cursor.game.result.is_terminal
+    ):
         actions = _build_game_actions(cursor)
         logger.debug(
             "Refreshed %s game actions after update at %s",
             len(actions),
             cursor.get_label(),
         )
+    elif cursor.game.phase is GamePhase.TERMINAL:
+        cursor.project_game_outcomes(ctx=ctx)
 
     return None
 
 
-@dispatch.register(task=P.JOURNAL, caller=HasGame)
 @on_journal(wants_caller_kind=HasGame, wants_exact_kind=False)
 def generate_game_journal(
     cursor: HasGame | None = None,
@@ -383,7 +305,6 @@ def generate_game_journal(
     return fragments
 
 
-@dispatch.register(task="get_ns", caller=HasGame)
 @on_gather_ns(wants_caller_kind=HasGame, wants_exact_kind=False)
 def inject_game_context(
     cursor: HasGame | None = None,

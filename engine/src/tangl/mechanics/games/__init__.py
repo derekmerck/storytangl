@@ -72,7 +72,6 @@ from .handlers import (
     inject_game_context,
     process_game_move,
     provision_game_moves,
-    setup_game_on_first_visit,
 )
 from .blackjack_game import BlackjackGame, BlackjackGameHandler, BlackjackMove, PlayingCard
 from .nim_game import NimGame, NimGameHandler
@@ -234,6 +233,5 @@ __all__ = [
     "inject_game_context",
     "process_game_move",
     "provision_game_moves",
-    "setup_game_on_first_visit",
 
 ]

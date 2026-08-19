@@ -999,12 +999,12 @@ class CredentialsGame(PickingGame):
         default_factory=dict,
         json_schema_extra={"reset_field": True},
     )
-    # Lazy cache of materialized offers (cleared on setup; rebuilt on arrival).
+    # Frontier-materialized offers persist through accepted-entry setup. PLANNING
+    # prepares the current and sequential candidate before that game is entered.
     materialized: list[CredentialCase] = Field(
         default_factory=list,
         json_schema_extra={
             "include": True,
-            "reset_field": True,
             "unstructurable": True,
         },
     )

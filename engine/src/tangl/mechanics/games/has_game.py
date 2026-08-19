@@ -11,6 +11,7 @@ from tangl.mechanics.games import Game, GameHandler
 
 if TYPE_CHECKING:
     from tangl.core import Graph, Node
+    from tangl.vm import VmPhaseCtx
 
 
 def _add_node_compat(graph: Graph, *, kind: type, label: str | None, **kwargs: Any):
@@ -40,10 +41,10 @@ class HasGame:
 
     Notes
     -----
-    Current move provisioning happens dynamically during ``PLANNING``, but the
-    formal model is closer to a self-fanout: each available move is an edge
-    variant carrying different payload/label data while still targeting this
-    same node.
+    A pending game is prepared and initialized on accepted entry during
+    ``UPDATE``. State-derived moves are then dynamically projected as edges;
+    the formal model is a self-fanout, with each variant carrying distinct
+    payload/label data while still targeting this same node.
 
     The self-fanout shape — a re-entrant node whose outgoing move edges are
     recomputed each visit from current state — is also what a two-party contest
@@ -98,6 +99,16 @@ class HasGame:
         if self.game_state is None:
             return
         self.game_state.bind_component_managers(self)
+
+    def prepare_game(self, *, ctx: VmPhaseCtx) -> None:
+        """Prepare world-owned state immediately before first game setup."""
+
+        _ = ctx
+
+    def project_game_outcomes(self, *, ctx: VmPhaseCtx) -> None:
+        """Project any world-owned dynamic terminal continuations."""
+
+        _ = ctx
 
     @classmethod
     def create_game_block(

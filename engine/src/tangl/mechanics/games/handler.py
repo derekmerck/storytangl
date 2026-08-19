@@ -59,6 +59,10 @@ class GameHandler(ABC, Generic[GameT]):
     
     # Subclasses can set this to bind a handler to a game type
     game_cls: ClassVar[Type[Game]] = Game
+
+    # Re-entrant games normally derive their moves from mutable state. Hosts
+    # with authored stable actions can opt out and gate those actions normally.
+    dynamic_move_projection: ClassVar[bool] = True
     
     # ─────────────────────────────────────────────────────────────────────
     # Abstract methods - must be implemented by subclasses

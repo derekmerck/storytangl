@@ -14,9 +14,8 @@ from tangl.mechanics.games.handlers import (
     inject_game_context,
     process_game_move,
     provision_game_moves,
-    setup_game_on_first_visit,
 )
-from tangl.vm import Frame, VmPhaseCtx
+from tangl.vm import Frame, ResolutionPhase, TraversableEdge, VmPhaseCtx
 
 
 class SampleGame(Game):
@@ -73,6 +72,35 @@ class GameBlock(HasGame, Block):
     _game_handler_class = TestGameHandler
 
 
+class StableGameHandler(TestGameHandler):
+    """Handler whose authored move edges are stable rather than projected."""
+
+    dynamic_move_projection = False
+
+
+class PresentationGameHandler(TestGameHandler):
+    """Records planning preflight without treating it as game setup."""
+
+    presentation_calls: int = 0
+
+    def provision_presentation(self, game: SampleGame, *, ctx: VmPhaseCtx) -> None:
+        self.presentation_calls += 1
+
+
+class PresentationGameBlock(HasGame, Block):
+    """Test block whose handler has a pending-game presentation preflight."""
+
+    _game_class = SampleGame
+    _game_handler_class = PresentationGameHandler
+
+
+class StableGameBlock(HasGame, Block):
+    """Test block for stable game-action lifetime."""
+
+    _game_class = SampleGame
+    _game_handler_class = StableGameHandler
+
+
 @pytest.fixture()
 def game_graph() -> Graph:
     return Graph(label="game_graph")
@@ -89,57 +117,14 @@ def game_block(game_graph: Graph) -> GameBlock:
 
 def make_frame(graph: Graph, cursor_id):
     cursor = graph.get(cursor_id)
-    frame = Frame(graph=graph, cursor=cursor)
-    if not hasattr(frame, "cursor_history"):
-        frame.cursor_history = [cursor_id]
-    elif not frame.cursor_history:
-        frame.cursor_history = [cursor_id]
-    return frame
+    return Frame(graph=graph, cursor=cursor)
 
 
 def make_ctx(frame: Frame):
-    ctx = frame._make_ctx(
-        incoming_edge=getattr(frame, "selected_edge", None),
-        incoming_payload=getattr(frame, "selected_payload", None),
+    return frame._make_ctx(
+        incoming_edge=frame.selected_edge,
+        incoming_payload=frame.selected_payload,
     )
-    if not hasattr(ctx, "_frame"):
-        object.__setattr__(ctx, "_frame", frame)
-    return ctx
-
-
-class TestSetupHandler:
-    def test_setup_on_first_visit_initializes_game(self, game_graph: Graph, game_block: GameBlock):
-        frame = make_frame(game_graph, game_block.uid)
-        ctx = make_ctx(frame)
-
-        assert game_block.game.phase is GamePhase.PENDING
-
-        setup_game_on_first_visit(game_block, ctx=ctx)
-
-        assert game_block.game.phase is GamePhase.READY
-        assert game_block.locals["game_initialized"] is True
-
-    def test_setup_skips_on_revisit(self, game_graph: Graph, game_block: GameBlock):
-        frame = make_frame(game_graph, game_block.uid)
-        frame.cursor_history = [game_block.uid, game_block.uid]
-        ctx = make_ctx(frame)
-
-        setup_game_on_first_visit(game_block, ctx=ctx)
-
-        assert "game_initialized" not in game_block.locals
-        assert game_block.game.phase is GamePhase.PENDING
-
-    def test_setup_idempotent_when_ready(self, game_graph: Graph, game_block: GameBlock):
-        frame = make_frame(game_graph, game_block.uid)
-        ctx = make_ctx(frame)
-
-        game_block.game_handler.setup(game_block.game)
-        game_block.locals.clear()
-
-        setup_game_on_first_visit(game_block, ctx=ctx)
-
-        assert "game_initialized" not in game_block.locals
-        assert game_block.game.phase is GamePhase.READY
 
 
 class TestProvisioningHandler:
@@ -188,6 +173,39 @@ class TestProvisioningHandler:
 
         assert actions == []
 
+    def test_pending_planning_preflight_does_not_setup_game(self, game_graph: Graph) -> None:
+        block = _add_node(game_graph, kind=PresentationGameBlock, label="pending_game")
+        ctx = Frame(graph=game_graph, cursor=block)._make_ctx()
+        ctx.current_phase = ResolutionPhase.PLANNING
+
+        assert provision_game_moves(block, ctx=ctx) is None
+        assert block.game.phase is GamePhase.PENDING
+        assert isinstance(block.game_handler, PresentationGameHandler)
+        assert block.game_handler.presentation_calls == 1
+
+    def test_stable_actions_are_not_reprojected_or_cleared(self, game_graph: Graph) -> None:
+        block = _add_node(game_graph, kind=StableGameBlock, label="stable_game")
+        block.game_handler.setup(block.game)
+        authored_action = Action(
+            graph=game_graph,
+            predecessor_id=block.uid,
+            successor_id=block.uid,
+            label="Play the stable move",
+            predicate="game_in_progress",
+        )
+        ctx = Frame(graph=game_graph, cursor=block)._make_ctx()
+
+        actions = provision_game_moves(block, ctx=ctx)
+
+        assert actions == []
+        assert game_graph.get(authored_action.uid) is authored_action
+        assert authored_action.available(ctx=ctx)
+
+        block.game.result = GameResult.WIN
+
+        terminal_ctx = Frame(graph=game_graph, cursor=block)._make_ctx()
+        assert not authored_action.available(ctx=terminal_ctx)
+
     def test_typed_accepts_survives_graph_snapshot(
         self,
         game_graph: Graph,
@@ -210,6 +228,150 @@ class TestProvisioningHandler:
 
 
 class TestUpdateHandler:
+    def test_prereqs_redirect_leaves_pending_game_uninitialized(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        intro = _add_node(game_graph, kind=Block, label="intro")
+        redirected = _add_node(game_graph, kind=Block, label="redirected")
+        entry = Action(
+            graph=game_graph,
+            predecessor_id=intro.uid,
+            successor_id=game_block.uid,
+            label="Enter game",
+        )
+        TraversableEdge(
+            graph=game_graph,
+            predecessor_id=game_block.uid,
+            successor_id=redirected.uid,
+            trigger_phase=ResolutionPhase.PREREQS,
+            label="redirect",
+        )
+
+        frame = Frame(graph=game_graph, cursor=intro)
+        frame.resolve_choice(entry)
+
+        assert frame.cursor is redirected
+        assert game_block.game.phase is GamePhase.PENDING
+
+    def test_accepted_entry_setups_pending_game_and_projects_moves(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        intro = _add_node(game_graph, kind=Block, label="intro")
+        entry = Action(
+            graph=game_graph,
+            predecessor_id=intro.uid,
+            successor_id=game_block.uid,
+            label="Enter game",
+        )
+
+        frame = Frame(graph=game_graph, cursor=intro)
+        frame.resolve_choice(entry)
+
+        actions = [edge for edge in game_block.edges_out() if isinstance(edge, Action)]
+        assert game_block.game.phase is GamePhase.READY
+        assert {action.payload["move"] for action in actions} == {"win", "lose", "draw"}
+
+    def test_ready_reentry_preserves_existing_game_state(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        game_block.game_handler.setup(game_block.game)
+        game_block.game.score["player"] = 3
+        action = Action(
+            graph=game_graph,
+            predecessor_id=game_block.uid,
+            successor_id=game_block.uid,
+            payload={"move": "win"},
+        )
+        ctx = Frame(graph=game_graph, cursor=game_block)._make_ctx(
+            incoming_edge=action,
+            incoming_payload=action.payload,
+        )
+
+        process_game_move(game_block, ctx=ctx)
+
+        assert game_block.game.score["player"] == 4
+
+    def test_update_invalidates_game_namespace_after_resolution(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        game_block.game_handler.setup(game_block.game)
+        action = Action(
+            graph=game_graph,
+            predecessor_id=game_block.uid,
+            successor_id=game_block.uid,
+            payload={"move": "win"},
+        )
+        ctx = Frame(graph=game_graph, cursor=game_block)._make_ctx(
+            incoming_edge=action,
+            incoming_payload=action.payload,
+        )
+
+        assert ctx.get_ns(game_block)["game_won"] is False
+
+        process_game_move(game_block, ctx=ctx)
+
+        assert ctx.get_ns(game_block)["game_won"] is True
+
+    def test_terminal_dynamic_move_leaves_stable_outcome_for_postreqs(
+        self,
+        game_graph: Graph,
+    ) -> None:
+        intro = _add_node(game_graph, kind=Block, label="intro")
+        victory = _add_node(game_graph, kind=Block, label="victory")
+        game_block = GameBlock.create_game_block(
+            graph=game_graph,
+            victory_dest=victory,
+            label="game",
+        )
+        entry = Action(
+            graph=game_graph,
+            predecessor_id=intro.uid,
+            successor_id=game_block.uid,
+            label="Enter game",
+        )
+        frame = Frame(graph=game_graph, cursor=intro)
+
+        frame.resolve_choice(entry)
+        win_action = next(
+            action
+            for action in game_block.edges_out()
+            if isinstance(action, Action) and action.payload == {"move": "win"}
+        )
+        frame.resolve_choice(win_action, choice_payload=win_action.payload)
+
+        assert game_block.game.phase is GamePhase.TERMINAL
+        assert not [
+            action
+            for action in game_block.edges_out()
+            if isinstance(action, Action) and action.payload is not None
+        ]
+        assert frame.cursor is victory
+
+    def test_ready_game_round_trip_does_not_setup_again(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ) -> None:
+        game_block.game_handler.setup(game_block.game)
+        game_block.game.score["player"] = 3
+        restored_graph = Graph.structure(game_graph.unstructure())
+        restored = restored_graph.get(game_block.uid)
+        assert isinstance(restored, GameBlock)
+        ctx = Frame(graph=restored_graph, cursor=restored)._make_ctx()
+
+        process_game_move(restored, ctx=ctx)
+
+        assert restored.game.phase is GamePhase.READY
+        assert restored.game.score["player"] == 3
+
     def test_move_processing_stores_results(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
         game_block.game_handler.setup(game_block.game)
@@ -272,7 +434,10 @@ class TestJournalHandler:
             successor_id=game_block.uid,
             payload={"move": "lose"},
         )
-        frame.selected_edge = action
+        ctx = frame._make_ctx(
+            incoming_edge=action,
+            incoming_payload=action.payload,
+        )
         process_game_move(game_block, ctx=ctx)
 
         fragments = generate_game_journal(game_block, ctx=ctx)

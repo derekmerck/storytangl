@@ -50,7 +50,7 @@ The current games package revolves around a small, stable contract:
   choices and narration through the live phase namespace without bypassing the
   shared VM handlers
 - **`HasGame`** is the author-facing facade that attaches a game to a story node
-- **package handlers** connect games to VM PREREQS, PLANNING, UPDATE, JOURNAL,
+- **package handlers** connect games to VM PLANNING, PREREQS, UPDATE, JOURNAL,
   and CONTEXT phases
 - **`create_game_block()`** is the ergonomic story-layer factory for the common
   "challenge block with outcome exits" pattern
@@ -91,9 +91,9 @@ subsystem.
 
 | VM phase | Game role |
 |---|---|
-| **PREREQS** | one-time setup on first entry when needed |
-| **PLANNING** | provision currently available move choices |
-| **UPDATE** | receive the chosen move and resolve one round |
+| **PLANNING** | provision the next frontier without accepting or initializing a pending game |
+| **PREREQS** | redirect/interrupt before content; a redirected game remains pending |
+| **UPDATE** | on accepted pending entry, run world preparation then pure setup; receive a selected move and refresh dynamic projections |
 | **JOURNAL** | emit round recap and score/status fragments |
 | **CONTEXT** | expose `game_won`, `game_lost`, `game_draw`, round facts, and similar flags |
 | **POSTREQS** | allow authored victory/defeat/draw exits to route onward |
@@ -178,7 +178,8 @@ The current package already proves the family shape:
 - light picking and inspection loops work through Kim's Game and credentials
 - self-loop move provisioning works in the VM
 - journaling and predicate exposure work end to end
-- dynamic game actions are rebuilt per planning pass rather than accumulating
+- dynamic game actions are rebuilt after their relevant UPDATE mutation rather
+  than accumulating; stable authored actions remain ordinary gated edges
 - outcome exits route cleanly through authored story blocks
 
 Concrete reference members now include:
