@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any, Protocol
 
 import yaml
@@ -95,6 +95,51 @@ class StoryCodec(Protocol):
         """
 
 
+def single_manifest_output_path(
+    *,
+    bundle: WorldBundle,
+    story_key: str | None,
+    format_name: str,
+    default_name: str,
+) -> str:
+    """Return the one safe source path declared for canonical export.
+
+    Canonical export returns content only, so it cannot repartition a story or
+    rewrite its manifest. The manifest therefore remains authoritative for the
+    sole output destination.
+    """
+
+    scripts = bundle.manifest.get_story_scripts(story_key)
+    if not scripts:
+        return default_name
+    if len(scripts) > 1:
+        raise ValueError(
+            f"Canonical {format_name} export does not support multiple declared "
+            "script paths.",
+        )
+
+    raw_target = scripts[0]
+    posix_target = PurePosixPath(raw_target)
+    windows_target = PureWindowsPath(raw_target)
+    if (
+        not raw_target
+        or raw_target in {".", "./", ".\\"}
+        or any(
+            target.is_absolute()
+            or bool(target.anchor)
+            or bool(target.drive)
+            or ".." in target.parts
+            for target in (posix_target, windows_target)
+        )
+    ):
+        raise ValueError(
+            f"{format_name.capitalize()} script path must stay inside the bundle: {raw_target}",
+        )
+    if "\\" in raw_target:
+        return windows_target.as_posix()
+    return posix_target.as_posix()
+
+
 class NearNativeYamlCodec:
     """Default codec for StoryTangl near-native YAML scripts.
 
@@ -155,18 +200,12 @@ class NearNativeYamlCodec:
         codec_state: dict[str, Any] | None = None,
     ) -> dict[str, str]:
         _ = codec_state
-        scripts = bundle.manifest.get_story_scripts(story_key)
-        if not scripts:
-            rel_path = "script.yaml"
-        elif len(scripts) > 1:
-            raise ValueError(
-                "Canonical near-native export does not support multiple declared script paths.",
-            )
-        else:
-            target = Path(scripts[0])
-            if target.is_absolute() or ".." in target.parts:
-                raise ValueError(f"Near-native script path must stay inside the bundle: {target}")
-            rel_path = target.as_posix()
+        rel_path = single_manifest_output_path(
+            bundle=bundle,
+            story_key=story_key,
+            format_name="near-native",
+            default_name="script.yaml",
+        )
         content = yaml.safe_dump(runtime_data, sort_keys=False, allow_unicode=True)
         return {rel_path: content}
 

@@ -130,8 +130,14 @@ recreating original file placement, section sugar, or diagnostic provenance.
 `WorldCompiler.encode(bundle, story_bundle, story_key=None)` resolves the
 bundle's matching codec, including its local domain contribution, and returns
 safe manifest-declared source-path content without writing or materializing a
-graph. Near-native encoding currently rejects multi-file stories rather than
-inventing a source repartitioning or manifest-rewrite policy.
+graph. Near-native encoding and the strict Twee 3 exporter both reject
+multi-file stories rather than inventing a source repartitioning or
+manifest-rewrite policy. The Twee exporter supports one ordinary ``world``
+scene of non-anonymous blocks with text and simple actions, preserving passage
+names, order, tags, header metadata, and format hints from codec state. Its
+output is normalized rather than byte-identical; artifacts with import loss or
+unrepresentable controls fail explicitly. Lossy export reporting, source
+residue, and source spans remain deferred under issue #188.
 
 That compiled bundle is a build-time artifact. `WorldBuilder` copies the
 surviving fields onto `World` and wires in adjunct resources such as:

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pytest import raises
+
 from tangl.core import Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
@@ -130,6 +132,29 @@ Done.
     return WorldBundle.load(root)
 
 
+def _write_story_data_loss_world(tmp_path: Path) -> WorldBundle:
+    root = tmp_path / "twine_story_data_loss"
+    root.mkdir()
+    (root / "world.yaml").write_text(
+        "label: twine_story_data_loss\ncodec: twine\nscripts: story.twee\n",
+        encoding="utf-8",
+    )
+    (root / "story.twee").write_text(
+        """
+:: StoryTitle
+Story Data Loss
+
+:: StoryData
+{"start":"Start","ifid":"not-exported"}
+
+:: Start
+Done.
+        """.strip(),
+        encoding="utf-8",
+    )
+    return WorldBundle.load(root)
+
+
 class TestTwineReferenceWorld:
     """Tests for the clean bundled Twine reference world."""
 
@@ -169,6 +194,59 @@ class TestTwineReferenceWorld:
         assert result.codec_id == "twee3_1_0"
         assert not result.report.unresolved_hard
 
+    def test_reference_world_has_a_lossless_canonical_twee_fixed_point(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        reference_root = Path(__file__).resolve().parents[4] / "worlds" / "twine_reference"
+        bundle = WorldBundle.load(reference_root)
+        compiler = WorldCompiler()
+        world = compiler.compile(bundle)
+        canonical = compiler.story_compiler.decompile(world.bundle)
+        original = (reference_root / "story.twee").read_text(encoding="utf-8")
+
+        emitted = compiler.encode(bundle, world.bundle)
+
+        output_root = tmp_path / "twine_reference"
+        output_root.mkdir()
+        (output_root / "world.yaml").write_text(
+            (reference_root / "world.yaml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        for relative_path, content in emitted.items():
+            target = output_root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+
+        World.clear_instances()
+        recompiled = WorldCompiler().compile(WorldBundle.load(output_root))
+        reemitted = WorldCompiler().encode(WorldBundle.load(output_root), recompiled.bundle)
+
+        assert emitted.keys() == {"story.twee"}
+        assert (reference_root / "story.twee").read_text(encoding="utf-8") == original
+        assert compiler.story_compiler.decompile(recompiled.bundle) == canonical
+        assert reemitted == emitted
+
+    def test_world_compiler_encodes_through_a_twine_manifest_alias(self, tmp_path: Path) -> None:
+        root = tmp_path / "twine_alias"
+        root.mkdir()
+        (root / "world.yaml").write_text(
+            "label: twine_alias\ncodec: twine\nscripts: story.twee\n",
+            encoding="utf-8",
+        )
+        (root / "story.twee").write_text(
+            ":: StoryTitle\nAlias\n\n:: StoryData\n{\"start\":\"Start\"}\n\n:: Start\nDone.\n",
+            encoding="utf-8",
+        )
+        bundle = WorldBundle.load(root)
+        compiler = WorldCompiler()
+        world = compiler.compile(bundle)
+
+        emitted = compiler.encode(bundle, world.bundle)
+
+        assert world.bundle.codec_id == "twee3_1_0"
+        assert emitted.keys() == {"story.twee"}
+
 
 class TestTwineLossPropagation:
     """Tests for end-to-end propagation of Twine decode losses."""
@@ -185,6 +263,14 @@ class TestTwineLossPropagation:
             for record in world.bundle.codec_state["loss_records"]
         )
         assert any("loss records" in warning for warning in world.metadata["codec_warnings"])
+
+    def test_story_data_loss_prevents_production_twee_export(self, tmp_path: Path) -> None:
+        bundle = _write_story_data_loss_world(tmp_path)
+        compiler = WorldCompiler()
+        world = compiler.compile(bundle)
+
+        with raises(ValueError, match="decode loss records"):
+            compiler.encode(bundle, world.bundle)
 
 
 class TestTwineStatefulLowering:
