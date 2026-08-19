@@ -239,6 +239,16 @@ That gives the aggregate-force family at least two distinct archetypes:
 Useful balance knobs in that second form include reserve depth, reserve width,
 initiative advantage, reinforcement cost, and posture-dependent payout.
 
+A third archetype sits alongside those two: a **call-response dominance** form,
+where each side deploys a phrase from its own accumulated repertoire and a
+catalog-declared directed relation decides whether the response answers the
+call. It takes directed dominance from `RpsGame` and asymmetric initiative from
+`SiegeRpsGame`, but differs from both in that the move set is actor-bound rather
+than universal, roles are initiative-sensitive, and the dominance graph is an
+extensible many-to-many catalog relation rather than a fixed cycle. Its pressure
+comes from an orthogonal acquisition shell rather than from the grammar itself.
+See `REPERTOIRE_LOOP_DESIGN.md`.
+
 These are worth keeping because they stress different aspects of the family:
 
 - richer runtime state
