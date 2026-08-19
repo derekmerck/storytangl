@@ -582,6 +582,8 @@ def _twine_title(runtime_data: dict[str, Any]) -> str:
     title = metadata.get("title") if isinstance(metadata, dict) else None
     if not isinstance(title, str) or not title.strip():
         raise ValueError("Lossless Twee export requires metadata.title.")
+    if title != title.strip():
+        raise ValueError("Lossless Twee title cannot have leading or trailing whitespace.")
     if any(line.startswith("::") for line in title.splitlines()):
         raise ValueError("Lossless Twee title cannot contain a passage header.")
     return title.strip()
@@ -590,6 +592,7 @@ def _twine_title(runtime_data: dict[str, Any]) -> str:
 def _validate_passage_name(name: str, *, block_key: str) -> None:
     if (
         not name
+        or name != name.strip()
         or any(char in name for char in ("\n", "\r", "[", "]", "{", "}", "|"))
         or "::" in name
         or "->" in name
@@ -602,7 +605,9 @@ def _validate_passage_name(name: str, *, block_key: str) -> None:
 
 
 def _validate_action_text(text: str, *, block_key: str) -> None:
-    if any(token in text for token in ("\n", "\r", "[", "]", "|", "->")):
+    if text != text.strip() or any(
+        token in text for token in ("\n", "\r", "[", "]", "|", ">", "->")
+    ):
         raise ValueError(
             f"Lossless Twee export cannot represent action text in block {block_key!r}.",
         )
@@ -610,7 +615,8 @@ def _validate_action_text(text: str, *, block_key: str) -> None:
 
 def _validate_content(content: str, *, block_key: str) -> None:
     if (
-        any(line.startswith("::") for line in content.splitlines())
+        content != content.strip()
+        or any(line.startswith("::") for line in content.splitlines())
         or any(token in content for token in ("[[", "]]", "<<", ">>"))
     ):
         raise ValueError(
@@ -645,6 +651,10 @@ def _twine_story_data(*, start_name: str, codec_state: dict[str, Any]) -> dict[s
     ):
         value = codec_state.get(state_key)
         if isinstance(value, str) and value:
+            if value != value.strip():
+                raise ValueError(
+                    "Lossless Twee export cannot normalize story format whitespace.",
+                )
             story_data[output_key] = value
     return story_data
 

@@ -544,6 +544,7 @@ Inside.
         ("field", "value", "match"),
         [
             ("text", "bad->text", "action text"),
+            ("text", "Pick > wisely", "action text"),
             ("successor_is_absolute", True, "explicit relative"),
             ("successor_is_inferred", True, "explicit relative"),
         ],
@@ -609,6 +610,29 @@ Inside.
                 codec_state=_simple_codec_state(),
             )
 
+        manifest_path = bundle.bundle_root / "world.yaml"
+        manifest_path.write_text(
+            "label: twine_unit\ncodec: twee3_1_0\nscripts: story.twee\nmetadata:\n  author: Unit\n",
+            encoding="utf-8",
+        )
+        manifest_bundle = WorldBundle.load(bundle.bundle_root)
+        data = _simple_runtime_data()
+        data["metadata"]["author"] = "Unit"
+        assert TwineCodec().encode(
+            bundle=manifest_bundle,
+            runtime_data=data,
+            story_key=None,
+            codec_state=_simple_codec_state(),
+        )
+        data["metadata"]["author"] = "Changed"
+        with pytest.raises(ValueError, match="target manifest"):
+            TwineCodec().encode(
+                bundle=manifest_bundle,
+                runtime_data=data,
+                story_key=None,
+                codec_state=_simple_codec_state(),
+            )
+
     @pytest.mark.parametrize(
         ("title", "meta", "match"),
         [
@@ -639,27 +663,43 @@ Inside.
                 codec_state=state,
             )
 
-        manifest_path = bundle.bundle_root / "world.yaml"
-        manifest_path.write_text(
-            "label: twine_unit\ncodec: twee3_1_0\nscripts: story.twee\nmetadata:\n  author: Unit\n",
-            encoding="utf-8",
-        )
-        manifest_bundle = WorldBundle.load(bundle.bundle_root)
+    @pytest.mark.parametrize(
+        ("target", "value"),
+        [
+            ("title", " The Unit Tower"),
+            ("content", " Choose."),
+            ("action", "Enter "),
+            ("passage_name", " Start Here"),
+            ("story_format", " Twine 2"),
+            ("story_format_version", "2.0 "),
+        ],
+    )
+    def test_encode_rejects_outer_whitespace_that_decode_normalizes(
+        self,
+        tmp_path: Path,
+        target: str,
+        value: str,
+    ) -> None:
+        bundle = _write_bundle(tmp_path, scripts={"story.twee": ":: Start\nOld."})
         data = _simple_runtime_data()
-        data["metadata"]["author"] = "Unit"
-        assert TwineCodec().encode(
-            bundle=manifest_bundle,
-            runtime_data=data,
-            story_key=None,
-            codec_state=_simple_codec_state(),
-        )
-        data["metadata"]["author"] = "Changed"
-        with pytest.raises(ValueError, match="target manifest"):
+        state = _simple_codec_state()
+        if target == "title":
+            data["metadata"]["title"] = value
+        elif target == "content":
+            data["scenes"]["world"]["blocks"]["start"]["content"] = value
+        elif target == "action":
+            data["scenes"]["world"]["blocks"]["start"]["actions"][0]["text"] = value
+        elif target == "passage_name":
+            state["passages"][0]["name"] = value
+        else:
+            state[target] = value
+
+        with pytest.raises(ValueError):
             TwineCodec().encode(
-                bundle=manifest_bundle,
+                bundle=bundle,
                 runtime_data=data,
                 story_key=None,
-                codec_state=_simple_codec_state(),
+                codec_state=state,
             )
 
     def test_encode_rejects_multi_file_or_unsafe_manifest_paths(self, tmp_path: Path) -> None:
