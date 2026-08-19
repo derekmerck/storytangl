@@ -200,15 +200,60 @@ than only *whether*.
 event-sourced, and a playthrough must be reproducible from a snapshot plus the
 choice log. If dominance were resolved by inspecting live world state during
 each round, replay would depend on world state at every step. Composing once at
-PREREQS puts the schedule in the ledger, so the contest replays deterministically
+PREREQS pins it for the whole contest, so the exchange replays deterministically
 no matter what the world does afterward. This is the strongest argument for the
-boundary — stronger than handler purity.
+boundary — stronger than handler purity. What the ledger actually stores is the
+schedule's hash rather than its contents; see below.
 
 **And it is projectable.** A sixty-four-entry matrix scoped to this contest is
 something `story_info` can actually render: what you hold, what it answers, what
 answered you. Monkey Island players kept notes on paper. Making the schedule an
 inspectable artifact is what turns an opaque quiz into a legible puzzle, and it
 costs nothing extra because the snapshot already exists.
+
+### Schedules are cached and hash-verified, not journaled
+
+A dominance schedule is generally **static across a whole game** — the catalog
+does not change, and most worlds contribute rules once. Writing one into the
+journal per exchange would be a large amount of duplicated bytes to preserve
+something that almost never varies.
+
+So schedules are computed on demand, content-hashed, and cached. What the record
+keeps is the *hash*, not the schedule:
+
+```text
+compose schedule
+  → content hash
+    → cache lookup keyed on (participating badge ids, active contributions)
+      → contest resolves against the cached schedule
+        → record stores schedule hash + engine version
+```
+
+On replay the schedule is recomposed from the same inputs and its hash compared
+to the stored one. A mismatch is a **reproduction error** and should be flagged
+as one, not silently accepted. The engine-version stamp — `tangl.info.__version__`,
+already surfaced through `SystemInfo` — separates "the engine changed" from "the
+composition is nondeterministic," which are very different bugs.
+
+`HasContent` is the primitive: a `DominanceSchedule(HasContent)` implements
+`get_hashable_content()` and inherits `content_hash()` plus compare-by-content.
+`EntityFactory` is the hash-and-cache precedent, holding `hash_by_uid` and
+`materialized_by_hash` and computing `template_hash()` once per template.
+
+**Hash the composed output, not the contribution inputs.** This matters more
+than it looks. #307 is an open bug establishing that durable hashing needs one
+canonical stable serialization, because structurally unordered values — `set`,
+`frozenset` — do not serialize deterministically across `PYTHONHASHSEED`.
+Contributions are exactly that shape: their selectors carry `has_tags`, and tags
+are sets. Hashing contributions directly would make this design depend on #307
+landing first.
+
+The composed schedule has no such problem. It is a flat mapping from ordered
+`(call_id, response_id)` pairs to an outcome and a source id — no sets, no
+arbitrary objects. Defining `get_hashable_content()` as that mapping in sorted
+key order is deterministic by construction, sidesteps the unordered-value
+problem entirely, and stays a good citizen of the contract #307 is trying to
+establish rather than working around it.
 
 ### Resolution rules
 
@@ -553,9 +598,6 @@ Neither is demo behavior. They exist to prove the seam is real.
 2. **Does an aftermath grant every witnessed phrase, or only the one that beat
    you?** A world policy, not a kernel decision. The reference world should pick
    the cheapest thing that works.
-3. **Does the composed schedule get journaled, or only projected?** It is small
-   enough to serialize per contest, which would make replay self-describing; it
-   may also be enough to recompose it from the snapshot inputs.
 
 Deferred as potential second consumers rather than open design: sequence prompts
 (Simon-says), and partial or near-miss scoring. Binary semantic matching is
