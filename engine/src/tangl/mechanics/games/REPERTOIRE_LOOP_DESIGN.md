@@ -7,7 +7,10 @@
 :related: token, singleton, assembly, transaction, credentials, widget
 ```
 
-**Status:** DESIGN — nothing landed. Revised after review of PR #380: the
+**Status:** L1 build-order step 1 landed: the pure fixed-list
+``CallResponseGame`` proves role capability, directed matching, initiative,
+structured evidence, and CLI output. Catalog-backed phrase ownership and the
+acquisition shell remain design work. Revised after review of PR #380: the
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
@@ -585,9 +588,9 @@ it is deliberately off the critical path.
 
 ## Build order
 
-1. Pure `CallResponseGame` over a fixed phrase set and a hand-written schedule:
-   role capability, directed matching, initiative, structured round notes,
-   ordinary CLI journal output.
+1. **Landed:** Pure `CallResponseGame` over a fixed phrase set and a
+   hand-written schedule: role capability, directed matching, initiative,
+   structured round notes, ordinary CLI journal output.
 2. `PhraseType` / `PhraseBadge` / owner-bound `RepertoireManager`; a
    `prepare_game(ctx)` snapshots participating badge ids and
    composes the schedule over just those pairs.

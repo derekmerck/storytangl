@@ -91,6 +91,13 @@ from .incremental_game import (
 )
 from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, TwentyTwoGame, TwentyTwoGameHandler
 from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
+from .call_response_game import (
+    CallResponseGame,
+    CallResponseGameHandler,
+    CallResponseExchange,
+    CallResponsePhrase,
+    DominanceMatch,
+)
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 from .kim_game import KimGame, KimGameHandler, KimMove
 from tangl.mechanics.credentials import (
@@ -182,6 +189,11 @@ __all__ = [
     "TwentyTwoGameHandler",
     "SiegeRpsGame",
     "SiegeRpsGameHandler",
+    "CallResponseGame",
+    "CallResponseGameHandler",
+    "CallResponseExchange",
+    "CallResponsePhrase",
+    "DominanceMatch",
     "PickingGame",
     "PickingGameHandler",
     "PickingMove",
