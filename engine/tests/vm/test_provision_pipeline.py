@@ -33,6 +33,7 @@ from tangl.vm.dispatch import (
     do_provision,
     on_provision,
 )
+from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.provision import (
     Affordance,
     Dependency,
@@ -310,17 +311,28 @@ class TestDispatchIntegration:
         from tangl.vm.traversable import TraversableEdge
 
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        edge = TraversableEdge(
-            predecessor_id=a.uid, successor_id=b.uid, registry=g
+        foyer = TraversableNode(label="foyer", registry=g)
+        current = TraversableNode(label="current", registry=g)
+        successor = TraversableNode(label="successor", registry=g)
+        entry_edge = TraversableEdge(
+            predecessor_id=foyer.uid,
+            successor_id=current.uid,
+            registry=g,
+        )
+        TraversableEdge(
+            predecessor_id=current.uid,
+            successor_id=successor.uid,
+            registry=g,
         )
 
         provisioned_nodes = []
+        successor_contexts = []
 
         @on_provision
         def record_provision(caller, *, ctx, **kwargs):
             provisioned_nodes.append(caller.label if hasattr(caller, "label") else str(caller))
+            if caller is successor:
+                successor_contexts.append((ctx.cursor, ctx.cursor_id, ctx.current_phase))
             return None
 
         # Also register validate_successor_exists so traversal doesn't fail
@@ -329,10 +341,13 @@ class TestDispatchIntegration:
         on_validate(sh.validate_successor_exists)
 
         with _cleanup_behaviors(record_provision, sh.validate_successor_exists):
-            frame = Frame(graph=g, cursor=a)
-            frame.follow_edge(edge)
-            # b was provisioned during PLANNING
-            assert any("b" in n for n in provisioned_nodes)
+            frame = Frame(graph=g, cursor=foyer)
+            frame.follow_edge(entry_edge)
+            # The one-step-ahead successor was provisioned during PLANNING.
+            assert any("successor" in node for node in provisioned_nodes)
+            assert successor_contexts == [
+                (successor, successor.uid, ResolutionPhase.PLANNING),
+            ]
 
     def test_provision_handler_can_add_entity_to_graph(
         self, clean_vm_dispatch

@@ -156,6 +156,9 @@ class _ResolverCtx:
         _ = node
         return {}
 
+    def invalidate_namespaces(self) -> None:
+        return None
+
     def get_location_entity_groups(self):
         return list(self._location_entity_groups)
 

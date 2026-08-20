@@ -98,11 +98,13 @@ block = RpsBlock.create_game_block(
 
 ## How It Works
 
-1. **PREREQS** – first-visit setup via ``setup_game_on_first_visit``.
-2. **PLANNING** – available moves become self-loop ``Action`` objects.
-   Old dynamic game actions are cleared before each rebuild so the block's move
-   list reflects current state instead of accumulating duplicates.
-3. **UPDATE** – selected move processed by the handler, mutating game state.
+1. **PLANNING** – provisions the next frontier but leaves a pending challenge
+   pending; it never accepts or initializes the game.
+2. **PREREQS** – may redirect before game content, still without setup.
+3. **UPDATE** – accepted first entry calls ``HasGame.prepare_game(ctx)`` and
+   ``GameHandler.setup()`` exactly once. A selected move then resolves through
+   the handler. Dynamic game actions are rebuilt after that mutation so JOURNAL
+   and the returned choice surface observe the live state.
 4. **JOURNAL** – human-readable fragments describing the round and score.
 5. **CONTEXT** – predicate namespace exposes ``game_won``/``game_lost`` flags.
 6. **POSTREQS** – exit edges created by the factory auto-trigger when predicates
@@ -114,22 +116,22 @@ the VM reads the shared namespace instead of reaching into the facet internals.
 
 ## Design Note: Self-Fanout Interpretation
 
-`HasGame` move provisioning is currently implemented as planning-time dynamic
-action creation, but conceptually it is a special case of fanout:
+`HasGame` can use dynamic action projection for state-derived moves, while an
+authored game may keep stable move and outcome edges gated by normal
+availability. The dynamic form is conceptually a game-logic-derived fan-out:
 
 - the game node surveys its currently available moves
 - each move becomes an edge variant with distinct payload/label metadata
 - every such edge points back to the same provider node: the game block itself
 
-In other words, a game block's move set can be understood as a **self-fanout of
-traversable edges** rather than a fundamentally separate mechanism. That is the
-conceptual interpretation only: the implementation remains a local
-planning-time projector **by design**, and `HasGame` moves should not be routed
-through `Resolver.resolve_fanout`. The open-link model
+In other words, a dynamic game block's move set can be understood as a
+**self-fanout of traversable edges** rather than a fundamentally separate
+mechanism. This broader fan-out shape is not resolver ``Fanout``: `HasGame`
+moves must not be routed through `Resolver.resolve_fanout`. The open-link model
 (`docs/src/design/planning/AFFORDANCE_MODEL.md`) records this mechanism in its
 audit table ("Game self-loop moves") as self-fanout — a provider-fixed offer to
-itself, projected as ordinary self-loop `Action`s and cleared by the game's own
-cleanup discriminator.
+itself, projected as ordinary self-loop `Action`s after the relevant UPDATE and
+cleared by the game's own cleanup discriminator.
 
 It is also one concrete instance of the broader **re-entrant provider** pattern
 used by hubs and repeatable activities: the cursor repeatedly re-enters a

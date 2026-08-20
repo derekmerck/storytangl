@@ -715,7 +715,7 @@ containers descend recursively through normal pipeline execution, each resolving
 own active entry.
 
 **Dynamic frontier refresh.** Domain packages that project dynamic choices during
-PLANNING must treat those edges as ephemeral affordances. Before rebuilding, a provider
+PLANNING or after a relevant UPDATE must treat those edges as ephemeral affordances. Before rebuilding, a provider
 clears only the previous dynamic edges it generated for that owner node. This is
 **cleanup ownership**, a compound key: scope to the owner node's `edges_out`, then
 match a discriminator tag set. Discriminators across projector families are mutually

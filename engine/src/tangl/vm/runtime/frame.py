@@ -330,6 +330,11 @@ class PhaseCtx:
 
         return self._ns_cache[uid]
 
+    def invalidate_namespaces(self) -> None:
+        """Discard namespace views after an in-place UPDATE mutation."""
+
+        self._ns_cache.clear()
+
     def get_location_entity_groups(self) -> list[Iterable]:
         """Entity pools ordered by runtime location distance from cursor."""
         cursor = self.cursor
@@ -762,7 +767,11 @@ class Frame:
         do_provision(self.cursor, ctx=ctx)
         for successor in list(self.cursor.successors()):
             if isinstance(successor, TraversableNode):
-                do_provision(successor, ctx=ctx)
+                successor_ctx = ctx.derive(
+                    cursor_id=successor.uid,
+                    current_phase=ResolutionPhase.PLANNING,
+                )
+                do_provision(successor, ctx=successor_ctx)
 
     def _handle_redirect(
         self,

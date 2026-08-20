@@ -28,7 +28,7 @@ from tangl.mechanics.credentials import (
     credential_card_text_spec,
     materialize_packet,
 )
-from tangl.mechanics.games import CredentialsGame, CredentialsGameHandler, HasGame
+from tangl.mechanics.games import CredentialsGame, CredentialsGameHandler, GamePhase, HasGame
 from tangl.mechanics.games.handlers import process_game_move, provision_game_moves
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
@@ -102,6 +102,7 @@ def _live_card_case(
     *,
     status: CredentialStatus = CredentialStatus.VALID,
     roster: list[CredentialCase] | None = None,
+    setup: bool = True,
 ):
     monkeypatch.setattr(
         "tangl.media.story_media.get_story_media_dir",
@@ -120,8 +121,10 @@ def _live_card_case(
         game_state=CredentialsGame(roster=roster or [_case(status=status)]),
     )
     handler = block.game_handler
-    handler.setup(block.game)
-    projection = handler.credential_card_projections(block.game)[0]
+    projection = None
+    if setup:
+        handler.setup(block.game)
+        projection = handler.credential_card_projections(block.game)[0]
     return story, block, block.game.active_case.packet_manager, projection
 
 
@@ -332,6 +335,7 @@ def test_lifecycle_provisions_one_card_and_emits_stable_piece_media_relation(
         "credential-card-printable_text",
         "credential-card-card",
     ]
+    assert {dependency.predecessor_id for dependency in dependencies} == {block.uid}
     assert len(rits) == 3
 
     document = next(
@@ -359,6 +363,33 @@ def test_lifecycle_provisions_one_card_and_emits_stable_piece_media_relation(
         for fragment in second
         if isinstance(fragment, GroupFragment) and fragment.group_type == "piece_media"
     ] == [relation[0].uid]
+
+
+def test_frontier_card_dependencies_are_owned_by_the_credential_block(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, _ = _live_card_case(monkeypatch, tmp_path, setup=False)
+    foyer = story.add_node(kind=Block, label="foyer")
+    current = story.add_node(kind=Block, label="current")
+    entry_action = Action(
+        graph=story,
+        predecessor_id=foyer.uid,
+        successor_id=current.uid,
+        label="Enter current node",
+    )
+    Action(
+        graph=story,
+        predecessor_id=current.uid,
+        successor_id=block.uid,
+        label="Enter checkpoint",
+    )
+
+    Frame(graph=story, cursor=foyer).follow_edge(entry_action)
+
+    dependencies = [value for value in story.values() if isinstance(value, MediaDep)]
+    assert block.game.phase is GamePhase.PENDING
+    assert {dependency.predecessor_id for dependency in dependencies} == {block.uid}
 
 
 def test_lifecycle_uses_document_subject_and_keeps_text_when_card_inputs_fail(

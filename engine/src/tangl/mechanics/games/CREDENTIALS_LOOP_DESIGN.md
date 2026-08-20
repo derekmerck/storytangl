@@ -285,7 +285,7 @@ Five properties keep Phases A/B/C as extensions rather than entangled rewrites:
 required manager; it has no parallel region, purpose, id, document, or
 possession fields. `derive_disposition` reads the concrete manager directly.
 
-`ScenarioOffer` is the authored arrival contract. At setup/UPDATE materialization
+`ScenarioOffer` is the authored arrival contract. Frontier PLANNING materialization
 creates one manager with the host owner and selected catalog, then applies failure
 modes to its components and possessions. A small private sampler feasibility
 check stays data-only; the materialized manager is asserted against the offer's
@@ -487,9 +487,9 @@ rules), mode)) == expected_for(mode)`.
 purpose pool + pinned + seed); `generate_roster` samples origin + target then
 picks a *feasible, verified* failure mode (so the linchpin holds by
 construction); `ScenarioOffer` is the unmaterialized promise; `materialize(offer,
-rules)` builds the packet deterministically; `CredentialsGame.offers` +
-`active_case` materialize each candidate **on arrival** (cached in
-`materialized`, a reset field). `render_narrative` (in the factory) projects the
+rules)` builds the packet deterministically; `CredentialsGame` materializes the
+active offer and one sequential successor during frontier PLANNING (cached in
+`materialized` across accepted-entry setup). `render_narrative` (in the factory) projects the
 inspect-loop strings from the structured truth so generated cases are playable.
 Pinned whitelisted encounters (the "John Smith" case) work. Multi-day shifts and
 live roster editing are deliberately left as repeated generation / ordinary list
@@ -520,18 +520,20 @@ origin under the day's rules, and sample one (or a composition). PASS = no mode;
 deny = a mitigatable mode {bad/missing seal, missing doc, declared-unpermitted
 contraband...}; arrest = a crime mode {forgery, fake id, concealment...}.
 
-**Roster = offers, materialized on arrival.** The roster holds **scenario offers**
+**Roster = offers, materialized at the frontier.** The roster holds **scenario offers**
 (origin + target class + chosen failure mode + any pins/overrides), *not* concrete
 packets. The actual `CredentialCase` (the credential tokens) is built on demand --
-via `build_valid` + `degrade` -- only when that candidate arrives in the story.
-Until then an offer is just a promise of a scenario, so the roster can be
+via `build_valid` + `degrade` -- when it enters the current or sequential
+successor frontier, before it can be selected. Until then an offer is just a
+promise of a scenario, so the roster can be
 **pre-empted, edited, reordered, or inserted into** (drop in John Smith, retune a
 day) before materialization. This unifies the three tiers: every roster entry is
 an offer, fully-specified (Tier 1), failure-specified (Tier 2), or
 disposition-specified (Tier 3), and materialization resolves it down the funnel.
 
-The lazy hook fits the existing loop cleanly: materialize the next offer into the
-active case at `advance_case` / setup time. The runtime loop still never learns
+The lazy hook fits the existing loop cleanly: PLANNING materializes the current
+offer and its one sequential successor without switching the active case or
+initializing the game. The runtime loop still never learns
 whether a case was authored or sampled. Port the distribution shape from
 `credential_script_models.py` (`expected_disposition_ratio` per region,
 `num_encounters`) and `credentials-2/cred_check_scene.py` (`sample_outcomes()`,
