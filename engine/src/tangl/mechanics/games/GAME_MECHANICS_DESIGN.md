@@ -50,8 +50,8 @@ The current games package revolves around a small, stable contract:
   choices and narration through the live phase namespace without bypassing the
   shared VM handlers
 - **`HasGame`** is the author-facing facade that attaches a game to a story node
-- **package handlers** connect games to VM PLANNING, PREREQS, UPDATE, JOURNAL,
-  and CONTEXT phases
+- **package handlers** connect games to VM PLANNING, UPDATE, JOURNAL, and
+  CONTEXT phases
 - **`create_game_block()`** is the ergonomic story-layer factory for the common
   "challenge block with outcome exits" pattern
 

@@ -332,6 +332,7 @@ def test_lifecycle_provisions_one_card_and_emits_stable_piece_media_relation(
         "credential-card-printable_text",
         "credential-card-card",
     ]
+    assert {dependency.predecessor_id for dependency in dependencies} == {block.uid}
     assert len(rits) == 3
 
     document = next(
@@ -359,6 +360,25 @@ def test_lifecycle_provisions_one_card_and_emits_stable_piece_media_relation(
         for fragment in second
         if isinstance(fragment, GroupFragment) and fragment.group_type == "piece_media"
     ] == [relation[0].uid]
+
+
+def test_frontier_card_dependencies_are_owned_by_the_credential_block(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story, block, _, _ = _live_card_case(monkeypatch, tmp_path)
+    entry = story.add_node(kind=Block, label="entry")
+    action = Action(
+        graph=story,
+        predecessor_id=entry.uid,
+        successor_id=block.uid,
+        label="Enter checkpoint",
+    )
+
+    Frame(graph=story, cursor=entry).follow_edge(action)
+
+    dependencies = [value for value in story.values() if isinstance(value, MediaDep)]
+    assert {dependency.predecessor_id for dependency in dependencies} == {block.uid}
 
 
 def test_lifecycle_uses_document_subject_and_keeps_text_when_card_inputs_fail(

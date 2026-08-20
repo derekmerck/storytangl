@@ -33,6 +33,7 @@ from tangl.vm.dispatch import (
     do_provision,
     on_provision,
 )
+from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.provision import (
     Affordance,
     Dependency,
@@ -317,10 +318,13 @@ class TestDispatchIntegration:
         )
 
         provisioned_nodes = []
+        successor_contexts = []
 
         @on_provision
         def record_provision(caller, *, ctx, **kwargs):
             provisioned_nodes.append(caller.label if hasattr(caller, "label") else str(caller))
+            if caller is b:
+                successor_contexts.append((ctx.cursor, ctx.cursor_id, ctx.current_phase))
             return None
 
         # Also register validate_successor_exists so traversal doesn't fail
@@ -333,6 +337,9 @@ class TestDispatchIntegration:
             frame.follow_edge(edge)
             # b was provisioned during PLANNING
             assert any("b" in n for n in provisioned_nodes)
+            assert successor_contexts == [
+                (b, b.uid, ResolutionPhase.PLANNING),
+            ]
 
     def test_provision_handler_can_add_entity_to_graph(
         self, clean_vm_dispatch

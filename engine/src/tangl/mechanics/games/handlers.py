@@ -3,7 +3,7 @@ from __future__ import annotations
 """VM phase handlers for game mechanics integration."""
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
@@ -18,7 +18,6 @@ from .has_game import HasGame
 
 if TYPE_CHECKING:
     from tangl.vm import VmPhaseCtx as Context
-    from tangl.vm.runtime.frame import PhaseCtx
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +72,6 @@ def _ctx_selected_payload(ctx: Context) -> Any:
     return ctx.selected_payload
 
 
-def _invalidate_game_namespace(ctx: Context) -> None:
-    """Clear the concrete phase cache after a game UPDATE mutation."""
-
-    cast("PhaseCtx", ctx).invalidate_namespaces()
 @on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
 def provision_game_moves(
     cursor: HasGame | None = None,
@@ -132,7 +127,7 @@ def provision_game_moves(
 
     if not moves:
         logger.warning("No available moves at %s despite READY phase", cursor.get_label())
-        return None if runtime_planning else []
+        return None if ctx.current_phase is P.PLANNING else []
 
     actions = _build_game_actions(cursor)
 
@@ -175,7 +170,7 @@ def process_game_move(
     if cursor.game.phase is GamePhase.PENDING:
         cursor.prepare_game(ctx=ctx)
         cursor.game_handler.setup(cursor.game)
-        _invalidate_game_namespace(ctx)
+        ctx.invalidate_namespaces()
         if cursor.game_handler.dynamic_move_projection:
             _clear_dynamic_game_actions(cursor, ctx=ctx)
             _build_game_actions(cursor)
@@ -214,7 +209,7 @@ def process_game_move(
         cursor.game.round,
     )
 
-    _invalidate_game_namespace(ctx)
+    ctx.invalidate_namespaces()
 
     if cursor.game_handler.dynamic_move_projection:
         _clear_dynamic_game_actions(cursor, ctx=ctx)

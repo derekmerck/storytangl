@@ -94,6 +94,20 @@ class PresentationGameBlock(HasGame, Block):
     _game_handler_class = PresentationGameHandler
 
 
+class EmptyMovesGameHandler(TestGameHandler):
+    """Ready dynamic game with no live moves."""
+
+    def get_available_moves(self, game: SampleGame) -> list[str]:
+        return []
+
+
+class EmptyMovesGameBlock(HasGame, Block):
+    """Test block for an empty dynamic move projection."""
+
+    _game_class = SampleGame
+    _game_handler_class = EmptyMovesGameHandler
+
+
 class StableGameBlock(HasGame, Block):
     """Test block for stable game-action lifetime."""
 
@@ -182,6 +196,20 @@ class TestProvisioningHandler:
         assert block.game.phase is GamePhase.PENDING
         assert isinstance(block.game_handler, PresentationGameHandler)
         assert block.game_handler.presentation_calls == 1
+
+    def test_empty_ready_dynamic_moves_preserve_phase_return_contract(
+        self,
+        game_graph: Graph,
+    ) -> None:
+        block = _add_node(game_graph, kind=EmptyMovesGameBlock, label="empty_game")
+        block.game_handler.setup(block.game)
+
+        planning_ctx = Frame(graph=game_graph, cursor=block)._make_ctx()
+        planning_ctx.current_phase = ResolutionPhase.PLANNING
+        assert provision_game_moves(block, ctx=planning_ctx) is None
+
+        direct_ctx = Frame(graph=game_graph, cursor=block)._make_ctx()
+        assert provision_game_moves(block, ctx=direct_ctx) == []
 
     def test_stable_actions_are_not_reprojected_or_cleared(self, game_graph: Graph) -> None:
         block = _add_node(game_graph, kind=StableGameBlock, label="stable_game")
