@@ -9,8 +9,10 @@
 
 **Status:** L1 build-order step 1 landed: the pure fixed-list
 ``CallResponseGame`` proves role capability, directed matching, initiative,
-structured evidence, and CLI output. Catalog-backed phrase ownership and the
-acquisition shell remain design work. Revised after review of PR #380: the
+structured evidence, and CLI output. L2 step 2a landed the world-independent
+``PhraseType`` / ``PhraseBadge`` / ``RepertoireManager`` ownership foundation.
+Step 2b accepted-entry schedule composition and snapshotting, plus the
+acquisition shell, remain design work. Revised after review of PR #380: the
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
@@ -591,9 +593,10 @@ it is deliberately off the critical path.
 1. **Landed:** Pure `CallResponseGame` over a fixed phrase set and a
    hand-written schedule: role capability, directed matching, initiative,
    structured round notes, ordinary CLI journal output.
-2. `PhraseType` / `PhraseBadge` / owner-bound `RepertoireManager`; a
-   `prepare_game(ctx)` snapshots participating badge ids and
-   composes the schedule over just those pairs.
+2. **2a landed:** `PhraseType` / `PhraseBadge` / owner-bound
+   `RepertoireManager` establish catalog truth and transferable badge
+   ownership. **2b pending:** `prepare_game(ctx)` snapshots participating
+   badge ids and composes the schedule over just those pairs.
 3. Shell-level aftermath handler reads exposure records and idempotently awards
    badges; the policy is swappable without touching steps 1-2.
 4. Winning grants a prize token from its own catalog, or a durable world
