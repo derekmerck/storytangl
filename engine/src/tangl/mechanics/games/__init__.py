@@ -94,6 +94,7 @@ from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
 from .call_response_game import (
     CallResponseGame,
     CallResponseGameHandler,
+    CallResponseExchange,
     CallResponsePhrase,
     DominanceMatch,
 )
@@ -190,6 +191,7 @@ __all__ = [
     "SiegeRpsGameHandler",
     "CallResponseGame",
     "CallResponseGameHandler",
+    "CallResponseExchange",
     "CallResponsePhrase",
     "DominanceMatch",
     "PickingGame",

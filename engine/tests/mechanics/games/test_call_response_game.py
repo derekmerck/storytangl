@@ -10,6 +10,7 @@ from tangl.core import Graph, Selector
 from tangl.mechanics.games import (
     CallResponseGame,
     CallResponseGameHandler,
+    CallResponseExchange,
     CallResponsePhrase,
     DominanceMatch,
     GamePhase,
@@ -79,6 +80,7 @@ class TestCallResponseKernel:
             "initiative_before": True,
             "initiative_after": False,
         }
+        assert isinstance(game.last_exchange, CallResponseExchange)
 
     def test_undeclared_pair_misses_and_preserves_caller_initiative(self) -> None:
         game = _game()
@@ -172,6 +174,16 @@ class TestCallResponseKernel:
             "Opponent wins the exchange. Score: you 0, opponent 1. Initiative: the opponent.",
         ]
 
+    def test_namespace_uses_a_qualified_initiative_key(self) -> None:
+        game = _game(player_has_initiative=False)
+        handler = CallResponseGameHandler()
+        handler.setup(game)
+
+        namespace = game.to_namespace()
+
+        assert namespace["call_response_player_has_initiative"] is False
+        assert "player_has_initiative" not in namespace
+
 
 class TestCallResponsePersistence:
     """Configured state and exchange history survive graph persistence."""
@@ -192,6 +204,8 @@ class TestCallResponsePersistence:
         assert restored.game.phrases["taunt"].roles == ["call"]
         assert restored.game.schedule[0].source_id == "dairy-rebuttal"
         assert restored.game.player_has_initiative is False
+        assert isinstance(restored.game.last_exchange, CallResponseExchange)
+        assert restored.game.last_exchange == block.game.last_exchange
         assert restored.game.history[-1].notes == block.game.history[-1].notes
 
 

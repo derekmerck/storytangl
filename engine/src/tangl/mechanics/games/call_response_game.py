@@ -54,6 +54,29 @@ class DominanceMatch(BaseModel):
     source_id: str
 
 
+class CallResponseExchange(BaseModel):
+    """Typed, durable evidence of one resolved call-response exchange.
+
+    Why
+    ---
+    The acquisition shell must consume the exact deployed phrases and result
+    without reading rendered journal prose.
+
+    API
+    ---
+    The game retains this value for its latest exchange; its plain mapping is
+    copied into :class:`RoundRecord.notes` for durable round history.
+    """
+
+    call_phrase_id: str
+    response_phrase_id: str
+    matched: bool
+    match_source_id: str | None
+    additional_exposed_phrase_ids: list[str]
+    initiative_before: bool
+    initiative_after: bool
+
+
 class CallResponseGame(Game[str]):
     """Persistent state for a fixed-list directed call-response contest.
 
@@ -89,16 +112,17 @@ class CallResponseGame(Game[str]):
         default=True,
         json_schema_extra={"reset_field": True},
     )
-    last_exchange: dict[str, Any] = Field(
-        default_factory=dict,
+    last_exchange: CallResponseExchange | None = Field(
+        default=None,
         json_schema_extra={"reset_field": True},
     )
+    opponent_strategy: str | None = None
 
     def to_namespace(self) -> dict[str, Any]:
         """Expose the current role while retaining the base game aliases."""
 
         namespace = super().to_namespace()
-        namespace["player_has_initiative"] = self.player_has_initiative
+        namespace["call_response_player_has_initiative"] = self.player_has_initiative
         return namespace
 
 
@@ -124,7 +148,8 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
     Notes
     -----
     Missing role-capable phrases are invalid fixed contest data, not a kernel
-    fallback case.
+    fallback case. The fixed kernel deterministically selects the first legal
+    opponent call, or the first positively matching response when one exists.
     """
 
     game_cls: ClassVar[type[Game]] = CallResponseGame
@@ -179,15 +204,15 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
             game.score["opponent"] += 1
             round_result = RoundResult.LOSE
 
-        game.last_exchange = {
-            "call_phrase_id": call_phrase_id,
-            "response_phrase_id": response_phrase_id,
-            "matched": matched,
-            "match_source_id": match.source_id if match is not None else None,
-            "additional_exposed_phrase_ids": [],
-            "initiative_before": initiative_before,
-            "initiative_after": initiative_after,
-        }
+        game.last_exchange = CallResponseExchange(
+            call_phrase_id=call_phrase_id,
+            response_phrase_id=response_phrase_id,
+            matched=matched,
+            match_source_id=match.source_id if match is not None else None,
+            additional_exposed_phrase_ids=[],
+            initiative_before=initiative_before,
+            initiative_after=initiative_after,
+        )
         return round_result
 
     def build_round_notes(
@@ -200,7 +225,9 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
         """Copy the exchange evidence into the immutable round record."""
 
         _ = player_move, opponent_move, round_result
-        return dict(game.last_exchange)
+        if game.last_exchange is None:
+            raise RuntimeError("Call-response round resolved without exchange evidence")
+        return game.last_exchange.model_dump()
 
     def get_journal_fragments(
         self,
@@ -215,17 +242,15 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
         if last_round is None:
             return []
 
-        notes = last_round.notes or {}
-        call_phrase_id = notes["call_phrase_id"]
-        response_phrase_id = notes["response_phrase_id"]
-        response_outcome = "answers" if notes["matched"] else "does not answer"
+        exchange = CallResponseExchange.model_validate(last_round.notes)
+        response_outcome = "answers" if exchange.matched else "does not answer"
         winner = "You win" if last_round.result is RoundResult.WIN else "Opponent wins"
-        initiative = "you" if notes["initiative_after"] else "the opponent"
+        initiative = "you" if exchange.initiative_after else "the opponent"
         return [
-            ContentFragment(content=f"Call: {game.phrases[call_phrase_id].text}"),
+            ContentFragment(content=f"Call: {game.phrases[exchange.call_phrase_id].text}"),
             ContentFragment(
                 content=(
-                    f"Response: {game.phrases[response_phrase_id].text} "
+                    f"Response: {game.phrases[exchange.response_phrase_id].text} "
                     f"{response_outcome} the call."
                 )
             ),
