@@ -44,35 +44,7 @@ class PhraseType(Singleton):
     roles: tuple[PhraseRole, ...]
 
 
-class PhraseBadgeToken(Token):
-    """Named token base for graph-owned phrase badges.
-
-    Why
-    ---
-    Keeps the public badge wrapper stable if later repertoire work needs
-    badge-local behavior.
-
-    Key Features
-    ------------
-    - Separates the public badge class from the generic token wrapper.
-
-    API
-    ---
-    :class:`PhraseBadge` is the generated wrapper bound to :class:`PhraseType`.
-
-    Notes
-    -----
-    The base adds no local policy; ordinary token and component ownership
-    semantics remain authoritative.
-
-    See also
-    --------
-    :class:`RepertoireManager`
-        Owner-bound storage for earned badges.
-    """
-
-
-PhraseBadge = PhraseBadgeToken._create_wrapper_cls(PhraseType, "PhraseBadge")
+PhraseBadge = Token._create_wrapper_cls(PhraseType, "PhraseBadge")
 
 
 class RepertoireManager(ComponentManager[PhraseBadge]):

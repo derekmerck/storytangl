@@ -101,7 +101,6 @@ from .call_response_game import (
 from .repertoire import (
     KNOWN_PHRASES_SLOT,
     PhraseBadge,
-    PhraseBadgeToken,
     PhraseType,
     RepertoireManager,
 )
@@ -201,6 +200,10 @@ __all__ = [
     "CallResponseExchange",
     "CallResponsePhrase",
     "DominanceMatch",
+    "KNOWN_PHRASES_SLOT",
+    "PhraseBadge",
+    "PhraseType",
+    "RepertoireManager",
     "PickingGame",
     "PickingGameHandler",
     "PickingMove",
