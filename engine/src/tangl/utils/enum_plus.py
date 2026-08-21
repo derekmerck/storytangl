@@ -19,7 +19,7 @@ class EnumPlusMixin(Enum_):
     at YAML/JSON/model boundaries while runtime state remains enum-typed. It also
     provides dictionary-key conversion, random picking, and ordering helpers.
 
-    Create class methods 'alias' and/or 'rev_alias' to support casting
+    Override :meth:`aliases` and/or :meth:`rev_aliases` to support casting
     additional values to the Enum.
 
     Note that Enums cannot have mixins except non-Enum's _before_ the
