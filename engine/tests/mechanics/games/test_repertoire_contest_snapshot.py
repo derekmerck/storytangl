@@ -13,6 +13,7 @@ from tangl.core import DispatchLayer, Graph, Node, Priority, Selector
 from tangl.mechanics.games import (
     KNOWN_PHRASES_SLOT,
     CallResponseGame,
+    CallResponseExchange,
     CallResponseGameHandler,
     CallResponsePhrase,
     DominanceComposition,
@@ -20,14 +21,20 @@ from tangl.mechanics.games import (
     DominanceContradiction,
     DominanceMatch,
     GamePhase,
+    GameResult,
     HasGame,
     PhraseBadge,
     PhraseType,
     RepertoireManager,
     compose_dominance_schedule,
 )
+from tangl.mechanics.transaction import (
+    CatalogAssetCommitment,
+    ComponentSlotAssetHolder,
+    TransactionOffer,
+)
 from tangl.story import Action, Block
-from tangl.vm import Ledger, TraversableEdge, VmPhaseCtx
+from tangl.vm import Ledger, ResolutionPhase as P, TraversableEdge, VmPhaseCtx, on_update
 
 
 @pytest.fixture(autouse=True)
@@ -105,6 +112,70 @@ class SnapshotContestBlock(HasGame, Block):
         self.composition_diagnostics = composition.diagnostics
 
 
+class RepertoireAftermathBlock(Block):
+    """Test-world outcome block that awards one phrase after a player loss."""
+
+    player_id: UUID
+    contest_id: UUID
+
+
+@on_update(
+    wants_caller_kind=RepertoireAftermathBlock,
+    wants_exact_kind=False,
+    priority=Priority.NORMAL,
+)
+def apply_repertoire_loss_aftermath(
+    *,
+    caller: RepertoireAftermathBlock,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> None:
+    """Mint the opponent's deployed phrase through the ordinary transaction path."""
+
+    if caller.locals.get("aftermath_applied"):
+        return
+
+    player = ctx.graph.get(caller.player_id)
+    contest = ctx.graph.get(caller.contest_id)
+    assert isinstance(player, RepertoireParticipant)
+    assert isinstance(contest, SnapshotContestBlock)
+    last_round = contest.game.last_round
+    if last_round is None:
+        raise ValueError("Repertoire aftermath requires one resolved exchange")
+
+    exchange = CallResponseExchange.model_validate(last_round.notes)
+    caller.locals["awarded_phrase_ids"] = []
+    if contest.game.result is GameResult.LOSE:
+        phrase_id = (
+            exchange.response_phrase_id
+            if exchange.initiative_before
+            else exchange.call_phrase_id
+        )
+        definition = PhraseType.get_instance(phrase_id)
+        if definition is None:
+            raise ValueError(f"No live phrase definition for award: {phrase_id}")
+        if not player.repertoire.has_phrase(phrase_id):
+            offer = TransactionOffer(
+                label=f"learn phrase: {phrase_id}",
+                commitments=[
+                    CatalogAssetCommitment(
+                        ComponentSlotAssetHolder(
+                            player.repertoire,
+                            KNOWN_PHRASES_SLOT,
+                        ),
+                        supplier=lambda: PhraseBadge(
+                            label=f"{caller.label}-{phrase_id}",
+                            token_from=definition.label,
+                        ),
+                        registry=ctx.graph,
+                    ),
+                ],
+            )
+            offer.accept()
+            caller.locals["awarded_phrase_ids"] = [phrase_id]
+    caller.locals["aftermath_applied"] = True
+
+
 def _definitions_from_repertoire(repertoire: RepertoireManager) -> list[PhraseType]:
     """Project one owner's live badge definitions into a stable contest input."""
 
@@ -170,7 +241,10 @@ def _add_badge(
     return badge
 
 
-def _snapshot_graph() -> tuple[
+def _snapshot_graph(
+    *,
+    initial_player_has_initiative: bool = True,
+) -> tuple[
     Graph,
     Ledger,
     RepertoireParticipant,
@@ -196,7 +270,10 @@ def _snapshot_graph() -> tuple[
         label="contest",
         player_id=player.uid,
         opponent_id=opponent.uid,
-        game_state=CallResponseGame(scoring_n=1),
+        game_state=CallResponseGame(
+            scoring_n=1,
+            initial_player_has_initiative=initial_player_has_initiative,
+        ),
         scenario_contributions=(
             _contribution(
                 call="taunt",
@@ -230,6 +307,63 @@ def _snapshot_graph() -> tuple[
     assert contest.game.phrases == {}
     assert late_badge in opponent.repertoire.badges()
     return graph, ledger, player, opponent, contest, late_badge, current_contest
+
+
+def _add_loss_aftermath(
+    graph: Graph,
+    *,
+    player: RepertoireParticipant,
+    contest: SnapshotContestBlock,
+) -> RepertoireAftermathBlock:
+    """Wire one stable terminal-loss continuation to a world-owned aftermath."""
+
+    aftermath = graph.add_node(
+        kind=RepertoireAftermathBlock,
+        label="learn from defeat",
+        player_id=player.uid,
+        contest_id=contest.uid,
+    )
+    TraversableEdge(
+        graph=graph,
+        predecessor_id=contest.uid,
+        successor_id=aftermath.uid,
+        label="Learn from the exchange",
+        trigger_phase=P.POSTREQS,
+        predicate="game_lost",
+    )
+    return aftermath
+
+
+def _play_terminal_loss(
+    *,
+    initial_player_has_initiative: bool,
+) -> tuple[
+    Graph,
+    Ledger,
+    RepertoireParticipant,
+    RepertoireParticipant,
+    SnapshotContestBlock,
+    RepertoireAftermathBlock,
+]:
+    """Run one loss through contest UPDATE, POSTREQS, and aftermath UPDATE."""
+
+    graph, ledger, player, opponent, contest, _late_badge, current_contest = _snapshot_graph(
+        initial_player_has_initiative=initial_player_has_initiative,
+    )
+    aftermath = _add_loss_aftermath(graph, player=player, contest=contest)
+    ledger.resolve_choice(current_contest.uid)
+    action = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+
+    ledger.resolve_choice(action.uid, choice_payload=action.payload)
+
+    assert contest.game.phase is GamePhase.TERMINAL
+    assert contest.game.result is GameResult.LOSE
+    assert ledger.cursor_id == aftermath.uid
+    return graph, ledger, player, opponent, contest, aftermath
 
 
 def _install_phrase_types() -> dict[str, PhraseType]:
@@ -353,3 +487,158 @@ def test_prepared_contest_snapshot_survives_graph_roundtrip() -> None:
         badge.reference_singleton.label: badge.reference_singleton
         for badge in restored_badges
     } == definitions
+
+
+@pytest.mark.parametrize(
+    ("initial_player_has_initiative", "awarded_phrase_id"),
+    [(True, "reply"), (False, "late_reply")],
+)
+def test_loss_aftermath_awards_the_opponent_deployed_phrase(
+    initial_player_has_initiative: bool,
+    awarded_phrase_id: str,
+) -> None:
+    graph, _ledger, player, opponent, contest, aftermath = _play_terminal_loss(
+        initial_player_has_initiative=initial_player_has_initiative,
+    )
+
+    exchange = CallResponseExchange.model_validate(contest.game.last_round.notes)
+    assert aftermath.locals["awarded_phrase_ids"] == [awarded_phrase_id]
+    assert player.repertoire.has_phrase(awarded_phrase_id)
+    opponent_badge = next(
+        badge
+        for badge in opponent.repertoire.badges()
+        if badge.token_from == awarded_phrase_id
+    )
+    learned_badge = next(
+        badge
+        for badge in player.repertoire.badges()
+        if badge.token_from == awarded_phrase_id
+    )
+    assert learned_badge.uid != opponent_badge.uid
+    assert learned_badge.reference_singleton is opponent_badge.reference_singleton
+    assert learned_badge.reference_singleton.label == awarded_phrase_id
+    assert exchange.initiative_before is initial_player_has_initiative
+    assert graph.get(learned_badge.uid) is learned_badge
+
+
+def test_aftermath_does_not_award_after_a_player_win() -> None:
+    graph, ledger, player, _opponent, contest, _late_badge, current_contest = _snapshot_graph()
+    contest.scenario_contributions = ()
+    aftermath = graph.add_node(
+        kind=RepertoireAftermathBlock,
+        label="no award after victory",
+        player_id=player.uid,
+        contest_id=contest.uid,
+    )
+    TraversableEdge(
+        graph=graph,
+        predecessor_id=contest.uid,
+        successor_id=aftermath.uid,
+        label="Leave after victory",
+        trigger_phase=P.POSTREQS,
+        predicate="game_won",
+    )
+
+    ledger.resolve_choice(current_contest.uid)
+    action = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+    ledger.resolve_choice(action.uid, choice_payload=action.payload)
+
+    assert contest.game.result is GameResult.WIN
+    assert ledger.cursor_id == aftermath.uid
+    assert aftermath.locals["aftermath_applied"] is True
+    assert aftermath.locals["awarded_phrase_ids"] == []
+    assert player.repertoire.phrase_ids() == ["taunt"]
+
+
+def test_loss_aftermath_is_idempotent_and_learned_phrase_reaches_next_contest() -> None:
+    graph, ledger, player, _opponent, contest, aftermath = _play_terminal_loss(
+        initial_player_has_initiative=True,
+    )
+    learned_badge = next(
+        badge for badge in player.repertoire.badges() if badge.token_from == "reply"
+    )
+    badge_ids_before = {
+        badge.uid
+        for badge in graph.find_nodes(Selector(has_kind=PhraseBadge))
+    }
+    reenter = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=aftermath.uid,
+        label="Reflect again",
+    )
+    duplicate = graph.add_node(
+        kind=RepertoireAftermathBlock,
+        label="duplicate award attempt",
+        player_id=player.uid,
+        contest_id=contest.uid,
+    )
+    duplicate_edge = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=duplicate.uid,
+        label="Try to learn again",
+    )
+    next_contest = graph.add_node(
+        kind=SnapshotContestBlock,
+        label="next contest",
+        player_id=player.uid,
+        opponent_id=contest.opponent_id,
+        game_state=CallResponseGame(scoring_n=1),
+        scenario_contributions=contest.scenario_contributions,
+    )
+    next_edge = TraversableEdge(
+        graph=graph,
+        predecessor_id=duplicate.uid,
+        successor_id=next_contest.uid,
+        label="Use the learned phrase",
+    )
+
+    ledger.resolve_choice(reenter.uid)
+    ledger.resolve_choice(duplicate_edge.uid)
+
+    assert aftermath.locals["awarded_phrase_ids"] == ["reply"]
+    assert duplicate.locals["awarded_phrase_ids"] == []
+    assert {
+        badge.uid
+        for badge in graph.find_nodes(Selector(has_kind=PhraseBadge))
+    } == badge_ids_before
+    assert player.repertoire.badges().count(learned_badge) == 1
+    assert next_contest.game.phase is GamePhase.PENDING
+
+    ledger.resolve_choice(next_edge.uid)
+
+    assert next_contest.game.phase is GamePhase.READY
+    assert "reply" in next_contest.game.player_phrase_ids
+    assert {
+        edge.payload["move"]
+        for edge in next_contest.edges_out(Selector(has_kind=Action))
+        if edge.payload is not None
+    } == {"reply", "taunt"}
+
+
+def test_awarded_badge_survives_fresh_catalog_graph_roundtrip() -> None:
+    _graph, ledger, player, _opponent, _contest, _aftermath = _play_terminal_loss(
+        initial_player_has_initiative=True,
+    )
+    learned_badge = next(
+        badge for badge in player.repertoire.badges() if badge.token_from == "reply"
+    )
+    payload = ledger.graph.unstructure()
+
+    PhraseType.clear_instances()
+    definitions = _install_phrase_types()
+    restored = Graph.structure(payload)
+    restored_player = restored.get(player.uid)
+    restored_badge = restored.get(learned_badge.uid)
+
+    assert isinstance(restored_player, RepertoireParticipant)
+    assert isinstance(restored_badge, PhraseBadge)
+    assert restored_player.repertoire.owner is restored_player
+    assert restored_badge.uid == learned_badge.uid
+    assert restored_badge in restored_player.repertoire.badges()
+    assert restored_badge.reference_singleton is definitions["reply"]
