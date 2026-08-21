@@ -260,6 +260,9 @@ full type map and rationale.**
 - Explicit, grouped imports: stdlib → third-party → local. No wildcards.
 - Black-like formatting: 4-space indents, trailing commas for diffs, double
   quotes. Lines under 100 characters.
+- For author-facing YAML/JSON/Pydantic enum values, use `EnumPlusMixin` before
+  `Enum`/`IntEnum`; keep runtime fields enum-typed and do not repeat
+  string-to-enum validators in domain models.
 - Module-level loggers: `logging.getLogger(__name__)`. Structured messages,
   no f-strings inside log calls.
 - See `docs/src/contrib/coding_style.md` for deeper rationale.

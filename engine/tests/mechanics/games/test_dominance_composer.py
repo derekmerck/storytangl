@@ -118,7 +118,7 @@ def test_authored_contribution_accepts_priority_name() -> None:
 
 
 def test_authored_contribution_rejects_unknown_ordering_name() -> None:
-    with pytest.raises(ValidationError, match="Unknown DispatchLayer name"):
+    with pytest.raises(ValidationError, match="LOCAAL"):
         DominanceContribution.model_validate(
             {
                 "call_selector": {},

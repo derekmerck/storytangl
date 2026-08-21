@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, Literal
+from typing import ClassVar, Iterable, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from tangl.core import DispatchLayer, Priority, Selector, Singleton, Token
 from tangl.mechanics.assembly import ComponentManager, Slot
@@ -53,29 +53,6 @@ class DominanceContribution(BaseModel):
     dispatch_layer: DispatchLayer = Field(alias="layer")
     priority: Priority = Priority.NORMAL
     source_id: str
-
-    @model_validator(mode="before")
-    @classmethod
-    def _parse_authored_ordering_names(cls, data: Any) -> Any:
-        """Accept documented enum names at the authored mapping boundary."""
-
-        if not isinstance(data, dict):
-            return data
-        payload = dict(data)
-        for field_name, enum_type in (
-            ("layer", DispatchLayer),
-            ("dispatch_layer", DispatchLayer),
-            ("priority", Priority),
-        ):
-            value = payload.get(field_name)
-            if isinstance(value, str):
-                try:
-                    payload[field_name] = enum_type[value]
-                except KeyError as exc:
-                    raise ValueError(
-                        f"Unknown {enum_type.__name__} name: {value}"
-                    ) from exc
-        return payload
 
 
 class DominanceContradiction(BaseModel):
