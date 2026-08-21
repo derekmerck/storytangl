@@ -598,8 +598,9 @@ it is deliberately off the critical path.
    `RepertoireManager` establish catalog truth and transferable badge
    ownership. **2b1 landed:** the pure composer folds bounded participants and
    layered `DominanceContribution` declarations into `DominanceMatch` values.
-   **2b2 landed:** world-owned `prepare_game(ctx)` snapshots participating
-   badge ids and invokes that composer for the accepted contest.
+   **2b2 landed:** world-owned `prepare_game(ctx)` snapshots phrase-definition
+   identifiers from participating badges and invokes that composer for the
+   accepted contest.
 3. Shell-level aftermath handler reads exposure records and idempotently awards
    badges; the policy is swappable without touching steps 1-2.
 4. Winning grants a prize token from its own catalog, or a durable world

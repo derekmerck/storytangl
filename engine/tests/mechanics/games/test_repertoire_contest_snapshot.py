@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Self
 from uuid import UUID
 
@@ -30,7 +31,7 @@ from tangl.vm import Ledger, TraversableEdge, VmPhaseCtx
 
 
 @pytest.fixture(autouse=True)
-def reset_phrase_types() -> None:
+def reset_phrase_types() -> Iterator[None]:
     """Keep the test-world catalog available for graph restoration only."""
 
     PhraseType.clear_instances()
@@ -180,39 +181,10 @@ def _snapshot_graph() -> tuple[
 ]:
     """Build foyer/current/contest topology with one badge moved before entry."""
 
-    taunt = PhraseType(
-        label="taunt",
-        text="You fight like a dairy farmer.",
-        roles=("call", "response"),
-        base_contributions=(
-            _contribution(
-                call="taunt",
-                response="reply",
-                result="miss",
-                layer=DispatchLayer.APPLICATION,
-                source_id="catalog-miss",
-            ),
-        ),
-    )
-    reply = PhraseType(
-        label="reply",
-        text="How appropriate. You fight like a cow.",
-        roles=("call", "response"),
-        base_contributions=(
-            _contribution(
-                call="reply",
-                response="late_reply",
-                result="match",
-                layer=DispatchLayer.AUTHOR,
-                source_id="reply-base",
-            ),
-        ),
-    )
-    late_reply = PhraseType(
-        label="late_reply",
-        text="That is the second-best thing about your mother.",
-        roles=("call", "response"),
-    )
+    definitions = _install_phrase_types()
+    taunt = definitions["taunt"]
+    reply = definitions["reply"]
+    late_reply = definitions["late_reply"]
 
     graph = Graph(label="repertoire-snapshot")
     foyer = graph.add_node(kind=Block, label="foyer")
@@ -258,6 +230,45 @@ def _snapshot_graph() -> tuple[
     assert contest.game.phrases == {}
     assert late_badge in opponent.repertoire.badges()
     return graph, ledger, player, opponent, contest, late_badge, current_contest
+
+
+def _install_phrase_types() -> dict[str, PhraseType]:
+    """Install the deterministic test-world catalog needed for restoration."""
+
+    taunt = PhraseType(
+        label="taunt",
+        text="You fight like a dairy farmer.",
+        roles=("call", "response"),
+        base_contributions=(
+            _contribution(
+                call="taunt",
+                response="reply",
+                result="miss",
+                layer=DispatchLayer.APPLICATION,
+                source_id="catalog-miss",
+            ),
+        ),
+    )
+    reply = PhraseType(
+        label="reply",
+        text="How appropriate. You fight like a cow.",
+        roles=("call", "response"),
+        base_contributions=(
+            _contribution(
+                call="reply",
+                response="late_reply",
+                result="match",
+                layer=DispatchLayer.AUTHOR,
+                source_id="reply-base",
+            ),
+        ),
+    )
+    late_reply = PhraseType(
+        label="late_reply",
+        text="That is the second-best thing about your mother.",
+        roles=("call", "response"),
+    )
+    return {phrase.label: phrase for phrase in (taunt, reply, late_reply)}
 
 
 def test_accepted_entry_snapshots_live_repertoires_after_frontier_provisioning() -> None:
@@ -315,7 +326,10 @@ def test_prepared_contest_snapshot_survives_graph_roundtrip() -> None:
     player.repertoire.assign(KNOWN_PHRASES_SLOT, late_badge)
     ledger.resolve_choice(current_contest.uid)
 
-    restored = Graph.structure(ledger.graph.unstructure())
+    payload = ledger.graph.unstructure()
+    PhraseType.clear_instances()
+    definitions = _install_phrase_types()
+    restored = Graph.structure(payload)
     restored_contest = restored.get(contest.uid)
     restored_player = restored.get(player.uid)
     restored_opponent = restored.get(opponent.uid)
@@ -327,5 +341,15 @@ def test_prepared_contest_snapshot_survives_graph_roundtrip() -> None:
     assert restored_contest.game.player_phrase_ids == ["late_reply", "taunt"]
     assert restored_contest.game.opponent_phrase_ids == ["reply"]
     assert restored_contest.game.schedule == contest.game.schedule
+    assert restored_player.repertoire.owner is restored_player
+    assert restored_opponent.repertoire.owner is restored_opponent
     assert restored_player.repertoire.phrase_ids() == ["late_reply", "taunt"]
     assert restored_opponent.repertoire.phrase_ids() == ["reply"]
+    restored_badges = [
+        *restored_player.repertoire.badges(),
+        *restored_opponent.repertoire.badges(),
+    ]
+    assert {
+        badge.reference_singleton.label: badge.reference_singleton
+        for badge in restored_badges
+    } == definitions
