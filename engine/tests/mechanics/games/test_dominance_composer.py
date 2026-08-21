@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from tangl.core import DispatchLayer, Priority, Selector
 from tangl.mechanics.games import (
@@ -72,6 +73,75 @@ def test_undeclared_pair_remains_absent_from_the_schedule() -> None:
 
     assert composition.schedule == []
     assert composition.diagnostics == []
+
+
+def test_authored_contribution_accepts_layer_name_and_default_priority() -> None:
+    authored = DominanceContribution.model_validate(
+        {
+            "call_selector": {"has_tags": {"insult"}},
+            "response_selector": {"has_identifier": "beaujolais"},
+            "result": "match",
+            "layer": "LOCAL",
+            "source_id": "beaujolais",
+        }
+    )
+
+    assert authored.dispatch_layer is DispatchLayer.LOCAL
+    assert authored.priority is Priority.NORMAL
+
+
+def test_python_construction_retains_dispatch_layer_name() -> None:
+    authored = contribution(
+        call=Selector(),
+        response=Selector(),
+        result="match",
+        layer=DispatchLayer.AUTHOR,
+        source_id="python",
+    )
+
+    assert authored.dispatch_layer is DispatchLayer.AUTHOR
+
+
+def test_authored_contribution_accepts_priority_name() -> None:
+    authored = DominanceContribution.model_validate(
+        {
+            "call_selector": {},
+            "response_selector": {},
+            "result": "match",
+            "layer": "AUTHOR",
+            "priority": "LATE",
+            "source_id": "late-author",
+        }
+    )
+
+    assert authored.priority is Priority.LATE
+
+
+def test_authored_contribution_rejects_unknown_ordering_name() -> None:
+    with pytest.raises(ValidationError, match="Unknown DispatchLayer name"):
+        DominanceContribution.model_validate(
+            {
+                "call_selector": {},
+                "response_selector": {},
+                "result": "match",
+                "layer": "LOCAAL",
+                "source_id": "typo",
+            }
+        )
+
+
+def test_authored_contribution_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError, match="unknown_field"):
+        DominanceContribution.model_validate(
+            {
+                "call_selector": {},
+                "response_selector": {},
+                "result": "match",
+                "layer": "LOCAL",
+                "source_id": "beaujolais",
+                "unknown_field": True,
+            }
+        )
 
 
 def test_base_contribution_uses_existing_identifier_and_tag_selectors() -> None:
