@@ -98,6 +98,12 @@ from .call_response_game import (
     CallResponsePhrase,
     DominanceMatch,
 )
+from .repertoire import (
+    KNOWN_PHRASES_SLOT,
+    PhraseBadge,
+    PhraseType,
+    RepertoireManager,
+)
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 from .kim_game import KimGame, KimGameHandler, KimMove
 from tangl.mechanics.credentials import (
@@ -194,6 +200,10 @@ __all__ = [
     "CallResponseExchange",
     "CallResponsePhrase",
     "DominanceMatch",
+    "KNOWN_PHRASES_SLOT",
+    "PhraseBadge",
+    "PhraseType",
+    "RepertoireManager",
     "PickingGame",
     "PickingGameHandler",
     "PickingMove",
