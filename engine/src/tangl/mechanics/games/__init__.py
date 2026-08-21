@@ -99,10 +99,15 @@ from .call_response_game import (
     DominanceMatch,
 )
 from .repertoire import (
+    DominanceComposition,
+    DominanceContribution,
+    DominanceContradiction,
+    DominanceResult,
     KNOWN_PHRASES_SLOT,
     PhraseBadge,
     PhraseType,
     RepertoireManager,
+    compose_dominance_schedule,
 )
 from .picking_game import PickingGame, PickingGameHandler, PickingMove
 from .kim_game import KimGame, KimGameHandler, KimMove
@@ -200,10 +205,15 @@ __all__ = [
     "CallResponseExchange",
     "CallResponsePhrase",
     "DominanceMatch",
+    "DominanceComposition",
+    "DominanceContribution",
+    "DominanceContradiction",
+    "DominanceResult",
     "KNOWN_PHRASES_SLOT",
     "PhraseBadge",
     "PhraseType",
     "RepertoireManager",
+    "compose_dominance_schedule",
     "PickingGame",
     "PickingGameHandler",
     "PickingMove",

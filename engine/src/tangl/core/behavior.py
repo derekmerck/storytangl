@@ -35,6 +35,7 @@ import logging
 from pydantic import ConfigDict, model_validator, SkipValidation
 
 from tangl.type_hints import Tag
+from tangl.utils.enum_plus import EnumPlusMixin
 from .entity import Entity
 from .registry import Registry, RegistryAware
 from .record import HasOrder, Record
@@ -44,7 +45,7 @@ from .ctx import DispatchCtx
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class Priority(IntEnum):
+class Priority(EnumPlusMixin, IntEnum):
     """Execution priority within one dispatch layer (lower values run earlier)."""
     FIRST = 0
     EARLY = 25
@@ -53,7 +54,7 @@ class Priority(IntEnum):
     LAST = 100
 
 
-class DispatchLayer(IntEnum):
+class DispatchLayer(EnumPlusMixin, IntEnum):
     """Registry layer ordering used before per-layer priority ordering."""
     # local sorts _later_ in execution priority so it can observe and aggregate globals
     GLOBAL = 0

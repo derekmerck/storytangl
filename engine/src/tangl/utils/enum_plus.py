@@ -12,13 +12,14 @@ else:
 
 
 class EnumPlusMixin(Enum_):
-    """
-    This is a utility mixin for Enums.
+    """Authoring-boundary adapter for typed enums.
 
-    It adds a robust 'missing' function with aliases, and utilities
-    for dictionary key conversion, random picking, and ordering.
+    Ordinary enum construction and Pydantic validation reach :meth:`_missing_`,
+    so this mixin accepts documented case-insensitive names, values, and aliases
+    at YAML/JSON/model boundaries while runtime state remains enum-typed. It also
+    provides dictionary-key conversion, random picking, and ordering helpers.
 
-    Create class methods 'alias' and/or 'rev_alias' to support casting
+    Override :meth:`aliases` and/or :meth:`rev_aliases` to support casting
     additional values to the Enum.
 
     Note that Enums cannot have mixins except non-Enum's _before_ the

@@ -69,6 +69,13 @@ presentation (renderers, web/UI)
   - UUIDs are `UUID` objects, not strings.
   - Datetimes are `datetime` objects, not ISO strings.
   - Entity types are Python `Type` objects, not fully‑qualified name strings.
+- **Enums at authored boundaries.** Runtime and model fields remain typed as
+  `Enum`/`IntEnum`, never string unions. When YAML, JSON, or Pydantic input
+  accepts human-readable enum names or values, inherit `EnumPlusMixin` before
+  `Enum`/`IntEnum`. Its `Enum._missing_` coercion is the boundary adapter used
+  by ordinary enum construction and Pydantic validation; do not repeat
+  string-to-enum validators in individual domain models. Unknown values still
+  fail unless that specific enum documents a fallback.
 
 - **Use Pydantic serializers for JSON/YAML output.**
   - Add `@field_serializer` for rich types needing string form (e.g., `bytes.hex()`).

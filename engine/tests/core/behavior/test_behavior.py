@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from pydantic import BaseModel
 
 from tangl.core.behavior import (
     Behavior,
@@ -19,6 +20,37 @@ from tangl.core.selector import Selector
 
 class SpecialEntity(Entity):
     """Entity subtype used for caller kind matching tests."""
+
+
+class OrderingConfig(BaseModel):
+    """Pydantic-backed authoring boundary for dispatch ordering tests."""
+
+    dispatch_layer: DispatchLayer
+    priority: Priority
+
+
+class TestOrderingEnums:
+    """Author-facing enum coercion retains ordinary integer ordering."""
+
+    def test_names_and_members_resolve_without_changing_values(self) -> None:
+        assert DispatchLayer("LOCAL") is DispatchLayer.LOCAL
+        assert DispatchLayer("local") is DispatchLayer.LOCAL
+        assert Priority("NORMAL") is Priority.NORMAL
+        assert Priority("late") is Priority.LATE
+        assert DispatchLayer(DispatchLayer.LOCAL) is DispatchLayer.LOCAL
+        assert Priority(Priority.NORMAL) is Priority.NORMAL
+        assert DispatchLayer(5) is DispatchLayer.LOCAL
+        assert Priority(75) is Priority.LATE
+        assert DispatchLayer.LOCAL > DispatchLayer.APPLICATION
+        assert Priority.LATE > Priority.NORMAL
+
+    def test_pydantic_model_coerces_author_facing_names(self) -> None:
+        ordering = OrderingConfig.model_validate(
+            {"dispatch_layer": "LOCAL", "priority": "late"}
+        )
+
+        assert ordering.dispatch_layer is DispatchLayer.LOCAL
+        assert ordering.priority is Priority.LATE
 
 
 class TestBehaviorCallerKind:
