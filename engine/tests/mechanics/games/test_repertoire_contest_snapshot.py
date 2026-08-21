@@ -1,0 +1,331 @@
+"""Accepted-entry repertoire snapshots for a world-owned call-response contest."""
+
+from __future__ import annotations
+
+from typing import Self
+from uuid import UUID
+
+import pytest
+from pydantic import Field, model_validator
+
+from tangl.core import DispatchLayer, Graph, Node, Priority, Selector
+from tangl.mechanics.games import (
+    KNOWN_PHRASES_SLOT,
+    CallResponseGame,
+    CallResponseGameHandler,
+    CallResponsePhrase,
+    DominanceComposition,
+    DominanceContribution,
+    DominanceContradiction,
+    DominanceMatch,
+    GamePhase,
+    HasGame,
+    PhraseBadge,
+    PhraseType,
+    RepertoireManager,
+    compose_dominance_schedule,
+)
+from tangl.story import Action, Block
+from tangl.vm import Ledger, TraversableEdge, VmPhaseCtx
+
+
+@pytest.fixture(autouse=True)
+def reset_phrase_types() -> None:
+    """Keep the test-world catalog available for graph restoration only."""
+
+    PhraseType.clear_instances()
+    yield
+    PhraseType.clear_instances()
+
+
+class RepertoireParticipant(Node):
+    """Test-world graph owner with one ordinary phrase repertoire."""
+
+    repertoire: RepertoireManager = Field(
+        default_factory=RepertoireManager,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+
+    @model_validator(mode="after")
+    def _bind_repertoire_owner(self) -> Self:
+        self.repertoire.bind_owner(self)
+        return self
+
+
+class SnapshotContestBlock(HasGame, Block):
+    """Test-world contest that snapshots participant repertoires on entry."""
+
+    _game_class = CallResponseGame
+    _game_handler_class = CallResponseGameHandler
+
+    player_id: UUID
+    opponent_id: UUID
+    scenario_contributions: tuple[DominanceContribution, ...] = Field(
+        default_factory=tuple,
+    )
+    composition_diagnostics: list[DominanceContradiction] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True},
+    )
+
+    def prepare_game(self, *, ctx: VmPhaseCtx) -> None:
+        """Freeze live repertoire definitions immediately before game setup."""
+
+        player = ctx.graph.get(self.player_id)
+        opponent = ctx.graph.get(self.opponent_id)
+        assert isinstance(player, RepertoireParticipant)
+        assert isinstance(opponent, RepertoireParticipant)
+
+        player_phrases = _definitions_from_repertoire(player.repertoire)
+        opponent_phrases = _definitions_from_repertoire(opponent.repertoire)
+        forward = compose_dominance_schedule(
+            player_phrases,
+            opponent_phrases,
+            contributions=self.scenario_contributions,
+        )
+        reverse = compose_dominance_schedule(
+            opponent_phrases,
+            player_phrases,
+            contributions=self.scenario_contributions,
+        )
+        composition = _combine_compositions(forward, reverse)
+
+        definitions = {phrase.label: phrase for phrase in [*player_phrases, *opponent_phrases]}
+        self.game.phrases = {
+            phrase_id: CallResponsePhrase(
+                text=definition.text,
+                roles=list(definition.roles),
+            )
+            for phrase_id, definition in sorted(definitions.items())
+        }
+        self.game.player_phrase_ids = [phrase.label for phrase in player_phrases]
+        self.game.opponent_phrase_ids = [phrase.label for phrase in opponent_phrases]
+        self.game.schedule = composition.schedule
+        self.composition_diagnostics = composition.diagnostics
+
+
+def _definitions_from_repertoire(repertoire: RepertoireManager) -> list[PhraseType]:
+    """Project one owner's live badge definitions into a stable contest input."""
+
+    definitions = {
+        badge.token_from: badge.reference_singleton
+        for badge in repertoire.badges()
+    }
+    return [definitions[phrase_id] for phrase_id in sorted(definitions)]
+
+
+def _combine_compositions(*compositions: DominanceComposition) -> DominanceComposition:
+    """Merge orientation schedules, rejecting non-identical duplicate pairs."""
+
+    matches: dict[tuple[str, str], DominanceMatch] = {}
+    diagnostics: list[DominanceContradiction] = []
+    for composition in compositions:
+        diagnostics.extend(composition.diagnostics)
+        for match in composition.schedule:
+            pair = (match.call_phrase_id, match.response_phrase_id)
+            existing = matches.get(pair)
+            if existing is not None and existing != match:
+                raise ValueError(f"Conflicting composed dominance match for {pair}")
+            matches[pair] = match
+    return DominanceComposition(
+        schedule=[matches[pair] for pair in sorted(matches)],
+        diagnostics=diagnostics,
+    )
+
+
+def _contribution(
+    *,
+    call: str,
+    response: str,
+    result: str,
+    layer: DispatchLayer,
+    source_id: str,
+) -> DominanceContribution:
+    """Build one exact-id contribution for the test-world contest."""
+
+    return DominanceContribution(
+        call_selector=Selector(has_identifier=call),
+        response_selector=Selector(has_identifier=response),
+        result=result,
+        dispatch_layer=layer,
+        priority=Priority.NORMAL,
+        source_id=source_id,
+    )
+
+
+def _add_badge(
+    graph: Graph,
+    owner: RepertoireParticipant,
+    definition: PhraseType,
+) -> PhraseBadge:
+    """Add one graph-owned badge to an owner's ordinary repertoire slot."""
+
+    badge = graph.add_node(
+        kind=PhraseBadge,
+        label=f"{owner.label}-{definition.label}",
+        token_from=definition.label,
+    )
+    owner.repertoire.assign(KNOWN_PHRASES_SLOT, badge)
+    return badge
+
+
+def _snapshot_graph() -> tuple[
+    Graph,
+    Ledger,
+    RepertoireParticipant,
+    RepertoireParticipant,
+    SnapshotContestBlock,
+    PhraseBadge,
+    TraversableEdge,
+]:
+    """Build foyer/current/contest topology with one badge moved before entry."""
+
+    taunt = PhraseType(
+        label="taunt",
+        text="You fight like a dairy farmer.",
+        roles=("call", "response"),
+        base_contributions=(
+            _contribution(
+                call="taunt",
+                response="reply",
+                result="miss",
+                layer=DispatchLayer.APPLICATION,
+                source_id="catalog-miss",
+            ),
+        ),
+    )
+    reply = PhraseType(
+        label="reply",
+        text="How appropriate. You fight like a cow.",
+        roles=("call", "response"),
+        base_contributions=(
+            _contribution(
+                call="reply",
+                response="late_reply",
+                result="match",
+                layer=DispatchLayer.AUTHOR,
+                source_id="reply-base",
+            ),
+        ),
+    )
+    late_reply = PhraseType(
+        label="late_reply",
+        text="That is the second-best thing about your mother.",
+        roles=("call", "response"),
+    )
+
+    graph = Graph(label="repertoire-snapshot")
+    foyer = graph.add_node(kind=Block, label="foyer")
+    current = graph.add_node(kind=Block, label="current")
+    player = graph.add_node(kind=RepertoireParticipant, label="player")
+    opponent = graph.add_node(kind=RepertoireParticipant, label="opponent")
+    contest = graph.add_node(
+        kind=SnapshotContestBlock,
+        label="contest",
+        player_id=player.uid,
+        opponent_id=opponent.uid,
+        game_state=CallResponseGame(scoring_n=1),
+        scenario_contributions=(
+            _contribution(
+                call="taunt",
+                response="reply",
+                result="match",
+                layer=DispatchLayer.LOCAL,
+                source_id="scenario-override",
+            ),
+        ),
+    )
+    _add_badge(graph, player, taunt)
+    _add_badge(graph, opponent, reply)
+    late_badge = _add_badge(graph, opponent, late_reply)
+    foyer_current = TraversableEdge(
+        graph=graph,
+        predecessor_id=foyer.uid,
+        successor_id=current.uid,
+        label="Approach the contest",
+    )
+    current_contest = TraversableEdge(
+        graph=graph,
+        predecessor_id=current.uid,
+        successor_id=contest.uid,
+        label="Begin the contest",
+    )
+    ledger = Ledger.from_graph(graph=graph, entry_id=foyer.uid)
+
+    ledger.resolve_choice(foyer_current.uid)
+
+    assert contest.game.phase is GamePhase.PENDING
+    assert contest.game.phrases == {}
+    assert late_badge in opponent.repertoire.badges()
+    return graph, ledger, player, opponent, contest, late_badge, current_contest
+
+
+def test_accepted_entry_snapshots_live_repertoires_after_frontier_provisioning() -> None:
+    graph, ledger, player, opponent, contest, late_badge, current_contest = _snapshot_graph()
+
+    opponent.repertoire.unassign(KNOWN_PHRASES_SLOT, late_badge)
+    player.repertoire.assign(KNOWN_PHRASES_SLOT, late_badge)
+
+    ledger.resolve_choice(current_contest.uid)
+
+    assert contest.game.phase is GamePhase.READY
+    assert contest.game.player_phrase_ids == ["late_reply", "taunt"]
+    assert contest.game.opponent_phrase_ids == ["reply"]
+    assert {
+        (match.call_phrase_id, match.response_phrase_id, match.matched, match.source_id)
+        for match in contest.game.schedule
+    } == {
+        ("reply", "late_reply", True, "reply-base"),
+        ("taunt", "reply", True, "scenario-override"),
+    }
+    assert contest.composition_diagnostics == []
+    action_moves = {
+        edge.payload["move"]
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload is not None
+    }
+    assert action_moves == {"late_reply", "taunt"}
+
+    player.repertoire.unassign(KNOWN_PHRASES_SLOT, late_badge)
+    opponent.repertoire.assign(KNOWN_PHRASES_SLOT, late_badge)
+
+    assert contest.game.player_phrase_ids == ["late_reply", "taunt"]
+    assert contest.game.opponent_phrase_ids == ["reply"]
+    assert any(
+        match.response_phrase_id == "late_reply"
+        for match in contest.game.schedule
+    )
+
+    taunt_action = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+    ledger.resolve_choice(taunt_action.uid, choice_payload=taunt_action.payload)
+
+    assert contest.game.phase is GamePhase.TERMINAL
+    assert contest.game.last_exchange is not None
+    assert contest.game.last_exchange.match_source_id == "scenario-override"
+    assert graph.get(contest.uid) is contest
+
+
+def test_prepared_contest_snapshot_survives_graph_roundtrip() -> None:
+    _, ledger, player, opponent, contest, late_badge, current_contest = _snapshot_graph()
+    opponent.repertoire.unassign(KNOWN_PHRASES_SLOT, late_badge)
+    player.repertoire.assign(KNOWN_PHRASES_SLOT, late_badge)
+    ledger.resolve_choice(current_contest.uid)
+
+    restored = Graph.structure(ledger.graph.unstructure())
+    restored_contest = restored.get(contest.uid)
+    restored_player = restored.get(player.uid)
+    restored_opponent = restored.get(opponent.uid)
+
+    assert isinstance(restored_contest, SnapshotContestBlock)
+    assert isinstance(restored_player, RepertoireParticipant)
+    assert isinstance(restored_opponent, RepertoireParticipant)
+    assert restored_contest.game.phase is GamePhase.READY
+    assert restored_contest.game.player_phrase_ids == ["late_reply", "taunt"]
+    assert restored_contest.game.opponent_phrase_ids == ["reply"]
+    assert restored_contest.game.schedule == contest.game.schedule
+    assert restored_player.repertoire.phrase_ids() == ["late_reply", "taunt"]
+    assert restored_opponent.repertoire.phrase_ids() == ["reply"]

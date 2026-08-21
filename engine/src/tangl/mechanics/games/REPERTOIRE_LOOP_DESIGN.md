@@ -12,8 +12,8 @@
 structured evidence, and CLI output. L2 step 2a landed the world-independent
 ``PhraseType`` / ``PhraseBadge`` / ``RepertoireManager`` ownership foundation.
 L2 step 2b1 landed the pure bounded dominance contribution fold; step 2b2
-accepted-entry repertoire snapshotting, plus the acquisition shell, remain
-design work. Revised after review of PR #380: the
+landed the accepted-entry repertoire snapshot proof. The acquisition shell
+remains design work. Revised after review of PR #380: the
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
@@ -598,8 +598,8 @@ it is deliberately off the critical path.
    `RepertoireManager` establish catalog truth and transferable badge
    ownership. **2b1 landed:** the pure composer folds bounded participants and
    layered `DominanceContribution` declarations into `DominanceMatch` values.
-   **2b2 pending:** `prepare_game(ctx)` snapshots participating badge ids and
-   invokes that composer for the accepted contest.
+   **2b2 landed:** world-owned `prepare_game(ctx)` snapshots participating
+   badge ids and invokes that composer for the accepted contest.
 3. Shell-level aftermath handler reads exposure records and idempotently awards
    badges; the policy is swappable without touching steps 1-2.
 4. Winning grants a prize token from its own catalog, or a durable world
