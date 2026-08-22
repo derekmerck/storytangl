@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Self
+from typing import ClassVar, Self
 from uuid import UUID
 
 import pytest
 from pydantic import Field, model_validator
 
-from tangl.core import DispatchLayer, Graph, Node, Priority, Selector
+from tangl.core import DispatchLayer, Graph, Node, Priority, Selector, Token, TokenCatalog
+from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.games import (
     KNOWN_PHRASES_SLOT,
     CallResponseGame,
@@ -29,12 +30,63 @@ from tangl.mechanics.games import (
     compose_dominance_schedule,
 )
 from tangl.mechanics.transaction import (
+    AssetMoveCommitment,
     CatalogAssetCommitment,
     ComponentSlotAssetHolder,
     TransactionOffer,
 )
 from tangl.story import Action, Block
+from tangl.story.concepts.asset import AssetType
 from tangl.vm import Ledger, ResolutionPhase as P, TraversableEdge, VmPhaseCtx, on_update
+
+
+KNOWN_PRIZES_SLOT = "known_prizes"
+
+
+class PrizeType(AssetType):
+    """Test-world catalog definition for a win reward distinct from phrases."""
+
+
+PrizeToken = Token._create_wrapper_cls(PrizeType, "RepertoirePrizeToken")
+
+
+class PrizeManager(ComponentManager[PrizeToken]):
+    """Test-world persistent collection for independently typed prize tokens."""
+
+    slots: ClassVar[dict[str, Slot]] = {
+        KNOWN_PRIZES_SLOT: Slot.for_type(
+            KNOWN_PRIZES_SLOT,
+            PrizeToken,
+            max_count=1000,
+        ),
+    }
+    granted_prize_ids: set[str] = Field(
+        default_factory=set,
+        json_schema_extra={"include": True},
+    )
+
+    def prizes(self) -> list[PrizeToken]:
+        """Return awarded prizes in stable definition/id order."""
+
+        return sorted(
+            self.get_slot(KNOWN_PRIZES_SLOT),
+            key=lambda prize: (prize.token_from, str(prize.uid)),
+        )
+
+    def prize_ids(self) -> list[str]:
+        """Return granted prize-definition identifiers."""
+
+        return [prize.token_from for prize in self.prizes()]
+
+    def has_prize(self, prize_id: str) -> bool:
+        """Return whether this owner currently holds a prize definition."""
+
+        return prize_id in self.prize_ids()
+
+    def has_received_prize(self, prize_id: str) -> bool:
+        """Return whether this world has granted the definition to this owner."""
+
+        return prize_id in self.granted_prize_ids
 
 
 @pytest.fixture(autouse=True)
@@ -42,8 +94,10 @@ def reset_phrase_types() -> Iterator[None]:
     """Keep the test-world catalog available for graph restoration only."""
 
     PhraseType.clear_instances()
+    PrizeType.clear_instances()
     yield
     PhraseType.clear_instances()
+    PrizeType.clear_instances()
 
 
 class RepertoireParticipant(Node):
@@ -53,10 +107,15 @@ class RepertoireParticipant(Node):
         default_factory=RepertoireManager,
         json_schema_extra={"include": True, "unstructurable": True},
     )
+    prizes: PrizeManager = Field(
+        default_factory=PrizeManager,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
     @model_validator(mode="after")
     def _bind_repertoire_owner(self) -> Self:
         self.repertoire.bind_owner(self)
+        self.prizes.bind_owner(self)
         return self
 
 
@@ -119,6 +178,14 @@ class RepertoireAftermathBlock(Block):
     contest_id: UUID
 
 
+class PrizeAftermathBlock(Block):
+    """Test-world outcome block that awards one authored prize after a win."""
+
+    player_id: UUID
+    contest_id: UUID
+    prize_definition_id: str
+
+
 @on_update(
     wants_caller_kind=RepertoireAftermathBlock,
     wants_exact_kind=False,
@@ -173,6 +240,55 @@ def apply_repertoire_loss_aftermath(
             )
             offer.accept()
             caller.locals["awarded_phrase_ids"] = [phrase_id]
+    caller.locals["aftermath_applied"] = True
+    ctx.invalidate_namespaces()
+
+
+@on_update(
+    wants_caller_kind=PrizeAftermathBlock,
+    wants_exact_kind=False,
+    priority=Priority.NORMAL,
+)
+def apply_prize_win_aftermath(
+    *,
+    caller: PrizeAftermathBlock,
+    ctx: VmPhaseCtx,
+    **_kw: object,
+) -> None:
+    """Mint one catalog-bound prize through the ordinary transaction path."""
+
+    if caller.locals.get("aftermath_applied"):
+        return
+
+    player = ctx.graph.get(caller.player_id)
+    contest = ctx.graph.get(caller.contest_id)
+    assert isinstance(player, RepertoireParticipant)
+    assert isinstance(contest, SnapshotContestBlock)
+    caller.locals["awarded_prize_ids"] = []
+    if contest.game.result is GameResult.WIN:
+        definition = next(
+            _prize_catalog().find_all(Selector(label=caller.prize_definition_id)),
+            None,
+        )
+        if definition is None:
+            raise ValueError(f"No catalog prize definition: {caller.prize_definition_id}")
+        if not player.prizes.has_received_prize(definition.label):
+            offer = TransactionOffer(
+                label=f"award prize: {definition.label}",
+                commitments=[
+                    CatalogAssetCommitment(
+                        ComponentSlotAssetHolder(player.prizes, KNOWN_PRIZES_SLOT),
+                        supplier=lambda: PrizeToken(
+                            label=f"{caller.label}-{definition.label}",
+                            token_from=definition.label,
+                        ),
+                        registry=ctx.graph,
+                    ),
+                ],
+            )
+            offer.accept()
+            player.prizes.granted_prize_ids.add(definition.label)
+            caller.locals["awarded_prize_ids"] = [definition.label]
     caller.locals["aftermath_applied"] = True
     ctx.invalidate_namespaces()
 
@@ -404,6 +520,97 @@ def _install_phrase_types() -> dict[str, PhraseType]:
         roles=("call", "response"),
     )
     return {phrase.label: phrase for phrase in (taunt, reply, late_reply)}
+
+
+def _install_prize_types() -> dict[str, PrizeType]:
+    """Install the bounded test-world prize catalog for awards and restoration."""
+
+    golden_trophy = PrizeType(
+        label="golden_trophy",
+        description="a golden trophy",
+    )
+    unoffered_trinket = PrizeType(
+        label="unoffered_trinket",
+        description="an unoffered trinket",
+    )
+    return {
+        prize.label: prize
+        for prize in (golden_trophy, unoffered_trinket)
+    }
+
+
+def _prize_catalog() -> TokenCatalog[PrizeType]:
+    """Return the explicit bounded catalog selected by this test world."""
+
+    golden_trophy = PrizeType.get_instance("golden_trophy")
+    if golden_trophy is None:
+        raise ValueError("Test-world prize catalog is not installed")
+    return TokenCatalog(
+        PrizeType,
+        members=(golden_trophy,),
+        label="reference-prizes",
+    )
+
+
+def _add_prize_aftermath(
+    graph: Graph,
+    *,
+    player: RepertoireParticipant,
+    contest: SnapshotContestBlock,
+    predicate: str,
+    label: str = "claim the trophy",
+) -> PrizeAftermathBlock:
+    """Wire one stable terminal continuation to the prize policy block."""
+
+    aftermath = graph.add_node(
+        kind=PrizeAftermathBlock,
+        label=label,
+        player_id=player.uid,
+        contest_id=contest.uid,
+        prize_definition_id="golden_trophy",
+    )
+    TraversableEdge(
+        graph=graph,
+        predecessor_id=contest.uid,
+        successor_id=aftermath.uid,
+        label="Resolve the prize",
+        trigger_phase=P.POSTREQS,
+        predicate=predicate,
+    )
+    return aftermath
+
+
+def _play_terminal_win() -> tuple[
+    Graph,
+    Ledger,
+    RepertoireParticipant,
+    RepertoireParticipant,
+    SnapshotContestBlock,
+    PrizeAftermathBlock,
+]:
+    """Run one win through contest UPDATE, POSTREQS, and prize aftermath UPDATE."""
+
+    _install_prize_types()
+    graph, ledger, player, opponent, contest, _late_badge, current_contest = _snapshot_graph()
+    contest.scenario_contributions = ()
+    aftermath = _add_prize_aftermath(
+        graph,
+        player=player,
+        contest=contest,
+        predicate="game_won",
+    )
+    ledger.resolve_choice(current_contest.uid)
+    action = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+    ledger.resolve_choice(action.uid, choice_payload=action.payload)
+
+    assert contest.game.phase is GamePhase.TERMINAL
+    assert contest.game.result is GameResult.WIN
+    assert ledger.cursor_id == aftermath.uid
+    return graph, ledger, player, opponent, contest, aftermath
 
 
 def test_accepted_entry_snapshots_live_repertoires_after_frontier_provisioning() -> None:
@@ -643,3 +850,158 @@ def test_awarded_badge_survives_fresh_catalog_graph_roundtrip() -> None:
     assert restored_badge.uid == learned_badge.uid
     assert restored_badge in restored_player.repertoire.badges()
     assert restored_badge.reference_singleton is definitions["reply"]
+
+
+def test_win_aftermath_awards_a_separate_catalog_prize() -> None:
+    graph, _ledger, player, _opponent, _contest, aftermath = _play_terminal_win()
+    prize = player.prizes.prizes()[0]
+    holder = ComponentSlotAssetHolder(player.prizes, KNOWN_PRIZES_SLOT)
+
+    assert aftermath.locals["awarded_prize_ids"] == ["golden_trophy"]
+    assert player.prizes.prize_ids() == ["golden_trophy"]
+    assert player.prizes.has_received_prize("golden_trophy")
+    assert prize in graph.find_nodes(Selector(has_kind=PrizeToken))
+    assert [definition.label for definition in _prize_catalog().find_all()] == [
+        "golden_trophy",
+    ]
+    assert prize.reference_singleton in list(_prize_catalog().find_all())
+    assert holder.get_asset("golden_trophy") is prize
+    assert holder.get_asset(prize.label) is prize
+    assert holder.get_asset_key(prize) == prize.label
+    assert player.repertoire.phrase_ids() == ["taunt"]
+    assert {
+        badge.token_from
+        for badge in graph.find_nodes(Selector(has_kind=PhraseBadge))
+    } == {"taunt", "reply", "late_reply"}
+
+
+def test_prize_aftermath_does_not_award_after_a_player_loss() -> None:
+    _install_prize_types()
+    graph, ledger, player, _opponent, contest, _late_badge, current_contest = _snapshot_graph()
+    aftermath = _add_prize_aftermath(
+        graph,
+        player=player,
+        contest=contest,
+        predicate="game_lost",
+        label="no trophy after defeat",
+    )
+    ledger.resolve_choice(current_contest.uid)
+    action = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+    ledger.resolve_choice(action.uid, choice_payload=action.payload)
+
+    assert contest.game.result is GameResult.LOSE
+    assert ledger.cursor_id == aftermath.uid
+    assert aftermath.locals["awarded_prize_ids"] == []
+    assert player.prizes.prizes() == []
+
+
+def test_prize_aftermath_is_idempotent_across_award_attempts() -> None:
+    graph, ledger, player, _opponent, contest, aftermath = _play_terminal_win()
+    prize = player.prizes.prizes()[0]
+    prize_ids_before = {
+        token.uid
+        for token in graph.find_nodes(Selector(has_kind=PrizeToken))
+    }
+    reenter = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=aftermath.uid,
+        label="Reflect on the prize",
+    )
+    duplicate = _add_prize_aftermath(
+        graph,
+        player=player,
+        contest=contest,
+        predicate="game_won",
+        label="duplicate trophy attempt",
+    )
+    duplicate_edge = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=duplicate.uid,
+        label="Try to claim another trophy",
+    )
+
+    ledger.resolve_choice(reenter.uid)
+    ledger.resolve_choice(duplicate_edge.uid)
+
+    assert aftermath.locals["awarded_prize_ids"] == ["golden_trophy"]
+    assert duplicate.locals["awarded_prize_ids"] == []
+    assert {
+        token.uid
+        for token in graph.find_nodes(Selector(has_kind=PrizeToken))
+    } == prize_ids_before
+    assert player.prizes.prizes() == [prize]
+
+
+def test_prize_grant_history_survives_transfer_and_blocks_a_second_award() -> None:
+    graph, ledger, player, opponent, contest, aftermath = _play_terminal_win()
+    prize = player.prizes.prizes()[0]
+    receipt = TransactionOffer(
+        label="trade the trophy",
+        commitments=[
+            AssetMoveCommitment(
+                ComponentSlotAssetHolder(player.prizes, KNOWN_PRIZES_SLOT),
+                ComponentSlotAssetHolder(opponent.prizes, KNOWN_PRIZES_SLOT),
+                prize,
+            ),
+        ],
+    ).accept()
+    prize_ids_before = {
+        token.uid
+        for token in graph.find_nodes(Selector(has_kind=PrizeToken))
+    }
+    another_aftermath = graph.add_node(
+        kind=PrizeAftermathBlock,
+        label="second trophy attempt",
+        player_id=player.uid,
+        contest_id=contest.uid,
+        prize_definition_id="golden_trophy",
+    )
+    retry_edge = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=another_aftermath.uid,
+        label="Seek another trophy",
+    )
+
+    ledger.resolve_choice(retry_edge.uid)
+
+    assert receipt.commitment_labels == ["move asset"]
+    assert player.prizes.prizes() == []
+    assert player.prizes.granted_prize_ids == {"golden_trophy"}
+    assert opponent.prizes.prizes() == [prize]
+    assert prize.uid in opponent.prizes.assignment_ids[KNOWN_PRIZES_SLOT]
+    assert another_aftermath.locals["awarded_prize_ids"] == []
+    assert {
+        token.uid
+        for token in graph.find_nodes(Selector(has_kind=PrizeToken))
+    } == prize_ids_before
+
+
+def test_awarded_prize_survives_fresh_catalog_graph_roundtrip() -> None:
+    _graph, ledger, player, _opponent, _contest, _aftermath = _play_terminal_win()
+    prize = player.prizes.prizes()[0]
+    payload = ledger.graph.unstructure()
+
+    PhraseType.clear_instances()
+    PrizeType.clear_instances()
+    _install_phrase_types()
+    prize_definitions = _install_prize_types()
+    restored = Graph.structure(payload)
+    restored_player = restored.get(player.uid)
+    restored_prize = restored.get(prize.uid)
+
+    assert isinstance(restored_player, RepertoireParticipant)
+    assert isinstance(restored_prize, PrizeToken)
+    assert isinstance(restored_player.prizes, PrizeManager)
+    assert restored_player.repertoire.owner is restored_player
+    assert restored_player.prizes.owner is restored_player
+    assert restored_player.prizes.granted_prize_ids == {"golden_trophy"}
+    assert restored_prize.uid == prize.uid
+    assert restored_prize in restored_player.prizes.prizes()
+    assert restored_prize.reference_singleton is prize_definitions["golden_trophy"]
