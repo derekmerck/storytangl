@@ -20,7 +20,7 @@ from tangl.core import (
     contribute_ns,
 )
 from tangl.core.runtime_op import Predicate
-from tangl.journal.fragments import ChoiceFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.games import (
     KNOWN_PHRASES_SLOT,
@@ -608,6 +608,66 @@ def _install_phrase_types() -> dict[str, PhraseType]:
     return {phrase.label: phrase for phrase in (taunt, reply, late_reply)}
 
 
+def _install_sword_master_phrase_type() -> PhraseType:
+    """Install one later call whose immutable relation recognizes ``reply``."""
+
+    return PhraseType(
+        label="sword_master_oblique_call",
+        text="My name is Guybrush Threepwood. Prepare to die.",
+        roles=("call",),
+        base_contributions=(
+            _contribution(
+                call="sword_master_oblique_call",
+                response="reply",
+                result="match",
+                layer=DispatchLayer.APPLICATION,
+                source_id="sword-master-catalog",
+            ),
+        ),
+    )
+
+
+def _build_sword_master_contest(
+    graph: Graph,
+    *,
+    player: RepertoireParticipant,
+) -> tuple[Ledger, RepertoireParticipant, SnapshotContestBlock, TraversableEdge]:
+    """Build one fresh frontier for an opponent holding only the later call."""
+
+    sword_master_call = _install_sword_master_phrase_type()
+    foyer = graph.add_node(kind=Block, label="sword master foyer")
+    current = graph.add_node(kind=Block, label="sword master current")
+    opponent = graph.add_node(kind=RepertoireParticipant, label="sword master")
+    contest = graph.add_node(
+        kind=SnapshotContestBlock,
+        label="sword master contest",
+        player_id=player.uid,
+        opponent_id=opponent.uid,
+        game_state=CallResponseGame(
+            scoring_n=1,
+            initial_player_has_initiative=False,
+        ),
+    )
+    _add_badge(graph, opponent, sword_master_call)
+    foyer_current = TraversableEdge(
+        graph=graph,
+        predecessor_id=foyer.uid,
+        successor_id=current.uid,
+        label="Approach the Sword Master",
+    )
+    current_contest = TraversableEdge(
+        graph=graph,
+        predecessor_id=current.uid,
+        successor_id=contest.uid,
+        label="Answer the Sword Master",
+    )
+    ledger = Ledger.from_graph(graph=graph, entry_id=foyer.uid)
+    ledger.resolve_choice(foyer_current.uid)
+
+    assert contest.game.phase is GamePhase.PENDING
+    return ledger, opponent, contest, current_contest
+
+
 def _install_prize_types() -> dict[str, PrizeType]:
     """Install the bounded test-world prize catalog for awards and restoration."""
 
@@ -813,6 +873,84 @@ def test_loss_aftermath_awards_the_opponent_deployed_phrase(
     assert learned_badge.reference_singleton.label == awarded_phrase_id
     assert exchange.initiative_before is initial_player_has_initiative
     assert graph.get(learned_badge.uid) is learned_badge
+
+
+def test_later_call_definition_answers_an_earned_response_in_a_fresh_contest() -> None:
+    """A bounded fresh snapshot composes a later call against an old earned badge."""
+
+    graph, _ledger, player, _opponent, first_contest, first_aftermath = _play_terminal_loss(
+        initial_player_has_initiative=True,
+    )
+    reply = PhraseType.get_instance("reply")
+    assert reply is not None
+    assert first_contest.game.player_phrase_ids == ["taunt"]
+    assert first_aftermath.locals["awarded_phrase_ids"] == ["reply"]
+    earned_reply = next(
+        badge for badge in player.repertoire.badges() if badge.token_from == "reply"
+    )
+    first_phrases = dict(first_contest.game.phrases)
+    first_schedule = list(first_contest.game.schedule)
+
+    sword_ledger, sword_master, sword_contest, current_contest = _build_sword_master_contest(
+        graph,
+        player=player,
+    )
+
+    assert all(
+        contribution.call_selector.has_identifier != "sword_master_oblique_call"
+        and contribution.response_selector.has_identifier != "sword_master_oblique_call"
+        for contribution in reply.base_contributions
+    )
+    assert earned_reply in player.repertoire.badges()
+    assert player.repertoire.has_phrase("sword_master_oblique_call") is False
+    assert sword_master.repertoire.phrase_ids() == ["sword_master_oblique_call"]
+    assert sword_contest.game.phase is GamePhase.PENDING
+
+    sword_ledger.resolve_choice(current_contest.uid)
+
+    assert sword_contest.game.phase is GamePhase.READY
+    assert sword_contest.game.player_phrase_ids == ["reply", "taunt"]
+    assert sword_contest.game.opponent_phrase_ids == ["sword_master_oblique_call"]
+    assert sword_contest.scenario_contributions == ()
+    assert sword_contest.game.schedule == [
+        DominanceMatch(
+            call_phrase_id="sword_master_oblique_call",
+            response_phrase_id="reply",
+            matched=True,
+            source_id="sword-master-catalog",
+        ),
+    ]
+    response = next(
+        edge
+        for edge in sword_contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "reply"}
+    )
+
+    sword_ledger.resolve_choice(response.uid, choice_payload=response.payload)
+
+    exchange = sword_contest.game.last_exchange
+    assert exchange is not None
+    assert exchange.call_phrase_id == "sword_master_oblique_call"
+    assert exchange.response_phrase_id == "reply"
+    assert exchange.matched is True
+    assert exchange.match_source_id == "sword-master-catalog"
+    assert exchange.initiative_before is False
+    assert exchange.initiative_after is True
+    assert sword_contest.game.result is GameResult.WIN
+    assert any(
+        isinstance(fragment, ContentFragment)
+        and fragment.content == "Call: My name is Guybrush Threepwood. Prepare to die."
+        for fragment in sword_ledger.get_journal()
+    )
+    assert any(
+        isinstance(fragment, ContentFragment)
+        and fragment.content
+        == "Response: How appropriate. You fight like a cow. answers the call."
+        for fragment in sword_ledger.get_journal()
+    )
+    assert first_contest.game.phrases == first_phrases
+    assert first_contest.game.schedule == first_schedule
+    assert "sword_master_oblique_call" not in first_contest.game.phrases
 
 
 def test_aftermath_does_not_award_after_a_player_win() -> None:
