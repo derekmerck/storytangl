@@ -942,6 +942,12 @@ def test_later_call_definition_answers_an_earned_response_in_a_fresh_contest() -
         and fragment.content == "Call: My name is Guybrush Threepwood. Prepare to die."
         for fragment in sword_ledger.get_journal()
     )
+    assert any(
+        isinstance(fragment, ContentFragment)
+        and fragment.content
+        == "Response: How appropriate. You fight like a cow. answers the call."
+        for fragment in sword_ledger.get_journal()
+    )
     assert first_contest.game.phrases == first_phrases
     assert first_contest.game.schedule == first_schedule
     assert "sword_master_oblique_call" not in first_contest.game.phrases
