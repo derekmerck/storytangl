@@ -136,7 +136,9 @@ class OpportunityHubBlock(Block):
     player_id: UUID
 
     @contribute_ns
-    def provide_opportunity_symbols(self) -> dict[str, object]:
+    def provide_opportunity_symbols(
+        self,
+    ) -> dict[str, RepertoireManager | PrizeManager]:
         """Publish the participant's current ownership managers for predicates."""
 
         player = self.graph.get(self.player_id)
