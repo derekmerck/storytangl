@@ -174,6 +174,7 @@ def apply_repertoire_loss_aftermath(
             offer.accept()
             caller.locals["awarded_phrase_ids"] = [phrase_id]
     caller.locals["aftermath_applied"] = True
+    ctx.invalidate_namespaces()
 
 
 def _definitions_from_repertoire(repertoire: RepertoireManager) -> list[PhraseType]:
