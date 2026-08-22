@@ -13,10 +13,11 @@ structured evidence, and CLI output. L2 step 2a landed the world-independent
 ``PhraseType`` / ``PhraseBadge`` / ``RepertoireManager`` ownership foundation.
 L2 step 2b1 landed the pure bounded dominance contribution fold; step 2b2
 landed the accepted-entry repertoire snapshot proof. Step 3 landed the
-reference world award-on-loss aftermath proof. Prize tokens, opportunity
-gating, Sword Master content, and richer presentation remain design work.
-This award policy does not constrain ordinary transfer, theft, or consumption
-variants. Revised after review of PR #380: the
+reference world award-on-loss aftermath proof. Step 4 landed the separate
+prize-on-win conformance proof. Opportunity gating, trading, Sword Master
+content, and richer presentation remain design work. These reference policies
+do not constrain ordinary transfer, theft, or consumption variants. Revised
+after review of PR #380: the
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
@@ -608,8 +609,10 @@ it is deliberately off the critical path.
    reads typed exchange evidence and idempotently mints the opponent's deployed
    phrase as a new player badge after a loss. This award-on-loss policy does
    not limit transfer, theft, or consumption variants.
-4. Winning grants a prize token from its own catalog, or a durable world
-   consequence.
+4. **Landed:** the reference world owns an UPDATE-phase win aftermath that
+   provisions one separately typed prize token from a bounded catalog. A prize
+   may ultimately be any durable world consequence; this proof keeps the token
+   catalog distinct from phrase competence.
 5. Opponents and locations gate on repertoire and prize holdings.
 6. Sword Master analogue: unfamiliar calls onto already-earned badges.
 7. Richer expressions and presentation, only after the CLI vertical is complete.
