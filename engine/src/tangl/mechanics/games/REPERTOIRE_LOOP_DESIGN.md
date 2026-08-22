@@ -612,7 +612,8 @@ it is deliberately off the critical path.
 4. **Landed:** the reference world owns an UPDATE-phase win aftermath that
    provisions one separately typed prize token from a bounded catalog. A prize
    may ultimately be any durable world consequence; this proof keeps the token
-   catalog distinct from phrase competence.
+   catalog distinct from phrase competence and grants each definition only once
+   even if its token later leaves the player's collection.
 5. Opponents and locations gate on repertoire and prize holdings.
 6. Sword Master analogue: unfamiliar calls onto already-earned badges.
 7. Richer expressions and presentation, only after the CLI vertical is complete.

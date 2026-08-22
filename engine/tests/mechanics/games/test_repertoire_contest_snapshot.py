@@ -30,6 +30,7 @@ from tangl.mechanics.games import (
     compose_dominance_schedule,
 )
 from tangl.mechanics.transaction import (
+    AssetMoveCommitment,
     CatalogAssetCommitment,
     ComponentSlotAssetHolder,
     TransactionOffer,
@@ -59,6 +60,10 @@ class PrizeManager(ComponentManager[PrizeToken]):
             max_count=1000,
         ),
     }
+    granted_prize_ids: set[str] = Field(
+        default_factory=set,
+        json_schema_extra={"include": True},
+    )
 
     def prizes(self) -> list[PrizeToken]:
         """Return awarded prizes in stable definition/id order."""
@@ -74,9 +79,14 @@ class PrizeManager(ComponentManager[PrizeToken]):
         return [prize.token_from for prize in self.prizes()]
 
     def has_prize(self, prize_id: str) -> bool:
-        """Return whether this owner has already received a prize definition."""
+        """Return whether this owner currently holds a prize definition."""
 
         return prize_id in self.prize_ids()
+
+    def has_received_prize(self, prize_id: str) -> bool:
+        """Return whether this world has granted the definition to this owner."""
+
+        return prize_id in self.granted_prize_ids
 
 
 @pytest.fixture(autouse=True)
@@ -262,7 +272,7 @@ def apply_prize_win_aftermath(
         )
         if definition is None:
             raise ValueError(f"No catalog prize definition: {caller.prize_definition_id}")
-        if not player.prizes.has_prize(definition.label):
+        if not player.prizes.has_received_prize(definition.label):
             offer = TransactionOffer(
                 label=f"award prize: {definition.label}",
                 commitments=[
@@ -277,6 +287,7 @@ def apply_prize_win_aftermath(
                 ],
             )
             offer.accept()
+            player.prizes.granted_prize_ids.add(definition.label)
             caller.locals["awarded_prize_ids"] = [definition.label]
     caller.locals["aftermath_applied"] = True
     ctx.invalidate_namespaces()
@@ -848,6 +859,7 @@ def test_win_aftermath_awards_a_separate_catalog_prize() -> None:
 
     assert aftermath.locals["awarded_prize_ids"] == ["golden_trophy"]
     assert player.prizes.prize_ids() == ["golden_trophy"]
+    assert player.prizes.has_received_prize("golden_trophy")
     assert prize in graph.find_nodes(Selector(has_kind=PrizeToken))
     assert [definition.label for definition in _prize_catalog().find_all()] == [
         "golden_trophy",
@@ -926,6 +938,51 @@ def test_prize_aftermath_is_idempotent_across_award_attempts() -> None:
     assert player.prizes.prizes() == [prize]
 
 
+def test_prize_grant_history_survives_transfer_and_blocks_a_second_award() -> None:
+    graph, ledger, player, opponent, contest, aftermath = _play_terminal_win()
+    prize = player.prizes.prizes()[0]
+    receipt = TransactionOffer(
+        label="trade the trophy",
+        commitments=[
+            AssetMoveCommitment(
+                ComponentSlotAssetHolder(player.prizes, KNOWN_PRIZES_SLOT),
+                ComponentSlotAssetHolder(opponent.prizes, KNOWN_PRIZES_SLOT),
+                prize,
+            ),
+        ],
+    ).accept()
+    prize_ids_before = {
+        token.uid
+        for token in graph.find_nodes(Selector(has_kind=PrizeToken))
+    }
+    another_aftermath = graph.add_node(
+        kind=PrizeAftermathBlock,
+        label="second trophy attempt",
+        player_id=player.uid,
+        contest_id=contest.uid,
+        prize_definition_id="golden_trophy",
+    )
+    retry_edge = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=another_aftermath.uid,
+        label="Seek another trophy",
+    )
+
+    ledger.resolve_choice(retry_edge.uid)
+
+    assert receipt.commitment_labels == ["move asset"]
+    assert player.prizes.prizes() == []
+    assert player.prizes.granted_prize_ids == {"golden_trophy"}
+    assert opponent.prizes.prizes() == [prize]
+    assert prize.uid in opponent.prizes.assignment_ids[KNOWN_PRIZES_SLOT]
+    assert another_aftermath.locals["awarded_prize_ids"] == []
+    assert {
+        token.uid
+        for token in graph.find_nodes(Selector(has_kind=PrizeToken))
+    } == prize_ids_before
+
+
 def test_awarded_prize_survives_fresh_catalog_graph_roundtrip() -> None:
     _graph, ledger, player, _opponent, _contest, _aftermath = _play_terminal_win()
     prize = player.prizes.prizes()[0]
@@ -944,6 +1001,7 @@ def test_awarded_prize_survives_fresh_catalog_graph_roundtrip() -> None:
     assert isinstance(restored_player.prizes, PrizeManager)
     assert restored_player.repertoire.owner is restored_player
     assert restored_player.prizes.owner is restored_player
+    assert restored_player.prizes.granted_prize_ids == {"golden_trophy"}
     assert restored_prize.uid == prize.uid
     assert restored_prize in restored_player.prizes.prizes()
     assert restored_prize.reference_singleton is prize_definitions["golden_trophy"]
