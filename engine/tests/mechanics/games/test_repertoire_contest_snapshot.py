@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import ClassVar, Self
 from uuid import UUID
 
 import pytest
 from pydantic import Field, model_validator
 
-from tangl.core import DispatchLayer, Graph, Node, Priority, Selector, Token, TokenCatalog
+from tangl.core import (
+    DispatchLayer,
+    Graph,
+    Node,
+    Priority,
+    Selector,
+    Token,
+    TokenCatalog,
+    contribute_ns,
+)
+from tangl.core.runtime_op import Predicate
+from tangl.journal.fragments import ChoiceFragment
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.games import (
     KNOWN_PHRASES_SLOT,
@@ -35,7 +46,7 @@ from tangl.mechanics.transaction import (
     ComponentSlotAssetHolder,
     TransactionOffer,
 )
-from tangl.story import Action, Block
+from tangl.story import Action, Block, StoryGraph
 from tangl.story.concepts.asset import AssetType
 from tangl.vm import Ledger, ResolutionPhase as P, TraversableEdge, VmPhaseCtx, on_update
 
@@ -117,6 +128,25 @@ class RepertoireParticipant(Node):
         self.repertoire.bind_owner(self)
         self.prizes.bind_owner(self)
         return self
+
+
+class OpportunityHubBlock(Block):
+    """Test-world stable-choice hub exposing one participant's live holdings."""
+
+    player_id: UUID
+
+    @contribute_ns
+    def provide_opportunity_symbols(
+        self,
+    ) -> dict[str, RepertoireManager | PrizeManager]:
+        """Publish the participant's current ownership managers for predicates."""
+
+        player = self.graph.get(self.player_id)
+        assert isinstance(player, RepertoireParticipant)
+        return {
+            "repertoire": player.repertoire,
+            "prizes": player.prizes,
+        }
 
 
 class SnapshotContestBlock(HasGame, Block):
@@ -361,6 +391,12 @@ def _add_badge(
 def _snapshot_graph(
     *,
     initial_player_has_initiative: bool = True,
+    graph_class: type[Graph] = Graph,
+    configure_current_frontier: Callable[
+        [Graph, RepertoireParticipant, Block],
+        None,
+    ]
+    | None = None,
 ) -> tuple[
     Graph,
     Ledger,
@@ -377,7 +413,7 @@ def _snapshot_graph(
     reply = definitions["reply"]
     late_reply = definitions["late_reply"]
 
-    graph = Graph(label="repertoire-snapshot")
+    graph = graph_class(label="repertoire-snapshot")
     foyer = graph.add_node(kind=Block, label="foyer")
     current = graph.add_node(kind=Block, label="current")
     player = graph.add_node(kind=RepertoireParticipant, label="player")
@@ -416,6 +452,8 @@ def _snapshot_graph(
         successor_id=contest.uid,
         label="Begin the contest",
     )
+    if configure_current_frontier is not None:
+        configure_current_frontier(graph, player, current)
     ledger = Ledger.from_graph(graph=graph, entry_id=foyer.uid)
 
     ledger.resolve_choice(foyer_current.uid)
@@ -424,6 +462,54 @@ def _snapshot_graph(
     assert contest.game.phrases == {}
     assert late_badge in opponent.repertoire.badges()
     return graph, ledger, player, opponent, contest, late_badge, current_contest
+
+
+def _add_opportunity_hub(
+    graph: Graph,
+    *,
+    player: RepertoireParticipant,
+    current: Block,
+) -> tuple[OpportunityHubBlock, TraversableEdge, Action, Action]:
+    """Add stable phrase- and prize-gated choices to the current frontier."""
+
+    hub = graph.add_node(
+        kind=OpportunityHubBlock,
+        label="opportunity hub",
+        player_id=player.uid,
+    )
+    challenge = graph.add_node(kind=Block, label="learned phrase challenge")
+    prize_location = graph.add_node(kind=Block, label="trophy location")
+    enter_hub = TraversableEdge(
+        graph=graph,
+        predecessor_id=current.uid,
+        successor_id=hub.uid,
+        label="Return to the hub",
+    )
+    phrase_action = Action(
+        predecessor_id=hub.uid,
+        successor_id=challenge.uid,
+        text="Challenge the stronger opponent",
+        availability=[Predicate(expr="repertoire.has_phrase('reply')")],
+    )
+    prize_action = Action(
+        predecessor_id=hub.uid,
+        successor_id=prize_location.uid,
+        text="Enter the trophy chamber",
+        availability=[Predicate(expr="prizes.has_prize('golden_trophy')")],
+    )
+    graph.add(phrase_action)
+    graph.add(prize_action)
+    return hub, enter_hub, phrase_action, prize_action
+
+
+def _latest_choice(ledger: Ledger, edge: Action) -> ChoiceFragment:
+    """Return the newest journaled availability projection for one stable action."""
+
+    return next(
+        fragment
+        for fragment in reversed(ledger.get_journal())
+        if isinstance(fragment, ChoiceFragment) and fragment.edge_id == edge.uid
+    )
 
 
 def _add_loss_aftermath(
@@ -1005,3 +1091,147 @@ def test_awarded_prize_survives_fresh_catalog_graph_roundtrip() -> None:
     assert restored_prize.uid == prize.uid
     assert restored_prize in restored_player.prizes.prizes()
     assert restored_prize.reference_singleton is prize_definitions["golden_trophy"]
+
+
+def test_stable_hub_choices_react_to_a_learned_phrase_after_loss() -> None:
+    """Loss acquisition opens its existing phrase gate without rebuilding the hub."""
+
+    opportunity: tuple[OpportunityHubBlock, TraversableEdge, Action, Action] | None = None
+
+    def configure_hub(
+        graph: Graph,
+        player: RepertoireParticipant,
+        current: Block,
+    ) -> None:
+        nonlocal opportunity
+        opportunity = _add_opportunity_hub(graph, player=player, current=current)
+
+    graph, ledger, player, _opponent, contest, _late_badge, current_contest = _snapshot_graph(
+        graph_class=StoryGraph,
+        configure_current_frontier=configure_hub,
+    )
+    assert opportunity is not None
+    hub, enter_hub, phrase_action, prize_action = opportunity
+    current = graph.get(ledger.cursor_id)
+    assert isinstance(current, Block)
+    return_to_current = TraversableEdge(
+        graph=graph,
+        predecessor_id=hub.uid,
+        successor_id=current.uid,
+        label="Return to the contest",
+    )
+    aftermath = _add_loss_aftermath(graph, player=player, contest=contest)
+    return_aftermath = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=hub.uid,
+        label="Return with what you learned",
+    )
+
+    ledger.resolve_choice(enter_hub.uid)
+
+    assert _latest_choice(ledger, phrase_action).available is False
+    assert _latest_choice(ledger, prize_action).available is False
+
+    ledger.resolve_choice(return_to_current.uid)
+    ledger.resolve_choice(current_contest.uid)
+    taunt = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+    ledger.resolve_choice(taunt.uid, choice_payload=taunt.payload)
+    assert ledger.cursor_id == aftermath.uid
+
+    ledger.resolve_choice(return_aftermath.uid)
+
+    assert player.repertoire.has_phrase("reply")
+    assert _latest_choice(ledger, phrase_action).available is True
+    assert _latest_choice(ledger, prize_action).available is False
+
+
+def test_stable_hub_prize_choice_requires_current_possession() -> None:
+    """A transferred prize closes its existing gate despite durable grant history."""
+
+    _install_prize_types()
+    opportunity: tuple[OpportunityHubBlock, TraversableEdge, Action, Action] | None = None
+
+    def configure_hub(
+        graph: Graph,
+        player: RepertoireParticipant,
+        current: Block,
+    ) -> None:
+        nonlocal opportunity
+        opportunity = _add_opportunity_hub(graph, player=player, current=current)
+
+    graph, ledger, player, opponent, contest, _late_badge, current_contest = _snapshot_graph(
+        graph_class=StoryGraph,
+        configure_current_frontier=configure_hub,
+    )
+    contest.scenario_contributions = ()
+    assert opportunity is not None
+    hub, enter_hub, phrase_action, prize_action = opportunity
+    current = graph.get(ledger.cursor_id)
+    assert isinstance(current, Block)
+    return_to_current = TraversableEdge(
+        graph=graph,
+        predecessor_id=hub.uid,
+        successor_id=current.uid,
+        label="Return to the contest",
+    )
+    aftermath = _add_prize_aftermath(
+        graph,
+        player=player,
+        contest=contest,
+        predicate="game_won",
+    )
+    return_aftermath = TraversableEdge(
+        graph=graph,
+        predecessor_id=aftermath.uid,
+        successor_id=hub.uid,
+        label="Return with the trophy",
+    )
+    refresh_hub = TraversableEdge(
+        graph=graph,
+        predecessor_id=hub.uid,
+        successor_id=hub.uid,
+        label="Look around again",
+    )
+
+    ledger.resolve_choice(enter_hub.uid)
+    assert _latest_choice(ledger, phrase_action).available is False
+    assert _latest_choice(ledger, prize_action).available is False
+
+    ledger.resolve_choice(return_to_current.uid)
+    ledger.resolve_choice(current_contest.uid)
+    taunt = next(
+        edge
+        for edge in contest.edges_out(Selector(has_kind=Action))
+        if edge.payload == {"move": "taunt"}
+    )
+    ledger.resolve_choice(taunt.uid, choice_payload=taunt.payload)
+    assert ledger.cursor_id == aftermath.uid
+
+    ledger.resolve_choice(return_aftermath.uid)
+    prize = player.prizes.prizes()[0]
+
+    assert player.repertoire.phrase_ids() == ["taunt"]
+    assert _latest_choice(ledger, phrase_action).available is False
+    assert _latest_choice(ledger, prize_action).available is True
+
+    TransactionOffer(
+        label="trade the trophy",
+        commitments=[
+            AssetMoveCommitment(
+                ComponentSlotAssetHolder(player.prizes, KNOWN_PRIZES_SLOT),
+                ComponentSlotAssetHolder(opponent.prizes, KNOWN_PRIZES_SLOT),
+                prize,
+            ),
+        ],
+    ).accept()
+    ledger.resolve_choice(refresh_hub.uid)
+
+    assert player.prizes.has_received_prize("golden_trophy")
+    assert player.prizes.has_prize("golden_trophy") is False
+    assert opponent.prizes.prizes() == [prize]
+    assert _latest_choice(ledger, prize_action).available is False

@@ -14,7 +14,8 @@ structured evidence, and CLI output. L2 step 2a landed the world-independent
 L2 step 2b1 landed the pure bounded dominance contribution fold; step 2b2
 landed the accepted-entry repertoire snapshot proof. Step 3 landed the
 reference world award-on-loss aftermath proof. Step 4 landed the separate
-prize-on-win conformance proof. Opportunity gating, trading, Sword Master
+prize-on-win conformance proof. Step 5 landed stable opportunity gating from
+current repertoire and prize holdings. Trading/full trade content, Sword Master
 content, and richer presentation remain design work. These reference policies
 do not constrain ordinary transfer, theft, or consumption variants. Revised
 after review of PR #380: the
@@ -614,7 +615,10 @@ it is deliberately off the critical path.
    may ultimately be any durable world consequence; this proof keeps the token
    catalog distinct from phrase competence and grants each definition only once
    even if its token later leaves the player's collection.
-5. Opponents and locations gate on repertoire and prize holdings.
+5. **Landed:** stable authored opportunities read current repertoire and prize
+   holdings through ordinary namespace predicates. Historical grants are award
+   policy/evidence, not possession: a transferred prize no longer opens a
+   possession-gated opportunity.
 6. Sword Master analogue: unfamiliar calls onto already-earned badges.
 7. Richer expressions and presentation, only after the CLI vertical is complete.
 
