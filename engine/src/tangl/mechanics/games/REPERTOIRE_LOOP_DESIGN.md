@@ -15,10 +15,12 @@ L2 step 2b1 landed the pure bounded dominance contribution fold; step 2b2
 landed the accepted-entry repertoire snapshot proof. Step 3 landed the
 reference world award-on-loss aftermath proof. Step 4 landed the separate
 prize-on-win conformance proof. Step 5 landed stable opportunity gating from
-current repertoire and prize holdings. Trading/full trade content, Sword Master
-content, and richer presentation remain design work. These reference policies
-do not constrain ordinary transfer, theft, or consumption variants. Revised
-after review of PR #380: the
+current repertoire and prize holdings. Step 6 landed the Sword Master
+conformance proof: a later call definition recognizes an already-earned
+response, while participant-held badges bound each fresh contest. Trading/full
+trade content, full Sword Master content, and richer presentation remain design
+work. These reference policies do not constrain ordinary transfer, theft, or
+consumption variants. Revised after review of PR #380: the
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
@@ -619,7 +621,10 @@ it is deliberately off the critical path.
    holdings through ordinary namespace predicates. Historical grants are award
    policy/evidence, not possession: a transferred prize no longer opens a
    possession-gated opportunity.
-6. Sword Master analogue: unfamiliar calls onto already-earned badges.
+6. **Landed:** a later call definition can recognize an old earned response in
+   a fresh bounded contest. Catalog installation alone does not alter earlier
+   snapshots or unrelated contests; participant-held badges determine the
+   composed schedule.
 7. Richer expressions and presentation, only after the CLI vertical is complete.
 
 Steps 1 and 2 must be independently testable — that is the check that L1 and L2
