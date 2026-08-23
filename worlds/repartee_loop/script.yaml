@@ -1,0 +1,84 @@
+label: repartee_loop
+
+metadata:
+  title: "Repartee Loop"
+  description: "Earn a reply, answer a master, and enter the salon."
+  start_at: quay.entrance
+
+scenes:
+  quay:
+    title: "The Quayside Salon"
+    templates:
+      player:
+        kind: "repartee_loop.domain.ReparteeParticipant"
+        label: player
+      dockhand:
+        kind: "repartee_loop.domain.ReparteeParticipant"
+        label: dockhand
+      master:
+        kind: "repartee_loop.domain.ReparteeParticipant"
+        label: master
+    blocks:
+      entrance:
+        content: "At the quay, every introduction is also a challenge."
+        actions:
+          - text: "Step into the practice court"
+            successor: setup
+
+      setup:
+        kind: "repartee_loop.domain.ReparteeSetupBlock"
+        content: "The clerk hands you one opening line and a warning not to waste it."
+        actions:
+          - text: "Enter the quay hub"
+            successor: hub
+
+      hub:
+        kind: "repartee_loop.domain.ReparteeHubBlock"
+        content: "The dockhand drills newcomers; the salon master waits beyond the rope."
+        actions:
+          - text: "Challenge the dockhand"
+            successor: dockhand_contest
+            conditions:
+              - "not repertoire.has_phrase('repartee_reply')"
+          - text: "Challenge the salon master"
+            successor: master_contest
+            conditions:
+              - "repertoire.has_phrase('repartee_reply')"
+              - "not prizes.has_prize('repartee_salon_token')"
+          - text: "Enter the salon"
+            successor: salon
+            conditions:
+              - "prizes.has_prize('repartee_salon_token')"
+
+      dockhand_contest:
+        kind: "repartee_loop.domain.DockhandContestBlock"
+        content: "The dockhand gives your borrowed line a patient hearing."
+        continues:
+          - successor: dockhand_aftermath
+            trigger: last
+            predicate: game_lost
+
+      dockhand_aftermath:
+        kind: "repartee_loop.domain.ReparteeLossAftermathBlock"
+        content: "The dockhand nods once and lets you keep the reply that beat you."
+        actions:
+          - text: "Return to the quay hub"
+            successor: hub
+
+      master_contest:
+        kind: "repartee_loop.domain.MasterContestBlock"
+        content: "The master offers an unfamiliar call with an expectant pause."
+        continues:
+          - successor: prize_aftermath
+            trigger: last
+            predicate: game_won
+
+      prize_aftermath:
+        kind: "repartee_loop.domain.ReparteePrizeAftermathBlock"
+        content: "The master grants you a brass token stamped with the salon seal."
+        actions:
+          - text: "Return to the quay hub"
+            successor: hub
+
+      salon:
+        content: "The salon door recognizes the brass token and admits you to the next room."
