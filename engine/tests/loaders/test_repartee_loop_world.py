@@ -59,6 +59,11 @@ class TestReparteeLoopWorld:
     def test_repartee_loop_awards_reply_then_prize_and_reaches_salon(self) -> None:
         bundle = WorldBundle.load(_repartee_root())
         world = WorldCompiler().compile(bundle)
+        from repartee_loop.domain import (
+            DockhandContestBlock,
+            MasterContestBlock,
+            ReparteeParticipant,
+        )
 
         assert "DockhandContestBlock" in world.class_registry
         assert "MasterContestBlock" in world.class_registry
@@ -78,6 +83,7 @@ class TestReparteeLoopWorld:
         ledger.resolve_choice(_action(ledger, "Challenge the dockhand").uid)
         assert ledger.cursor.label == "dockhand_contest"
         dockhand = ledger.cursor
+        assert isinstance(dockhand, DockhandContestBlock)
         starter_action = next(
             edge
             for edge in dockhand.edges_out(Selector(has_kind=Action, trigger_phase=None))
@@ -86,11 +92,13 @@ class TestReparteeLoopWorld:
         ledger.resolve_choice(starter_action.uid, choice_payload=starter_action.payload)
 
         assert ledger.cursor.label == "dockhand_aftermath"
-        dockhand_exchange = CallResponseExchange.model_validate(dockhand.game.last_round.notes)
+        dockhand_round = dockhand.game.last_round
+        assert dockhand_round is not None
+        dockhand_exchange = CallResponseExchange.model_validate(dockhand_round.notes)
         assert dockhand_exchange.response_phrase_id == "repartee_reply"
         assert dockhand.game.result is GameResult.LOSE
         player = result.graph.find_one(Selector(label="player"))
-        assert player is not None
+        assert isinstance(player, ReparteeParticipant)
         assert player.repertoire.phrase_ids() == ["repartee_reply", "repartee_starter_call"]
         assert ledger.cursor.locals["awarded_phrase_ids"] == ["repartee_reply"]
 
@@ -103,6 +111,7 @@ class TestReparteeLoopWorld:
         ledger.resolve_choice(_action(ledger, "Challenge the salon master").uid)
         assert ledger.cursor.label == "master_contest"
         master = ledger.cursor
+        assert isinstance(master, MasterContestBlock)
         assert master.game.player_phrase_ids == ["repartee_reply", "repartee_starter_call"]
         assert master.game.opponent_phrase_ids == ["repartee_master_call"]
         assert player.repertoire.has_phrase("repartee_master_call") is False
@@ -130,7 +139,9 @@ class TestReparteeLoopWorld:
         ledger.resolve_choice(reply_action.uid, choice_payload=reply_action.payload)
 
         assert ledger.cursor.label == "prize_aftermath"
-        master_exchange = CallResponseExchange.model_validate(master.game.last_round.notes)
+        master_round = master.game.last_round
+        assert master_round is not None
+        master_exchange = CallResponseExchange.model_validate(master_round.notes)
         assert master_exchange.call_phrase_id == "repartee_master_call"
         assert master_exchange.response_phrase_id == "repartee_reply"
         assert master_exchange.matched is True
@@ -143,6 +154,7 @@ class TestReparteeLoopWorld:
 
         ledger.resolve_choice(_action(ledger, "Return to the quay hub").uid)
         assert ledger.cursor.label == "hub"
+        assert _choice(ledger, "Challenge the salon master").available is False
         assert _choice(ledger, "Enter the salon").available is True
         ledger.resolve_choice(_action(ledger, "Enter the salon").uid)
 

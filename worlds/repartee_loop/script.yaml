@@ -44,6 +44,7 @@ scenes:
             successor: master_contest
             conditions:
               - "repertoire.has_phrase('repartee_reply')"
+              - "not prizes.has_prize('repartee_salon_token')"
           - text: "Enter the salon"
             successor: salon
             conditions:

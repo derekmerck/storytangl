@@ -21,9 +21,8 @@ response, while participant-held badges bound each fresh contest. Trading/full
 trade content, full Sword Master content, and richer presentation remain design
 work. Step 7 landed the launchable ``repartee_loop`` CLI reference world, so
 the core feature track is complete. These reference policies do not constrain
-ordinary transfer, theft, or consumption variants. Revised after review of PR
-#380: the
-keyed prompt/answer model was replaced by a shared phrase catalog with a
+ordinary transfer, theft, or consumption variants. Revised after review
+of PR #380: the keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
 owner-bound repertoire that supplies its moves, and the acquisition shell

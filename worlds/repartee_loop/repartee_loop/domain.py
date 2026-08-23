@@ -234,21 +234,20 @@ def _participant(graph: Graph, label: str) -> ReparteeParticipant:
     return participant
 
 
+def _phrase(phrase_id: str) -> PhraseType:
+    """Resolve one phrase through the world-selected catalog."""
+
+    definition = next(PHRASE_CATALOG.find_all(Selector(label=phrase_id)), None)
+    if definition is None:
+        raise ValueError(f"No repartee phrase definition: {phrase_id}")
+    return definition
+
+
 def _definitions(manager: RepertoireManager) -> list[PhraseType]:
     """Resolve one manager's current badges through the bounded phrase catalog."""
 
     definitions = {badge.token_from for badge in manager.badges()}
-    return [
-        definition
-        for phrase_id in sorted(definitions)
-        if (
-            definition := next(
-                PHRASE_CATALOG.find_all(Selector(label=phrase_id)),
-                None,
-            )
-        )
-        is not None
-    ]
+    return [_phrase(phrase_id) for phrase_id in sorted(definitions)]
 
 
 def _prepare_contest(
@@ -278,13 +277,6 @@ def _prepare_contest(
     game.player_phrase_ids = [definition.label for definition in player_definitions]
     game.opponent_phrase_ids = [definition.label for definition in opponent_definitions]
     game.schedule = [matches[pair] for pair in sorted(matches)]
-
-
-def _phrase(phrase_id: str) -> PhraseType:
-    definition = next(PHRASE_CATALOG.find_all(Selector(label=phrase_id)), None)
-    if definition is None:
-        raise ValueError(f"No repartee phrase definition: {phrase_id}")
-    return definition
 
 
 def _prize(prize_id: str) -> ReparteePrizeType:
