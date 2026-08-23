@@ -19,8 +19,10 @@ current repertoire and prize holdings. Step 6 landed the Sword Master
 conformance proof: a later call definition recognizes an already-earned
 response, while participant-held badges bound each fresh contest. Trading/full
 trade content, full Sword Master content, and richer presentation remain design
-work. These reference policies do not constrain ordinary transfer, theft, or
-consumption variants. Revised after review of PR #380: the
+work. Step 7 landed the launchable ``repartee_loop`` CLI reference world, so
+the core feature track is complete. These reference policies do not constrain
+ordinary transfer, theft, or consumption variants. Revised after review of PR
+#380: the
 keyed prompt/answer model was replaced by a shared phrase catalog with a
 directed dominance relation, and the proposed engine seam was withdrawn.
 **Scope:** a call-response dominance kernel in `tangl.mechanics.games`, the
@@ -625,7 +627,13 @@ it is deliberately off the critical path.
    a fresh bounded contest. Catalog installation alone does not alter earlier
    snapshots or unrelated contests; participant-held badges determine the
    composed schedule.
-7. Richer expressions and presentation, only after the CLI vertical is complete.
+7. **Landed:** ``worlds/repartee_loop`` composes the kernel, loss acquisition,
+   later-call recognition, prize award, and stable opportunity gates in one
+   compiled CLI vertical.
+
+The numbered core build order is complete. Richer expressions, revoicing, and
+presentation remain deferred P-axis work; full trading/barter content remains
+an optional world-level follow-on rather than missing foundation.
 
 Steps 1 and 2 must be independently testable — that is the check that L1 and L2
 are really orthogonal.
