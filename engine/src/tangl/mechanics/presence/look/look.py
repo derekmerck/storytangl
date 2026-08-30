@@ -159,8 +159,6 @@ class Look(Entity):
 
     preg: bool = False
 
-    # todo: handle makeup similar to ornament?
-
     def trait_tokens(self) -> list[str]:
         """Return concise visible-trait phrases for prose or prompt use."""
         traits: list[str] = []

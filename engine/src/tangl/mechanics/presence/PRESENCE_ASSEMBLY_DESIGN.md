@@ -9,8 +9,8 @@
 
 **Status:** IMPLEMENTED FOUNDATION + ACTIVE GENERALIZATION. Outfit and wardrobe
 managers use the shared owner-bound assembly path; presence text and portrait
-projections are active consumers, including credential-card composition. Ornament
-coverage and the broader body-attachment unification remain open design work.
+projections are active consumers, including credential-card composition. Outfit-aware
+ornament coverage is landed; the broader body-attachment unification remains open.
 
 > Current issue tracking: #283. The earlier assembly issues #131 and
 > #194/#195/#196 are closed implementation history. This doc holds the *what and
@@ -46,7 +46,7 @@ robot parts, vehicles, and credential packets.
 - `Ornamentation` is still a plain `Node` with `collection: list[Ornament]`.
 - `Ornament` is an `Entity` with `body_part: BodyPart`, `ornament_type: OrnamentType`, `text: str`.
 - `Look` composes `Look`, `OutfitManager`, and `Ornamentation` into prose and media
-  payloads, but does not currently feed outfit coverage into ornament visibility.
+  payloads, using `OutfitManager.covered_mask()` to filter ornament visibility.
 - `BodyRegion`/`BodyPart` support coarse/fine masks. `WearableLayer.BODY` exists;
   `WearableLayer.INNER` is documented as hiding the body.
 
@@ -117,12 +117,12 @@ Do not collapse ornaments directly into `OutfitManager` yet. Instead:
 5. Reuse the same body-slot/visibility instrument for injuries and cybernetics
    before creating separate managers with near-identical assignment rules.
 
-## First low-risk slice
+## Landed low-risk slice
 
-Before deep model changes (validates the cross-manager visibility contract without
-committing to tokens vs assets vs body-layer):
+The first slice validates the cross-manager visibility contract without committing
+to tokens vs assets vs body-layer:
 
-- Add `OutfitManager.covered_mask()` using ON/CLOSED worn items at `INNER`+.
-- Teach `Ornamentation.describe_visible_items(outfit=...)`.
-- Update `Look.describe()` and media payloads to omit ornaments hidden by outfit.
-- Test: an arm tattoo is hidden by a shirt/coat and visible when uncovered.
+- `OutfitManager.covered_mask()` uses ON/CLOSED worn items at `INNER`+.
+- Ornament description accepts the resulting covered-part mask.
+- `Look` prose, namespace, and media projections omit ornaments hidden by outfit.
+- Tests cover open and closed layers, body-layer marks, and visible/hidden regions.
