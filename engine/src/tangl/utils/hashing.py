@@ -18,10 +18,9 @@ logger.setLevel(logging.WARNING)
 
 logger.debug( f"Hashing with salt: {HASHING_SALT}" )
 
-# todo: this hashing is not stable for set insertion order even if the sets
-#       contain the same items, they will present as different strings under
-#       different insertion orders (dicts get sorted tho).  Probably not worth
-#       the extra complexity to fix.
+# JSON mapping keys are sorted, but nested sets and fallback Python objects are
+# not canonical across processes. Durable callers must pass explicitly encoded
+# values.
 
 def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
 

@@ -63,8 +63,6 @@ class Requirement(Selector, Generic[PT]):
     provider_id: Optional[UUID] = None
     hard_requirement: bool = True
 
-    # todo: validate not none selector
-
     @property
     def satisfied(self):
         return self.provider_id is not None or not self.hard_requirement
