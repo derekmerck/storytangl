@@ -146,25 +146,3 @@ class Thesaurus(Singleton):
             s = syn.re_sub(s)
         print(s)
         return s
-
-    # todo: Need to inject this as a post-processor in rejinja/render_str and then render again
-
-
-# legacy code is clever, it uses a reverse search through the text.
-
-# language=python
-"""
-import random
-cls = object
-pat, repl, s = "my_regex", "my_repl", "my string"
-for match in reversed( list( pat.finditer( s ) ) ):
-    if random.random() < cls.replacement_prob:
-        if isinstance( repl, list ) and len( repl ) > 1:
-            repl_ = ""
-            for repl_el in repl:
-                repl_ += random.choice( list( repl_el ) ) + " "
-            repl_ = repl_[:-1]
-        else:
-            repl_ = random.choice( list(repl) )
-        s = s[:match.start()] + repl_ + s[match.end():]
-"""

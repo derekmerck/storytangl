@@ -48,7 +48,7 @@ def find_misspelled( str_, pwl: typ.Union[pathlib.Path, str]=None ) -> errdict: 
     def cardinal_err(err) -> str:
         # checks to see if this is part of a hyphenated word
 
-        # todo: skip ok for now, but standardize it eventually
+        # Project prose treats "ok" as an accepted lowercase spelling.
         if err.word.lower() == "ok":
             return False
 

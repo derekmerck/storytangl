@@ -17,7 +17,7 @@ class Gens(EnumPlusMixin, Enum):
 
     @property
     def is_xx(self) -> bool:
-        # todo: need 3 states now, they's are she's for now
+        # Legacy binary compatibility view: neutral values follow the XX branch.
         if self in { self.XX, self.X_ }:
             return True
         return False
@@ -55,7 +55,7 @@ class ExtGens(EnumPlusMixin, Enum):
 
     @property
     def is_xx(self) -> bool:
-        # todo: need 3 states, they's are she's for now
+        # Legacy binary compatibility view: neutral values follow the XX branch.
         if self in { ExtGens.F, ExtGens.TF, ExtGens.XXY, ExtGens.X_ }:
             return True
         return False
@@ -64,4 +64,3 @@ class ExtGens(EnumPlusMixin, Enum):
     def pick(cls, rand = None) -> Self:
         rand = rand or random.Random()
         return rand.choice([cls.XX, cls.XY])
-
