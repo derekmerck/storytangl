@@ -24,7 +24,11 @@ def wearables():
     socks = WearableType(label='socks', covers={BodyRegion.FEET}, layer=WearableLayer.INNER)
     shoes = WearableType(label='shoes', covers={BodyRegion.FEET}, noun='shoes')
     dress = WearableType(label='dress', covers={BodyRegion.LOWER, BodyRegion.UPPER}, noun='dress')
-    exclusive_dress = WearableType(label='exclusive_dress', from_ref='dress', tags={'exclusive'})
+    exclusive_dress = WearableType(
+        label="exclusive_dress",
+        inherit_from="dress",
+        tags={"exclusive"},
+    )
 
     yield (
         Wearable(token_from='coat'),
@@ -66,24 +70,15 @@ def test_wearable_type(load_wearable_types):
 
     assert shirt_type.layer < coat_type.layer
 
-@pytest.mark.xfail(reason="need to implement from_ref", strict=False)
-def test_wearable_from_ref(wearables):
+def test_wearable_type_inheritance(wearables):
 
     dress, exclusive_dress = wearables[-2:]
 
     print( dress.reference_singleton )
     print( exclusive_dress.reference_singleton )
 
-    assert exclusive_dress.has_tags("exclusive")
+    assert exclusive_dress.reference_singleton.has_tags("exclusive")
     assert exclusive_dress.noun == "dress"
-
-    # todo: implement from_ref
-    green_pants = Wearable(token_from="pants",
-                           label="green_pants",
-                           color="green",
-                           from_ref="pants")
-    assert green_pants.color == "green"
-    assert green_pants.noun == "pants"
 
 
 def test_print_default_wearables(load_wearable_types):
