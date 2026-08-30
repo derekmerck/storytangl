@@ -71,6 +71,85 @@ The scratch archive also contains machinery that should *not* be promoted as-is:
 - ad hoc delta-map parsers
 
 
+Legacy Harvest Ledger
+---------------------
+
+The files under ``scratch/mechanics/progression/legacy`` are implementation
+archaeology, but they are not ready for wholesale deletion.  The table below
+separates ideas already represented by the live package from ideas that still
+need an explicit disposition.
+
+.. list-table:: Legacy progression ideas
+   :header-rows: 1
+   :widths: 34 12 54
+
+   * - Archive idea
+     - State
+     - Live seam or remaining question
+   * - Continuous values with narrative quality tiers; equality by tier,
+       ordering by value
+     - Landed
+     - ``Stat``, handlers, and projection
+   * - Linear, logarithmic, and normal/probit measurement curves
+     - Landed
+     - ``handlers`` preserves the useful curve separation
+   * - Intrinsic-governed skill/domain competency
+     - Landed
+     - ``StatDef.governed_by`` and ``HasStats.compute_competency``
+   * - Unified cost, difficulty, outcome, and payout flow
+     - Landed
+     - ``StatChallenge``, ``ChallengeResult``, and resolver
+   * - Opposed checks plus domain, cost-currency, and reward-currency remapping
+     - Landed
+     - ``resolve_challenge`` and ``SituationalEffect``
+   * - Actor, equipment, and context as effect/tag donors
+     - Landed
+     - Explicit effect/tag donors replace dynamic badge injection
+   * - Outcome-weighted growth that also nudges the governing intrinsic
+     - Partial
+     - Challenge growth and governor gain landed; inactivity decay and
+       restorative loss did not
+   * - Currencies governed or capped by a related stat, with stat-dependent
+       recovery
+     - Unported
+     - ``StatDef.currency_name`` associates a name only; wallet capacity and
+       recovery policy remain undefined
+   * - Threshold qualities automatically donating effects (the useful part of
+       dynamic badges)
+     - Unported
+     - Preserve the concept as an explicit conditional donor, not generated
+       properties or metaprogramming
+   * - Task history as an owned sequence of complete resolution receipts
+     - Partial
+     - One ``ChallengeResult`` is explicit; durable history ownership and replay
+       policy remain undefined
+   * - All-of tag applicability for compound circumstances
+     - Unported
+     - Archive effects used subset matching; live effects use intersection
+       matching. Add an explicit mode only for a real authored example
+   * - Per-currency absolute and relative delta maps
+     - Deferred
+     - Live scalar modifiers and remaps are easier to inspect. Revisit only when
+       a concrete challenge needs asymmetric currency modification
+   * - Random sampling of a continuous value when an author supplies only a
+       quality tier
+     - Deferred
+     - If retained, sampling belongs at an explicit materialization boundary,
+       not inside ``Stat`` construction
+   * - Qualitative wealth, standing, reputation, and access gates
+     - Unported
+     - Phase 4 below remains the intended home
+   * - Inverse relationship axes such as fear/trust and hate/love
+     - Rehome
+     - Useful interaction precedent, but it belongs to relationship/control
+       state, not generic progression
+
+Until every ``Partial``, ``Unported``, and ``Rehome`` row has either landed or
+been deliberately rejected in its owning design, retain the legacy archive as
+the evidence behind this ledger.  Individual duplicate implementations and
+tests can be retired later against these explicit dispositions.
+
+
 Design Principles
 -----------------
 
