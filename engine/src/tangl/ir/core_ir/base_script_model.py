@@ -18,11 +18,11 @@ class BaseScriptItem(Record):
 
     parent: Optional["BaseScriptItem"] = Field(None, exclude=True)
 
-    # todo: I think this is out of spec now -- templates are just actor scripts, location scripts, block scripts, etc.
+    # Legacy template grouping retained for compatible authored payloads.
     template_names: Optional[Label] = None
 
-    # todo: we haven't implemented this on story-node yet have we?
-    locked: bool = False                      # Requires manual unlocking
+    # Legacy authoring hint; runtime locking remains mechanic-owned.
+    locked: bool = False
     locals: Optional[StringMap] = None        # Namespace
     conditions: Optional[list[Expr]] = Field(
         None,

@@ -20,7 +20,8 @@ class Auto1111Api(WebUIApi):
     #     super().__init__(*args, **kwargs)
 
     def generate_image(self, spec: Auto1111Spec) -> tuple[Image, Auto1111Spec]:
-        # todo: add call to change the mode
+        # Worker configuration owns the active checkpoint; this adapter does
+        # not switch models per request.
 
         kwargs = spec.to_request()
         if 'images' in kwargs:
