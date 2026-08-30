@@ -7,7 +7,6 @@ from pathlib import Path
 # General types
 StringMap: TypeAlias = MutableMapping[str, Any]
 # A dict with identifier-safe string keys such as namespace, constraints, unstructured data
-# todo: Could validate proper record keys for various _types_ of string maps (and sanitize)
 Primitive: TypeAlias = str | int | float | Enum | bool
 Pathlike: TypeAlias = Path | str
 Typelike: TypeAlias = Type | str
@@ -28,7 +27,6 @@ Step: TypeAlias = int           # Graph traversal or resolution step counter/epo
 
 # Used by storage and serializers
 UnstructuredData: TypeAlias = StringMap
-# todo: rename HasUid to "StructuredModel" or fold into BaseModelPlus?
 # A string map of kwargs suitable for structuring a HasUid instance, includes a 'kind' and 'uid' key
 class HasUid(Protocol):
     kind: Typelike

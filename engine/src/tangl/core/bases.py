@@ -543,9 +543,6 @@ class HasContent(BaseModelPlus):
         # frozen, could make this into a cached- or shelved-property
         return hashing_func(self.get_hashable_content())
 
-    # todo: want to use a computed_property or cached property _iff_ the model config
-    #       is frozen, as with Record and descendents
-
     def eq_by_content(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:
             return False
