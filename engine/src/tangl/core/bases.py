@@ -283,8 +283,8 @@ class Unstructurable(BaseModelPlus):
       This generalizes explicit constructor-form handling for fields like
       ``EntityTemplate.payload``; ``Registry.members`` keeps its bespoke path so
       ``Registry.add()`` can preserve ownership-binding guardrails.
-      It should not revive the old automorphic structuring experiments from
-      ``scratch/legacy/core/core-23/structuring/``: no self-casting from data,
+      It should not revive the retired automorphic structuring experiments:
+      no self-casting from data,
       self-templating, property-name child inference, or object-self-shaping
       pipeline belongs in the core constructor-form path.
     - Set ``guard_unstructure = True`` for classes that should refuse constructor-form

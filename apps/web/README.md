@@ -370,4 +370,4 @@ fragment-renderer roadmap for the stabilization work still in flight.
 
 ---
 
-**Questions? Check the `/notes` directory or review legacy code in `/scratch/legacy/web` for reference implementations.**
+**Questions? Check the project design notes and current fragment-renderer roadmap.**

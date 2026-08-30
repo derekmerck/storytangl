@@ -16,8 +16,7 @@ association, shops, trades, services, component install flows, and future
 credential/chopshop compliance.
 **Prior art:** VM `Requirement` / `ProvisionOffer`, story asset
 `AssetTransactionManager`, assembly `ComponentManager` and connector association,
-legacy `scratch/legacy/core/core-30/graph_handlers/associating.py`, and the
-CarWars garage/shop proof.
+the retired bilateral-association precedent, and the CarWars garage/shop proof.
 
 ---
 

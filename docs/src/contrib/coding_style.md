@@ -57,8 +57,8 @@ presentation (renderers, web/UI)
 - Do not auto-embed arbitrary `Entity`-typed fields. If a nested value is a
   real graph member, persist a reference. If it is an owner-bound manager or
   value object, mark the field for constructor-form recursion.
-- Keep recursive constructor-form handling narrow. The legacy automorphic
-  experiments in `scratch/legacy/core/core-23/structuring/` are explicit
+- Keep recursive constructor-form handling narrow. The retired automorphic
+  experiments are explicit
   non-goals: no self-casting, no self-templating, no misnamed-child inference,
   and no broad object-self-shaping pipeline.
 - No implicit IO in models; persistence belongs to ledger/service.
