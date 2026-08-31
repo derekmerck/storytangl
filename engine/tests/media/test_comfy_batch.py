@@ -50,6 +50,10 @@ def prepare(
     ], api.endpoint())
 
 
+# CLI tests target an explicit endpoint so they never depend on whether the
+# host happens to have a worker configured.
+OFFLINE_ENDPOINT = "http://worker:8188"
+
 class TestTemplateAndIdentity:
     def test_json_escaping_types_and_nonrecursive_prompt(self) -> None:
         text = '"Claire"\n\\ {{ missing }} — café'
@@ -306,7 +310,8 @@ class TestCLI:
         }))
         with patch.object(batch, "ComfyApi", return_value=api):
             assert batch.main([
-                "batch", str(manifest), "--receipts", str(tmp_path / "receipts.json")
+                "batch", str(manifest), "--receipts", str(tmp_path / "receipts.json"),
+                "--url", OFFLINE_ENDPOINT,
             ]) == 1
         api.queue_prompt.assert_not_called()
         api.upload_image.assert_not_called()
@@ -324,7 +329,7 @@ class TestCLI:
             assert batch.main([
                 "submit", str(template), "--prompt", "ink", "--prompt", "pixel",
                 "--seed", "910", "--seed", "911", "--image", str(image),
-                "--receipts", str(path), "--dry-run",
+                "--receipts", str(path), "--url", OFFLINE_ENDPOINT, "--dry-run",
             ]) == 0
         submit.assert_not_called()
         upload.assert_not_called()
@@ -342,7 +347,10 @@ class TestCLI:
             "jobs": [{"params": {"seed": 2}, "images": {"front": "one.webp", "back": "two.webp"}}],
         }))
         path = tmp_path / "receipts.json"
-        assert batch.main(["batch", str(manifest), "--receipts", str(path), "--dry-run"]) == 0
+        assert batch.main([
+            "batch", str(manifest), "--receipts", str(path),
+            "--url", OFFLINE_ENDPOINT, "--dry-run",
+        ]) == 0
         receipt = batch.BatchReceipt.model_validate_json(path.read_text())
         assert receipt.jobs[0].params == {"prompt": "ink", "seed": 2}
         assert set(receipt.jobs[0].sources) == {"front", "back"}
@@ -353,7 +361,7 @@ class TestCLI:
         with patch.object(batch, "ComfyApi", return_value=api):
             assert batch.main([
                 "submit", str(template), "--prompt", "ink", "--seed", "1",
-                "--receipts", str(tmp_path / "receipt.json"),
+                "--receipts", str(tmp_path / "receipt.json"), "--url", OFFLINE_ENDPOINT,
             ]) == 0
         api.get_history.assert_not_called()
 
@@ -363,6 +371,6 @@ class TestCLI:
         with patch.object(batch, "ComfyApi", return_value=api):
             assert batch.main([
                 "submit", "unused.json", "--timeout", "0",
-                "--receipts", str(tmp_path / "receipt.json"),
+                "--receipts", str(tmp_path / "receipt.json"), "--url", OFFLINE_ENDPOINT,
             ]) == 1
         api.queue_prompt.assert_not_called()

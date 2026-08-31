@@ -100,10 +100,26 @@ def test_missing_configuration_is_an_error_not_a_guessed_host(
 
     assert build_parser().parse_args(["submit", "w.j2", "--receipts", "r.json"]).url is None
 
-    with pytest.raises(SystemExit) as excinfo:
-        main(["submit", "w.j2", "--receipts", "r.json"])
-    assert excinfo.value.code == 2
-    assert "no ComfyUI worker configured" in capsys.readouterr().err
+    # Exit 1 is the documented input-error code; 2 already means wait-budget
+    # expired and must stay distinguishable from a configuration problem.
+    assert main(["submit", "w.j2", "--receipts", "r.json"]) == 1
+    assert "No ComfyUI worker configured" in capsys.readouterr().err
+
+
+def test_collect_is_exempt_because_its_endpoint_is_receipt_bound(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`collect` never defines --url, so the worker check must not fire on it."""
+
+    monkeypatch.setattr("comfy_batch.configured_comfy_url", lambda: None)
+    from comfy_batch import build_parser, main
+
+    args = build_parser().parse_args(["collect", "r.json"])
+    assert not hasattr(args, "url")
+
+    # Reaches the receipt read rather than refusing for a missing worker.
+    missing = tmp_path / "absent.json"
+    assert main(["collect", str(missing)]) == 1
 
 
 def test_explicit_url_overrides_configuration(monkeypatch: pytest.MonkeyPatch) -> None:

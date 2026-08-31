@@ -333,19 +333,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    if getattr(args, "url", None) is None:
-        # No host is assumed. An unreachable guess is no better than no worker.
-        parser.error(
-            "no ComfyUI worker configured. Set "
-            "content.apis.stableforge.comfy_workers in settings.local.toml "
-            "(gitignored), or an equivalent TANGL_ environment variable, or "
-            "pass --url explicitly."
-        )
+    args = build_parser().parse_args(argv)
     try:
         if args.timeout <= 0 or not 0 < args.poll_interval <= 60:
             raise ValueError("Timeout must be positive and poll interval must be in (0, 60]")
+        # `collect` is exempt: it uses the endpoint bound to its receipt and
+        # never defines --url. No host is assumed for the others; an
+        # unreachable guess is no better than no worker at all.
+        if hasattr(args, "url") and args.url is None:
+            raise ValueError(
+                "No ComfyUI worker configured. Set "
+                "content.apis.stableforge.comfy_workers in settings.local.toml "
+                "(gitignored), or an equivalent TANGL_ environment variable, or "
+                "pass --url explicitly."
+            )
         if args.output_dir and args.output_dir.resolve().is_relative_to(REPO_ROOT):
             raise ValueError("Download media outside the repository (PNG/JPG Git LFS safety)")
         if args.command == "collect":
