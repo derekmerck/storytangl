@@ -249,6 +249,11 @@ def collect_jobs(
         raise ValueError("Timeout must be positive and poll interval must be in (0, 60]")
     if receipt.endpoint != api.endpoint():
         raise ValueError("Receipt endpoint does not match the worker")
+    if any(job.status == "prepared" for job in receipt.jobs):
+        raise ValueError(
+            "Receipt contains unsubmitted jobs. Submit first: rerun the original "
+            "submit/batch command without --dry-run, using the same receipt path."
+        )
     deadline = time.monotonic() + timeout
     downloaded: set[str] = set()
     while True:

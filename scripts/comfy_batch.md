@@ -116,6 +116,10 @@ PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py collect \
 collection pass; pending jobs remain pending. Collection polls every submitted job
 each pass, so a slow first job does not prevent collecting later completions.
 
+Collection rejects receipts containing unsubmitted (`prepared`) jobs, even alongside
+completed jobs. After a dry run, rerun the original `submit`/`batch` command without
+`--dry-run`, using the same receipt path. `collect` never submits jobs itself.
+
 ## Explicit batch: different parameters or several images per job
 
 Create a manifest such as:

@@ -297,6 +297,49 @@ class TestCLI:
             assert batch.main(["collect", str(path), "--wait"]) == 0
         assert api.queue_prompt.call_count == 1
 
+    @pytest.mark.parametrize("wait", [False, True])
+    @pytest.mark.parametrize("mixed", [False, True])
+    def test_collect_rejects_unsubmitted_prepared_jobs(
+        self, api: Mock, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        wait: bool, mixed: bool,
+    ) -> None:
+        receipt = prepare(api, count=2 if mixed else 1)
+        if mixed:
+            receipt.jobs[0].status = "completed"
+            receipt.jobs[0].prompt_id = "finished-job"
+            receipt.jobs[0].history = {"status": {"completed": True}, "outputs": {}}
+        path = tmp_path / "receipts.json"
+        batch.save_receipt(path, receipt)
+        before = path.read_bytes()
+        with patch.object(batch, "ComfyApi", return_value=api):
+            assert batch.main([
+                "collect", str(path), "--output-dir", str(tmp_path / "out"),
+                *(["--wait"] if wait else []),
+            ]) == 1
+        assert "Submit first" in capsys.readouterr().err
+        api.get_history.assert_not_called()
+        api.fetch_image_bytes.assert_not_called()
+        api.queue_prompt.assert_not_called()
+        api.upload_image.assert_not_called()
+        assert path.read_bytes() == before
+
+    @pytest.mark.parametrize("status", ["submitting", "submission_unknown"])
+    def test_collect_does_not_retry_uncertain_submissions(
+        self, api: Mock, tmp_path: Path, capsys: pytest.CaptureFixture[str], status: str,
+    ) -> None:
+        receipt = prepare(api)
+        receipt.jobs[0].status = status
+        path = tmp_path / "receipts.json"
+        batch.save_receipt(path, receipt)
+        before = path.read_bytes()
+        with patch.object(batch, "ComfyApi", return_value=api):
+            assert batch.main(["collect", str(path), "--wait"]) == 1
+        assert "Submit first" not in capsys.readouterr().err
+        api.get_history.assert_not_called()
+        api.queue_prompt.assert_not_called()
+        api.upload_image.assert_not_called()
+        assert path.read_bytes() == before
+
     def test_all_manifest_jobs_validate_before_dispatch(self, api: Mock, tmp_path: Path) -> None:
         template = tmp_path / "workflow.json.j2"
         template.write_text(TEMPLATE)
