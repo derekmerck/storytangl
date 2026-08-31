@@ -84,11 +84,19 @@ decision to share is made on evidence.
 - Session bootstrap. `create_user()` must be called for a real user id; an
   invented `uuid4()` is rejected by `ServiceManager.open_user`.
 - `ledger_id` travels in `RuntimeEnvelope.metadata`, not as an attribute.
+- Media payloads name their source by `path`/`url` depending on
+  `content_format`, never `content` or `source`. Both bridges therefore carry
+  the same `("path", "url", "src", "ref")` probe.
+- `ChoiceFragment` stores its activation override in `activation_payload`
+  (wire alias `payload`), not `choice_payload`.
 - Group fragments must be flattened before per-step grouping.
-- Media that cannot be dereferenced degrades to its text floor.
+- Media that cannot be dereferenced degrades to its text floor, and the service
+  may supply that text itself in a content-shaped payload.
 
-Both of the first two were rediscovered the hard way while writing this port.
-That is the strongest argument so far for a shared session-bootstrap helper.
+The first four were each rediscovered the hard way while writing this port —
+three of them by shipping the bug first. That is the strongest argument so far
+for extracting a shared envelope-adaptation helper: none of these is guessable
+from the type signatures, and a third port would pay the same tax again.
 
 **Genuinely different, and reasons not to unify the turn model yet:**
 

@@ -80,8 +80,11 @@ class Stage:
         self.hitboxes.clear()
         self._draw_background(turn)
         self._draw_portraits(turn)
-        bottom = self._draw_lines(turn)
-        self._draw_choices(turn, top=bottom)
+        # Choices are laid out first and always reserved, so a long exchange can
+        # never push the only way to continue off the logical surface.
+        choices_top = LOGICAL_SIZE[1] - 4 - len(turn.choices) * 11
+        self._draw_lines(turn, floor=choices_top)
+        self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
 
@@ -98,19 +101,32 @@ class Stage:
             x = 8 if index == 0 else LOGICAL_SIZE[0] - 64
             self.surface.blit(scaled, (x, 40))
 
-    def _draw_lines(self, turn: Turn) -> int:
-        """Draw narration and dialog, returning the y below the last line."""
+    def _draw_lines(self, turn: Turn, *, floor: int) -> None:
+        """Draw the most recent lines that fit above ``floor``.
 
-        y = 108
-        for line in turn.lines:
-            if line.speaker is None:
-                y = self._draw_box(line.text, y, fill=INK, text_colour=CREAM)
-                continue
-            heading = line.speaker
-            if line.manner:
-                heading = f"{line.speaker} ({line.manner})"
-            y = self._draw_box(line.text, y, fill=CREAM, text_colour=INK, heading=heading)
-        return y
+        A merged turn can carry more prose than the surface holds — the dockhand
+        contest alone emits five lines. Older lines are dropped rather than
+        overflowing, since the CLI floor still carries the full transcript.
+        """
+
+        drawn: list[tuple[str, str | None, int]] = []
+        total = 0
+        for line in reversed(turn.lines):
+            heading = None
+            if line.speaker is not None:
+                heading = f"{line.speaker} ({line.manner})" if line.manner else line.speaker
+            height = 4 + (len(self._wrap(line.text, 74)) + (1 if heading else 0)) * 9 + 2
+            if total + height > floor - 8:
+                break
+            drawn.append((line.text, heading, height))
+            total += height
+
+        y = floor - total
+        for text, heading, _height in reversed(drawn):
+            if heading is None:
+                y = self._draw_box(text, y, fill=INK, text_colour=CREAM)
+            else:
+                y = self._draw_box(text, y, fill=CREAM, text_colour=INK, heading=heading)
 
     def _draw_box(
         self,
@@ -132,7 +148,7 @@ class Stage:
         return rect.bottom + 2
 
     def _draw_choices(self, turn: Turn, *, top: int) -> None:
-        y = max(top, LOGICAL_SIZE[1] - 6 - len(turn.choices) * 11)
+        y = top
         for index, choice in enumerate(turn.choices, start=1):
             label = f"{index}. {choice.text}"
             if not choice.available and choice.unavailable_reason:

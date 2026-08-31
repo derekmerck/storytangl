@@ -7,6 +7,7 @@ import json
 import pytest
 
 from tangl.core import Graph, Selector
+from tangl.journal.fragments import AttributedFragment
 from tangl.mechanics.games import (
     CallResponseGame,
     CallResponseGameHandler,
@@ -249,8 +250,9 @@ class TestCallResponseVmIntegration:
 
         assert contest.game.history[-1].notes["matched"] is True
         assert any(
-            getattr(fragment, "who", None) == "Opponent"
-            and getattr(fragment, "how", None) == "answers"
+            fragment.who == "Opponent"
+            and fragment.how == "answers"
             and fragment.content == "How appropriate."
             for fragment in ledger.get_journal()
+            if isinstance(fragment, AttributedFragment)
         )

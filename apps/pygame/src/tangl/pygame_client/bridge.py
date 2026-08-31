@@ -7,6 +7,7 @@ pytest. The renderer lives in :mod:`tangl.pygame_client.stage`.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -37,6 +38,23 @@ def _text(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
     return value.strip() or None
+
+
+# Media payloads name their source by content_format. ``content``/``source`` are
+# not among them; see ``tangl.service.media.media_fragment_to_payload``.
+_SOURCE_KEYS = ("path", "url", "src", "ref")
+
+
+def _payload_source(payload: dict[str, Any]) -> str | None:
+    """Return the first usable media source key in a service payload."""
+
+    for key in _SOURCE_KEYS:
+        value = payload.get(key)
+        if isinstance(value, Path):
+            return str(value)
+        if (text := _text(value)) is not None:
+            return text
+    return None
 
 
 def _step(fragment: BaseFragment) -> int:
@@ -146,7 +164,7 @@ class PygameSessionBridge:
                     text=_text(fragment.text) or "(unnamed choice)",
                     available=bool(getattr(fragment, "available", True)),
                     unavailable_reason=_text(getattr(fragment, "unavailable_reason", None)),
-                    payload=getattr(fragment, "choice_payload", None),
+                    payload=fragment.activation_payload,
                 )
             )
             return
@@ -173,6 +191,22 @@ class PygameSessionBridge:
             if text is not None:
                 turn.lines.append(Line(text=text))
 
+    @staticmethod
+    def _append_fallback_text(
+        turn: Turn,
+        payload: dict[str, Any] | None,
+        fragment: MediaFragment,
+    ) -> None:
+        """Render whatever text stands in for media that cannot be shown."""
+
+        text = None
+        if payload is not None:
+            text = _text(payload.get("content")) or _text(payload.get("text"))
+        if text is None:
+            text = _text(getattr(fragment, "text", None))
+        if text is not None:
+            turn.lines.append(Line(text=text))
+
     def _append_media(self, turn: Turn, fragment: MediaFragment) -> None:
         payload = media_fragment_to_payload(
             fragment,
@@ -180,15 +214,15 @@ class PygameSessionBridge:
             world_id=self.world_id,
         )
         if payload is None or payload.get("fragment_type") != "media":
-            # Media that cannot be dereferenced degrades to its text floor.
-            text = _text(getattr(fragment, "text", None))
-            if text is not None:
-                turn.lines.append(Line(text=text))
+            # Media that cannot be dereferenced degrades to its text floor. The
+            # service may supply that text itself, so prefer the payload's.
+            self._append_fallback_text(turn, payload, fragment)
             return
 
-        source = _text(payload.get("content")) or _text(payload.get("source"))
+        source = _payload_source(payload)
         if source is None:
             logger.debug("Media payload without a usable source: %r", payload)
+            self._append_fallback_text(turn, payload, fragment)
             return
         turn.images.append(
             StageImage(

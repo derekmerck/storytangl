@@ -73,10 +73,11 @@ def main(argv: list[str] | None = None) -> int:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif pygame.K_1 <= event.key <= pygame.K_9:
+                    # The renderer numbers every choice, available or not, so the
+                    # key must index the displayed list rather than a filtered one.
                     index = event.key - pygame.K_1
-                    available = [c for c in frame.choices if c.available]
-                    if index < len(available):
-                        choice = available[index]
+                    if index < len(frame.choices) and frame.choices[index].available:
+                        choice = frame.choices[index]
                         envelope = bridge.choose(choice.edge_id, choice.payload)
                         frame = _merge(_turns(bridge, envelope))
                         stage.draw(frame)
