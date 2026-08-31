@@ -39,12 +39,14 @@ not parse prose prefixes.
 
 ## Running
 
-pygame is not a Poetry dependency, matching the Ren'Py app's convention of not
-vendoring a client runtime:
+pygame-ce is a **dev/test** dependency, not a runtime one — `poetry install`
+brings it in so the renderer tests run in CI, while the engine and service never
+import it. That is a different question from the Ren'Py app's convention of not
+vendoring an SDK: pygame-ce is an ordinary wheel, so there is no reason it
+cannot be a test requirement.
 
-```bash
-pip install pygame-ce
-```
+The bridge and session tests import no pygame at all and run regardless; only
+the renderer tests need it, and they skip cleanly when it is absent.
 
 ```bash
 PYTHONPATH=engine/src:apps/pygame/src:worlds/repartee_loop \

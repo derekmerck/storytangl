@@ -97,6 +97,7 @@ toml = "^0.10.2"
 pytest = "^8.3.4"
 pytest-cov = "^4.1.0"     # coverage plugin for pytest
 httpx = "^0.28.1"         # for fastapi testing
+pygame-ce = "^2.5.0"      # apps/pygame renderer tests; not a runtime dependency
 
 # lang
 beautifulsoup4 = "^4.12.3"  # beautiful soup
