@@ -34,6 +34,10 @@ scenes:
             media_role: narrative_im_landscape
           - name: clerk_sprite.png
             media_role: dialog_im
+            staging_hints:
+              media_transition: from_left
+              media_position: left
+              media_flip_h: true
         kind: "repartee_loop.domain.ReparteeSetupBlock"
         content: "The clerk hands you one opening line and a warning not to waste it."
         actions:

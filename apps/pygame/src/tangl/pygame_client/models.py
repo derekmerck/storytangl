@@ -20,6 +20,9 @@ class StageImage:
     source: str
     alt_text: str | None = None
     source_id: UUID | None = None
+    flip_h: bool = False
+    """From ``staging_hints.media_flip_h``. Other staging hints are ignored by
+    this port; honouring a subset is expected of a conforming client."""
 
 
 @dataclass(slots=True, frozen=True)

@@ -224,11 +224,13 @@ class PygameSessionBridge:
             logger.debug("Media payload without a usable source: %r", payload)
             self._append_fallback_text(turn, payload, fragment)
             return
+        hints = fragment.staging_hints
         turn.images.append(
             StageImage(
                 role=_text(payload.get("media_role")) or _text(fragment.media_role) or "media",
                 source=source,
                 alt_text=_text(payload.get("text")),
                 source_id=getattr(fragment, "rit_id", None),
+                flip_h=bool(getattr(hints, "media_flip_h", None)),
             )
         )

@@ -193,6 +193,15 @@ class StagingHints(BaseModel, extra="allow"):
     media_transition: TransitionName | None = None
     media_duration: DurationName | float | None = None
     media_timing: TimingName | None = None
+    media_flip_h: bool | None = None
+    """Mirror the asset horizontally when staged.
+
+    Orthogonal to :attr:`media_position` (where it sits) and
+    :attr:`media_transition` (how it arrives, including ``from_left`` and
+    ``from_right``). Sprite art has a fixed facing, so a sprite reused on the
+    other side of a stage needs mirroring independently of either. Ports honour
+    the hints they understand and ignore the rest.
+    """
 
 
 ContentFormatType = Literal["url", "data", "xml", "json", "rit"]

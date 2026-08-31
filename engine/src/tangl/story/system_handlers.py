@@ -614,6 +614,7 @@ def render_block_media(*, caller, ctx, **_kw):
                 MediaFragment(
                     source_id=caller.uid,
                     media_role=payload.get("media_role"),
+                    staging_hints=payload.get("staging_hints"),
                     content=provider,
                     content_format="rit",
                     content_type=getattr(provider, "data_type", MediaDataType.MEDIA),
@@ -629,6 +630,7 @@ def render_block_media(*, caller, ctx, **_kw):
                 MediaFragment(
                     source_id=caller.uid,
                     media_role=payload.get("media_role"),
+                    staging_hints=payload.get("staging_hints"),
                     content=str(payload.get("url")),
                     content_format="url",
                     content_type=_media_type_for_item(payload),
@@ -643,6 +645,7 @@ def render_block_media(*, caller, ctx, **_kw):
                 MediaFragment(
                     source_id=caller.uid,
                     media_role=payload.get("media_role"),
+                    staging_hints=payload.get("staging_hints"),
                     content=payload.get("data"),
                     content_format="data",
                     content_type=_media_type_for_item(payload),

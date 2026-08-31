@@ -69,8 +69,14 @@ class Stage:
         found = []
         for role in roles:
             for image in turn.images:
-                if image.role == role and (loaded := self._load(image.source)) is not None:
-                    found.append(loaded)
+                if image.role != role:
+                    continue
+                loaded = self._load(image.source)
+                if loaded is None:
+                    continue
+                if image.flip_h:
+                    loaded = pygame.transform.flip(loaded, True, False)
+                found.append(loaded)
         return found
 
     # ── drawing ──────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ from typing import Optional
 
 from pydantic import AnyUrl, BaseModel, model_validator
 
+from tangl.journal.fragments import StagingHints
 from tangl.media.media_role import MediaRole
 from tangl.media.type_hints import Media
 from tangl.type_hints import UniqueLabel
@@ -46,6 +47,7 @@ class MediaItemScript(BaseScriptItem, arbitrary_types_allowed=True):
 
     media_role: Optional[MediaRole] = None
     text: Optional[str] = None  # title or caption
+    staging_hints: Optional[StagingHints] = None  # client-facing presentation hints
 
     @model_validator(mode='after')
     def _check_exactly_one_field(self):
