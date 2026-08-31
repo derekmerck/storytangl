@@ -88,7 +88,10 @@ class ComfyWorkerSnapshot:
 class ComfyApi:
     """Thin HTTP client for the subset of the ComfyUI API used by the worker flow."""
 
-    def __init__(self, url: str = "http://127.0.0.1:8188") -> None:
+    def __init__(self, url: str = "http://127.0.0.1:8188", *, timeout: float = 30.0) -> None:
+        if timeout <= 0:
+            raise ValueError("HTTP timeout must be positive")
+        self.timeout = timeout
         if "://" not in url:
             url = f"http://{url}"
         parsed = urlparse(url)
@@ -103,28 +106,47 @@ class ComfyApi:
 
     def queue_prompt(self, workflow: dict[str, dict] | ComfyWorkflow) -> str:
         payload = workflow.spec if isinstance(workflow, ComfyWorkflow) else workflow
-        response = requests.post(self.endpoint("prompt"), json={"prompt": payload})
+        response = requests.post(
+            self.endpoint("prompt"), json={"prompt": payload}, timeout=self.timeout
+        )
         response.raise_for_status()
-        prompt_id = response.json().get("prompt_id")
+        result = response.json()
+        prompt_id = result.get("prompt_id") if isinstance(result, dict) else None
         if not isinstance(prompt_id, str) or not prompt_id:
             raise ValueError("ComfyUI did not return a prompt_id")
         return prompt_id
 
+    def upload_image(self, data: bytes, *, filename: str) -> str:
+        """Upload unchanged bytes and return the worker-selected LoadImage input path."""
+        response = requests.post(
+            self.endpoint("upload/image"),
+            files={"image": (filename, data)},
+            data={"type": "input", "overwrite": "false"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        name = payload.get("name") if isinstance(payload, dict) else None
+        if not isinstance(name, str) or not name:
+            raise ValueError("ComfyUI upload did not return a name")
+        subfolder = payload.get("subfolder", "")
+        return f"{subfolder}/{name}" if subfolder else name
+
     def get_queue_status(self) -> dict[str, object]:
-        response = requests.get(self.endpoint("prompt"))
+        response = requests.get(self.endpoint("prompt"), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return payload.get("exec_info", {}) if isinstance(payload, dict) else {}
 
     def get_queue(self) -> dict[str, Any]:
-        response = requests.get(self.endpoint("queue"))
+        response = requests.get(self.endpoint("queue"), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return payload if isinstance(payload, dict) else {}
 
     def get_history(self, prompt_id: str | None = None) -> dict | None:
         endpoint = f"history/{prompt_id}" if prompt_id is not None else "history"
-        response = requests.get(self.endpoint(endpoint))
+        response = requests.get(self.endpoint(endpoint), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         if prompt_id is None:
@@ -186,37 +208,38 @@ class ComfyApi:
                 "subfolder": subfolder,
                 "type": folder_type,
             },
+            timeout=self.timeout,
         )
         response.raise_for_status()
         return response.content
 
     def list_model_types(self) -> list[str]:
-        response = requests.get(self.endpoint("models"))
+        response = requests.get(self.endpoint("models"), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return [str(item) for item in payload] if isinstance(payload, list) else []
 
     def list_models(self, folder: str) -> list[str]:
-        response = requests.get(self.endpoint(f"models/{folder}"))
+        response = requests.get(self.endpoint(f"models/{folder}"), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return [str(item) for item in payload] if isinstance(payload, list) else []
 
     def list_embeddings(self) -> list[str]:
-        response = requests.get(self.endpoint("embeddings"))
+        response = requests.get(self.endpoint("embeddings"), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return [str(item) for item in payload] if isinstance(payload, list) else []
 
     def get_object_info(self, node_class: str | None = None) -> dict[str, Any]:
         endpoint = f"object_info/{node_class}" if node_class is not None else "object_info"
-        response = requests.get(self.endpoint(endpoint))
+        response = requests.get(self.endpoint(endpoint), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return payload if isinstance(payload, dict) else {}
 
     def get_system_stats(self) -> dict[str, Any]:
-        response = requests.get(self.endpoint("system_stats"))
+        response = requests.get(self.endpoint("system_stats"), timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         return payload if isinstance(payload, dict) else {}
@@ -244,6 +267,7 @@ class ComfyApi:
         response = requests.post(
             self.endpoint("queue"),
             json={"delete": [prompt_id]},
+            timeout=self.timeout,
         )
         response.raise_for_status()
         try:
@@ -253,7 +277,7 @@ class ComfyApi:
         return payload if isinstance(payload, dict) else {}
 
     def interrupt(self) -> dict[str, Any]:
-        response = requests.post(self.endpoint("interrupt"))
+        response = requests.post(self.endpoint("interrupt"), timeout=self.timeout)
         response.raise_for_status()
         try:
             payload = response.json()

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from tangl.media.media_creators.comfy_forge import ComfyApi, ComfyWorkflow
 
 
@@ -38,6 +40,7 @@ class TestComfyApiSubmission:
         post.assert_called_once_with(
             "http://titan2.lan:8188/prompt",
             json={"prompt": workflow},
+            timeout=30.0,
         )
 
     def test_queue_prompt_accepts_comfy_workflow_wrapper(self) -> None:
@@ -125,7 +128,7 @@ class TestComfyApiIntrospection:
             model_types = api.list_model_types()
 
         assert model_types == ["checkpoints", "loras"]
-        get.assert_called_once_with("http://127.0.0.1:8188/models")
+        get.assert_called_once_with("http://127.0.0.1:8188/models", timeout=30.0)
 
     def test_describe_worker_collects_models_embeddings_and_system_stats(self) -> None:
         api = ComfyApi()
@@ -165,6 +168,7 @@ class TestComfyApiControlAndBinaryFetches:
         post.assert_called_once_with(
             "http://127.0.0.1:9000/queue",
             json={"delete": ["prompt-1"]},
+            timeout=30.0,
         )
 
     def test_interrupt_posts_to_interrupt_endpoint(self) -> None:
@@ -177,7 +181,7 @@ class TestComfyApiControlAndBinaryFetches:
             payload = api.interrupt()
 
         assert payload == {}
-        post.assert_called_once_with("http://127.0.0.1:9000/interrupt")
+        post.assert_called_once_with("http://127.0.0.1:9000/interrupt", timeout=30.0)
 
     def test_fetch_image_bytes_passes_expected_view_params(self) -> None:
         api = ComfyApi("http://127.0.0.1:9000")
@@ -200,4 +204,30 @@ class TestComfyApiControlAndBinaryFetches:
                 "subfolder": "story",
                 "type": "output",
             },
+            timeout=30.0,
         )
+
+
+def test_upload_preserves_bytes_and_uses_worker_selected_path() -> None:
+    api = ComfyApi("http://worker:8188", timeout=7)
+    with patch(
+        "tangl.media.media_creators.comfy_forge.comfy_api.requests.post",
+        return_value=_response(json_data={"name": "renamed.webp", "subfolder": "uploads"}),
+    ) as post:
+        assert api.upload_image(b"original-bytes", filename="source.webp") == "uploads/renamed.webp"
+    post.assert_called_once_with(
+        "http://worker:8188/upload/image",
+        files={"image": ("source.webp", b"original-bytes")},
+        data={"type": "input", "overwrite": "false"},
+        timeout=7,
+    )
+
+
+@pytest.mark.parametrize("payload", [None, [], {}, {"name": ""}])
+def test_invalid_upload_response_is_explicit(payload: object) -> None:
+    with patch(
+        "tangl.media.media_creators.comfy_forge.comfy_api.requests.post",
+        return_value=_response(json_data=payload),
+    ):
+        with pytest.raises(ValueError, match="upload did not return a name"):
+            ComfyApi().upload_image(b"source", filename="source.webp")

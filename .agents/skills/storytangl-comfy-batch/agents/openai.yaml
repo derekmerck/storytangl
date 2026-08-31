@@ -1,0 +1,4 @@
+interface:
+  display_name: "StoryTangl ComfyUI Batch"
+  short_description: "Prepare, dispatch, and collect ComfyUI jobs"
+  default_prompt: "Use $storytangl-comfy-batch to prepare or run the requested ComfyUI jobs with source hashes and resumable receipts."

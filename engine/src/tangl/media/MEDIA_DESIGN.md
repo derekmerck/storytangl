@@ -26,6 +26,9 @@
 > deterministic in-process checker harness and a first real ComfyUI worker
 > backend. This note describes the implemented
 > architecture and the design commitments for the still-evolving creator layer.
+> A standalone `scripts/comfy_batch.py` helper also supports templated workflow
+> jobs, source uploads, resumable JSON receipts, and optional collection without
+> entering the forge/provisioning lifecycle.
 >
 > The package-level architecture is canonical here. The public entry point at
 > `docs/src/design/MEDIA_DESIGN.md` summarizes the cross-package pipeline and
