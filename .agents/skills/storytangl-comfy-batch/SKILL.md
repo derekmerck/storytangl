@@ -17,9 +17,16 @@ commands. It owns the manifest schema, CLI flags, and receipt semantics. Inspect
 [the implementation](../../../scripts/comfy_batch.py) for behavior not covered
 there, debugging, or requested changes.
 
-- Establish the workflow, actual worker URL, parameters/variants, optional sources,
-  receipt location, and whether the user wants submission only or collected output.
-  Do not assume Titan2, localhost, a model inventory, or previous host availability.
+- Establish the workflow, parameters/variants, optional sources, receipt location,
+  and whether the user wants submission only or collected output. The worker URL
+  comes from `content.apis.stableforge.comfy_workers` via
+  `configured_comfy_url()`; `--url` defaults to it, so omit the flag unless
+  overriding. Never hard-code a host. Do not assume a model inventory or previous
+  host availability — query `/object_info` on the target worker.
+- To reuse or replay an existing image's graph, recover it with
+  `scripts/workflow_from_png.py`; see the helper guide's recovery section for what
+  the metadata does and does not carry. Bundled example workflows, including
+  model-free smoke templates, live in `scripts/examples/comfy/`.
 - Run from the repository root in its existing Python environment. The documented
   command is `PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py ...`.
   If Poetry selects an incomplete environment, use a verified existing project

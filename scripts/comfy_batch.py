@@ -296,7 +296,9 @@ def assignments(values: list[str]) -> dict[str, JsonValue]:
     return result
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser. Exposed so offline tests can assert defaults."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     submit = commands.add_parser("submit", help="One job, or prompts × images × seeds")
@@ -326,7 +328,11 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--http-timeout", type=float, default=30)
         command.add_argument("--poll-interval", type=float, default=2)
         command.add_argument("--output-dir", type=Path, help="Download images outside the repo")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     try:
         if args.timeout <= 0 or not 0 < args.poll_interval <= 60:
             raise ValueError("Timeout must be positive and poll interval must be in (0, 60]")

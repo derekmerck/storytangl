@@ -148,6 +148,61 @@ PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py batch /path/to/jo
 No matrix language is added to manifests: callers can mechanically generate the
 explicit jobs list when they need more elaborate experiments.
 
+## Recovering a workflow from a ComfyUI PNG
+
+ComfyUI writes the graph into PNG `tEXt` chunks, so a generated image usually
+carries the workflow that made it. Prefer recovering a known-good workflow over
+authoring one:
+
+```sh
+PYTHONPATH=engine/src python scripts/workflow_from_png.py <image.png> --models -o out.json
+```
+
+It exports the literal API JSON and prints model dependencies plus a
+**non-exhaustive** list of candidate parameters. It does not parameterize
+anything for you, and its suggestions key on common input names, so knobs such as
+`cfg` and `denoise` will be missed — read the exported graph.
+
+Two chunks may be present. `prompt` is API format and is what this helper
+consumes; `workflow` is the canvas layout and only appears on UI-generated
+images, for loading back into ComfyUI.
+
+This is **workflow recovery, not a reproduction guarantee.** The metadata carries
+the graph only — not source-image bytes, model weights, ComfyUI or torch
+versions, or the GPU. Any of those changing can change the output. Metadata is
+also fragile: screenshots, chat uploads, and most editors strip it. An extracted
+workflow additionally names uploaded sources by their content-addressed server
+filename, which depends on server state; replace that with
+`{{ images.source | tojson }}` and pass `--image` so the helper re-uploads.
+
+## Bundled example workflows
+
+`scripts/examples/comfy/` holds the model-free smoke templates plus Flux.2 Klein
+scene templates:
+
+| Template | Shape |
+| --- | --- |
+| `solid_color.json.j2` | stock nodes, no models — first connectivity test |
+| `image_passthrough.json.j2` | upload round trip, no sampler |
+| `flux2_klein.json.j2` | Flux.2 Klein text-to-image |
+| `flux2_klein_ref.json.j2` | plus `FluxKontextImageScale` reference conditioning |
+| `flux2_ref_scene.json.j2` | `ReferenceLatent` conditioning, explicit output dimensions |
+| `flux2_ref_img2img.json.j2` | **experimental** — reference latent seeds the sampler via `SplitSigmasDenoise` |
+
+The Flux.2 templates name specific model files; query `/object_info` on the
+target worker rather than assuming they exist there.
+
+Two notes learned the hard way. A workflow that wires `GetImageSize` from a
+scaled reference into the latent and scheduler **inherits its output aspect ratio
+from that reference**, which silently produces mismatched sizes across a set;
+`flux2_ref_scene.json.j2` takes explicit `width`/`height` instead. And exported
+UI graphs often carry orphaned nodes and a `PreviewImage` whose output is temp —
+drop the orphans and use `SaveImage` with a `filename_prefix` when templatizing.
+
+`denoise` in the img2img template is quantized against `steps`, so its useful
+range moves with the step count. Sweep it for your own step count with a batch
+manifest rather than trusting a fixed table.
+
 ## Bookkeeping and failure semantics
 
 - Receipts include the template, parameters, source paths and byte SHA-256 hashes,

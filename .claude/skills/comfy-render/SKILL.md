@@ -12,6 +12,10 @@ provisioning lifecycle — it is a plain job runner with JSON receipts.
 Read `scripts/comfy_batch.md` for the full contract. This skill covers the
 working invocation, two ready templates, and the traps.
 
+Read [the helper usage guide](../../../scripts/comfy_batch.md) first — it owns
+the manifest schema, CLI flags, receipt semantics, PNG recovery, and the bundled
+example workflows. This skill adds only the render-loop habits on top.
+
 ## Server
 
 The endpoint comes from settings, never from a hardcoded host. `comfy_batch.py`
@@ -74,7 +78,7 @@ to a scratch directory — downloads into the repo are rejected for LFS safety.
 Then `Read` the returned PNG path to actually look at the result. Never report a
 render as good without viewing it.
 
-## Bundled templates
+## Templates
 
 Both live beside this file and are verified working against the live worker.
 
@@ -86,22 +90,29 @@ Known-good: `steps=4`, `cfg=1` at 1280×800. Klein is heavily distilled — 4 st
 is the tuned value for scene work, not a placeholder. Composes a **new** scene;
 the reference contributes loose stylistic influence only.
 
-**`flux2_ref_img2img.json.j2`** — same graph, but the reference latent seeds the
-sampler through `SplitSigmasDenoise`, so the source composition is **preserved**
-and restyled. Adds `denoise`. Calibrated on the harbour etching:
+**`flux2_ref_img2img.json.j2`** — **EXPERIMENTAL.** Same graph, but the
+reference latent seeds the sampler through `SplitSigmasDenoise`, so the source
+composition is preserved and restyled rather than replaced. Adds `denoise`.
 
-| `denoise` | result |
-|---|---|
-| 0.65 | source reproduced almost verbatim |
-| 0.90 | source hand-coloured; structure untouched |
-| **0.95–0.99** | **full palette restyle, composition preserved** |
+`denoise` is **quantized against `steps`**, so its useful range moves with the
+step count and there is no portable calibration table. Observed on this worker,
+same seed, one source image, one sample per value:
 
-This is a restyle tool, not a "more reference influence" dial. It is the right
-way to conform an existing asset to the house palette, or to convert an etching
-straight into game style. Note the source's frame, caption band, and borders
-survive as structure — crop the reference first.
+- at `steps=12`: 0.65 left the source almost untouched, 0.90 read as the source
+  hand-coloured, 0.95-0.99 gave a full palette restyle.
+- at `steps=4`: 0.90 already gives the full restyle. Three values across
+  0.90-0.99 produced three distinct outputs, so the knob is live at low step
+  counts, but the thresholds are not the ones above.
 
-**`flux2_klein.json.j2` / `flux2_klein_ref.json.j2`** — minimal hand-built
+Treat those as anecdotes, not calibration. **Sweep `denoise` at your own step
+count** — `comfy_batch` batch manifests exist for exactly this — and look at the
+results. Reference conditioning also influences composition on its own, so
+neither workflow *guarantees* preservation; it is a strong tendency, not a
+contract. The source's frame, caption band, and borders survive as structure, so
+crop the reference first.
+
+
+**`scripts/examples/comfy/flux2_klein*.json.j2`** — minimal hand-built
 txt2img and `FluxKontextImageScale` reference variants. Kept as small
 smoke-tests; prefer `flux2_ref_scene` for real work.
 
@@ -110,20 +121,23 @@ JSON with `nodes`/`links`), then replace only the inputs you want to expose with
 Jinja: `{{ prompt | tojson }}`, `{{ seed }}`, `{{ images.source | tojson }}`. Use
 `tojson` *without* surrounding quotes for strings.
 
-## Any ComfyUI PNG is a template source
+## Recovering a workflow from a ComfyUI PNG
 
-ComfyUI embeds the workflow in PNG `tEXt` chunks, so every generated image is
-strictly reproducible and reusable as a starting template. **Prefer extracting a
-known-good workflow over authoring one.**
+ComfyUI embeds the workflow in PNG `tEXt` chunks, so a generated image usually
+carries the graph that made it. This is **workflow recovery**, not a
+reproduction guarantee. **Prefer recovering a known-good workflow over authoring
+one.**
 
 ```bash
 PYTHONPATH=engine/src "$PY" \
-  .claude/skills/comfy-render/workflow_from_png.py <image.png> --models -o out.json.j2
+  scripts/workflow_from_png.py <image.png> --models -o out.json.j2
 ```
 
-It prints the model dependencies and every literal input worth turning into a
-Jinja variable, then writes the workflow. Replace the listed values with Jinja and
-it is a template.
+It exports the literal JSON and prints model dependencies plus a
+**non-exhaustive** list of candidate parameters — it does not parameterize
+anything for you. The suggestion list keys on common input names and will miss
+knobs like `cfg` and `denoise`, so read the exported graph rather than trusting
+it. Replace values with Jinja by hand to get a template.
 
 Two chunks exist:
 
@@ -132,9 +146,14 @@ Two chunks exist:
 - **`workflow`** — canvas layout. Only on UI-generated images; load it back into
   the ComfyUI canvas, not into this helper.
 
-Reproducibility is byte-exact: extracting a workflow and resubmitting it verbatim
-against the same worker reproduced an identical PNG (same SHA-256), and
-`comfy_batch` recognized it as the same request fingerprint.
+**On reproducibility.** In one observed experiment, recovering a workflow and
+resubmitting it verbatim against the same worker minutes later reproduced a
+byte-identical PNG, and `comfy_batch` recognized it as the same request
+fingerprint. That is evidence the sampler is deterministic given an unchanged
+environment — it is **not** a general contract. The metadata carries the graph
+only: not source-image bytes, not model weights, not ComfyUI or torch versions,
+not the GPU. Any of those changing can change the output. Say "recovered the
+workflow", not "reproducible".
 
 Caveats:
 
@@ -191,9 +210,12 @@ no text, no lettering, no watermark, no signature
   no frame` and `no people, empty center staging area` — sprites composite on top.
 - Sprites: `flat pure magenta #FF00FF background, no shadow, no ground plane`,
   and `entire figure and all props contained within the frame, feet at the
-  bottom edge`. Magenta is excluded from the palette so keying is exact.
-- UI frames: `perfectly symmetrical and orthogonal, no perspective` so the result
-  is 9-sliceable for variable-width text.
+  bottom edge`. Magenta is asked for because it is outside the palette, but the
+  model will not hold it exactly — expect to key with tolerance, or use `rembg`,
+  and check edges rather than assuming a clean cut.
+- UI frames: `perfectly symmetrical and orthogonal, no perspective`. This makes
+  a 9-sliceable result *more likely*, not guaranteed; verify the corners and
+  straight edges before slicing, and expect to redraw borders by hand.
 - With a strong reference image, keep the prompt to **costume and palette deltas**
   and let the image carry pose and silhouette. A specific prompt overrides the
   reference; a dense reference (fine-hatched panoramas) conditions poorly, while a
