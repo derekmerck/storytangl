@@ -13,7 +13,15 @@ from enum import Enum
 from typing import Any, Literal, Self
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from tangl.core import BaseFragment, Graph, Registry, Selector
 from tangl.journal.intent import Accepts, Blocker, KvRow, UIHints
@@ -183,6 +191,22 @@ TransitionName = Literal[
 DurationName = Literal["short", "medium", "long"]
 TimingName = Literal["start", "stop", "pause", "restart", "loop"]
 
+# Coarse staging grid, named from the viewer's side of the screen. Deliberately
+# not theatrical: "stage left" is the performer's left and therefore the
+# audience's right, which reads backwards here and is rejected outright rather
+# than silently accepted (see StagingHints._normalize_axis).
+#
+# Subdivisions are the planned extension, keeping these three as the cardinals:
+# left_left, left, left_right, mid_left, mid, mid_right, right_left, right,
+# right_right — for staging crowds by nudging off a cardinal rather than by
+# hardcoded pixel offsets.
+MediaXName = Literal["left", "mid", "right"]
+MediaYName = Literal["top", "mid", "bottom"]
+
+_AXIS_ALIASES = {"screen_left": "left", "screen_right": "right", "center": "mid",
+                 "centre": "mid", "middle": "mid"}
+_AXIS_REJECTED = {"stage_left", "stage_right"}
+
 
 class StagingHints(BaseModel, extra="allow"):
     """Client-facing media staging hints."""
@@ -193,6 +217,28 @@ class StagingHints(BaseModel, extra="allow"):
     media_transition: TransitionName | None = None
     media_duration: DurationName | float | None = None
     media_timing: TimingName | None = None
+
+    @field_validator("media_x", "media_y", mode="before")
+    @classmethod
+    def _normalize_axis(cls, value: Any) -> Any:
+        """Accept screen-relative aliases; refuse theatrical ones outright."""
+
+        if not isinstance(value, str):
+            return value
+        name = value.strip().lower()
+        if name in _AXIS_REJECTED:
+            raise ValueError(
+                f"{value!r} is not a staging position. Theatrical 'stage left' is "
+                "the performer's left and the viewer's right, which inverts this "
+                "vocabulary. Use 'left' or 'right', named from the viewer's side."
+            )
+        return _AXIS_ALIASES.get(name, name)
+    media_x: MediaXName | None = None
+    """Horizontal staging slot, named from the viewer's side of the screen."""
+
+    media_y: MediaYName | None = None
+    """Vertical staging level."""
+
     media_flip_h: bool | None = None
     """Mirror the asset horizontally when staged.
 

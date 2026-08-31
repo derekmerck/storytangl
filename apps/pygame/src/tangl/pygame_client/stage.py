@@ -15,7 +15,7 @@ from uuid import UUID
 
 import pygame
 
-from .models import Turn
+from .models import StageImage, Turn
 
 LOGICAL_SIZE = (320, 200)
 SCALE = 3
@@ -23,6 +23,8 @@ SCALE = 3
 BACKGROUND_ROLES = ("narrative_im_landscape", "narrative_im", "cover_im")
 PORTRAIT_ROLES = ("dialog_im", "avatar_im")
 PORTRAIT_HEIGHT = 112
+MARGIN = 10
+_DEFAULT_SLOTS = ("left", "right", "mid")
 
 INK = (26, 28, 44)
 CREAM = (232, 226, 205)
@@ -65,7 +67,9 @@ class Stage:
         self._cache[source] = surface
         return surface
 
-    def _by_role(self, turn: Turn, roles: tuple[str, ...]) -> list[pygame.Surface]:
+    def _by_role(
+        self, turn: Turn, roles: tuple[str, ...]
+    ) -> list[tuple[StageImage, pygame.Surface]]:
         found = []
         for role in roles:
             for image in turn.images:
@@ -76,7 +80,7 @@ class Stage:
                     continue
                 if image.flip_h:
                     loaded = pygame.transform.flip(loaded, True, False)
-                found.append(loaded)
+                found.append((image, loaded))
         return found
 
     # ── drawing ──────────────────────────────────────────────────────────
@@ -98,19 +102,31 @@ class Stage:
     def _draw_background(self, turn: Turn) -> None:
         backgrounds = self._by_role(turn, BACKGROUND_ROLES)
         if backgrounds:
-            self.surface.blit(pygame.transform.scale(backgrounds[0], LOGICAL_SIZE), (0, 0))
+            surface = backgrounds[0][1]
+            self.surface.blit(pygame.transform.scale(surface, LOGICAL_SIZE), (0, 0))
         else:
             self.surface.fill(TEAL)
 
     def _draw_portraits(self, turn: Turn, *, floor: int) -> None:
         """Place up to two sprites on a shared baseline, preserving aspect."""
 
-        for index, portrait in enumerate(self._by_role(turn, PORTRAIT_ROLES)[:2]):
+        staged = self._by_role(turn, PORTRAIT_ROLES)[:3]
+        for index, (image, portrait) in enumerate(staged):
             height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
             width = max(1, round(portrait.get_width() * height / portrait.get_height()))
             scaled = pygame.transform.scale(portrait, (width, height))
-            x = 10 if index == 0 else LOGICAL_SIZE[0] - width - 10
-            self.surface.blit(scaled, (x, floor - height))
+            slot = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
+            self.surface.blit(scaled, (self._slot_x(slot, width), floor - height))
+
+    @staticmethod
+    def _slot_x(slot: str, width: int) -> int:
+        """Left edge for a horizontal staging slot. Unknown slots centre."""
+
+        if slot == "left":
+            return MARGIN
+        if slot == "right":
+            return LOGICAL_SIZE[0] - width - MARGIN
+        return (LOGICAL_SIZE[0] - width) // 2
 
     def _draw_lines(self, turn: Turn, *, floor: int) -> None:
         """Draw the most recent lines that fit above ``floor``.

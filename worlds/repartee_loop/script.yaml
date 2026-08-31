@@ -35,8 +35,9 @@ scenes:
           - name: clerk_sprite.png
             media_role: dialog_im
             staging_hints:
+              media_x: left
+              media_y: bottom
               media_transition: from_left
-              media_position: left
               media_flip_h: true
         kind: "repartee_loop.domain.ReparteeSetupBlock"
         content: "The clerk hands you one opening line and a warning not to waste it."
@@ -71,6 +72,9 @@ scenes:
             media_role: narrative_im_landscape
           - name: worker_sprite.png
             media_role: dialog_im
+            staging_hints:
+              media_x: right
+              media_y: bottom
         kind: "repartee_loop.domain.DockhandContestBlock"
         content: "The dockhand gives your borrowed line a patient hearing."
         continues:
@@ -84,6 +88,9 @@ scenes:
             media_role: narrative_im_landscape
           - name: worker_sprite.png
             media_role: dialog_im
+            staging_hints:
+              media_x: right
+              media_y: bottom
         kind: "repartee_loop.domain.ReparteeLossAftermathBlock"
         content: "The dockhand nods once and lets you keep the reply that beat you."
         actions:

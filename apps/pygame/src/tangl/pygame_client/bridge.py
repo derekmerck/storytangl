@@ -231,6 +231,7 @@ class PygameSessionBridge:
                 source=source,
                 alt_text=_text(payload.get("text")),
                 source_id=getattr(fragment, "rit_id", None),
+                x_slot=getattr(hints, "media_x", None),
                 flip_h=bool(getattr(hints, "media_flip_h", None)),
             )
         )
