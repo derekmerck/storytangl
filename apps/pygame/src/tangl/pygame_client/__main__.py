@@ -47,12 +47,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--world", default="repartee_loop")
     parser.add_argument("--assets", type=Path, default=None)
     parser.add_argument("--screenshot", type=Path, help="render one frame, save it, and exit")
+    parser.add_argument(
+        "--advance",
+        type=int,
+        default=0,
+        help="take N first-available choices before rendering; for headless checks",
+    )
     args = parser.parse_args(argv)
 
     bridge = PygameSessionBridge()
     envelope = bridge.start(args.world)
     stage = Stage(asset_dir=args.assets, title=f"StoryTangl — {args.world}")
     frame = _merge(_turns(bridge, envelope))
+
+    for _ in range(args.advance):
+        available = [choice for choice in frame.choices if choice.available]
+        if not available:
+            break
+        envelope = bridge.choose(available[0].edge_id, available[0].payload)
+        frame = _merge(_turns(bridge, envelope))
+
     stage.draw(frame)
 
     if args.screenshot is not None:

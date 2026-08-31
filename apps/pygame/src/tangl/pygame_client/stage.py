@@ -22,6 +22,7 @@ SCALE = 3
 
 BACKGROUND_ROLES = ("narrative_im_landscape", "narrative_im", "cover_im")
 PORTRAIT_ROLES = ("dialog_im", "avatar_im")
+PORTRAIT_HEIGHT = 112
 
 INK = (26, 28, 44)
 CREAM = (232, 226, 205)
@@ -79,10 +80,10 @@ class Stage:
 
         self.hitboxes.clear()
         self._draw_background(turn)
-        self._draw_portraits(turn)
         # Choices are laid out first and always reserved, so a long exchange can
         # never push the only way to continue off the logical surface.
         choices_top = LOGICAL_SIZE[1] - 4 - len(turn.choices) * 11
+        self._draw_portraits(turn, floor=choices_top)
         self._draw_lines(turn, floor=choices_top)
         self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
@@ -95,11 +96,15 @@ class Stage:
         else:
             self.surface.fill(TEAL)
 
-    def _draw_portraits(self, turn: Turn) -> None:
+    def _draw_portraits(self, turn: Turn, *, floor: int) -> None:
+        """Place up to two sprites on a shared baseline, preserving aspect."""
+
         for index, portrait in enumerate(self._by_role(turn, PORTRAIT_ROLES)[:2]):
-            scaled = pygame.transform.scale(portrait, (56, 84))
-            x = 8 if index == 0 else LOGICAL_SIZE[0] - 64
-            self.surface.blit(scaled, (x, 40))
+            height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
+            width = max(1, round(portrait.get_width() * height / portrait.get_height()))
+            scaled = pygame.transform.scale(portrait, (width, height))
+            x = 10 if index == 0 else LOGICAL_SIZE[0] - width - 10
+            self.surface.blit(scaled, (x, floor - height))
 
     def _draw_lines(self, turn: Turn, *, floor: int) -> None:
         """Draw the most recent lines that fit above ``floor``.
