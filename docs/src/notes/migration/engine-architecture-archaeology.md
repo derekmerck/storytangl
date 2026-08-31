@@ -124,7 +124,7 @@ discrete asset moves, catalog creation, and ordered rollback-capable commitments
 The asset and transaction focused suites passed **50 tests** in this audit.
 That does not certify all inventory persistence or all historical trade policy.
 
-The [asset design](../../../../engine/src/tangl/story/concepts/asset/ASSET_DESIGN.md)
+The [asset design](https://github.com/derekmerck/storytangl/blob/a0f473394ef2e68320fcf0e9b7905b8166a1182f/engine/src/tangl/story/concepts/asset/ASSET_DESIGN.md)
 explicitly defers relationship-backed ownership. Current holder maps and transaction adapters are not
 proof that general re-attachment/preflight hooks landed. The
 `engine/src/tangl/mechanics/TRANSACTION_OFFER_DESIGN.md` already retains bilateral
