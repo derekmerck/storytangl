@@ -31,9 +31,17 @@ media_dir: media_spaceport   # default: media
 Nothing else changes — not the script, not the staging hints, not any client.
 `media/` is the quayside set; `media_spaceport/` reskins the same beats as a
 night spaceport, with the clerk as a service robot and the dockhand as an
-alien stevedore. Each pack carries a `manifest.json` recording per-asset source
-and generation hashes, and a `provenance/` directory with the workflow
-templates and batch receipts that produced it.
+alien stevedore.
+
+Each pack carries a `manifest.json` whose top-level `size`, `mode`, and
+`sha256` describe the **shipped** file, with the render as generated recorded
+under `conformed_from`. A test asserts the manifest matches the assets, since
+conforming images after writing a manifest is exactly how the two drift apart.
+
+Only `media_spaceport/` has generation provenance: per-asset source and
+generation hashes, the background-removal model, and a `provenance/` directory
+with the workflow templates and batch receipts that produced it. The base pack
+predates that capture and records only shipped files and the conformance step.
 
 Assets are conformed to the client's target rather than stored at generation
 size: backgrounds resample to the 320x200 logical surface and sprites are

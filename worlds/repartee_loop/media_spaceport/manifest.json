@@ -4,11 +4,11 @@
     "quai_bg": {
       "file": "quai_bg.png",
       "size": [
-        1280,
-        800
+        320,
+        200
       ],
       "mode": "RGB",
-      "sha256": "5f3b0ee82bef8d48dc4cd588343f5e736b12304b3e34d9a9dded8f156b1324ae",
+      "sha256": "6f4298fb5cccd93ef7521ec72eedd9c962a5602b77e5f07a666d002b414ddeb2",
       "source": {
         "asset": "quai_bg",
         "source": "/Users/derek/Downloads/rapartee/quai_bg.png",
@@ -25,16 +25,25 @@
         "receipt": "receipts.json",
         "request_sha256": "0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36",
         "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36/000-quai_bg_00001_.png"
+      },
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "mode": "RGB",
+        "sha256": "5f3b0ee82bef8d48dc4cd588343f5e736b12304b3e34d9a9dded8f156b1324ae",
+        "transform": "resize to 320x200, nearest-neighbour"
       }
     },
     "warehouse_bg": {
       "file": "warehouse_bg.png",
       "size": [
-        1280,
-        800
+        320,
+        200
       ],
       "mode": "RGB",
-      "sha256": "6517ff075748b43b165589079800a0e5562f4b6ca320fe3320be69e6a12225ed",
+      "sha256": "4bcffe2720fd7a22e3c1953db97091d2841e821fb2a90114bcc3cf9b48a5cc93",
       "source": {
         "asset": "warehouse_bg",
         "source": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
@@ -51,16 +60,25 @@
         "receipt": "refinement-receipts.json",
         "request_sha256": "203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675",
         "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675/000-warehouse_bg-refined_00001_.png"
+      },
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "mode": "RGB",
+        "sha256": "6517ff075748b43b165589079800a0e5562f4b6ca320fe3320be69e6a12225ed",
+        "transform": "resize to 320x200, nearest-neighbour"
       }
     },
     "salon_bg": {
       "file": "salon_bg.png",
       "size": [
-        1280,
-        800
+        320,
+        200
       ],
       "mode": "RGB",
-      "sha256": "ccea6a63566cb222b9541fd0b5c246ef880a2c31fe29986880ebf4cf82519ed3",
+      "sha256": "18f85b249d24eef35838b79f53943f8b5bfe5eae89e922cd29ccc8f50383ae19",
       "source": {
         "asset": "salon_bg",
         "source": "/Users/derek/Downloads/rapartee/salon_bg.png",
@@ -77,16 +95,25 @@
         "receipt": "receipts.json",
         "request_sha256": "5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a",
         "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a/000-salon_bg_00001_.png"
+      },
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "mode": "RGB",
+        "sha256": "ccea6a63566cb222b9541fd0b5c246ef880a2c31fe29986880ebf4cf82519ed3",
+        "transform": "resize to 320x200, nearest-neighbour"
       }
     },
     "master_sprite": {
       "file": "master_sprite.png",
       "size": [
-        1024,
-        1024
+        91,
+        112
       ],
       "mode": "RGBA",
-      "sha256": "19aa5b81ae6866c57afe898cfc0212016a593a747739b80ff84bea14d877feea",
+      "sha256": "35a4f32fdd0fc85a656e0d563cff24a2c169cc0e78861cf3e107f61b0ed61eae",
       "source": {
         "asset": "master_sprite",
         "source": "/Users/derek/Downloads/rapartee/master_sprite.png",
@@ -110,16 +137,25 @@
         852,
         1008
       ],
-      "background_removal_request_sha256": "b73a974015d3ed667390b60c895175584384b12f37931b1ee514b27919595fe8"
+      "background_removal_request_sha256": "b73a974015d3ed667390b60c895175584384b12f37931b1ee514b27919595fe8",
+      "conformed_from": {
+        "size": [
+          1024,
+          1024
+        ],
+        "mode": "RGBA",
+        "sha256": "19aa5b81ae6866c57afe898cfc0212016a593a747739b80ff84bea14d877feea",
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+      }
     },
     "clerk_sprite": {
       "file": "clerk_sprite.png",
       "size": [
-        1024,
-        1024
+        103,
+        112
       ],
       "mode": "RGBA",
-      "sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5",
+      "sha256": "987c280baa724f4347365d5f13b7fb0494f4825823d3690ded84c04b7743d76d",
       "source": {
         "asset": "clerk_sprite",
         "source": "/Users/derek/Downloads/rapartee/clerk_sprite.png",
@@ -143,16 +179,25 @@
         974,
         1005
       ],
-      "background_removal_request_sha256": "f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0"
+      "background_removal_request_sha256": "f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0",
+      "conformed_from": {
+        "size": [
+          1024,
+          1024
+        ],
+        "mode": "RGBA",
+        "sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5",
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+      }
     },
     "worker_sprite": {
       "file": "worker_sprite.png",
       "size": [
-        1024,
-        1024
+        111,
+        112
       ],
       "mode": "RGBA",
-      "sha256": "7a4754f299f7600a96a260090533006992dca5da44bbf21ce61ccd4773bbe269",
+      "sha256": "3d63ec97f829e31885d5bfdde4658a5916f0eb128177376321a25d0ddc4601c1",
       "source": {
         "asset": "worker_sprite",
         "source": "/Users/derek/Downloads/rapartee/worker_sprite.png",
@@ -176,7 +221,16 @@
         999,
         988
       ],
-      "background_removal_request_sha256": "5b6de92ab9be0659cfb63542892ca3c6fc148fd884b3f0bba930238be183fb86"
+      "background_removal_request_sha256": "5b6de92ab9be0659cfb63542892ca3c6fc148fd884b3f0bba930238be183fb86",
+      "conformed_from": {
+        "size": [
+          1024,
+          1024
+        ],
+        "mode": "RGBA",
+        "sha256": "7a4754f299f7600a96a260090533006992dca5da44bbf21ce61ccd4773bbe269",
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+      }
     }
   },
   "background_removal": {
@@ -189,5 +243,16 @@
     "Backgrounds retain the source staging layouts; not pixel-identical geometry.",
     "Quay contains small generated sign-like marks.",
     "No engine/client integration or staging-hint changes in this pack."
-  ]
+  ],
+  "conformance": {
+    "note": "Top-level size/mode/sha256 describe the shipped file. The render as generated is under conformed_from, and source/generation describe how that render was produced.",
+    "target": {
+      "background": [
+        320,
+        200
+      ],
+      "sprite_height": 112,
+      "resample": "nearest"
+    }
+  }
 }
