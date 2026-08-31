@@ -26,7 +26,12 @@ from tangl.service.media import (
     MediaRenderProfile,
     media_fragment_to_payload,
 )
-from tangl.service.response import DirectEdgeRequest, RuntimeEnvelope, RuntimeInfo
+from tangl.service.response import (
+    DirectEdgeRequest,
+    JsonValue,
+    RuntimeEnvelope,
+    RuntimeInfo,
+)
 from tangl.service.service_manager import ServiceManager
 
 from .models import Choice, Line, StageImage, Turn
@@ -101,7 +106,7 @@ class PygameSessionBridge:
         self._sync(envelope)
         return envelope
 
-    def choose(self, edge_id: UUID, payload: Any | None = None) -> RuntimeEnvelope:
+    def choose(self, edge_id: UUID, payload: JsonValue | None = None) -> RuntimeEnvelope:
         """Commit one choice by edge id."""
 
         if self.user_id is None or self.ledger_id is None:

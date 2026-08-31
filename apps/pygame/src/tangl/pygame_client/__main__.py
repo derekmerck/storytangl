@@ -3,8 +3,9 @@
     PYTHONPATH=engine/src:apps/pygame/src python -m tangl.pygame_client \
         --world repartee_loop --assets worlds/repartee_loop/media
 
-Every click and key resolves to a choice ``edge_id``, never to a bespoke action,
-so a later hotspot commits the same payload as the numbered list.
+Number keys select a choice, arrows and page keys scroll prose, escape quits.
+Every click and choice key resolves to a choice ``edge_id``, never to a bespoke
+action, so a later hotspot commits the same payload as the numbered list.
 """
 
 from __future__ import annotations
@@ -86,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                elif event.key in (pygame.K_UP, pygame.K_PAGEUP):
+                    stage.scroll_by(-1 if event.key == pygame.K_UP else -4)
+                    stage.draw(frame)
+                elif event.key in (pygame.K_DOWN, pygame.K_PAGEDOWN):
+                    stage.scroll_by(1 if event.key == pygame.K_DOWN else 4)
+                    stage.draw(frame)
                 elif pygame.K_1 <= event.key <= pygame.K_9:
                     # The renderer numbers every choice, available or not, so the
                     # key must index the displayed list rather than a filtered one.

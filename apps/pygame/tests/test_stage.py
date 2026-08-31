@@ -78,3 +78,67 @@ def test_unavailable_choices_are_shown_but_not_clickable(stage: Stage) -> None:
 
     assert len(stage.hitboxes) == 1
     assert stage.hitboxes[0][1] == turn.choices[1].edge_id
+
+
+def test_a_paragraph_longer_than_the_surface_still_renders(stage: Stage) -> None:
+    """Paging works over rendered rows, so an oversized line is not dropped."""
+
+    turn = Turn(
+        step=1,
+        lines=[Line(text="word " * 400)],
+        choices=[Choice(edge_id=uuid4(), text="continue")],
+    )
+    stage.draw(turn)
+
+    band = pygame.Surface((LOGICAL_SIZE[0], 140))
+    band.blit(stage.surface, (0, 0), pygame.Rect(0, 24, LOGICAL_SIZE[0], 140))
+    colours = {band.get_at((x, y))[:3] for x in range(0, LOGICAL_SIZE[0], 4) for y in range(0, 140, 4)}
+    assert len(colours) > 1, "prose band is blank"
+    assert stage.max_scroll > 0, "an oversized paragraph should be scrollable"
+
+
+def test_every_row_is_reachable_by_scrolling(stage: Stage) -> None:
+    turn = Turn(
+        step=1,
+        lines=[Line(text=f"line {index} of narration") for index in range(40)],
+        choices=[Choice(edge_id=uuid4(), text="continue")],
+    )
+    stage.draw(turn)
+    assert stage.max_scroll > 0
+
+    stage.scroll_by(-stage.max_scroll)
+    assert stage.scroll == 0, "should reach the first row"
+    stage.scroll_by(999)
+    assert stage.scroll == stage.max_scroll, "should clamp at the last row"
+
+
+def test_unloadable_media_degrades_to_its_text_floor(stage: Stage) -> None:
+    """A URL or missing file must not vanish; its description stays reachable."""
+
+    from tangl.pygame_client.models import StageImage
+
+    turn = Turn(
+        step=1,
+        images=[
+            StageImage(
+                role="dialog_im",
+                source="https://example.invalid/portrait.png",
+                alt_text="A woman with red hair.",
+            )
+        ],
+        choices=[Choice(edge_id=uuid4(), text="continue")],
+    )
+    stage.draw(turn)
+
+    rows = stage._rows(turn, [turn.images[0]])
+    assert any("red hair" in row.text for row in rows)
+    assert all(row.kind == "alt" for row in rows)
+
+
+def test_unloadable_media_without_alt_text_names_its_role(stage: Stage) -> None:
+    from tangl.pygame_client.models import StageImage
+
+    image = StageImage(role="narrative_im_landscape", source="/absent/bg.png")
+    rows = stage._rows(Turn(step=1), [image])
+
+    assert any("narrative_im_landscape" in row.text for row in rows)

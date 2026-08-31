@@ -8,8 +8,9 @@ divergences between them are recorded in ``apps/pygame/README.md``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 from uuid import UUID
+
+from tangl.service.response import JsonValue
 
 
 @dataclass(slots=True, frozen=True)
@@ -53,7 +54,7 @@ class Choice:
     text: str
     available: bool = True
     unavailable_reason: str | None = None
-    payload: Any = None
+    payload: JsonValue | None = None
 
 
 @dataclass(slots=True)
