@@ -168,11 +168,21 @@ class TestCallResponseKernel:
         handler.receive_move(game, "taunt")
         fragments = handler.get_journal_fragments(game)
 
-        assert [fragment.content for fragment in fragments] == [
-            "Call: You fight like a dairy farmer.",
-            "Response: How appropriate. answers the call.",
-            "Opponent wins the exchange. Score: you 0, opponent 1. Initiative: the opponent.",
-        ]
+        call, response, outcome = fragments
+        assert (call.who, call.how, call.content) == (
+            "You",
+            "calls",
+            "You fight like a dairy farmer.",
+        )
+        assert (response.who, response.how, response.content) == (
+            "Opponent",
+            "answers",
+            "How appropriate.",
+        )
+        assert outcome.fragment_type == "content"
+        assert outcome.content == (
+            "Opponent wins the exchange. Score: you 0, opponent 1. Initiative: the opponent."
+        )
 
     def test_namespace_uses_a_qualified_initiative_key(self) -> None:
         game = _game(player_has_initiative=False)
@@ -239,7 +249,8 @@ class TestCallResponseVmIntegration:
 
         assert contest.game.history[-1].notes["matched"] is True
         assert any(
-            "Response: How appropriate. answers the call." in fragment.content
+            getattr(fragment, "who", None) == "Opponent"
+            and getattr(fragment, "how", None) == "answers"
+            and fragment.content == "How appropriate."
             for fragment in ledger.get_journal()
-            if isinstance(fragment.content, str)
         )

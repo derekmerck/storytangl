@@ -938,14 +938,15 @@ def test_later_call_definition_answers_an_earned_response_in_a_fresh_contest() -
     assert exchange.initiative_after is True
     assert sword_contest.game.result is GameResult.WIN
     assert any(
-        isinstance(fragment, ContentFragment)
-        and fragment.content == "Call: My name is Guybrush Threepwood. Prepare to die."
+        getattr(fragment, "who", None) == "Opponent"
+        and getattr(fragment, "how", None) == "calls"
+        and fragment.content == "My name is Guybrush Threepwood. Prepare to die."
         for fragment in sword_ledger.get_journal()
     )
     assert any(
-        isinstance(fragment, ContentFragment)
-        and fragment.content
-        == "Response: How appropriate. You fight like a cow. answers the call."
+        getattr(fragment, "who", None) == "You"
+        and getattr(fragment, "how", None) == "answers"
+        and fragment.content == "How appropriate. You fight like a cow."
         for fragment in sword_ledger.get_journal()
     )
     assert first_contest.game.phrases == first_phrases

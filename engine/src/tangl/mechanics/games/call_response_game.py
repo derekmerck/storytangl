@@ -6,7 +6,7 @@ from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, Field
 
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import AttributedFragment, ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
@@ -107,6 +107,8 @@ class CallResponseGame(Game[str]):
     player_phrase_ids: list[str] = Field(default_factory=list)
     opponent_phrase_ids: list[str] = Field(default_factory=list)
     schedule: list[DominanceMatch] = Field(default_factory=list)
+    player_label: str = "You"
+    opponent_label: str = "Opponent"
     initial_player_has_initiative: bool = True
     player_has_initiative: bool = Field(
         default=True,
@@ -235,7 +237,13 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
         *,
         ctx: VmPhaseCtx | None = None,
     ) -> list[ContentFragment] | None:
-        """Render the latest exchange as a complete text presentation floor."""
+        """Render the latest exchange as a complete text presentation floor.
+
+        The two spoken lines are attributed so visual ports can render them as
+        dialog without parsing prose prefixes; the outcome line stays plain
+        narration. ``player_label``/``opponent_label`` let a world name the
+        speakers, defaulting to ``You``/``Opponent``.
+        """
 
         _ = ctx
         last_round = game.last_round
@@ -243,16 +251,26 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
             return []
 
         exchange = CallResponseExchange.model_validate(last_round.notes)
-        response_outcome = "answers" if exchange.matched else "does not answer"
         winner = "You win" if last_round.result is RoundResult.WIN else "Opponent wins"
         initiative = "you" if exchange.initiative_after else "the opponent"
+
+        caller, responder = (
+            (game.player_label, game.opponent_label)
+            if exchange.initiative_before
+            else (game.opponent_label, game.player_label)
+        )
         return [
-            ContentFragment(content=f"Call: {game.phrases[exchange.call_phrase_id].text}"),
-            ContentFragment(
-                content=(
-                    f"Response: {game.phrases[exchange.response_phrase_id].text} "
-                    f"{response_outcome} the call."
-                )
+            AttributedFragment(
+                content=game.phrases[exchange.call_phrase_id].text,
+                who=caller,
+                how="calls",
+                media="",
+            ),
+            AttributedFragment(
+                content=game.phrases[exchange.response_phrase_id].text,
+                who=responder,
+                how="answers" if exchange.matched else "falters",
+                media="",
             ),
             ContentFragment(
                 content=(
