@@ -7,7 +7,6 @@ import pytest
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
 
-# todo: merge with template tests, nothing script-ish
 pytestmark = pytest.mark.skip(
     reason=(
         "Legacy-only HierarchicalTemplate parent/path semantics; v38 parity is covered by "
@@ -32,7 +31,7 @@ def test_scoped_template_path_includes_parent() -> None:
     template = BaseScriptItem(label="start", parent=parent)
 
     assert template.path == "scene1.start"
-    # todo: is the path an identifier?  I don't think so, unless we admit that it's not unique (actor named foo.bar, scene named foo.bar, etc.)
+    # Scoped paths are not identifiers because labels may collide across entity kinds.
     # assert template.has_identifier("scene1.start")
     assert template.has_identifier("start")
 

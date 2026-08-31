@@ -59,8 +59,6 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
     model_config = ConfigDict(frozen=False, populate_by_name=True)
     # frozen false, so it can run 'after' model validators
 
-    # todo: handle data stored in other dbs like path is indirect reference to file data?
-    #       Annotate data with cms info?
     path: Optional[Path] = None
     data: Optional[Any] = None
     # Must have one or the other if no pre-computed content hash
@@ -203,8 +201,7 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
         expiry = getattr(self, "expiry", None)
         return expiry is not None and expiry < datetime.now()
 
-    # this is to avoid recomputing hash values for static inventories
-    # todo: should change it to cache the value keyed on (fn, mdate, size)
+    # Avoid recomputing hash values for unchanged static inventory files.
     @shelved(fn="rits")
     @staticmethod
     def _from_path(cls, path: Path) -> MediaResourceInventoryTag:

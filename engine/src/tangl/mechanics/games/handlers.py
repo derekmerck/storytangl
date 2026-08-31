@@ -21,9 +21,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# todo: should probably register these on story dispatch instead of vm
-
-
 def _has_tags(value: Any, *tags: str) -> bool:
     actual = getattr(value, "tags", set()) or set()
     return set(tags).issubset(actual)

@@ -262,8 +262,6 @@ class MenuBlockScript(BlockScript):
     wants_tags: list[Tag] = Field(None, description="Required tags on dynamically assigned menu items.")
     wants_cls: ClassName = Field(None, description="Required class for dynamically assigned menu items.")
 
-    # todo: at least 1 of
-
 
 class SceneScript(BaseScriptItem):
 
@@ -275,7 +273,7 @@ class SceneScript(BaseScriptItem):
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
 
-    # todo: How do we inject other block types like menus, challenges (games) and activities (task)??  using discriminator fields?
+    # Mechanic-specific authored block kinds remain a compiler-extension concern.
     blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.", json_schema_extra={"visit_field": True})

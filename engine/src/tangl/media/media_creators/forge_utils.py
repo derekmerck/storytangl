@@ -9,7 +9,7 @@ def basic_info() -> dict:
         "creator": __author__,       # override with domain author?
         "email": __author_email__,   # override with domain author?
         "url": __url__,              # override with client relative url?
-        "collection": None,          # todo: this should be the domain/world and version
+        "collection": None,
         "source": f"{__title__} v{__version__}"
     }
 

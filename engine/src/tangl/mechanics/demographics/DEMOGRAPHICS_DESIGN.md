@@ -37,7 +37,7 @@ design/API/data-extension, not comment hygiene. Do the review *before* changing 
   how to configure weighted sampling/gender/age/family-name-order/titles without a
   settings blob?
 
-## Existing TODOs (the raw material)
+## Open design questions consolidated from the implementation
 
 - `data_models.py`: sampling weights; subtypes→enum; ethnicity-aware namebanks;
   region/country-by-name; overlays.
@@ -69,4 +69,4 @@ hooks are isolated behind a catalog/policy object.
 2. Identify side-project/fantasy namebanks if present here or in sibling dirs.
 3. Sketch two extension designs: (a) minimal overlay files loaded by world/package
    resources; (b) explicit `DemographicCatalog` + optional dispatch hooks.
-4. Only then decide which TODO comments become code, docs, or issues.
+4. Only then decide which questions become code changes, documentation, or issues.

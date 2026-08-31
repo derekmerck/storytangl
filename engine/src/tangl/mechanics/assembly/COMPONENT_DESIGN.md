@@ -416,9 +416,8 @@ take a position on each; they are the substance of the implementation:
 
 ## Association: the slotting substrate (v3.2 prior art), and the transaction it generalizes
 
-Slotting a component is a **bilateral association**, and v3.2 already built the mechanism
-worth adopting — `scratch/legacy/core/core-32/graph_handlers/associating.py` +
-`connection.py`:
+Slotting a component is a **bilateral association**. The useful v3.2 precedent was a
+pair of associating and connection contracts:
 
 - **`Associating`** — `on_can_associate` / `on_can_disassociate` (admission/approval
   pipelines) + `on_associate` / `on_disassociate` (side-effect hooks). `can_associate_with`

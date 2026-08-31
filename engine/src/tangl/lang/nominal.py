@@ -57,8 +57,6 @@ class DeterminativeType(Enum):
 DT = DeterminativeType
 
 class DetHandler:
-    # todo: could make these class methods to match other handler patterns
-
     @classmethod
     def get_quantifier(cls, nominal: Nominal) -> Optional[str]:
         # For now, let's assume:
@@ -94,7 +92,6 @@ class DetHandler:
     def determinative(cls, nominal: Nominal, dt: DT, np: str = None, is_xx: bool = True):
         det = cls.get_det( nominal, dt, np, is_xx )
         res = f"{det} {np}"
-        # todo: also need to report plurality of returned determinative nominal
         return res
 
 class Nominal(BaseModel):

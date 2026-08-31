@@ -92,4 +92,3 @@ def manager(request, tmpdir):
         storage=storage,
     )
     return pm
-    # todo: need teardown to clear test_obj if connecting to a persistent db

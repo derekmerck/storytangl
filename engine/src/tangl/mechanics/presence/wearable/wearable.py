@@ -55,11 +55,13 @@ class WearableType(AssetType):
     Wearables are Singleton Asset-type objects.  They are managed through a
     complementary "Outfit" class that can be attached to an Actor or Player Proxy.
 
+    ``noun`` and ``plural`` are the small phrase projection needed by outfit
+    prose; the broader randomized :class:`~tangl.lang.nominal.Nominal` model is
+    not part of the wearable type contract.
+
     Set `locals.exclusive = True` or add the 'exclusive' tag to the object to
     indicate that the item is exclusive to a particular role or actor.
     """
-    # todo: Mix-in the 'Nominal' class, so they render as a noun phrase.
-    #       that would include `is_plural` as well
 
     # _instances: ClassVar[dict[str, WearableType]]
 

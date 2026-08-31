@@ -7,8 +7,6 @@ However, ornaments are not represented as assets because they are unique
 to each actor's body.
 """
 
-# todo: refactor using outfit_manager/credential_manager paradigm
-
 from __future__ import annotations
 from collections import defaultdict
 
@@ -89,7 +87,6 @@ class Ornament(Entity):
         )
 
 
-# todo: should implement this like outfit manager/credential manager
 class Ornamentation(Node):
 
     collection: list[Ornament] = Field(default_factory=list)
@@ -133,7 +130,6 @@ class Ornamentation(Node):
         self.collection.append(ornament)
 
     def remove_ornament(self, ornament: Ornament) -> None:
-        # todo: add a convenience accessor
         if ornament in self.collection:
             self.collection.remove(ornament)
 

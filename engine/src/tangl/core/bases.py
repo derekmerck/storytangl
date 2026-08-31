@@ -283,8 +283,8 @@ class Unstructurable(BaseModelPlus):
       This generalizes explicit constructor-form handling for fields like
       ``EntityTemplate.payload``; ``Registry.members`` keeps its bespoke path so
       ``Registry.add()`` can preserve ownership-binding guardrails.
-      It should not revive the old automorphic structuring experiments from
-      ``scratch/legacy/core/core-23/structuring/``: no self-casting from data,
+      It should not revive the retired automorphic structuring experiments:
+      no self-casting from data,
       self-templating, property-name child inference, or object-self-shaping
       pipeline belongs in the core constructor-form path.
     - Set ``guard_unstructure = True`` for classes that should refuse constructor-form
@@ -542,9 +542,6 @@ class HasContent(BaseModelPlus):
     def content_hash(self) -> Hash:
         # frozen, could make this into a cached- or shelved-property
         return hashing_func(self.get_hashable_content())
-
-    # todo: want to use a computed_property or cached property _iff_ the model config
-    #       is frozen, as with Record and descendents
 
     def eq_by_content(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:

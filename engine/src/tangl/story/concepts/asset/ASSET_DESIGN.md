@@ -123,7 +123,7 @@ holding will eventually want preflight hooks shaped like `on_can_link` and
 `on_can_unlink`, but those should be introduced as general graph relationship
 hooks when a concrete relationship slice needs them.
 
-## Known Limitations And TODO
+## Known Limitations
 
 The current slice is intentionally sufficient for sandbox affordance
 experiments, not a complete inventory system.

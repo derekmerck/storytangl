@@ -63,8 +63,4 @@ class MasterScript(BaseScriptItem):
                  'type': 'string',
                  'x-intellij-language-injection': 'Markdown'}
 
-        # # todo: move this into passages format and override function
-        # if 'PassageScript' in defs:
-        #     defs['PassageScript']['properties']['text']['x-intellij-language-injection'] = "Markdown"
-
         return schema

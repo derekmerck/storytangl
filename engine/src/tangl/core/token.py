@@ -117,12 +117,6 @@ class Token(Node, Generic[WST]):
 
     token_from: str = Field(...)
 
-    # todo: why is this commented out, probably _do_ want to be able to update tags
-    #       maybe b/c discarding would be hard?  (i.e., keep {-foo} and use it to
-    #       hide {foo}?)  Probably want something like this anyway for other complete
-    #       tag-merging purposes.
-    # tags: set[Tag] = Field(default_factory=set, json_schema_extra={"instance_var": True})
-
     # noinspection PyNestedDecorators
     @field_validator("token_from")
     @classmethod

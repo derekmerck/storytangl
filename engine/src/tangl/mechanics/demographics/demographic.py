@@ -30,8 +30,6 @@ class DemographicData(PersonalName):
     region: Region = None
     age_range: AgeRange = None
 
-    # todo: set family_name_first from country/language
-
     @property
     def demonym(self) -> str:
         if self.region and self.region.demonym:
@@ -83,7 +81,6 @@ class HasDemographics(HasNamespace):
 
     @property
     def formal_name(self) -> str:
-        # todo: Need to inject title from parent's role association
         return self.demographic.formal_name()
 
     @property
@@ -96,7 +93,6 @@ class HasDemographics(HasNamespace):
 
     @property
     def formal_full_name(self) -> str:
-        # todo: Need to inject title from parent's role association
         return self.demographic.formal_full_name()
 
     @contribute_ns

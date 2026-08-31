@@ -221,7 +221,7 @@ we might extend it later.
 │                                                         │
 │  • Compiles scripts into StoryGraph                     │
 │  • Creates structural nodes (scenes, blocks)            │
-│  • TODO: Wire roles/settings to Dependencies            │
+│  • Historical gap: roles/settings dependency wiring    │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼
@@ -462,7 +462,7 @@ Requirement(..., hard_requirement=True)
 # - Added to result.unresolved_hard_requirements
 # - result.is_viable = False
 # - Softlock detected if ALL frontier nodes non-viable
-# - Choice should be unavailable (TODO: mark instead of filter)
+# - Choice remains visible but is marked unavailable
 ```
 
 **Soft Requirement (best effort):**

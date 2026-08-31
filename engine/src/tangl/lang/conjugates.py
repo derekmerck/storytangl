@@ -2,8 +2,6 @@ from .pronoun import PoV
 
 from dataclasses import dataclass
 
-# todo: could generate these from pattern
-
 from .helpers.pattern import conjugate as pattern_conjugate
 
 @dataclass

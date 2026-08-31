@@ -42,8 +42,8 @@ from tangl.service.response import RuntimeInfo
 logger = logging.getLogger(__name__)
 
 
-# todo: this is a placeholder that creates a default user for testing
 def get_user_credentials(service_manager: ServiceManager) -> UUID:
+    """Ensure the configured development client secret has a user id."""
     secret = settings.client.secret
     result = service_manager.create_user(secret=secret)
 
