@@ -36,6 +36,8 @@ def history_error(history: dict[str, Any]) -> str | None:
                     continue
                 message_kind = item[0]
                 message_payload = item[1]
+                if message_kind == "execution_interrupted":
+                    return "execution_interrupted"
                 if message_kind == "execution_error" and isinstance(message_payload, dict):
                     details = message_payload.get("exception_message") or message_payload.get("error")
                     if isinstance(details, str) and details.strip():
