@@ -109,9 +109,31 @@ def test_mouse_click_commits_the_choice_under_the_cursor(
     assert edge_id == gated[1].edge_id, "only the available choice is clickable"
 
 
-def test_scroll_keys_do_not_commit_a_choice(
-    gated: list[Choice], committed: list[tuple[UUID, object]]
+def test_scroll_keys_move_the_view_without_committing(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, object]]
 ) -> None:
-    _run([_key(pygame.K_DOWN), _key(pygame.K_UP), _key(pygame.K_PAGEDOWN)])
+    """Arrows scroll prose. They must move the view and commit nothing."""
 
+    frame = Turn(
+        step=1,
+        lines=[Line(text=f"line {index}") for index in range(60)],
+        choices=[Choice(edge_id=uuid4(), text="continue")],
+    )
+    monkeypatch.setattr(client, "_merge", lambda _turns: frame)
+    monkeypatch.setattr(client, "_turns", lambda _bridge, _envelope: [frame])
+
+    seen: list[int] = []
+    from tangl.pygame_client.stage import Stage
+
+    original = Stage.scroll_by
+
+    def _record(self, delta: int) -> None:
+        original(self, delta)
+        seen.append(self.scroll)
+
+    monkeypatch.setattr(Stage, "scroll_by", _record)
+    _run([_key(pygame.K_UP), _key(pygame.K_UP), _key(pygame.K_PAGEDOWN)])
+
+    assert seen, "scroll keys never reached the loop"
+    assert seen[0] < seen[-1] or len(set(seen)) > 1, "the view never moved"
     assert committed == []
