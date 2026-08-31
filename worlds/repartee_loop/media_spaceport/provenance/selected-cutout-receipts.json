@@ -1,0 +1,802 @@
+{
+  "version": 1,
+  "endpoint": "http://titan2:8188",
+  "template": "{\n  \"1\": {\"class_type\": \"LoadImage\", \"inputs\": {\"image\": {{ images.source | tojson }}}},\n  \"2\": {\"class_type\": \"LoadBackgroundRemovalModel\", \"inputs\": {\"bg_removal_name\": \"birefnet.safetensors\"}},\n  \"3\": {\"class_type\": \"RemoveBackground\", \"inputs\": {\"bg_removal_model\": [\"2\", 0], \"image\": [\"1\", 0]}},\n  \"4\": {\"class_type\": \"InvertMask\", \"inputs\": {\"mask\": [\"3\", 0]}},\n  \"5\": {\"class_type\": \"JoinImageWithAlpha\", \"inputs\": {\"image\": [\"1\", 0], \"alpha\": [\"4\", 0]}},\n  \"6\": {\"class_type\": \"SaveImage\", \"inputs\": {\"images\": [\"5\", 0], \"filename_prefix\": {{ prefix | tojson }}}}\n}\n",
+  "jobs": [
+    {
+      "request_sha256": "b73a974015d3ed667390b60c895175584384b12f37931b1ee514b27919595fe8",
+      "params": {
+        "asset": "master_sprite",
+        "prefix": "repartee_spaceport/master_sprite-rgba"
+      },
+      "sources": {
+        "source": {
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png",
+          "sha256": "fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4",
+          "upload_name": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+        }
+      },
+      "workflow": {
+        "1": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+          }
+        },
+        "2": {
+          "class_type": "LoadBackgroundRemovalModel",
+          "inputs": {
+            "bg_removal_name": "birefnet.safetensors"
+          }
+        },
+        "3": {
+          "class_type": "RemoveBackground",
+          "inputs": {
+            "bg_removal_model": [
+              "2",
+              0
+            ],
+            "image": [
+              "1",
+              0
+            ]
+          }
+        },
+        "4": {
+          "class_type": "InvertMask",
+          "inputs": {
+            "mask": [
+              "3",
+              0
+            ]
+          }
+        },
+        "5": {
+          "class_type": "JoinImageWithAlpha",
+          "inputs": {
+            "image": [
+              "1",
+              0
+            ],
+            "alpha": [
+              "4",
+              0
+            ]
+          }
+        },
+        "6": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "5",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/master_sprite-rgba"
+          }
+        }
+      },
+      "submitted_workflow": {
+        "1": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+          }
+        },
+        "2": {
+          "class_type": "LoadBackgroundRemovalModel",
+          "inputs": {
+            "bg_removal_name": "birefnet.safetensors"
+          }
+        },
+        "3": {
+          "class_type": "RemoveBackground",
+          "inputs": {
+            "bg_removal_model": [
+              "2",
+              0
+            ],
+            "image": [
+              "1",
+              0
+            ]
+          }
+        },
+        "4": {
+          "class_type": "InvertMask",
+          "inputs": {
+            "mask": [
+              "3",
+              0
+            ]
+          }
+        },
+        "5": {
+          "class_type": "JoinImageWithAlpha",
+          "inputs": {
+            "image": [
+              "1",
+              0
+            ],
+            "alpha": [
+              "4",
+              0
+            ]
+          }
+        },
+        "6": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "5",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/master_sprite-rgba"
+          }
+        }
+      },
+      "prompt_id": "dd85b42d-9163-4ebe-8a60-ca0a7e31aaf5",
+      "status": "completed",
+      "submitted_at": 1788196767.956682,
+      "history": {
+        "prompt": [
+          535,
+          "dd85b42d-9163-4ebe-8a60-ca0a7e31aaf5",
+          {
+            "1": {
+              "class_type": "LoadImage",
+              "inputs": {
+                "image": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+              }
+            },
+            "2": {
+              "class_type": "LoadBackgroundRemovalModel",
+              "inputs": {
+                "bg_removal_name": "birefnet.safetensors"
+              }
+            },
+            "3": {
+              "class_type": "RemoveBackground",
+              "inputs": {
+                "bg_removal_model": [
+                  "2",
+                  0
+                ],
+                "image": [
+                  "1",
+                  0
+                ]
+              }
+            },
+            "4": {
+              "class_type": "InvertMask",
+              "inputs": {
+                "mask": [
+                  "3",
+                  0
+                ]
+              }
+            },
+            "5": {
+              "class_type": "JoinImageWithAlpha",
+              "inputs": {
+                "image": [
+                  "1",
+                  0
+                ],
+                "alpha": [
+                  "4",
+                  0
+                ]
+              }
+            },
+            "6": {
+              "class_type": "SaveImage",
+              "inputs": {
+                "images": [
+                  "5",
+                  0
+                ],
+                "filename_prefix": "repartee_spaceport/master_sprite-rgba"
+              }
+            }
+          },
+          {
+            "create_time": 1788196767991
+          },
+          [
+            "6"
+          ]
+        ],
+        "outputs": {
+          "6": {
+            "images": [
+              {
+                "filename": "master_sprite-rgba_00001_.png",
+                "subfolder": "repartee_spaceport",
+                "type": "output"
+              }
+            ]
+          }
+        },
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "dd85b42d-9163-4ebe-8a60-ca0a7e31aaf5",
+                "timestamp": 1788196767992
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [
+                  "1"
+                ],
+                "prompt_id": "dd85b42d-9163-4ebe-8a60-ca0a7e31aaf5",
+                "timestamp": 1788196768008
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "dd85b42d-9163-4ebe-8a60-ca0a7e31aaf5",
+                "timestamp": 1788196769989
+              }
+            ]
+          ]
+        },
+        "meta": {
+          "6": {
+            "node_id": "6",
+            "display_node": "6",
+            "parent_node": null,
+            "real_node_id": "6"
+          }
+        }
+      },
+      "downloads": [
+        {
+          "filename": "master_sprite-rgba_00001_.png",
+          "subfolder": "repartee_spaceport",
+          "type": "output",
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/cutouts/b73a974015d3ed667390b60c895175584384b12f37931b1ee514b27919595fe8/000-master_sprite-rgba_00001_.png",
+          "sha256": "19aa5b81ae6866c57afe898cfc0212016a593a747739b80ff84bea14d877feea"
+        }
+      ],
+      "error": null
+    },
+    {
+      "request_sha256": "f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0",
+      "params": {
+        "asset": "clerk_sprite",
+        "prefix": "repartee_spaceport/clerk_sprite-rgba"
+      },
+      "sources": {
+        "source": {
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png",
+          "sha256": "717e9a8226af5e2a772528d33ff96d5d8b3cb8055c8399bf8ffbeaf97073b7d5",
+          "upload_name": "sha256-717e9a8226af5e2a772528d33ff96d5d8b3cb8055c8399bf8ffbeaf97073b7d5.png"
+        }
+      },
+      "workflow": {
+        "1": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "sha256-717e9a8226af5e2a772528d33ff96d5d8b3cb8055c8399bf8ffbeaf97073b7d5.png"
+          }
+        },
+        "2": {
+          "class_type": "LoadBackgroundRemovalModel",
+          "inputs": {
+            "bg_removal_name": "birefnet.safetensors"
+          }
+        },
+        "3": {
+          "class_type": "RemoveBackground",
+          "inputs": {
+            "bg_removal_model": [
+              "2",
+              0
+            ],
+            "image": [
+              "1",
+              0
+            ]
+          }
+        },
+        "4": {
+          "class_type": "InvertMask",
+          "inputs": {
+            "mask": [
+              "3",
+              0
+            ]
+          }
+        },
+        "5": {
+          "class_type": "JoinImageWithAlpha",
+          "inputs": {
+            "image": [
+              "1",
+              0
+            ],
+            "alpha": [
+              "4",
+              0
+            ]
+          }
+        },
+        "6": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "5",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/clerk_sprite-rgba"
+          }
+        }
+      },
+      "submitted_workflow": {
+        "1": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "sha256-717e9a8226af5e2a772528d33ff96d5d8b3cb8055c8399bf8ffbeaf97073b7d5.png"
+          }
+        },
+        "2": {
+          "class_type": "LoadBackgroundRemovalModel",
+          "inputs": {
+            "bg_removal_name": "birefnet.safetensors"
+          }
+        },
+        "3": {
+          "class_type": "RemoveBackground",
+          "inputs": {
+            "bg_removal_model": [
+              "2",
+              0
+            ],
+            "image": [
+              "1",
+              0
+            ]
+          }
+        },
+        "4": {
+          "class_type": "InvertMask",
+          "inputs": {
+            "mask": [
+              "3",
+              0
+            ]
+          }
+        },
+        "5": {
+          "class_type": "JoinImageWithAlpha",
+          "inputs": {
+            "image": [
+              "1",
+              0
+            ],
+            "alpha": [
+              "4",
+              0
+            ]
+          }
+        },
+        "6": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "5",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/clerk_sprite-rgba"
+          }
+        }
+      },
+      "prompt_id": "d8ef731e-49b7-45a8-b798-f8df35d32fc3",
+      "status": "completed",
+      "submitted_at": 1788196768.3278248,
+      "history": {
+        "prompt": [
+          536,
+          "d8ef731e-49b7-45a8-b798-f8df35d32fc3",
+          {
+            "1": {
+              "class_type": "LoadImage",
+              "inputs": {
+                "image": "sha256-717e9a8226af5e2a772528d33ff96d5d8b3cb8055c8399bf8ffbeaf97073b7d5.png"
+              }
+            },
+            "2": {
+              "class_type": "LoadBackgroundRemovalModel",
+              "inputs": {
+                "bg_removal_name": "birefnet.safetensors"
+              }
+            },
+            "3": {
+              "class_type": "RemoveBackground",
+              "inputs": {
+                "bg_removal_model": [
+                  "2",
+                  0
+                ],
+                "image": [
+                  "1",
+                  0
+                ]
+              }
+            },
+            "4": {
+              "class_type": "InvertMask",
+              "inputs": {
+                "mask": [
+                  "3",
+                  0
+                ]
+              }
+            },
+            "5": {
+              "class_type": "JoinImageWithAlpha",
+              "inputs": {
+                "image": [
+                  "1",
+                  0
+                ],
+                "alpha": [
+                  "4",
+                  0
+                ]
+              }
+            },
+            "6": {
+              "class_type": "SaveImage",
+              "inputs": {
+                "images": [
+                  "5",
+                  0
+                ],
+                "filename_prefix": "repartee_spaceport/clerk_sprite-rgba"
+              }
+            }
+          },
+          {
+            "create_time": 1788196768371
+          },
+          [
+            "6"
+          ]
+        ],
+        "outputs": {
+          "6": {
+            "images": [
+              {
+                "filename": "clerk_sprite-rgba_00001_.png",
+                "subfolder": "repartee_spaceport",
+                "type": "output"
+              }
+            ]
+          }
+        },
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "d8ef731e-49b7-45a8-b798-f8df35d32fc3",
+                "timestamp": 1788196770224
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [
+                  "2"
+                ],
+                "prompt_id": "d8ef731e-49b7-45a8-b798-f8df35d32fc3",
+                "timestamp": 1788196770228
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "d8ef731e-49b7-45a8-b798-f8df35d32fc3",
+                "timestamp": 1788196770920
+              }
+            ]
+          ]
+        },
+        "meta": {
+          "6": {
+            "node_id": "6",
+            "display_node": "6",
+            "parent_node": null,
+            "real_node_id": "6"
+          }
+        }
+      },
+      "downloads": [
+        {
+          "filename": "clerk_sprite-rgba_00001_.png",
+          "subfolder": "repartee_spaceport",
+          "type": "output",
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/cutouts/f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0/000-clerk_sprite-rgba_00001_.png",
+          "sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5"
+        }
+      ],
+      "error": null
+    },
+    {
+      "request_sha256": "5b6de92ab9be0659cfb63542892ca3c6fc148fd884b3f0bba930238be183fb86",
+      "params": {
+        "asset": "worker_sprite",
+        "prefix": "repartee_spaceport/worker_sprite-rgba"
+      },
+      "sources": {
+        "source": {
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020/000-worker_sprite_00001_.png",
+          "sha256": "b8179850167892197f6eb3213ba48866870f9ba2d87759cdc78da5dd9f9fbd42",
+          "upload_name": "sha256-b8179850167892197f6eb3213ba48866870f9ba2d87759cdc78da5dd9f9fbd42.png"
+        }
+      },
+      "workflow": {
+        "1": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "sha256-b8179850167892197f6eb3213ba48866870f9ba2d87759cdc78da5dd9f9fbd42.png"
+          }
+        },
+        "2": {
+          "class_type": "LoadBackgroundRemovalModel",
+          "inputs": {
+            "bg_removal_name": "birefnet.safetensors"
+          }
+        },
+        "3": {
+          "class_type": "RemoveBackground",
+          "inputs": {
+            "bg_removal_model": [
+              "2",
+              0
+            ],
+            "image": [
+              "1",
+              0
+            ]
+          }
+        },
+        "4": {
+          "class_type": "InvertMask",
+          "inputs": {
+            "mask": [
+              "3",
+              0
+            ]
+          }
+        },
+        "5": {
+          "class_type": "JoinImageWithAlpha",
+          "inputs": {
+            "image": [
+              "1",
+              0
+            ],
+            "alpha": [
+              "4",
+              0
+            ]
+          }
+        },
+        "6": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "5",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/worker_sprite-rgba"
+          }
+        }
+      },
+      "submitted_workflow": {
+        "1": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "sha256-b8179850167892197f6eb3213ba48866870f9ba2d87759cdc78da5dd9f9fbd42.png"
+          }
+        },
+        "2": {
+          "class_type": "LoadBackgroundRemovalModel",
+          "inputs": {
+            "bg_removal_name": "birefnet.safetensors"
+          }
+        },
+        "3": {
+          "class_type": "RemoveBackground",
+          "inputs": {
+            "bg_removal_model": [
+              "2",
+              0
+            ],
+            "image": [
+              "1",
+              0
+            ]
+          }
+        },
+        "4": {
+          "class_type": "InvertMask",
+          "inputs": {
+            "mask": [
+              "3",
+              0
+            ]
+          }
+        },
+        "5": {
+          "class_type": "JoinImageWithAlpha",
+          "inputs": {
+            "image": [
+              "1",
+              0
+            ],
+            "alpha": [
+              "4",
+              0
+            ]
+          }
+        },
+        "6": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "5",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/worker_sprite-rgba"
+          }
+        }
+      },
+      "prompt_id": "a26a379f-6bda-43bd-8c3a-8a44420e1f8e",
+      "status": "completed",
+      "submitted_at": 1788196769.2644851,
+      "history": {
+        "prompt": [
+          537,
+          "a26a379f-6bda-43bd-8c3a-8a44420e1f8e",
+          {
+            "1": {
+              "class_type": "LoadImage",
+              "inputs": {
+                "image": "sha256-b8179850167892197f6eb3213ba48866870f9ba2d87759cdc78da5dd9f9fbd42.png"
+              }
+            },
+            "2": {
+              "class_type": "LoadBackgroundRemovalModel",
+              "inputs": {
+                "bg_removal_name": "birefnet.safetensors"
+              }
+            },
+            "3": {
+              "class_type": "RemoveBackground",
+              "inputs": {
+                "bg_removal_model": [
+                  "2",
+                  0
+                ],
+                "image": [
+                  "1",
+                  0
+                ]
+              }
+            },
+            "4": {
+              "class_type": "InvertMask",
+              "inputs": {
+                "mask": [
+                  "3",
+                  0
+                ]
+              }
+            },
+            "5": {
+              "class_type": "JoinImageWithAlpha",
+              "inputs": {
+                "image": [
+                  "1",
+                  0
+                ],
+                "alpha": [
+                  "4",
+                  0
+                ]
+              }
+            },
+            "6": {
+              "class_type": "SaveImage",
+              "inputs": {
+                "images": [
+                  "5",
+                  0
+                ],
+                "filename_prefix": "repartee_spaceport/worker_sprite-rgba"
+              }
+            }
+          },
+          {
+            "create_time": 1788196769313
+          },
+          [
+            "6"
+          ]
+        ],
+        "outputs": {
+          "6": {
+            "images": [
+              {
+                "filename": "worker_sprite-rgba_00001_.png",
+                "subfolder": "repartee_spaceport",
+                "type": "output"
+              }
+            ]
+          }
+        },
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "a26a379f-6bda-43bd-8c3a-8a44420e1f8e",
+                "timestamp": 1788196770920
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [
+                  "2"
+                ],
+                "prompt_id": "a26a379f-6bda-43bd-8c3a-8a44420e1f8e",
+                "timestamp": 1788196770924
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "a26a379f-6bda-43bd-8c3a-8a44420e1f8e",
+                "timestamp": 1788196771580
+              }
+            ]
+          ]
+        },
+        "meta": {
+          "6": {
+            "node_id": "6",
+            "display_node": "6",
+            "parent_node": null,
+            "real_node_id": "6"
+          }
+        }
+      },
+      "downloads": [
+        {
+          "filename": "worker_sprite-rgba_00001_.png",
+          "subfolder": "repartee_spaceport",
+          "type": "output",
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/cutouts/5b6de92ab9be0659cfb63542892ca3c6fc148fd884b3f0bba930238be183fb86/000-worker_sprite-rgba_00001_.png",
+          "sha256": "7a4754f299f7600a96a260090533006992dca5da44bbf21ce61ccd4773bbe269"
+        }
+      ],
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,1565 @@
+{
+  "version": 1,
+  "endpoint": "http://titan2:8188",
+  "template": "{\n  \"1\": {\n    \"inputs\": {\n      \"image\": {{ images.source | tojson }}\n    },\n    \"class_type\": \"LoadImage\",\n    \"_meta\": {\n      \"title\": \"source_image\"\n    }\n  },\n  \"2\": {\n    \"inputs\": {\n      \"upscale_method\": \"lanczos\",\n      \"megapixels\": 1,\n      \"resolution_steps\": 1,\n      \"image\": [\n        \"1\",\n        0\n      ]\n    },\n    \"class_type\": \"ImageScaleToTotalPixels\",\n    \"_meta\": {\n      \"title\": \"normalize_source\"\n    }\n  },\n  \"4\": {\n    \"inputs\": {\n      \"unet_name\": \"flux-2-klein-4b-fp8.safetensors\",\n      \"weight_dtype\": \"default\"\n    },\n    \"class_type\": \"UNETLoader\",\n    \"_meta\": {\n      \"title\": \"diffusion_model\"\n    }\n  },\n  \"5\": {\n    \"inputs\": {\n      \"clip_name\": \"qwen_3_4b.safetensors\",\n      \"type\": \"flux2\",\n      \"device\": \"default\"\n    },\n    \"class_type\": \"CLIPLoader\",\n    \"_meta\": {\n      \"title\": \"text_encoder\"\n    }\n  },\n  \"6\": {\n    \"inputs\": {\n      \"vae_name\": \"flux2-vae.safetensors\"\n    },\n    \"class_type\": \"VAELoader\",\n    \"_meta\": {\n      \"title\": \"vae\"\n    }\n  },\n  \"7\": {\n    \"inputs\": {\n      \"text\": {{ prompt | tojson }},\n      \"clip\": [\n        \"5\",\n        0\n      ]\n    },\n    \"class_type\": \"CLIPTextEncode\",\n    \"_meta\": {\n      \"title\": \"edit_prompt\"\n    }\n  },\n  \"8\": {\n    \"inputs\": {\n      \"conditioning\": [\n        \"7\",\n        0\n      ]\n    },\n    \"class_type\": \"ConditioningZeroOut\",\n    \"_meta\": {\n      \"title\": \"negative_conditioning\"\n    }\n  },\n  \"9\": {\n    \"inputs\": {\n      \"pixels\": [\n        \"2\",\n        0\n      ],\n      \"vae\": [\n        \"6\",\n        0\n      ]\n    },\n    \"class_type\": \"VAEEncode\",\n    \"_meta\": {\n      \"title\": \"encode_reference\"\n    }\n  },\n  \"10\": {\n    \"inputs\": {\n      \"conditioning\": [\n        \"7\",\n        0\n      ],\n      \"latent\": [\n        \"9\",\n        0\n      ]\n    },\n    \"class_type\": \"ReferenceLatent\",\n    \"_meta\": {\n      \"title\": \"positive_reference\"\n    }\n  },\n  \"12\": {\n    \"inputs\": {\n      \"width\": {{ width }},\n      \"height\": {{ height }},\n      \"batch_size\": 1\n    },\n    \"class_type\": \"EmptyFlux2LatentImage\",\n    \"_meta\": {\n      \"title\": \"output_latent\"\n    }\n  },\n  \"13\": {\n    \"inputs\": {\n      \"steps\": 4,\n      \"width\": {{ width }},\n      \"height\": {{ height }}\n    },\n    \"class_type\": \"Flux2Scheduler\",\n    \"_meta\": {\n      \"title\": \"scheduler\"\n    }\n  },\n  \"14\": {\n    \"inputs\": {\n      \"noise_seed\": {{ seed }}\n    },\n    \"class_type\": \"RandomNoise\",\n    \"_meta\": {\n      \"title\": \"noise\"\n    }\n  },\n  \"15\": {\n    \"inputs\": {\n      \"cfg\": 1,\n      \"model\": [\n        \"4\",\n        0\n      ],\n      \"positive\": [\n        \"10\",\n        0\n      ],\n      \"negative\": [\n        \"8\",\n        0\n      ]\n    },\n    \"class_type\": \"CFGGuider\",\n    \"_meta\": {\n      \"title\": \"guider\"\n    }\n  },\n  \"16\": {\n    \"inputs\": {\n      \"sampler_name\": \"euler\"\n    },\n    \"class_type\": \"KSamplerSelect\",\n    \"_meta\": {\n      \"title\": \"sampler\"\n    }\n  },\n  \"17\": {\n    \"inputs\": {\n      \"noise\": [\n        \"14\",\n        0\n      ],\n      \"guider\": [\n        \"15\",\n        0\n      ],\n      \"sampler\": [\n        \"16\",\n        0\n      ],\n      \"sigmas\": [\n        \"13\",\n        0\n      ],\n      \"latent_image\": [\n        \"12\",\n        0\n      ]\n    },\n    \"class_type\": \"SamplerCustomAdvanced\",\n    \"_meta\": {\n      \"title\": \"render\"\n    }\n  },\n  \"18\": {\n    \"inputs\": {\n      \"samples\": [\n        \"17\",\n        0\n      ],\n      \"vae\": [\n        \"6\",\n        0\n      ]\n    },\n    \"class_type\": \"VAEDecode\",\n    \"_meta\": {\n      \"title\": \"decode\"\n    }\n  },\n  \"20\": {\n    \"class_type\": \"SaveImage\",\n    \"inputs\": {\n      \"images\": [\n        \"18\",\n        0\n      ],\n      \"filename_prefix\": {{ prefix | tojson }}\n    }\n  }\n}\n",
+  "jobs": [
+    {
+      "request_sha256": "203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675",
+      "params": {
+        "asset": "warehouse_bg",
+        "prompt": "Reimagine this entire building as an unmistakably futuristic orbital cargo hangar: enormous segmented airlock doors with amber light strips, ribbed metal bulkheads, exposed conduits, antenna arrays and space-age shipping containers. A starry sky with a large ringed planet replaces the blue sky. Preserve only the camera perspective, doorway locations and the broad empty foreground deck with its circular markings. Replace all historical masonry, wooden crates and ropes. Retro adventure-game pixel art, crisp outlines, restrained teal and copper, dithered shading. No people, lettering, signatures or borders.",
+        "seed": 19921023,
+        "width": 1280,
+        "height": 800,
+        "prefix": "repartee_spaceport/warehouse_bg-refined"
+      },
+      "sources": {
+        "source": {
+          "path": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
+          "sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+          "upload_name": "sha256-b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4.png"
+        }
+      },
+      "workflow": {
+        "1": {
+          "inputs": {
+            "image": "sha256-b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4.png"
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "source_image"
+          }
+        },
+        "2": {
+          "inputs": {
+            "upscale_method": "lanczos",
+            "megapixels": 1,
+            "resolution_steps": 1,
+            "image": [
+              "1",
+              0
+            ]
+          },
+          "class_type": "ImageScaleToTotalPixels",
+          "_meta": {
+            "title": "normalize_source"
+          }
+        },
+        "4": {
+          "inputs": {
+            "unet_name": "flux-2-klein-4b-fp8.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "diffusion_model"
+          }
+        },
+        "5": {
+          "inputs": {
+            "clip_name": "qwen_3_4b.safetensors",
+            "type": "flux2",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "text_encoder"
+          }
+        },
+        "6": {
+          "inputs": {
+            "vae_name": "flux2-vae.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "vae"
+          }
+        },
+        "7": {
+          "inputs": {
+            "text": "Reimagine this entire building as an unmistakably futuristic orbital cargo hangar: enormous segmented airlock doors with amber light strips, ribbed metal bulkheads, exposed conduits, antenna arrays and space-age shipping containers. A starry sky with a large ringed planet replaces the blue sky. Preserve only the camera perspective, doorway locations and the broad empty foreground deck with its circular markings. Replace all historical masonry, wooden crates and ropes. Retro adventure-game pixel art, crisp outlines, restrained teal and copper, dithered shading. No people, lettering, signatures or borders.",
+            "clip": [
+              "5",
+              0
+            ]
+          },
+          "class_type": "CLIPTextEncode",
+          "_meta": {
+            "title": "edit_prompt"
+          }
+        },
+        "8": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "negative_conditioning"
+          }
+        },
+        "9": {
+          "inputs": {
+            "pixels": [
+              "2",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEEncode",
+          "_meta": {
+            "title": "encode_reference"
+          }
+        },
+        "10": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ],
+            "latent": [
+              "9",
+              0
+            ]
+          },
+          "class_type": "ReferenceLatent",
+          "_meta": {
+            "title": "positive_reference"
+          }
+        },
+        "12": {
+          "inputs": {
+            "width": 1280,
+            "height": 800,
+            "batch_size": 1
+          },
+          "class_type": "EmptyFlux2LatentImage",
+          "_meta": {
+            "title": "output_latent"
+          }
+        },
+        "13": {
+          "inputs": {
+            "steps": 4,
+            "width": 1280,
+            "height": 800
+          },
+          "class_type": "Flux2Scheduler",
+          "_meta": {
+            "title": "scheduler"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise_seed": 19921023
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "noise"
+          }
+        },
+        "15": {
+          "inputs": {
+            "cfg": 1,
+            "model": [
+              "4",
+              0
+            ],
+            "positive": [
+              "10",
+              0
+            ],
+            "negative": [
+              "8",
+              0
+            ]
+          },
+          "class_type": "CFGGuider",
+          "_meta": {
+            "title": "guider"
+          }
+        },
+        "16": {
+          "inputs": {
+            "sampler_name": "euler"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "sampler"
+          }
+        },
+        "17": {
+          "inputs": {
+            "noise": [
+              "14",
+              0
+            ],
+            "guider": [
+              "15",
+              0
+            ],
+            "sampler": [
+              "16",
+              0
+            ],
+            "sigmas": [
+              "13",
+              0
+            ],
+            "latent_image": [
+              "12",
+              0
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "render"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": [
+              "17",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "decode"
+          }
+        },
+        "20": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "18",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/warehouse_bg-refined"
+          }
+        }
+      },
+      "submitted_workflow": {
+        "1": {
+          "inputs": {
+            "image": "sha256-b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4.png"
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "source_image"
+          }
+        },
+        "2": {
+          "inputs": {
+            "upscale_method": "lanczos",
+            "megapixels": 1,
+            "resolution_steps": 1,
+            "image": [
+              "1",
+              0
+            ]
+          },
+          "class_type": "ImageScaleToTotalPixels",
+          "_meta": {
+            "title": "normalize_source"
+          }
+        },
+        "4": {
+          "inputs": {
+            "unet_name": "flux-2-klein-4b-fp8.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "diffusion_model"
+          }
+        },
+        "5": {
+          "inputs": {
+            "clip_name": "qwen_3_4b.safetensors",
+            "type": "flux2",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "text_encoder"
+          }
+        },
+        "6": {
+          "inputs": {
+            "vae_name": "flux2-vae.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "vae"
+          }
+        },
+        "7": {
+          "inputs": {
+            "text": "Reimagine this entire building as an unmistakably futuristic orbital cargo hangar: enormous segmented airlock doors with amber light strips, ribbed metal bulkheads, exposed conduits, antenna arrays and space-age shipping containers. A starry sky with a large ringed planet replaces the blue sky. Preserve only the camera perspective, doorway locations and the broad empty foreground deck with its circular markings. Replace all historical masonry, wooden crates and ropes. Retro adventure-game pixel art, crisp outlines, restrained teal and copper, dithered shading. No people, lettering, signatures or borders.",
+            "clip": [
+              "5",
+              0
+            ]
+          },
+          "class_type": "CLIPTextEncode",
+          "_meta": {
+            "title": "edit_prompt"
+          }
+        },
+        "8": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "negative_conditioning"
+          }
+        },
+        "9": {
+          "inputs": {
+            "pixels": [
+              "2",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEEncode",
+          "_meta": {
+            "title": "encode_reference"
+          }
+        },
+        "10": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ],
+            "latent": [
+              "9",
+              0
+            ]
+          },
+          "class_type": "ReferenceLatent",
+          "_meta": {
+            "title": "positive_reference"
+          }
+        },
+        "12": {
+          "inputs": {
+            "width": 1280,
+            "height": 800,
+            "batch_size": 1
+          },
+          "class_type": "EmptyFlux2LatentImage",
+          "_meta": {
+            "title": "output_latent"
+          }
+        },
+        "13": {
+          "inputs": {
+            "steps": 4,
+            "width": 1280,
+            "height": 800
+          },
+          "class_type": "Flux2Scheduler",
+          "_meta": {
+            "title": "scheduler"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise_seed": 19921023
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "noise"
+          }
+        },
+        "15": {
+          "inputs": {
+            "cfg": 1,
+            "model": [
+              "4",
+              0
+            ],
+            "positive": [
+              "10",
+              0
+            ],
+            "negative": [
+              "8",
+              0
+            ]
+          },
+          "class_type": "CFGGuider",
+          "_meta": {
+            "title": "guider"
+          }
+        },
+        "16": {
+          "inputs": {
+            "sampler_name": "euler"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "sampler"
+          }
+        },
+        "17": {
+          "inputs": {
+            "noise": [
+              "14",
+              0
+            ],
+            "guider": [
+              "15",
+              0
+            ],
+            "sampler": [
+              "16",
+              0
+            ],
+            "sigmas": [
+              "13",
+              0
+            ],
+            "latent_image": [
+              "12",
+              0
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "render"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": [
+              "17",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "decode"
+          }
+        },
+        "20": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "18",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/warehouse_bg-refined"
+          }
+        }
+      },
+      "prompt_id": "d55e8e5e-edf8-4bcd-a195-2a9331007c0e",
+      "status": "completed",
+      "submitted_at": 1788196484.5493429,
+      "history": {
+        "prompt": [
+          533,
+          "d55e8e5e-edf8-4bcd-a195-2a9331007c0e",
+          {
+            "1": {
+              "inputs": {
+                "image": "sha256-b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4.png"
+              },
+              "class_type": "LoadImage",
+              "_meta": {
+                "title": "source_image"
+              }
+            },
+            "2": {
+              "inputs": {
+                "upscale_method": "lanczos",
+                "megapixels": 1.0,
+                "resolution_steps": 1,
+                "image": [
+                  "1",
+                  0
+                ]
+              },
+              "class_type": "ImageScaleToTotalPixels",
+              "_meta": {
+                "title": "normalize_source"
+              }
+            },
+            "4": {
+              "inputs": {
+                "unet_name": "flux-2-klein-4b-fp8.safetensors",
+                "weight_dtype": "default"
+              },
+              "class_type": "UNETLoader",
+              "_meta": {
+                "title": "diffusion_model"
+              }
+            },
+            "5": {
+              "inputs": {
+                "clip_name": "qwen_3_4b.safetensors",
+                "type": "flux2",
+                "device": "default"
+              },
+              "class_type": "CLIPLoader",
+              "_meta": {
+                "title": "text_encoder"
+              }
+            },
+            "6": {
+              "inputs": {
+                "vae_name": "flux2-vae.safetensors"
+              },
+              "class_type": "VAELoader",
+              "_meta": {
+                "title": "vae"
+              }
+            },
+            "7": {
+              "inputs": {
+                "text": "Reimagine this entire building as an unmistakably futuristic orbital cargo hangar: enormous segmented airlock doors with amber light strips, ribbed metal bulkheads, exposed conduits, antenna arrays and space-age shipping containers. A starry sky with a large ringed planet replaces the blue sky. Preserve only the camera perspective, doorway locations and the broad empty foreground deck with its circular markings. Replace all historical masonry, wooden crates and ropes. Retro adventure-game pixel art, crisp outlines, restrained teal and copper, dithered shading. No people, lettering, signatures or borders.",
+                "clip": [
+                  "5",
+                  0
+                ]
+              },
+              "class_type": "CLIPTextEncode",
+              "_meta": {
+                "title": "edit_prompt"
+              }
+            },
+            "8": {
+              "inputs": {
+                "conditioning": [
+                  "7",
+                  0
+                ]
+              },
+              "class_type": "ConditioningZeroOut",
+              "_meta": {
+                "title": "negative_conditioning"
+              }
+            },
+            "9": {
+              "inputs": {
+                "pixels": [
+                  "2",
+                  0
+                ],
+                "vae": [
+                  "6",
+                  0
+                ]
+              },
+              "class_type": "VAEEncode",
+              "_meta": {
+                "title": "encode_reference"
+              }
+            },
+            "10": {
+              "inputs": {
+                "conditioning": [
+                  "7",
+                  0
+                ],
+                "latent": [
+                  "9",
+                  0
+                ]
+              },
+              "class_type": "ReferenceLatent",
+              "_meta": {
+                "title": "positive_reference"
+              }
+            },
+            "12": {
+              "inputs": {
+                "width": 1280,
+                "height": 800,
+                "batch_size": 1
+              },
+              "class_type": "EmptyFlux2LatentImage",
+              "_meta": {
+                "title": "output_latent"
+              }
+            },
+            "13": {
+              "inputs": {
+                "steps": 4,
+                "width": 1280,
+                "height": 800
+              },
+              "class_type": "Flux2Scheduler",
+              "_meta": {
+                "title": "scheduler"
+              }
+            },
+            "14": {
+              "inputs": {
+                "noise_seed": 19921023
+              },
+              "class_type": "RandomNoise",
+              "_meta": {
+                "title": "noise"
+              }
+            },
+            "15": {
+              "inputs": {
+                "cfg": 1.0,
+                "model": [
+                  "4",
+                  0
+                ],
+                "positive": [
+                  "10",
+                  0
+                ],
+                "negative": [
+                  "8",
+                  0
+                ]
+              },
+              "class_type": "CFGGuider",
+              "_meta": {
+                "title": "guider"
+              }
+            },
+            "16": {
+              "inputs": {
+                "sampler_name": "euler"
+              },
+              "class_type": "KSamplerSelect",
+              "_meta": {
+                "title": "sampler"
+              }
+            },
+            "17": {
+              "inputs": {
+                "noise": [
+                  "14",
+                  0
+                ],
+                "guider": [
+                  "15",
+                  0
+                ],
+                "sampler": [
+                  "16",
+                  0
+                ],
+                "sigmas": [
+                  "13",
+                  0
+                ],
+                "latent_image": [
+                  "12",
+                  0
+                ]
+              },
+              "class_type": "SamplerCustomAdvanced",
+              "_meta": {
+                "title": "render"
+              }
+            },
+            "18": {
+              "inputs": {
+                "samples": [
+                  "17",
+                  0
+                ],
+                "vae": [
+                  "6",
+                  0
+                ]
+              },
+              "class_type": "VAEDecode",
+              "_meta": {
+                "title": "decode"
+              }
+            },
+            "20": {
+              "class_type": "SaveImage",
+              "inputs": {
+                "images": [
+                  "18",
+                  0
+                ],
+                "filename_prefix": "repartee_spaceport/warehouse_bg-refined"
+              }
+            }
+          },
+          {
+            "create_time": 1788196484593
+          },
+          [
+            "20"
+          ]
+        ],
+        "outputs": {
+          "20": {
+            "images": [
+              {
+                "filename": "warehouse_bg-refined_00001_.png",
+                "subfolder": "repartee_spaceport",
+                "type": "output"
+              }
+            ]
+          }
+        },
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "d55e8e5e-edf8-4bcd-a195-2a9331007c0e",
+                "timestamp": 1788196484593
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [
+                  "4",
+                  "5",
+                  "6",
+                  "16"
+                ],
+                "prompt_id": "d55e8e5e-edf8-4bcd-a195-2a9331007c0e",
+                "timestamp": 1788196484600
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "d55e8e5e-edf8-4bcd-a195-2a9331007c0e",
+                "timestamp": 1788196493055
+              }
+            ]
+          ]
+        },
+        "meta": {
+          "20": {
+            "node_id": "20",
+            "display_node": "20",
+            "parent_node": null,
+            "real_node_id": "20"
+          }
+        }
+      },
+      "downloads": [
+        {
+          "filename": "warehouse_bg-refined_00001_.png",
+          "subfolder": "repartee_spaceport",
+          "type": "output",
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675/000-warehouse_bg-refined_00001_.png",
+          "sha256": "6517ff075748b43b165589079800a0e5562f4b6ca320fe3320be69e6a12225ed"
+        }
+      ],
+      "error": null
+    },
+    {
+      "request_sha256": "6f6a4f4e04e66d119ebd623b67020e6ce3317b845e23e78ac17eadf8ab6e5402",
+      "params": {
+        "asset": "master_sprite",
+        "prompt": "Keep this exact teal alien character and pixel art unchanged, but replace the white cuff on his raised forearm with a plain copper-colored uniform sleeve and a clearly attached teal hand. Give the rod in his hands a softly glowing cyan energy tip. Plain flat light gray background, no cast shadow. Preserve his expression, tall crescent crest, full-body pose, proportions and existing two hands. No additional limbs or objects.",
+        "seed": 19921025,
+        "width": 1024,
+        "height": 1024,
+        "prefix": "repartee_spaceport/master_sprite-refined"
+      },
+      "sources": {
+        "source": {
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png",
+          "sha256": "fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4",
+          "upload_name": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+        }
+      },
+      "workflow": {
+        "1": {
+          "inputs": {
+            "image": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "source_image"
+          }
+        },
+        "2": {
+          "inputs": {
+            "upscale_method": "lanczos",
+            "megapixels": 1,
+            "resolution_steps": 1,
+            "image": [
+              "1",
+              0
+            ]
+          },
+          "class_type": "ImageScaleToTotalPixels",
+          "_meta": {
+            "title": "normalize_source"
+          }
+        },
+        "4": {
+          "inputs": {
+            "unet_name": "flux-2-klein-4b-fp8.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "diffusion_model"
+          }
+        },
+        "5": {
+          "inputs": {
+            "clip_name": "qwen_3_4b.safetensors",
+            "type": "flux2",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "text_encoder"
+          }
+        },
+        "6": {
+          "inputs": {
+            "vae_name": "flux2-vae.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "vae"
+          }
+        },
+        "7": {
+          "inputs": {
+            "text": "Keep this exact teal alien character and pixel art unchanged, but replace the white cuff on his raised forearm with a plain copper-colored uniform sleeve and a clearly attached teal hand. Give the rod in his hands a softly glowing cyan energy tip. Plain flat light gray background, no cast shadow. Preserve his expression, tall crescent crest, full-body pose, proportions and existing two hands. No additional limbs or objects.",
+            "clip": [
+              "5",
+              0
+            ]
+          },
+          "class_type": "CLIPTextEncode",
+          "_meta": {
+            "title": "edit_prompt"
+          }
+        },
+        "8": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "negative_conditioning"
+          }
+        },
+        "9": {
+          "inputs": {
+            "pixels": [
+              "2",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEEncode",
+          "_meta": {
+            "title": "encode_reference"
+          }
+        },
+        "10": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ],
+            "latent": [
+              "9",
+              0
+            ]
+          },
+          "class_type": "ReferenceLatent",
+          "_meta": {
+            "title": "positive_reference"
+          }
+        },
+        "12": {
+          "inputs": {
+            "width": 1024,
+            "height": 1024,
+            "batch_size": 1
+          },
+          "class_type": "EmptyFlux2LatentImage",
+          "_meta": {
+            "title": "output_latent"
+          }
+        },
+        "13": {
+          "inputs": {
+            "steps": 4,
+            "width": 1024,
+            "height": 1024
+          },
+          "class_type": "Flux2Scheduler",
+          "_meta": {
+            "title": "scheduler"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise_seed": 19921025
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "noise"
+          }
+        },
+        "15": {
+          "inputs": {
+            "cfg": 1,
+            "model": [
+              "4",
+              0
+            ],
+            "positive": [
+              "10",
+              0
+            ],
+            "negative": [
+              "8",
+              0
+            ]
+          },
+          "class_type": "CFGGuider",
+          "_meta": {
+            "title": "guider"
+          }
+        },
+        "16": {
+          "inputs": {
+            "sampler_name": "euler"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "sampler"
+          }
+        },
+        "17": {
+          "inputs": {
+            "noise": [
+              "14",
+              0
+            ],
+            "guider": [
+              "15",
+              0
+            ],
+            "sampler": [
+              "16",
+              0
+            ],
+            "sigmas": [
+              "13",
+              0
+            ],
+            "latent_image": [
+              "12",
+              0
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "render"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": [
+              "17",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "decode"
+          }
+        },
+        "20": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "18",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/master_sprite-refined"
+          }
+        }
+      },
+      "submitted_workflow": {
+        "1": {
+          "inputs": {
+            "image": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "source_image"
+          }
+        },
+        "2": {
+          "inputs": {
+            "upscale_method": "lanczos",
+            "megapixels": 1,
+            "resolution_steps": 1,
+            "image": [
+              "1",
+              0
+            ]
+          },
+          "class_type": "ImageScaleToTotalPixels",
+          "_meta": {
+            "title": "normalize_source"
+          }
+        },
+        "4": {
+          "inputs": {
+            "unet_name": "flux-2-klein-4b-fp8.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "diffusion_model"
+          }
+        },
+        "5": {
+          "inputs": {
+            "clip_name": "qwen_3_4b.safetensors",
+            "type": "flux2",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "text_encoder"
+          }
+        },
+        "6": {
+          "inputs": {
+            "vae_name": "flux2-vae.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "vae"
+          }
+        },
+        "7": {
+          "inputs": {
+            "text": "Keep this exact teal alien character and pixel art unchanged, but replace the white cuff on his raised forearm with a plain copper-colored uniform sleeve and a clearly attached teal hand. Give the rod in his hands a softly glowing cyan energy tip. Plain flat light gray background, no cast shadow. Preserve his expression, tall crescent crest, full-body pose, proportions and existing two hands. No additional limbs or objects.",
+            "clip": [
+              "5",
+              0
+            ]
+          },
+          "class_type": "CLIPTextEncode",
+          "_meta": {
+            "title": "edit_prompt"
+          }
+        },
+        "8": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "negative_conditioning"
+          }
+        },
+        "9": {
+          "inputs": {
+            "pixels": [
+              "2",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEEncode",
+          "_meta": {
+            "title": "encode_reference"
+          }
+        },
+        "10": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ],
+            "latent": [
+              "9",
+              0
+            ]
+          },
+          "class_type": "ReferenceLatent",
+          "_meta": {
+            "title": "positive_reference"
+          }
+        },
+        "12": {
+          "inputs": {
+            "width": 1024,
+            "height": 1024,
+            "batch_size": 1
+          },
+          "class_type": "EmptyFlux2LatentImage",
+          "_meta": {
+            "title": "output_latent"
+          }
+        },
+        "13": {
+          "inputs": {
+            "steps": 4,
+            "width": 1024,
+            "height": 1024
+          },
+          "class_type": "Flux2Scheduler",
+          "_meta": {
+            "title": "scheduler"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise_seed": 19921025
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "noise"
+          }
+        },
+        "15": {
+          "inputs": {
+            "cfg": 1,
+            "model": [
+              "4",
+              0
+            ],
+            "positive": [
+              "10",
+              0
+            ],
+            "negative": [
+              "8",
+              0
+            ]
+          },
+          "class_type": "CFGGuider",
+          "_meta": {
+            "title": "guider"
+          }
+        },
+        "16": {
+          "inputs": {
+            "sampler_name": "euler"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "sampler"
+          }
+        },
+        "17": {
+          "inputs": {
+            "noise": [
+              "14",
+              0
+            ],
+            "guider": [
+              "15",
+              0
+            ],
+            "sampler": [
+              "16",
+              0
+            ],
+            "sigmas": [
+              "13",
+              0
+            ],
+            "latent_image": [
+              "12",
+              0
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "render"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": [
+              "17",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "decode"
+          }
+        },
+        "20": {
+          "class_type": "SaveImage",
+          "inputs": {
+            "images": [
+              "18",
+              0
+            ],
+            "filename_prefix": "repartee_spaceport/master_sprite-refined"
+          }
+        }
+      },
+      "prompt_id": "a03fe187-66bc-4b55-b71e-abca8935b857",
+      "status": "completed",
+      "submitted_at": 1788196485.248538,
+      "history": {
+        "prompt": [
+          534,
+          "a03fe187-66bc-4b55-b71e-abca8935b857",
+          {
+            "1": {
+              "inputs": {
+                "image": "sha256-fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4.png"
+              },
+              "class_type": "LoadImage",
+              "_meta": {
+                "title": "source_image"
+              }
+            },
+            "2": {
+              "inputs": {
+                "upscale_method": "lanczos",
+                "megapixels": 1.0,
+                "resolution_steps": 1,
+                "image": [
+                  "1",
+                  0
+                ]
+              },
+              "class_type": "ImageScaleToTotalPixels",
+              "_meta": {
+                "title": "normalize_source"
+              }
+            },
+            "4": {
+              "inputs": {
+                "unet_name": "flux-2-klein-4b-fp8.safetensors",
+                "weight_dtype": "default"
+              },
+              "class_type": "UNETLoader",
+              "_meta": {
+                "title": "diffusion_model"
+              }
+            },
+            "5": {
+              "inputs": {
+                "clip_name": "qwen_3_4b.safetensors",
+                "type": "flux2",
+                "device": "default"
+              },
+              "class_type": "CLIPLoader",
+              "_meta": {
+                "title": "text_encoder"
+              }
+            },
+            "6": {
+              "inputs": {
+                "vae_name": "flux2-vae.safetensors"
+              },
+              "class_type": "VAELoader",
+              "_meta": {
+                "title": "vae"
+              }
+            },
+            "7": {
+              "inputs": {
+                "text": "Keep this exact teal alien character and pixel art unchanged, but replace the white cuff on his raised forearm with a plain copper-colored uniform sleeve and a clearly attached teal hand. Give the rod in his hands a softly glowing cyan energy tip. Plain flat light gray background, no cast shadow. Preserve his expression, tall crescent crest, full-body pose, proportions and existing two hands. No additional limbs or objects.",
+                "clip": [
+                  "5",
+                  0
+                ]
+              },
+              "class_type": "CLIPTextEncode",
+              "_meta": {
+                "title": "edit_prompt"
+              }
+            },
+            "8": {
+              "inputs": {
+                "conditioning": [
+                  "7",
+                  0
+                ]
+              },
+              "class_type": "ConditioningZeroOut",
+              "_meta": {
+                "title": "negative_conditioning"
+              }
+            },
+            "9": {
+              "inputs": {
+                "pixels": [
+                  "2",
+                  0
+                ],
+                "vae": [
+                  "6",
+                  0
+                ]
+              },
+              "class_type": "VAEEncode",
+              "_meta": {
+                "title": "encode_reference"
+              }
+            },
+            "10": {
+              "inputs": {
+                "conditioning": [
+                  "7",
+                  0
+                ],
+                "latent": [
+                  "9",
+                  0
+                ]
+              },
+              "class_type": "ReferenceLatent",
+              "_meta": {
+                "title": "positive_reference"
+              }
+            },
+            "12": {
+              "inputs": {
+                "width": 1024,
+                "height": 1024,
+                "batch_size": 1
+              },
+              "class_type": "EmptyFlux2LatentImage",
+              "_meta": {
+                "title": "output_latent"
+              }
+            },
+            "13": {
+              "inputs": {
+                "steps": 4,
+                "width": 1024,
+                "height": 1024
+              },
+              "class_type": "Flux2Scheduler",
+              "_meta": {
+                "title": "scheduler"
+              }
+            },
+            "14": {
+              "inputs": {
+                "noise_seed": 19921025
+              },
+              "class_type": "RandomNoise",
+              "_meta": {
+                "title": "noise"
+              }
+            },
+            "15": {
+              "inputs": {
+                "cfg": 1.0,
+                "model": [
+                  "4",
+                  0
+                ],
+                "positive": [
+                  "10",
+                  0
+                ],
+                "negative": [
+                  "8",
+                  0
+                ]
+              },
+              "class_type": "CFGGuider",
+              "_meta": {
+                "title": "guider"
+              }
+            },
+            "16": {
+              "inputs": {
+                "sampler_name": "euler"
+              },
+              "class_type": "KSamplerSelect",
+              "_meta": {
+                "title": "sampler"
+              }
+            },
+            "17": {
+              "inputs": {
+                "noise": [
+                  "14",
+                  0
+                ],
+                "guider": [
+                  "15",
+                  0
+                ],
+                "sampler": [
+                  "16",
+                  0
+                ],
+                "sigmas": [
+                  "13",
+                  0
+                ],
+                "latent_image": [
+                  "12",
+                  0
+                ]
+              },
+              "class_type": "SamplerCustomAdvanced",
+              "_meta": {
+                "title": "render"
+              }
+            },
+            "18": {
+              "inputs": {
+                "samples": [
+                  "17",
+                  0
+                ],
+                "vae": [
+                  "6",
+                  0
+                ]
+              },
+              "class_type": "VAEDecode",
+              "_meta": {
+                "title": "decode"
+              }
+            },
+            "20": {
+              "class_type": "SaveImage",
+              "inputs": {
+                "images": [
+                  "18",
+                  0
+                ],
+                "filename_prefix": "repartee_spaceport/master_sprite-refined"
+              }
+            }
+          },
+          {
+            "create_time": 1788196485284
+          },
+          [
+            "20"
+          ]
+        ],
+        "outputs": {
+          "20": {
+            "images": [
+              {
+                "filename": "master_sprite-refined_00001_.png",
+                "subfolder": "repartee_spaceport",
+                "type": "output"
+              }
+            ]
+          }
+        },
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "a03fe187-66bc-4b55-b71e-abca8935b857",
+                "timestamp": 1788196493296
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [
+                  "4",
+                  "5",
+                  "6",
+                  "16"
+                ],
+                "prompt_id": "a03fe187-66bc-4b55-b71e-abca8935b857",
+                "timestamp": 1788196493302
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "a03fe187-66bc-4b55-b71e-abca8935b857",
+                "timestamp": 1788196501955
+              }
+            ]
+          ]
+        },
+        "meta": {
+          "20": {
+            "node_id": "20",
+            "display_node": "20",
+            "parent_node": null,
+            "real_node_id": "20"
+          }
+        }
+      },
+      "downloads": [
+        {
+          "filename": "master_sprite-refined_00001_.png",
+          "subfolder": "repartee_spaceport",
+          "type": "output",
+          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/6f6a4f4e04e66d119ebd623b67020e6ce3317b845e23e78ac17eadf8ab6e5402/000-master_sprite-refined_00001_.png",
+          "sha256": "100356a0aace0fb067c707ad948188fc06ada34032a37fc7407e7a5fe890d7a2"
+        }
+      ],
+      "error": null
+    }
+  ]
+}

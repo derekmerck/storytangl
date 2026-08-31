@@ -1,0 +1,32 @@
+{
+  "workflow": "cutout.json.j2",
+  "jobs": [
+    {
+      "params": {
+        "asset": "master_sprite",
+        "prefix": "repartee_spaceport/master_sprite-rgba"
+      },
+      "images": {
+        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "clerk_sprite",
+        "prefix": "repartee_spaceport/clerk_sprite-rgba"
+      },
+      "images": {
+        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "worker_sprite",
+        "prefix": "repartee_spaceport/worker_sprite-rgba"
+      },
+      "images": {
+        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020/000-worker_sprite_00001_.png"
+      }
+    }
+  ]
+}

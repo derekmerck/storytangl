@@ -1,0 +1,74 @@
+[
+  {
+    "asset": "quai_bg",
+    "source": "/Users/derek/Downloads/rapartee/quai_bg.png",
+    "source_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
+    "reference": "/Users/derek/Downloads/rapartee/quai_bg.png",
+    "reference_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
+    "size": [
+      1280,
+      800
+    ],
+    "preprocessing": "none"
+  },
+  {
+    "asset": "warehouse_bg",
+    "source": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
+    "source_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+    "reference": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
+    "reference_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+    "size": [
+      1280,
+      800
+    ],
+    "preprocessing": "none"
+  },
+  {
+    "asset": "salon_bg",
+    "source": "/Users/derek/Downloads/rapartee/salon_bg.png",
+    "source_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
+    "reference": "/Users/derek/Downloads/rapartee/salon_bg.png",
+    "reference_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
+    "size": [
+      1280,
+      800
+    ],
+    "preprocessing": "none"
+  },
+  {
+    "asset": "master_sprite",
+    "source": "/Users/derek/Downloads/rapartee/master_sprite.png",
+    "source_sha256": "acca53631b7f6d5e4e500f6b4c41fe2deff8fe557f15bfccc4700745d4ec15a2",
+    "reference": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/master_sprite.png",
+    "reference_sha256": "cbe85b4c3c5c27acde6c835acd55d60cc3e68eb0b098a23f69ce66fd057c9ebc",
+    "size": [
+      1024,
+      1024
+    ],
+    "preprocessing": "alpha composite over RGB(224,224,224)"
+  },
+  {
+    "asset": "clerk_sprite",
+    "source": "/Users/derek/Downloads/rapartee/clerk_sprite.png",
+    "source_sha256": "424bc8bee7404f609e02154fb2c1e21ece67acdf04e847f6a6e0e28d3b2327f0",
+    "reference": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/clerk_sprite.png",
+    "reference_sha256": "91a3965fe0c95212fe6478a0d19db1088173b5ab380d8948b8388867b8e8961c",
+    "size": [
+      1024,
+      1024
+    ],
+    "preprocessing": "alpha composite over RGB(224,224,224)"
+  },
+  {
+    "asset": "worker_sprite",
+    "source": "/Users/derek/Downloads/rapartee/worker_sprite.png",
+    "source_sha256": "0b8ac1ea43ccae2a61a21080e57459695b73505133ffef563ff8b2d4e10133e9",
+    "reference": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/worker_sprite.png",
+    "reference_sha256": "2d86dfe30cca81c4a92da537c3fd73c9b79232ca595e22610bae83a35c30c7b2",
+    "size": [
+      1024,
+      1024
+    ],
+    "preprocessing": "alpha composite over RGB(224,224,224)"
+  }
+]

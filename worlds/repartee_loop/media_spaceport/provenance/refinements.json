@@ -1,0 +1,31 @@
+{
+  "workflow": "workflow.json.j2",
+  "jobs": [
+    {
+      "params": {
+        "asset": "warehouse_bg",
+        "prompt": "Reimagine this entire building as an unmistakably futuristic orbital cargo hangar: enormous segmented airlock doors with amber light strips, ribbed metal bulkheads, exposed conduits, antenna arrays and space-age shipping containers. A starry sky with a large ringed planet replaces the blue sky. Preserve only the camera perspective, doorway locations and the broad empty foreground deck with its circular markings. Replace all historical masonry, wooden crates and ropes. Retro adventure-game pixel art, crisp outlines, restrained teal and copper, dithered shading. No people, lettering, signatures or borders.",
+        "seed": 19921023,
+        "width": 1280,
+        "height": 800,
+        "prefix": "repartee_spaceport/warehouse_bg-refined"
+      },
+      "images": {
+        "source": "/Users/derek/Downloads/rapartee/warehouse_bg.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "master_sprite",
+        "prompt": "Keep this exact teal alien character and pixel art unchanged, but replace the white cuff on his raised forearm with a plain copper-colored uniform sleeve and a clearly attached teal hand. Give the rod in his hands a softly glowing cyan energy tip. Plain flat light gray background, no cast shadow. Preserve his expression, tall crescent crest, full-body pose, proportions and existing two hands. No additional limbs or objects.",
+        "seed": 19921025,
+        "width": 1024,
+        "height": 1024,
+        "prefix": "repartee_spaceport/master_sprite-refined"
+      },
+      "images": {
+        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png"
+      }
+    }
+  ]
+}

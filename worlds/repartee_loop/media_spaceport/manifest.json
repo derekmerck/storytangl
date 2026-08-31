@@ -1,0 +1,193 @@
+{
+  "pack": "repartee-spaceport",
+  "assets": {
+    "quai_bg": {
+      "file": "quai_bg.png",
+      "size": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "sha256": "5f3b0ee82bef8d48dc4cd588343f5e736b12304b3e34d9a9dded8f156b1324ae",
+      "source": {
+        "asset": "quai_bg",
+        "source": "/Users/derek/Downloads/rapartee/quai_bg.png",
+        "source_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
+        "reference": "/Users/derek/Downloads/rapartee/quai_bg.png",
+        "reference_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
+        "size": [
+          1280,
+          800
+        ],
+        "preprocessing": "none"
+      },
+      "generation": {
+        "receipt": "receipts.json",
+        "request_sha256": "0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36",
+        "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36/000-quai_bg_00001_.png"
+      }
+    },
+    "warehouse_bg": {
+      "file": "warehouse_bg.png",
+      "size": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "sha256": "6517ff075748b43b165589079800a0e5562f4b6ca320fe3320be69e6a12225ed",
+      "source": {
+        "asset": "warehouse_bg",
+        "source": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
+        "source_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+        "reference": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
+        "reference_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+        "size": [
+          1280,
+          800
+        ],
+        "preprocessing": "none"
+      },
+      "generation": {
+        "receipt": "refinement-receipts.json",
+        "request_sha256": "203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675",
+        "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675/000-warehouse_bg-refined_00001_.png"
+      }
+    },
+    "salon_bg": {
+      "file": "salon_bg.png",
+      "size": [
+        1280,
+        800
+      ],
+      "mode": "RGB",
+      "sha256": "ccea6a63566cb222b9541fd0b5c246ef880a2c31fe29986880ebf4cf82519ed3",
+      "source": {
+        "asset": "salon_bg",
+        "source": "/Users/derek/Downloads/rapartee/salon_bg.png",
+        "source_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
+        "reference": "/Users/derek/Downloads/rapartee/salon_bg.png",
+        "reference_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
+        "size": [
+          1280,
+          800
+        ],
+        "preprocessing": "none"
+      },
+      "generation": {
+        "receipt": "receipts.json",
+        "request_sha256": "5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a",
+        "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a/000-salon_bg_00001_.png"
+      }
+    },
+    "master_sprite": {
+      "file": "master_sprite.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "sha256": "19aa5b81ae6866c57afe898cfc0212016a593a747739b80ff84bea14d877feea",
+      "source": {
+        "asset": "master_sprite",
+        "source": "/Users/derek/Downloads/rapartee/master_sprite.png",
+        "source_sha256": "acca53631b7f6d5e4e500f6b4c41fe2deff8fe557f15bfccc4700745d4ec15a2",
+        "reference": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/master_sprite.png",
+        "reference_sha256": "cbe85b4c3c5c27acde6c835acd55d60cc3e68eb0b098a23f69ce66fd057c9ebc",
+        "size": [
+          1024,
+          1024
+        ],
+        "preprocessing": "alpha composite over RGB(224,224,224)"
+      },
+      "generation": {
+        "receipt": "receipts.json",
+        "request_sha256": "c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e",
+        "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png"
+      },
+      "alpha_bbox": [
+        57,
+        27,
+        852,
+        1008
+      ],
+      "background_removal_request_sha256": "b73a974015d3ed667390b60c895175584384b12f37931b1ee514b27919595fe8"
+    },
+    "clerk_sprite": {
+      "file": "clerk_sprite.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5",
+      "source": {
+        "asset": "clerk_sprite",
+        "source": "/Users/derek/Downloads/rapartee/clerk_sprite.png",
+        "source_sha256": "424bc8bee7404f609e02154fb2c1e21ece67acdf04e847f6a6e0e28d3b2327f0",
+        "reference": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/clerk_sprite.png",
+        "reference_sha256": "91a3965fe0c95212fe6478a0d19db1088173b5ab380d8948b8388867b8e8961c",
+        "size": [
+          1024,
+          1024
+        ],
+        "preprocessing": "alpha composite over RGB(224,224,224)"
+      },
+      "generation": {
+        "receipt": "receipts.json",
+        "request_sha256": "9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63",
+        "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png"
+      },
+      "alpha_bbox": [
+        90,
+        46,
+        974,
+        1005
+      ],
+      "background_removal_request_sha256": "f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0"
+    },
+    "worker_sprite": {
+      "file": "worker_sprite.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "sha256": "7a4754f299f7600a96a260090533006992dca5da44bbf21ce61ccd4773bbe269",
+      "source": {
+        "asset": "worker_sprite",
+        "source": "/Users/derek/Downloads/rapartee/worker_sprite.png",
+        "source_sha256": "0b8ac1ea43ccae2a61a21080e57459695b73505133ffef563ff8b2d4e10133e9",
+        "reference": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/worker_sprite.png",
+        "reference_sha256": "2d86dfe30cca81c4a92da537c3fd73c9b79232ca595e22610bae83a35c30c7b2",
+        "size": [
+          1024,
+          1024
+        ],
+        "preprocessing": "alpha composite over RGB(224,224,224)"
+      },
+      "generation": {
+        "receipt": "receipts.json",
+        "request_sha256": "dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020",
+        "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020/000-worker_sprite_00001_.png"
+      },
+      "alpha_bbox": [
+        67,
+        44,
+        999,
+        988
+      ],
+      "background_removal_request_sha256": "5b6de92ab9be0659cfb63542892ca3c6fc148fd884b3f0bba930238be183fb86"
+    }
+  },
+  "background_removal": {
+    "model": "birefnet.safetensors",
+    "sha256": "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154",
+    "source": "https://huggingface.co/Comfy-Org/BiRefNet"
+  },
+  "review_notes": [
+    "Master refinement rejected for an extra arm; first master selected.",
+    "Backgrounds retain the source staging layouts; not pixel-identical geometry.",
+    "Quay contains small generated sign-like marks.",
+    "No engine/client integration or staging-hint changes in this pack."
+  ]
+}
