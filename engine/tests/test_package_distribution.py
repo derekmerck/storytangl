@@ -11,6 +11,8 @@ Run these against an installed package:
     pip install -e .
     pytest engine/tests/test_package_distribution.py
 """
+import os
+from pathlib import Path
 import subprocess
 import sys
 import pytest
@@ -83,6 +85,34 @@ class TestEntryPoints:
         assert callable(main_func)
 
 
+def _interpreter_scripts_on_path() -> bool:
+    """Whether this interpreter's script directory is on PATH.
+
+    Console scripts are only reachable from an activated environment. Invoking
+    the interpreter by absolute path — common in a worktree, or under a
+    launcher — leaves its ``bin``/``Scripts`` directory off PATH, which makes
+    the checks below inapplicable rather than failing. Entry-point *declaration*
+    is covered separately above and always runs.
+    """
+
+    script_dir = Path(sys.executable).parent.resolve()
+    return any(
+        Path(entry).resolve() == script_dir
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry
+    )
+
+
+requires_activated_env = pytest.mark.skipif(
+    not _interpreter_scripts_on_path(),
+    reason=(
+        "console scripts need an activated environment; "
+        f"{Path(sys.executable).parent} is not on PATH"
+    ),
+)
+
+
+@requires_activated_env
 class TestScriptInvocation:
     """Test that installed scripts actually run."""
 

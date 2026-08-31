@@ -18,8 +18,8 @@ from pathlib import Path
 import pygame
 
 from .bridge import PygameSessionBridge
-from .models import Turn
-from .stage import Stage
+from .models import StageImage, Turn
+from .stage import BACKGROUND_ROLES, Stage
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,32 @@ def _merge(turns: list[Turn]) -> Turn:
 
     Time Parity: the client may show intermediate steps, but must never trap the
     player below the CLI floor, which presents the whole batch at once.
+
+    Media is stage state rather than a transcript, so it is merged by identity
+    rather than concatenated. Consecutive steps in one batch restate the scene —
+    the dockhand contest and its aftermath both carry the same background and
+    portrait — and concatenating them draws a character twice, at two default
+    slots, since unslotted duplicates take successive positions.
+
+    The rule is deliberately small: one background, last one wins so a scene
+    change during the batch is not stale; other media keyed by role, source, and
+    slot, so two genuinely distinct portraits both survive while a restatement
+    of the same one does not. Later values replace earlier ones in place, which
+    keeps first-appearance order stable for default slot assignment.
     """
 
     merged = Turn(step=turns[-1].step if turns else 0)
+    staged: dict[tuple[str, ...], StageImage] = {}
     for turn in turns:
-        merged.images.extend(turn.images)
+        for image in turn.images:
+            key = (
+                ("background",)
+                if image.role in BACKGROUND_ROLES
+                else (image.role, image.source, image.x_slot or "")
+            )
+            staged[key] = image
         merged.lines.extend(turn.lines)
+    merged.images.extend(staged.values())
     merged.choices.extend(turns[-1].choices if turns else [])
     return merged
 
