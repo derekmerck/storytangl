@@ -90,12 +90,20 @@ def test_url_default_prefers_configured_worker(monkeypatch: pytest.MonkeyPatch) 
     assert args.url == "http://worker:8188"
 
 
-def test_url_default_falls_back_to_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("comfy_batch.configured_comfy_url", lambda: None)
-    from comfy_batch import build_parser
+def test_missing_configuration_is_an_error_not_a_guessed_host(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No host is assumed: an unreachable guess is no better than no worker."""
 
-    args = build_parser().parse_args(["submit", "w.j2", "--receipts", "r.json"])
-    assert args.url == "http://127.0.0.1:8188"
+    monkeypatch.setattr("comfy_batch.configured_comfy_url", lambda: None)
+    from comfy_batch import build_parser, main
+
+    assert build_parser().parse_args(["submit", "w.j2", "--receipts", "r.json"]).url is None
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["submit", "w.j2", "--receipts", "r.json"])
+    assert excinfo.value.code == 2
+    assert "no ComfyUI worker configured" in capsys.readouterr().err
 
 
 def test_explicit_url_overrides_configuration(monkeypatch: pytest.MonkeyPatch) -> None:

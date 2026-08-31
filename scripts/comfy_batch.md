@@ -11,10 +11,11 @@ use `/tmp` for receipts and downloaded images; choose durable storage for real w
 No SSH, server-local input paths, or new dependencies are required.
 
 `--url` defaults to the first configured
-`content.apis.stableforge.comfy_workers` entry, falling back to
-`http://127.0.0.1:8188`. Set it once rather than passing a host on every
-invocation — `settings.local.toml` is gitignored and is the right place for a
-machine-specific worker:
+`content.apis.stableforge.comfy_workers` entry. **There is no assumed default
+host** — with nothing configured and no `--url`, the helper exits with an error
+rather than guessing. A wrong host is no more useful than no host. Set it once
+rather than passing one on every invocation; `settings.local.toml` is gitignored
+and is the right place for a machine-specific worker:
 
 ```toml
 dynaconf_merge = true

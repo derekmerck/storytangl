@@ -21,7 +21,9 @@ there, debugging, or requested changes.
   and whether the user wants submission only or collected output. The worker URL
   comes from `content.apis.stableforge.comfy_workers` via
   `configured_comfy_url()`; `--url` defaults to it, so omit the flag unless
-  overriding. Never hard-code a host. Do not assume a model inventory or previous
+  overriding. Never hard-code a host. There is no assumed default: with nothing
+  configured the helper errors rather than trying localhost, so ask the user for
+  a URL instead of guessing one. Do not assume a model inventory or previous
   host availability — query `/object_info` on the target worker.
 - To reuse or replay an existing image's graph, recover it with
   `scripts/workflow_from_png.py`; see the helper guide's recovery section for what

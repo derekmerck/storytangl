@@ -314,10 +314,11 @@ def build_parser() -> argparse.ArgumentParser:
     for command in (submit, batch):
         command.add_argument(
             "--url",
-            default=configured_comfy_url() or "http://127.0.0.1:8188",
+            default=configured_comfy_url(),
             help=(
                 "ComfyUI endpoint. Defaults to the first configured "
-                "content.apis.stableforge.comfy_workers entry, else localhost."
+                "content.apis.stableforge.comfy_workers entry. Required when "
+                "no worker is configured; there is no assumed default host."
             ),
         )
         command.add_argument("--receipts", type=Path, required=True)
@@ -332,7 +333,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if getattr(args, "url", None) is None:
+        # No host is assumed. An unreachable guess is no better than no worker.
+        parser.error(
+            "no ComfyUI worker configured. Set "
+            "content.apis.stableforge.comfy_workers in settings.local.toml "
+            "(gitignored), or an equivalent TANGL_ environment variable, or "
+            "pass --url explicitly."
+        )
     try:
         if args.timeout <= 0 or not 0 < args.poll_interval <= 60:
             raise ValueError("Timeout must be positive and poll interval must be in (0, 60]")

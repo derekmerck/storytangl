@@ -25,9 +25,14 @@ reads it automatically, so **omit `--url`** unless targeting a different worker.
 COMFY=$(PYTHONPATH=engine/src python -c "from tangl.media.media_creators.comfy_forge._common import configured_comfy_url; print(configured_comfy_url() or '')")
 ```
 
-If that comes back empty, no worker is configured. Say so rather than guessing a
-host — `settings.local.toml` is gitignored and is where a machine-specific
-worker belongs:
+Outside a StoryTangl checkout, or for a one-shot with no settings, ask the user
+for the URL and pass `--url` for that session only.
+
+If that comes back empty, no worker is configured. **Ask the user for a worker
+URL rather than guessing one** — there is no default host, and `comfy_batch.py`
+will refuse to run instead of trying localhost. For repeated use, have them
+configure it; `settings.local.toml` is gitignored and is where a
+machine-specific worker belongs:
 
 ```toml
 dynaconf_merge = true
