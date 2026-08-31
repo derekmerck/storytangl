@@ -10,6 +10,22 @@ that is not installed, set `PYTHONPATH=engine/src` as shown below. The examples
 use `/tmp` for receipts and downloaded images; choose durable storage for real work.
 No SSH, server-local input paths, or new dependencies are required.
 
+`--url` defaults to the first configured
+`content.apis.stableforge.comfy_workers` entry, falling back to
+`http://127.0.0.1:8188`. Set it once rather than passing a host on every
+invocation — `settings.local.toml` is gitignored and is the right place for a
+machine-specific worker:
+
+```toml
+dynaconf_merge = true
+
+[content.apis.stableforge]
+comfy_workers = ["http://your-worker:8188"]
+```
+
+`TANGL_`-prefixed environment variables and `.secrets.toml` also work. Pass
+`--url` explicitly only to target a worker other than the configured one.
+
 ## First test: no models or source image
 
 The included stock-node workflow generates a 64×64 solid color:
@@ -17,7 +33,6 @@ The included stock-node workflow generates a 64×64 solid color:
 ```sh
 PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py submit \
   scripts/examples/comfy/solid_color.json.j2 \
-  --url http://titan2:8188 \
   --set color=3368652 \
   --receipts /tmp/comfy-toy/receipts.json \
   --wait --output-dir /tmp/comfy-toy/images
@@ -71,7 +86,6 @@ anonymize, or otherwise preprocess them.
 ```sh
 PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py submit \
   /path/to/restyle.json.j2 \
-  --url http://titan2:8188 \
   --prompt 'Render subject with loose ink and wash, watercolor blooms.' \
   --prompt 'Render subject with loose ink and wash, watercolor blooms, vague background.' \
   --image /path/to/one.webp --image /path/to/two.webp \
@@ -128,7 +142,7 @@ working directory. Job parameters override batch defaults; `images` is reserved.
 
 ```sh
 PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py batch /path/to/jobs.json \
-  --url http://titan2:8188 --receipts /tmp/comfy-explicit/receipts.json --wait
+  --receipts /tmp/comfy-explicit/receipts.json --wait
 ```
 
 No matrix language is added to manifests: callers can mechanically generate the

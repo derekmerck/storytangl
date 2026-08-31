@@ -18,7 +18,7 @@ from jinja2 import StrictUndefined, TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from tangl.media.media_creators.comfy_forge._common import history_error
+from tangl.media.media_creators.comfy_forge._common import configured_comfy_url, history_error
 from tangl.media.media_creators.comfy_forge.comfy_api import ComfyApi
 
 Workflow = dict[str, dict[str, JsonValue]]
@@ -310,7 +310,14 @@ def main(argv: list[str] | None = None) -> int:
     collect = commands.add_parser("collect", help="Collect a saved batch without resubmitting")
     collect.add_argument("receipts", type=Path)
     for command in (submit, batch):
-        command.add_argument("--url", default="http://127.0.0.1:8188")
+        command.add_argument(
+            "--url",
+            default=configured_comfy_url() or "http://127.0.0.1:8188",
+            help=(
+                "ComfyUI endpoint. Defaults to the first configured "
+                "content.apis.stableforge.comfy_workers entry, else localhost."
+            ),
+        )
         command.add_argument("--receipts", type=Path, required=True)
         command.add_argument("--dry-run", action="store_true", help="Prepare receipts offline")
     for command in (submit, batch, collect):
