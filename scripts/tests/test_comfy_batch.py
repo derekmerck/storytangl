@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
-import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -13,15 +11,8 @@ import pytest
 import requests
 from jinja2 import UndefinedError
 
+import comfy_batch as batch
 from tangl.media.media_creators.comfy_forge.comfy_api import ComfyApi
-
-spec = importlib.util.spec_from_file_location(
-    "comfy_batch", Path(__file__).resolve().parents[3] / "scripts/comfy_batch.py"
-)
-assert spec is not None and spec.loader is not None
-batch = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = batch
-spec.loader.exec_module(batch)
 
 TEMPLATE = '''{
   "1": {"class_type": "Example", "inputs": {

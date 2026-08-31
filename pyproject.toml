@@ -138,6 +138,7 @@ testpaths = [
     "engine/src/tangl/vm",
     "engine/tests",               # base tests
     "docs/tests",                 # docs tests
+    "scripts/tests",              # standalone helper tests (offline)
 #    "apps/**/tests",             # all apps tests
     "apps/cli/tests",             # cli tests
     "apps/renpy/tests",           # renpy adapter tests

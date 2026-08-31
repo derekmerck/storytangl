@@ -120,7 +120,21 @@ output types remain in raw history. Preserve output bytes/PNG metadata and hashe
 Request fingerprints do not pin installed model weights or custom-node versions.
 
 Exit codes: `0` successful submission/collection pass, `1` error, `2` wait expired,
-`130` interrupted. For requested helper changes, validate the focused tests under
-`engine/tests/media/test_comfy_batch.py` and
-`engine/tests/media/media_creators/comfy_forge/`; do not rewrite the helper for
-ordinary dispatch or duplicate its manual in this skill.
+`130` interrupted. For requested helper changes, run the offline suites that ordinary
+CI discovers:
+
+```sh
+PYTHONPATH=engine/src poetry run pytest \
+  scripts/tests \
+  engine/tests/media/media_creators/comfy_forge \
+  engine/tests/media/test_comfy_forge.py
+```
+
+`scripts/tests` owns the standalone helper, bundled templates, and PNG recovery
+contracts and refuses network access even when local worker settings exist. The
+engine paths own Comfy forge/spec/dispatcher behavior; their one real-worker test is
+collected but skipped unless `RUN_COMFY_INTEGRATION=1`. Run that opt-in test only when
+live rendering is authorized, using `COMFY_URL` or configured worker settings and an
+optional `COMFY_TEST_CHECKPOINT`. `scripts/comfy_smoke_test.py` is a separately invoked
+manual diagnostic, not a pytest suite. Do not rewrite the helper for ordinary dispatch
+or duplicate its manual in this skill.
