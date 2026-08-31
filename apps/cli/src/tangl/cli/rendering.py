@@ -261,8 +261,7 @@ def _plain_fragment_lines(fragment: Any) -> list[str]:
         return [f"{str(who).upper()}{aside}: {content}"]
     if ftype == "media":
         role = _read(fragment, "media_role") or _read(fragment, "role") or "media"
-        content = _fragment_text(fragment)
-        return [f"[{role}: {_basename(content)}]"]
+        return [f"[{role}: {_media_name(fragment)}]"]
     if ftype == "kv":
         content = _read(fragment, "content")
         if isinstance(content, list):
@@ -366,7 +365,7 @@ def _rich_media_placeholder(fragment: Any) -> Any:
     from rich.panel import Panel
 
     role = _read(fragment, "media_role") or _read(fragment, "role") or "media"
-    return Panel(_basename(_fragment_text(fragment)), title=str(role), expand=False)
+    return Panel(_media_name(fragment), title=str(role), expand=False)
 
 
 def _rich_projected_table(title: str, value: JsonMapping) -> Any | None:
@@ -696,6 +695,28 @@ def _line_pairs(lines: list[str]) -> list[tuple[str, str]]:
         else:
             pairs.append(("", line))
     return pairs
+
+
+def _media_name(fragment: Any) -> str:
+    """Name a media fragment for the text floor.
+
+    ``content`` is a ``MediaRIT`` object for inventory-backed media, so the
+    generic string accessor falls through to the fragment repr. Prefer the
+    resource's own label or path.
+    """
+
+    content = _read(fragment, "content")
+    for attr in ("label", "path"):
+        value = getattr(content, attr, None)
+        if value:
+            return _basename(str(value))
+    for attr in ("text", "fallback_text"):
+        value = _read(fragment, attr)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    if isinstance(content, str) and content.strip():
+        return _basename(content.strip())
+    return _read(fragment, "media_role") or "media"
 
 
 def _fragment_text(fragment: Any) -> str:
