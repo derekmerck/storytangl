@@ -138,7 +138,7 @@ def test_unloadable_media_degrades_to_its_text_floor(stage: Stage) -> None:
 def test_unloadable_media_without_alt_text_names_its_role(stage: Stage) -> None:
     from tangl.pygame_client.models import StageImage
 
-    image = StageImage(role="narrative_im_landscape", source="/absent/bg.png")
+    image = StageImage(role="narrative_im", source="/absent/bg.png")
     rows = stage._rows(Turn(step=1), [image])
 
-    assert any("narrative_im_landscape" in row.text for row in rows)
+    assert any("narrative_im" in row.text for row in rows)

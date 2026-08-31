@@ -114,17 +114,21 @@ def test_media_sources_are_read_from_service_payload_keys(
         "tangl.pygame_client.bridge.media_fragment_to_payload",
         lambda fragment, **_: {
             "fragment_type": "media",
-            "media_role": "narrative_im_landscape",
+            "media_role": "narrative_im",
             key: "/assets/bg_quay.png",
         },
     )
     fragment = MediaFragment(
-        content="bg_quay.png", content_format="url", media_role="narrative_im_landscape", step=1
+        content="bg_quay.png",
+        content_format="url",
+        media_role="narrative_im",
+        staging_hints={"media_shape": "landscape"},
+        step=1,
     )
 
     (image,) = bridge.build_turns([fragment])[0].images
     assert image.source == "/assets/bg_quay.png"
-    assert image.role == "narrative_im_landscape"
+    assert image.role == "narrative_im"
 
 
 def test_undereferenceable_media_degrades_to_payload_text(

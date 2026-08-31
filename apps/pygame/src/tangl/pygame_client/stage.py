@@ -34,7 +34,7 @@ class _Row:
 LOGICAL_SIZE = (320, 200)
 SCALE = 3
 
-BACKGROUND_ROLES = ("narrative_im_landscape", "narrative_im", "cover_im")
+BACKGROUND_ROLES = ("narrative_im", "cover_im")
 PORTRAIT_ROLES = ("dialog_im", "avatar_im")
 PORTRAIT_HEIGHT = 112
 MARGIN = 10
