@@ -17,9 +17,18 @@ commands. It owns the manifest schema, CLI flags, and receipt semantics. Inspect
 [the implementation](../../../scripts/comfy_batch.py) for behavior not covered
 there, debugging, or requested changes.
 
-- Establish the workflow, actual worker URL, parameters/variants, optional sources,
-  receipt location, and whether the user wants submission only or collected output.
-  Do not assume Titan2, localhost, a model inventory, or previous host availability.
+- Establish the workflow, parameters/variants, optional sources, receipt location,
+  and whether the user wants submission only or collected output. The worker URL
+  comes from `content.apis.stableforge.comfy_workers` via
+  `configured_comfy_url()`; `--url` defaults to it, so omit the flag unless
+  overriding. Never hard-code a host. There is no assumed default: with nothing
+  configured the helper errors rather than trying localhost, so ask the user for
+  a URL instead of guessing one. Do not assume a model inventory or previous
+  host availability — query `/object_info` on the target worker.
+- To reuse or replay an existing image's graph, recover it with
+  `scripts/workflow_from_png.py`; see the helper guide's recovery section for what
+  the metadata does and does not carry. Bundled example workflows, including
+  model-free smoke templates, live in `scripts/examples/comfy/`.
 - Run from the repository root in its existing Python environment. The documented
   command is `PYTHONPATH=engine/src poetry run python scripts/comfy_batch.py ...`.
   If Poetry selects an incomplete environment, use a verified existing project
@@ -111,7 +120,21 @@ output types remain in raw history. Preserve output bytes/PNG metadata and hashe
 Request fingerprints do not pin installed model weights or custom-node versions.
 
 Exit codes: `0` successful submission/collection pass, `1` error, `2` wait expired,
-`130` interrupted. For requested helper changes, validate the focused tests under
-`engine/tests/media/test_comfy_batch.py` and
-`engine/tests/media/media_creators/comfy_forge/`; do not rewrite the helper for
-ordinary dispatch or duplicate its manual in this skill.
+`130` interrupted. For requested helper changes, run the offline suites that ordinary
+CI discovers:
+
+```sh
+PYTHONPATH=engine/src poetry run pytest \
+  scripts/tests \
+  engine/tests/media/media_creators/comfy_forge \
+  engine/tests/media/test_comfy_forge.py
+```
+
+`scripts/tests` owns the standalone helper, bundled templates, and PNG recovery
+contracts and refuses network access even when local worker settings exist. The
+engine paths own Comfy forge/spec/dispatcher behavior; their one real-worker test is
+collected but skipped unless `RUN_COMFY_INTEGRATION=1`. Run that opt-in test only when
+live rendering is authorized, using `COMFY_URL` or configured worker settings and an
+optional `COMFY_TEST_CHECKPOINT`. `scripts/comfy_smoke_test.py` is a separately invoked
+manual diagnostic, not a pytest suite. Do not rewrite the helper for ordinary dispatch
+or duplicate its manual in this skill.

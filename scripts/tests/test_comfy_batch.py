@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
-import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -13,15 +11,8 @@ import pytest
 import requests
 from jinja2 import UndefinedError
 
+import comfy_batch as batch
 from tangl.media.media_creators.comfy_forge.comfy_api import ComfyApi
-
-spec = importlib.util.spec_from_file_location(
-    "comfy_batch", Path(__file__).resolve().parents[3] / "scripts/comfy_batch.py"
-)
-assert spec is not None and spec.loader is not None
-batch = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = batch
-spec.loader.exec_module(batch)
 
 TEMPLATE = '''{
   "1": {"class_type": "Example", "inputs": {
@@ -49,6 +40,10 @@ def prepare(
         for n in range(count)
     ], api.endpoint())
 
+
+# CLI tests target an explicit endpoint so they never depend on whether the
+# host happens to have a worker configured.
+OFFLINE_ENDPOINT = "http://worker:8188"
 
 class TestTemplateAndIdentity:
     def test_json_escaping_types_and_nonrecursive_prompt(self) -> None:
@@ -293,6 +288,49 @@ class TestCLI:
             assert batch.main(["collect", str(path), "--wait"]) == 0
         assert api.queue_prompt.call_count == 1
 
+    @pytest.mark.parametrize("wait", [False, True])
+    @pytest.mark.parametrize("mixed", [False, True])
+    def test_collect_rejects_unsubmitted_prepared_jobs(
+        self, api: Mock, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        wait: bool, mixed: bool,
+    ) -> None:
+        receipt = prepare(api, count=2 if mixed else 1)
+        if mixed:
+            receipt.jobs[0].status = "completed"
+            receipt.jobs[0].prompt_id = "finished-job"
+            receipt.jobs[0].history = {"status": {"completed": True}, "outputs": {}}
+        path = tmp_path / "receipts.json"
+        batch.save_receipt(path, receipt)
+        before = path.read_bytes()
+        with patch.object(batch, "ComfyApi", return_value=api):
+            assert batch.main([
+                "collect", str(path), "--output-dir", str(tmp_path / "out"),
+                *(["--wait"] if wait else []),
+            ]) == 1
+        assert "Submit first" in capsys.readouterr().err
+        api.get_history.assert_not_called()
+        api.fetch_image_bytes.assert_not_called()
+        api.queue_prompt.assert_not_called()
+        api.upload_image.assert_not_called()
+        assert path.read_bytes() == before
+
+    @pytest.mark.parametrize("status", ["submitting", "submission_unknown"])
+    def test_collect_does_not_retry_uncertain_submissions(
+        self, api: Mock, tmp_path: Path, capsys: pytest.CaptureFixture[str], status: str,
+    ) -> None:
+        receipt = prepare(api)
+        receipt.jobs[0].status = status
+        path = tmp_path / "receipts.json"
+        batch.save_receipt(path, receipt)
+        before = path.read_bytes()
+        with patch.object(batch, "ComfyApi", return_value=api):
+            assert batch.main(["collect", str(path), "--wait"]) == 1
+        assert "Submit first" not in capsys.readouterr().err
+        api.get_history.assert_not_called()
+        api.queue_prompt.assert_not_called()
+        api.upload_image.assert_not_called()
+        assert path.read_bytes() == before
+
     def test_all_manifest_jobs_validate_before_dispatch(self, api: Mock, tmp_path: Path) -> None:
         template = tmp_path / "workflow.json.j2"
         template.write_text(TEMPLATE)
@@ -306,7 +344,8 @@ class TestCLI:
         }))
         with patch.object(batch, "ComfyApi", return_value=api):
             assert batch.main([
-                "batch", str(manifest), "--receipts", str(tmp_path / "receipts.json")
+                "batch", str(manifest), "--receipts", str(tmp_path / "receipts.json"),
+                "--url", OFFLINE_ENDPOINT,
             ]) == 1
         api.queue_prompt.assert_not_called()
         api.upload_image.assert_not_called()
@@ -324,7 +363,7 @@ class TestCLI:
             assert batch.main([
                 "submit", str(template), "--prompt", "ink", "--prompt", "pixel",
                 "--seed", "910", "--seed", "911", "--image", str(image),
-                "--receipts", str(path), "--dry-run",
+                "--receipts", str(path), "--url", OFFLINE_ENDPOINT, "--dry-run",
             ]) == 0
         submit.assert_not_called()
         upload.assert_not_called()
@@ -342,7 +381,10 @@ class TestCLI:
             "jobs": [{"params": {"seed": 2}, "images": {"front": "one.webp", "back": "two.webp"}}],
         }))
         path = tmp_path / "receipts.json"
-        assert batch.main(["batch", str(manifest), "--receipts", str(path), "--dry-run"]) == 0
+        assert batch.main([
+            "batch", str(manifest), "--receipts", str(path),
+            "--url", OFFLINE_ENDPOINT, "--dry-run",
+        ]) == 0
         receipt = batch.BatchReceipt.model_validate_json(path.read_text())
         assert receipt.jobs[0].params == {"prompt": "ink", "seed": 2}
         assert set(receipt.jobs[0].sources) == {"front", "back"}
@@ -353,7 +395,7 @@ class TestCLI:
         with patch.object(batch, "ComfyApi", return_value=api):
             assert batch.main([
                 "submit", str(template), "--prompt", "ink", "--seed", "1",
-                "--receipts", str(tmp_path / "receipt.json"),
+                "--receipts", str(tmp_path / "receipt.json"), "--url", OFFLINE_ENDPOINT,
             ]) == 0
         api.get_history.assert_not_called()
 
@@ -363,6 +405,6 @@ class TestCLI:
         with patch.object(batch, "ComfyApi", return_value=api):
             assert batch.main([
                 "submit", "unused.json", "--timeout", "0",
-                "--receipts", str(tmp_path / "receipt.json"),
+                "--receipts", str(tmp_path / "receipt.json"), "--url", OFFLINE_ENDPOINT,
             ]) == 1
         api.queue_prompt.assert_not_called()

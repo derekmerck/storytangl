@@ -18,7 +18,7 @@ from jinja2 import StrictUndefined, TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from tangl.media.media_creators.comfy_forge._common import history_error
+from tangl.media.media_creators.comfy_forge._common import configured_comfy_url, history_error
 from tangl.media.media_creators.comfy_forge.comfy_api import ComfyApi
 
 Workflow = dict[str, dict[str, JsonValue]]
@@ -249,6 +249,11 @@ def collect_jobs(
         raise ValueError("Timeout must be positive and poll interval must be in (0, 60]")
     if receipt.endpoint != api.endpoint():
         raise ValueError("Receipt endpoint does not match the worker")
+    if any(job.status == "prepared" for job in receipt.jobs):
+        raise ValueError(
+            "Receipt contains unsubmitted jobs. Submit first: rerun the original "
+            "submit/batch command without --dry-run, using the same receipt path."
+        )
     deadline = time.monotonic() + timeout
     downloaded: set[str] = set()
     while True:
@@ -296,7 +301,9 @@ def assignments(values: list[str]) -> dict[str, JsonValue]:
     return result
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser. Exposed so offline tests can assert defaults."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     submit = commands.add_parser("submit", help="One job, or prompts × images × seeds")
@@ -310,7 +317,15 @@ def main(argv: list[str] | None = None) -> int:
     collect = commands.add_parser("collect", help="Collect a saved batch without resubmitting")
     collect.add_argument("receipts", type=Path)
     for command in (submit, batch):
-        command.add_argument("--url", default="http://127.0.0.1:8188")
+        command.add_argument(
+            "--url",
+            default=configured_comfy_url(),
+            help=(
+                "ComfyUI endpoint. Defaults to the first configured "
+                "content.apis.stableforge.comfy_workers entry. Required when "
+                "no worker is configured; there is no assumed default host."
+            ),
+        )
         command.add_argument("--receipts", type=Path, required=True)
         command.add_argument("--dry-run", action="store_true", help="Prepare receipts offline")
     for command in (submit, batch, collect):
@@ -319,10 +334,24 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--http-timeout", type=float, default=30)
         command.add_argument("--poll-interval", type=float, default=2)
         command.add_argument("--output-dir", type=Path, help="Download images outside the repo")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     try:
         if args.timeout <= 0 or not 0 < args.poll_interval <= 60:
             raise ValueError("Timeout must be positive and poll interval must be in (0, 60]")
+        # `collect` is exempt: it uses the endpoint bound to its receipt and
+        # never defines --url. No host is assumed for the others; an
+        # unreachable guess is no better than no worker at all.
+        if hasattr(args, "url") and args.url is None:
+            raise ValueError(
+                "No ComfyUI worker configured. Set "
+                "content.apis.stableforge.comfy_workers in settings.local.toml "
+                "(gitignored), or an equivalent TANGL_ environment variable, or "
+                "pass --url explicitly."
+            )
         if args.output_dir and args.output_dir.resolve().is_relative_to(REPO_ROOT):
             raise ValueError("Download media outside the repository (PNG/JPG Git LFS safety)")
         if args.command == "collect":

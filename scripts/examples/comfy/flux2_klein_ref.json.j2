@@ -1,0 +1,72 @@
+{
+  "unet": {
+    "class_type": "UNETLoader",
+    "inputs": {"unet_name": "flux-2-klein-4b-fp8.safetensors", "weight_dtype": "default"}
+  },
+  "clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "flux2"}
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {"vae_name": "flux2-vae.safetensors"}
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {"clip": ["clip", 0], "text": {{ prompt | tojson }}}
+  },
+  "load_ref": {
+    "class_type": "LoadImage",
+    "inputs": {"image": {{ images.source | tojson }}}
+  },
+  "scale_ref": {
+    "class_type": "FluxKontextImageScale",
+    "inputs": {"image": ["load_ref", 0]}
+  },
+  "encode_ref": {
+    "class_type": "VAEEncode",
+    "inputs": {"pixels": ["scale_ref", 0], "vae": ["vae", 0]}
+  },
+  "reference": {
+    "class_type": "ReferenceLatent",
+    "inputs": {"conditioning": ["positive", 0], "latent": ["encode_ref", 0]}
+  },
+  "latent": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {"width": {{ width }}, "height": {{ height }}, "batch_size": 1}
+  },
+  "sigmas": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {"steps": {{ steps }}, "width": {{ width }}, "height": {{ height }}}
+  },
+  "noise": {
+    "class_type": "RandomNoise",
+    "inputs": {"noise_seed": {{ seed }}}
+  },
+  "guider": {
+    "class_type": "BasicGuider",
+    "inputs": {"model": ["unet", 0], "conditioning": ["reference", 0]}
+  },
+  "sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {"sampler_name": "euler"}
+  },
+  "sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["noise", 0],
+      "guider": ["guider", 0],
+      "sampler": ["sampler", 0],
+      "sigmas": ["sigmas", 0],
+      "latent_image": ["latent", 0]
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {"samples": ["sample", 0], "vae": ["vae", 0]}
+  },
+  "save": {
+    "class_type": "SaveImage",
+    "inputs": {"images": ["decode", 0], "filename_prefix": {{ prefix | tojson }}}
+  }
+}

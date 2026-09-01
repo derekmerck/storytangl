@@ -19,6 +19,7 @@ from PIL import Image
 
 from tangl.journal.media import MediaFragment
 from tangl.media.media_creators.comfy_forge import ComfyApi, ComfySpec
+from tangl.media.media_creators.comfy_forge._common import configured_comfy_url
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
@@ -306,7 +307,9 @@ class TestComfyLiveIntegration:
     def test_real_comfy_dispatcher_returns_image_bytes_from_comfy_spec(self) -> None:
         from tangl.media.media_creators.comfy_forge import ComfyDispatcher
 
-        url = os.environ.get("COMFY_URL", "titan2.lan:8188")
+        url = os.environ.get("COMFY_URL") or configured_comfy_url()
+        if url is None:
+            pytest.skip("No ComfyUI worker configured")
         api = ComfyApi(url)
         checkpoint = os.environ.get("COMFY_TEST_CHECKPOINT")
         if checkpoint is None:
