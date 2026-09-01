@@ -362,8 +362,11 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         if not build.cost_growth or purchased <= 0:
             return dict(build.cost)
         multiplier = (1.0 + build.cost_growth) ** purchased
+        # Round before ceiling: 100 * 1.1 is 110.00000000000001 in binary
+        # floating point, and ceiling that would overcharge by one unit at
+        # every exact point on the curve.
         return {
-            label: math.ceil(amount * multiplier)
+            label: math.ceil(round(amount * multiplier, 9))
             for label, amount in build.cost.items()
         }
 

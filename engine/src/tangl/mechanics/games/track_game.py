@@ -49,12 +49,12 @@ from typing import ClassVar
 
 from pydantic import Field
 
-from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
 from .game import Game
+from .game_token import GameTokenType, discrete_token_class
 from .handler import GameHandler
 from .strategies import opponent_strategies
 
@@ -75,22 +75,35 @@ class TrackMove:
         return self.token_id == FORFEIT_TOKEN
 
 
-class TrackToken(BaseModelPlus):
-    """One racing token's position state.
+class RacingPieceType(GameTokenType):
+    """Frozen definition of a racing piece, plus its mutable per-piece state.
+
+    Fields marked ``instance_var`` are materialized as writable fields on the
+    token wrapper, so the definition stays shared and immutable while each
+    piece carries its own seat, position, and status.
 
     ``position`` counts steps advanced from the start, so the board index is
     ``position % track_length`` and the exact-landing rule is a comparison
-    against ``finish_distance``. ``None`` means the token sits in the pile.
+    against ``finish_distance``. ``None`` means the piece sits in the pile.
     """
 
-    owner: str
-    token_id: int
-    position: int | None = None
-    finished: bool = False
+    owner: str = Field("player", json_schema_extra={"instance_var": True})
+    token_id: int = Field(0, json_schema_extra={"instance_var": True})
+    position: int | None = Field(None, json_schema_extra={"instance_var": True})
+    finished: bool = Field(False, json_schema_extra={"instance_var": True})
+
+
+#: Default piece definition. Worlds may register their own — a lacquered
+#: marble, a carved horse — and point ``TrackGame.piece_type`` at it.
+DEFAULT_PIECE_LABEL = "racing_piece"
+
+
+class TrackToken(discrete_token_class(RacingPieceType, "TrackToken")):
+    """One racing piece: a graph-capable token over a shared definition."""
 
     @property
     def in_pile(self) -> bool:
-        """True when this token is waiting in the pile."""
+        """True when this piece is waiting in the pile."""
 
         return self.position is None and not self.finished
 
@@ -100,6 +113,13 @@ class TrackToken(BaseModelPlus):
         if self.position is None or self.finished:
             return None
         return self.position % track_length
+
+
+def _ensure_default_piece_type() -> None:
+    """Register the stock piece definition if a world has not supplied one."""
+
+    if RacingPieceType.get_instance(DEFAULT_PIECE_LABEL) is None:
+        RacingPieceType(label=DEFAULT_PIECE_LABEL, description="a racing piece")
 
 
 class TrackGame(Game[TrackMove]):
@@ -112,6 +132,10 @@ class TrackGame(Game[TrackMove]):
     finish_distance: int = 24
     tokens_per_side: int = 3
     tokens_to_finish: int = 1
+
+    #: Piece definition label. Worlds may register their own ``RacingPieceType``
+    #: and name it here to give a table its own marbles.
+    piece_type: str = DEFAULT_PIECE_LABEL
 
     #: Board-index redirections: landing on a key square moves the token to the
     #: value square. Ladders point forward, chutes point back. Applied once, so
@@ -307,8 +331,15 @@ class TrackGameHandler(GameHandler[TrackGame]):
     game_cls: ClassVar[type[Game]] = TrackGame
 
     def on_setup(self, game: TrackGame) -> None:
+        if game.piece_type == DEFAULT_PIECE_LABEL:
+            _ensure_default_piece_type()
         game.tokens = [
-            TrackToken(owner=owner, token_id=index)
+            TrackToken(
+                token_from=game.piece_type,
+                label=f"{owner}-{index}",
+                owner=owner,
+                token_id=index,
+            )
             for owner in ("player", "opponent")
             for index in range(game.tokens_per_side)
         ]
@@ -539,7 +570,9 @@ def _threatened_indices(game: TrackGame, threatening_owner: str) -> set[int]:
     for token in game.owned_tokens(threatening_owner):
         if not game.is_legal(token, roll):
             continue
-        target = game.target_position(token, roll)
+        # Danger is where an attacker comes to rest, after any redirect, not
+        # where it first arrives.
+        target = game.resolve_landing(token, roll)
         if target != game.finish_distance:
             indices.add(target % game.track_length)
     return indices
@@ -612,6 +645,56 @@ def _track_hapless(game: TrackGame, **ctx) -> TrackMove:
     )
 
 
+def _evicted_by_player(game: TrackGame, player_move: TrackMove | None) -> set[int]:
+    """Return board indices the player's committed move will clear."""
+
+    if player_move is None or player_move.is_forfeit:
+        return set()
+    token = game.get_token("player", player_move.token_id)
+    if token is None or not game.is_legal(token, game.player_roll):
+        return set()
+    landing = game.resolve_landing(token, game.player_roll)
+    if landing == game.finish_distance:
+        return set()
+    return {landing % game.track_length}
+
+
+def _projected_player_squares(
+    game: TrackGame,
+    player_move: TrackMove | None,
+) -> list[tuple[int, int]]:
+    """Return the player's post-move (position, board index) pairs.
+
+    Most advanced first, so a hunter goes after the leader. The token named by
+    ``player_move`` is projected to where it will land; the rest stand still.
+    """
+
+    moved_id = None
+    landing = None
+    if player_move is not None and not player_move.is_forfeit:
+        token = game.get_token("player", player_move.token_id)
+        if token is not None and game.is_legal(token, game.player_roll):
+            moved_id = player_move.token_id
+            landing = game.resolve_landing(token, game.player_roll)
+
+    squares: list[tuple[int, int]] = []
+    for token in game.owned_tokens("player"):
+        if token.finished:
+            continue
+        if token.token_id == moved_id:
+            if landing == game.finish_distance:
+                continue  # about to leave the board entirely
+            position = landing
+        elif token.position is None:
+            continue
+        else:
+            position = token.position
+        squares.append((position, position % game.track_length))
+
+    squares.sort(key=lambda pair: pair[0], reverse=True)
+    return squares
+
+
 @opponent_strategies.register("track_force_capture")
 def _track_force_capture(game: TrackGame, player_move: TrackMove | None = None, **ctx) -> TrackMove:
     """Revise after the player commits so the rival lands a capture if it can.
@@ -624,23 +707,22 @@ def _track_force_capture(game: TrackGame, player_move: TrackMove | None = None, 
     no capture can be manufactured.
     """
 
-    _ = player_move
-    targets = sorted(
-        (token for token in game.owned_tokens("player") if not token.finished and token.position is not None),
-        key=lambda token: token.position or 0,
-        reverse=True,
-    )
-    for victim in targets:
-        victim_index = victim.board_index(game.track_length)
+    # Revision runs after the player commits but before the round resolves, so
+    # hunt where the player's pieces will *be*, not where they are now.
+    projected = _projected_player_squares(game, player_move)
+
+    for _, victim_index in projected:
         for hunter in game.owned_tokens("opponent"):
             if hunter.finished:
                 continue
             base = 0 if hunter.position is None else hunter.position
+            if hunter.board_index(game.track_length) in _evicted_by_player(game, player_move):
+                base = 0  # the player's move sends this hunter back to the pile
             for roll in range(game.min_roll, game.max_roll + 1):
                 target = base + roll
                 if target >= game.finish_distance:
                     continue
-                if target % game.track_length != victim_index:
+                if game.landing_from(base, roll) % game.track_length != victim_index:
                     continue
                 game.opponent_roll = roll
                 return TrackMove(token_id=hunter.token_id)

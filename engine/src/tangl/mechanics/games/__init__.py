@@ -90,7 +90,23 @@ from .incremental_game import (
     TaskSpec,
 )
 from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, TwentyTwoGame, TwentyTwoGameHandler
-from .track_game import FORFEIT_TOKEN, TrackGame, TrackGameHandler, TrackMove, TrackToken
+from .game_token import (
+    DiscreteGameToken,
+    FungibleGameToken,
+    GameTokenType,
+    discrete_token_class,
+    dominant_affiliation,
+    value_by_affiliation,
+)
+from .track_game import (
+    DEFAULT_PIECE_LABEL,
+    FORFEIT_TOKEN,
+    RacingPieceType,
+    TrackGame,
+    TrackGameHandler,
+    TrackMove,
+    TrackToken,
+)
 from .track_analysis import (
     TrackAnalysis,
     analyze_track,
@@ -208,6 +224,14 @@ __all__ = [
     "TrackGameHandler",
     "TrackMove",
     "TrackToken",
+    "DEFAULT_PIECE_LABEL",
+    "RacingPieceType",
+    "DiscreteGameToken",
+    "FungibleGameToken",
+    "GameTokenType",
+    "discrete_token_class",
+    "dominant_affiliation",
+    "value_by_affiliation",
     "TrackAnalysis",
     "analyze_track",
     "expected_rolls_to_finish",

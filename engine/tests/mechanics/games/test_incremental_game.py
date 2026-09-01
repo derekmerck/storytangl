@@ -351,3 +351,45 @@ class TestIncrementalEphemeralResources:
 
         assert result.name == "WIN"
         assert game.resources.get("labor", 0) == 0
+
+
+class TestIncrementalCostArithmetic:
+    """Escalation must not overcharge on binary-float noise."""
+
+    def test_exact_curve_points_are_not_rounded_up(self) -> None:
+        game = _sample_game(
+            starting_resources={"gold": 1000},
+            build_specs={"mill": BuildSpec(cost={"gold": 100}, cost_growth=0.1)},
+            unlocked_builds=["mill"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="mill"))
+
+        # 100 * 1.1 is 110.00000000000001 in binary floating point; ceiling
+        # that unrounded would charge 111.
+        assert handler.get_build_cost(game, "mill") == {"gold": 110}
+        assert game.resources["gold"] == 900
+
+    def test_escalation_stays_monotone_across_many_purchases(self) -> None:
+        game = _sample_game(
+            starting_resources={"gold": 100_000},
+            build_specs={"mill": BuildSpec(cost={"gold": 100}, cost_growth=0.1)},
+            unlocked_builds=["mill"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        costs = []
+        for _ in range(8):
+            costs.append(handler.get_build_cost(game, "mill")["gold"])
+            handler.receive_move(game, IncrementalMove(kind="build", target="mill"))
+
+        assert costs == sorted(costs)
+        assert costs[0] == 100
+        assert costs[1] == 110

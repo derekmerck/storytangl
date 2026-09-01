@@ -366,3 +366,46 @@ class TestRedirectSquares:
         # so it does not apply and the token rests on the arrival square.
         assert game.get_token("player", 0).position == 4
         assert "player_redirected" not in (game.last_round.notes or {})
+
+
+class TestReviewRegressions:
+    """Cases raised in review of the original board-rung PR."""
+
+    def test_forced_capture_targets_the_post_move_position(self) -> None:
+        # The leader is at 6 and is committed to move to 7. Hunting its old
+        # square would land the rival on an empty space.
+        game, handler = _ready(
+            roll_sequence=[1],
+            opponent_strategy="track_optimal",
+            opponent_revision_strategy="track_force_capture",
+        )
+        _place(game, "player", 0, 6)
+        _place(game, "player", 1, None)
+        _place(game, "opponent", 0, 2)
+        _place(game, "opponent", 1, None)
+
+        handler.receive_move(game, TrackMove(token_id=0))
+
+        notes = game.last_round.notes or {}
+        assert notes["opponent_roll"] == 5      # 2 -> 7, not 2 -> 6
+        assert notes["opponent_evicted"] == {"owner": "player", "token_id": 0}
+
+    def test_danger_is_measured_after_redirects(self) -> None:
+        # The player would arrive on index 5 but a chute carries it to index 1,
+        # so an opponent token resting on index 5 is not actually threatened
+        # and must not earn an escape bonus over a more advanced token.
+        game, handler = _ready(
+            track_length=8,
+            finish_distance=30,
+            roll_sequence=[2],
+            redirects={5: 1},
+            opponent_strategy="track_optimal",
+        )
+        _place(game, "player", 0, 3)
+        _place(game, "player", 1, None)
+        _place(game, "opponent", 0, 5)
+        _place(game, "opponent", 1, 6)
+
+        handler._preselect_opponent_move(game)
+
+        assert game.opponent_next_move.token_id == 1
