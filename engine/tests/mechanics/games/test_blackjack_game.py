@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from tangl.core import Graph
+from tangl.core import Graph, Token
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.blackjack_game import (
     BlackjackGame,
     BlackjackGameHandler,
     BlackjackMove,
     PlayingCard,
+    PlayingCardType,
 )
 from tangl.mechanics.games.handlers import inject_game_context, provision_game_moves
 from tangl.story import Action, Block
@@ -16,7 +17,7 @@ from tangl.vm import Frame, Ledger, TraversableEdge as ChoiceEdge
 
 
 def _card(rank: int, suit: str) -> PlayingCard:
-    return PlayingCard(rank=rank, suit=suit)
+    return PlayingCard.of(rank, suit)
 
 
 def _make_ledger(graph: Graph, start_node: Block) -> Ledger:
@@ -172,3 +173,72 @@ class TestBlackjackIntegration:
 
         assert namespace["blackjack_player_total"] >= 0
         assert namespace["blackjack_dealer_visible_hand"]
+
+
+class TestCardsAsTokens:
+    """Cards are tokens over a shared deck definition."""
+
+    def test_a_card_is_a_canonical_token(self) -> None:
+        assert issubclass(PlayingCard, Token)
+
+    def test_rank_and_suit_come_from_the_frozen_definition(self) -> None:
+        card = PlayingCard.of(12, "d")
+
+        assert card.short_name == "QD"
+        assert (card.rank, card.suit) == (12, "d")
+        assert card.token_from == "QD"
+
+    def test_suit_doubles_as_the_affiliation(self) -> None:
+        # which is what gives suit-sensitive card games the shared helpers
+        assert PlayingCard.of(7, "h").affiliation == "h"
+
+    def test_two_dealt_cards_share_one_definition(self) -> None:
+        first = PlayingCard.of(1, "s")
+        second = PlayingCard.of(1, "s")
+
+        assert first.uid != second.uid
+        assert first.token_from == second.token_from
+
+    def test_face_up_is_per_card_not_per_definition(self) -> None:
+        card = PlayingCard.of(1, "s")
+        card.face_up = False
+
+        assert PlayingCardType.get_instance("AS").face_up is True
+        assert PlayingCard.of(1, "s").face_up is True
+
+    def test_a_fresh_deck_holds_fifty_two_distinct_cards(self) -> None:
+        deck = PlayingCard.fresh_deck(seed=3)
+
+        assert len(deck) == 52
+        assert len({card.short_name for card in deck}) == 52
+
+
+class TestHoleCard:
+    """The dealer's hole card is face down rather than positionally hidden."""
+
+    def test_the_second_dealer_card_is_dealt_face_down(self) -> None:
+        game = BlackjackGame(shuffle_seed=5)
+        BlackjackGameHandler().setup(game)
+
+        assert [card.face_up for card in game.dealer_hand] == [True, False]
+        assert len(game.visible_dealer_hand) == 1
+
+    def test_turning_the_hole_card_over_reveals_it(self) -> None:
+        game = BlackjackGame(shuffle_seed=5)
+        BlackjackGameHandler().setup(game)
+
+        game.dealer_hand[1].face_up = True
+
+        assert len(game.visible_dealer_hand) == 2
+        assert game.to_namespace()["blackjack_dealer_visible_total"] == game.dealer_total
+
+    def test_a_terminal_hand_shows_everything(self) -> None:
+        game = BlackjackGame(shuffle_seed=5)
+        handler = BlackjackGameHandler()
+        handler.setup(game)
+
+        while handler.get_available_moves(game):
+            handler.receive_move(game, BlackjackMove.STAND)
+
+        assert game.result.is_terminal
+        assert len(game.visible_dealer_hand) == len(game.dealer_hand)

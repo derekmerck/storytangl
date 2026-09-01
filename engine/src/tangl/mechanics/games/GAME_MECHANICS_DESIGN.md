@@ -178,13 +178,18 @@ knight; the 7♠ is a seven of spades) with mutable per-instance state (this
 knight is on e4 and has castled; this card is face-down in the discard).
 Position at the board rung is an ordinary `instance_var`, not a new mechanism.
 
-That pattern is already load-bearing in three places — `PhraseBadge` in
-`repertoire.py`, `CredentialComponentToken`, and `VehicleComponentToken` — so
-the upper rungs are not speculative. What remains is that the older kernels
-predate it: `NimGame.heap_size` is a bare `int`, `AggregateForceGame` reserves
-and `IncrementalGame` resources are bare `dict[str, int]`, and blackjack carries
-a private `PlayingCard` model. Reconciling those is a second-consumer task, not
-a prerequisite for the ladder.
+That pattern is load-bearing across the family — `PhraseBadge` in
+`repertoire.py`, `CredentialComponentToken`, `VehicleComponentToken`,
+`TrackToken`, and `PlayingCard` — and the token-rung kernels hold their piles in
+`AssetWallet`s. Blackjack is the clearest illustration of the split: a card's
+rank and suit are frozen definition, while `face_up` is per-instance state, so
+the same seven of spades is a hole card in one hand and an upcard in another.
+Suit doubles as its affiliation, which hands suit-sensitive card games the
+shared grouping helpers without further work.
+
+`IncrementalGame.resources` remains a bare `dict[str, int]`. Its resources are
+an economy rather than a set of pieces, so the case for converting it is weaker
+and waits on a consumer.
 
 ### Heaps Are Token Types, and the Token Rung Is One Kernel
 
@@ -332,7 +337,7 @@ the rungs enumerable and world-legible instead of implicit in each kernel.
 | `AggregateForceGame`, `BagRpsGame`, `SiegeRpsGame` | token | reserves as wallets of coloured, weighted tokens; composition without per-unit identity |
 | `PickingGame`, `KimGame` | verb over token/named | picking axis, rung varies by host |
 | `CredentialsGame` | named token | stacked picking composition |
-| `BlackjackGame` | named token | honest rung; cards are private to the module rather than shared |
+| `BlackjackGame` | named token | cards are `Token`s over a standard-deck definition; rank and suit are frozen identity, `face_up` is per-card state, suit doubles as affiliation |
 | `CorridorGame` | card, scalarized | identity deliberately projected away |
 | `TrackGame` | board | cyclic index, assignable rolls, exact-landing finish, eviction, redirection squares; no-choice race boards are its degenerate configuration |
 | `IncrementalGame` | incremental | geometric build-cost escalation (`BuildSpec.cost_growth`) and non-bankable `ephemeral_resources` give it the accelerate-then-wall pacing the rung requires; per-player discount/productivity/efficiency multipliers remain unbuilt |

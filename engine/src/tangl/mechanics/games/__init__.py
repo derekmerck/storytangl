@@ -73,7 +73,14 @@ from .handlers import (
     process_game_move,
     provision_game_moves,
 )
-from .blackjack_game import BlackjackGame, BlackjackGameHandler, BlackjackMove, PlayingCard
+from .blackjack_game import (
+    BlackjackGame,
+    BlackjackGameHandler,
+    BlackjackMove,
+    PlayingCard,
+    PlayingCardType,
+    ensure_standard_deck,
+)
 from .nim_game import DEFAULT_HEAP, NimGame, NimGameHandler, NimMove
 from .aggregate_force_game import (
     AggregateForceGame,
@@ -207,6 +214,8 @@ __all__ = [
     "BlackjackGameHandler",
     "BlackjackMove",
     "PlayingCard",
+    "PlayingCardType",
+    "ensure_standard_deck",
     "NimGame",
     "NimGameHandler",
     "NimMove",
