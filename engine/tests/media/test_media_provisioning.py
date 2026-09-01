@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 
+import pytest
+
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_data_type import MediaDataType
-from tangl.media.media_resource.media_provisioning import MediaProvisioner
+from tangl.media.media_resource.media_provisioning import MediaProvisioner, _coerce_media_type
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag
 from tangl.core import Selector
@@ -69,3 +71,10 @@ def test_media_dep_sanitizes_media_basename_from_label() -> None:
     )
 
     assert dep.requirement.media_basename == "Hero_Banner"
+
+
+def test_provisioning_rejects_filename_extensions_as_explicit_media_types() -> None:
+    assert _coerce_media_type("IMAGE") is MediaDataType.IMAGE
+
+    with pytest.raises(ValueError):
+        _coerce_media_type("png")
