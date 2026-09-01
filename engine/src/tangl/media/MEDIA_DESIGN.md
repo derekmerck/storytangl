@@ -288,6 +288,10 @@ cross-cutting output types consumed by both story (emission) and service
 - `scope` — inventory scope for service-layer resolution
 - `staging_hints` — optional `StagingHints` for client presentation
 
+Shape is presentation metadata, not narrative intent. Authors use one
+`narrative_im` role plus `staging_hints.media_shape`; they do not encode
+landscape, portrait, or square geometry into the role name.
+
 **`StagingHints`** carries client-facing suggestions: shape, size, position,
 transition, duration, timing. These are hints, not commands; the client decides
 how to interpret them based on its capabilities.

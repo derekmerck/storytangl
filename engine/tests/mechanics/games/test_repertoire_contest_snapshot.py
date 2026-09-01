@@ -20,7 +20,7 @@ from tangl.core import (
     contribute_ns,
 )
 from tangl.core.runtime_op import Predicate
-from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.journal.fragments import AttributedFragment, ChoiceFragment, ContentFragment
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.games import (
     KNOWN_PHRASES_SLOT,
@@ -937,16 +937,22 @@ def test_later_call_definition_answers_an_earned_response_in_a_fresh_contest() -
     assert exchange.initiative_before is False
     assert exchange.initiative_after is True
     assert sword_contest.game.result is GameResult.WIN
-    assert any(
-        isinstance(fragment, ContentFragment)
-        and fragment.content == "Call: My name is Guybrush Threepwood. Prepare to die."
+    spoken = [
+        fragment
         for fragment in sword_ledger.get_journal()
+        if isinstance(fragment, AttributedFragment)
+    ]
+    assert any(
+        fragment.who == "Opponent"
+        and fragment.how == "calls"
+        and fragment.content == "My name is Guybrush Threepwood. Prepare to die."
+        for fragment in spoken
     )
     assert any(
-        isinstance(fragment, ContentFragment)
-        and fragment.content
-        == "Response: How appropriate. You fight like a cow. answers the call."
-        for fragment in sword_ledger.get_journal()
+        fragment.who == "You"
+        and fragment.how == "answers"
+        and fragment.content == "How appropriate. You fight like a cow."
+        for fragment in spoken
     )
     assert first_contest.game.phrases == first_phrases
     assert first_contest.game.schedule == first_schedule

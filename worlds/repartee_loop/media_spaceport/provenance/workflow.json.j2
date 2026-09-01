@@ -1,0 +1,228 @@
+{
+  "1": {
+    "inputs": {
+      "image": {{ images.source | tojson }}
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "source_image"
+    }
+  },
+  "2": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1,
+      "image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "normalize_source"
+    }
+  },
+  "4": {
+    "inputs": {
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "diffusion_model"
+    }
+  },
+  "5": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "text_encoder"
+    }
+  },
+  "6": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "vae"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": {{ prompt | tojson }},
+      "clip": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "edit_prompt"
+    }
+  },
+  "8": {
+    "inputs": {
+      "conditioning": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "negative_conditioning"
+    }
+  },
+  "9": {
+    "inputs": {
+      "pixels": [
+        "2",
+        0
+      ],
+      "vae": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "encode_reference"
+    }
+  },
+  "10": {
+    "inputs": {
+      "conditioning": [
+        "7",
+        0
+      ],
+      "latent": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "positive_reference"
+    }
+  },
+  "12": {
+    "inputs": {
+      "width": {{ width }},
+      "height": {{ height }},
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "output_latent"
+    }
+  },
+  "13": {
+    "inputs": {
+      "steps": 4,
+      "width": {{ width }},
+      "height": {{ height }}
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {
+      "title": "scheduler"
+    }
+  },
+  "14": {
+    "inputs": {
+      "noise_seed": {{ seed }}
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "noise"
+    }
+  },
+  "15": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "4",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "guider"
+    }
+  },
+  "16": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "sampler"
+    }
+  },
+  "17": {
+    "inputs": {
+      "noise": [
+        "14",
+        0
+      ],
+      "guider": [
+        "15",
+        0
+      ],
+      "sampler": [
+        "16",
+        0
+      ],
+      "sigmas": [
+        "13",
+        0
+      ],
+      "latent_image": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "render"
+    }
+  },
+  "18": {
+    "inputs": {
+      "samples": [
+        "17",
+        0
+      ],
+      "vae": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "decode"
+    }
+  },
+  "20": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "18",
+        0
+      ],
+      "filename_prefix": {{ prefix | tojson }}
+    }
+  }
+}

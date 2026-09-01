@@ -9,11 +9,6 @@ class MediaRole(Enum):
 
     NARRATIVE_IM   = "narrative_im"
 
-    # size hints: landscape, portrait, square
-    NARRATIVE_IM_L = "narrative_im_landscape"
-    NARRATIVE_IM_P = "narrative_im_portrait"
-    NARRATIVE_IM_S = "narrative_im_square"
-
     AVATAR_IM = "avatar_im"        # portrait, dynamic svg, has actor look
     DIALOG_IM = "dialog_im"        # sm square, dynamic, has actor attitude
 

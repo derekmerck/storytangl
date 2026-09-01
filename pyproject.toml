@@ -92,6 +92,7 @@ toml = "^0.10.2"
 pytest = "^8.3.4"
 pytest-cov = "^4.1.0"     # coverage plugin for pytest
 httpx = "^0.28.1"         # for fastapi testing
+pygame-ce = "^2.5.0"      # apps/pygame renderer tests; not a runtime dependency
 
 # lang
 beautifulsoup4 = "^4.12.3"  # beautiful soup
@@ -136,6 +137,7 @@ testpaths = [
     "scripts/tests",              # standalone helper tests (offline)
 #    "apps/**/tests",             # all apps tests
     "apps/cli/tests",             # cli tests
+    "apps/pygame/tests",          # pygame adapter tests (renderer skips without pygame)
     "apps/renpy/tests",           # renpy adapter tests
     "apps/server/tests"           # rest server tests
 #    "worlds/*/tests"             # sample world tests
@@ -144,6 +146,7 @@ pythonpath = [
     "engine/src/",
     "engine/tests/",
     "apps/cli/src/",
+    "apps/pygame/src/",
     "apps/renpy/src/",
     "apps/server/src",
     "apps/server/tests"

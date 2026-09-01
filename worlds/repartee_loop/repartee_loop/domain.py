@@ -179,6 +179,7 @@ class DockhandGame(CallResponseGame):
 
     scoring_n: int = 1
     initial_player_has_initiative: bool = True
+    opponent_label: str = "Dockhand"
 
 
 class MasterGame(CallResponseGame):
@@ -186,6 +187,7 @@ class MasterGame(CallResponseGame):
 
     scoring_n: int = 1
     initial_player_has_initiative: bool = False
+    opponent_label: str = "Salon Master"
 
 
 class DockhandContestBlock(HasGame, Block):

@@ -20,12 +20,29 @@ scenes:
         label: master
     blocks:
       entrance:
+        media:
+          - name: quai_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: "At the quay, every introduction is also a challenge."
         actions:
           - text: "Step into the practice court"
             successor: setup
 
       setup:
+        media:
+          - name: quai_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: clerk_sprite.png
+            media_role: dialog_im
+            staging_hints:
+              media_x: left
+              media_y: bottom
+              media_transition: from_left
+              media_flip_h: true
         kind: "repartee_loop.domain.ReparteeSetupBlock"
         content: "The clerk hands you one opening line and a warning not to waste it."
         actions:
@@ -33,6 +50,11 @@ scenes:
             successor: hub
 
       hub:
+        media:
+          - name: quai_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         kind: "repartee_loop.domain.ReparteeHubBlock"
         content: "The dockhand drills newcomers; the salon master waits beyond the rope."
         actions:
@@ -51,6 +73,16 @@ scenes:
               - "prizes.has_prize('repartee_salon_token')"
 
       dockhand_contest:
+        media:
+          - name: warehouse_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: worker_sprite.png
+            media_role: dialog_im
+            staging_hints:
+              media_x: right
+              media_y: bottom
         kind: "repartee_loop.domain.DockhandContestBlock"
         content: "The dockhand gives your borrowed line a patient hearing."
         continues:
@@ -59,6 +91,16 @@ scenes:
             predicate: game_lost
 
       dockhand_aftermath:
+        media:
+          - name: warehouse_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: worker_sprite.png
+            media_role: dialog_im
+            staging_hints:
+              media_x: right
+              media_y: bottom
         kind: "repartee_loop.domain.ReparteeLossAftermathBlock"
         content: "The dockhand nods once and lets you keep the reply that beat you."
         actions:
@@ -66,6 +108,13 @@ scenes:
             successor: hub
 
       master_contest:
+        media:
+          - name: salon_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: master_sprite.png
+            media_role: dialog_im
         kind: "repartee_loop.domain.MasterContestBlock"
         content: "The master offers an unfamiliar call with an expectant pause."
         continues:
@@ -74,6 +123,13 @@ scenes:
             predicate: game_won
 
       prize_aftermath:
+        media:
+          - name: salon_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: master_sprite.png
+            media_role: dialog_im
         kind: "repartee_loop.domain.ReparteePrizeAftermathBlock"
         content: "The master grants you a brass token stamped with the salon seal."
         actions:
@@ -81,4 +137,9 @@ scenes:
             successor: hub
 
       salon:
+        media:
+          - name: salon_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: "The salon door recognizes the brass token and admits you to the next room."

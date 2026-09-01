@@ -1,0 +1,83 @@
+{
+  "workflow": "workflow.json.j2",
+  "jobs": [
+    {
+      "params": {
+        "asset": "quai_bg",
+        "prompt": "Transform this harbor into an exotic orbital spaceport dock. Replace water with a deep starfield, sailing boats with docked spacecraft, warehouses with futuristic terminal buildings, and rope barriers with illuminated safety rails. Keep the same perspective, foreground deck, doorway placement and open staging space. Empty scene without people. Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+        "seed": 19920922,
+        "width": 1280,
+        "height": 800,
+        "prefix": "repartee_spaceport/quai_bg"
+      },
+      "images": {
+        "source": "source-assets/quai_bg.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "warehouse_bg",
+        "prompt": "Transform this warehouse into a retro science-fiction spaceport cargo bay. Replace masonry with weathered metal bulkheads, shutters with hangar doors, wooden crates with futuristic cargo containers, and ropes with thick cables. Retain the exact camera angle, broad empty foreground deck and circular deck markings. Empty scene without people. Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+        "seed": 19920923,
+        "width": 1280,
+        "height": 800,
+        "prefix": "repartee_spaceport/warehouse_bg"
+      },
+      "images": {
+        "source": "source-assets/warehouse_bg.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "salon_bg",
+        "prompt": "Transform this salon into an elegant orbital spaceport observation lounge. Replace wooden panels with futuristic wall panels, candles with amber electric sconces, and the harbor view with spacecraft and a distant planet through the same large window. Preserve the room geometry and entirely empty foreground floor. Empty scene without people. Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+        "seed": 19920924,
+        "width": 1280,
+        "height": 800,
+        "prefix": "repartee_spaceport/salon_bg"
+      },
+      "images": {
+        "source": "source-assets/salon_bg.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "master_sprite",
+        "prompt": "Transform this character into a pompous teal alien fencing master with an extravagant swept-back cranial crest instead of a hat, an elegant copper-colored space uniform and a ceremonial energy cane. Keep the same compact full-body silhouette, hunched pose, facing direction and mischievous expression. One character, two arms, two legs, entire figure and cane visible, plain light gray background without scenery or ground shadow. Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+        "seed": 19920925,
+        "width": 1024,
+        "height": 1024,
+        "prefix": "repartee_spaceport/master_sprite"
+      },
+      "images": {
+        "source": "generation-artifacts/references/master_sprite.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "clerk_sprite",
+        "prompt": "Transform this character into a fussy brass-and-teal bureaucrat robot with a long angular optical face and curved backpack casing, reading a glowing datapad instead of paper. Replace the hat with a streamlined mechanical head. Keep the same hunched full-body silhouette, left-facing pose and hand positions. One robot, two arms, two legs, entire figure visible, plain light gray background without scenery or ground shadow. Datapad contains simple abstract bars, not lettering. Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+        "seed": 19920926,
+        "width": 1024,
+        "height": 1024,
+        "prefix": "repartee_spaceport/clerk_sprite"
+      },
+      "images": {
+        "source": "generation-artifacts/references/clerk_sprite.png"
+      }
+    },
+    {
+      "params": {
+        "asset": "worker_sprite",
+        "prompt": "Transform this character into a stocky friendly green alien spaceport dockworker, with a broad ridged bald head instead of the hat, copper work vest, teal utility suit and heavy boots. Keep the same full-body silhouette, facing direction and open-handed conversational gesture. One character, two arms, two legs, entire figure visible, plain light gray background without scenery or ground shadow. Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+        "seed": 19920927,
+        "width": 1024,
+        "height": 1024,
+        "prefix": "repartee_spaceport/worker_sprite"
+      },
+      "images": {
+        "source": "generation-artifacts/references/worker_sprite.png"
+      }
+    }
+  ]
+}
