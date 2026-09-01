@@ -98,6 +98,7 @@ from .game_token import (
     affiliation_of,
     discrete_token_class,
     dominant_affiliation,
+    transfer_tokens,
     value_by_affiliation,
     weight_of,
 )
@@ -237,6 +238,7 @@ __all__ = [
     "GameTokenSpec",
     "affiliation_of",
     "weight_of",
+    "transfer_tokens",
     "discrete_token_class",
     "dominant_affiliation",
     "value_by_affiliation",

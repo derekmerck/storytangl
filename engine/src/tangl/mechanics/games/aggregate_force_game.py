@@ -8,6 +8,7 @@ attrition based on composition, and return surviving force to reserve.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from itertools import product
 from typing import ClassVar, TypeVar
 
@@ -20,11 +21,34 @@ from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
 from .game import Game
-from .game_token import GameTokenSpec, affiliation_of, dominant_affiliation, weight_of
+from .game_token import (
+    GameTokenSpec,
+    affiliation_of,
+    dominant_affiliation,
+    transfer_tokens,
+    weight_of,
+)
 from .handler import GameHandler
 
 
 ForceProfile = tuple[tuple[str, int], ...]
+
+
+class ForceDisposition(str, Enum):
+    """Where a token goes once a clash resolves.
+
+    Commitment is a real transfer from reserve into an active pool, so every
+    committed token must be routed somewhere afterwards.
+    """
+
+    #: Stays active, still committed for the next round.
+    CONSERVE = "conserve"
+    #: Returns to its owner's reserve.
+    RETIRE = "retire"
+    #: Leaves the game entirely.
+    DECIMATE = "decimate"
+    #: Passes to the opponent's reserve.
+    CEDE = "cede"
 
 
 @dataclass(frozen=True)
@@ -73,6 +97,10 @@ class AggregateForceGame(Game[ForceCommitMove]):
     player_opening_reserve: dict[str, int] = Field(default_factory=dict)
     opponent_opening_reserve: dict[str, int] = Field(default_factory=dict)
 
+    #: What happens to tokens that survive a clash. Retiring them is the
+    #: classic sortie; conserving them builds a standing front line.
+    survivor_disposition: ForceDisposition = ForceDisposition.RETIRE
+
     player_reserve: AssetWallet = Field(
         default_factory=AssetWallet,
         json_schema_extra={"reset_field": True},
@@ -81,10 +109,83 @@ class AggregateForceGame(Game[ForceCommitMove]):
         default_factory=AssetWallet,
         json_schema_extra={"reset_field": True},
     )
+    player_active: AssetWallet = Field(
+        default_factory=AssetWallet,
+        json_schema_extra={"reset_field": True},
+    )
+    opponent_active: AssetWallet = Field(
+        default_factory=AssetWallet,
+        json_schema_extra={"reset_field": True},
+    )
+    player_eliminated: AssetWallet = Field(
+        default_factory=AssetWallet,
+        json_schema_extra={"reset_field": True},
+    )
+    opponent_eliminated: AssetWallet = Field(
+        default_factory=AssetWallet,
+        json_schema_extra={"reset_field": True},
+    )
     round_detail: dict[str, object] | None = Field(
         default=None,
         json_schema_extra={"reset_field": True},
     )
+
+    def reserve_of(self, owner: str) -> AssetWallet:
+        """Return one side's reserve bag."""
+
+        return self.player_reserve if owner == "player" else self.opponent_reserve
+
+    def active_of(self, owner: str) -> AssetWallet:
+        """Return one side's committed, in-play pool."""
+
+        return self.player_active if owner == "player" else self.opponent_active
+
+    def eliminated_of(self, owner: str) -> AssetWallet:
+        """Return one side's out-of-game pile."""
+
+        return self.player_eliminated if owner == "player" else self.opponent_eliminated
+
+    def standing_force(self, owner: str) -> int:
+        """Return weighted force still available: reserve plus what is in play.
+
+        A side is not beaten merely because everything it owns is committed.
+        """
+
+        return self.total_force(self.reserve_of(owner)) + self.total_force(
+            self.active_of(owner)
+        )
+
+    def rank_ladder(self, affiliation: str) -> list[str]:
+        """Return one affiliation's token labels ordered light to heavy.
+
+        Weight classes within a colour are a ladder: ``blue+0`` below
+        ``blue+1``. Promotion and demotion walk it, so a field brevet, reserve
+        training, an injury, or illness changes what a token *is* without
+        changing whose it is or where it sits.
+        """
+
+        definitions = self.token_definitions()
+        labels = [
+            label
+            for label in self.ordered_force_types()
+            if affiliation_of(label, definitions) == affiliation
+        ]
+        return sorted(labels, key=lambda label: (weight_of(label, definitions), label))
+
+    def ranked_neighbor(self, label: str, steps: int) -> str | None:
+        """Return the label ``steps`` rungs up or down its own weight ladder.
+
+        Returns None at the ends of the ladder, so a promotion with nowhere to
+        go is a no-op rather than an error.
+        """
+
+        ladder = self.rank_ladder(self.get_force_affiliation(label))
+        if label not in ladder:
+            return None
+        target = ladder.index(label) + steps
+        if target < 0 or target >= len(ladder):
+            return None
+        return ladder[target]
 
     def ordered_force_types(self) -> list[str]:
         """Return the stable *token label* ordering for profiles and labels."""
@@ -142,6 +243,13 @@ class AggregateForceGame(Game[ForceCommitMove]):
                 "aggregate_opponent_reserve": dict(self.opponent_reserve.amounts),
                 "aggregate_player_dominant": self.dominant_affiliation(self.player_reserve),
                 "aggregate_opponent_dominant": self.dominant_affiliation(self.opponent_reserve),
+                "aggregate_player_active": dict(self.player_active.amounts),
+                "aggregate_opponent_active": dict(self.opponent_active.amounts),
+                "aggregate_player_eliminated": dict(self.player_eliminated.amounts),
+                "aggregate_opponent_eliminated": dict(self.opponent_eliminated.amounts),
+                "aggregate_player_standing": self.standing_force("player"),
+                "aggregate_opponent_standing": self.standing_force("opponent"),
+                "aggregate_survivor_disposition": self.survivor_disposition.value,
                 "aggregate_player_force": self.total_force(self.player_reserve),
                 "aggregate_opponent_force": self.total_force(self.opponent_reserve),
                 "aggregate_max_commit_size": self.max_commit_size,
@@ -205,11 +313,23 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
             if opponent_profiles:
                 opponent_commit = opponent_profiles[0].as_dict()
 
-        player_losses = self._allocate_casualties(game, opponent_commit, player_commit)
-        opponent_losses = self._allocate_casualties(game, player_commit, opponent_commit)
+        # Commitment is a real transfer: tokens leave the reserve and stand in
+        # the active pool until the clash routes them somewhere.
+        player_commit = self.commit_forces(game, "player", player_commit)
+        opponent_commit = self.commit_forces(game, "opponent", opponent_commit)
 
-        self._apply_losses(game.player_reserve, player_losses)
-        self._apply_losses(game.opponent_reserve, opponent_losses)
+        player_losses = self._allocate_casualties(
+            game, game.opponent_active, game.player_active
+        )
+        opponent_losses = self._allocate_casualties(
+            game, game.player_active, game.opponent_active
+        )
+
+        self.apply_casualties(game, "player", player_losses)
+        self.apply_casualties(game, "opponent", opponent_losses)
+
+        player_survivors = self.dispose_survivors(game, "player")
+        opponent_survivors = self.dispose_survivors(game, "opponent")
 
         player_damage = self._weighted_total(game, opponent_losses)
         opponent_damage = self._weighted_total(game, player_losses)
@@ -223,6 +343,13 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
             "opponent_losses": opponent_losses,
             "player_dominant": game.dominant_affiliation(player_commit),
             "opponent_dominant": game.dominant_affiliation(opponent_commit),
+            "player_survivors": player_survivors,
+            "opponent_survivors": opponent_survivors,
+            "player_active": dict(game.player_active.amounts),
+            "opponent_active": dict(game.opponent_active.amounts),
+            "player_eliminated": dict(game.player_eliminated.amounts),
+            "opponent_eliminated": dict(game.opponent_eliminated.amounts),
+            "survivor_disposition": game.survivor_disposition.value,
             "player_reserve": dict(game.player_reserve.amounts),
             "opponent_reserve": dict(game.opponent_reserve.amounts),
             "player_damage": player_damage,
@@ -243,8 +370,8 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         return RoundResult.DRAW
 
     def evaluate(self, game: AggregateForceGameT) -> GameResult:
-        player_force = game.total_force(game.player_reserve)
-        opponent_force = game.total_force(game.opponent_reserve)
+        player_force = game.standing_force("player")
+        opponent_force = game.standing_force("opponent")
 
         if player_force <= 0 and opponent_force <= 0:
             if game.score["player"] > game.score["opponent"]:
@@ -308,6 +435,190 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
             ),
         ]
         return fragments
+
+    # ─────────────────────────────────────────────────────────────────
+    # The commitment cycle
+    #
+    # Reserve -> active on commit; active -> reserve, out of the game, or the
+    # opponent's reserve on resolution. These are public because a world may
+    # want to drive them for dramatic effect rather than only through a clash.
+    # ─────────────────────────────────────────────────────────────────
+
+    def commit_forces(
+        self,
+        game: AggregateForceGameT,
+        owner: str,
+        profile: dict[str, int],
+    ) -> dict[str, int]:
+        """Move a committed profile from reserve into the active pool."""
+
+        return transfer_tokens(game.reserve_of(owner), game.active_of(owner), profile)
+
+    def apply_casualties(
+        self,
+        game: AggregateForceGameT,
+        owner: str,
+        losses: dict[str, int],
+    ) -> dict[str, int]:
+        """Send casualties out of the active pool and out of the game."""
+
+        return transfer_tokens(game.active_of(owner), game.eliminated_of(owner), losses)
+
+    def dispose_survivors(
+        self,
+        game: AggregateForceGameT,
+        owner: str,
+        disposition: ForceDisposition | None = None,
+    ) -> dict[str, int]:
+        """Route whatever survived the clash out of the active pool.
+
+        Returns what moved. ``CONSERVE`` moves nothing, leaving the pool
+        standing for the next round.
+        """
+
+        chosen = disposition or game.survivor_disposition
+        active = game.active_of(owner)
+        survivors = {label: count for label, count in active.items() if count > 0}
+        if not survivors or chosen is ForceDisposition.CONSERVE:
+            return {}
+
+        if chosen is ForceDisposition.RETIRE:
+            destination = game.reserve_of(owner)
+        elif chosen is ForceDisposition.DECIMATE:
+            destination = game.eliminated_of(owner)
+        else:  # CEDE
+            rival = "opponent" if owner == "player" else "player"
+            destination = game.reserve_of(rival)
+
+        return transfer_tokens(active, destination, survivors)
+
+    def adjust_reserve(
+        self,
+        game: AggregateForceGameT,
+        owner: str,
+        deltas: dict[str, int],
+        *,
+        reason: str | None = None,
+    ) -> dict[str, object]:
+        """Augment or hobble a reserve between clashes.
+
+        This is the seam for events that happen away from the field — a surge
+        of fresh recruits, a plague at home — so a world can move the economy
+        of force without pretending the change came out of a fight.
+        """
+
+        reserve = game.reserve_of(owner)
+        gained = {label: count for label, count in deltas.items() if count > 0}
+        lost = {
+            label: min(-count, reserve[label])
+            for label, count in deltas.items()
+            if count < 0
+        }
+        lost = {label: count for label, count in lost.items() if count > 0}
+
+        if gained:
+            reserve.gain(gained)
+        if lost:
+            transfer_tokens(reserve, game.eliminated_of(owner), lost)
+
+        return {"owner": owner, "gained": gained, "lost": lost, "reason": reason}
+
+    def _pool_of(self, game: AggregateForceGameT, owner: str, pool: str) -> AssetWallet:
+        if pool == "active":
+            return game.active_of(owner)
+        if pool == "eliminated":
+            return game.eliminated_of(owner)
+        return game.reserve_of(owner)
+
+    def transmute(
+        self,
+        game: AggregateForceGameT,
+        owner: str,
+        label: str,
+        to_label: str,
+        count: int = 1,
+        *,
+        pool: str = "reserve",
+        to_owner: str | None = None,
+        to_pool: str | None = None,
+        reason: str | None = None,
+    ) -> dict[str, object] | None:
+        """Change what tokens are, whose they are, or where they sit.
+
+        A token's state has three independent axes, and this moves any of them
+        at once:
+
+        - **owner** — a token changes sides, which is a defection
+        - **affiliation** — rock becomes paper, a metamorphosis
+        - **weight** — a rung up or down its own ladder, amelioration or decay
+
+        The returned record names whichever axes actually changed, so a world
+        can narrate the difference between a bribe, a transformation, and a
+        promotion without inspecting wallets itself. Returns None when there is
+        nothing to move.
+        """
+
+        source = self._pool_of(game, owner, pool)
+        destination = self._pool_of(game, to_owner or owner, to_pool or pool)
+        moved = min(count, source[label])
+        if moved <= 0:
+            return None
+
+        source.spend({label: moved})
+        destination.gain({to_label: moved})
+
+        changes: list[str] = []
+        if to_owner is not None and to_owner != owner:
+            changes.append("defect")
+        if game.get_force_affiliation(label) != game.get_force_affiliation(to_label):
+            changes.append("metamorphosis")
+        before = game.get_force_weight(label)
+        after = game.get_force_weight(to_label)
+        if after > before:
+            changes.append("ameliorate")
+        elif after < before:
+            changes.append("decay")
+
+        return {
+            "owner": owner,
+            "to_owner": to_owner or owner,
+            "pool": pool,
+            "to_pool": to_pool or pool,
+            "from": label,
+            "to": to_label,
+            "count": moved,
+            "changes": changes,
+            "reason": reason,
+        }
+
+    def retrain(
+        self,
+        game: AggregateForceGameT,
+        owner: str,
+        label: str,
+        count: int = 1,
+        *,
+        steps: int = 1,
+        pool: str = "reserve",
+        reason: str | None = None,
+    ) -> dict[str, object] | None:
+        """Promote or demote tokens a rung on their own weight ladder.
+
+        The weight-axis convenience over :meth:`transmute`: same side, same
+        colour, different class. Positive ``steps`` promotes — a brevet,
+        reserve training — and negative demotes, for a field injury or illness.
+        Returns None when the ladder has no rung to move to.
+        """
+
+        target = game.ranked_neighbor(label, steps)
+        if target is None:
+            return None
+        record = self.transmute(
+            game, owner, label, target, count, pool=pool, reason=reason
+        )
+        if record is not None:
+            record["direction"] = "promote" if steps > 0 else "demote"
+        return record
 
     def _profiles_for_reserve(
         self,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tangl.core import Graph
 from tangl.mechanics.games import GameTokenSpec, HasGame
-from tangl.mechanics.games.aggregate_force_game import ForceCommitMove
+from tangl.mechanics.games.aggregate_force_game import ForceCommitMove, ForceDisposition
 from tangl.mechanics.games.bag_rps_game import BagRpsGame, BagRpsGameHandler
 from tangl.mechanics.games.handlers import inject_game_context, provision_game_moves
 from tangl.story import Action, Block
@@ -253,3 +253,273 @@ class TestWeightedAndColouredTokens:
 
         assert plain.get_force_affiliation("rock") == "rock"
         assert plain.get_force_weight("rock") == 1
+
+
+class TestCommitmentCycle:
+    """Commitment is a transfer, and every committed token gets routed."""
+
+    def _game(self, **kwargs) -> BagRpsGame:
+        config = {
+            "player_opening_reserve": {"rock": 3, "paper": 1},
+            "opponent_opening_reserve": {"scissors": 3},
+        }
+        config.update(kwargs)
+        return BagRpsGame(**config)
+
+    def _clash(self, game: BagRpsGame) -> BagRpsGameHandler:
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.resolve_round(
+            game,
+            ForceCommitMove(profile=(("rock", 2),)),
+            ForceCommitMove(profile=(("scissors", 2),)),
+        )
+        return handler
+
+    def test_committing_moves_tokens_out_of_the_reserve(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        moved = handler.commit_forces(game, "player", {"rock": 2})
+
+        assert moved == {"rock": 2}
+        assert game.player_reserve.amounts == {"rock": 1, "paper": 1}
+        assert game.player_active.amounts == {"rock": 2}
+
+    def test_a_commitment_cannot_overdraw_the_reserve(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        moved = handler.commit_forces(game, "player", {"paper": 5})
+
+        assert moved == {"paper": 1}
+        assert game.player_active.amounts == {"paper": 1}
+
+    def test_survivors_retire_to_the_reserve_by_default(self) -> None:
+        game = self._game()
+        self._clash(game)
+
+        # Rock beats scissors, but the disadvantaged trade ratio still buys the
+        # losing side one casualty, so one of the committed pair comes home.
+        assert game.player_active.amounts == {}
+        assert game.player_eliminated["rock"] == 1
+        assert game.player_reserve["rock"] == 2
+
+    def test_conserved_survivors_stay_in_play(self) -> None:
+        game = self._game(survivor_disposition=ForceDisposition.CONSERVE)
+        self._clash(game)
+
+        assert game.player_active["rock"] == 1
+        assert game.player_reserve["rock"] == 1
+
+    def test_ceded_survivors_cross_to_the_opponent(self) -> None:
+        game = self._game(survivor_disposition=ForceDisposition.CEDE)
+        self._clash(game)
+
+        assert game.player_active.amounts == {}
+        assert game.opponent_reserve["rock"] == 1
+
+    def test_casualties_leave_the_game_entirely(self) -> None:
+        game = self._game()
+        self._clash(game)
+
+        assert game.opponent_eliminated["scissors"] == 2
+        assert game.opponent_reserve["scissors"] == 1
+
+    def test_a_side_is_not_beaten_while_its_force_is_committed(self) -> None:
+        game = self._game(survivor_disposition=ForceDisposition.CONSERVE)
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.commit_forces(game, "player", {"rock": 3, "paper": 1})
+
+        assert game.player_reserve.amounts == {}
+        assert game.standing_force("player") == 4
+        assert handler.evaluate(game).name == "IN_PROCESS"
+
+
+class TestReserveAdjustmentAndRetraining:
+    """Seams for pressure that does not come out of a fight."""
+
+    def _game(self) -> BagRpsGame:
+        return BagRpsGame(
+            force_types=["blue_0", "blue_1", "sharp"],
+            force_beats={"rock": "scissors", "paper": "rock", "scissors": "paper"},
+            token_specs={
+                "blue_0": GameTokenSpec(affiliation="rock", value=1),
+                "blue_1": GameTokenSpec(affiliation="rock", value=2),
+                "sharp": GameTokenSpec(affiliation="scissors", value=1),
+            },
+            player_opening_reserve={"blue_0": 3},
+            opponent_opening_reserve={"sharp": 2},
+        )
+
+    def test_fresh_recruits_augment_the_reserve(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        record = handler.adjust_reserve(
+            game, "player", {"blue_0": 2}, reason="a surge of fresh recruits"
+        )
+
+        assert game.player_reserve["blue_0"] == 5
+        assert record["gained"] == {"blue_0": 2}
+        assert record["reason"] == "a surge of fresh recruits"
+
+    def test_a_plague_at_home_hobbles_the_reserve(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        record = handler.adjust_reserve(game, "player", {"blue_0": -2}, reason="plague")
+
+        assert game.player_reserve["blue_0"] == 1
+        assert game.player_eliminated["blue_0"] == 2
+        assert record["lost"] == {"blue_0": 2}
+
+    def test_a_reserve_cannot_be_hobbled_below_empty(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        handler.adjust_reserve(game, "player", {"blue_0": -99})
+
+        assert game.player_reserve["blue_0"] == 0
+        assert game.player_eliminated["blue_0"] == 3
+
+    def test_promotion_walks_the_weight_ladder_within_a_colour(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        assert game.rank_ladder("rock") == ["blue_0", "blue_1"]
+
+        record = handler.retrain(game, "player", "blue_0", 2, reason="brevet")
+
+        assert record["to"] == "blue_1"
+        assert record["direction"] == "promote"
+        assert game.player_reserve.amounts == {"blue_0": 1, "blue_1": 2}
+
+    def test_demotion_walks_the_other_way(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.retrain(game, "player", "blue_0", 3)
+
+        record = handler.retrain(game, "player", "blue_1", 1, steps=-1, reason="injury")
+
+        assert record["to"] == "blue_0"
+        assert record["direction"] == "demote"
+        assert game.player_reserve.amounts == {"blue_1": 2, "blue_0": 1}
+
+    def test_promotion_off_the_end_of_the_ladder_is_a_no_op(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.retrain(game, "player", "blue_0", 3)
+
+        assert handler.retrain(game, "player", "blue_1", 1) is None
+        assert game.player_reserve.amounts == {"blue_1": 3}
+
+    def test_retraining_can_target_committed_tokens(self) -> None:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.commit_forces(game, "player", {"blue_0": 2})
+
+        handler.retrain(game, "player", "blue_0", 1, pool="active", reason="field brevet")
+
+        assert game.player_active.amounts == {"blue_0": 1, "blue_1": 1}
+        assert game.player_reserve.amounts == {"blue_0": 1}
+
+
+class TestTransmutation:
+    """Owner, affiliation, and weight are three independent axes."""
+
+    def _game(self) -> BagRpsGame:
+        return BagRpsGame(
+            force_types=["blue_0", "blue_1", "red_0"],
+            force_beats={"rock": "scissors", "paper": "rock", "scissors": "paper"},
+            token_specs={
+                "blue_0": GameTokenSpec(affiliation="rock", value=1),
+                "blue_1": GameTokenSpec(affiliation="rock", value=2),
+                "red_0": GameTokenSpec(affiliation="paper", value=1),
+            },
+            player_opening_reserve={"blue_0": 3},
+            opponent_opening_reserve={"red_0": 2},
+        )
+
+    def _ready(self) -> tuple[BagRpsGame, BagRpsGameHandler]:
+        game = self._game()
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        return game, handler
+
+    def test_a_token_can_change_sides(self) -> None:
+        game, handler = self._ready()
+
+        record = handler.transmute(
+            game, "player", "blue_0", "blue_0", 1,
+            to_owner="opponent", reason="bought off",
+        )
+
+        assert record["changes"] == ["defect"]
+        assert game.player_reserve["blue_0"] == 2
+        assert game.opponent_reserve["blue_0"] == 1
+
+    def test_a_token_can_change_affiliation(self) -> None:
+        game, handler = self._ready()
+
+        record = handler.transmute(game, "player", "blue_0", "red_0", 1)
+
+        assert record["changes"] == ["metamorphosis"]
+        assert game.player_reserve.amounts == {"blue_0": 2, "red_0": 1}
+
+    def test_a_token_can_change_weight(self) -> None:
+        game, handler = self._ready()
+
+        record = handler.transmute(game, "player", "blue_0", "blue_1", 1)
+
+        assert record["changes"] == ["ameliorate"]
+
+    def test_decay_is_the_other_direction(self) -> None:
+        game, handler = self._ready()
+        handler.transmute(game, "player", "blue_0", "blue_1", 2)
+
+        record = handler.transmute(game, "player", "blue_1", "blue_0", 1)
+
+        assert record["changes"] == ["decay"]
+
+    def test_several_axes_can_change_at_once(self) -> None:
+        game, handler = self._ready()
+
+        record = handler.transmute(
+            game, "player", "blue_1", "red_0", 1,
+            to_owner="opponent", reason="a defector, transformed and diminished",
+        )
+
+        # nothing to move: the player holds no blue_1 yet
+        assert record is None
+
+        handler.transmute(game, "player", "blue_0", "blue_1", 1)
+        record = handler.transmute(
+            game, "player", "blue_1", "red_0", 1, to_owner="opponent",
+        )
+
+        assert record["changes"] == ["defect", "metamorphosis", "decay"]
+        assert game.opponent_reserve["red_0"] == 3
+
+    def test_transmutation_can_cross_pools(self) -> None:
+        game, handler = self._ready()
+        handler.commit_forces(game, "player", {"blue_0": 2})
+
+        record = handler.transmute(
+            game, "player", "blue_0", "blue_1", 1, pool="active", to_pool="reserve",
+        )
+
+        assert record["pool"] == "active"
+        assert record["to_pool"] == "reserve"
+        assert game.player_active.amounts == {"blue_0": 1}
+        assert game.player_reserve.amounts == {"blue_0": 1, "blue_1": 1}

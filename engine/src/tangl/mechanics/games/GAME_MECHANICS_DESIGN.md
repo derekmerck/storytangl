@@ -237,16 +237,44 @@ and the player must keep the running relationship inside a band. That is the
 older `MndCard` spike restated in pile terms, and it is why the deferred
 multi-axis work belongs to this family rather than to a card-specific kernel.
 
-#### The open disposition question
+#### The Commitment Cycle
 
-The aggregate-force loop has a step the current implementation flattens. After
-a comparison, committed tokens could return to the field, return to the bag, or
-be set aside as spent — three dispositions, not one. Today commitment is
-virtual and only casualties leave the reserve, so "survivor return" never
-happens because survivors never left. Making the cycle explicit would give the
-family a real economy of force, and it is the same open policy the migration
-archaeology recorded around casualty priority and last-down units. It wants a
-consumer before it is built, because the choice materially changes the game.
+Aggregate force is the family's economy of force, and it works because
+**commitment is a real transfer rather than a comparison**. A side's tokens sit
+in a reserve bag; committing moves them into an active pool; resolving routes
+every committed token somewhere. Nothing is virtual, so survivors can return
+because they genuinely left.
+
+Resolution routes each active token by disposition:
+
+| Disposition | Where the token goes |
+|---|---|
+| `CONSERVE` | stays active, still committed next round — a standing front line |
+| `RETIRE` | back to its owner's reserve — the classic sortie |
+| `DECIMATE` | out of the game |
+| `CEDE` | across to the opponent's reserve |
+
+Two further seams exist because pressure does not only come from fighting:
+
+- **Reserve adjustment** augments or hobbles a bag between clashes — a surge of
+  fresh recruits, a plague at home. A world can move the economy without
+  pretending the change came out of a battle.
+- **Transmutation** changes what a token *is*. Token state has three
+  independent axes and any combination may move at once: **owner** (a
+  defection), **affiliation** (rock becomes paper, a metamorphosis), and
+  **weight** (a rung up or down its own ladder — a brevet or reserve training
+  against a field injury or illness). The returned record names which axes
+  changed, so narration can tell a bribe from a transformation without
+  inspecting wallets.
+
+Weight classes within an affiliation form a ladder, derived from the token
+vocabulary rather than declared separately: promotion and demotion walk it, and
+running off either end is a no-op rather than an error.
+
+This is the concrete answer to the policy question the migration archaeology
+left open around survivor return and casualty priority. What remains genuinely
+open is *targeting* — which tokens die first — since a bag of counts still has
+no per-unit identity to prefer one over another.
 
 #### Status
 

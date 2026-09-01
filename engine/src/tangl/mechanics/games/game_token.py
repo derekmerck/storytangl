@@ -135,6 +135,32 @@ def weight_of(label: str, definitions: Mapping[str, TokenDefinition]) -> float:
     return 1 if definition is None else definition.value
 
 
+def transfer_tokens(
+    source: AssetWallet,
+    destination: AssetWallet,
+    amounts: Mapping[str, int],
+) -> dict[str, int]:
+    """Move tokens between two wallets, returning what actually moved.
+
+    Clamped to what the source holds, so a caller cannot overdraw a pile by
+    asking for more than is there. This is the within-game movement primitive;
+    moving assets between *holders* — a game and a story actor, say — is
+    ``AssetTransactionManager``'s job, since that needs preflight consent from
+    both sides.
+    """
+
+    moved = {
+        label: min(count, source[label])
+        for label, count in amounts.items()
+        if count > 0
+    }
+    moved = {label: count for label, count in moved.items() if count > 0}
+    if moved:
+        source.spend(moved)
+        destination.gain(moved)
+    return moved
+
+
 def value_by_affiliation(
     wallet: AssetWallet | Mapping[str, int],
     definitions: Mapping[str, TokenDefinition],
