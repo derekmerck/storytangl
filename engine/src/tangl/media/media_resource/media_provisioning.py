@@ -213,15 +213,11 @@ def materialize_rit_from_spec(
         MediaResolutionClass.INLINE,
         MediaResolutionClass.FAST_SYNC,
     ):
-        data_type = (
-            _coerce_media_type(
-                getattr(spec, "data_type", None) or getattr(spec, "media_type", None)
-            )
-            or MediaDataType.MEDIA
+        data_type = _coerce_media_type(
+            getattr(spec, "data_type", None) or getattr(spec, "media_type", None)
         )
-        return MediaRIT(
+        pending_rit = MediaRIT(
             label=_story_media_base_name(spec=spec, requirement=requirement),
-            data_type=data_type,
             tags={f"scope:{scope_tag}"},
             status=MediaRITStatus.PENDING,
             persistence_policy=getattr(
@@ -234,6 +230,9 @@ def materialize_rit_from_spec(
             adapted_spec_hash=fingerprint,
             source_step_id=source_step_id,
         )
+        if data_type is not None:
+            pending_rit.data_type = data_type
+        return pending_rit
 
     if manager is None:
         raise RuntimeError("Story media manager is not available")

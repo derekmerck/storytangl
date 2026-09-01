@@ -606,7 +606,7 @@ def render_block_media(*, caller, ctx, **_kw):
                     staging_hints=payload.get("staging_hints"),
                     content=provider,
                     content_format="rit",
-                    content_type=getattr(provider, "data_type", MediaDataType.MEDIA),
+                    content_type=provider.data_type or MediaDataType.MEDIA,
                     text=payload.get("text"),
                     fallback_text=payload.get("fallback_text") or payload.get("text"),
                     scope=dependency.scope or _scope_from_provider(provider),

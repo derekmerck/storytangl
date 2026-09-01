@@ -181,7 +181,7 @@ class TestAsyncInlineLifecycle:
         provider = dep.provider
         assert isinstance(provider, MediaRIT)
         assert provider.status == MediaRITStatus.PENDING
-        assert provider.data_type is MediaDataType.MEDIA
+        assert provider.data_type is None
         assert provider.path is None
         assert provider.adapted_spec_hash is not None
         assert provider.spec_fingerprint == provider.adapted_spec_hash
@@ -273,7 +273,6 @@ class TestAsyncInlineLifecycle:
                 '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
                 '<circle cx="16" cy="16" r="14" fill="red"/></svg>'
             ),
-            data_type=MediaDataType.VECTOR,
             execution_spec={**provider.adapted_spec, "sampler": "fake-worker"},
             worker_id="fake-worker",
         )
@@ -286,6 +285,8 @@ class TestAsyncInlineLifecycle:
         assert provider.job_id is None
         assert provider.execution_spec_hash is not None
         assert provider.path is not None and provider.path.exists()
+        assert provider.path.suffix == ".svg"
+        assert provider.data_type is MediaDataType.VECTOR
 
     def test_failed_job_is_not_resubmitted(
         self,
