@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Self
 from enum import Enum
 from pathlib import Path
+from typing import Self
 
 from tangl.utils.enum_plus import EnumPlusMixin
 
@@ -21,7 +21,7 @@ class MediaDataType(EnumPlusMixin, Enum):
     ANIMATION = "animation"
 
     @classmethod
-    def extension_map(cls):
+    def extension_map(cls) -> dict[Self, list[str]]:
         return {
             cls.IMAGE: ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
             cls.VECTOR: ["svg", "ai"],
@@ -30,23 +30,15 @@ class MediaDataType(EnumPlusMixin, Enum):
         }
 
     @classmethod
-    def inv_ext_map(cls):
+    def inv_ext_map(cls) -> dict[str, Self]:
         return { vv: k for k, v in cls.extension_map().items() for vv in v }
 
     @classmethod
-    def _missing_(cls, value: object) -> Self:
-        if isinstance(value, str):
-            value = value.strip('.')
-        if value in cls.inv_ext_map():
-            return cls.inv_ext_map()[value]
-        return cls.OTHER
-
-    @classmethod
     def from_path(cls, path: str | Path) -> Self:
-        path = Path(path)
-        return cls(path.suffix)
+        extension = Path(path).suffix or str(path)
+        return cls.inv_ext_map().get(extension.lstrip(".").lower(), cls.OTHER)
 
     @property
-    def ext(self):
+    def ext(self) -> str:
         # first entry is default ext
         return self.extension_map()[self][0]

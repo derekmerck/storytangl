@@ -42,15 +42,8 @@ def _requirement_extra(requirement: Requirement) -> dict[str, Any]:
     return extra
 
 
-def _coerce_media_type(value: Any) -> MediaDataType | None:
-    if isinstance(value, MediaDataType):
-        return value
-    if isinstance(value, str):
-        try:
-            return MediaDataType(value)
-        except ValueError:
-            return MediaDataType._missing_(value)
-    return None
+def _coerce_media_type(value: object) -> MediaDataType | None:
+    return None if value is None else MediaDataType(value)
 
 
 def _infer_generated_media_type(media: Any, spec: MediaSpec) -> MediaDataType:
@@ -220,7 +213,12 @@ def materialize_rit_from_spec(
         MediaResolutionClass.INLINE,
         MediaResolutionClass.FAST_SYNC,
     ):
-        data_type = _coerce_media_type(getattr(spec, "data_type", None) or getattr(spec, "media_type", None))
+        data_type = (
+            _coerce_media_type(
+                getattr(spec, "data_type", None) or getattr(spec, "media_type", None)
+            )
+            or MediaDataType.MEDIA
+        )
         return MediaRIT(
             label=_story_media_base_name(spec=spec, requirement=requirement),
             data_type=data_type,

@@ -181,6 +181,7 @@ class TestAsyncInlineLifecycle:
         provider = dep.provider
         assert isinstance(provider, MediaRIT)
         assert provider.status == MediaRITStatus.PENDING
+        assert provider.data_type is MediaDataType.MEDIA
         assert provider.path is None
         assert provider.adapted_spec_hash is not None
         assert provider.spec_fingerprint == provider.adapted_spec_hash

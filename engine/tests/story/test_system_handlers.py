@@ -16,11 +16,13 @@ from tangl.mechanics.presence.look import BodyPhenotype, EyeColor, HairColor, Ha
 from tangl.mechanics.presence.look.look import HasLook
 from tangl.mechanics.presence.ornaments import Ornament, OrnamentType
 from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableType
+from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.story import Actor, Role, Scene, StoryGraph
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.story.system_handlers import (
+    _media_type_for_item,
     render_block,
     render_block_choices,
     render_block_content,
@@ -127,6 +129,14 @@ def _presence_story(
         _build_ornaments(guide)
 
     return graph, block, guide
+
+
+def test_media_item_type_uses_extension_inference_only_without_explicit_type() -> None:
+    assert _media_type_for_item({"kind": "IMAGE"}) is MediaDataType.IMAGE
+    assert _media_type_for_item({"url": "portrait.PNG"}) is MediaDataType.IMAGE
+
+    with pytest.raises(ValueError):
+        _media_type_for_item({"kind": "png"})
 
 
 def test_render_block_emits_content_media_and_choice_fragments() -> None:

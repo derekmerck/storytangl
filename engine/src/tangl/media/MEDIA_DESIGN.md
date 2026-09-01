@@ -76,6 +76,22 @@ concepts. The service layer dereferences the final `MediaRIT` into a
 transport-appropriate format (URL, inline data, passthrough path) — media
 itself never decides how content reaches the client.
 
+### Classification Boundary
+
+`MediaDataType` is a semantic classification (`IMAGE`, `VECTOR`, `AUDIO`, and
+so on), not a filename parser. Author-facing declarations pass through the
+ordinary `EnumPlusMixin` enum boundary, so documented enum names, values, and
+aliases normalize there while unknown explicit values fail loudly.
+`MediaDataType.from_path()` is the separate, explicit filename-extension
+inference path; it normalizes a leading dot and case, and only that path maps an
+unknown extension to `OTHER`.
+
+This classification is distinct from the file's encoding or format (`png`,
+`svg`, `mp3`), the narrative `MediaRole`, and the service transport
+representation (URL, inline data, or passthrough path). Existing field names
+remain compatible while those concepts are progressively clarified; this note
+does not introduce a schema migration.
+
 ---
 
 ## Media Module Map

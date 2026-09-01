@@ -352,21 +352,10 @@ def _merge_fragment_batches(*batches: Any) -> list[Record]:
     return merged
 
 
-def _coerce_media_type(value: Any) -> MediaDataType:
-    if isinstance(value, MediaDataType):
-        return value
-    if isinstance(value, str) and value.strip():
-        try:
-            return MediaDataType(value)
-        except ValueError:
-            return MediaDataType(value.strip("."))
-    return MediaDataType.MEDIA
-
-
 def _media_type_for_item(item: dict[str, Any]) -> MediaDataType:
     explicit = item.get("content_type") or item.get("media_type") or item.get("kind")
     if explicit is not None:
-        return _coerce_media_type(explicit)
+        return MediaDataType(explicit)
 
     for key in ("url", "name", "src"):
         value = item.get(key)
