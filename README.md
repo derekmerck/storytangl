@@ -30,9 +30,10 @@ graph/navigation/journal; Chatman's kernels and satellites become required and
 optional dependency edges; Genette's discourse operations become phase-bus
 transformations.
 
-**It enables structural analysis and validation.** Dependency graphs expose
-properties such as reachability, satisfiability, dependency closure, and
-role-binding constraints before prose is rendered.
+**It makes structural analysis and validation possible.** The current
+preflight and diagnostic surfaces report loader, compiler, and runtime findings.
+Broader reachability, finishability, and solver-backed analysis remain active
+research rather than a finished authoring product.
 
 **It is a constraint-driven narrative engine.** Partial specifications such as
 "a scene needs a villain" can be resolved at runtime through provisioning,
@@ -85,9 +86,10 @@ VALIDATE -> PLANNING -> PREREQS -> UPDATE -> JOURNAL -> FINALIZE -> POSTREQS -> 
 ```
 
 Each phase is a dispatch point where registered handlers run in priority order
-and return auditable receipts. The system is event-sourced: state changes are
-ledger entries, so a playthrough is reproducible from a snapshot plus the
-choice log.
+and return auditable receipts. The ledger retains ordered output, diff-based
+replay records, and periodic constructor-form checkpoints. Execution is
+deterministic from the same graph state and chosen edges; persisted semantic
+journal playback across renderers is still being completed.
 
 ### Provisioning
 
@@ -134,6 +136,67 @@ For a deeper treatment of the conceptual foundations, see
 
 ---
 
+## Current Capability Status
+
+StoryTangl is a working reference engine with several complete vertical proofs,
+not a uniformly mature game-production stack. These categories describe the
+current repository rather than the full design vocabulary.
+
+### Realized Today
+
+- One typed runtime compiles world bundles, materializes graphs, resolves
+  dependencies, traverses the phase pipeline, persists ledgers, and emits one
+  journal-fragment stream.
+- Near-native YAML and a bounded Twee/Twine codec feed the same compiler and
+  runtime. The sandbox and structured-story surfaces both lower interaction to
+  ordinary `Action` edges.
+- `ServiceManager` is the canonical lifecycle API. CLI and REST adapters, a Vue
+  web client, and Ren'Py and pygame reference ports consume its typed responses;
+  the non-web ports remain proofs of concept rather than supported products.
+- Assembly, transactions, credentials, progression primitives, sandbox
+  projection, and several game kernels are implemented. The `repartee_loop`
+  world demonstrates retained repertoire, contest aftermath, prize-gated
+  choices, attributed dialog, and two interchangeable art packs.
+- File-backed media travels through world inventory, provisioning, journal
+  fragments, service dereferencing, and client-neutral roles/staging hints. A
+  ComfyUI-backed creator lifecycle and a separate receipt-based batch helper are
+  also present; they do not form a second story runtime.
+- Structured authoring diagnostics and world preflight endpoints exist, with
+  focused validators continuing to grow through the same reporting surface.
+
+### Live Integration Gaps
+
+- Persisted semantic journal replay and exact cross-renderer fidelity
+  ([#400](https://github.com/derekmerck/storytangl/issues/400)), plus real-browser
+  acceptance over the REST/web stack
+  ([#73](https://github.com/derekmerck/storytangl/issues/73)).
+- World-scoped token dereferencing: catalogs are bounded, but `Token` can still
+  fall through to a process-global singleton registry
+  ([#404](https://github.com/derekmerck/storytangl/issues/404)).
+- Media contract convergence: authored URL/data media bypasses the normal
+  inventory path ([#407](https://github.com/derekmerck/storytangl/issues/407)),
+  and staged visual elements still need one addressable piece/update/delete
+  lifecycle instead of client-side identity inference
+  ([#409](https://github.com/derekmerck/storytangl/issues/409)).
+- Broader visual proof across distinct fragment surfaces, worlds, clients, and
+  one out-of-process transport remains an integration milestone
+  ([#410](https://github.com/derekmerck/storytangl/issues/410)).
+
+### Aspirational Directions
+
+Solver-backed narrative analysis, multi-reader traversal, cross-story
+progression, semantic lifting/compression, broad authoring UX, and richer
+generative presentation are research directions. Open issues and design notes
+preserve those ideas, but they are not promises of current support or required
+steps on the integration baseline.
+
+The active sequencing boundary is the
+[integration roadmap](https://github.com/derekmerck/storytangl/issues/402);
+gameplay convergence and demonstrations are tracked separately in
+[#332](https://github.com/derekmerck/storytangl/issues/332).
+
+---
+
 ## Project Structure
 
 ```text
@@ -149,14 +212,15 @@ storytangl/
 │   │   ├── mechanics/          # Optional domain vocabularies
 │   │   ├── media/              # Media specs, creators, and dereference boundary
 │   │   ├── prose/              # Text-facing parsing and voice helpers
-│   │   ├── service/            # Gateway, orchestrator, controllers
+│   │   ├── service/            # Manager-first lifecycle, auth, typed responses
 │   │   └── persistence/        # Storage abstraction across backends
 │   └── tests/                  # Engine test suite
 ├── apps/
 │   ├── cli/                    # cmd2 command-line interface
 │   ├── server/                 # FastAPI REST API
 │   ├── web/                    # Vue 3 + TypeScript web client
-│   └── renpy/                  # Ren'Py proof-of-concept adapter
+│   ├── renpy/                  # Ren'Py proof-of-concept adapter
+│   └── pygame/                 # Headless-tested visual reference port
 ├── docs/                       # Sphinx docs and design notes
 ├── worlds/                     # Reference story bundles
 └── scripts/                    # Utility and analysis scripts
@@ -180,7 +244,7 @@ Major package design notes:
 | core | [CORE_DESIGN.md](engine/src/tangl/core/CORE_DESIGN.md) | Entity, graph, dispatch, templates |
 | vm | [VM_DESIGN.md](engine/src/tangl/vm/VM_DESIGN.md) | Phases, provisioning, traversal, replay |
 | story | [STORY_DESIGN.md](engine/src/tangl/story/STORY_DESIGN.md) | Fabula compilation, concepts, journal |
-| service | [SERVICE_DESIGN.md](engine/src/tangl/service/SERVICE_DESIGN.md) | Gateway, orchestrator, response envelopes |
+| service | [SERVICE_DESIGN.md](engine/src/tangl/service/SERVICE_DESIGN.md) | Manager lifecycle, persistence, transport, typed responses |
 | media | [MEDIA_DESIGN.md](engine/src/tangl/media/MEDIA_DESIGN.md) | Media inventory, creators, dereference boundary |
 | sandbox | [SANDBOX_DESIGN.md](engine/src/tangl/mechanics/sandbox/SANDBOX_DESIGN.md) | Location-centered dynamic choice projection |
 
@@ -213,7 +277,10 @@ poetry install -E docs      # Sphinx documentation extras
 ### Run Tests
 
 ```bash
-# Engine suite
+# Configured repository suite: engine, docs, scripts, and reference adapters
+poetry run pytest
+
+# Engine suite only
 poetry run pytest engine/tests
 
 # Individual layers
@@ -226,6 +293,9 @@ poetry run pytest engine/tests/mechanics
 cd apps/web
 yarn install
 yarn test
+
+# Pygame reference port
+PYTHONPATH=engine/src:apps/pygame/src poetry run pytest apps/pygame/tests
 ```
 
 ### Run The Reference Apps
@@ -243,6 +313,10 @@ cd apps/web
 yarn install
 yarn dev
 # then open http://localhost:5173
+
+# Pygame reference port and the staged repartee world
+PYTHONPATH=engine/src:apps/pygame/src:worlds/repartee_loop \
+  poetry run python -m tangl.pygame_client --world repartee_loop
 ```
 
 ### Build Docs
@@ -256,7 +330,9 @@ poetry run make -C docs html
 ## Research Directions
 
 StoryTangl is positioned as a research platform for computational narratology.
-Active and planned explorations include:
+The following list is a research agenda, not a supported-feature list. Some
+ideas have bounded pressure tests; most require a named consumer and a focused
+contract before promotion:
 
 - **Narrative planning as constraints**: dependency resolution, provisioning,
   and future fact-ledger solving.
