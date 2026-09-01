@@ -12,8 +12,6 @@ from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.utils.sanitize_str import sanitize_str
 from .media_resource_inv_tag import MediaRITStatus, MediaResourceInventoryTag as MediaRIT
 
-# todo: probably want a media requirement subclass, then use that in a dependency and affordance subclass, media affordances are pre-decided media objects that can be attached as appropriate, first time you see a char etc.
-
 class MediaDep(Dependency[MediaRIT]):
     """
     Links a graph node to a media resource.

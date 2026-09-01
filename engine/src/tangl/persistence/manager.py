@@ -91,7 +91,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
         """"
         Data in a context manager with optional write-back on exit
         """
-        # todo: service layer can deal with locking the context if it's in a threaded environment
+        # Threaded callers own synchronization at the service boundary.
 
         if uid not in self:
             raise KeyError(f"Unable to find {uid}")

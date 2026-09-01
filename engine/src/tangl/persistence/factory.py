@@ -39,8 +39,6 @@ DEFAULT_MONGO_URL = settings.get('service.apis.mongo.url', False)
 
 ManagerT = TypeVar("ManagerT", bound=PersistenceManager)
 
-# todo: extend backends to mysql, protobuf, msgpack?
-
 class PersistenceManagerFactory:
     """
     Factory class providing different configurations of PersistenceManager.

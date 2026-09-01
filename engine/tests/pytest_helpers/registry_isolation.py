@@ -30,7 +30,6 @@ SHARED_BEHAVIOR_REGISTRIES: tuple[tuple[str, str], ...] = (
     ("tangl.core.dispatch", "dispatch"),
     ("tangl.vm.dispatch", "dispatch"),
     ("tangl.story.dispatch", "story_dispatch"),
-    ("tangl.ir.dispatch", "script_dispatch"),
     ("tangl.service.dispatch", "service_info_dispatch"),
     ("tangl.mechanics.sandbox.dispatch", "sandbox_dispatch"),
     ("tangl.media.dispatch", "media_dispatch"),

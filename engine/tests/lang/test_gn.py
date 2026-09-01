@@ -31,6 +31,10 @@ def test_normalize_gn():
     print( res )
     assert res == expected_xx_str, "Result should match expected"
 
+
+def test_normalize_gn_prefers_longest_phrase():
+    assert normalize_gn("The Father General arrived.", True) == "The Mother Superior arrived."
+
     test_xx_str = "Ms. Foo is the Queen."
     expected_xy_str = "Mr. Foo is the King."
 

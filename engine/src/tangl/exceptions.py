@@ -1,5 +1,3 @@
-# todo: swap these in to make exception management more precise
-
 class TanglException( Exception ):
     # all StoryTangl-specific exceptions are derived from this one
     pass

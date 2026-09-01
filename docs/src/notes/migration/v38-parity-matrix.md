@@ -347,7 +347,9 @@ Planned target modules referenced by `PORT_*` rows:
     - `Post-swap disallowed legacy imports: 0`
     - `Post-swap disallowed *38 imports: 0`
 - Active CI gate now runs in post-swap mode.
-- Legacy source and retired legacy test trees are archived under `scratch/legacy/...`.
+- Legacy source and retired legacy test trees are retained in Git history; the
+  in-tree archive was removed after its useful precedents were consolidated in
+  [Engine Architecture Archaeology](engine-architecture-archaeology.md).
 - Compatibility wrapper packages (`tangl.core38`, `tangl.vm38`, `tangl.story38`, `tangl.service38`) have been retired from production source trees.
 - Legacy call-routing shim plumbing removed in active app/service code:
   - CLI no longer exposes `call_legacy_endpoint(...)` and no longer uses `_call_legacy(...)` controller helpers.

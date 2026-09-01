@@ -166,7 +166,7 @@ class CallReceipt(Record):
 
     # Aggregation functions
 
-    # todo: force resolve any deferred receipts?  otherwise they don't count as None's
+    # Aggregation considers only receipts that have already resolved.
 
     @classmethod
     def iter_results(cls, *receipts) -> Iterator[Any]:
@@ -242,11 +242,6 @@ class Behavior(RegistryAware, HasOrder, Entity):
         >>> c = Behavior(func=lambda *_, **__: True, wants_caller_kind=Entity)
         >>> assert Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
     """
-    # todo: method type introspection was in v37, but complicated and underutilized?
-    #       - detect class methods as caller hint
-    #       - detect inst methods as caller hint and bind func to caller dynamically
-    #       - detect instance funcs and bind source
-
     func: Callable = lambda *_, **__: True
     task: Tag = None
     priority: int = Priority.NORMAL
@@ -269,8 +264,6 @@ class Behavior(RegistryAware, HasOrder, Entity):
 
     def __call__(self, *args, ctx: RuntimeCtx = None, **kwargs) -> CallReceipt:
         """Invoke behavior function and return a resolved :class:`CallReceipt`."""
-        # todo: could do some introspection here, if the func wants caller, etc., check
-        #       for default call args/kwargs in ctx
         return CallReceipt(
             origin_id=self.uid,
             result=self.func(*args, ctx=ctx, **kwargs),

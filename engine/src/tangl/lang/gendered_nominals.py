@@ -25,7 +25,7 @@ gendered_nominals_ = """
 - [ count, countess ]
 - [ czar, czarina ]
 - [ dad, mom ]       
-- [ daddy, mommy ]     # todo: check if this can match, superset of dad/mom
+- [ daddy, mommy ]
 - [ dog, bitch ]
 - [ drake, duck ]      # n: duck
 - [ duke, duchess ]
@@ -33,7 +33,7 @@ gendered_nominals_ = """
 - [ emperor, empress ]
 - [ enchanter, enchantress ]
 - [ father, mother ]  # n: parent
-- [ father general, mother superior ]   # todo: check if this can match, superset of father/mother
+- [ father general, mother superior ]
 - [ gander, goose ]   # n: goose
 - [ gentleman, lady ]
 - [ giant, giantess ]
@@ -77,7 +77,7 @@ gendered_nominals_ = """
 - [ signor, signora ]
 - [ sir, miss ]            # wanted to use ma'am, but the apostrophe confuses the system
 - [ son, daughter ]
-- [ stag, hind ]           # n: deer, alternate for hart/hind, todo: check duplicate pair behavior
+- [ stag, hind ]           # n: deer, alternate masculine form for hart/hind
 - [ steward, maid ]
 - [ sultan, sultana ]
 - [ taikomochi, geisha ]   # n: geisha, masculine means 'jester'
@@ -110,78 +110,11 @@ def gn(word: str, is_xx: bool = True):
         return new_word
     return word
 
-is_xx_patterns = r"(\b" + r"\b|\b".join(list(xx_map)) + r"\b)"
+# Match longer phrases before their single-word prefixes (for example,
+# "father general" before "father").
+_ordered_nominals = sorted(xx_map, key=lambda word: (-len(word), word))
+is_xx_patterns = r"(\b" + r"\b|\b".join(_ordered_nominals) + r"\b)"
 is_xx_regex = re.compile(is_xx_patterns, re.IGNORECASE)
 
 def normalize_gn(s: str, is_xx: bool = True):
     return is_xx_regex.sub(partial(gn, is_xx=is_xx), s)
-
-# <ignore>
-
-# The legacy code for this is interesting.  It programmatically injected properties for each term into the 'Actor' class, so they could be referenced by Jinja templates "A {{ my_actor.guy }} is here." and it would automatically render the code to reflect the actor's current gender.  The code goes into some detail regarding capitalization and the use of the leading or trailing underscore to distinguish possessive from objective pronouns (her_ dog, the dog's owner is _her).  That has been entirely factored out in the pronoun module, so it simplified handling the words significantly.  It also dynamically wrote out a pyi stub file, so the Actor class would not be type-flagged for using such expressions.
-
-# language=Python
-"""
-def add_desc_helpers(cls, test, **kwargs):
-
-    def fget_wrapper(test, ok, nok):
-        def fget(self) -> str:
-            return test(self) and ok or nok
-
-        return fget
-
-    pyi_hints = f"class {cls.__name__}:\n"
-
-    def handle_underscores(s):  # ss out and SS in
-        if s.startswith("_"):
-            r = s[1:]
-            R = r.capitalize()
-            _r = s
-            _R = "_" + R
-
-        elif k.endswith("_"):
-            r = s[:-1]
-            R = r.capitalize()
-            _r = s
-            _R = R + "_"
-
-        else:
-            r = s
-            R = r.capitalize()
-            _r = s
-            _R = R
-
-        return _r, _R, r, R
-
-    for k, v in kwargs.items():
-        _k, _K, kk, KK = handle_underscores(k)
-        _v, _V, vv, VV = handle_underscores(v)
-
-        prop = property(fget_wrapper(test, kk, vv))
-        setattr(cls, _k, prop)
-        setattr(cls, _v, prop)
-
-        prop = property(fget_wrapper(test, KK, VV))
-        setattr(cls, _K, prop)
-        setattr(cls, _V, prop)
-
-        pyi_hints += f"\t{_k}: str\n\t{_v}: str\n\t{_K}: str\n\t{_V}: str\n"
-
-    return pyi_hints
-
-
-kwargs = {
-
-    "_her": "him",   # obj, gave to her
-    "her_": "his_",  # possessive, her dog
-    "hers": "_his",  # possessive passive, dog was hers
-
-    "she": "he",
-    "herself": "himself", 
-    ...  # etc as with 'gendered_nominals' var
-}
-
-test = lambda self: self.gens == G.XX
-add_desc_helpers(ActorDescMixin, test, **kwargs)
-"""
-# </ignore>

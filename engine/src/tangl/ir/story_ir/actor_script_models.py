@@ -27,13 +27,7 @@ class ActorScript(BaseScriptItem):
     # at least 1 of name, full name, or first and land
     gender: Optional[Gens] = None
 
-    # todo: consider how to reserve a look, demographics field for mechanics that may not be used?
-
     assets: list[AssetsScript] = None     # assets associated with the actor
-
-    # look: Optional[LookScript] = None
-    # wearables: Optional[list[AssetScript]] = Field(None, alias="outfit")
-    # ornaments: Optional[OrnamentationScript] = None
 
     media: list[MediaItemScript] = None
 

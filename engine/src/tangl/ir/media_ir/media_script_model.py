@@ -42,7 +42,7 @@ class MediaItemScript(BaseScriptItem, arbitrary_types_allowed=True):
 
     # This requires a loc lookup, or creation + registration
     # spec: Optional[MediaSpecification] = None         #: spec for procedural/generative creation
-    # todo: can't use the class b/c abstract method
+    # Specs remain mappings because the shared specification type is abstract.
     spec: Optional[dict] = None         #: spec for procedural/generative creation
 
     media_role: Optional[MediaRole] = None

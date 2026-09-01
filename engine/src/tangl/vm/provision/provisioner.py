@@ -64,11 +64,6 @@ class ProvisionOffer(Record):
     one. ``ProvisionOffer`` keeps the selection process pure by storing a lazy
     callback instead of materializing providers eagerly.
     """
-    # todo: seems like we want to attach the accepted offer to the requirement or
-    #       requirement carrier, maybe exclude the callback and serialize as just the
-    #       origin, policy, priority?  Or just track the accepted-offer-id in the
-    #       requirement?
-
     model_config = ConfigDict(arbitrary_types_allowed=True)
     # has arbitrary types, don't allow serialization
     guard_unstructure: ClassVar[bool] = True

@@ -125,13 +125,11 @@ class DemographicSampler:
 
     @classmethod
     def sample_gender(cls, weighted: bool = False, rng: Any = None) -> Gender:
-        # todo: could apply artificial gender weighting here
         gender = Gender.pick(rand=cls._rand(rng))
         return gender
 
     @classmethod
     def sample_age_range(cls, weighted: bool = False, rng: Any = None) -> AgeRange:
-        # todo: could definitely find age distributions per region at least
         age_range = cls._rand(rng).choice([*AgeRange.__members__.values()])
         return age_range
 

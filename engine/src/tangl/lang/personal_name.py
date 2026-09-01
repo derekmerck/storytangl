@@ -12,8 +12,6 @@ from .gendered_nominals import normalize_gn
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-# todo: replace 'has_personal_name' with this improved system
-
 class PersonalName(BaseModel):
     """
     Provides methods:

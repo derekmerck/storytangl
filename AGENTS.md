@@ -187,8 +187,8 @@ full type map and rationale.**
   constructor-form recursion. This generalizes the existing one-off pattern in
   `Registry.members` and `EntityTemplate.payload`: fields excluded from raw
   Pydantic dumping but deliberately walked through constructor form.
-  It must stay much smaller than the legacy automorphic structuring experiments
-  under `scratch/legacy/core/core-23/structuring/`: no data-driven self-casting,
+  It must stay much smaller than the retired v2.3 automorphic structuring
+  experiments: no data-driven self-casting,
   no opportunistic template/default lookup, no child-field inference from
   property names, and no broad "make the object shape itself" pipeline.
 - **Import direction is a strict DAG.** `core ← vm ← story ← service`.
