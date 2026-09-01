@@ -74,7 +74,7 @@ from .handlers import (
     provision_game_moves,
 )
 from .blackjack_game import BlackjackGame, BlackjackGameHandler, BlackjackMove, PlayingCard
-from .nim_game import NimGame, NimGameHandler
+from .nim_game import DEFAULT_HEAP, NimGame, NimGameHandler, NimMove
 from .aggregate_force_game import (
     AggregateForceGame,
     AggregateForceGameHandler,
@@ -205,6 +205,8 @@ __all__ = [
     "PlayingCard",
     "NimGame",
     "NimGameHandler",
+    "NimMove",
+    "DEFAULT_HEAP",
     "AggregateForceGame",
     "AggregateForceGameHandler",
     "ForceCommitMove",

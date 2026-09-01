@@ -179,6 +179,66 @@ and `IncrementalGame` resources are bare `dict[str, int]`, and blackjack carries
 a private `PlayingCard` model. Reconciling those is a second-consumer task, not
 a prerequisite for the ladder.
 
+### Heaps Are Token Types, and the Token Rung Is One Kernel
+
+A scalar heap is an appealing trap. It is the one configuration of the token
+rung that is already solved: under a take bound `k`, a heap of size `n` is a
+first-player win exactly when `n % (k + 1) != 0`, so a single-heap board has no
+strategy left in it once anyone notices. The default shipped Nim board — seven
+tokens, take one to three — was a forced win for whoever moved first.
+
+The interesting cases start at two, and *more heaps* and *more token types* turn
+out to be the same generalization:
+
+> **A heap is a token type in a wallet.**
+
+`{"heap": 7}` is classic Nim. `{"red": 5, "blue": 3}` is a two-colour contest
+whose piles deplete independently. Nothing else is required to get from one to
+the other, which is the argument for holding token-rung state in an
+`AssetWallet` rather than a scalar or a bespoke dict.
+
+Bounded multi-heap Nim is genuinely strategic rather than solved-by-inspection.
+Each heap's Grundy value under a take bound is `n % (k + 1)`, and a position is
+lost for the mover exactly when those values XOR to zero. `NimGame` exposes that
+as `grundy_values()` and `is_losing_position`, and `nim_optimal` plays it.
+
+#### One kernel behind several games
+
+Once piles are wallets, several apparently distinct games are configurations of
+one shape: **N piles of fungible tokens, moves that put or take quantities, and
+terminal conditions that are predicates over pile contents or relationships.**
+
+| Game | Piles | Moves | Terminal condition |
+|---|---|---|---|
+| Nim | 1 | take | pile empties |
+| Multi-heap Nim | N | take | all piles empty |
+| Corridor | 2, monotonically increasing | put | a pile crosses the ceiling, or the rival is trapped between your pile and it |
+| Twenty-two | 2, fed by vector cards | put, from a drawn source | the relationship between the piles leaves its legal band |
+
+Corridor is the instructive one. Its two scores rise monotonically and its
+terminal conditions are already relational rather than a race — a side busts by
+crossing the shared target, or wins by trapping the rival between its own value
+and that target. Read as piles, it is opposing Nim played upward: each side
+builds, and the contest is over keeping the *difference* inside a legal
+corridor. The same effect is reachable two ways — one token type with both put
+and take moves, or two token types feeding their own piles — and the second is
+what the current implementation already does with scalars.
+
+Twenty-two extends that to a drawn source of **vector** tokens: a card carrying
+one additive and one subtractive value, so a draw pushes both a top and a bottom
+and the player must keep the running relationship inside a band. That is the
+older `MndCard` spike restated in pile terms, and it is why the deferred
+multi-axis work belongs to this family rather than to a card-specific kernel.
+
+#### Status
+
+Nim holds its heaps in a wallet today and multi-heap play falls out of that with
+no added structure, which is the evidence for the claim above. Generalizing to
+put-and-take moves, and reskinning corridor and twenty-two onto the shared
+kernel, is the next step and is not yet done. Corridor's current terminal rules
+are subtly specific — the trap condition in particular — so a reskin must
+preserve them deliberately rather than assume a race.
+
 ### Orthogonal Axes
 
 These vary independently of the rung and must not be confused with it:
@@ -222,7 +282,7 @@ the rungs enumerable and world-legible instead of implicit in each kernel.
 |---|---|---|
 | `TrivialGame`, `RpsGame` / `RpslsGame` | strategy | dominance relation only |
 | `CallResponseGame` + `repertoire` | strategy | actor-bound move sets over a `Token` catalog; see `REPERTOIRE_LOOP_DESIGN.md` |
-| `NimGame` | token | one heap; multi-heap remains an open extension |
+| `NimGame` | token | heaps held as token types in an `AssetWallet`; multi-heap and multi-colour play, with bounded-Nim Grundy strategy |
 | `AggregateForceGame`, `BagRpsGame`, `SiegeRpsGame` | token → card boundary | composition without unit identity |
 | `PickingGame`, `KimGame` | verb over token/named | picking axis, rung varies by host |
 | `CredentialsGame` | named token | stacked picking composition |
@@ -539,7 +599,9 @@ real story traversal rather than isolated core tests.
 The longer design note contained several future directions that still seem
 valuable, even though they are not commitments:
 
-- **larger token games** such as marker-exchange contests beyond one-heap Nim
+- **put-and-take pile moves**, generalizing the token rung so corridor and
+  twenty-two become configurations of the shared pile kernel rather than
+  separate implementations
 - **richer picking/verification games** such as multi-stage credential checks
 - **larger card games** with fuller deck, discard, or betting structures
 - **richer board topologies** beyond one cyclic track — branching routes, safe
