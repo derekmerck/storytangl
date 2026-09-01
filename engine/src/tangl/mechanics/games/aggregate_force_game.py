@@ -14,11 +14,13 @@ from typing import ClassVar, TypeVar
 from pydantic import Field
 
 from tangl.journal.fragments import ContentFragment
+from tangl.story.concepts.asset import AssetWallet
 
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
 from .game import Game
+from .game_token import GameTokenSpec, affiliation_of, dominant_affiliation, weight_of
 from .handler import GameHandler
 
 
@@ -50,7 +52,18 @@ class AggregateForceGame(Game[ForceCommitMove]):
     opponent_strategy: str | None = "aggregate_force_greedy"
 
     force_types: list[str] = Field(default_factory=list)
+
+    #: Dominance cycle between **affiliations**. When a contest declares no
+    #: token specs each label is its own affiliation, so this keeps the plain
+    #: one-token-per-colour shape unchanged.
     force_beats: dict[str, str] = Field(default_factory=dict)
+
+    #: Per-token colour and weight. Declaring several labels with the same
+    #: affiliation and different values is what gives a bag *sizes* of a type —
+    #: a heavy brute and a light brute both answer to "rock".
+    token_specs: dict[str, GameTokenSpec] = Field(default_factory=dict)
+
+    #: Legacy-free weight fallback for contests that declare no token specs.
     force_weights: dict[str, int] = Field(default_factory=dict)
 
     max_commit_size: int = 3
@@ -60,12 +73,12 @@ class AggregateForceGame(Game[ForceCommitMove]):
     player_opening_reserve: dict[str, int] = Field(default_factory=dict)
     opponent_opening_reserve: dict[str, int] = Field(default_factory=dict)
 
-    player_reserve: dict[str, int] = Field(
-        default_factory=dict,
+    player_reserve: AssetWallet = Field(
+        default_factory=AssetWallet,
         json_schema_extra={"reset_field": True},
     )
-    opponent_reserve: dict[str, int] = Field(
-        default_factory=dict,
+    opponent_reserve: AssetWallet = Field(
+        default_factory=AssetWallet,
         json_schema_extra={"reset_field": True},
     )
     round_detail: dict[str, object] | None = Field(
@@ -74,18 +87,48 @@ class AggregateForceGame(Game[ForceCommitMove]):
     )
 
     def ordered_force_types(self) -> list[str]:
-        """Return the stable type ordering for profiles and labels."""
+        """Return the stable *token label* ordering for profiles and labels."""
 
         if self.force_types:
             return list(self.force_types)
+        if self.token_specs:
+            return list(self.token_specs)
         return list(self.force_beats)
 
+    def token_definitions(self) -> dict[str, GameTokenSpec]:
+        """Return the resolved token vocabulary, filling weights from fallback."""
+
+        definitions = dict(self.token_specs)
+        for label, weight in self.force_weights.items():
+            if label not in definitions:
+                definitions[label] = GameTokenSpec(value=weight)
+        return definitions
+
+    def get_force_affiliation(self, label: str) -> str:
+        """Return the dominance class a token label belongs to."""
+
+        return affiliation_of(label, self.token_definitions())
+
     def get_force_weight(self, label: str) -> int:
-        """Return the force weight for a given type."""
+        """Return the force weight for a given token label."""
 
-        return self.force_weights.get(label, 1)
+        return int(weight_of(label, self.token_definitions()))
 
-    def total_force(self, reserve: dict[str, int]) -> int:
+    def affiliations_present(self, reserve) -> set[str]:
+        """Return the affiliations represented in a reserve or profile."""
+
+        return {
+            self.get_force_affiliation(label)
+            for label, count in reserve.items()
+            if count > 0
+        }
+
+    def dominant_affiliation(self, reserve) -> str | None:
+        """Return the affiliation carrying the most weight in a holding."""
+
+        return dominant_affiliation(reserve, self.token_definitions())
+
+    def total_force(self, reserve) -> int:
         """Return weighted force remaining in a reserve."""
 
         return sum(count * self.get_force_weight(label) for label, count in reserve.items())
@@ -95,13 +138,22 @@ class AggregateForceGame(Game[ForceCommitMove]):
         namespace.update(
             {
                 "aggregate_force_types": self.ordered_force_types(),
-                "aggregate_player_reserve": dict(self.player_reserve),
-                "aggregate_opponent_reserve": dict(self.opponent_reserve),
+                "aggregate_player_reserve": dict(self.player_reserve.amounts),
+                "aggregate_opponent_reserve": dict(self.opponent_reserve.amounts),
+                "aggregate_player_dominant": self.dominant_affiliation(self.player_reserve),
+                "aggregate_opponent_dominant": self.dominant_affiliation(self.opponent_reserve),
                 "aggregate_player_force": self.total_force(self.player_reserve),
                 "aggregate_opponent_force": self.total_force(self.opponent_reserve),
                 "aggregate_max_commit_size": self.max_commit_size,
                 "aggregate_max_mix_types": self.max_mix_types,
-                "aggregate_force_weights": dict(self.force_weights),
+                "aggregate_force_weights": {
+                    label: self.get_force_weight(label)
+                    for label in self.ordered_force_types()
+                },
+                "aggregate_force_affiliations": {
+                    label: self.get_force_affiliation(label)
+                    for label in self.ordered_force_types()
+                },
             }
         )
         return namespace
@@ -116,12 +168,18 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     game_cls: ClassVar[type[Game]] = AggregateForceGame
 
     def on_setup(self, game: AggregateForceGameT) -> None:
-        game.player_reserve = dict(game.player_opening_reserve)
-        game.opponent_reserve = dict(game.opponent_opening_reserve)
+        game.player_reserve = AssetWallet()
+        game.player_reserve.gain({
+            label: count for label, count in game.player_opening_reserve.items() if count > 0
+        })
+        game.opponent_reserve = AssetWallet()
+        game.opponent_reserve.gain({
+            label: count for label, count in game.opponent_opening_reserve.items() if count > 0
+        })
         game.round_detail = {
             "outcome": "opening",
-            "player_reserve": dict(game.player_reserve),
-            "opponent_reserve": dict(game.opponent_reserve),
+            "player_reserve": dict(game.player_reserve.amounts),
+            "opponent_reserve": dict(game.opponent_reserve.amounts),
         }
 
     def get_available_moves(self, game: AggregateForceGameT) -> list[ForceCommitMove]:
@@ -163,8 +221,10 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
             "opponent_commit": opponent_commit,
             "player_losses": player_losses,
             "opponent_losses": opponent_losses,
-            "player_reserve": dict(game.player_reserve),
-            "opponent_reserve": dict(game.opponent_reserve),
+            "player_dominant": game.dominant_affiliation(player_commit),
+            "opponent_dominant": game.dominant_affiliation(opponent_commit),
+            "player_reserve": dict(game.player_reserve.amounts),
+            "opponent_reserve": dict(game.opponent_reserve.amounts),
             "player_damage": player_damage,
             "opponent_damage": opponent_damage,
         }
@@ -254,7 +314,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         game: AggregateForceGameT,
         reserve: dict[str, int],
     ) -> list[ForceCommitMove]:
-        types = [label for label in game.ordered_force_types() if reserve.get(label, 0) > 0]
+        types = [label for label in game.ordered_force_types() if reserve[label] > 0]
         if not types:
             return []
 
@@ -288,7 +348,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         losses: dict[str, int] = {}
         remaining = budget
         for label in priorities:
-            available = defender.get(label, 0)
+            available = defender[label] if hasattr(defender, "amounts") else defender.get(label, 0)
             if available <= 0 or remaining <= 0:
                 continue
             taken = min(available, remaining)
@@ -305,7 +365,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         if not attacker or not defender:
             return 0
 
-        defender_types = {label for label, count in defender.items() if count > 0}
+        defender_affiliations = game.affiliations_present(defender)
         favorable = 0
         neutral = 0
         disadvantaged = 0
@@ -314,16 +374,17 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
             if count <= 0:
                 continue
             power = count * game.get_force_weight(label)
-            beaten = game.force_beats.get(label)
-            if beaten in defender_types:
+            affiliation = game.get_force_affiliation(label)
+            beaten = game.force_beats.get(affiliation)
+            if beaten in defender_affiliations:
                 favorable += power
-            elif label in defender_types:
+            elif affiliation in defender_affiliations:
                 neutral += power
             else:
                 disadvantaged += power
 
         budget = favorable + neutral + (disadvantaged // max(game.disadvantaged_trade_ratio, 1))
-        return min(budget, sum(defender.values()))
+        return min(budget, sum(count for _, count in defender.items()))
 
     def _defender_target_priority(
         self,
@@ -331,20 +392,23 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         attacker: dict[str, int],
         defender: dict[str, int],
     ) -> list[str]:
-        attacker_types = {label for label, count in attacker.items() if count > 0}
+        attacker_affiliations = game.affiliations_present(attacker)
+        order = game.ordered_force_types()
 
         def priority(label: str) -> tuple[int, int]:
-            if any(game.force_beats.get(attacker_label) == label for attacker_label in attacker_types):
-                return (0, game.ordered_force_types().index(label))
-            if label in attacker_types:
-                return (1, game.ordered_force_types().index(label))
-            return (2, game.ordered_force_types().index(label))
+            affiliation = game.get_force_affiliation(label)
+            rank = order.index(label) if label in order else len(order)
+            if any(game.force_beats.get(attacking) == affiliation for attacking in attacker_affiliations):
+                return (0, rank)
+            if affiliation in attacker_affiliations:
+                return (1, rank)
+            return (2, rank)
 
         return sorted((label for label, count in defender.items() if count > 0), key=priority)
 
-    def _apply_losses(self, reserve: dict[str, int], losses: dict[str, int]) -> None:
+    def _apply_losses(self, reserve: AssetWallet, losses: dict[str, int]) -> None:
         for label, count in losses.items():
-            reserve[label] = max(reserve.get(label, 0) - count, 0)
+            reserve.spend({label: min(count, reserve[label])})
 
     def _weighted_total(self, game: AggregateForceGameT, profile: dict[str, int]) -> int:
         return sum(count * game.get_force_weight(label) for label, count in profile.items())

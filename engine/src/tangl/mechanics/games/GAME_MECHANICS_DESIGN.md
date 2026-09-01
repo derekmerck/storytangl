@@ -127,10 +127,17 @@ game still has counts, a card game still has strategy.
 The ladder is a better organizing tool than a flat genre list because it
 explains membership rather than asserting it:
 
-- **Aggregate-force contests sit between token and card.** `bag_rps` and
-  `siege_rps` compose a commitment out of counts, but no individual unit has
-  identity — which is exactly why casualty priority and "adaptive" joker units
-  stayed unresolved design questions rather than implementation details.
+- **Aggregate-force contests are the driving case for coloured, weighted
+  tokens.** They are rock-paper-scissors plus a resource constraint: a bag may
+  hold many tokens of a type, many *sizes* of a type, or both; each side plays
+  some out, a dominance calculation compares them, and survivors return or are
+  set aside. That requires a token label to carry an affiliation *and* a
+  weight independently — several labels sharing one colour at different
+  weights — which is precisely what `FungibleGameToken` and `GameTokenSpec`
+  provide and what a label-is-its-own-colour model cannot express.
+  Individual units still have no identity, which is why casualty priority and
+  "adaptive" joker units remain open design questions rather than
+  implementation details.
 - **Corridor is a card game with identity projected away.** `CorridorGame`
   draws from an ordered `source_sequence` of integers. Its shared-threshold
   pressure is card pressure; it simply declines to model which card. The
@@ -230,6 +237,17 @@ and the player must keep the running relationship inside a band. That is the
 older `MndCard` spike restated in pile terms, and it is why the deferred
 multi-axis work belongs to this family rather than to a card-specific kernel.
 
+#### The open disposition question
+
+The aggregate-force loop has a step the current implementation flattens. After
+a comparison, committed tokens could return to the field, return to the bag, or
+be set aside as spent — three dispositions, not one. Today commitment is
+virtual and only casualties leave the reserve, so "survivor return" never
+happens because survivors never left. Making the cycle explicit would give the
+family a real economy of force, and it is the same open policy the migration
+archaeology recorded around casualty priority and last-down units. It wants a
+consumer before it is built, because the choice materially changes the game.
+
 #### Status
 
 Nim holds its heaps in a wallet today and multi-heap play falls out of that with
@@ -283,7 +301,7 @@ the rungs enumerable and world-legible instead of implicit in each kernel.
 | `TrivialGame`, `RpsGame` / `RpslsGame` | strategy | dominance relation only |
 | `CallResponseGame` + `repertoire` | strategy | actor-bound move sets over a `Token` catalog; see `REPERTOIRE_LOOP_DESIGN.md` |
 | `NimGame` | token | heaps held as token types in an `AssetWallet`; multi-heap and multi-colour play, with bounded-Nim Grundy strategy |
-| `AggregateForceGame`, `BagRpsGame`, `SiegeRpsGame` | token → card boundary | composition without unit identity |
+| `AggregateForceGame`, `BagRpsGame`, `SiegeRpsGame` | token | reserves as wallets of coloured, weighted tokens; composition without per-unit identity |
 | `PickingGame`, `KimGame` | verb over token/named | picking axis, rung varies by host |
 | `CredentialsGame` | named token | stacked picking composition |
 | `BlackjackGame` | named token | honest rung; cards are private to the module rather than shared |

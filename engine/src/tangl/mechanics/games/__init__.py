@@ -93,10 +93,13 @@ from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, Twen
 from .game_token import (
     DiscreteGameToken,
     FungibleGameToken,
+    GameTokenSpec,
     GameTokenType,
+    affiliation_of,
     discrete_token_class,
     dominant_affiliation,
     value_by_affiliation,
+    weight_of,
 )
 from .track_game import (
     DEFAULT_PIECE_LABEL,
@@ -231,6 +234,9 @@ __all__ = [
     "DiscreteGameToken",
     "FungibleGameToken",
     "GameTokenType",
+    "GameTokenSpec",
+    "affiliation_of",
+    "weight_of",
     "discrete_token_class",
     "dominant_affiliation",
     "value_by_affiliation",

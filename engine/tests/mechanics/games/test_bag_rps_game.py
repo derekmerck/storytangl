@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from tangl.core import Graph
-from tangl.mechanics.games import HasGame
+from tangl.mechanics.games import GameTokenSpec, HasGame
+from tangl.mechanics.games.aggregate_force_game import ForceCommitMove
 from tangl.mechanics.games.bag_rps_game import BagRpsGame, BagRpsGameHandler
 from tangl.mechanics.games.handlers import inject_game_context, provision_game_moves
 from tangl.story import Action, Block
@@ -74,7 +75,9 @@ class TestBagRpsCore:
 
         assert result.name == "LOSE"
         assert game.score == {"player": 1, "opponent": 2}
-        assert game.player_reserve == {"paper": 0, "scissors": 0}
+        # The reserve is a wallet, so exhausted token types drop out entirely
+        # rather than lingering as zero counts.
+        assert game.player_reserve.amounts == {}
 
     def test_move_generation_respects_commit_bounds(self) -> None:
         game = BagRpsGame(
@@ -170,3 +173,83 @@ class TestBagRpsIntegration:
 
         assert namespace["aggregate_player_force"] > 0
         assert namespace["bag_rps_player_reserve"]
+
+
+class TestWeightedAndColouredTokens:
+    """Many sizes of a type, many types, or both in one bag."""
+
+    def _game(self, **kwargs) -> BagRpsGame:
+        config = {
+            "force_types": ["brute", "heavy_brute", "fast", "sharp"],
+            "force_beats": {"rock": "scissors", "paper": "rock", "scissors": "paper"},
+            "token_specs": {
+                "brute": GameTokenSpec(affiliation="rock", value=1),
+                "heavy_brute": GameTokenSpec(affiliation="rock", value=3),
+                "fast": GameTokenSpec(affiliation="paper", value=1),
+                "sharp": GameTokenSpec(affiliation="scissors", value=1),
+            },
+            "player_opening_reserve": {"brute": 2, "heavy_brute": 1, "fast": 1},
+            "opponent_opening_reserve": {"sharp": 3},
+        }
+        config.update(kwargs)
+        return BagRpsGame(**config)
+
+    def test_several_labels_can_share_one_affiliation(self) -> None:
+        game = self._game()
+
+        assert game.get_force_affiliation("brute") == "rock"
+        assert game.get_force_affiliation("heavy_brute") == "rock"
+        assert game.get_force_weight("heavy_brute") == 3
+
+    def test_dominant_affiliation_weighs_size_against_count(self) -> None:
+        game = self._game()
+        BagRpsGameHandler().setup(game)
+
+        # one heavy brute plus two light outweighs a single fast marker
+        assert game.dominant_affiliation(game.player_reserve) == "rock"
+
+    def test_a_heavy_token_hits_harder_than_a_light_one(self) -> None:
+        # The defender must be deep enough that the casualty budget is not
+        # capped by its own size, or weight cannot show through.
+        handler = BagRpsGameHandler()
+        results = []
+        for label in ("brute", "heavy_brute"):
+            game = self._game(
+                player_opening_reserve={label: 1},
+                opponent_opening_reserve={"sharp": 3},
+            )
+            handler.setup(game)
+            handler.resolve_round(
+                game,
+                ForceCommitMove(profile=((label, 1),)),
+                ForceCommitMove(profile=(("sharp", 3),)),
+            )
+            results.append(game.score["player"])
+
+        assert results == [1, 3]
+
+    def test_dominance_is_evaluated_between_affiliations(self) -> None:
+        # heavy_brute is "rock" and must beat "scissors" despite the label
+        # sharing no name with either side of the declared cycle
+        game = self._game(
+            player_opening_reserve={"heavy_brute": 1},
+            opponent_opening_reserve={"sharp": 1},
+        )
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        result = handler.resolve_round(
+            game,
+            ForceCommitMove(profile=(("heavy_brute", 1),)),
+            ForceCommitMove(profile=(("sharp", 1),)),
+        )
+
+        assert result.name == "WIN"
+        assert game.opponent_reserve.amounts == {}
+
+    def test_undeclared_contests_keep_label_as_affiliation(self) -> None:
+        # The stock rock/paper/scissors bag declares no specs at all.
+        plain = BagRpsGame()
+
+        assert plain.get_force_affiliation("rock") == "rock"
+        assert plain.get_force_weight("rock") == 1
