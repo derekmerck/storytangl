@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from tangl.journal.fragments import MediaFragment
 from tangl.pygame_client.bridge import PygameSessionBridge
+
 
 @pytest.fixture
 def bridge() -> PygameSessionBridge:
@@ -35,6 +37,27 @@ def test_opening_turn_carries_narration_and_an_available_choice(
 
     assert any("every introduction is also a challenge" in line.text for line in lines)
     assert any(choice.available and choice.text for choice in choices)
+
+
+def test_opening_turn_uses_the_canonical_narrative_background_role(
+    bridge: PygameSessionBridge, repartee_world: str
+) -> None:
+    envelope = bridge.start(repartee_world)
+    media = next(
+        fragment for fragment in envelope.fragments if isinstance(fragment, MediaFragment)
+    )
+    images = [
+        image
+        for turn in bridge.build_turns(list(envelope.fragments))
+        for image in turn.images
+    ]
+
+    assert media.media_role == "narrative_im"
+    assert media.staging_hints is not None
+    assert media.staging_hints.media_shape == "landscape"
+    assert [(image.role, Path(image.source).name) for image in images] == [
+        ("narrative_im", "quai_bg.png"),
+    ]
 
 
 def test_choosing_by_edge_id_advances_the_story(

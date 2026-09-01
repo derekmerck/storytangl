@@ -22,9 +22,12 @@ Adapter proof of concept. The bridge and turn model are covered by ordinary
 ## Design Commitments
 
 **The client holds no world knowledge.** Backgrounds and portraits are selected
-by `media_role` (`narrative_im_landscape`, `cover_im` → background;
+by `media_role` (`narrative_im`, `cover_im` → background;
 `dialog_im`, `avatar_im` → portrait), never by block label. A world with no art
 still plays, rendering flat colour plus text. Art is purely additive.
+Image geometry remains an orthogonal staging hint: Repartee's backgrounds use
+`media_shape: landscape`, while this stage is free to promote the current
+`narrative_im` to its full-frame background.
 
 **Every click resolves to an `edge_id`.** The input layer never commits a
 bespoke action, so a later map hotspot produces the same payload as selecting

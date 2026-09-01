@@ -17,7 +17,7 @@ from tangl.pygame_client.models import Choice, Line, StageImage, Turn  # noqa: E
 
 
 def _bg(source: str) -> StageImage:
-    return StageImage(role="narrative_im_landscape", source=source)
+    return StageImage(role="narrative_im", source=source)
 
 
 def _sprite(source: str, slot: str | None = None) -> StageImage:
@@ -64,7 +64,7 @@ def test_the_last_background_wins_when_the_scene_changes() -> None:
              choices=[Choice(edge_id=uuid4(), text="go on")]),
     ])
 
-    backgrounds = [i.source for i in merged.images if i.role == "narrative_im_landscape"]
+    backgrounds = [i.source for i in merged.images if i.role == "narrative_im"]
     assert backgrounds == ["warehouse.png"]
 
 

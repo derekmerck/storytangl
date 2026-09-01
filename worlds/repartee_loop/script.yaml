@@ -22,7 +22,9 @@ scenes:
       entrance:
         media:
           - name: quai_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: "At the quay, every introduction is also a challenge."
         actions:
           - text: "Step into the practice court"
@@ -31,7 +33,9 @@ scenes:
       setup:
         media:
           - name: quai_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
           - name: clerk_sprite.png
             media_role: dialog_im
             staging_hints:
@@ -48,7 +52,9 @@ scenes:
       hub:
         media:
           - name: quai_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         kind: "repartee_loop.domain.ReparteeHubBlock"
         content: "The dockhand drills newcomers; the salon master waits beyond the rope."
         actions:
@@ -69,7 +75,9 @@ scenes:
       dockhand_contest:
         media:
           - name: warehouse_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
           - name: worker_sprite.png
             media_role: dialog_im
             staging_hints:
@@ -85,7 +93,9 @@ scenes:
       dockhand_aftermath:
         media:
           - name: warehouse_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
           - name: worker_sprite.png
             media_role: dialog_im
             staging_hints:
@@ -100,7 +110,9 @@ scenes:
       master_contest:
         media:
           - name: salon_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
           - name: master_sprite.png
             media_role: dialog_im
         kind: "repartee_loop.domain.MasterContestBlock"
@@ -113,7 +125,9 @@ scenes:
       prize_aftermath:
         media:
           - name: salon_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
           - name: master_sprite.png
             media_role: dialog_im
         kind: "repartee_loop.domain.ReparteePrizeAftermathBlock"
@@ -125,5 +139,7 @@ scenes:
       salon:
         media:
           - name: salon_bg.png
-            media_role: narrative_im_landscape
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: "The salon door recognizes the brass token and admits you to the next room."
