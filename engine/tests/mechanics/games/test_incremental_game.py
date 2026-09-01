@@ -207,3 +207,147 @@ class TestIncrementalIntegration:
 
         assert namespace["incremental_worker_pool"] == 1
         assert "forage" in namespace["incremental_unlocked_tasks"]
+
+
+class TestIncrementalEscalation:
+    """Escalating build costs give the shell its accelerate-then-wall pacing."""
+
+    def test_repeated_builds_escalate_cost(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 10},
+            build_specs={"hut": BuildSpec(cost={"food": 2}, cost_growth=0.5)},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        assert handler.get_build_cost(game, "hut") == {"food": 2}
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+        assert game.build_counts["hut"] == 1
+        assert game.resources["food"] == 8
+        assert handler.get_build_cost(game, "hut") == {"food": 3}
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+        assert game.build_counts["hut"] == 2
+        assert game.resources["food"] == 5
+        assert handler.get_build_cost(game, "hut") == {"food": 5}
+
+    def test_flat_cost_builds_stay_flat(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 10},
+            build_specs={"hut": BuildSpec(cost={"food": 2})},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+
+        assert handler.get_build_cost(game, "hut") == {"food": 2}
+        assert game.resources["food"] == 6
+
+    def test_escalating_cost_withdraws_the_build_move(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 5},
+            build_specs={"hut": BuildSpec(cost={"food": 2}, cost_growth=1.0)},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+
+        assert game.resources["food"] == 3
+        assert handler.get_build_cost(game, "hut") == {"food": 4}
+        build_targets = [
+            move.target for move in handler.get_available_moves(game) if move.kind == "build"
+        ]
+        assert build_targets == []
+
+    def test_move_label_prices_only_escalated_builds(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 10},
+            build_specs={"hut": BuildSpec(cost={"food": 2}, cost_growth=1.0)},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+        move = IncrementalMove(kind="build", target="hut")
+
+        assert handler.get_move_label(game, move) == "Build hut"
+
+        handler.receive_move(game, move)
+
+        assert handler.get_move_label(game, move) == "Build hut (4 food)"
+
+
+class TestIncrementalEphemeralResources:
+    """Non-bankable resources force per-cycle spending rather than hoarding."""
+
+    def _labor_game(self, **kwargs) -> IncrementalGame:
+        config = {
+            "starting_resources": {},
+            "starting_workers": 1,
+            "task_specs": {"forage": TaskSpec(produces={"labor": 1})},
+            "build_specs": {},
+            "promotion_specs": {},
+            "upkeep": {},
+            "victory_resources": {},
+            "unlocked_tasks": ["forage"],
+            "unlocked_builds": [],
+            "unlocked_promotions": [],
+            "ephemeral_resources": ["labor"],
+        }
+        config.update(kwargs)
+        return _sample_game(**config)
+
+    def test_ephemeral_resources_do_not_bank_across_cycles(self) -> None:
+        game = self._labor_game()
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="assign", target="forage"))
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert game.resources.get("labor", 0) == 0
+        assert (game.last_round.notes or {}).get("spoiled") == {"labor": 1}
+
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert game.cycle == 2
+        assert game.resources.get("labor", 0) == 0
+
+    def test_durable_resources_still_bank(self) -> None:
+        game = self._labor_game(
+            task_specs={"forage": TaskSpec(produces={"labor": 1, "scrap": 1})},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="assign", target="forage"))
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert game.resources["scrap"] == 2
+        assert game.resources.get("labor", 0) == 0
+
+    def test_victory_is_judged_before_spoilage(self) -> None:
+        game = self._labor_game(victory_resources={"labor": 1})
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="assign", target="forage"))
+        result = handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert result.name == "WIN"
+        assert game.resources.get("labor", 0) == 0

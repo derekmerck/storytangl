@@ -90,6 +90,13 @@ from .incremental_game import (
     TaskSpec,
 )
 from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, TwentyTwoGame, TwentyTwoGameHandler
+from .track_game import FORFEIT_TOKEN, TrackGame, TrackGameHandler, TrackMove, TrackToken
+from .track_analysis import (
+    TrackAnalysis,
+    analyze_track,
+    expected_rolls_to_finish,
+    finish_distribution,
+)
 from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
 from .call_response_game import (
     CallResponseGame,
@@ -196,6 +203,15 @@ __all__ = [
     "CorridorGame",
     "CorridorGameHandler",
     "CorridorMove",
+    "FORFEIT_TOKEN",
+    "TrackGame",
+    "TrackGameHandler",
+    "TrackMove",
+    "TrackToken",
+    "TrackAnalysis",
+    "analyze_track",
+    "expected_rolls_to_finish",
+    "finish_distribution",
     "TwentyTwoGame",
     "TwentyTwoGameHandler",
     "SiegeRpsGame",

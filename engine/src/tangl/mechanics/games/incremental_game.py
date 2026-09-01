@@ -7,6 +7,7 @@ explicit upkeep, optional builds and promotions, and cycle-based production.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import ClassVar
 
 from pydantic import Field
@@ -36,9 +37,15 @@ class TaskSpec(BaseModelPlus):
 
 
 class BuildSpec(BaseModelPlus):
-    """Immediate build option for the incremental shell."""
+    """Repeatable build option for the incremental shell.
+
+    ``cost_growth`` is the fractional premium charged per prior purchase of the
+    same build, giving the escalating cost curve that separates an incremental
+    loop from repeated flat token spending. Zero keeps the historical flat cost.
+    """
 
     cost: dict[str, int] = Field(default_factory=dict)
+    cost_growth: float = 0.0
     infrastructure_gain: dict[str, int] = Field(default_factory=dict)
     resource_gain: dict[str, int] = Field(default_factory=dict)
     worker_gain: int = 0
@@ -71,6 +78,10 @@ class IncrementalGame(Game[IncrementalMove]):
     victory_resources: dict[str, int] = Field(default_factory=dict)
     loss_if_upkeep_unpaid: bool = True
 
+    #: Resources that cannot be banked between cycles; cleared after each cycle
+    #: resolves. Labor-style inputs are ephemeral, cash-style ones are not.
+    ephemeral_resources: list[str] = Field(default_factory=list)
+
     unlocked_tasks: list[str] = Field(default_factory=list)
     unlocked_builds: list[str] = Field(default_factory=list)
     unlocked_promotions: list[str] = Field(default_factory=list)
@@ -88,6 +99,10 @@ class IncrementalGame(Game[IncrementalMove]):
         json_schema_extra={"reset_field": True},
     )
     infrastructure: dict[str, int] = Field(
+        default_factory=dict,
+        json_schema_extra={"reset_field": True},
+    )
+    build_counts: dict[str, int] = Field(
         default_factory=dict,
         json_schema_extra={"reset_field": True},
     )
@@ -117,6 +132,8 @@ class IncrementalGame(Game[IncrementalMove]):
                 "incremental_unlocked_builds": list(self.unlocked_builds),
                 "incremental_unlocked_promotions": list(self.unlocked_promotions),
                 "incremental_pending_rewards": dict(self.pending_rewards),
+                "incremental_build_counts": dict(self.build_counts),
+                "incremental_ephemeral_resources": list(self.ephemeral_resources),
             }
         )
         return namespace
@@ -132,6 +149,7 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         game.worker_pool = game.starting_workers
         game.task_assignments = {name: 0 for name in game.task_specs}
         game.infrastructure = {}
+        game.build_counts = {}
         game.pending_rewards = {}
         game.cycle = 0
         game.round_detail = {
@@ -152,7 +170,9 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
 
         for build_name in game.unlocked_builds:
             build = game.build_specs.get(build_name)
-            if build is not None and self._can_afford(game.resources, build.cost):
+            if build is None:
+                continue
+            if self._can_afford(game.resources, self.get_build_cost(game, build_name)):
                 moves.append(IncrementalMove(kind="build", target=build_name))
 
         for promotion_name in game.unlocked_promotions:
@@ -174,7 +194,15 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         if move.kind == "unassign":
             return f"Unassign 1 worker from {move.target}"
         if move.kind == "build":
-            return f"Build {move.target}"
+            target = move.target or ""
+            cost = self.get_build_cost(game, target)
+            base = game.build_specs[target].cost if target in game.build_specs else {}
+            if cost != base:
+                priced = ", ".join(
+                    f"{amount} {label}" for label, amount in sorted(cost.items())
+                )
+                return f"Build {target} ({priced})"
+            return f"Build {target}"
         if move.kind == "promote":
             return f"Promote 1 worker into {move.target}"
         return "End cycle"
@@ -297,6 +325,14 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
             ContentFragment(content=f"Cycle {notes.get('cycle', game.cycle)} resolves."),
             ContentFragment(content=self._resource_line(notes.get("resources", game.resources))),
         ]
+        spoiled = notes.get("spoiled") or {}
+        if spoiled:
+            spoiled_line = ", ".join(
+                f"{amount} {label}" for label, amount in sorted(spoiled.items())
+            )
+            fragments.append(
+                ContentFragment(content=f"Unbanked stock spoils before the next cycle: {spoiled_line}.")
+            )
         if last_round.result == RoundResult.WIN:
             fragments.append(ContentFragment(content="The shell finally tips into a winning surplus."))
         elif last_round.result == RoundResult.LOSE:
@@ -311,15 +347,40 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         game.worker_pool += 1
         game.task_assignments[task_name] = max(game.task_assignments.get(task_name, 0) - 1, 0)
 
+    def get_build_cost(self, game: IncrementalGame, build_name: str) -> dict[str, int]:
+        """Return the current price of a build, escalated by prior purchases.
+
+        Each prior purchase multiplies the base cost by ``1 + cost_growth``.
+        Amounts are rounded up so a growing cost always moves by at least one
+        unit rather than stalling on integer truncation.
+        """
+
+        build = game.build_specs.get(build_name)
+        if build is None:
+            return {}
+        purchased = game.build_counts.get(build_name, 0)
+        if not build.cost_growth or purchased <= 0:
+            return dict(build.cost)
+        multiplier = (1.0 + build.cost_growth) ** purchased
+        return {
+            label: math.ceil(amount * multiplier)
+            for label, amount in build.cost.items()
+        }
+
     def _apply_build(self, game: IncrementalGame, build_name: str, detail: dict[str, object]) -> None:
         build = game.build_specs[build_name]
-        self._spend(game.resources, build.cost)
+        cost = self.get_build_cost(game, build_name)
+        self._spend(game.resources, cost)
+        game.build_counts[build_name] = game.build_counts.get(build_name, 0) + 1
         self._earn(game.resources, build.resource_gain)
         self._earn(game.infrastructure, build.infrastructure_gain)
         game.worker_pool += build.worker_gain
         self._unlock(game.unlocked_tasks, build.unlock_tasks)
         self._unlock(game.unlocked_builds, build.unlock_builds)
         self._unlock(game.unlocked_promotions, build.unlock_promotions)
+        detail["build_cost"] = dict(cost)
+        detail["build_count"] = game.build_counts[build_name]
+        detail["next_build_cost"] = self.get_build_cost(game, build_name)
         detail["resources"] = dict(game.resources)
         detail["infrastructure"] = dict(game.infrastructure)
 
@@ -368,13 +429,35 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
         detail["task_assignments"] = dict(game.task_assignments)
         detail["worker_pool"] = game.worker_pool
 
-        if game.victory_resources and self._meets_requirements(game.resources, game.victory_resources):
+        # Victory is judged on the cycle's peak state, before unbanked resources
+        # spoil, so a win produced this cycle still counts.
+        victory = bool(game.victory_resources) and self._meets_requirements(
+            game.resources, game.victory_resources
+        )
+
+        spoiled = self._clear_ephemeral(game)
+        if spoiled:
+            detail["spoiled"] = spoiled
+            detail["resources"] = dict(game.resources)
+
+        if victory:
             detail["outcome"] = "victory"
             game.score["player"] = 1
             return RoundResult.WIN
 
         detail["outcome"] = "continue"
         return RoundResult.CONTINUE
+
+    def _clear_ephemeral(self, game: IncrementalGame) -> dict[str, int]:
+        """Drop non-bankable resources at cycle end and report what spoiled."""
+
+        spoiled: dict[str, int] = {}
+        for label in game.ephemeral_resources:
+            amount = game.resources.get(label, 0)
+            if amount:
+                spoiled[label] = amount
+            game.resources.pop(label, None)
+        return spoiled
 
     def _can_afford(self, wallet: dict[str, int], cost: dict[str, int]) -> bool:
         return all(wallet.get(label, 0) >= amount for label, amount in cost.items())
