@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "endpoint": "http://titan2:8188",
+  "endpoint": "configured-worker",
   "template": "{\n  \"1\": {\n    \"inputs\": {\n      \"image\": {{ images.source | tojson }}\n    },\n    \"class_type\": \"LoadImage\",\n    \"_meta\": {\n      \"title\": \"source_image\"\n    }\n  },\n  \"2\": {\n    \"inputs\": {\n      \"upscale_method\": \"lanczos\",\n      \"megapixels\": 1,\n      \"resolution_steps\": 1,\n      \"image\": [\n        \"1\",\n        0\n      ]\n    },\n    \"class_type\": \"ImageScaleToTotalPixels\",\n    \"_meta\": {\n      \"title\": \"normalize_source\"\n    }\n  },\n  \"4\": {\n    \"inputs\": {\n      \"unet_name\": \"flux-2-klein-4b-fp8.safetensors\",\n      \"weight_dtype\": \"default\"\n    },\n    \"class_type\": \"UNETLoader\",\n    \"_meta\": {\n      \"title\": \"diffusion_model\"\n    }\n  },\n  \"5\": {\n    \"inputs\": {\n      \"clip_name\": \"qwen_3_4b.safetensors\",\n      \"type\": \"flux2\",\n      \"device\": \"default\"\n    },\n    \"class_type\": \"CLIPLoader\",\n    \"_meta\": {\n      \"title\": \"text_encoder\"\n    }\n  },\n  \"6\": {\n    \"inputs\": {\n      \"vae_name\": \"flux2-vae.safetensors\"\n    },\n    \"class_type\": \"VAELoader\",\n    \"_meta\": {\n      \"title\": \"vae\"\n    }\n  },\n  \"7\": {\n    \"inputs\": {\n      \"text\": {{ prompt | tojson }},\n      \"clip\": [\n        \"5\",\n        0\n      ]\n    },\n    \"class_type\": \"CLIPTextEncode\",\n    \"_meta\": {\n      \"title\": \"edit_prompt\"\n    }\n  },\n  \"8\": {\n    \"inputs\": {\n      \"conditioning\": [\n        \"7\",\n        0\n      ]\n    },\n    \"class_type\": \"ConditioningZeroOut\",\n    \"_meta\": {\n      \"title\": \"negative_conditioning\"\n    }\n  },\n  \"9\": {\n    \"inputs\": {\n      \"pixels\": [\n        \"2\",\n        0\n      ],\n      \"vae\": [\n        \"6\",\n        0\n      ]\n    },\n    \"class_type\": \"VAEEncode\",\n    \"_meta\": {\n      \"title\": \"encode_reference\"\n    }\n  },\n  \"10\": {\n    \"inputs\": {\n      \"conditioning\": [\n        \"7\",\n        0\n      ],\n      \"latent\": [\n        \"9\",\n        0\n      ]\n    },\n    \"class_type\": \"ReferenceLatent\",\n    \"_meta\": {\n      \"title\": \"positive_reference\"\n    }\n  },\n  \"12\": {\n    \"inputs\": {\n      \"width\": {{ width }},\n      \"height\": {{ height }},\n      \"batch_size\": 1\n    },\n    \"class_type\": \"EmptyFlux2LatentImage\",\n    \"_meta\": {\n      \"title\": \"output_latent\"\n    }\n  },\n  \"13\": {\n    \"inputs\": {\n      \"steps\": 4,\n      \"width\": {{ width }},\n      \"height\": {{ height }}\n    },\n    \"class_type\": \"Flux2Scheduler\",\n    \"_meta\": {\n      \"title\": \"scheduler\"\n    }\n  },\n  \"14\": {\n    \"inputs\": {\n      \"noise_seed\": {{ seed }}\n    },\n    \"class_type\": \"RandomNoise\",\n    \"_meta\": {\n      \"title\": \"noise\"\n    }\n  },\n  \"15\": {\n    \"inputs\": {\n      \"cfg\": 1,\n      \"model\": [\n        \"4\",\n        0\n      ],\n      \"positive\": [\n        \"10\",\n        0\n      ],\n      \"negative\": [\n        \"8\",\n        0\n      ]\n    },\n    \"class_type\": \"CFGGuider\",\n    \"_meta\": {\n      \"title\": \"guider\"\n    }\n  },\n  \"16\": {\n    \"inputs\": {\n      \"sampler_name\": \"euler\"\n    },\n    \"class_type\": \"KSamplerSelect\",\n    \"_meta\": {\n      \"title\": \"sampler\"\n    }\n  },\n  \"17\": {\n    \"inputs\": {\n      \"noise\": [\n        \"14\",\n        0\n      ],\n      \"guider\": [\n        \"15\",\n        0\n      ],\n      \"sampler\": [\n        \"16\",\n        0\n      ],\n      \"sigmas\": [\n        \"13\",\n        0\n      ],\n      \"latent_image\": [\n        \"12\",\n        0\n      ]\n    },\n    \"class_type\": \"SamplerCustomAdvanced\",\n    \"_meta\": {\n      \"title\": \"render\"\n    }\n  },\n  \"18\": {\n    \"inputs\": {\n      \"samples\": [\n        \"17\",\n        0\n      ],\n      \"vae\": [\n        \"6\",\n        0\n      ]\n    },\n    \"class_type\": \"VAEDecode\",\n    \"_meta\": {\n      \"title\": \"decode\"\n    }\n  },\n  \"20\": {\n    \"class_type\": \"SaveImage\",\n    \"inputs\": {\n      \"images\": [\n        \"18\",\n        0\n      ],\n      \"filename_prefix\": {{ prefix | tojson }}\n    }\n  }\n}\n",
   "jobs": [
     {
@@ -15,7 +15,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/Downloads/rapartee/quai_bg.png",
+          "path": "source-assets/quai_bg.png",
           "sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
           "upload_name": "sha256-ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee.png"
         }
@@ -776,7 +776,7 @@
           "filename": "quai_bg_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36/000-quai_bg_00001_.png",
+          "path": "generation-artifacts/raw/0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36/000-quai_bg_00001_.png",
           "sha256": "5f3b0ee82bef8d48dc4cd588343f5e736b12304b3e34d9a9dded8f156b1324ae"
         }
       ],
@@ -794,7 +794,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/Downloads/rapartee/warehouse_bg.png",
+          "path": "source-assets/warehouse_bg.png",
           "sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
           "upload_name": "sha256-b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4.png"
         }
@@ -1557,7 +1557,7 @@
           "filename": "warehouse_bg_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/8fff27c533a5d29fd8e32875d16a6a2536fa29e566804108a9da56a646977f60/000-warehouse_bg_00001_.png",
+          "path": "generation-artifacts/raw/8fff27c533a5d29fd8e32875d16a6a2536fa29e566804108a9da56a646977f60/000-warehouse_bg_00001_.png",
           "sha256": "db6ff785025ebb04e15a389a778efa4aab22dde49742600a2fe65fbc39736a62"
         }
       ],
@@ -1575,7 +1575,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/Downloads/rapartee/salon_bg.png",
+          "path": "source-assets/salon_bg.png",
           "sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
           "upload_name": "sha256-a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314.png"
         }
@@ -2338,7 +2338,7 @@
           "filename": "salon_bg_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a/000-salon_bg_00001_.png",
+          "path": "generation-artifacts/raw/5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a/000-salon_bg_00001_.png",
           "sha256": "ccea6a63566cb222b9541fd0b5c246ef880a2c31fe29986880ebf4cf82519ed3"
         }
       ],
@@ -2356,7 +2356,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/master_sprite.png",
+          "path": "generation-artifacts/references/master_sprite.png",
           "sha256": "cbe85b4c3c5c27acde6c835acd55d60cc3e68eb0b098a23f69ce66fd057c9ebc",
           "upload_name": "sha256-cbe85b4c3c5c27acde6c835acd55d60cc3e68eb0b098a23f69ce66fd057c9ebc.png"
         }
@@ -3117,7 +3117,7 @@
           "filename": "master_sprite_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png",
+          "path": "generation-artifacts/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png",
           "sha256": "fb0ce4c784cd63a342fa5449ee55615ebfb765c5420e1c2a39b54ba33bac92a4"
         }
       ],
@@ -3135,7 +3135,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/clerk_sprite.png",
+          "path": "generation-artifacts/references/clerk_sprite.png",
           "sha256": "91a3965fe0c95212fe6478a0d19db1088173b5ab380d8948b8388867b8e8961c",
           "upload_name": "sha256-91a3965fe0c95212fe6478a0d19db1088173b5ab380d8948b8388867b8e8961c.png"
         }
@@ -3898,7 +3898,7 @@
           "filename": "clerk_sprite_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png",
+          "path": "generation-artifacts/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png",
           "sha256": "717e9a8226af5e2a772528d33ff96d5d8b3cb8055c8399bf8ffbeaf97073b7d5"
         }
       ],
@@ -3916,7 +3916,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/worker_sprite.png",
+          "path": "generation-artifacts/references/worker_sprite.png",
           "sha256": "2d86dfe30cca81c4a92da537c3fd73c9b79232ca595e22610bae83a35c30c7b2",
           "upload_name": "sha256-2d86dfe30cca81c4a92da537c3fd73c9b79232ca595e22610bae83a35c30c7b2.png"
         }
@@ -4679,7 +4679,7 @@
           "filename": "worker_sprite_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020/000-worker_sprite_00001_.png",
+          "path": "generation-artifacts/raw/dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020/000-worker_sprite_00001_.png",
           "sha256": "b8179850167892197f6eb3213ba48866870f9ba2d87759cdc78da5dd9f9fbd42"
         }
       ],

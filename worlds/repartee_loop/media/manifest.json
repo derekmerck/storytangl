@@ -1,3 +1,115 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:210555b00673c0368c631c5ae0630dce057d5c695abeaed2c4216799a2a641b9
-size 2715
+{
+  "pack": "repartee-quayside",
+  "assets": {
+    "clerk_sprite": {
+      "file": "clerk_sprite.png",
+      "size": [
+        102,
+        112
+      ],
+      "mode": "RGBA",
+      "sha256": "f423fc97479c7cd43e29d792e54775eda8f0551cbc50f0dfa6a2ea02f62e3b3e",
+      "conformed_from": {
+        "size": [
+          1024,
+          1024
+        ],
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+      }
+    },
+    "master_sprite": {
+      "file": "master_sprite.png",
+      "size": [
+        101,
+        112
+      ],
+      "mode": "RGBA",
+      "sha256": "22e1f72e96b82fc374abdd80df37ebf57506caf340ff28c7c99661320d41dc7f",
+      "conformed_from": {
+        "size": [
+          1024,
+          1024
+        ],
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+      }
+    },
+    "quai_bg": {
+      "file": "quai_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "ea50296365a86c451ae1f09f16e36b6571fa181388d93f0ee295384b4e1e0bc5",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "salon_bg": {
+      "file": "salon_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "39ede33bf37ba5f3ffc29b510e0a985e886a64d9d4b8f159c60e10d10ea21621",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "warehouse_bg": {
+      "file": "warehouse_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "5ab8ab17e594b8bdaf4a429bdf9b7c4a02c2d244f71540d88b1da9f92072cd40",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "worker_sprite": {
+      "file": "worker_sprite.png",
+      "size": [
+        107,
+        112
+      ],
+      "mode": "RGBA",
+      "sha256": "eb64013cbbe7bb047613a2462553cc0746f5b8f85862f6a4fa7cc1101050769d",
+      "conformed_from": {
+        "size": [
+          1024,
+          1024
+        ],
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+      }
+    }
+  },
+  "conformance": {
+    "note": "Top-level fields describe the shipped file.",
+    "target": {
+      "background": [
+        320,
+        200
+      ],
+      "sprite_height": 112,
+      "resample": "nearest"
+    }
+  },
+  "review_notes": [
+    "Generation provenance was not captured for this pack; only the shipped files and the conformance step are recorded."
+  ]
+}

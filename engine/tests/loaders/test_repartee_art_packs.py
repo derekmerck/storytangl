@@ -10,7 +10,8 @@ import pytest
 from PIL import Image
 
 WORLD = Path(__file__).resolve().parents[3] / "worlds" / "repartee_loop"
-PACKS = sorted(p for p in WORLD.glob("media*") if (p / "manifest.json").is_file())
+PACKS = sorted(p for p in WORLD.glob("media*") if p.is_dir())
+MANIFEST_PACKS = [p for p in PACKS if (p / "manifest.json").is_file()]
 ASSET_NAMES = {
     "quai_bg", "salon_bg", "warehouse_bg",
     "clerk_sprite", "master_sprite", "worker_sprite",
@@ -22,11 +23,16 @@ def _entries(pack: Path):
     return [(pack, name, entry) for name, entry in manifest["assets"].items()]
 
 
-CASES = [case for pack in PACKS for case in _entries(pack)]
+CASES = [case for pack in MANIFEST_PACKS for case in _entries(pack)]
 
 
-def test_every_pack_declares_a_manifest() -> None:
-    assert {p.name for p in PACKS} == {"media", "media_spaceport"}
+def test_demo_ships_both_interchangeable_art_packs() -> None:
+    assert {pack.name for pack in PACKS} == {"media", "media_spaceport"}
+
+
+@pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.name)
+def test_every_pack_declares_a_manifest(pack: Path) -> None:
+    assert (pack / "manifest.json").is_file()
 
 
 @pytest.mark.parametrize(
@@ -52,6 +58,8 @@ def test_manifest_hash_and_size_match_the_shipped_file(
 def test_packs_are_interchangeable_by_name(pack: Path) -> None:
     """A swap is one manifest line, so packs must agree on asset names."""
 
+    manifest = json.loads((pack / "manifest.json").read_text())
+    assert set(manifest["assets"]) == ASSET_NAMES
     assert {f.stem for f in (pack / "images").glob("*.png")} == ASSET_NAMES
 
 
@@ -65,47 +73,17 @@ def test_shipped_assets_are_conformed_to_the_client_target(pack: Path) -> None:
                 assert image.size[1] == 112
 
 
-class TestWireContractForClients:
-    """What a non-pygame client actually receives for staged media.
+def test_opening_media_wire_payload_separates_role_from_shape() -> None:
+    """The DTO gives clients semantic intent and an independent layout hint."""
 
-    The web reference client derives landscape treatment from
-    ``staging_hints.media_shape``, not from the role name, so separating shape
-    from role only helps if the hint survives serialization.
-    """
+    from tangl.persistence import PersistenceManagerFactory
+    from tangl.service.service_manager import ServiceManager
 
-    @staticmethod
-    def _first_media_fragment() -> dict:
-        from tangl.persistence import PersistenceManagerFactory
-        from tangl.service.service_manager import ServiceManager
+    manager = ServiceManager(PersistenceManagerFactory.native_in_mem())
+    user_id = manager.create_user().details["user_id"]
+    envelope = manager.create_story(user_id=user_id, world_id="repartee_loop")
+    fragments = envelope.to_dto()["fragments"]
+    payload = next(fragment for fragment in fragments if fragment["fragment_type"] == "media")
 
-        manager = ServiceManager(PersistenceManagerFactory.native_in_mem())
-        user_id = manager.create_user().details["user_id"]
-        envelope = manager.create_story(user_id=user_id, world_id="repartee_loop")
-        for fragment in envelope.fragments:
-            payload = (
-                fragment if isinstance(fragment, dict) else fragment.model_dump(mode="json")
-            )
-            if payload.get("fragment_type") == "media":
-                return payload
-        raise AssertionError("no media fragment in the opening envelope")
-
-    def test_role_carries_intent_without_encoding_shape(self) -> None:
-        payload = self._first_media_fragment()
-
-        assert payload["media_role"] == "narrative_im"
-        assert "landscape" not in payload["media_role"]
-
-    def test_staging_hints_survive_serialization(self) -> None:
-        """Hints reach the client on the wire, not only on the in-process fragment."""
-
-        payload = self._first_media_fragment()
-
-        assert payload["staging_hints"]["media_shape"] == "landscape"
-
-    def test_the_web_client_landscape_rule_would_match(self) -> None:
-        """Mirrors apps/web `hasLandscapeShape`, which reads the hint not the role."""
-
-        payload = self._first_media_fragment()
-        shape = (payload.get("staging_hints") or {}).get("media_shape")
-
-        assert shape in {"landscape", "banner", "cover", "bg"}
+    assert payload["media_role"] == "narrative_im"
+    assert payload["staging_hints"]["media_shape"] == "landscape"

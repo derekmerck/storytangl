@@ -11,7 +11,7 @@
         "prefix": "repartee_spaceport/warehouse_bg-refined"
       },
       "images": {
-        "source": "/Users/derek/Downloads/rapartee/warehouse_bg.png"
+        "source": "source-assets/warehouse_bg.png"
       }
     },
     {
@@ -24,7 +24,7 @@
         "prefix": "repartee_spaceport/master_sprite-refined"
       },
       "images": {
-        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png"
+        "source": "generation-artifacts/raw/c65b701a2b8e41a5c9b2f7b5cb74acbdeae9c1d781fa1507a144cac887f5e21e/000-master_sprite_00001_.png"
       }
     }
   ]

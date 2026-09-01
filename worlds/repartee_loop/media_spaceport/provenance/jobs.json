@@ -11,7 +11,7 @@
         "prefix": "repartee_spaceport/quai_bg"
       },
       "images": {
-        "source": "/Users/derek/Downloads/rapartee/quai_bg.png"
+        "source": "source-assets/quai_bg.png"
       }
     },
     {
@@ -24,7 +24,7 @@
         "prefix": "repartee_spaceport/warehouse_bg"
       },
       "images": {
-        "source": "/Users/derek/Downloads/rapartee/warehouse_bg.png"
+        "source": "source-assets/warehouse_bg.png"
       }
     },
     {
@@ -37,7 +37,7 @@
         "prefix": "repartee_spaceport/salon_bg"
       },
       "images": {
-        "source": "/Users/derek/Downloads/rapartee/salon_bg.png"
+        "source": "source-assets/salon_bg.png"
       }
     },
     {
@@ -50,7 +50,7 @@
         "prefix": "repartee_spaceport/master_sprite"
       },
       "images": {
-        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/master_sprite.png"
+        "source": "generation-artifacts/references/master_sprite.png"
       }
     },
     {
@@ -63,7 +63,7 @@
         "prefix": "repartee_spaceport/clerk_sprite"
       },
       "images": {
-        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/clerk_sprite.png"
+        "source": "generation-artifacts/references/clerk_sprite.png"
       }
     },
     {
@@ -76,7 +76,7 @@
         "prefix": "repartee_spaceport/worker_sprite"
       },
       "images": {
-        "source": "/Users/derek/.codex/visualizations/2026/07/30/019fb576-96f2-71a2-9cde-7cca99778352/repartee-spaceport/references/worker_sprite.png"
+        "source": "generation-artifacts/references/worker_sprite.png"
       }
     }
   ]

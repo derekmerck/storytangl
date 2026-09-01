@@ -7,7 +7,6 @@ These drive the loop rather than probing the renderer. Events are queued before
 from __future__ import annotations
 
 import os
-from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -20,21 +19,26 @@ from tangl.pygame_client import __main__ as client  # noqa: E402
 from tangl.pygame_client.bridge import PygameSessionBridge  # noqa: E402
 from tangl.pygame_client.models import Choice, Line, Turn  # noqa: E402
 from tangl.pygame_client.stage import SCALE  # noqa: E402
+from tangl.service import JsonValue, RuntimeEnvelope  # noqa: E402
 
 WORLD = "repartee_loop"
 
 
 @pytest.fixture
-def committed(monkeypatch: pytest.MonkeyPatch) -> list[tuple[UUID, object]]:
+def committed(monkeypatch: pytest.MonkeyPatch) -> list[tuple[UUID, JsonValue | None]]:
     """Record every choice the loop commits, without changing behaviour."""
 
-    seen: list[tuple[UUID, object]] = []
+    seen: list[tuple[UUID, JsonValue | None]] = []
 
-    def _record(self, edge_id, payload=None):
+    def _record(
+        _self: PygameSessionBridge,
+        edge_id: UUID,
+        payload: JsonValue | None = None,
+    ) -> RuntimeEnvelope:
         # The frame is frozen to synthetic choices, so these edges are not in
         # the ledger. What is under test is the loop's dispatch, not traversal.
         seen.append((edge_id, payload))
-        return SimpleNamespace(fragments=[], metadata={})
+        return RuntimeEnvelope()
 
     monkeypatch.setattr(PygameSessionBridge, "choose", _record)
     return seen
@@ -66,7 +70,7 @@ def _run(events: list[pygame.event.Event]) -> None:
 
 
 def test_number_key_uses_displayed_numbering(
-    gated: list[Choice], committed: list[tuple[UUID, object]]
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]]
 ) -> None:
     """Key 2 commits the second *displayed* choice, not the second available one."""
 
@@ -76,14 +80,16 @@ def test_number_key_uses_displayed_numbering(
 
 
 def test_number_key_on_an_unavailable_choice_commits_nothing(
-    gated: list[Choice], committed: list[tuple[UUID, object]]
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]]
 ) -> None:
     _run([_key(pygame.K_1)])
 
     assert committed == []
 
 
-def test_quit_event_ends_the_loop(gated: list[Choice], committed: list[tuple[UUID, object]]) -> None:
+def test_quit_event_ends_the_loop(
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
     """A bare QUIT returns from main() without committing anything."""
 
     _run([])
@@ -92,7 +98,7 @@ def test_quit_event_ends_the_loop(gated: list[Choice], committed: list[tuple[UUI
 
 
 def test_mouse_click_commits_the_choice_under_the_cursor(
-    gated: list[Choice], committed: list[tuple[UUID, object]]
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]]
 ) -> None:
     pygame.init()
     from tangl.pygame_client.stage import Stage
@@ -110,7 +116,8 @@ def test_mouse_click_commits_the_choice_under_the_cursor(
 
 
 def test_scroll_keys_move_the_view_without_committing(
-    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, object]]
+    monkeypatch: pytest.MonkeyPatch,
+    committed: list[tuple[UUID, JsonValue | None]],
 ) -> None:
     """Arrows scroll prose. They must move the view and commit nothing."""
 
