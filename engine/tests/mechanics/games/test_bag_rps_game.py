@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.core import Graph
 from tangl.mechanics.games import GameTokenSpec, HasGame
 from tangl.mechanics.games.aggregate_force_game import ForceCommitMove, ForceDisposition
@@ -523,3 +525,88 @@ class TestTransmutation:
         assert record["to_pool"] == "reserve"
         assert game.player_active.amounts == {"blue_0": 1}
         assert game.player_reserve.amounts == {"blue_0": 1, "blue_1": 1}
+
+
+class TestAttritionPolicies:
+    """How much force dies, and whose, is a named and swappable choice."""
+
+    def _run(self, policy: str, player: int, opponent: int, **kwargs) -> tuple[dict, dict]:
+        game = BagRpsGame(
+            casualty_policy=policy,
+            max_commit_size=20,
+            player_opening_reserve={"rock": player},
+            opponent_opening_reserve={"scissors": opponent},
+            **kwargs,
+        )
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.resolve_round(
+            game,
+            ForceCommitMove(profile=(("rock", player),)),
+            ForceCommitMove(profile=(("scissors", opponent),)),
+        )
+        detail = game.round_detail or {}
+        return detail["player_losses"], detail["opponent_losses"]
+
+    def test_trade_ratio_remains_the_default(self) -> None:
+        assert BagRpsGame().casualty_policy == "trade_ratio"
+
+    def test_proportional_power_costs_the_loser_more(self) -> None:
+        player_losses, opponent_losses = self._run("proportional_power", 5, 5)
+
+        # rock beats scissors, so the winning side bleeds less
+        assert sum(player_losses.values()) < sum(opponent_losses.values())
+
+    def test_a_small_commitment_is_not_annihilated_by_a_large_one(self) -> None:
+        # Denominating each quota against the *combined* pool would wipe the
+        # smaller bag out entirely, because the rate would be calibrated on
+        # force that was never its own.
+        _, opponent_losses = self._run("proportional_power", 7, 3)
+
+        assert sum(opponent_losses.values()) < 3
+
+    def test_losses_scale_with_the_size_of_your_own_commitment(self) -> None:
+        _, small = self._run("proportional_power", 7, 3)
+        _, large = self._run("proportional_power", 7, 9)
+
+        assert sum(large.values()) > sum(small.values())
+
+    def test_a_gentler_rate_kills_less(self) -> None:
+        _, heavy = self._run("proportional_power", 6, 6, decimation_rate=0.5)
+        _, light = self._run("proportional_power", 6, 6, decimation_rate=0.1)
+
+        assert sum(heavy.values()) > sum(light.values())
+
+    def test_heavy_tokens_absorb_more_of_a_power_quota(self) -> None:
+        # Two weight-2 tokens satisfy a quota that would cost four light ones.
+        game = BagRpsGame(
+            casualty_policy="proportional_power",
+            force_types=["heavy", "sharp"],
+            force_beats={"rock": "scissors", "paper": "rock", "scissors": "paper"},
+            token_specs={
+                "heavy": GameTokenSpec(affiliation="rock", value=4),
+                "sharp": GameTokenSpec(affiliation="scissors", value=1),
+            },
+            max_commit_size=20,
+            player_opening_reserve={"heavy": 2},
+            opponent_opening_reserve={"sharp": 8},
+        )
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+        handler.resolve_round(
+            game,
+            ForceCommitMove(profile=(("heavy", 2),)),
+            ForceCommitMove(profile=(("sharp", 8),)),
+        )
+        detail = game.round_detail or {}
+
+        # equal power on both sides, but one heavy token pays a whole quota
+        assert sum(detail["player_losses"].values()) <= 1
+
+    def test_an_unknown_policy_is_an_error_not_a_silent_default(self) -> None:
+        game = BagRpsGame(casualty_policy="no_such_policy")
+        handler = BagRpsGameHandler()
+        handler.setup(game)
+
+        with pytest.raises(KeyError):
+            handler.resolve_attrition(game)

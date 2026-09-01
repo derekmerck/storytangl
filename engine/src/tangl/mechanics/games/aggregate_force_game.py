@@ -29,9 +29,16 @@ from .game_token import (
     weight_of,
 )
 from .handler import GameHandler
+from .strategies import StrategyRegistry
 
 
 ForceProfile = tuple[tuple[str, int], ...]
+
+
+#: Named attrition policies. How many tokens die, and whose, is an authored
+#: choice rather than a fact about the rules, so it lives in a registry the way
+#: opponent strategies do — visible, swappable, and testable.
+casualty_policies: StrategyRegistry = StrategyRegistry(label="casualty_policies")
 
 
 class ForceDisposition(str, Enum):
@@ -100,6 +107,13 @@ class AggregateForceGame(Game[ForceCommitMove]):
     #: What happens to tokens that survive a clash. Retiring them is the
     #: classic sortie; conserving them builds a standing front line.
     survivor_disposition: ForceDisposition = ForceDisposition.RETIRE
+
+    #: Named attrition policy deciding how much force each side loses.
+    casualty_policy: str = "trade_ratio"
+
+    #: Share of total committed power destroyed in a clash, for power-denominated
+    #: policies. 0.3 decimates roughly a third of everything on the field.
+    decimation_rate: float = 0.3
 
     player_reserve: AssetWallet = Field(
         default_factory=AssetWallet,
@@ -318,12 +332,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         player_commit = self.commit_forces(game, "player", player_commit)
         opponent_commit = self.commit_forces(game, "opponent", opponent_commit)
 
-        player_losses = self._allocate_casualties(
-            game, game.opponent_active, game.player_active
-        )
-        opponent_losses = self._allocate_casualties(
-            game, game.player_active, game.opponent_active
-        )
+        player_losses, opponent_losses = self.resolve_attrition(game)
 
         self.apply_casualties(game, "player", player_losses)
         self.apply_casualties(game, "opponent", opponent_losses)
@@ -667,6 +676,70 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
             remaining -= taken
         return losses
 
+    def resolve_attrition(
+        self,
+        game: AggregateForceGameT,
+    ) -> tuple[dict[str, int], dict[str, int]]:
+        """Return (player_losses, opponent_losses) under the named policy."""
+
+        return casualty_policies.execute(game.casualty_policy, game, handler=self)
+
+    def effective_power(
+        self,
+        game: AggregateForceGameT,
+        attacker,
+        defender,
+    ) -> int:
+        """Return an attacking holding's power after dominance weighting.
+
+        Favourable and neutral matchups contribute their full weight;
+        disadvantaged force is divided by the trade ratio.
+        """
+
+        defender_affiliations = game.affiliations_present(defender)
+        favorable = neutral = disadvantaged = 0
+        for label, count in attacker.items():
+            if count <= 0:
+                continue
+            power = count * game.get_force_weight(label)
+            affiliation = game.get_force_affiliation(label)
+            if game.force_beats.get(affiliation) in defender_affiliations:
+                favorable += power
+            elif affiliation in defender_affiliations:
+                neutral += power
+            else:
+                disadvantaged += power
+        return favorable + neutral + (disadvantaged // max(game.disadvantaged_trade_ratio, 1))
+
+    def draw_down(
+        self,
+        game: AggregateForceGameT,
+        holding,
+        quota: float,
+        priority: list[str],
+    ) -> dict[str, int]:
+        """Remove tokens one at a time until their weight meets a power quota.
+
+        Overshoot is accepted: a heavy token cannot be split, so the last one
+        taken may carry the total past the quota.
+        """
+
+        losses: dict[str, int] = {}
+        removed = 0.0
+        if quota <= 0:
+            return losses
+
+        remaining = {label: holding[label] for label in priority}
+        for label in priority:
+            weight = max(game.get_force_weight(label), 1)
+            while removed < quota and remaining.get(label, 0) > 0:
+                losses[label] = losses.get(label, 0) + 1
+                remaining[label] -= 1
+                removed += weight
+            if removed >= quota:
+                break
+        return losses
+
     def _casualty_budget(
         self,
         game: AggregateForceGameT,
@@ -734,3 +807,88 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         if move is None:
             return None
         return move.as_dict()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Attrition policies
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@casualty_policies.register("trade_ratio")
+def _trade_ratio_attrition(game: AggregateForceGame, *, handler) -> tuple[dict, dict]:
+    """Count-denominated attrition: each side's losses are capped by its size.
+
+    An attacker's dominance-weighted power buys that many enemy *tokens*,
+    regardless of what those tokens weigh.
+    """
+
+    player_losses = handler._allocate_casualties(
+        game, game.opponent_active, game.player_active
+    )
+    opponent_losses = handler._allocate_casualties(
+        game, game.player_active, game.opponent_active
+    )
+    return player_losses, opponent_losses
+
+
+@casualty_policies.register("proportional_power")
+def _proportional_power_attrition(
+    game: AggregateForceGame,
+    *,
+    handler,
+) -> tuple[dict, dict]:
+    """Power-denominated attrition split by the outcome differential.
+
+    Each side loses a share of **its own** committed power, scaled by how
+    effective the enemy was, so the winner bleeds less. With equal commitments
+    and effective power at 70/30, a decimation rate of 0.3 destroys 30% of
+    everything on the field, split 30/70 — a tenth of the total taken from the
+    winner and a fifth from the loser.
+
+    Tokens are drawn down one at a time until their accumulated weight meets
+    each side's quota, so heavy tokens absorb more of it and a quota smaller
+    than the lightest token still costs one.
+
+    The denominator matters. Taking each side's quota as a share of the
+    *combined* pool only behaves when the bags are symmetric: a small
+    commitment measured against a large opponent's power is annihilated
+    outright, because the rate was calibrated on force that was never its own.
+    Normalizing against each side's own commitment keeps losses proportionate
+    at any relative size while reducing to the same numbers when the bags
+    match.
+    """
+
+    player_active = game.player_active
+    opponent_active = game.opponent_active
+
+    player_power = game.total_force(player_active)
+    opponent_power = game.total_force(opponent_active)
+    if player_power + opponent_power <= 0:
+        return {}, {}
+
+    player_effect = handler.effective_power(game, player_active, opponent_active)
+    opponent_effect = handler.effective_power(game, opponent_active, player_active)
+    combined = player_effect + opponent_effect
+
+    if combined <= 0:
+        player_share = opponent_share = 0.5
+    else:
+        # You lose in proportion to how effective the *other* side was. The
+        # factor of two keeps the average loss at the decimation rate when both
+        # sides are equally effective.
+        player_share = 2 * opponent_effect / combined
+        opponent_share = 2 * player_effect / combined
+
+    player_losses = handler.draw_down(
+        game,
+        player_active,
+        player_power * game.decimation_rate * player_share,
+        handler._defender_target_priority(game, opponent_active, player_active),
+    )
+    opponent_losses = handler.draw_down(
+        game,
+        opponent_active,
+        opponent_power * game.decimation_rate * opponent_share,
+        handler._defender_target_priority(game, player_active, opponent_active),
+    )
+    return player_losses, opponent_losses
