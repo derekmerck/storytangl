@@ -26,6 +26,8 @@ from tangl.mechanics.sandbox import (
     SandboxFixture,
     SandboxInteraction,
     SandboxLocation,
+    SandboxMap,
+    SandboxMapRegion,
     SandboxMob,
     SandboxMobAffordance,
     SandboxScope,
@@ -2033,3 +2035,267 @@ def test_role_provider_can_donate_sandbox_events() -> None:
     road.locals["can_pause"] = False
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
     assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+
+
+def _plate_graph() -> tuple[Graph, SandboxLocation, SandboxLocation]:
+    """A map hub whose one neighbour claims a region on the hub's plate."""
+
+    graph = Graph(label="quay")
+    scope = SandboxScope(label="quay_scope")
+    hub = SandboxLocation(
+        label="quay_map",
+        location_name="The Quay",
+        sandbox_scope="quay",
+        links={"in": "mill"},
+        map=SandboxMap(
+            name="quay",
+            plate="quay_map.png",
+            regions={
+                "mill": SandboxMapRegion(x=0.31, y=0.44, w=0.12, h=0.18),
+                "lighthouse": SandboxMapRegion(x=0.80, y=0.12, w=0.10, h=0.22),
+            },
+        ),
+    )
+    mill = SandboxLocation(
+        label="mill",
+        location_name="The Mill",
+        sandbox_scope="quay",
+        links={"out": "quay_map"},
+        plates=["quay:mill", "world:quayside"],
+    )
+    graph.add(scope)
+    graph.add(hub)
+    graph.add(mill)
+    scope.add_child(hub)
+    scope.add_child(mill)
+    return graph, hub, mill
+
+
+def test_travel_choices_inherit_the_plate_regions_their_target_claims() -> None:
+    graph, hub, _mill = _plate_graph()
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    choices = [f for f in fragments or [] if isinstance(f, ChoiceFragment)]
+    travel = next(
+        choice
+        for choice in choices
+        if choice.ui_hints.source == "sandbox_link" and choice.ui_hints.target == "mill"
+    )
+
+    assert travel.tags == {"ui:plate:quay:mill", "ui:plate:world:quayside"}
+
+
+def test_choice_tags_expose_the_ui_namespace_and_nothing_else() -> None:
+    graph, hub, _mill = _plate_graph()
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+    edge = next(
+        action
+        for action in _dynamic_sandbox_actions(hub)
+        if action.ui_hints.source == "sandbox_link"
+    )
+
+    # The edge carries engine internals the client has no business seeing.
+    assert {"dynamic", "sandbox", "movement"}.issubset(edge.tags)
+
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    choice = next(
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.ui_hints.source == "sandbox_link"
+    )
+
+    assert all(tag.startswith("ui:") for tag in choice.tags)
+
+
+def test_a_location_claiming_no_region_renders_an_untagged_choice() -> None:
+    graph, hub, mill = _plate_graph()
+    mill.plates = []
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    choice = next(
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.ui_hints.source == "sandbox_link"
+    )
+
+    assert choice.tags == set()
+
+
+def test_map_travel_fans_out_over_the_regions_locations_claim() -> None:
+    graph, hub, _mill = _plate_graph()
+    lighthouse = SandboxLocation(
+        label="lighthouse",
+        location_name="The Lighthouse",
+        sandbox_scope="quay",
+        plates=["quay:lighthouse"],
+    )
+    graph.add(lighthouse)
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    travel = _dynamic_sandbox_actions_with_tag(hub, "map_travel")
+    assert {action.text for action in travel} == {
+        "Go to The Mill",
+        "Go to The Lighthouse",
+    }
+    assert {action.ui_hints.region for action in travel} == {"mill", "lighthouse"}
+    assert all(action.ui_hints.plate == "quay" for action in travel)
+
+
+def test_a_region_no_location_claims_projects_no_travel() -> None:
+    graph, hub, _mill = _plate_graph()
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    travel = _dynamic_sandbox_actions_with_tag(hub, "map_travel")
+    # The plate declares "lighthouse"; nothing claims it, so the hitbox is inert.
+    assert [action.ui_hints.region for action in travel] == ["mill"]
+
+
+def test_map_travel_is_offered_on_the_destinations_own_terms() -> None:
+    graph, hub, mill = _plate_graph()
+    scope = graph.find_one(Selector.from_identifier("quay_scope"))
+    mill.availability = [Predicate(expr="mill_is_open")]
+    scope.locals["mill_is_open"] = False
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+    travel = next(iter(_dynamic_sandbox_actions_with_tag(hub, "map_travel")))
+
+    assert not travel.available(ctx=ctx)
+
+    scope.locals["mill_is_open"] = True
+    assert travel.available(ctx=ctx)
+
+
+def test_unreachable_map_travel_renders_dimmed_rather_than_absent() -> None:
+    graph, hub, mill = _plate_graph()
+    scope = graph.find_one(Selector.from_identifier("quay_scope"))
+    mill.availability = [Predicate(expr="mill_is_open")]
+    scope.locals["mill_is_open"] = False
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    choice = next(
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment)
+        and getattr(f.ui_hints, "region", None) == "mill"
+    )
+
+    assert not choice.available
+    assert choice.unavailable_reason
+    assert choice.tags == {"ui:plate:quay:mill", "ui:plate:world:quayside"}
+
+
+def test_a_region_two_locations_claim_projects_no_travel(caplog) -> None:
+    """An ambiguous hitbox is left inert rather than silently resolved."""
+
+    graph, hub, mill = _plate_graph()
+    rival = SandboxLocation(
+        label="rival_mill",
+        location_name="The Other Mill",
+        sandbox_scope="quay",
+        plates=["quay:mill"],
+    )
+    graph.add(rival)
+    graph.find_one(Selector.from_identifier("quay_scope")).add_child(rival)
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    with caplog.at_level("WARNING"):
+        do_provision(hub, ctx=ctx)
+
+    assert _dynamic_sandbox_actions_with_tag(hub, "map_travel") == []
+    assert "claimed by" in caplog.text
+
+
+def test_an_authored_travel_action_inherits_the_regions_claim() -> None:
+    """A hand-written action keeps its region rather than losing the hitbox."""
+
+    graph, hub, mill = _plate_graph()
+    authored = Action(
+        registry=graph,
+        label="authored_walk",
+        predecessor_id=hub.uid,
+        successor_id=mill.uid,
+        text="Walk down to the mill",
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    # No rival generated action competes with the authored one...
+    assert _dynamic_sandbox_actions_with_tag(hub, "map_travel") == []
+    # ...and the authored action is what the region now binds to.
+    assert "ui:plate:quay:mill" in authored.tags
+
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    choice = next(
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.text == "Walk down to the mill"
+    )
+    assert choice.tags == {"ui:plate:quay:mill", "ui:plate:world:quayside"}
+
+
+def test_repeated_provisioning_does_not_stack_map_travel() -> None:
+    """Planning runs every step; generated travel must not accumulate."""
+
+    graph, hub, _mill = _plate_graph()
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+    first = len(_dynamic_sandbox_actions_with_tag(hub, "map_travel"))
+    do_provision(hub, ctx=ctx)
+    do_provision(hub, ctx=ctx)
+
+    assert first == 1
+    assert len(_dynamic_sandbox_actions_with_tag(hub, "map_travel")) == first
+
+
+def test_two_authored_routes_to_one_region_leave_it_inert(caplog) -> None:
+    """Walking and sailing to the same quay is not a basis for owning a hitbox."""
+
+    graph, hub, mill = _plate_graph()
+    for label, text in (("walk_to_mill", "Walk"), ("sail_to_mill", "Sail")):
+        Action(
+            registry=graph,
+            label=label,
+            predecessor_id=hub.uid,
+            successor_id=mill.uid,
+            text=text,
+        )
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    with caplog.at_level("WARNING"):
+        do_provision(hub, ctx=ctx)
+
+    # Neither authored route takes the claim, and no rival is generated.
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    claimed = [
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.text in {"Walk", "Sail"} and f.tags
+    ]
+    assert claimed == []
+    assert _dynamic_sandbox_actions_with_tag(hub, "map_travel") == []
+    assert "authored routes" in caplog.text
+
+    # Both routes are still offered; only the hitbox is withheld.
+    offered = {
+        f.text for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.text in {"Walk", "Sail"}
+    }
+    assert offered == {"Walk", "Sail"}

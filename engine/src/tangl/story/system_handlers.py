@@ -31,7 +31,12 @@ from tangl.vm import (
     on_provision,
 )
 
-from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
+from tangl.journal.fragments import (
+    ChoiceFragment,
+    ContentFragment,
+    MediaFragment,
+    client_visible_tags,
+)
 
 from .dispatch import on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
@@ -711,6 +716,7 @@ def render_block_choices(*, caller, ctx, **_kw):
                 blockers=blockers or None,
                 accepts=edge.accepts,
                 ui_hints=edge.ui_hints,
+                tags=client_visible_tags(edge.tags),
             )
         )
 

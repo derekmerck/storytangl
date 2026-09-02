@@ -27,6 +27,13 @@ Current first-pass surface:
 - `SandboxExit`: an optional structured link declaration for custom egress
   text, message exits, and fixture-gated traversal while preserving the simple
   `direction -> target` table form.
+- `SandboxMap` / `SandboxMapRegion`: a visual map plate published by the
+  location that owns it — a named image plus named hitboxes in fractions of the
+  plate. Geometry only; it names no destinations.
+- `SandboxLocation.plates`: the regions a location claims, each
+  `"<plate>:<region>"`. A location names itself and never learns where it sits,
+  so it can appear on several plates at different scales, and a plate may
+  declare regions nothing currently claims.
 - `SandboxInventory`: a ready-at-hand `HasAssets` holder used by sandbox scopes
   for player inventory in the first slice.
 - `SandboxFixture`: a place-bound object composed from typed facets such as
@@ -60,6 +67,17 @@ Current first-pass surface:
   links into normal dynamic actions, unless a manual action already covers that
   target. Direction aliases such as `n`, `s`, `e`, `w`, `u`, and `d` are
   normalized into canonical UI hints while preserving the raw authored key.
+- `project_sandbox_map_travel`: planning handler that fans travel out over a
+  plate's regions, one action per location claiming one. The target's own
+  `availability` is copied onto the generated edge, so a place guards itself and
+  an unreachable one renders as an ordinary unavailable choice with its reason
+  rather than disappearing. A region no location claims projects nothing, which
+  is what separates "not on offer" from "offered and refused". A region is left
+  inert when its claim is ambiguous — two locations claiming it, or one location
+  reachable by two authored routes — since awarding the hitbox to whichever edge
+  iteration yields first would hide the other choice behind one that looks
+  correct. An authored route to a claimed target inherits the claim rather than
+  being shadowed by a generated rival.
 - `project_sandbox_asset_actions`: planning handler that projects present assets
   as take/read choices, player-held assets as drop choices, and present/carried
   asset interactions as ordinary choices.
@@ -91,6 +109,16 @@ Current first-pass surface:
   adapter for the existing service story-info seam. It projects disclosed
   sandbox state into ordinary `ProjectedState` sections for clients that want
   status rails, inventory panels, map modals, or ebook-style summaries.
+- `map_plate` / `map_regions` story-info channels: plate geometry for clients
+  that draw maps, advertised only by a location that owns a plate and served
+  only when asked for by name. Deliberately not folded into the `map` channel,
+  which stays the reader-facing gazetteer: a text client asking to see the map
+  wants place names, not a table of hitbox coordinates it cannot draw.
+
+  Geometry rides story-info rather than the journal because it is reference
+  state — it changes when the art changes, not when the reader moves. Liveness
+  stays on the choice list, where availability already lives, and the two are
+  joined in the client by region name through the `ui:plate:` choice tags.
 
 The wait action intentionally mirrors the `tangl.mechanics.games` self-loop
 pattern: planning creates a dynamic `Action`, the action targets the current

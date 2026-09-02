@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
@@ -44,6 +45,8 @@ from .time import (
     current_world_time,
 )
 from .visibility import SandboxProjectionState, SandboxVisibilityRule
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -297,17 +300,31 @@ def _message_exit_text(direction: str, exit_spec: SandboxExit) -> str:
     return f"Go {canonical}"
 
 
+def _manual_link_actions(
+    location: SandboxLocation,
+    *,
+    target: SandboxLocation,
+) -> list[Action]:
+    """Return every authored (non-generated) action already reaching ``target``.
+
+    All of them, not the first: a location may be reachable by more than one
+    authored route — walking and sailing to the same quay — and which one graph
+    iteration happens to yield is not a basis for deciding who owns a hitbox.
+    """
+
+    return [
+        edge
+        for edge in location.edges_out(Selector(has_kind=Action))
+        if not _has_tags(edge, "dynamic") and edge.successor is target
+    ]
+
+
 def _has_manual_link_action(
     location: SandboxLocation,
     *,
     target: SandboxLocation,
 ) -> bool:
-    for edge in location.edges_out(Selector(has_kind=Action)):
-        if _has_tags(edge, "dynamic"):
-            continue
-        if edge.successor is target:
-            return True
-    return False
+    return bool(_manual_link_actions(location, target=target))
 
 
 def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
@@ -345,6 +362,23 @@ def _sandbox_contribution_hints(
         hints["source_kind"] = source_kind
     hints.update(extra)
     return hints
+
+
+PLATE_TAG_PREFIX = "ui:plate:"
+
+
+def _plate_tags(target: object) -> set[str]:
+    """Return the ``ui:plate:`` tags a choice pointing at ``target`` inherits.
+
+    The claim lives on the destination because generated choices do not exist
+    when a world is authored. Only :class:`SandboxLocation` claims regions; a
+    choice targeting anything else contributes nothing.
+    """
+
+    plates = getattr(target, "plates", None)
+    if not isinstance(plates, (list, tuple, set)):
+        return set()
+    return {f"{PLATE_TAG_PREFIX}{claim}" for claim in plates if isinstance(claim, str)}
 
 
 def _nearest_wait_enabled(location: SandboxLocation) -> bool:
@@ -1311,7 +1345,7 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
             text=_movement_text(raw_direction, target, exit_spec),
             payload=_sandbox_action_payload("movement"),
             availability=availability,
-            tags={"dynamic", "sandbox", "movement"},
+            tags={"dynamic", "sandbox", "movement", *_plate_tags(target)},
             ui_hints=_sandbox_contribution_hints(
                 caller,
                 source="sandbox_link",
@@ -1325,6 +1359,115 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
             ),
         )
     return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_map_travel(*, caller, ctx, **_kw):
+    """Project travel to every location claiming a region on this plate.
+
+    The plate's regions are the fanout: a region with no claimant simply has no
+    choice behind it, which is what leaves its hitbox inert, and a location
+    claiming a region on some other plate is not reached from here. Neither the
+    map nor the location consults the other's geometry.
+
+    Travel is offered on the destination's own terms — the target's
+    ``availability`` is copied onto the generated edge — so the reason a place
+    cannot be reached lives with the place that is guarding itself, and renders
+    as an ordinary unavailable choice rather than a missing one.
+    """
+
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if caller.map is None or not caller.auto_provision:
+        return None
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="map_travel", ctx=ctx)
+
+    plate = caller.map
+    for region in sorted(plate.regions):
+        claim = f"{plate.name}:{region}"
+        claimants = _locations_claiming(graph, claim)
+        if len(claimants) > 1:
+            # Two places cannot share one hitbox: whichever the client picked
+            # would be arbitrary, and the reader would have no way to see that
+            # a choice was dropped. Leave the region unclaimed and say so.
+            logger.warning(
+                "Sandbox map region %r on plate %r is claimed by %s; "
+                "leaving it inert. At most one location may claim a region.",
+                region,
+                plate.name,
+                ", ".join(sorted(node.get_label() for node in claimants)),
+            )
+            continue
+        for target in claimants:
+            if target is caller:
+                continue
+            manual = _manual_link_actions(caller, target=target)
+            if len(manual) > 1:
+                # Same rule as two locations claiming one region: an ambiguous
+                # hitbox is left inert rather than awarded to whichever edge
+                # iteration happened to yield first.
+                logger.warning(
+                    "Sandbox map region %r on plate %r has %d authored routes "
+                    "to %r (%s); leaving it inert. Give the region one "
+                    "claimant.",
+                    region,
+                    plate.name,
+                    len(manual),
+                    target.get_label(),
+                    ", ".join(sorted(edge.get_label() for edge in manual)),
+                )
+                continue
+            if manual:
+                # An authored action already offers this travel. Tag it rather
+                # than generating a rival, so the region binds to the choice the
+                # reader actually sees instead of going inert.
+                manual[0].tags |= _plate_tags(target)
+                continue
+            Action(
+                registry=graph,
+                label=f"sandbox_map_{caller.get_label()}_{region}_{target.get_label()}",
+                predecessor_id=caller.uid,
+                successor_id=target.uid,
+                text=f"Go to {target.location_name or target.get_label()}",
+                payload=_sandbox_action_payload("movement"),
+                availability=list(target.availability),
+                tags={
+                    "dynamic",
+                    "sandbox",
+                    "movement",
+                    "map_travel",
+                    *_plate_tags(target),
+                },
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_map",
+                    contribution="movement",
+                    source_label=caller.get_label(),
+                    source_kind="location",
+                    target=target.get_label(),
+                    plate=plate.name,
+                    region=region,
+                ),
+            )
+    return None
+
+
+def _locations_claiming(graph: Graph, claim: str) -> list[SandboxLocation]:
+    """Return locations claiming ``claim``, in stable label order."""
+
+    claimants = [
+        node
+        for node in graph.find_all(Selector(has_kind=SandboxLocation))
+        if isinstance(node, SandboxLocation) and claim in node.plates
+    ]
+    return sorted(claimants, key=lambda node: node.get_label())
 
 
 def _project_location_asset_actions(

@@ -949,6 +949,31 @@ type; clients may also request narrower map sections such as `map_nodes` or
 visible/known exits, and known blocked or locked state. It must not expose
 secret geography, hidden mobs, raw pathfinding truth, or future schedule state.
 
+A location that owns a `map` publishes two further channels, `map_plate` and
+`map_regions`, carrying the plate's name, its image asset, and named hitboxes
+in fractions of the plate. These are explicitly requested and never folded into
+`map`: that channel is the reader-facing gazetteer, and a text client asking to
+see the map wants place names rather than a coordinate table it cannot draw.
+
+The split is the same disclosure/affordance line drawn everywhere else. Plate
+geometry is reference state — it changes when the art changes, not when the
+reader moves — so it can be fetched once and cached, and it names no
+destinations. Which places are reachable right now stays on the choice list,
+where availability already lives. A client joins the two by region name, using
+the `ui:plate:<plate>:<region>` tags that generated travel choices inherit from
+the location they point at. Neither side references the other, so a location can
+claim regions on several plates at different scales.
+
+The region *names* are world truth and survive any reskin. The *rectangles* are
+currently world-owned too, which assumes every art pack's plate shares one
+composition — so an independently composed pack cannot yet be dropped in without
+editing world data. Geometry belongs beside the plate it measures; until that
+moves, treat this half of the contract as provisional (#419).
+
+The plate image itself travels as ordinary media with `media_role: map_im`,
+outside the background roles, so a client with no map view renders the numbered
+choice list and never mistakes a plate for scenery.
+
 Visibility rules filter projected state the same way they filter journal and
 local affordances. Darkness may leave current location, time, and inventory
 visible while suppressing local assets, fixtures, mobs, and exits. This keeps

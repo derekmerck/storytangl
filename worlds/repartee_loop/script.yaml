@@ -46,31 +46,109 @@ scenes:
         kind: "repartee_loop.domain.ReparteeSetupBlock"
         content: "The clerk hands you one opening line and a warning not to waste it."
         actions:
-          - text: "Enter the quay hub"
-            successor: hub
+          - text: "Step out onto the quay"
+            successor: quay_map
 
-      hub:
+      # The map is a place, not a subsystem: standing here is standing on the
+      # quay looking at the district, and travel is ordinary choices. The plate
+      # names regions; each place below claims one. Neither knows the other's
+      # claim. The rects below are world-owned, so a pack that composes the
+      # district differently still needs them edited — see #419.
+      quay_map:
+        kind: "repartee_loop.domain.ReparteeLocation"
+        location_name: "The Quay"
+        media:
+          - name: quay_map.png
+            media_role: map_im
+        map:
+          name: quay
+          plate: quay_map.png
+          regions:
+            quayside: {x: 0.03, y: 0.13, w: 0.25, h: 0.30}
+            salon_terrace: {x: 0.34, y: 0.26, w: 0.24, h: 0.22}
+            salon: {x: 0.75, y: 0.43, w: 0.21, h: 0.28}
+            practice_yard: {x: 0.28, y: 0.60, w: 0.40, h: 0.36}
+        content: "The district runs from the water to the salon steps."
+
+      quayside:
+        kind: "repartee_loop.domain.ReparteeLocation"
+        location_name: "The Quayside"
+        plates: [quay:quayside]
+        links:
+          out:
+            target: quay_map
+            text: "Return to the map"
         media:
           - name: quai_bg.png
             media_role: narrative_im
             staging_hints:
               media_shape: landscape
-        kind: "repartee_loop.domain.ReparteeHubBlock"
-        content: "The dockhand drills newcomers; the salon master waits beyond the rope."
+        content: "Cranes work the water. Nobody here is interested in your line."
+
+      practice_yard:
+        kind: "repartee_loop.domain.ReparteeLocation"
+        location_name: "The Practice Yard"
+        plates: [quay:practice_yard]
+        links:
+          out:
+            target: quay_map
+            text: "Return to the map"
+        media:
+          - name: warehouse_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: worker_sprite.png
+            media_role: dialog_im
+            staging_hints:
+              media_x: right
+              media_y: bottom
+        content: "The dockhand drills newcomers between loads."
         actions:
           - text: "Challenge the dockhand"
             successor: dockhand_contest
             conditions:
               - "not repertoire.has_phrase('repartee_reply')"
+
+      # Availability lives with the place that guards itself, so the map dims
+      # this region and says why, rather than hiding a location that plainly
+      # exists on the plate.
+      salon_terrace:
+        kind: "repartee_loop.domain.ReparteeLocation"
+        location_name: "The Salon Terrace"
+        plates: [quay:salon_terrace]
+        conditions:
+          - "repertoire.has_phrase('repartee_reply')"
+        links:
+          out:
+            target: quay_map
+            text: "Return to the map"
+        media:
+          - name: salon_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+          - name: master_sprite.png
+            media_role: dialog_im
+        content: "The salon master holds the terrace, waiting past the rope."
+        actions:
           - text: "Challenge the salon master"
             successor: master_contest
             conditions:
-              - "repertoire.has_phrase('repartee_reply')"
               - "not prizes.has_prize('repartee_salon_token')"
-          - text: "Enter the salon"
-            successor: salon
-            conditions:
-              - "prizes.has_prize('repartee_salon_token')"
+
+      salon:
+        kind: "repartee_loop.domain.ReparteeLocation"
+        location_name: "The Salon"
+        plates: [quay:salon]
+        conditions:
+          - "prizes.has_prize('repartee_salon_token')"
+        media:
+          - name: salon_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        content: "The salon door recognizes the brass token and admits you to the next room."
 
       dockhand_contest:
         media:
@@ -104,8 +182,8 @@ scenes:
         kind: "repartee_loop.domain.ReparteeLossAftermathBlock"
         content: "The dockhand nods once and lets you keep the reply that beat you."
         actions:
-          - text: "Return to the quay hub"
-            successor: hub
+          - text: "Step back into the yard"
+            successor: practice_yard
 
       master_contest:
         media:
@@ -133,13 +211,5 @@ scenes:
         kind: "repartee_loop.domain.ReparteePrizeAftermathBlock"
         content: "The master grants you a brass token stamped with the salon seal."
         actions:
-          - text: "Return to the quay hub"
-            successor: hub
-
-      salon:
-        media:
-          - name: salon_bg.png
-            media_role: narrative_im
-            staging_hints:
-              media_shape: landscape
-        content: "The salon door recognizes the brass token and admits you to the next room."
+          - text: "Step back onto the terrace"
+            successor: salon_terrace

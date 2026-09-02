@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import Field
 
-from tangl.core import Graph, Token
+from tangl.core import Graph, Selector, Token
 from tangl.mechanics.sandbox import (
     ChargeFacet,
     ContainerFacet,
@@ -15,6 +15,8 @@ from tangl.mechanics.sandbox import (
     SandboxExit,
     SandboxFixture,
     SandboxLocation,
+    SandboxMap,
+    SandboxMapRegion,
     SandboxMob,
     SandboxScope,
     SandboxVisibilityRule,
@@ -395,3 +397,82 @@ def test_sandbox_map_honors_visibility_suppression() -> None:
     edges = sections["sandbox_map_edges"].value
     assert isinstance(edges, TableValue)
     assert edges.rows == []
+
+
+def _plate_hub() -> tuple[Graph, SandboxLocation]:
+    graph = Graph(label="quay")
+    hub = SandboxLocation(
+        label="quay_map",
+        location_name="The Quay",
+        links={"in": "mill"},
+        map=SandboxMap(
+            name="quay",
+            plate="quay_map.png",
+            regions={
+                "mill": SandboxMapRegion(x=0.31, y=0.44, w=0.12, h=0.18),
+                "lighthouse": SandboxMapRegion(x=0.80, y=0.12, w=0.10, h=0.22),
+            },
+        ),
+    )
+    mill = SandboxLocation(label="mill", location_name="The Mill", plates=["quay:mill"])
+    graph.add(hub)
+    graph.add(mill)
+    return graph, hub
+
+
+def test_sandbox_plate_geometry_projects_when_asked_for_by_name() -> None:
+    graph, hub = _plate_hub()
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
+
+    projected = do_get_story_info(
+        hub,
+        ctx=ctx,
+        request=StoryInfoRequest(kinds=["map_plate", "map_regions"]),
+    )
+
+    sections = _section_by_id(projected.sections)
+    plate = sections["sandbox_map_plate"]
+    assert isinstance(plate.value, KvListValue)
+    assert [(row.key, row.value) for row in plate.value.items] == [
+        ("Name", "quay"),
+        ("Image", "quay_map.png"),
+        ("Regions", 2),
+    ]
+
+    regions = sections["sandbox_map_regions"]
+    assert isinstance(regions.value, TableValue)
+    assert regions.value.columns == ["Region", "x", "y", "w", "h"]
+    assert regions.value.rows == [
+        ["lighthouse", 0.80, 0.12, 0.10, 0.22],
+        ["mill", 0.31, 0.44, 0.12, 0.18],
+    ]
+
+
+def test_sandbox_map_channel_stays_reader_facing() -> None:
+    """The gazetteer must not hand a text client a table of hitboxes."""
+
+    graph, hub = _plate_hub()
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
+
+    projected = do_get_story_info(hub, ctx=ctx, request=StoryInfoRequest(kind="map"))
+
+    assert "sandbox_map_nodes" in _section_by_id(projected.sections)
+    assert "sandbox_map_plate" not in _section_by_id(projected.sections)
+    assert "sandbox_map_regions" not in _section_by_id(projected.sections)
+
+
+def test_sandbox_plate_channel_is_advertised_only_by_the_plate_owner() -> None:
+    graph, hub = _plate_hub()
+    mill = graph.find_one(Selector.from_identifier("mill"))
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+
+    hub_ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
+    mill_ctx = PhaseCtx(graph=graph, cursor_id=mill.uid, step=ledger.step)
+
+    hub_kinds = {a.kind for a in do_advertise_info_channels(hub, ctx=hub_ctx)}
+    mill_kinds = {a.kind for a in do_advertise_info_channels(mill, ctx=mill_ctx)}
+
+    assert "map_plate" in hub_kinds
+    assert "map_plate" not in mill_kinds

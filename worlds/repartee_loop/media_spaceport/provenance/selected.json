@@ -28,5 +28,10 @@
     "receipt": "receipts.json",
     "request_sha256": "dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020",
     "path": "generation-artifacts/raw/dcfb1421b658e9b9696cfde9ef5d1cc90b44212e1b09410f990d8aa8aabd2020/000-worker_sprite_00001_.png"
+  },
+  "quay_map": {
+    "receipt": "map-receipts.json",
+    "request_sha256": "2d90f3136d518eaf3c10ff3b3cbeb2a6f24baa6965575bcfb4f172ad6aa920ae",
+    "path": "generation-artifacts/raw/2d90f3136d518eaf3c10ff3b3cbeb2a6f24baa6965575bcfb4f172ad6aa920ae/000-quay_map_00001_.png"
   }
 }

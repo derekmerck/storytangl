@@ -19,7 +19,7 @@ import pygame
 
 from .bridge import PygameSessionBridge
 from .models import StageImage, Turn
-from .stage import BACKGROUND_ROLES, Stage
+from .stage import BACKGROUND_ROLES, MAP_ROLES, Stage
 
 logger = logging.getLogger(__name__)
 
@@ -51,16 +51,28 @@ def _merge(turns: list[Turn]) -> Turn:
     staged: dict[tuple[str, ...], StageImage] = {}
     for turn in turns:
         for image in turn.images:
-            key = (
-                ("background",)
-                if image.role in BACKGROUND_ROLES
-                else (image.role, image.source, image.x_slot or "")
-            )
+            # A plate is stage state like a background: a batch that crosses
+            # between two maps must not keep the old one and pair it with the
+            # new geometry. Both collapse to one slot, last one wins.
+            if image.role in BACKGROUND_ROLES:
+                key: tuple[str, ...] = ("background",)
+            elif image.role in MAP_ROLES:
+                key = ("map",)
+            else:
+                key = (image.role, image.source, image.x_slot or "")
             staged[key] = image
         merged.lines.extend(turn.lines)
     merged.images.extend(staged.values())
     merged.choices.extend(turns[-1].choices if turns else [])
     return merged
+
+
+def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
+    """Merge a batch into one actionable frame and attach the current plate."""
+
+    frame = _merge(_turns(bridge, envelope))
+    frame.plate = bridge.map_plate()
+    return frame
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -79,14 +91,14 @@ def main(argv: list[str] | None = None) -> int:
     bridge = PygameSessionBridge()
     envelope = bridge.start(args.world)
     stage = Stage(asset_dir=args.assets, title=f"StoryTangl — {args.world}")
-    frame = _merge(_turns(bridge, envelope))
+    frame = _frame(bridge, envelope)
 
     for _ in range(args.advance):
         available = [choice for choice in frame.choices if choice.available]
         if not available:
             break
         envelope = bridge.choose(available[0].edge_id, available[0].payload)
-        frame = _merge(_turns(bridge, envelope))
+        frame = _frame(bridge, envelope)
 
     stage.draw(frame)
 
@@ -102,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if (hit := stage.hit(event.pos)) is not None:
                     envelope = bridge.choose(*hit)
-                    frame = _merge(_turns(bridge, envelope))
+                    frame = _frame(bridge, envelope)
                     stage.draw(frame)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -120,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
                     if index < len(frame.choices) and frame.choices[index].available:
                         choice = frame.choices[index]
                         envelope = bridge.choose(choice.edge_id, choice.payload)
-                        frame = _merge(_turns(bridge, envelope))
+                        frame = _frame(bridge, envelope)
                         stage.draw(frame)
     pygame.quit()
     return 0

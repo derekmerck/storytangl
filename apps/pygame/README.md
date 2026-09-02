@@ -30,8 +30,9 @@ Image geometry remains an orthogonal staging hint: Repartee's backgrounds use
 `narrative_im` to its full-frame background.
 
 **Every click resolves to an `edge_id`.** The input layer never commits a
-bespoke action, so a later map hotspot produces the same payload as selecting
-the numbered choice (widget vocabulary §5.3, Input Parity).
+bespoke action, so a map hotspot produces the same payload as selecting the
+numbered choice (widget vocabulary §5.3, Input Parity). That is now exercised
+rather than merely intended — see the map view below.
 
 **Unavailable choices render dimmed with their `unavailable_reason`** rather
 than being hidden (§5.1, Decision Legibility).
@@ -39,6 +40,54 @@ than being hidden (§5.1, Decision Legibility).
 **Attribution decides presentation.** An `AttributedFragment` renders as a
 speaker bubble; a plain `ContentFragment` renders as narration. The client does
 not parse prose prefixes.
+
+## The Map View
+
+When the cursor publishes a plate, the client draws it instead of the ordinary
+scene layout: the plate full-frame, an outlined box per region, and the choice
+number pinned inside each box.
+
+The two halves arrive by different routes and are joined in the client, which
+is the point of the design:
+
+- **Geometry** comes from story-info, requested by name as `map_plate` and
+  `map_regions`. It is reference state — it changes when the art changes, not
+  when the reader moves — so a client that cannot draw maps never asks for it.
+- **Liveness** comes from the ordinary choice list. A travel choice carries a
+  `ui:plate:<plate>:<region>` tag, and the renderer boxes the region whose name
+  a live choice claims.
+
+Everything else falls out of that intersection rather than needing a rule. A
+region no choice claims is drawn nowhere and clicks nowhere, which is how "not
+currently on offer" differs from "offered and refused" — the latter is a real
+choice with `available: false`, so it gets a dimmed box and its
+`unavailable_reason` in the legend.
+
+**At most one choice may claim a region.** The engine refuses to project an
+ambiguous one — whether two locations claim the same region, or one location is
+reachable by two authored routes — and this renderer skips it rather than
+picking a winner. Choosing between claimants would hide a dropped choice behind
+a hitbox that looks perfectly correct. The routes stay offered in the legend;
+only the hitbox is withheld.
+
+The plate drawn is the one the geometry *names*, not merely the first `map_im`
+staged. Picture and rectangles arrive by different routes, so a batch that
+crosses between two maps could otherwise pair one map's image with the other's
+hitboxes.
+
+The footer is capped and pages. It is drawn over the plate, so hit-testing runs
+in reverse draw order and a legend row wins the pixels it visibly covers.
+
+The pin carries only the number. A 70px box cannot hold "Go to The Practice
+Yard", and shortening it would mean parsing prose the client does not own, so
+the names stay in the legend below and the number ties the two together. Every
+choice appears there, boxed or not, which keeps the CLI floor literally on
+screen: same number, same edge, whichever the reader clicks.
+
+`map_im` is deliberately outside `BACKGROUND_ROLES`. A plate is full-frame but
+is not scenery, and a client with no map view must not stage it as a backdrop —
+it renders the numbered list instead, which is exactly what this client did
+before this feature existed.
 
 ## Running
 

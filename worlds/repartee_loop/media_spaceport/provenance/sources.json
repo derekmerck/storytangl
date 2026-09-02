@@ -70,5 +70,17 @@
       1024
     ],
     "preprocessing": "alpha composite over RGB(224,224,224)"
+  },
+  {
+    "asset": "quay_map",
+    "source": "source-assets/quay_map.png",
+    "source_sha256": "56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0",
+    "reference": "source-assets/quay_map.png",
+    "reference_sha256": "56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0",
+    "size": [
+      1280,
+      800
+    ],
+    "preprocessing": "none"
   }
 ]

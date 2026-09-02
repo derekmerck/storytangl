@@ -77,3 +77,33 @@ def test_lines_accumulate_and_only_the_last_step_offers_choices() -> None:
 
     assert [line.text for line in merged.lines] == ["first", "second"]
     assert [choice.edge_id for choice in merged.choices] == [edge]
+
+
+def _plate(source: str) -> StageImage:
+    return StageImage(role="map_im", source=source)
+
+
+def test_crossing_between_two_maps_keeps_only_the_latest_plate() -> None:
+    """A plate is stage state, not transcript.
+
+    A batch that leaves one map and arrives at another would otherwise carry
+    both, and the renderer would pair a picture with the wrong geometry.
+    """
+
+    merged = _merge([
+        Turn(step=1, images=[_plate("quay_map.png")], lines=[Line(text="the quay")]),
+        Turn(step=2, images=[_plate("uplands_map.png")], lines=[Line(text="the uplands")]),
+    ])
+
+    plates = [image for image in merged.images if image.role == "map_im"]
+    assert [image.source for image in plates] == ["uplands_map.png"]
+
+
+def test_a_plate_and_a_background_do_not_displace_each_other() -> None:
+    """They share the frame; only same-kind restaging collapses."""
+
+    merged = _merge([
+        Turn(step=1, images=[_bg("quai_bg.png"), _plate("quay_map.png")]),
+    ])
+
+    assert {image.role for image in merged.images} == {"narrative_im", "map_im"}
