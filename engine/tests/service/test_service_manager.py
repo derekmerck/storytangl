@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -433,3 +434,37 @@ def test_create_user_restores_an_existing_recovery_secret(
 
     assert first.details["user_id"] == second.details["user_id"]
     assert len([item for item in persistence.values() if isinstance(item, User)]) == 1
+
+
+def test_create_user_rerolls_a_generated_codename_collision(
+    manager: ServiceManager,
+    persistence,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = manager.create_user(secret="occupied-codename")
+    generated_names = iter(["occupied-codename", "free-codename"])
+    monkeypatch.setattr(
+        "tangl.service.service_manager.get_code_name",
+        lambda: next(generated_names),
+    )
+
+    created = manager.create_user()
+
+    assert created.details["user_secret"] == "free-codename"
+    assert created.details["user_id"] != occupied.details["user_id"]
+    assert len([item for item in persistence.values() if isinstance(item, User)]) == 2
+
+
+def test_create_user_restores_persisted_recovery_codename_after_restart(
+    tmp_path: Path,
+) -> None:
+    first_persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    first_manager = ServiceManager(first_persistence)
+    created = first_manager.create_user(secret="persistent-codename")
+
+    restarted_persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    restarted_manager = ServiceManager(restarted_persistence)
+    restored = restarted_manager.create_user(secret="persistent-codename")
+
+    assert restored.details["user_id"] == created.details["user_id"]
+    assert len([item for item in restarted_persistence.values() if isinstance(item, User)]) == 1

@@ -41,6 +41,7 @@ These codenames are memorable recovery capabilities, not passwords or a claim
 of cryptographic account protection. Authentication/security policy, identity
 providers, expiry, and permissions are explicitly outside this contract.
 
-[Issue #352](https://github.com/derekmerck/storytangl/issues/352) owns the
-remaining collision hardening, persistent-restart coverage, browser E2E,
-`RemoteServiceManager` parity, and world-themed namebank follow-ups.
+Collision rerolling, persisted recovery, and `RemoteServiceManager` parity are
+covered by the service contract. Real-browser E2E remains with
+[Issue #73](https://github.com/derekmerck/storytangl/issues/73); world-themed
+namebanks remain deferred.

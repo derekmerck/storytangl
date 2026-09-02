@@ -233,6 +233,13 @@ class TestRemoteTransportAndAuth:
 
         assert created.details == {"user_id": str(user_id)}
         assert envelope.metadata["world_id"] == "demo_world"
+        assert manager._bound_secret == "new-secret"
+        assert manager._bound_api_key == "new-key"
+        assert manager._bound_user_id == user_id
+        assert session.calls[0]["params"] == {
+            "secret": "new-secret",
+            "render_profile": "raw",
+        }
         assert session.calls[1]["headers"] == {
             "X-API-Key": "new-key",
             "api-key": "new-key",
@@ -240,6 +247,50 @@ class TestRemoteTransportAndAuth:
         assert session.calls[2]["headers"] == {
             "X-API-Key": "new-key",
             "api-key": "new-key",
+        }
+
+    def test_create_user_uses_server_generated_secret_and_binds_immediate_auth(self) -> None:
+        user_id = uuid4()
+        session = RecordingSession(
+            [
+                StubResponse(
+                    200,
+                    {
+                        "api_key": "generated-key",
+                        "user_secret": "server-codename",
+                        "user_id": str(user_id),
+                    },
+                ),
+                StubResponse(
+                    200,
+                    {
+                        "user_id": str(user_id),
+                        "user_secret": "server-codename",
+                        "created_dt": "2026-01-01T00:00:00",
+                        "worlds_played": [],
+                    },
+                ),
+                StubResponse(200, _runtime_envelope_payload()),
+            ]
+        )
+        manager = RemoteServiceManager("https://example.test/api/v2", session=session)
+
+        created = manager.create_user()
+        envelope = manager.create_story(user_id=user_id, world_id="demo_world")
+
+        assert created.details == {"user_id": str(user_id)}
+        assert envelope.metadata["world_id"] == "demo_world"
+        assert manager._bound_secret == "server-codename"
+        assert manager._bound_api_key == "generated-key"
+        assert manager._bound_user_id == user_id
+        assert session.calls[0]["params"] == {"render_profile": "raw"}
+        assert session.calls[1]["headers"] == {
+            "X-API-Key": "generated-key",
+            "api-key": "generated-key",
+        }
+        assert session.calls[2]["headers"] == {
+            "X-API-Key": "generated-key",
+            "api-key": "generated-key",
         }
 
     def test_update_user_refreshes_auth_and_does_not_reuse_old_key(self) -> None:
