@@ -63,6 +63,19 @@ currently on offer" differs from "offered and refused" — the latter is a real
 choice with `available: false`, so it gets a dimmed box and its
 `unavailable_reason` in the legend.
 
+**At most one choice may claim a region.** The engine refuses to project an
+ambiguous one, and this renderer skips it rather than picking a winner: choosing
+between two claimants here would hide a dropped choice behind a hitbox that
+looks perfectly correct.
+
+The plate drawn is the one the geometry *names*, not merely the first `map_im`
+staged. Picture and rectangles arrive by different routes, so a batch that
+crosses between two maps could otherwise pair one map's image with the other's
+hitboxes.
+
+The footer is capped and pages. It is drawn over the plate, so hit-testing runs
+in reverse draw order and a legend row wins the pixels it visibly covers.
+
 The pin carries only the number. A 70px box cannot hold "Go to The Practice
 Yard", and shortening it would mean parsing prose the client does not own, so
 the names stay in the legend below and the number ties the two together. Every

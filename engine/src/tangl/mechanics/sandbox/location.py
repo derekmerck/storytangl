@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tangl.core import Token, contribute_ns
 from tangl.story import MenuBlock
@@ -63,6 +63,30 @@ class SandboxMapRegion(BaseModel):
     y: float
     w: float
     h: float
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "SandboxMapRegion":
+        """Refuse a rectangle a plate cannot contain.
+
+        Caught here rather than in a renderer because every client would have
+        to rediscover it, and a hitbox off the edge of the plate is silently
+        unclickable rather than visibly wrong.
+        """
+
+        if self.w <= 0 or self.h <= 0:
+            raise ValueError(
+                f"map region must have positive extent, got w={self.w}, h={self.h}"
+            )
+        if not (0.0 <= self.x and 0.0 <= self.y):
+            raise ValueError(
+                f"map region origin must be inside the plate, got x={self.x}, y={self.y}"
+            )
+        if self.x + self.w > 1.0 or self.y + self.h > 1.0:
+            raise ValueError(
+                "map region must lie wholly inside the plate: "
+                f"x+w={self.x + self.w}, y+h={self.y + self.h} exceed 1.0"
+            )
+        return self
 
     def as_row(self, name: str) -> list[str | float]:
         """Return the disclosure row for this region."""
@@ -280,6 +304,19 @@ class SandboxLocation(HasAssets, MenuBlock):
     wait_enabled: bool | None = None
     wait_text: str | None = None
     wait_turn_delta: int | None = None
+
+    @field_validator("plates")
+    @classmethod
+    def _validate_plate_claims(cls, value: list[str]) -> list[str]:
+        """Refuse a claim that cannot name both a plate and a region."""
+
+        for claim in value:
+            plate, _, region = claim.partition(":")
+            if not plate.strip() or not region.strip() or ":" in region:
+                raise ValueError(
+                    f"plate claim must be '<plate>:<region>', got {claim!r}"
+                )
+        return value
 
     def fixture_by_label(self, label: str) -> SandboxFixture:
         """Return the named local fixture."""

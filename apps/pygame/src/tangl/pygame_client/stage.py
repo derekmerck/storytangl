@@ -57,7 +57,12 @@ _ROW_STYLES = {
     "dialog": (CREAM, INK),
     "narration": (INK, CREAM),
     "alt": (INK, DIM),
+    "choice": (INK, CREAM),
 }
+
+MAP_FOOTER_ROWS = 8
+"""Rows the map footer may occupy before it scrolls. A map drawn under a
+footer that grows without limit is a map nobody can see."""
 
 
 class Stage:
@@ -170,14 +175,36 @@ class Stage:
         staged = self._pick(loaded, MAP_ROLES)
         if plate is None or not staged:
             return False
+        surface = self._plate_surface(plate, staged)
+        if surface is None:
+            return False
 
-        self.surface.blit(pygame.transform.scale(staged[0][1], LOGICAL_SIZE), (0, 0))
+        self.surface.blit(pygame.transform.scale(surface, LOGICAL_SIZE), (0, 0))
         claimed = self._claimed_regions(turn, plate)
         for index, choice, region in claimed:
             self._draw_region(index, choice, region)
 
         self._draw_map_footer(turn)
         return True
+
+    @staticmethod
+    def _plate_surface(
+        plate: MapPlate, staged: list[tuple[StageImage, pygame.Surface]]
+    ) -> pygame.Surface | None:
+        """Pick the image this plate names, never merely the first staged one.
+
+        Geometry and image arrive by different routes, so drawing a map whose
+        picture is one place and whose hitboxes are another is a real failure
+        mode rather than a hypothetical one. When the plate names no image, a
+        single staged map is unambiguous and anything more is not.
+        """
+
+        if plate.image:
+            for image, surface in staged:
+                if Path(image.source).name == plate.image:
+                    return surface
+            return None
+        return staged[0][1] if len(staged) == 1 else None
 
     @staticmethod
     def _claimed_regions(
@@ -190,16 +217,20 @@ class Stage:
         offer differs from one that is offered and refused.
         """
 
-        by_tag = {
-            tag: (index, choice)
-            for index, choice in enumerate(turn.choices, start=1)
-            for tag in choice.tags
-        }
+        by_tag: dict[str, list[tuple[int, Choice]]] = {}
+        for index, choice in enumerate(turn.choices, start=1):
+            for tag in choice.tags:
+                by_tag.setdefault(tag, []).append((index, choice))
         pairs: list[tuple[int, Choice, MapRegion]] = []
         for region in plate.regions:
-            match = by_tag.get(plate.claim(region))
-            if match is not None:
-                pairs.append((match[0], match[1], region))
+            matches = by_tag.get(plate.claim(region)) or []
+            if len(matches) != 1:
+                # Zero is an inert region. More than one is ambiguous, and the
+                # engine already refuses to project it; picking one here would
+                # hide a dropped choice behind a hitbox that looks correct.
+                continue
+            index, choice = matches[0]
+            pairs.append((index, choice, region))
         return pairs
 
     def _draw_region(self, index: int, choice: Choice, region: MapRegion) -> None:
@@ -229,34 +260,71 @@ class Stage:
             self.hitboxes.append((rect, choice.edge_id, choice.payload))
 
     def _draw_map_footer(self, turn: Turn) -> None:
-        """Narration and the full numbered legend along the bottom.
+        """Narration and the full numbered legend, bounded and pageable.
 
-        Every choice appears here, including the ones that already have a box
-        on the plate. That is the Input Parity floor kept literally on screen:
-        the same number, the same edge, whichever the reader clicks.
+        Every choice appears here, including ones that already have a box on
+        the plate. That is the Input Parity floor kept literally on screen: the
+        same number, the same edge, whichever the reader clicks.
+
+        The footer is capped and scrolls rather than growing without limit —
+        an attributed exchange on a map location would otherwise cover the map
+        it is drawn over. Paging starts at the bottom so the choices, which are
+        the only way to continue, are what a fresh turn shows.
         """
 
-        rows = [part for line in turn.lines for part in self._wrap(line.text, 74)]
-        height = (len(rows) + len(turn.choices)) * ROW_H
-        if not height:
+        rows = self._rows(turn, [])
+        rows.extend(
+            _Row(self._choice_label(index, choice), "choice")
+            for index, choice in enumerate(turn.choices, start=1)
+        )
+        if not rows:
             return
-        y = LOGICAL_SIZE[1] - height - 2
-        for row in rows:
+
+        capacity = min(len(rows), MAP_FOOTER_ROWS)
+        self.max_scroll = max(0, len(rows) - capacity)
+        if turn is not self._last_turn:
+            self.scroll = self.max_scroll
+            self._last_turn = turn
+        self.scroll = min(max(self.scroll, 0), self.max_scroll)
+
+        visible = rows[self.scroll : self.scroll + capacity]
+        y = LOGICAL_SIZE[1] - capacity * ROW_H - 2
+        # Choices are keyed by their number rather than by row order, so a
+        # scrolled-away choice stays selectable from the keyboard.
+        by_label = {
+            self._choice_label(index, choice): choice
+            for index, choice in enumerate(turn.choices, start=1)
+        }
+        for row in visible:
             pygame.draw.rect(self.surface, INK, pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H))
-            self.surface.blit(self.font.render(row, False, CREAM), (4, y))
-            y += ROW_H
-        for index, choice in enumerate(turn.choices, start=1):
-            colour = CREAM if choice.available else DIM
-            label = f"{index}. {choice.text}"
-            if not choice.available and choice.unavailable_reason:
-                label = f"{label} — {choice.unavailable_reason}"
-            text = self.font.render(label, False, colour)
-            pygame.draw.rect(self.surface, INK, pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H))
+            choice = by_label.get(row.text) if row.kind == "choice" else None
+            colour = CREAM
+            if choice is not None and not choice.available:
+                colour = DIM
+            elif row.kind == "heading":
+                colour = RUST
+            text = self.font.render(row.text, False, colour)
             self.surface.blit(text, (4, y))
-            if choice.available:
+            if choice is not None and choice.available:
                 rect = pygame.Rect(4, y, text.get_width(), ROW_H)
                 self.hitboxes.append((rect, choice.edge_id, choice.payload))
             y += ROW_H
+
+        if self.max_scroll:
+            marker = f"{self.scroll + 1}/{self.max_scroll + 1}  \u2191\u2193"
+            surface = self.font.render(marker, False, DIM)
+            self.surface.blit(
+                surface,
+                (LOGICAL_SIZE[0] - surface.get_width() - 4,
+                 LOGICAL_SIZE[1] - capacity * ROW_H - ROW_H - 2),
+            )
+
+    @staticmethod
+    def _choice_label(index: int, choice: Choice) -> str:
+        label = f"{index}. {choice.text}"
+        if not choice.available and choice.unavailable_reason:
+            return f"{label} — {choice.unavailable_reason}"
+        return label
 
     def _draw_background(
         self, loaded: list[tuple[StageImage, pygame.Surface]]
@@ -344,7 +412,9 @@ class Stage:
         """Map a window click to the edge id its choice commits."""
 
         logical = (position[0] // SCALE, position[1] // SCALE)
-        for rect, edge_id, payload in self.hitboxes:
+        # Reverse draw order: the footer is drawn over the plate, so a legend
+        # row sitting on top of a region must win the click it visibly owns.
+        for rect, edge_id, payload in reversed(self.hitboxes):
             if rect.collidepoint(logical):
                 return edge_id, payload
         return None

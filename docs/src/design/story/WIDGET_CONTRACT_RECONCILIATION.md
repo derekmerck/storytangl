@@ -146,7 +146,7 @@ surfaces and ignores these enrichments.
 | `ui_hints.validity_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional preview over mediation choices; fallback to ordinary choice text |
 | `ui_hints.encounter_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional risk badge / suffix; fallback to `ui_hints.emphasis` + prose |
 | `ui_hints.drag` | P3 | docs + v1.5 wireframe | n/a | optional enrichment; click-pick fallback remains required by §5.3 |
-| `ui:plate:<plate>:<region>` map claim | P2 | done (pygame map view) | done (sandbox `plates` → generated travel edges) | Vue map view unbuilt; geometry rides `map_plate`/`map_regions` info channels |
+| `ui:plate:<plate>:<region>` map claim | P2 | done (pygame map view) | partial (names portable; rectangles still world-owned, #419) | Vue map view unbuilt; geometry rides `map_plate`/`map_regions` info channels; at most one choice may claim a region |
 | Genre transcript examples | P3 diagnostic | v1.5 wireframe samples | n/a | add executable transcripts when demo worlds stabilize; diagnostic, not gating |
 | `_common/EXTENSIONS.md` | deferred | n/a | n/a | do not create until a fourth cross-genre pattern is not already covered by core v1.6 |
 

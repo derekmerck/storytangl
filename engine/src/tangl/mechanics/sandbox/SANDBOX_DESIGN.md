@@ -961,9 +961,14 @@ reader moves — so it can be fetched once and cached, and it names no
 destinations. Which places are reachable right now stays on the choice list,
 where availability already lives. A client joins the two by region name, using
 the `ui:plate:<plate>:<region>` tags that generated travel choices inherit from
-the location they point at. Neither side references the other, so a plate can
-be redrawn, rescaled, or removed without touching the world, and a location can
+the location they point at. Neither side references the other, so a location can
 claim regions on several plates at different scales.
+
+The region *names* are world truth and survive any reskin. The *rectangles* are
+currently world-owned too, which assumes every art pack's plate shares one
+composition — so an independently composed pack cannot yet be dropped in without
+editing world data. Geometry belongs beside the plate it measures; until that
+moves, treat this half of the contract as provisional (#419).
 
 The plate image itself travels as ordinary media with `media_role: map_im`,
 outside the background roles, so a client with no map view renders the numbered

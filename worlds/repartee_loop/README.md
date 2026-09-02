@@ -26,9 +26,13 @@ honest and there is no map-mode for a client to get stuck in.
 
 Travel is ordinary choices. The plate declares named regions; each place claims
 one; the fanout offers travel to whichever places claim a region on the plate
-you are standing on. Neither side references the other, which is what lets the
-art be redrawn, rescaled, or replaced without touching the world — and lets a
+you are standing on. Neither side references the other, which is what lets a
 place claim a region on a second plate it has never heard of.
+
+The *names* survive a reskin. The *rectangles* do not yet: they are world-owned,
+so a pack whose plate composes the district differently cannot be dropped in
+without editing world data. See #419 — and see below for why the two packs here
+are not evidence to the contrary.
 
 Entry conditions live with the place that guards itself:
 
@@ -93,15 +97,17 @@ spaceport plate was generated from the quayside plate as a pixel reference, so
 the same four rects fit both — starfield for water, docked craft for ships,
 same doorway at the top of the same steps.
 
-That agreement is currently luck rather than structure. The world owns the
-region *names*, which is right — a place claiming `quay:salon` is world truth.
-But it also owns the region *geometry*, which assumes every pack's plate shares
-a composition. That held here only because the spaceport plate was generated
-from the quayside plate as a reference; a pack drawn independently would need
-its own rects for the same names. Geometry arguably belongs to the pack, beside
-the plate it measures, with the world's table as the fallback. Aspirational, not
-built: nothing here needs it yet, and the shape of the fix is a per-pack
-override rather than a change to how regions are claimed.
+That agreement is luck rather than structure, and should not be read as proof
+that geometry is portable. The world owns the region *names*, which is right — a
+place claiming `quay:salon` is world truth. It also owns the region *geometry*,
+which assumes every pack's plate shares a composition. That held here only
+because the spaceport plate was generated from the quayside plate as a pixel
+reference, so it preserves the source composition by construction.
+
+A pack drawn independently would need its own rects for the same names, and
+there is nowhere to put them short of editing the world. Geometry belongs to the
+pack, beside the plate it measures, with the world's table as the fallback.
+Tracked in #419; the contract stays provisional until then.
 
 Its batch manifest (`provenance/map-jobs.json`) is also the first one authored
 in factored form: the shared style clause and output size sit in pack-level

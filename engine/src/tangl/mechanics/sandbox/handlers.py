@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
@@ -44,6 +45,8 @@ from .time import (
     current_world_time,
 )
 from .visibility import SandboxProjectionState, SandboxVisibilityRule
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -297,17 +300,27 @@ def _message_exit_text(direction: str, exit_spec: SandboxExit) -> str:
     return f"Go {canonical}"
 
 
+def _manual_link_action(
+    location: SandboxLocation,
+    *,
+    target: SandboxLocation,
+) -> Action | None:
+    """Return an authored (non-generated) action already reaching ``target``."""
+
+    for edge in location.edges_out(Selector(has_kind=Action)):
+        if _has_tags(edge, "dynamic"):
+            continue
+        if edge.successor is target:
+            return edge
+    return None
+
+
 def _has_manual_link_action(
     location: SandboxLocation,
     *,
     target: SandboxLocation,
 ) -> bool:
-    for edge in location.edges_out(Selector(has_kind=Action)):
-        if _has_tags(edge, "dynamic"):
-            continue
-        if edge.successor is target:
-            return True
-    return False
+    return _manual_link_action(location, target=target) is not None
 
 
 def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
@@ -1375,8 +1388,28 @@ def project_sandbox_map_travel(*, caller, ctx, **_kw):
     plate = caller.map
     for region in sorted(plate.regions):
         claim = f"{plate.name}:{region}"
-        for target in _locations_claiming(graph, claim):
-            if target is caller or _has_manual_link_action(caller, target=target):
+        claimants = _locations_claiming(graph, claim)
+        if len(claimants) > 1:
+            # Two places cannot share one hitbox: whichever the client picked
+            # would be arbitrary, and the reader would have no way to see that
+            # a choice was dropped. Leave the region unclaimed and say so.
+            logger.warning(
+                "Sandbox map region %r on plate %r is claimed by %s; "
+                "leaving it inert. At most one location may claim a region.",
+                region,
+                plate.name,
+                ", ".join(sorted(node.get_label() for node in claimants)),
+            )
+            continue
+        for target in claimants:
+            if target is caller:
+                continue
+            manual = _manual_link_action(caller, target=target)
+            if manual is not None:
+                # An authored action already offers this travel. Tag it rather
+                # than generating a rival, so the region binds to the choice the
+                # reader actually sees instead of going inert.
+                manual.tags |= _plate_tags(target)
                 continue
             Action(
                 registry=graph,

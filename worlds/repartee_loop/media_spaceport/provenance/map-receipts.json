@@ -16,7 +16,7 @@
       },
       "sources": {
         "source": {
-          "path": "/Users/derek/dev/storytangl-claude/.claude/worktrees/vigilant-nobel-f19f95/worlds/repartee_loop/media_spaceport/provenance/source-assets/quay_map.png",
+          "path": "source-assets/quay_map.png",
           "sha256": "56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0",
           "upload_name": "sha256-56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0.png"
         }

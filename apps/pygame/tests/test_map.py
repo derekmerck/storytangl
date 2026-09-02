@@ -137,3 +137,95 @@ def test_a_turn_without_a_plate_falls_back_to_the_ordinary_layout(stage, frame) 
 
     assert stage.hit(_centre(quayside)) is None
     assert {edge for _rect, edge, _payload in stage.hitboxes} == {frame.choices[0].edge_id}
+
+
+def test_the_plate_named_by_geometry_wins_over_a_stale_one(stage, frame, tmp_path):
+    """A batch crossing two maps must not pair one picture with the other's rects."""
+
+    stale = pygame.Surface(LOGICAL_SIZE)
+    stale.fill((255, 0, 0))
+    pygame.image.save(stale, str(tmp_path / "old_map.png"))
+    frame.images.insert(0, StageImage(role="map_im", source="old_map.png"))
+
+    stage.draw(frame)
+    drawn = stage.surface.get_at((2, 2))[:3]
+
+    # The stale plate is solid red; the named one is not.
+    assert drawn != (255, 0, 0)
+
+
+def test_an_unnamed_plate_image_refuses_to_guess(stage, frame, tmp_path):
+    """Two staged maps and no name is ambiguous, so nothing is drawn."""
+
+    pygame.image.save(pygame.Surface(LOGICAL_SIZE), str(tmp_path / "old_map.png"))
+    frame.images.insert(0, StageImage(role="map_im", source="old_map.png"))
+    frame.plate = MapPlate(name="quay", image=None, regions=PLATE.regions)
+
+    stage.draw(frame)
+    quayside = next(r for r in PLATE.regions if r.name == "quayside")
+
+    assert stage.hit(_centre(quayside)) is None
+
+
+def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
+    """The footer is drawn over the plate, so it must own the pixels it covers."""
+
+    wide = MapRegion(name="quayside", x=0.0, y=0.0, w=1.0, h=1.0)
+    frame.plate = MapPlate(name="quay", image="quay_map.png", regions=(wide,))
+    stage.draw(frame)
+
+    legend = next(
+        rect for rect, edge, _p in stage.hitboxes
+        if edge == frame.choices[0].edge_id and rect.h == 9 and rect.x == 4
+    )
+    click = ((legend.x + 1) * SCALE, (legend.y + 1) * SCALE)
+
+    # Both the region and the legend row cover this pixel; the legend is on top.
+    assert wide.x == 0.0 and wide.y == 0.0  # the region really does cover it
+    assert stage.hit(click) == (frame.choices[0].edge_id, frame.choices[0].payload)
+
+
+def test_a_long_footer_pages_instead_of_covering_the_map(stage, frame):
+    """Narration plus a long choice list must not grow over the whole plate."""
+
+    frame.lines = [Line(text="A very long stretch of narration. " * 12)]
+    frame.choices = [
+        Choice(edge_id=uuid4(), text=f"Choice {n}", tags=frozenset())
+        for n in range(12)
+    ]
+    stage.draw(frame)
+
+    from tangl.pygame_client.stage import MAP_FOOTER_ROWS, ROW_H
+
+    assert stage.max_scroll > 0
+    footer_top = LOGICAL_SIZE[1] - MAP_FOOTER_ROWS * ROW_H - 2
+    assert footer_top > LOGICAL_SIZE[1] // 2, "footer must not take half the plate"
+    assert all(rect.y >= footer_top for rect, _e, _p in stage.hitboxes)
+
+
+def test_paging_a_long_footer_reaches_the_earlier_rows(stage, frame):
+    """Scrolling exposes rows the first page could not fit."""
+
+    frame.choices = [
+        Choice(edge_id=uuid4(), text=f"Choice {n}") for n in range(12)
+    ]
+    stage.draw(frame)
+    bottom = {edge for _r, edge, _p in stage.hitboxes}
+
+    stage.scroll_by(-stage.max_scroll)
+    stage.draw(frame)
+    top = {edge for _r, edge, _p in stage.hitboxes}
+
+    assert top != bottom
+    assert frame.choices[0].edge_id in top
+
+
+def test_an_attributed_line_keeps_its_speaker_in_the_footer(stage, frame):
+    """The footer reuses ordinary row construction, so attribution survives."""
+
+    frame.lines = [Line(text="You are late.", speaker="Master", manner="dryly")]
+    stage.draw(frame)
+    rows = stage._rows(frame, [])
+
+    assert any(row.kind == "heading" and "Master" in row.text for row in rows)
+    assert any(row.kind == "dialog" for row in rows)

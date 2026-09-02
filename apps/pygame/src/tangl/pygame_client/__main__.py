@@ -19,7 +19,7 @@ import pygame
 
 from .bridge import PygameSessionBridge
 from .models import StageImage, Turn
-from .stage import BACKGROUND_ROLES, Stage
+from .stage import BACKGROUND_ROLES, MAP_ROLES, Stage
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +51,15 @@ def _merge(turns: list[Turn]) -> Turn:
     staged: dict[tuple[str, ...], StageImage] = {}
     for turn in turns:
         for image in turn.images:
-            key = (
-                ("background",)
-                if image.role in BACKGROUND_ROLES
-                else (image.role, image.source, image.x_slot or "")
-            )
+            # A plate is stage state like a background: a batch that crosses
+            # between two maps must not keep the old one and pair it with the
+            # new geometry. Both collapse to one slot, last one wins.
+            if image.role in BACKGROUND_ROLES:
+                key: tuple[str, ...] = ("background",)
+            elif image.role in MAP_ROLES:
+                key = ("map",)
+            else:
+                key = (image.role, image.source, image.x_slot or "")
             staged[key] = image
         merged.lines.extend(turn.lines)
     merged.images.extend(staged.values())

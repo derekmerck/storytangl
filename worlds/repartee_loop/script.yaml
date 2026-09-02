@@ -52,7 +52,8 @@ scenes:
       # The map is a place, not a subsystem: standing here is standing on the
       # quay looking at the district, and travel is ordinary choices. The plate
       # names regions; each place below claims one. Neither knows the other's
-      # geometry, so the art can be redrawn without touching the world.
+      # claim. The rects below are world-owned, so a pack that composes the
+      # district differently still needs them edited — see #419.
       quay_map:
         kind: "repartee_loop.domain.ReparteeLocation"
         location_name: "The Quay"

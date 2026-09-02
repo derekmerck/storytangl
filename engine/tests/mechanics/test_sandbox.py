@@ -2198,3 +2198,68 @@ def test_unreachable_map_travel_renders_dimmed_rather_than_absent() -> None:
     assert not choice.available
     assert choice.unavailable_reason
     assert choice.tags == {"ui:plate:quay:mill", "ui:plate:world:quayside"}
+
+
+def test_a_region_two_locations_claim_projects_no_travel(caplog) -> None:
+    """An ambiguous hitbox is left inert rather than silently resolved."""
+
+    graph, hub, mill = _plate_graph()
+    rival = SandboxLocation(
+        label="rival_mill",
+        location_name="The Other Mill",
+        sandbox_scope="quay",
+        plates=["quay:mill"],
+    )
+    graph.add(rival)
+    graph.find_one(Selector.from_identifier("quay_scope")).add_child(rival)
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    with caplog.at_level("WARNING"):
+        do_provision(hub, ctx=ctx)
+
+    assert _dynamic_sandbox_actions_with_tag(hub, "map_travel") == []
+    assert "claimed by" in caplog.text
+
+
+def test_an_authored_travel_action_inherits_the_regions_claim() -> None:
+    """A hand-written action keeps its region rather than losing the hitbox."""
+
+    graph, hub, mill = _plate_graph()
+    authored = Action(
+        registry=graph,
+        label="authored_walk",
+        predecessor_id=hub.uid,
+        successor_id=mill.uid,
+        text="Walk down to the mill",
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+
+    # No rival generated action competes with the authored one...
+    assert _dynamic_sandbox_actions_with_tag(hub, "map_travel") == []
+    # ...and the authored action is what the region now binds to.
+    assert "ui:plate:quay:mill" in authored.tags
+
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    choice = next(
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.text == "Walk down to the mill"
+    )
+    assert choice.tags == {"ui:plate:quay:mill", "ui:plate:world:quayside"}
+
+
+def test_repeated_provisioning_does_not_stack_map_travel() -> None:
+    """Planning runs every step; generated travel must not accumulate."""
+
+    graph, hub, _mill = _plate_graph()
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    do_provision(hub, ctx=ctx)
+    first = len(_dynamic_sandbox_actions_with_tag(hub, "map_travel"))
+    do_provision(hub, ctx=ctx)
+    do_provision(hub, ctx=ctx)
+
+    assert first == 1
+    assert len(_dynamic_sandbox_actions_with_tag(hub, "map_travel")) == first
