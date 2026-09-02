@@ -13,12 +13,14 @@ from typing import ClassVar
 
 from pydantic import Field
 
-from tangl.core.bases import BaseModelPlus
+from pydantic import Field
+
 from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
 from .game import Game
+from .game_token import GameTokenType, discrete_token_class
 from .handler import GameHandler
 
 
@@ -29,29 +31,57 @@ class BlackjackMove(Enum):
     STAND = "stand"
 
 
-class PlayingCard(BaseModelPlus):
-    """Serializable playing card model for blackjack-style contests."""
+SUITS = ("s", "h", "d", "c")
+RANK_LABELS = {1: "A", 11: "J", 12: "Q", 13: "K"}
+
+
+def card_label(rank: int, suit: str) -> str:
+    """Return the canonical short name for a rank and suit, such as ``QD``."""
+
+    return f"{RANK_LABELS.get(rank, str(rank))}{suit.upper()}"
+
+
+class PlayingCardType(GameTokenType):
+    """Frozen definition of one card in a standard deck.
+
+    A card's rank and suit are its identity and never change, so they live on
+    the definition. Whether it is currently face up is per-instance state: the
+    same seven of spades is a hole card in one hand and an upcard in another.
+
+    Suit doubles as the ``affiliation``, which gives suit-sensitive card games
+    the shared grouping helpers for free.
+    """
 
     rank: int
     suit: str
+    face_up: bool = Field(True, json_schema_extra={"instance_var": True})
+
+
+class PlayingCard(discrete_token_class(PlayingCardType, "PlayingCard")):
+    """One dealt card: a token over a shared standard-deck definition."""
 
     @property
     def short_name(self) -> str:
-        rank_label = {
-            1: "A",
-            11: "J",
-            12: "Q",
-            13: "K",
-        }.get(self.rank, str(self.rank))
-        return f"{rank_label}{self.suit.upper()}"
+        return card_label(self.rank, self.suit)
+
+    def get_label(self) -> str:
+        return self.short_name
+
+    @classmethod
+    def of(cls, rank: int, suit: str, *, face_up: bool = True) -> PlayingCard:
+        """Return a card token for one rank and suit."""
+
+        ensure_standard_deck()
+        return cls(token_from=card_label(rank, suit), face_up=face_up)
 
     @classmethod
     def fresh_deck(cls, *, seed: int | None = None) -> list[PlayingCard]:
-        """Return a shuffled 52-card deck."""
+        """Return a shuffled 52-card deck of card tokens."""
 
+        ensure_standard_deck()
         deck = [
-            cls(rank=rank, suit=suit)
-            for suit in ("s", "h", "d", "c")
+            cls(token_from=card_label(rank, suit))
+            for suit in SUITS
             for rank in range(1, 14)
         ]
         random.Random(seed).shuffle(deck)
@@ -77,6 +107,27 @@ class PlayingCard(BaseModelPlus):
 
     def __str__(self) -> str:  # pragma: no cover - exercised via journal strings
         return self.short_name
+
+
+def ensure_standard_deck() -> None:
+    """Register the 52 standard card definitions if they are not present.
+
+    Singleton registries are per class, so these labels cannot collide with
+    another game's token vocabulary. A world wanting a tarot deck, a stripped
+    deck, or suit-ranked cards registers its own ``PlayingCardType`` set.
+    """
+
+    for suit in SUITS:
+        for rank in range(1, 14):
+            label = card_label(rank, suit)
+            if PlayingCardType.get_instance(label) is None:
+                PlayingCardType(
+                    label=label,
+                    rank=rank,
+                    suit=suit,
+                    affiliation=suit,
+                    value=min(rank, 10),
+                )
 
 
 class BlackjackGame(Game[BlackjackMove]):
@@ -123,7 +174,9 @@ class BlackjackGame(Game[BlackjackMove]):
     def visible_dealer_hand(self) -> list[PlayingCard]:
         if self.result.is_terminal or self.reveal_policy == "full":
             return list(self.dealer_hand)
-        return list(self.dealer_hand[:1])
+        # The hole card is genuinely face down rather than positionally hidden,
+        # so a world can turn one over without slicing the hand.
+        return [card for card in self.dealer_hand if card.face_up]
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
@@ -169,7 +222,9 @@ class BlackjackGameHandler(GameHandler[BlackjackGame]):
         game.player_hand = [self._draw_card(game)]
         game.dealer_hand = [self._draw_card(game)]
         game.player_hand.append(self._draw_card(game))
-        game.dealer_hand.append(self._draw_card(game))
+        hole_card = self._draw_card(game)
+        hole_card.face_up = False
+        game.dealer_hand.append(hole_card)
         game.player_stood = False
         game.round_detail = {
             "phase": "opening",

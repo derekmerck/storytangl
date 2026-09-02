@@ -123,8 +123,21 @@ class SiegeRpsGameHandler(AggregateForceGameHandler[SiegeRpsGame]):
             acting_as_attacker=False,
         ) - game.response_pressure_tax
 
-        attacker_losses = self._allocate_casualties(game, defender_profile, attacker_profile)
-        defender_losses = self._allocate_casualties(game, attacker_profile, defender_profile)
+        attacker_owner = "player" if initiative_before else "opponent"
+        defender_owner = "opponent" if initiative_before else "player"
+        self.commit_forces(game, attacker_owner, attacker_profile)
+        self.commit_forces(game, defender_owner, defender_profile)
+
+        # Casualties fall on everything standing, not only what was committed
+        # this round. Under CONSERVE a previous round's survivors are still on
+        # the field, and allocating against the fresh commitment alone would
+        # make them invisible as both attacker and target. Pressure stays keyed
+        # on the round's own commitment, which is the declaration being made.
+        attacker_active = game.active_of(attacker_owner)
+        defender_active = game.active_of(defender_owner)
+
+        attacker_losses = self._allocate_casualties(game, defender_active, attacker_active)
+        defender_losses = self._allocate_casualties(game, attacker_active, defender_active)
 
         if initiative_before:
             player_losses = attacker_losses
@@ -133,8 +146,10 @@ class SiegeRpsGameHandler(AggregateForceGameHandler[SiegeRpsGame]):
             player_losses = defender_losses
             opponent_losses = attacker_losses
 
-        self._apply_losses(game.player_reserve, player_losses)
-        self._apply_losses(game.opponent_reserve, opponent_losses)
+        self.apply_casualties(game, "player", player_losses)
+        self.apply_casualties(game, "opponent", opponent_losses)
+        self.dispose_survivors(game, "player")
+        self.dispose_survivors(game, "opponent")
 
         player_damage = self._weighted_total(game, opponent_losses)
         opponent_damage = self._weighted_total(game, player_losses)
@@ -155,8 +170,8 @@ class SiegeRpsGameHandler(AggregateForceGameHandler[SiegeRpsGame]):
             "defense_pressure": defense_pressure,
             "player_losses": player_losses,
             "opponent_losses": opponent_losses,
-            "player_reserve": dict(game.player_reserve),
-            "opponent_reserve": dict(game.opponent_reserve),
+            "player_reserve": dict(game.player_reserve.amounts),
+            "opponent_reserve": dict(game.opponent_reserve.amounts),
             "player_damage": player_damage,
             "opponent_damage": opponent_damage,
         }
@@ -217,8 +232,8 @@ class SiegeRpsGameHandler(AggregateForceGameHandler[SiegeRpsGame]):
         ]
 
     def evaluate(self, game: SiegeRpsGame) -> GameResult:
-        player_force = game.total_force(game.player_reserve)
-        opponent_force = game.total_force(game.opponent_reserve)
+        player_force = game.standing_force("player")
+        opponent_force = game.standing_force("opponent")
 
         if player_force <= 0 and opponent_force <= 0:
             if game.score["player"] > game.score["opponent"]:

@@ -101,7 +101,9 @@ def _force_profile_from_resources(resources: dict[str, int]) -> dict[str, int]:
 
 def _write_back_force(shell: ColonyShellBlock, contest: ColonyContestBlock) -> None:
     for label in FORCE_TYPES:
-        shell.game.resources[label] = contest.game.player_reserve.get(label, 0)
+        # The contest reserve is an AssetWallet; indexing returns 0 for a
+        # token type the wallet no longer carries.
+        shell.game.resources[label] = contest.game.player_reserve[label]
 
 
 @on_prereqs(

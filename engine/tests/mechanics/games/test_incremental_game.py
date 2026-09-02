@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from tangl.core import Graph
 from tangl.mechanics.games import BuildSpec, HasGame, IncrementalGame, IncrementalGameHandler, PromotionSpec, TaskSpec
 from tangl.mechanics.games.incremental_game import IncrementalMove
@@ -207,3 +210,225 @@ class TestIncrementalIntegration:
 
         assert namespace["incremental_worker_pool"] == 1
         assert "forage" in namespace["incremental_unlocked_tasks"]
+
+
+class TestIncrementalEscalation:
+    """Escalating build costs give the shell its accelerate-then-wall pacing."""
+
+    def test_repeated_builds_escalate_cost(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 10},
+            build_specs={"hut": BuildSpec(cost={"food": 2}, cost_growth=0.5)},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        assert handler.get_build_cost(game, "hut") == {"food": 2}
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+        assert game.build_counts["hut"] == 1
+        assert game.resources["food"] == 8
+        assert handler.get_build_cost(game, "hut") == {"food": 3}
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+        assert game.build_counts["hut"] == 2
+        assert game.resources["food"] == 5
+        assert handler.get_build_cost(game, "hut") == {"food": 5}
+
+    def test_flat_cost_builds_stay_flat(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 10},
+            build_specs={"hut": BuildSpec(cost={"food": 2})},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+
+        assert handler.get_build_cost(game, "hut") == {"food": 2}
+        assert game.resources["food"] == 6
+
+    def test_escalating_cost_withdraws_the_build_move(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 5},
+            build_specs={"hut": BuildSpec(cost={"food": 2}, cost_growth=1.0)},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="hut"))
+
+        assert game.resources["food"] == 3
+        assert handler.get_build_cost(game, "hut") == {"food": 4}
+        build_targets = [
+            move.target for move in handler.get_available_moves(game) if move.kind == "build"
+        ]
+        assert build_targets == []
+
+    def test_move_label_prices_only_escalated_builds(self) -> None:
+        game = _sample_game(
+            starting_resources={"food": 10},
+            build_specs={"hut": BuildSpec(cost={"food": 2}, cost_growth=1.0)},
+            unlocked_builds=["hut"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+        move = IncrementalMove(kind="build", target="hut")
+
+        assert handler.get_move_label(game, move) == "Build hut"
+
+        handler.receive_move(game, move)
+
+        assert handler.get_move_label(game, move) == "Build hut (4 food)"
+
+
+class TestIncrementalEphemeralResources:
+    """Non-bankable resources force per-cycle spending rather than hoarding."""
+
+    def _labor_game(self, **kwargs) -> IncrementalGame:
+        config = {
+            "starting_resources": {},
+            "starting_workers": 1,
+            "task_specs": {"forage": TaskSpec(produces={"labor": 1})},
+            "build_specs": {},
+            "promotion_specs": {},
+            "upkeep": {},
+            "victory_resources": {},
+            "unlocked_tasks": ["forage"],
+            "unlocked_builds": [],
+            "unlocked_promotions": [],
+            "ephemeral_resources": ["labor"],
+        }
+        config.update(kwargs)
+        return _sample_game(**config)
+
+    def test_ephemeral_resources_do_not_bank_across_cycles(self) -> None:
+        game = self._labor_game()
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="assign", target="forage"))
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert game.resources.get("labor", 0) == 0
+        assert (game.last_round.notes or {}).get("spoiled") == {"labor": 1}
+
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert game.cycle == 2
+        assert game.resources.get("labor", 0) == 0
+
+    def test_durable_resources_still_bank(self) -> None:
+        game = self._labor_game(
+            task_specs={"forage": TaskSpec(produces={"labor": 1, "scrap": 1})},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="assign", target="forage"))
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+        handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert game.resources["scrap"] == 2
+        assert game.resources.get("labor", 0) == 0
+
+    def test_victory_is_judged_before_spoilage(self) -> None:
+        game = self._labor_game(victory_resources={"labor": 1})
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="assign", target="forage"))
+        result = handler.receive_move(game, IncrementalMove(kind="end_cycle"))
+
+        assert result.name == "WIN"
+        assert game.resources.get("labor", 0) == 0
+
+
+class TestIncrementalCostArithmetic:
+    """Escalation must not overcharge on binary-float noise."""
+
+    def test_exact_curve_points_are_not_rounded_up(self) -> None:
+        game = _sample_game(
+            starting_resources={"gold": 1000},
+            build_specs={"mill": BuildSpec(cost={"gold": 100}, cost_growth=0.1)},
+            unlocked_builds=["mill"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        handler.receive_move(game, IncrementalMove(kind="build", target="mill"))
+
+        # 100 * 1.1 is 110.00000000000001 in binary floating point; ceiling
+        # that unrounded would charge 111.
+        assert handler.get_build_cost(game, "mill") == {"gold": 110}
+        assert game.resources["gold"] == 900
+
+    def test_escalation_stays_monotone_across_many_purchases(self) -> None:
+        game = _sample_game(
+            starting_resources={"gold": 100_000},
+            build_specs={"mill": BuildSpec(cost={"gold": 100}, cost_growth=0.1)},
+            unlocked_builds=["mill"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        costs = []
+        for _ in range(8):
+            costs.append(handler.get_build_cost(game, "mill")["gold"])
+            handler.receive_move(game, IncrementalMove(kind="build", target="mill"))
+
+        assert costs == sorted(costs)
+        assert costs[0] == 100
+        assert costs[1] == 110
+
+
+class TestCostGrowthValidation:
+    """A growth premium must be finite and non-negative."""
+
+    @pytest.mark.parametrize("bad", [-0.1, -1.0, -2.0, float("nan"), float("inf"), float("-inf")])
+    def test_invalid_growth_is_rejected_at_declaration(self, bad: float) -> None:
+        # A negative premium inverts the curve and eventually returns negative
+        # prices, which _spend() would credit back to the wallet; NaN and
+        # infinities propagate silently into the cost arithmetic.
+        with pytest.raises(ValidationError):
+            BuildSpec(cost={"gold": 10}, cost_growth=bad)
+
+    def test_zero_growth_remains_valid_flat_pricing(self) -> None:
+        spec = BuildSpec(cost={"gold": 10}, cost_growth=0.0)
+
+        assert spec.cost_growth == 0.0
+
+    def test_a_repeated_build_can_never_credit_the_wallet(self) -> None:
+        game = _sample_game(
+            starting_resources={"gold": 100},
+            build_specs={"mill": BuildSpec(cost={"gold": 10}, cost_growth=0.5)},
+            unlocked_builds=["mill"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        balances = [game.resources["gold"]]
+        for _ in range(4):
+            handler.receive_move(game, IncrementalMove(kind="build", target="mill"))
+            balances.append(game.resources["gold"])
+
+        assert balances == sorted(balances, reverse=True)
+        assert all(amount >= 0 for amount in handler.get_build_cost(game, "mill").values())

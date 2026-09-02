@@ -17,7 +17,7 @@ from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
-from .game import Game
+from .game import Game, RoundRecord
 from .handler import GameHandler
 
 
@@ -55,6 +55,14 @@ class PickingGame(Game[PickingMove]):
     round_detail: dict[str, object] | None = Field(
         default=None,
         json_schema_extra={"reset_field": True},
+    )
+    opponent_next_move: PickingMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[PickingMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
     )
 
     def get_visible_items(self) -> list[str]:
@@ -112,7 +120,23 @@ class PickingGameHandler(GameHandler[PickingGameT]):
 
     game_cls: ClassVar[type[Game]] = PickingGame
 
-    def _normalize_move(self, move: Any) -> PickingMove:
+    def receive_move(
+        self,
+        game: PickingGameT,
+        player_move: PickingMove | tuple[str, str],
+    ) -> RoundResult:
+        """Normalize the move before the round is recorded.
+
+        Callers may pass a ``(kind, target)`` tuple, and the ``guess`` alias
+        resolves to ``decide``. Coercing here rather than inside resolution
+        means history stores the structured move, so a saved game restores it
+        as a ``PickingMove`` instead of a raw tuple that would rebuild with an
+        unnormalized kind.
+        """
+
+        return super().receive_move(game, self._normalize_move(player_move))
+
+    def _normalize_move(self, move: PickingMove | tuple[str, str]) -> PickingMove:
         """Coerce legacy tuple moves into the structured move shape."""
 
         if isinstance(move, PickingMove):

@@ -29,14 +29,26 @@ example, `IncrementalGameHandler.resolve_cycle_tick()` resolves one
 production/upkeep cycle without requiring sandbox to know anything about
 workers, resources, or task names. The sandbox package can adapt that operation
 to its tick seam, while the incremental game remains manually runnable through
-ordinary `HasGame` blocks.
+ordinary `HasGame` blocks. `IncrementalGameHandler.get_build_cost()` is the
+matching read operation: build prices escalate geometrically with prior
+purchases, so callers must ask for the current price rather than reading
+`BuildSpec.cost` directly.
 
 The Game component class itself is only responsible for managing and dumping state when required, such as for assigning namespace variables to evaluate win conditions at higher levels.
 
 Games progress over "rounds", to distinguish them from story "turns".  One turn of the base story structure (i.e., one block) may comprise multiple games with multiple rounds.
 
 Implemented reference kernels currently include ``RpsGame`` / ``RpslsGame``,
-``BlackjackGame``, ``NimGame``, ``KimGame``, and ``CredentialsGame``.
+``BlackjackGame``, ``NimGame``, ``KimGame``, ``TrackGame``, and
+``CredentialsGame``.
+
+``track_analysis.analyze_track()`` solves a no-choice track layout as a Markov
+chain, returning a ``TrackAnalysis`` with expected rolls to finish, a baseline
+for the same board stripped of redirects, and an advisory name for the dramatic
+shape it produces (``footrace``, ``balanced``, ``chaotic``, ``heartbreak``).
+``track_analysis.finish_distribution()`` returns the cumulative finish
+distribution separately, whose tail exposes a punishing endgame. Use them to
+tune a board against a target pacing before authoring a world around it.
 
 Types of Games
 --------------
