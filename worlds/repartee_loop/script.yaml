@@ -63,10 +63,10 @@ scenes:
           name: quay
           plate: quay_map.png
           regions:
-            quayside: {x: 0.06, y: 0.54, w: 0.22, h: 0.24}
-            practice_yard: {x: 0.33, y: 0.63, w: 0.22, h: 0.24}
-            salon_terrace: {x: 0.58, y: 0.31, w: 0.22, h: 0.24}
-            salon: {x: 0.74, y: 0.06, w: 0.20, h: 0.22}
+            quayside: {x: 0.03, y: 0.13, w: 0.25, h: 0.30}
+            salon_terrace: {x: 0.34, y: 0.26, w: 0.24, h: 0.22}
+            salon: {x: 0.75, y: 0.43, w: 0.21, h: 0.28}
+            practice_yard: {x: 0.28, y: 0.60, w: 0.40, h: 0.36}
         content: "The district runs from the water to the salon steps."
 
       quayside:

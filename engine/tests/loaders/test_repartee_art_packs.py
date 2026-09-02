@@ -13,7 +13,7 @@ WORLD = Path(__file__).resolve().parents[3] / "worlds" / "repartee_loop"
 PACKS = sorted(p for p in WORLD.glob("media*") if p.is_dir())
 MANIFEST_PACKS = [p for p in PACKS if (p / "manifest.json").is_file()]
 ASSET_NAMES = {
-    "quai_bg", "salon_bg", "warehouse_bg",
+    "quai_bg", "salon_bg", "warehouse_bg", "quay_map",
     "clerk_sprite", "master_sprite", "worker_sprite",
 }
 
@@ -63,11 +63,22 @@ def test_packs_are_interchangeable_by_name(pack: Path) -> None:
     assert {f.stem for f in (pack / "images").glob("*.png")} == ASSET_NAMES
 
 
+# Full-frame assets fill the logical surface; sprites are trimmed and share a
+# height. The map plate is full-frame without being scenery — no client stages
+# it as a background, since it carries media_role "map_im" — so it is named
+# here rather than caught by the "_bg" suffix.
+FULL_FRAME_ASSETS = {"quay_map"}
+
+
+def _is_full_frame(stem: str) -> bool:
+    return stem.endswith("_bg") or stem in FULL_FRAME_ASSETS
+
+
 @pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.name)
 def test_shipped_assets_are_conformed_to_the_client_target(pack: Path) -> None:
     for shipped in (pack / "images").glob("*.png"):
         with Image.open(shipped) as image:
-            if shipped.stem.endswith("_bg"):
+            if _is_full_frame(shipped.stem):
                 assert image.size == (320, 200)
             else:
                 assert image.size[1] == 112

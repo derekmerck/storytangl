@@ -1,0 +1,21 @@
+{
+  "workflow": "workflow.json.j2",
+  "params": {
+    "style": "Match the reference retro adventure-game pixel art, crisp dark contours, restrained teal, copper, cream and deep indigo palette, flat shading and dithered gradients. No text, signatures, watermark or border.",
+    "width": 1280,
+    "height": 800
+  },
+  "jobs": [
+    {
+      "params": {
+        "asset": "quay_map",
+        "subject": "Transform this night harbour map into a retro science-fiction orbital spaceport dock seen from the same high angle. Replace the water with a deep starfield, the moored sailing ships with docked spacecraft, the brick gable warehouses with futuristic terminal buildings, the crates and coiled rope with cargo containers and thick cables, and the iron railings with illuminated safety rails. Keep the same perspective and the same building placement, and keep the same four brightly lit districts: the docked ships upper left, the lit boardwalk mid left, the cargo yard across the foreground, and the terminal doorway at the top of its steps on the right.",
+        "seed": 19920928,
+        "prefix": "repartee_spaceport/quay_map"
+      },
+      "images": {
+        "source": "source-assets/quay_map.png"
+      }
+    }
+  ]
+}

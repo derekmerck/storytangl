@@ -1,109 +1,46 @@
 {
   "pack": "repartee-spaceport",
   "assets": {
-    "quai_bg": {
-      "file": "quai_bg.png",
+    "clerk_sprite": {
+      "file": "clerk_sprite.png",
       "size": [
-        320,
-        200
+        103,
+        112
       ],
-      "mode": "RGB",
-      "sha256": "6f4298fb5cccd93ef7521ec72eedd9c962a5602b77e5f07a666d002b414ddeb2",
+      "mode": "RGBA",
+      "sha256": "987c280baa724f4347365d5f13b7fb0494f4825823d3690ded84c04b7743d76d",
       "source": {
-        "asset": "quai_bg",
-        "source": "source-assets/quai_bg.png",
-        "source_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
-        "reference": "source-assets/quai_bg.png",
-        "reference_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
+        "asset": "clerk_sprite",
+        "source": "source-assets/clerk_sprite.png",
+        "source_sha256": "424bc8bee7404f609e02154fb2c1e21ece67acdf04e847f6a6e0e28d3b2327f0",
+        "reference": "generation-artifacts/references/clerk_sprite.png",
+        "reference_sha256": "91a3965fe0c95212fe6478a0d19db1088173b5ab380d8948b8388867b8e8961c",
         "size": [
-          1280,
-          800
+          1024,
+          1024
         ],
-        "preprocessing": "none"
+        "preprocessing": "alpha composite over RGB(224,224,224)"
       },
       "generation": {
         "receipt": "receipts.json",
-        "request_sha256": "0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36",
-        "path": "generation-artifacts/raw/0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36/000-quai_bg_00001_.png"
+        "request_sha256": "9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63",
+        "path": "generation-artifacts/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png"
       },
-      "conformed_from": {
-        "size": [
-          1280,
-          800
-        ],
-        "mode": "RGB",
-        "sha256": "5f3b0ee82bef8d48dc4cd588343f5e736b12304b3e34d9a9dded8f156b1324ae",
-        "transform": "resize to 320x200, nearest-neighbour"
-      }
-    },
-    "warehouse_bg": {
-      "file": "warehouse_bg.png",
-      "size": [
-        320,
-        200
+      "alpha_bbox": [
+        90,
+        46,
+        974,
+        1005
       ],
-      "mode": "RGB",
-      "sha256": "4bcffe2720fd7a22e3c1953db97091d2841e821fb2a90114bcc3cf9b48a5cc93",
-      "source": {
-        "asset": "warehouse_bg",
-        "source": "source-assets/warehouse_bg.png",
-        "source_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
-        "reference": "source-assets/warehouse_bg.png",
-        "reference_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
-        "size": [
-          1280,
-          800
-        ],
-        "preprocessing": "none"
-      },
-      "generation": {
-        "receipt": "refinement-receipts.json",
-        "request_sha256": "203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675",
-        "path": "generation-artifacts/raw/203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675/000-warehouse_bg-refined_00001_.png"
-      },
+      "background_removal_request_sha256": "f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0",
       "conformed_from": {
         "size": [
-          1280,
-          800
+          1024,
+          1024
         ],
-        "mode": "RGB",
-        "sha256": "6517ff075748b43b165589079800a0e5562f4b6ca320fe3320be69e6a12225ed",
-        "transform": "resize to 320x200, nearest-neighbour"
-      }
-    },
-    "salon_bg": {
-      "file": "salon_bg.png",
-      "size": [
-        320,
-        200
-      ],
-      "mode": "RGB",
-      "sha256": "18f85b249d24eef35838b79f53943f8b5bfe5eae89e922cd29ccc8f50383ae19",
-      "source": {
-        "asset": "salon_bg",
-        "source": "source-assets/salon_bg.png",
-        "source_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
-        "reference": "source-assets/salon_bg.png",
-        "reference_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
-        "size": [
-          1280,
-          800
-        ],
-        "preprocessing": "none"
-      },
-      "generation": {
-        "receipt": "receipts.json",
-        "request_sha256": "5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a",
-        "path": "generation-artifacts/raw/5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a/000-salon_bg_00001_.png"
-      },
-      "conformed_from": {
-        "size": [
-          1280,
-          800
-        ],
-        "mode": "RGB",
-        "sha256": "ccea6a63566cb222b9541fd0b5c246ef880a2c31fe29986880ebf4cf82519ed3",
-        "transform": "resize to 320x200, nearest-neighbour"
+        "mode": "RGBA",
+        "sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5",
+        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
       }
     },
     "master_sprite": {
@@ -148,46 +85,126 @@
         "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
       }
     },
-    "clerk_sprite": {
-      "file": "clerk_sprite.png",
+    "quai_bg": {
+      "file": "quai_bg.png",
       "size": [
-        103,
-        112
+        320,
+        200
       ],
-      "mode": "RGBA",
-      "sha256": "987c280baa724f4347365d5f13b7fb0494f4825823d3690ded84c04b7743d76d",
+      "mode": "RGB",
+      "sha256": "6f4298fb5cccd93ef7521ec72eedd9c962a5602b77e5f07a666d002b414ddeb2",
       "source": {
-        "asset": "clerk_sprite",
-        "source": "source-assets/clerk_sprite.png",
-        "source_sha256": "424bc8bee7404f609e02154fb2c1e21ece67acdf04e847f6a6e0e28d3b2327f0",
-        "reference": "generation-artifacts/references/clerk_sprite.png",
-        "reference_sha256": "91a3965fe0c95212fe6478a0d19db1088173b5ab380d8948b8388867b8e8961c",
+        "asset": "quai_bg",
+        "source": "source-assets/quai_bg.png",
+        "source_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
+        "reference": "source-assets/quai_bg.png",
+        "reference_sha256": "ad5f5d7979c28b04799edbf41719eebbad8b79870634507e716637096e2c2eee",
         "size": [
-          1024,
-          1024
+          1280,
+          800
         ],
-        "preprocessing": "alpha composite over RGB(224,224,224)"
+        "preprocessing": "none"
       },
       "generation": {
         "receipt": "receipts.json",
-        "request_sha256": "9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63",
-        "path": "generation-artifacts/raw/9e6acba9757bca910e8e0d675d1f3bb063c920c66622c2fb052337b9782f2e63/000-clerk_sprite_00001_.png"
+        "request_sha256": "0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36",
+        "path": "generation-artifacts/raw/0ee404275922c636e49058f3d6d597a0c50385feca0fed679a211dd8b2117a36/000-quai_bg_00001_.png"
       },
-      "alpha_bbox": [
-        90,
-        46,
-        974,
-        1005
-      ],
-      "background_removal_request_sha256": "f2670cfd3a13cfdf5ddfb9f725d21b13a524aacb909d3eb7c4aba7df2375c2b0",
       "conformed_from": {
         "size": [
-          1024,
-          1024
+          1280,
+          800
         ],
-        "mode": "RGBA",
-        "sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5",
-        "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
+        "mode": "RGB",
+        "sha256": "5f3b0ee82bef8d48dc4cd588343f5e736b12304b3e34d9a9dded8f156b1324ae",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "quay_map": {
+      "file": "quay_map.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "e607f91cc9d40ca213c13d66773c817ca67e17dfd7930e7adb2c15500cf86059",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "b6aedc9d5ffda416aa4fd6620c694acec2bebbb470463939e4751238758a15a4",
+        "transform": "crop 4px top and 1px bottom render frame, resize to 320x200, nearest-neighbour"
+      }
+    },
+    "salon_bg": {
+      "file": "salon_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "18f85b249d24eef35838b79f53943f8b5bfe5eae89e922cd29ccc8f50383ae19",
+      "source": {
+        "asset": "salon_bg",
+        "source": "source-assets/salon_bg.png",
+        "source_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
+        "reference": "source-assets/salon_bg.png",
+        "reference_sha256": "a5161810e71d29e2dbb7009b563e4a785236ee05746a5907f2e93d42c4537314",
+        "size": [
+          1280,
+          800
+        ],
+        "preprocessing": "none"
+      },
+      "generation": {
+        "receipt": "receipts.json",
+        "request_sha256": "5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a",
+        "path": "generation-artifacts/raw/5a31d272dcf108ac9522e8b95bff8e1752832addcb1ad6b13f69135d129c084a/000-salon_bg_00001_.png"
+      },
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "mode": "RGB",
+        "sha256": "ccea6a63566cb222b9541fd0b5c246ef880a2c31fe29986880ebf4cf82519ed3",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "warehouse_bg": {
+      "file": "warehouse_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "4bcffe2720fd7a22e3c1953db97091d2841e821fb2a90114bcc3cf9b48a5cc93",
+      "source": {
+        "asset": "warehouse_bg",
+        "source": "source-assets/warehouse_bg.png",
+        "source_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+        "reference": "source-assets/warehouse_bg.png",
+        "reference_sha256": "b4f691a5f05f771777e41cab1238651bed892f1670d5e5d2ad3214b495efd1c4",
+        "size": [
+          1280,
+          800
+        ],
+        "preprocessing": "none"
+      },
+      "generation": {
+        "receipt": "refinement-receipts.json",
+        "request_sha256": "203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675",
+        "path": "generation-artifacts/raw/203bc5ed1b1cdec25d58ab0a743f81ebd6cdd1bbf9510ce91ab8748638621675/000-warehouse_bg-refined_00001_.png"
+      },
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "mode": "RGB",
+        "sha256": "6517ff075748b43b165589079800a0e5562f4b6ca320fe3320be69e6a12225ed",
+        "transform": "resize to 320x200, nearest-neighbour"
       }
     },
     "worker_sprite": {

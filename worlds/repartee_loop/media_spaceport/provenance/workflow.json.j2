@@ -55,7 +55,7 @@
   },
   "7": {
     "inputs": {
-      "text": {{ prompt | tojson }},
+      "text": {{ (prompt if prompt is defined else subject ~ " " ~ style) | tojson }},
       "clip": [
         "5",
         0

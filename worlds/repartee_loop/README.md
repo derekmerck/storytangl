@@ -77,17 +77,39 @@ conforming images after writing a manifest is exactly how the two drift apart.
 Only `media_spaceport/` has generation provenance: per-asset source and
 generation hashes, the background-removal model, and a `provenance/` directory
 with the workflow templates and batch receipts that produced it. The base pack
-predates that capture and records only shipped files and the conformance step.
+predates that capture and records only shipped files and the conformance step —
+its map plate included, which was rendered outside the batch helper and carries
+only its source hash and conformance transform.
 
 Assets are conformed to the client's target rather than stored at generation
 size: backgrounds resample to the 320x200 logical surface and sprites are
 trimmed to their alpha bounds and scaled to a common height, both
 nearest-neighbour so the result sits on a real pixel grid.
 
-The map plate `quay_map.png` is named by the world but not yet drawn in either
-pack. Until it is, the plate resolves to nothing and degrades to its text
-floor: the district still plays, as a numbered list of places. Art is additive
-here in the strict sense — the map works before the map exists.
+The map plate is the strongest test of the interchangeability rule, because
+both packs must agree on geometry as well as names: the world's region table is
+authored once and has to land on the right building in either skin. The
+spaceport plate was generated from the quayside plate as a pixel reference, so
+the same four rects fit both — starfield for water, docked craft for ships,
+same doorway at the top of the same steps.
+
+That agreement is currently luck rather than structure. The world owns the
+region *names*, which is right — a place claiming `quay:salon` is world truth.
+But it also owns the region *geometry*, which assumes every pack's plate shares
+a composition. That held here only because the spaceport plate was generated
+from the quayside plate as a reference; a pack drawn independently would need
+its own rects for the same names. Geometry arguably belongs to the pack, beside
+the plate it measures, with the world's table as the fallback. Aspirational, not
+built: nothing here needs it yet, and the shape of the fix is a per-pack
+override rather than a change to how regions are claimed.
+
+Its batch manifest (`provenance/map-jobs.json`) is also the first one authored
+in factored form: the shared style clause and output size sit in pack-level
+`params`, and the job carries only its subject, seed, and prefix. That is what
+makes "render the whole pack again, but at dawn" one edit instead of six, and
+`comfy_batch.py` has supported it all along. The other six jobs still carry
+whole hand-written prompts with that clause copied into each, and converting
+them is mechanical.
 
 Because staging hints live on the block rather than the asset, a pack must keep
 the same names and roughly the same composition. The spaceport pack retains the

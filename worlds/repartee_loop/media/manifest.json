@@ -49,6 +49,23 @@
         "transform": "resize to 320x200, nearest-neighbour"
       }
     },
+    "quay_map": {
+      "file": "quay_map.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "29ae24faa4403aed070096782922764a6291f4d3cb31246d7c648c0c27268d78",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0",
+        "transform": "crop 10px top and 6px bottom render frame, resize to 320x200, nearest-neighbour"
+      }
+    },
     "salon_bg": {
       "file": "salon_bg.png",
       "size": [
