@@ -134,6 +134,31 @@ class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
     content: list[KvRow] = Field(default_factory=list)
 
 
+UI_TAG_PREFIX = "ui:"
+
+
+def client_visible_tags(tags: object) -> set[str]:
+    """Return the ``ui:``-namespaced subset of ``tags``.
+
+    Graph-side tags are mostly engine internals — ``dynamic``, ``sandbox``,
+    ``movement``, ``fanout:<uuid>`` — and one of them carries graph identity, so
+    promotion onto a client-facing fragment is opt-in by namespace rather than
+    by omission. An author or mechanic that wants a tag to reach clients says so
+    by naming it, and everything else stays inside the graph.
+
+    This extends the convention already read off fragment tags by
+    :meth:`tangl.core.BaseFragment.has_channel`, which spells its own namespace
+    ``channel:``. Non-string tags (:data:`tangl.type_hints.Tag` also admits
+    enums and ints) cannot carry a namespace and are dropped.
+    """
+
+    if not isinstance(tags, (set, frozenset, list, tuple)):
+        return set()
+    return {
+        tag for tag in tags if isinstance(tag, str) and tag.startswith(UI_TAG_PREFIX)
+    }
+
+
 class ChoiceFragment(BaseFragment, extra="allow"):
     """Direct, UUID-backed action offered to a client."""
 
@@ -443,6 +468,8 @@ __all__ = [
     "PresentationHints",
     "StagingHints",
     "UIHints",
+    "UI_TAG_PREFIX",
+    "client_visible_tags",
     "fragment_from_dto",
     "fragment_to_dto",
 ]

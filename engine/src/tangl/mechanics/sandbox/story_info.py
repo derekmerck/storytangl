@@ -29,12 +29,21 @@ from .handlers import (
     sandbox_projection_state,
 )
 from .facets import ChargeFacet, ContainerFacet
-from .location import SandboxExit, SandboxFixture, SandboxLocation, normalize_sandbox_direction
+from .location import (
+    SandboxExit,
+    SandboxFixture,
+    SandboxLocation,
+    SandboxMap,
+    normalize_sandbox_direction,
+)
 from .time import current_world_time
 
 
 DEFAULT_PERIOD_LABELS = ("morning", "afternoon", "evening", "night")
 MAP_KIND = "map"
+MAP_PLATE_KIND = "map_plate"
+MAP_REGIONS_KIND = "map_regions"
+PLATE_KINDS = {MAP_PLATE_KIND, MAP_REGIONS_KIND}
 SANDBOX_INFO_KINDS = {
     "exits",
     "fixtures",
@@ -44,6 +53,8 @@ SANDBOX_INFO_KINDS = {
     MAP_KIND,
     "map_edges",
     "map_nodes",
+    MAP_PLATE_KIND,
+    MAP_REGIONS_KIND,
     "presence",
     "world_time",
 }
@@ -230,6 +241,14 @@ def advertise_sandbox_info_channels(
             query={"kinds": [MAP_KIND], "scope": "known"},
         ),
     ]
+    if caller.map is not None:
+        affordances.append(
+            InfoAffordance(
+                kind=MAP_PLATE_KIND,
+                label="Map Plate",
+                query={"kinds": [MAP_PLATE_KIND, MAP_REGIONS_KIND]},
+            )
+        )
     if projection.suppress_location_description:
         return affordances
     if not projection.suppress_asset_affordances:
@@ -297,7 +316,60 @@ def project_sandbox_map_info(
 
     map_sections = _requested_map_sections(caller, ctx=ctx, requested=requested)
     sections.extend(map_sections)
+    sections.extend(_requested_plate_sections(caller, requested=requested))
     return sections or None
+
+
+def _requested_plate_sections(
+    location: SandboxLocation,
+    *,
+    requested: set[str],
+) -> list[ProjectedSection]:
+    """Return plate geometry, and only when a client asks for it by name.
+
+    Deliberately not folded into ``map``: that channel is the reader-facing
+    gazetteer, and a text client asking to see the map wants place names, not a
+    table of hitbox coordinates it cannot draw.
+    """
+
+    if requested.isdisjoint(PLATE_KINDS):
+        return []
+    if location.map is None:
+        return []
+    return [
+        section
+        for section in _plate_sections(location.map)
+        if _section_matches_requested(section, requested)
+    ]
+
+
+def _plate_sections(plate: SandboxMap) -> list[ProjectedSection]:
+    return [
+        ProjectedSection(
+            section_id="sandbox_map_plate",
+            title="Map Plate",
+            kind=MAP_PLATE_KIND,
+            value=KvListValue(
+                items=[
+                    KvRow(key="Name", value=plate.name),
+                    KvRow(key="Image", value=plate.plate or ""),
+                    KvRow(key="Regions", value=len(plate.regions)),
+                ]
+            ),
+        ),
+        ProjectedSection(
+            section_id="sandbox_map_regions",
+            title="Map Regions",
+            kind=MAP_REGIONS_KIND,
+            value=TableValue(
+                columns=["Region", "x", "y", "w", "h"],
+                rows=[
+                    region.as_row(name)
+                    for name, region in sorted(plate.regions.items())
+                ],
+            ),
+        ),
+    ]
 
 
 def _requested_map_sections(
@@ -636,6 +708,8 @@ def _target_name(location: SandboxLocation, target_ref: str | None) -> str | Non
 __all__ = [
     "DEFAULT_PERIOD_LABELS",
     "MAP_KIND",
+    "MAP_PLATE_KIND",
+    "MAP_REGIONS_KIND",
     "SandboxStoryInfoProjector",
     "advertise_sandbox_info_channels",
     "project_sandbox_map_info",

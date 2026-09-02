@@ -347,6 +347,23 @@ def _sandbox_contribution_hints(
     return hints
 
 
+PLATE_TAG_PREFIX = "ui:plate:"
+
+
+def _plate_tags(target: object) -> set[str]:
+    """Return the ``ui:plate:`` tags a choice pointing at ``target`` inherits.
+
+    The claim lives on the destination because generated choices do not exist
+    when a world is authored. Only :class:`SandboxLocation` claims regions; a
+    choice targeting anything else contributes nothing.
+    """
+
+    plates = getattr(target, "plates", None)
+    if not isinstance(plates, (list, tuple, set)):
+        return set()
+    return {f"{PLATE_TAG_PREFIX}{claim}" for claim in plates if isinstance(claim, str)}
+
+
 def _nearest_wait_enabled(location: SandboxLocation) -> bool:
     if location.wait_enabled is not None:
         return location.wait_enabled
@@ -1311,7 +1328,7 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
             text=_movement_text(raw_direction, target, exit_spec),
             payload=_sandbox_action_payload("movement"),
             availability=availability,
-            tags={"dynamic", "sandbox", "movement"},
+            tags={"dynamic", "sandbox", "movement", *_plate_tags(target)},
             ui_hints=_sandbox_contribution_hints(
                 caller,
                 source="sandbox_link",
@@ -1325,6 +1342,80 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
             ),
         )
     return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_map_travel(*, caller, ctx, **_kw):
+    """Project travel to every location claiming a region on this plate.
+
+    The plate's regions are the fanout: a region with no claimant simply has no
+    choice behind it, which is what leaves its hitbox inert, and a location
+    claiming a region on some other plate is not reached from here. Neither the
+    map nor the location consults the other's geometry.
+
+    Travel is offered on the destination's own terms — the target's
+    ``availability`` is copied onto the generated edge — so the reason a place
+    cannot be reached lives with the place that is guarding itself, and renders
+    as an ordinary unavailable choice rather than a missing one.
+    """
+
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if caller.map is None or not caller.auto_provision:
+        return None
+    graph = caller.graph
+    if graph is None or _graph_frozen_shape(graph):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="map_travel", ctx=ctx)
+
+    plate = caller.map
+    for region in sorted(plate.regions):
+        claim = f"{plate.name}:{region}"
+        for target in _locations_claiming(graph, claim):
+            if target is caller or _has_manual_link_action(caller, target=target):
+                continue
+            Action(
+                registry=graph,
+                label=f"sandbox_map_{caller.get_label()}_{region}_{target.get_label()}",
+                predecessor_id=caller.uid,
+                successor_id=target.uid,
+                text=f"Go to {target.location_name or target.get_label()}",
+                payload=_sandbox_action_payload("movement"),
+                availability=list(target.availability),
+                tags={
+                    "dynamic",
+                    "sandbox",
+                    "movement",
+                    "map_travel",
+                    *_plate_tags(target),
+                },
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_map",
+                    contribution="movement",
+                    source_label=caller.get_label(),
+                    source_kind="location",
+                    target=target.get_label(),
+                    plate=plate.name,
+                    region=region,
+                ),
+            )
+    return None
+
+
+def _locations_claiming(graph: Graph, claim: str) -> list[SandboxLocation]:
+    """Return locations claiming ``claim``, in stable label order."""
+
+    claimants = [
+        node
+        for node in graph.find_all(Selector(has_kind=SandboxLocation))
+        if isinstance(node, SandboxLocation) and claim in node.plates
+    ]
+    return sorted(claimants, key=lambda node: node.get_label())
 
 
 def _project_location_asset_actions(

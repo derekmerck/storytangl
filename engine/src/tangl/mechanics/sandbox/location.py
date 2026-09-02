@@ -51,6 +51,40 @@ class SandboxExit(BaseModel):
     through: str | None = None
 
 
+class SandboxMapRegion(BaseModel):
+    """One named hitbox on a visual map plate, in normalized plate coordinates.
+
+    Origin is the plate's top-left corner and every value is a fraction of the
+    plate, so a region survives any rendered size. The region carries no notion
+    of what it leads to: binding is by name against whichever choices claim it.
+    """
+
+    x: float
+    y: float
+    w: float
+    h: float
+
+    def as_row(self, name: str) -> list[str | float]:
+        """Return the disclosure row for this region."""
+        return [name, self.x, self.y, self.w, self.h]
+
+
+class SandboxMap(BaseModel):
+    """A visual map plate: a named image plus the regions drawn on it.
+
+    Declares geometry only. A plate may name regions no location claims — an
+    inert hitbox — and locations may claim regions on plates that do not exist,
+    which is what lets plates be added, rescaled, or removed without touching
+    the world.
+    """
+
+    name: str
+    plate: str | None = None
+    """Asset name of the plate image, staged separately as ``map_im`` media."""
+
+    regions: dict[str, SandboxMapRegion] = Field(default_factory=dict)
+
+
 class SandboxFixture(HasAssets):
     """Place-bound sandbox fixture composed from typed capability facets."""
 
@@ -227,6 +261,20 @@ class SandboxLocation(HasAssets, MenuBlock):
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     sandbox_scope: str | None = None
     location_name: str = ""
+    map: SandboxMap | None = None
+    """Visual map plate published by this location, when it owns one."""
+
+    plates: list[str] = Field(default_factory=list)
+    """Visual-map regions this location claims, each ``"<plate>:<region>"``.
+
+    A location names itself; it never learns where it sits. Generated choices
+    that point here inherit the claim as a ``ui:plate:`` tag, and a plate that
+    declares a matching region binds its hitbox to whichever of those choices is
+    live. Neither side references the other, so a location can claim regions on
+    several plates at different scales, and a plate may declare regions nothing
+    currently claims.
+    """
+
     light: bool = False
     dark_text: str | None = None
     wait_enabled: bool | None = None

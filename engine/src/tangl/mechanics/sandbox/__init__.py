@@ -46,6 +46,7 @@ from .handlers import (
     project_sandbox_fixture_actions,
     project_sandbox_location_interactions,
     project_sandbox_location_links,
+    project_sandbox_map_travel,
     project_sandbox_mob_actions,
     project_sandbox_scheduled_events,
     project_sandbox_unlocks,
@@ -61,6 +62,8 @@ from .location import (
     SandboxExit,
     SandboxFixture,
     SandboxLocation,
+    SandboxMap,
+    SandboxMapRegion,
     normalize_sandbox_direction,
 )
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
@@ -100,6 +103,8 @@ __all__ = [
     "SandboxLocationContributionsSpec",
     "SandboxLocation",
     "SandboxLocationSpec",
+    "SandboxMap",
+    "SandboxMapRegion",
     "ChargeConsumption",
     "ChargeFacet",
     "ContainerFacet",
@@ -144,6 +149,7 @@ __all__ = [
     "project_sandbox_fixture_actions",
     "project_sandbox_location_interactions",
     "project_sandbox_location_links",
+    "project_sandbox_map_travel",
     "project_sandbox_mob_actions",
     "project_sandbox_scheduled_events",
     "project_sandbox_unlocks",
