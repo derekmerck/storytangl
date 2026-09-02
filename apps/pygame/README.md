@@ -64,9 +64,11 @@ choice with `available: false`, so it gets a dimmed box and its
 `unavailable_reason` in the legend.
 
 **At most one choice may claim a region.** The engine refuses to project an
-ambiguous one, and this renderer skips it rather than picking a winner: choosing
-between two claimants here would hide a dropped choice behind a hitbox that
-looks perfectly correct.
+ambiguous one — whether two locations claim the same region, or one location is
+reachable by two authored routes — and this renderer skips it rather than
+picking a winner. Choosing between claimants would hide a dropped choice behind
+a hitbox that looks perfectly correct. The routes stay offered in the legend;
+only the hitbox is withheld.
 
 The plate drawn is the one the geometry *names*, not merely the first `map_im`
 staged. Picture and rectangles arrive by different routes, so a batch that

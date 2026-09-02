@@ -779,7 +779,7 @@
           "filename": "quay_map_00001_.png",
           "subfolder": "repartee_spaceport",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-vigilant-nobel-f19f95/00ef8e00-8765-4c60-a404-6de67d84529f/scratchpad/spaceport-map/2d90f3136d518eaf3c10ff3b3cbeb2a6f24baa6965575bcfb4f172ad6aa920ae/000-quay_map_00001_.png",
+          "path": "generation-artifacts/raw/2d90f3136d518eaf3c10ff3b3cbeb2a6f24baa6965575bcfb4f172ad6aa920ae/000-quay_map_00001_.png",
           "sha256": "b6aedc9d5ffda416aa4fd6620c694acec2bebbb470463939e4751238758a15a4"
         }
       ],

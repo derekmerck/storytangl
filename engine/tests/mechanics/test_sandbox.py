@@ -2263,3 +2263,39 @@ def test_repeated_provisioning_does_not_stack_map_travel() -> None:
 
     assert first == 1
     assert len(_dynamic_sandbox_actions_with_tag(hub, "map_travel")) == first
+
+
+def test_two_authored_routes_to_one_region_leave_it_inert(caplog) -> None:
+    """Walking and sailing to the same quay is not a basis for owning a hitbox."""
+
+    graph, hub, mill = _plate_graph()
+    for label, text in (("walk_to_mill", "Walk"), ("sail_to_mill", "Sail")):
+        Action(
+            registry=graph,
+            label=label,
+            predecessor_id=hub.uid,
+            successor_id=mill.uid,
+            text=text,
+        )
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+
+    with caplog.at_level("WARNING"):
+        do_provision(hub, ctx=ctx)
+
+    # Neither authored route takes the claim, and no rival is generated.
+    fragments = render_block_choices(caller=hub, ctx=ctx)
+    claimed = [
+        f
+        for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.text in {"Walk", "Sail"} and f.tags
+    ]
+    assert claimed == []
+    assert _dynamic_sandbox_actions_with_tag(hub, "map_travel") == []
+    assert "authored routes" in caplog.text
+
+    # Both routes are still offered; only the hitbox is withheld.
+    offered = {
+        f.text for f in fragments or []
+        if isinstance(f, ChoiceFragment) and f.text in {"Walk", "Sail"}
+    }
+    assert offered == {"Walk", "Sail"}

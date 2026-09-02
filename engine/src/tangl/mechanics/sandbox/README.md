@@ -72,7 +72,12 @@ Current first-pass surface:
   `availability` is copied onto the generated edge, so a place guards itself and
   an unreachable one renders as an ordinary unavailable choice with its reason
   rather than disappearing. A region no location claims projects nothing, which
-  is what separates "not on offer" from "offered and refused".
+  is what separates "not on offer" from "offered and refused". A region is left
+  inert when its claim is ambiguous — two locations claiming it, or one location
+  reachable by two authored routes — since awarding the hitbox to whichever edge
+  iteration yields first would hide the other choice behind one that looks
+  correct. An authored route to a claimed target inherits the claim rather than
+  being shadowed by a generated rival.
 - `project_sandbox_asset_actions`: planning handler that projects present assets
   as take/read choices, player-held assets as drop choices, and present/carried
   asset interactions as ordinary choices.

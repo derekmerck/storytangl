@@ -128,11 +128,29 @@
       ],
       "mode": "RGB",
       "sha256": "e607f91cc9d40ca213c13d66773c817ca67e17dfd7930e7adb2c15500cf86059",
+      "source": {
+        "asset": "quay_map",
+        "source": "source-assets/quay_map.png",
+        "source_sha256": "56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0",
+        "reference": "source-assets/quay_map.png",
+        "reference_sha256": "56c466d6b2b7a1c9fe7105dd229627d8d6e8e533e44220ad480ca50697a8f8b0",
+        "size": [
+          1280,
+          800
+        ],
+        "preprocessing": "none"
+      },
+      "generation": {
+        "receipt": "map-receipts.json",
+        "request_sha256": "2d90f3136d518eaf3c10ff3b3cbeb2a6f24baa6965575bcfb4f172ad6aa920ae",
+        "path": "generation-artifacts/raw/2d90f3136d518eaf3c10ff3b3cbeb2a6f24baa6965575bcfb4f172ad6aa920ae/000-quay_map_00001_.png"
+      },
       "conformed_from": {
         "size": [
           1280,
           800
         ],
+        "mode": "RGB",
         "sha256": "b6aedc9d5ffda416aa4fd6620c694acec2bebbb470463939e4751238758a15a4",
         "transform": "crop 4px top and 1px bottom render frame, resize to 320x200, nearest-neighbour"
       }

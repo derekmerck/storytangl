@@ -300,19 +300,23 @@ def _message_exit_text(direction: str, exit_spec: SandboxExit) -> str:
     return f"Go {canonical}"
 
 
-def _manual_link_action(
+def _manual_link_actions(
     location: SandboxLocation,
     *,
     target: SandboxLocation,
-) -> Action | None:
-    """Return an authored (non-generated) action already reaching ``target``."""
+) -> list[Action]:
+    """Return every authored (non-generated) action already reaching ``target``.
 
-    for edge in location.edges_out(Selector(has_kind=Action)):
-        if _has_tags(edge, "dynamic"):
-            continue
-        if edge.successor is target:
-            return edge
-    return None
+    All of them, not the first: a location may be reachable by more than one
+    authored route — walking and sailing to the same quay — and which one graph
+    iteration happens to yield is not a basis for deciding who owns a hitbox.
+    """
+
+    return [
+        edge
+        for edge in location.edges_out(Selector(has_kind=Action))
+        if not _has_tags(edge, "dynamic") and edge.successor is target
+    ]
 
 
 def _has_manual_link_action(
@@ -320,7 +324,7 @@ def _has_manual_link_action(
     *,
     target: SandboxLocation,
 ) -> bool:
-    return _manual_link_action(location, target=target) is not None
+    return bool(_manual_link_actions(location, target=target))
 
 
 def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
@@ -1404,12 +1408,27 @@ def project_sandbox_map_travel(*, caller, ctx, **_kw):
         for target in claimants:
             if target is caller:
                 continue
-            manual = _manual_link_action(caller, target=target)
-            if manual is not None:
+            manual = _manual_link_actions(caller, target=target)
+            if len(manual) > 1:
+                # Same rule as two locations claiming one region: an ambiguous
+                # hitbox is left inert rather than awarded to whichever edge
+                # iteration happened to yield first.
+                logger.warning(
+                    "Sandbox map region %r on plate %r has %d authored routes "
+                    "to %r (%s); leaving it inert. Give the region one "
+                    "claimant.",
+                    region,
+                    plate.name,
+                    len(manual),
+                    target.get_label(),
+                    ", ".join(sorted(edge.get_label() for edge in manual)),
+                )
+                continue
+            if manual:
                 # An authored action already offers this travel. Tag it rather
                 # than generating a rival, so the region binds to the choice the
                 # reader actually sees instead of going inert.
-                manual.tags |= _plate_tags(target)
+                manual[0].tags |= _plate_tags(target)
                 continue
             Action(
                 registry=graph,
