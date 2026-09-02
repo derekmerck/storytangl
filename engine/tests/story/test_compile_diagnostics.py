@@ -15,10 +15,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pydantic import Field
+
 from tangl.core import Selector
-from tangl.story.episode import Block
+from tangl.story.episode import Block, Scene
 from tangl.story.fabula import CompileSeverity, StoryCompiler
 from tangl.vm import TraversableNode
+
+
+class NarratedScene(Scene):
+    """Domain scene kind that declares its own ``text`` field."""
+
+    text: str = Field(default="")
 
 
 # ============================================================================
@@ -288,7 +296,7 @@ class TestCompileDiagnosticsPayloadConstruction:
         assert "Block" in message
         assert "scenes[0].intro.blocks[0].start" in message
 
-    def test_degraded_payload_does_not_hide_other_diagnostics(self) -> None:
+    def test_degraded_payload_keeps_its_own_reference_diagnostics(self) -> None:
         script = _valid_script()
         script["scenes"]["intro"]["blocks"]["start"]["availability"] = ["flag"]
         script["scenes"]["intro"]["blocks"]["start"]["roles"] = [
@@ -303,11 +311,21 @@ class TestCompileDiagnosticsPayloadConstruction:
 
         payload = self._payload(bundle, "intro.start")
         assert type(payload) is TraversableNode
-        # The degraded block carries no roles, so its dangling actor ref is not
-        # reachable; the construction issue is what explains that loss.
+        # Reference diagnostics read the authored specs, so a payload that
+        # failed to construct still reports everything the compiler knows.
         assert [issue.code for issue in bundle.issues] == [
             "compile:payload_construction_failed",
+            "compile:dangling_actor_ref",
             "compile:dangling_successor_ref",
+        ]
+        assert [
+            issue.source_ref.authored_path
+            for issue in bundle.issues
+            if issue.source_ref is not None
+        ] == [
+            "scenes[0].intro.blocks[0].start",
+            "scenes[0].intro.blocks[0].start.roles[0]",
+            "scenes[0].intro.blocks[1].other.actions[0]",
         ]
 
     def test_scene_payload_construction_failure_is_recorded(self) -> None:
@@ -404,6 +422,31 @@ class TestCompileDiagnosticsUnknownAuthoredKeys:
         script["actors"]["guide"]["ancestor_tags"] = []
 
         assert self._unknown_key_issues(_compile(script)) == []
+
+    def test_scene_text_is_kept_by_a_kind_that_declares_it(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["kind"] = NarratedScene
+        script["scenes"]["intro"]["text"] = "Narration"
+
+        bundle = _compile(script)
+
+        assert self._unknown_key_issues(bundle) == []
+        templ = bundle.template_registry.find_one(Selector(label="intro"))
+        assert templ is not None
+        assert isinstance(templ.payload, NarratedScene)
+        assert templ.payload.text == "Narration"
+        assert templ.payload.title == "Narration"
+
+    def test_synthetic_scene_title_is_not_reported_as_authored(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["kind"] = "Node"
+        script["scenes"]["intro"]["text"] = "Narration"
+
+        issues = self._unknown_key_issues(_compile(script))
+
+        # ``title`` is compiler-synthesized, so only the authored ``text`` the
+        # resolved kind cannot carry is reported.
+        assert [issue.details["key"] for issue in issues] == ["text"]
 
     def test_action_successor_spellings_are_not_reported(self) -> None:
         script = _valid_script()

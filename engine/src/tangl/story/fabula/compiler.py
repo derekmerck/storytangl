@@ -534,20 +534,6 @@ def _report_dropped_authored_keys(
         )
 
 
-def _payload_specs(payload: Entity, field_name: str) -> list[dict[str, Any]]:
-    """Return one provider-spec field, tolerating a degraded payload.
-
-    A payload that failed construction is downgraded to a bare
-    :class:`TraversableNode` and carries no role or setting scopes. Reading it
-    through ``getattr`` keeps the reported
-    ``compile:payload_construction_failed`` issue as the diagnostic the author
-    sees, instead of an unrelated ``AttributeError`` raised further downstream.
-    """
-
-    specs = getattr(payload, field_name, None)
-    return specs if isinstance(specs, list) else []
-
-
 def _sanitize_issue_details(code: str, details: dict[str, JsonValue]) -> dict[str, JsonValue]:
     allowed_keys = _COMPILE_ISSUE_DETAIL_KEYS.get(code)
     if not allowed_keys:
@@ -766,21 +752,28 @@ class StoryCompiler:
         root_scene_labels = {scene_label for _scene_index, scene_label, _scene_data in scenes}
         for scene_index, scene_label, scene_data in scenes:
             scene_authored_path = _authored_item_path("scenes", scene_index, scene_label)
+            scene_kind = self._resolve_kind(scene_data.get("kind"), fallback=Scene)
+            scene_kind_fields = getattr(scene_kind, "model_fields", {})
+            scene_roles = self._normalize_list(scene_data.get("roles"))
+            scene_settings = self._normalize_list(scene_data.get("settings"))
             scene_payload_data: dict[str, Any] = {
                 **scene_data,
                 "label": scene_data.get("label") or scene_label,
-                "title": scene_data.get("title") or scene_data.get("text") or "",
-                "roles": self._normalize_list(scene_data.get("roles")),
-                "settings": self._normalize_list(scene_data.get("settings")),
+                "roles": scene_roles,
+                "settings": scene_settings,
             }
-            # ``text`` is an accepted authored spelling of a scene ``title``;
-            # drop it once folded in so it is not reported as an ignored key.
-            scene_payload_data.pop("text", None)
+            if "title" in scene_kind_fields:
+                # ``text`` is an accepted authored spelling of a scene
+                # ``title``. Fold it in, then drop it so it is not reported as
+                # an ignored key -- unless the resolved kind declares its own
+                # ``text`` field, which keeps the authored value.
+                scene_payload_data["title"] = (
+                    scene_data.get("title") or scene_data.get("text") or ""
+                )
+                if "text" not in scene_kind_fields:
+                    scene_payload_data.pop("text", None)
             scene_payload = self._build_payload(
-                kind=self._resolve_kind(
-                    scene_data.get("kind"),
-                    fallback=Scene,
-                ),
+                kind=scene_kind,
                 payload=scene_payload_data,
                 default_label=scene_label,
                 collector=collector,
@@ -799,7 +792,7 @@ class StoryCompiler:
             root.add_child(scene_templ)
             self._collect_provider_ref_issues(
                 collector=collector,
-                specs=_payload_specs(scene_payload, "roles"),
+                specs=scene_roles,
                 source_label=scene_label,
                 authored_path_prefix=f"{scene_authored_path}.roles",
                 field_name="roles",
@@ -808,7 +801,7 @@ class StoryCompiler:
             )
             self._collect_provider_ref_issues(
                 collector=collector,
-                specs=_payload_specs(scene_payload, "settings"),
+                specs=scene_settings,
                 source_label=scene_label,
                 authored_path_prefix=f"{scene_authored_path}.settings",
                 field_name="settings",
@@ -876,6 +869,8 @@ class StoryCompiler:
                     field_name="redirects",
                 )
 
+                block_roles = self._normalize_list(block_data.get("roles"))
+                block_settings = self._normalize_list(block_data.get("settings"))
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
                         block_data.get("kind")
@@ -888,8 +883,8 @@ class StoryCompiler:
                         "actions": actions,
                         "continues": continues,
                         "redirects": redirects,
-                        "roles": self._normalize_list(block_data.get("roles")),
-                        "settings": self._normalize_list(block_data.get("settings")),
+                        "roles": block_roles,
+                        "settings": block_settings,
                         "media": self._normalize_list(block_data.get("media")),
                     },
                     default_label=block_label,
@@ -909,7 +904,7 @@ class StoryCompiler:
                 scene_templ.add_child(block_templ)
                 self._collect_provider_ref_issues(
                     collector=collector,
-                    specs=_payload_specs(block_payload, "roles"),
+                    specs=block_roles,
                     source_label=qualified_label,
                     authored_path_prefix=f"{block_authored_path}.roles",
                     field_name="roles",
@@ -918,7 +913,7 @@ class StoryCompiler:
                 )
                 self._collect_provider_ref_issues(
                     collector=collector,
-                    specs=_payload_specs(block_payload, "settings"),
+                    specs=block_settings,
                     source_label=qualified_label,
                     authored_path_prefix=f"{block_authored_path}.settings",
                     field_name="settings",
