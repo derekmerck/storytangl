@@ -20,7 +20,7 @@ from tangl.story.concepts.asset import AssetWallet
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
-from .game import Game
+from .game import Game, RoundRecord
 from .game_token import (
     GameTokenSpec,
     affiliation_of,
@@ -117,31 +117,63 @@ class AggregateForceGame(Game[ForceCommitMove]):
 
     player_reserve: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "reset_field": True,
+            "include": True,
+            "unstructurable": True,
+        },
     )
     opponent_reserve: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "reset_field": True,
+            "include": True,
+            "unstructurable": True,
+        },
     )
     player_active: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "reset_field": True,
+            "include": True,
+            "unstructurable": True,
+        },
     )
     opponent_active: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "reset_field": True,
+            "include": True,
+            "unstructurable": True,
+        },
     )
     player_eliminated: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "reset_field": True,
+            "include": True,
+            "unstructurable": True,
+        },
     )
     opponent_eliminated: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"reset_field": True},
+        json_schema_extra={
+            "reset_field": True,
+            "include": True,
+            "unstructurable": True,
+        },
     )
     round_detail: dict[str, object] | None = Field(
         default=None,
         json_schema_extra={"reset_field": True},
+    )
+    opponent_next_move: ForceCommitMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[ForceCommitMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
     )
 
     def reserve_of(self, owner: str) -> AssetWallet:

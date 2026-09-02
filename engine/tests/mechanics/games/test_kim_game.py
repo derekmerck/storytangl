@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tangl.core import Graph
 from tangl.mechanics.games import HasGame
+from tangl.mechanics.games.picking_game import PickingMove
 from tangl.mechanics.games.kim_game import KimGame, KimGameHandler
 from tangl.mechanics.games.handlers import inject_game_context
 from tangl.story import Action, Block
@@ -34,7 +35,7 @@ class TestKimCore:
         handler = KimGameHandler()
         handler.setup(game)
 
-        result = handler.receive_move(game, ("inspect", "material"))
+        result = handler.receive_move(game, PickingMove(kind="inspect", target="material"))
 
         assert result.name == "CONTINUE"
         assert game.remaining_cues == 1
@@ -45,7 +46,7 @@ class TestKimCore:
         handler = KimGameHandler()
         handler.setup(game)
 
-        result = handler.receive_move(game, ("guess", "silver thimble"))
+        result = handler.receive_move(game, PickingMove(kind="decide", target="silver thimble"))
 
         assert result.name == "WIN"
         assert game.result.name == "WIN"
@@ -55,7 +56,7 @@ class TestKimCore:
         handler = KimGameHandler()
         handler.setup(game)
 
-        result = handler.receive_move(game, ("guess", "ivory die"))
+        result = handler.receive_move(game, PickingMove(kind="decide", target="ivory die"))
 
         assert result.name == "LOSE"
         assert game.result.name == "LOSE"
@@ -120,7 +121,7 @@ class TestKimIntegration:
         block = graph.add_node(kind=KimBlock, label="tray")
         block.game.missing_item = "silver thimble"
         block.game_handler.setup(block.game)
-        block.game_handler.receive_move(block.game, ("inspect", "material"))
+        block.game_handler.receive_move(block.game, PickingMove(kind="inspect", target="material"))
 
         frame = ledger_frame = Ledger.from_graph(graph=graph, entry_id=block.uid).get_frame()
         ctx = ledger_frame._make_ctx()

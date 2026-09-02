@@ -33,12 +33,50 @@ from tangl.story.concepts.asset import AssetWallet
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
-from .game import Game
+from .game import Game, RoundRecord
 from .handler import GameHandler
 from .strategies import opponent_strategies
 
 #: Heap label used when a game does not name its piles.
 DEFAULT_HEAP = "heap"
+
+
+def is_losing(piles: list[int], max_take: int, last_token_wins: bool) -> bool:
+    """Return whether the player to move is lost under optimal play.
+
+    Normal play (taking the last token wins) is bounded-Nim Grundy: a heap of
+    size ``n`` has value ``n % (max_take + 1)`` and the mover is lost when
+    those XOR to zero.
+
+    Misère play (taking the last token loses) is a different game and the
+    normal-play answer is simply wrong for it. Two cases are exact and are the
+    ones that matter:
+
+    - a single heap is lost for the mover when ``n % (max_take + 1) == 1``,
+      the modulus shifted by one
+    - once every heap holds at most one token the take bound is irrelevant, and
+      the mover is lost exactly when an odd number of heaps remain
+
+    Between those, this follows the standard misère-Nim convention of playing
+    the normal-play strategy until the endgame. That is exact for unbounded
+    Nim; under a take bound with mixed large heaps it is a heuristic, and is
+    documented as such rather than claimed as theory.
+    """
+
+    live = [count for count in piles if count > 0]
+    if not live:
+        return True
+
+    modulus = max_take + 1
+
+    if last_token_wins:
+        return reduce(xor, [count % modulus for count in live]) == 0
+
+    if len(live) == 1:
+        return live[0] % modulus == 1
+    if all(count <= 1 for count in live):
+        return len(live) % 2 == 1
+    return reduce(xor, [count % modulus for count in live]) == 0
 
 
 @dataclass(frozen=True)
@@ -70,7 +108,22 @@ class NimGame(Game[NimMove]):
 
     heaps: AssetWallet = Field(
         default_factory=AssetWallet,
+        json_schema_extra={
+            "reset_field": True,
+            # gain()/spend() mutate the wallet in place, so without an explicit
+            # include the recursive exclude_unset dump emits an empty bag and a
+            # saved game reloads with no board.
+            "include": True,
+            "unstructurable": True,
+        },
+    )
+    opponent_next_move: NimMove | None = Field(
+        default=None,
         json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[NimMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
     )
     round_detail: dict[str, object] | None = Field(
         default=None,
@@ -106,12 +159,17 @@ class NimGame(Game[NimMove]):
 
     @property
     def is_losing_position(self) -> bool:
-        """True when the player to move has no forced win under optimal play."""
+        """True when the player to move has no forced win under optimal play.
 
-        values = self.grundy_values()
-        if not values:
-            return True
-        return reduce(xor, values) == 0
+        Honors the misère rule: under ``last_token_wins=False`` the normal-play
+        Grundy answer does not describe this game.
+        """
+
+        return is_losing(
+            [self.heaps[label] for label in self.pile_labels()],
+            self.max_take,
+            self.last_token_wins,
+        )
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
@@ -215,6 +273,7 @@ class NimGameHandler(GameHandler[NimGame]):
             game.round_detail = detail
             return RoundResult.CONTINUE
 
+        opponent_move = self._revalidate(game, opponent_move, detail)
         game.heaps.spend({opponent_move.pile: opponent_move.count})
         detail["opponent_take"] = opponent_move.count
         detail["opponent_pile"] = opponent_move.pile
@@ -304,6 +363,31 @@ class NimGameHandler(GameHandler[NimGame]):
         fragments.append(ContentFragment(content=end_line))
         return fragments
 
+    def _revalidate(
+        self,
+        game: NimGame,
+        move: NimMove,
+        detail: dict[str, object],
+    ) -> NimMove:
+        """Return a move that is still legal after the player's take.
+
+        The opponent's move is pre-selected before the player acts, so when
+        both target the same heap it may no longer be affordable. Spending it
+        blind raises and strands the game mid-resolution, so the intent is kept
+        — same heap, as much as remains — and only falls back to another heap
+        when that one is gone.
+        """
+
+        legal = game.get_available_moves()
+        if move in legal:
+            return move
+
+        detail["opponent_move_adjusted"] = {"pile": move.pile, "count": move.count}
+        same_pile = [option for option in legal if option.pile == move.pile]
+        if same_pile:
+            return max(same_pile, key=lambda option: option.count)
+        return legal[0]
+
     def _score_terminal(self, game: NimGame, result: RoundResult) -> None:
         if result == RoundResult.WIN:
             game.score["player"] = 1
@@ -334,15 +418,20 @@ def _nim_optimal(game: NimGame, **ctx) -> NimMove:
     opponent the most chances to err.
     """
 
-    modulus = game.max_take + 1
     moves = game.get_available_moves()
 
     for move in moves:
-        residuals = []
-        for label in game.pile_labels():
-            remaining = game.heaps[label] - (move.count if label == move.pile else 0)
-            residuals.append(remaining % modulus)
-        if residuals and reduce(xor, residuals) == 0:
+        remaining = [
+            game.heaps[label] - (move.count if label == move.pile else 0)
+            for label in game.pile_labels()
+        ]
+        if not any(count > 0 for count in remaining):
+            # Emptying the board is winning under normal play and losing under
+            # misère, so only take it when taking the last token wins.
+            if game.last_token_wins:
+                return move
+            continue
+        if is_losing(remaining, game.max_take, game.last_token_wins):
             return move
 
     largest = max(game.pile_labels(), key=lambda label: game.heaps[label])

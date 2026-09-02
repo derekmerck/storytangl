@@ -134,11 +134,13 @@ class TestPiecesAsGraphCapableTokens:
         assert TrackMove(token_id=0) in moves
 
     def test_pieces_survive_a_round_trip_through_the_game_state(self) -> None:
+        # Raw model_dump/model_validate is not the persistence contract; the
+        # graph round trip lives in test_game_persistence.py. This only pins
+        # that piece state is plain enough to serialize at all.
         game, handler = self._game()
         handler.receive_move(game, TrackMove(token_id=0))
 
-        dumped = game.model_dump()
-        restored = TrackGame.model_validate(dumped)
+        restored = TrackGame.model_validate(game.model_dump())
 
         assert [piece.position for piece in restored.tokens] == [
             piece.position for piece in game.tokens

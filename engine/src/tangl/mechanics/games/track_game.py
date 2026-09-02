@@ -53,7 +53,7 @@ from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
-from .game import Game
+from .game import Game, RoundRecord
 from .game_token import GameTokenType, discrete_token_class
 from .handler import GameHandler
 from .strategies import opponent_strategies
@@ -167,6 +167,14 @@ class TrackGame(Game[TrackMove]):
     round_detail: dict[str, object] | None = Field(
         default=None,
         json_schema_extra={"reset_field": True},
+    )
+    opponent_next_move: TrackMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[TrackMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
     )
 
     # ─────────────────────────────────────────────────────────────────
