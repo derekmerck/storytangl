@@ -40,8 +40,11 @@ class CompileSeverity(str, Enum):
 
     Notes
     -----
-    v1 of compiler diagnostics emits only ``error`` issues. ``warning`` exists
-    so the surface can align with later authoring-integrity diagnostics work.
+    ``error`` marks a bundle the author almost certainly did not intend:
+    unresolvable references, duplicate labels, a payload that would not build.
+    ``warning`` marks authoring integrity the compiler can work around, such as
+    authored keys the payload kind cannot carry. Bundle preflight fails on the
+    former and reports the latter.
     """
 
     ERROR = "error"
