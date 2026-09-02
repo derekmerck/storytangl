@@ -73,8 +73,15 @@ from .handlers import (
     process_game_move,
     provision_game_moves,
 )
-from .blackjack_game import BlackjackGame, BlackjackGameHandler, BlackjackMove, PlayingCard
-from .nim_game import NimGame, NimGameHandler
+from .blackjack_game import (
+    BlackjackGame,
+    BlackjackGameHandler,
+    BlackjackMove,
+    PlayingCard,
+    PlayingCardType,
+    ensure_standard_deck,
+)
+from .nim_game import DEFAULT_HEAP, NimGame, NimGameHandler, NimMove
 from .aggregate_force_game import (
     AggregateForceGame,
     AggregateForceGameHandler,
@@ -93,10 +100,14 @@ from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, Twen
 from .game_token import (
     DiscreteGameToken,
     FungibleGameToken,
+    GameTokenSpec,
     GameTokenType,
+    affiliation_of,
     discrete_token_class,
     dominant_affiliation,
+    transfer_tokens,
     value_by_affiliation,
+    weight_of,
 )
 from .track_game import (
     DEFAULT_PIECE_LABEL,
@@ -203,8 +214,12 @@ __all__ = [
     "BlackjackGameHandler",
     "BlackjackMove",
     "PlayingCard",
+    "PlayingCardType",
+    "ensure_standard_deck",
     "NimGame",
     "NimGameHandler",
+    "NimMove",
+    "DEFAULT_HEAP",
     "AggregateForceGame",
     "AggregateForceGameHandler",
     "ForceCommitMove",
@@ -229,6 +244,10 @@ __all__ = [
     "DiscreteGameToken",
     "FungibleGameToken",
     "GameTokenType",
+    "GameTokenSpec",
+    "affiliation_of",
+    "weight_of",
+    "transfer_tokens",
     "discrete_token_class",
     "dominant_affiliation",
     "value_by_affiliation",

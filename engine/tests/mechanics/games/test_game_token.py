@@ -7,7 +7,10 @@ from tangl.story.concepts.asset import AssetType, AssetWallet, CountableAsset
 from tangl.mechanics.games import (
     DEFAULT_PIECE_LABEL,
     FungibleGameToken,
+    GameTokenSpec,
     GameTokenType,
+    affiliation_of,
+    weight_of,
     RacingPieceType,
     TrackGame,
     TrackGameHandler,
@@ -32,35 +35,53 @@ class TestSubstrateShape:
 
 
 class TestWalletHelpers:
-    """The token rung groups fungible markers by affiliation."""
+    """The token rung groups fungible markers by affiliation and weight."""
+
+    def _definitions(self) -> dict[str, GameTokenSpec]:
+        return {
+            "brute": GameTokenSpec(affiliation="rock", value=1),
+            "heavy_brute": GameTokenSpec(affiliation="rock", value=3),
+            "fast": GameTokenSpec(affiliation="paper", value=1),
+        }
 
     def _wallet(self) -> AssetWallet:
-        for label, affiliation, value in [
-            ("gt_brute", "rock", 1),
-            ("gt_heavy_brute", "rock", 3),
-            ("gt_fast", "paper", 1),
-        ]:
-            if FungibleGameToken.get_instance(label) is None:
-                FungibleGameToken(label=label, affiliation=affiliation, value=value)
-        return AssetWallet(amounts={"gt_brute": 2, "gt_heavy_brute": 1, "gt_fast": 4})
+        return AssetWallet(amounts={"brute": 2, "heavy_brute": 1, "fast": 4})
 
-    def test_value_is_weighted_by_definition(self) -> None:
-        totals = value_by_affiliation(self._wallet())
+    def test_many_sizes_of_one_type_aggregate_by_affiliation(self) -> None:
+        totals = value_by_affiliation(self._wallet(), self._definitions())
 
-        assert totals["rock"] == 5.0     # 2x1 plus 1x3
-        assert totals["paper"] == 4.0
+        assert totals["rock"] == 5     # two light brutes plus one heavy
+        assert totals["paper"] == 4
 
     def test_dominant_affiliation_uses_weight_not_count(self) -> None:
         # paper has more markers; rock has more force
-        assert dominant_affiliation(self._wallet()) == "rock"
+        assert dominant_affiliation(self._wallet(), self._definitions()) == "rock"
 
     def test_empty_wallet_has_no_dominant_affiliation(self) -> None:
-        assert dominant_affiliation(AssetWallet()) is None
+        assert dominant_affiliation(AssetWallet(), self._definitions()) is None
 
-    def test_unknown_labels_are_ignored(self) -> None:
-        wallet = AssetWallet(amounts={"not_a_registered_token": 5})
+    def test_undeclared_labels_are_their_own_affiliation_at_weight_one(self) -> None:
+        # This default is what lets a plain one-token-per-colour contest work
+        # without declaring anything at all.
+        wallet = AssetWallet(amounts={"rock": 2, "paper": 1})
 
-        assert value_by_affiliation(wallet) == {}
+        assert affiliation_of("rock", {}) == "rock"
+        assert weight_of("rock", {}) == 1
+        assert value_by_affiliation(wallet, {}) == {"rock": 2, "paper": 1}
+
+    def test_ties_resolve_alphabetically_for_determinism(self) -> None:
+        wallet = AssetWallet(amounts={"brute": 3, "fast": 3})
+
+        assert dominant_affiliation(wallet, self._definitions()) == "paper"
+
+    def test_helpers_do_not_consult_the_global_registry(self) -> None:
+        # A label registered process-wide must not leak into a contest that did
+        # not declare it; token vocabulary is world-local (issue #404).
+        if FungibleGameToken.get_instance("registry_only_token") is None:
+            FungibleGameToken(label="registry_only_token", affiliation="rock", value=99)
+        wallet = AssetWallet(amounts={"registry_only_token": 1})
+
+        assert value_by_affiliation(wallet, {}) == {"registry_only_token": 1}
 
 
 class TestPiecesAsGraphCapableTokens:
@@ -113,11 +134,13 @@ class TestPiecesAsGraphCapableTokens:
         assert TrackMove(token_id=0) in moves
 
     def test_pieces_survive_a_round_trip_through_the_game_state(self) -> None:
+        # Raw model_dump/model_validate is not the persistence contract; the
+        # graph round trip lives in test_game_persistence.py. This only pins
+        # that piece state is plain enough to serialize at all.
         game, handler = self._game()
         handler.receive_move(game, TrackMove(token_id=0))
 
-        dumped = game.model_dump()
-        restored = TrackGame.model_validate(dumped)
+        restored = TrackGame.model_validate(game.model_dump())
 
         assert [piece.position for piece in restored.tokens] == [
             piece.position for piece in game.tokens
