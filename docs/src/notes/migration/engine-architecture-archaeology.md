@@ -204,20 +204,21 @@ tests; they were not run against v38.
   authoring semantics, not a reason to reintroduce implicit runtime merging.
   Revisit only for a concrete compiler/codec compatibility requirement.
 
-### Still-present bag, siege, and winding-RPS spikes
+### Bag, siege, and winding-RPS spikes
 
-These sources are **not in the deleted archive**. They remain under
-`scratch/mechanics/games/token_games/` and should be preserved for a dedicated
-game-design pass:
+The dedicated game-design pass these were preserved for has happened. Bag and
+siege are now implemented and their scratch sources deleted; the winding-RPS
+geometric experiment is not, and remains under
+`scratch/mechanics/games/token_games/winding_rps/`.
 
-- `bag_rps.py`: commits token counts from reserves, sums power by affiliation,
-  chooses a dominant affiliation, and applies a matchup payout to total power
-  before inflicting casualties. This implementation uses numeric tie-breaking
-  for the dominant affiliation, not a settled many-to-many matching rule.
-- `siege_rps.py`: attacker/defender signaling, reinforcement, reserves, committed
-  forces, and losses. Its prose proposes information upgrades, force multipliers,
-  and adaptive leaders. The author's intended loop includes returning survivors
-  after a clash; the snippets are not proof of a complete return/withdraw cycle.
+- `bag_rps.py` and `siege_rps.py` **landed** as `BagRpsGame` and `SiegeRpsGame`
+  over the shared `AggregateForceGame` kernel. Two of the open questions below
+  are answered there: dominant affiliation is decided by weighted value with an
+  explicit alphabetical tie-break rather than incidental ordering, and the
+  survivor return/withdraw cycle is real — commitment transfers reserve into an
+  active pool and every committed token is routed afterwards by an explicit
+  disposition (conserve, retire, decimate, or cede). See
+  `GAME_MECHANICS_DESIGN.md`.
 - `winding_rps/wind_rps.py`: an alternative to reducing the whole force to its
   dominant affiliation. It compares normalized power distributions under cyclic
   rotation, converts distance into an effective-power multiplier, and randomly
@@ -231,8 +232,11 @@ game-design pass:
 
 The author also recalls unique adaptive tokens being lost last. Preserve those
 as two independent policies: **adaptive affiliation** and **casualty priority**.
-The latter exists as `last_down` fields but is still a TODO in `siege_rps.py`
-and `winding_rps/sig.py`; the inspected decimators do not enforce it. Likewise,
+Both are still open. Casualty *policy* is now a named registry
+(`casualty_policies`, with count- and power-denominated members), but casualty
+*targeting* — which tokens die first — remains undecided, because a bag of
+counts has no per-unit identity to prefer. Adaptive affiliation has no
+implementation at all. Likewise,
 the old count-based bags do not prove durable identity for individual heroes.
 
 The design payoff is drafting a smaller counter-force against a known or hinted
