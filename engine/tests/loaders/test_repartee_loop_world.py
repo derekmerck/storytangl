@@ -5,13 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from tangl.core import Selector
-from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.games import CallResponseExchange, GameResult
+from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.response import StoryInfoRequest
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _repo_worlds_dir() -> Path:
@@ -32,6 +35,16 @@ def _action(ledger: Ledger, text: str) -> Action:
     )
     assert isinstance(action, Action)
     return action
+
+
+def _choices(ledger: Ledger) -> list[ChoiceFragment]:
+    """Return the choice fragments projected for the current step."""
+
+    return [
+        fragment
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ChoiceFragment) and fragment.step == ledger.step
+    ]
 
 
 def _choice(ledger: Ledger, text: str) -> ChoiceFragment:
@@ -73,13 +86,15 @@ class TestReparteeLoopWorld:
         assert ledger.cursor.label == "entrance"
         ledger.resolve_choice(_action(ledger, "Step into the practice court").uid)
         assert ledger.cursor.label == "setup"
-        ledger.resolve_choice(_action(ledger, "Enter the quay hub").uid)
+        ledger.resolve_choice(_action(ledger, "Step out onto the quay").uid)
 
-        assert ledger.cursor.label == "hub"
-        assert _choice(ledger, "Challenge the dockhand").available is True
-        assert _choice(ledger, "Challenge the salon master").available is False
-        assert _choice(ledger, "Enter the salon").available is False
+        assert ledger.cursor.label == "quay_map"
+        assert _choice(ledger, "Go to The Practice Yard").available is True
+        assert _choice(ledger, "Go to The Salon Terrace").available is False
+        assert _choice(ledger, "Go to The Salon").available is False
 
+        ledger.resolve_choice(_action(ledger, "Go to The Practice Yard").uid)
+        assert ledger.cursor.label == "practice_yard"
         ledger.resolve_choice(_action(ledger, "Challenge the dockhand").uid)
         assert ledger.cursor.label == "dockhand_contest"
         dockhand = ledger.cursor
@@ -102,12 +117,17 @@ class TestReparteeLoopWorld:
         assert player.repertoire.phrase_ids() == ["repartee_reply", "repartee_starter_call"]
         assert ledger.cursor.locals["awarded_phrase_ids"] == ["repartee_reply"]
 
-        ledger.resolve_choice(_action(ledger, "Return to the quay hub").uid)
-        assert ledger.cursor.label == "hub"
+        ledger.resolve_choice(_action(ledger, "Step back into the yard").uid)
+        assert ledger.cursor.label == "practice_yard"
         assert _choice(ledger, "Challenge the dockhand").available is False
-        assert _choice(ledger, "Challenge the salon master").available is True
-        assert _choice(ledger, "Enter the salon").available is False
+        ledger.resolve_choice(_action(ledger, "Return to the map").uid)
 
+        assert ledger.cursor.label == "quay_map"
+        assert _choice(ledger, "Go to The Salon Terrace").available is True
+        assert _choice(ledger, "Go to The Salon").available is False
+
+        ledger.resolve_choice(_action(ledger, "Go to The Salon Terrace").uid)
+        assert ledger.cursor.label == "salon_terrace"
         ledger.resolve_choice(_action(ledger, "Challenge the salon master").uid)
         assert ledger.cursor.label == "master_contest"
         master = ledger.cursor
@@ -152,11 +172,14 @@ class TestReparteeLoopWorld:
         assert result.graph.get(prize.uid) is prize
         assert ledger.cursor.locals["awarded_prize_ids"] == ["repartee_salon_token"]
 
-        ledger.resolve_choice(_action(ledger, "Return to the quay hub").uid)
-        assert ledger.cursor.label == "hub"
+        ledger.resolve_choice(_action(ledger, "Step back onto the terrace").uid)
+        assert ledger.cursor.label == "salon_terrace"
         assert _choice(ledger, "Challenge the salon master").available is False
-        assert _choice(ledger, "Enter the salon").available is True
-        ledger.resolve_choice(_action(ledger, "Enter the salon").uid)
+        ledger.resolve_choice(_action(ledger, "Return to the map").uid)
+
+        assert ledger.cursor.label == "quay_map"
+        assert _choice(ledger, "Go to The Salon").available is True
+        ledger.resolve_choice(_action(ledger, "Go to The Salon").uid)
 
         assert ledger.cursor.label == "salon"
         journal_text = [
@@ -167,3 +190,114 @@ class TestReparteeLoopWorld:
         assert any("Your argument arrives" in text for text in journal_text)
         assert any("Then it has walked" in text for text in journal_text)
         assert any("You win the exchange" in text for text in journal_text)
+
+    def test_repartee_map_hub_offers_every_region_the_district_claims(self) -> None:
+        """The plate's four regions each have a live choice behind them."""
+
+        bundle = WorldBundle.load(_repartee_root())
+        world = WorldCompiler().compile(bundle)
+        result = world.create_story("repartee_map_demo", init_mode=InitMode.EAGER)
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        ledger.resolve_choice(_action(ledger, "Step into the practice court").uid)
+        ledger.resolve_choice(_action(ledger, "Step out onto the quay").uid)
+
+        travel = {
+            choice.text: choice
+            for choice in _choices(ledger)
+            if choice.tags
+        }
+        assert {choice.text for choice in travel.values()} == {
+            "Go to The Quayside",
+            "Go to The Practice Yard",
+            "Go to The Salon Terrace",
+            "Go to The Salon",
+        }
+        assert {tag for choice in travel.values() for tag in choice.tags} == {
+            "ui:plate:quay:quayside",
+            "ui:plate:quay:practice_yard",
+            "ui:plate:quay:salon_terrace",
+            "ui:plate:quay:salon",
+        }
+
+    def test_repartee_map_dims_the_salon_rather_than_hiding_it(self) -> None:
+        """A guarded place stays on the plate, tagged, with a reason."""
+
+        bundle = WorldBundle.load(_repartee_root())
+        world = WorldCompiler().compile(bundle)
+        result = world.create_story("repartee_dim_demo", init_mode=InitMode.EAGER)
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        ledger.resolve_choice(_action(ledger, "Step into the practice court").uid)
+        ledger.resolve_choice(_action(ledger, "Step out onto the quay").uid)
+
+        salon = _choice(ledger, "Go to The Salon")
+        assert salon.available is False
+        assert salon.unavailable_reason
+        assert salon.tags == {"ui:plate:quay:salon"}
+
+    def test_repartee_publishes_plate_geometry_on_its_own_channel(self) -> None:
+        """Geometry is served, and the reader-facing map channel stays prose."""
+
+        bundle = WorldBundle.load(_repartee_root())
+        world = WorldCompiler().compile(bundle)
+        result = world.create_story("repartee_plate_demo", init_mode=InitMode.EAGER)
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        ledger.resolve_choice(_action(ledger, "Step into the practice court").uid)
+        ledger.resolve_choice(_action(ledger, "Step out onto the quay").uid)
+
+        ctx = PhaseCtx(
+            graph=result.graph,
+            cursor_id=ledger.cursor.uid,
+            step=ledger.step,
+        )
+        advertised = {a.kind for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)}
+        assert {"map", "map_plate"} <= advertised
+
+        state = do_get_story_info(
+            ledger.cursor,
+            ctx=ctx,
+            request=StoryInfoRequest(kinds=["map_plate", "map_regions"]),
+        )
+        sections = {section.section_id: section for section in state.sections}
+        regions = sections["sandbox_map_regions"]
+        assert regions.value.columns == ["Region", "x", "y", "w", "h"]
+        assert [row[0] for row in regions.value.rows] == [
+            "practice_yard",
+            "quayside",
+            "salon",
+            "salon_terrace",
+        ]
+
+        gazetteer = do_get_story_info(
+            ledger.cursor,
+            ctx=ctx,
+            request=StoryInfoRequest(kind="map"),
+        )
+        assert not any(
+            section.section_id.startswith("sandbox_map_region")
+            for section in gazetteer.sections
+        )
+
+    def test_repartee_plate_rides_as_media_the_stage_will_not_mistake_for_scenery(
+        self,
+    ) -> None:
+        """The plate is media with an info role, so no client stages it as a
+        background. A client that draws maps looks for it by role."""
+
+        bundle = WorldBundle.load(_repartee_root())
+        world = WorldCompiler().compile(bundle)
+        result = world.create_story("repartee_plate_media", init_mode=InitMode.EAGER)
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        ledger.resolve_choice(_action(ledger, "Step into the practice court").uid)
+        ledger.resolve_choice(_action(ledger, "Step out onto the quay").uid)
+
+        roles = {
+            fragment.media_role
+            for fragment in ledger.get_journal()
+            if isinstance(fragment, MediaFragment) and fragment.step == ledger.step
+        }
+        assert "map_im" in roles
+        assert "narrative_im" not in roles

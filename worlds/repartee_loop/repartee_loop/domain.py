@@ -17,6 +17,12 @@ from tangl.core import (
     contribute_ns,
 )
 from tangl.mechanics.assembly import ComponentManager, Slot
+from tangl.mechanics.sandbox import SandboxLocation
+
+# Registers the sandbox story-info channels for this world's places, the
+# same way credential_gate opts into the credentials channels. Without it
+# the gazetteer and plate geometry are defined but never advertised.
+import tangl.mechanics.sandbox.story_info  # noqa: F401
 from tangl.mechanics.games import (
     KNOWN_PHRASES_SLOT,
     CallResponseExchange,
@@ -163,8 +169,19 @@ class ReparteeSetupBlock(Block):
     """Dedicated UPDATE boundary that seeds the player's initial call badge."""
 
 
-class ReparteeHubBlock(Block):
-    """Stable choice hub that publishes the player's current holdings."""
+class ReparteeLocation(SandboxLocation):
+    """One place in the quay district.
+
+    Publishes the player's holdings the way the old single hub block did, so an
+    authored predicate reads the same names whether it gates entry to a place or
+    an opportunity offered inside one. Places are the only thing that changed;
+    the contests they lead to are still ordinary blocks.
+
+    The district has no clock, so waiting is off: a wait choice at every corner
+    of a five-room map is noise, not an affordance.
+    """
+
+    wait_enabled: bool | None = False
 
     @contribute_ns
     def provide_repartee_symbols(self) -> dict[str, RepertoireManager | ReparteePrizeManager]:
