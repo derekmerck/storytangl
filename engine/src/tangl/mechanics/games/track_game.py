@@ -303,9 +303,11 @@ class TrackGame(Game[TrackMove]):
 
     def to_namespace(self) -> dict[str, object]:
         namespace = super().to_namespace()
+        # opponent_next_move is typed TrackMove | None on this game and restores
+        # concretely through constructor form, so a None check is enough.
         opponent_next = self.opponent_next_move
         threatened = None
-        if isinstance(opponent_next, TrackMove) and not opponent_next.is_forfeit:
+        if opponent_next is not None and not opponent_next.is_forfeit:
             victim = self.would_evict("opponent", opponent_next.token_id, self.opponent_roll)
             threatened = None if victim is None else victim.owner
         namespace.update(
@@ -324,7 +326,7 @@ class TrackGame(Game[TrackMove]):
                 "track_player_finished": self.finished_count("player"),
                 "track_opponent_finished": self.finished_count("opponent"),
                 "track_opponent_next_token": (
-                    opponent_next.token_id if isinstance(opponent_next, TrackMove) else None
+                    opponent_next.token_id if opponent_next is not None else None
                 ),
                 # Author hook for telegraphing intent before the player commits.
                 "track_opponent_threatens": threatened == "player",
@@ -736,6 +738,6 @@ def _track_force_capture(game: TrackGame, player_move: TrackMove | None = None, 
                 return TrackMove(token_id=hunter.token_id)
 
     standing = game.opponent_next_move
-    if isinstance(standing, TrackMove):
+    if standing is not None:
         return standing
     return _track_optimal(game)

@@ -125,11 +125,19 @@ class SiegeRpsGameHandler(AggregateForceGameHandler[SiegeRpsGame]):
 
         attacker_owner = "player" if initiative_before else "opponent"
         defender_owner = "opponent" if initiative_before else "player"
-        attacker_profile = self.commit_forces(game, attacker_owner, attacker_profile)
-        defender_profile = self.commit_forces(game, defender_owner, defender_profile)
+        self.commit_forces(game, attacker_owner, attacker_profile)
+        self.commit_forces(game, defender_owner, defender_profile)
 
-        attacker_losses = self._allocate_casualties(game, defender_profile, attacker_profile)
-        defender_losses = self._allocate_casualties(game, attacker_profile, defender_profile)
+        # Casualties fall on everything standing, not only what was committed
+        # this round. Under CONSERVE a previous round's survivors are still on
+        # the field, and allocating against the fresh commitment alone would
+        # make them invisible as both attacker and target. Pressure stays keyed
+        # on the round's own commitment, which is the declaration being made.
+        attacker_active = game.active_of(attacker_owner)
+        defender_active = game.active_of(defender_owner)
+
+        attacker_losses = self._allocate_casualties(game, defender_active, attacker_active)
+        defender_losses = self._allocate_casualties(game, attacker_active, defender_active)
 
         if initiative_before:
             player_losses = attacker_losses

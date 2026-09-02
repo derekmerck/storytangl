@@ -7,6 +7,7 @@ attrition based on composition, and return surviving force to reserve.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from itertools import product
@@ -255,7 +256,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
 
         return int(weight_of(label, self.token_definitions()))
 
-    def affiliations_present(self, reserve) -> set[str]:
+    def affiliations_present(self, reserve: AssetWallet | Mapping[str, int]) -> set[str]:
         """Return the affiliations represented in a reserve or profile."""
 
         return {
@@ -264,12 +265,12 @@ class AggregateForceGame(Game[ForceCommitMove]):
             if count > 0
         }
 
-    def dominant_affiliation(self, reserve) -> str | None:
+    def dominant_affiliation(self, reserve: AssetWallet | Mapping[str, int]) -> str | None:
         """Return the affiliation carrying the most weight in a holding."""
 
         return dominant_affiliation(reserve, self.token_definitions())
 
-    def total_force(self, reserve) -> int:
+    def total_force(self, reserve: AssetWallet | Mapping[str, int]) -> int:
         """Return weighted force remaining in a reserve."""
 
         return sum(count * self.get_force_weight(label) for label, count in reserve.items())
@@ -658,7 +659,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     def _profiles_for_reserve(
         self,
         game: AggregateForceGameT,
-        reserve: dict[str, int],
+        reserve: AssetWallet,
     ) -> list[ForceCommitMove]:
         types = [label for label in game.ordered_force_types() if reserve[label] > 0]
         if not types:
@@ -683,8 +684,8 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     def _allocate_casualties(
         self,
         game: AggregateForceGameT,
-        attacker: dict[str, int],
-        defender: dict[str, int],
+        attacker: AssetWallet,
+        defender: AssetWallet,
     ) -> dict[str, int]:
         budget = self._casualty_budget(game, attacker, defender)
         if budget <= 0:
@@ -694,7 +695,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
         losses: dict[str, int] = {}
         remaining = budget
         for label in priorities:
-            available = defender[label] if hasattr(defender, "amounts") else defender.get(label, 0)
+            available = defender[label]
             if available <= 0 or remaining <= 0:
                 continue
             taken = min(available, remaining)
@@ -713,8 +714,8 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     def effective_power(
         self,
         game: AggregateForceGameT,
-        attacker,
-        defender,
+        attacker: AssetWallet,
+        defender: AssetWallet,
     ) -> int:
         """Return an attacking holding's power after dominance weighting.
 
@@ -740,7 +741,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     def draw_down(
         self,
         game: AggregateForceGameT,
-        holding,
+        holding: AssetWallet,
         quota: float,
         priority: list[str],
     ) -> dict[str, int]:
@@ -769,8 +770,8 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     def _casualty_budget(
         self,
         game: AggregateForceGameT,
-        attacker: dict[str, int],
-        defender: dict[str, int],
+        attacker: AssetWallet,
+        defender: AssetWallet,
     ) -> int:
         if not attacker or not defender:
             return 0
@@ -799,8 +800,8 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     def _defender_target_priority(
         self,
         game: AggregateForceGameT,
-        attacker: dict[str, int],
-        defender: dict[str, int],
+        attacker: AssetWallet,
+        defender: AssetWallet,
     ) -> list[str]:
         attacker_affiliations = game.affiliations_present(attacker)
         order = game.ordered_force_types()

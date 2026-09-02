@@ -99,10 +99,16 @@ class GameTokenSpec(BaseModelPlus):
 
 
 class TokenDefinition(Protocol):
-    """Read contract shared by inline specs and catalog definitions."""
+    """Read contract shared by inline specs and catalog definitions.
 
-    affiliation: str | None
-    value: float
+    Read-only: helpers consult a token vocabulary, they never rewrite it.
+    """
+
+    @property
+    def affiliation(self) -> str | None: ...
+
+    @property
+    def value(self) -> float: ...
 
 
 # ─────────────────────────────────────────────────────────────────────────────

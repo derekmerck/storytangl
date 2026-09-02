@@ -43,10 +43,12 @@ Implemented reference kernels currently include ``RpsGame`` / ``RpslsGame``,
 ``CredentialsGame``.
 
 ``track_analysis.analyze_track()`` solves a no-choice track layout as a Markov
-chain, reporting expected rolls to finish, a cumulative finish distribution, and
-an advisory name for the dramatic shape it produces (``footrace``, ``balanced``,
-``chaotic``, ``heartbreak``). Use it to tune a board against a target pacing
-before authoring a world around it.
+chain, returning a ``TrackAnalysis`` with expected rolls to finish, a baseline
+for the same board stripped of redirects, and an advisory name for the dramatic
+shape it produces (``footrace``, ``balanced``, ``chaotic``, ``heartbreak``).
+``track_analysis.finish_distribution()`` returns the cumulative finish
+distribution separately, whose tail exposes a punishing endgame. Use them to
+tune a board against a target pacing before authoring a world around it.
 
 Types of Games
 --------------

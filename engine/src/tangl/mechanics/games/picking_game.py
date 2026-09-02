@@ -120,7 +120,11 @@ class PickingGameHandler(GameHandler[PickingGameT]):
 
     game_cls: ClassVar[type[Game]] = PickingGame
 
-    def receive_move(self, game: PickingGameT, player_move: Any) -> RoundResult:
+    def receive_move(
+        self,
+        game: PickingGameT,
+        player_move: PickingMove | tuple[str, str],
+    ) -> RoundResult:
         """Normalize the move before the round is recorded.
 
         Callers may pass a ``(kind, target)`` tuple, and the ``guess`` alias
@@ -132,7 +136,7 @@ class PickingGameHandler(GameHandler[PickingGameT]):
 
         return super().receive_move(game, self._normalize_move(player_move))
 
-    def _normalize_move(self, move: Any) -> PickingMove:
+    def _normalize_move(self, move: PickingMove | tuple[str, str]) -> PickingMove:
         """Coerce legacy tuple moves into the structured move shape."""
 
         if isinstance(move, PickingMove):

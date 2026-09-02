@@ -45,7 +45,11 @@ class BuildSpec(BaseModelPlus):
     """
 
     cost: dict[str, int] = Field(default_factory=dict)
-    cost_growth: float = 0.0
+    #: Non-negative and finite. A negative premium inverts the curve into a
+    #: discount that eventually returns negative prices, which `_spend()` would
+    #: credit back to the wallet; NaN and infinities propagate into the cost
+    #: arithmetic instead of failing at declaration.
+    cost_growth: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     infrastructure_gain: dict[str, int] = Field(default_factory=dict)
     resource_gain: dict[str, int] = Field(default_factory=dict)
     worker_gain: int = 0

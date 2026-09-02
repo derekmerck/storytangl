@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from tangl.core import Graph
 from tangl.mechanics.games import BuildSpec, HasGame, IncrementalGame, IncrementalGameHandler, PromotionSpec, TaskSpec
 from tangl.mechanics.games.incremental_game import IncrementalMove
@@ -393,3 +396,39 @@ class TestIncrementalCostArithmetic:
         assert costs == sorted(costs)
         assert costs[0] == 100
         assert costs[1] == 110
+
+
+class TestCostGrowthValidation:
+    """A growth premium must be finite and non-negative."""
+
+    @pytest.mark.parametrize("bad", [-0.1, -1.0, -2.0, float("nan"), float("inf"), float("-inf")])
+    def test_invalid_growth_is_rejected_at_declaration(self, bad: float) -> None:
+        # A negative premium inverts the curve and eventually returns negative
+        # prices, which _spend() would credit back to the wallet; NaN and
+        # infinities propagate silently into the cost arithmetic.
+        with pytest.raises(ValidationError):
+            BuildSpec(cost={"gold": 10}, cost_growth=bad)
+
+    def test_zero_growth_remains_valid_flat_pricing(self) -> None:
+        spec = BuildSpec(cost={"gold": 10}, cost_growth=0.0)
+
+        assert spec.cost_growth == 0.0
+
+    def test_a_repeated_build_can_never_credit_the_wallet(self) -> None:
+        game = _sample_game(
+            starting_resources={"gold": 100},
+            build_specs={"mill": BuildSpec(cost={"gold": 10}, cost_growth=0.5)},
+            unlocked_builds=["mill"],
+            victory_resources={},
+            upkeep={},
+        )
+        handler = IncrementalGameHandler()
+        handler.setup(game)
+
+        balances = [game.resources["gold"]]
+        for _ in range(4):
+            handler.receive_move(game, IncrementalMove(kind="build", target="mill"))
+            balances.append(game.resources["gold"])
+
+        assert balances == sorted(balances, reverse=True)
+        assert all(amount >= 0 for amount in handler.get_build_cost(game, "mill").values())

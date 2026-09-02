@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from tangl.core import Graph
+from tangl.story.concepts.asset import AssetWallet
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.handlers import inject_game_context, provision_game_moves
+from tangl.mechanics.games.aggregate_force_game import ForceDisposition
 from tangl.mechanics.games.siege_rps_game import ForceCommitMove, SiegeRpsGame, SiegeRpsGameHandler
 from tangl.story import Action, Block
 from tangl.vm import Frame
@@ -117,3 +119,67 @@ class TestSiegeRpsIntegration:
 
         assert namespace["siege_player_has_initiative"] is False
         assert namespace["siege_opponent_signal"] is not None
+
+
+class TestConservedForceRemainsOnTheField:
+    """Casualties fall on everything standing, not only this round's commit."""
+
+    def _game(self, **kwargs) -> SiegeRpsGame:
+        config = {
+            "survivor_disposition": ForceDisposition.CONSERVE,
+            "player_opening_reserve": {"rock": 6},
+            "opponent_opening_reserve": {"scissors": 6},
+            "max_commit_size": 1,
+        }
+        config.update(kwargs)
+        return SiegeRpsGame(**config)
+
+    def _commit(self, handler, game, player_label, opponent_label) -> None:
+        game.opponent_next_move = ForceCommitMove(profile=((opponent_label, 1),))
+        handler.receive_move(game, ForceCommitMove(profile=((player_label, 1),)))
+
+    def test_survivors_accumulate_across_rounds(self) -> None:
+        game = self._game()
+        handler = SiegeRpsGameHandler()
+        handler.setup(game)
+
+        self._commit(handler, game, "rock", "scissors")
+        assert game.player_active.amounts == {"rock": 1}
+
+        self._commit(handler, game, "rock", "scissors")
+        assert game.player_active.amounts == {"rock": 2}
+
+    def test_allocation_sees_standing_force_not_just_the_commit(self) -> None:
+        # The defect: casualties were allocated against the dict returned by
+        # commit_forces, so conserved survivors were invisible as targets. The
+        # budget is capped by the defender's size, so a two-rock standing force
+        # can lose more than a one-rock commitment.
+        game = self._game()
+        handler = SiegeRpsGameHandler()
+        handler.setup(game)
+        game.player_active.gain({"rock": 2})
+        game.opponent_active.gain({"paper": 3})
+
+        commit_only = AssetWallet(amounts={"rock": 1})
+        from_commit = handler._allocate_casualties(
+            game, game.opponent_active, commit_only
+        )
+        from_standing = handler._allocate_casualties(
+            game, game.opponent_active, game.player_active
+        )
+
+        assert sum(from_commit.values()) == 1
+        assert sum(from_standing.values()) == 2
+
+    def test_holdings_are_wallets_throughout_allocation(self) -> None:
+        game = self._game()
+        handler = SiegeRpsGameHandler()
+        handler.setup(game)
+        self._commit(handler, game, "rock", "scissors")
+
+        losses = handler._allocate_casualties(
+            game, game.opponent_active, game.player_active
+        )
+
+        assert isinstance(losses, dict)
+        assert all(isinstance(count, int) for count in losses.values())
