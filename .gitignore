@@ -116,3 +116,9 @@ apps/renpy/project/game/python-packages/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Art-pack generation sources. Referenced by sha256 in pack provenance and
+# reproducible from it, but too large to version — and easy to sweep in by
+# accident with `git add -A`.
+worlds/*/incoming/
+worlds/*/media*/provenance/source-assets/

@@ -70,6 +70,7 @@ the negotiation is mostly about typed-shape graduations.
 | `/story/info` accepts `kind`/`kinds` + `query` params | S | done client-side | done (same endpoint; singular/plural kind filters + query descriptor routing) | add bundle-specific providers as worlds need them |
 | §1.6 Info channels | S | done (info pills + CLI floor) | done | keep rich renderers optional; `ProjectedState` fallback remains required |
 | `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
+| `ui:`-namespaced fragment `tags` (client-visible subset) | P2 | partial (pygame map hotspots bind on `ui:plate:`) | done (`client_visible_tags`, promoted at choice rendering) | name each `ui:` sub-namespace here as a bundle claims one |
 | Bundle customization / presentation profiles | S target | partial (docs + older world `ui_config`) | not_started | keep advisory; requires world-info catalog before conformance |
 | §5.1 Decision Legibility Contract | S | partial (JSON harness covers fixtures/sequences) | n/a (contract; not a capability) | expand field coverage as new decision surfaces promote |
 | §5.2 Time Parity Rule (visual ritual skip, media advance) | S | partial (JSON harness covers readable fallbacks) | n/a | browser timing/skip E2E remains later |
@@ -145,6 +146,7 @@ surfaces and ignores these enrichments.
 | `ui_hints.validity_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional preview over mediation choices; fallback to ordinary choice text |
 | `ui_hints.encounter_check` | P3 | docs + v1.5 wireframe | bundle-specific | optional risk badge / suffix; fallback to `ui_hints.emphasis` + prose |
 | `ui_hints.drag` | P3 | docs + v1.5 wireframe | n/a | optional enrichment; click-pick fallback remains required by §5.3 |
+| `ui:plate:<plate>:<region>` map claim | P2 | done (pygame map view) | done (sandbox `plates` → generated travel edges) | Vue map view unbuilt; geometry rides `map_plate`/`map_regions` info channels |
 | Genre transcript examples | P3 diagnostic | v1.5 wireframe samples | n/a | add executable transcripts when demo worlds stabilize; diagnostic, not gating |
 | `_common/EXTENSIONS.md` | deferred | n/a | n/a | do not create until a fourth cross-genre pattern is not already covered by core v1.6 |
 
