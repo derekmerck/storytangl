@@ -17,7 +17,7 @@ import pygame
 
 from dataclasses import dataclass
 
-from .models import StageImage, Turn
+from .models import Choice, MapPlate, MapRegion, StageImage, Turn
 
 
 @dataclass(slots=True, frozen=True)
@@ -36,6 +36,10 @@ SCALE = 3
 
 BACKGROUND_ROLES = ("narrative_im", "cover_im")
 PORTRAIT_ROLES = ("dialog_im", "avatar_im")
+MAP_ROLES = ("map_im",)
+"""A plate is full-frame but is not scenery: it is deliberately outside
+BACKGROUND_ROLES so a client with no map view never stages it as a backdrop."""
+
 PORTRAIT_HEIGHT = 112
 MARGIN = 10
 _DEFAULT_SLOTS = ("left", "right", "mid")
@@ -127,6 +131,10 @@ class Stage:
 
         self.hitboxes.clear()
         loaded, unloadable = self._resolve_images(turn)
+        if self._draw_map(turn, loaded):
+            pygame.transform.scale(self.surface, self.window.get_size(), self.window)
+            pygame.display.flip()
+            return
         self._draw_background(loaded)
         # Choices are laid out first and always reserved, so a long exchange can
         # never push the only way to continue off the logical surface.
@@ -144,6 +152,111 @@ class Stage:
         self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
+
+    # ── map view ─────────────────────────────────────────────────────────
+
+    def _draw_map(
+        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]]
+    ) -> bool:
+        """Draw the plate with a hitbox per claimed region. False when no map.
+
+        Numbering runs over the whole choice list, so a region's label and its
+        keyboard shortcut are the same number, and a choice no region claims
+        still gets an ordinary row. That is the Input Parity floor made visible
+        rather than merely asserted in a test.
+        """
+
+        plate = turn.plate
+        staged = self._pick(loaded, MAP_ROLES)
+        if plate is None or not staged:
+            return False
+
+        self.surface.blit(pygame.transform.scale(staged[0][1], LOGICAL_SIZE), (0, 0))
+        claimed = self._claimed_regions(turn, plate)
+        for index, choice, region in claimed:
+            self._draw_region(index, choice, region)
+
+        self._draw_map_footer(turn)
+        return True
+
+    @staticmethod
+    def _claimed_regions(
+        turn: Turn, plate: MapPlate
+    ) -> list[tuple[int, Choice, MapRegion]]:
+        """Pair each region with the choice claiming it, in plate order.
+
+        A region no choice claims is simply absent from the result: nothing is
+        drawn and nothing is clickable, which is how a place that is not on
+        offer differs from one that is offered and refused.
+        """
+
+        by_tag = {
+            tag: (index, choice)
+            for index, choice in enumerate(turn.choices, start=1)
+            for tag in choice.tags
+        }
+        pairs: list[tuple[int, Choice, MapRegion]] = []
+        for region in plate.regions:
+            match = by_tag.get(plate.claim(region))
+            if match is not None:
+                pairs.append((match[0], match[1], region))
+        return pairs
+
+    def _draw_region(self, index: int, choice: Choice, region: MapRegion) -> None:
+        """Outline one region and pin its choice number inside the corner.
+
+        The pin carries the number only. A 70px box cannot hold "Go to The
+        Practice Yard", and the client is not allowed to shorten it — that
+        would mean parsing prose it does not own — so the names stay in the
+        legend and the number is what ties the two together.
+        """
+
+        rect = pygame.Rect(
+            round(region.x * LOGICAL_SIZE[0]),
+            round(region.y * LOGICAL_SIZE[1]),
+            max(4, round(region.w * LOGICAL_SIZE[0])),
+            max(4, round(region.h * LOGICAL_SIZE[1])),
+        )
+        colour = CREAM if choice.available else DIM
+        pygame.draw.rect(self.surface, colour, rect, width=1)
+
+        text = self.font.render(str(index), False, colour)
+        pin = pygame.Rect(rect.x + 1, rect.y + 1, text.get_width() + 4, ROW_H)
+        pygame.draw.rect(self.surface, INK, pin)
+        self.surface.blit(text, (pin.x + 2, pin.y))
+
+        if choice.available:
+            self.hitboxes.append((rect, choice.edge_id, choice.payload))
+
+    def _draw_map_footer(self, turn: Turn) -> None:
+        """Narration and the full numbered legend along the bottom.
+
+        Every choice appears here, including the ones that already have a box
+        on the plate. That is the Input Parity floor kept literally on screen:
+        the same number, the same edge, whichever the reader clicks.
+        """
+
+        rows = [part for line in turn.lines for part in self._wrap(line.text, 74)]
+        height = (len(rows) + len(turn.choices)) * ROW_H
+        if not height:
+            return
+        y = LOGICAL_SIZE[1] - height - 2
+        for row in rows:
+            pygame.draw.rect(self.surface, INK, pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H))
+            self.surface.blit(self.font.render(row, False, CREAM), (4, y))
+            y += ROW_H
+        for index, choice in enumerate(turn.choices, start=1):
+            colour = CREAM if choice.available else DIM
+            label = f"{index}. {choice.text}"
+            if not choice.available and choice.unavailable_reason:
+                label = f"{label} — {choice.unavailable_reason}"
+            text = self.font.render(label, False, colour)
+            pygame.draw.rect(self.surface, INK, pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H))
+            self.surface.blit(text, (4, y))
+            if choice.available:
+                rect = pygame.Rect(4, y, text.get_width(), ROW_H)
+                self.hitboxes.append((rect, choice.edge_id, choice.payload))
+            y += ROW_H
 
     def _draw_background(
         self, loaded: list[tuple[StageImage, pygame.Surface]]

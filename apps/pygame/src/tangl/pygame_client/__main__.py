@@ -63,6 +63,14 @@ def _merge(turns: list[Turn]) -> Turn:
     return merged
 
 
+def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
+    """Merge a batch into one actionable frame and attach the current plate."""
+
+    frame = _merge(_turns(bridge, envelope))
+    frame.plate = bridge.map_plate()
+    return frame
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--world", default="repartee_loop")
@@ -79,14 +87,14 @@ def main(argv: list[str] | None = None) -> int:
     bridge = PygameSessionBridge()
     envelope = bridge.start(args.world)
     stage = Stage(asset_dir=args.assets, title=f"StoryTangl — {args.world}")
-    frame = _merge(_turns(bridge, envelope))
+    frame = _frame(bridge, envelope)
 
     for _ in range(args.advance):
         available = [choice for choice in frame.choices if choice.available]
         if not available:
             break
         envelope = bridge.choose(available[0].edge_id, available[0].payload)
-        frame = _merge(_turns(bridge, envelope))
+        frame = _frame(bridge, envelope)
 
     stage.draw(frame)
 
@@ -102,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if (hit := stage.hit(event.pos)) is not None:
                     envelope = bridge.choose(*hit)
-                    frame = _merge(_turns(bridge, envelope))
+                    frame = _frame(bridge, envelope)
                     stage.draw(frame)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -120,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
                     if index < len(frame.choices) and frame.choices[index].available:
                         choice = frame.choices[index]
                         envelope = bridge.choose(choice.edge_id, choice.payload)
-                        frame = _merge(_turns(bridge, envelope))
+                        frame = _frame(bridge, envelope)
                         stage.draw(frame)
     pygame.quit()
     return 0

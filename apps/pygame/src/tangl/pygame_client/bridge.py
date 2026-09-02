@@ -34,7 +34,7 @@ from tangl.service.response import (
 )
 from tangl.service.service_manager import ServiceManager
 
-from .models import Choice, Line, StageImage, Turn
+from .models import Choice, Line, MapPlate, MapRegion, StageImage, Turn
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +141,72 @@ class PygameSessionBridge:
             raise RuntimeError("RuntimeEnvelope metadata did not include ledger_id")
         self.ledger_id = raw if isinstance(raw, UUID) else UUID(str(raw))
 
+    # ── disclosure ───────────────────────────────────────────────────────
+
+    def map_plate(self) -> MapPlate | None:
+        """Return the plate the cursor publishes, or None where there is no map.
+
+        Plate geometry rides story-info rather than the journal because it is
+        reference state, not turn content: it changes when the world's art
+        changes, not when the reader moves. Requested by name so a client that
+        cannot draw maps never pays for it.
+        """
+
+        if self.user_id is None or self.ledger_id is None:
+            return None
+        state = self.service_manager.get_story_info(
+            user_id=self.user_id,
+            ledger_id=self.ledger_id,
+            kinds=["map_plate", "map_regions"],
+        )
+        sections = {
+            section.get("section_id"): section
+            for section in (state.to_dto().get("sections") or [])
+        }
+        summary = sections.get("sandbox_map_plate")
+        if summary is None:
+            return None
+        rows = {
+            row.get("key"): row.get("value")
+            for row in (summary.get("value", {}).get("items") or [])
+        }
+        name = _text(rows.get("Name"))
+        if name is None:
+            return None
+        return MapPlate(
+            name=name,
+            image=_text(rows.get("Image")),
+            regions=self._regions(sections.get("sandbox_map_regions")),
+        )
+
+    @staticmethod
+    def _regions(section: dict[str, Any] | None) -> tuple[MapRegion, ...]:
+        """Read region rows, skipping any the table cannot express as numbers."""
+
+        if section is None:
+            return ()
+        value = section.get("value") or {}
+        columns = list(value.get("columns") or [])
+        regions: list[MapRegion] = []
+        for row in value.get("rows") or []:
+            fields = dict(zip(columns, row))
+            name = _text(fields.get("Region"))
+            if name is None:
+                continue
+            try:
+                regions.append(
+                    MapRegion(
+                        name=name,
+                        x=float(fields["x"]),
+                        y=float(fields["y"]),
+                        w=float(fields["w"]),
+                        h=float(fields["h"]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                logger.debug("Unusable map region row: %r", row)
+        return tuple(regions)
+
     # ── adaptation ───────────────────────────────────────────────────────
 
     def build_turns(self, fragments: list[BaseFragment]) -> list[Turn]:
@@ -170,6 +236,11 @@ class PygameSessionBridge:
                     available=bool(getattr(fragment, "available", True)),
                     unavailable_reason=_text(getattr(fragment, "unavailable_reason", None)),
                     payload=fragment.activation_payload,
+                    tags=frozenset(
+                        tag
+                        for tag in (getattr(fragment, "tags", None) or ())
+                        if isinstance(tag, str)
+                    ),
                 )
             )
             return
