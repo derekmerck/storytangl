@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import difflib
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
@@ -18,11 +20,16 @@ from ..episode import Action, Block, MenuBlock, Scene
 from .types import AuthoredRef, CompileIssue, CompileSeverity, JsonValue
 
 
+logger = logging.getLogger(__name__)
+
+
 ISSUE_DUPLICATE_LABEL = "compile:duplicate_label"
 ISSUE_DANGLING_SUCCESSOR_REF = "compile:dangling_successor_ref"
 ISSUE_DANGLING_ACTOR_REF = "compile:dangling_actor_ref"
 ISSUE_DANGLING_LOCATION_REF = "compile:dangling_location_ref"
 ISSUE_EMPTY_ENTRY_RESOLUTION = "compile:empty_entry_resolution"
+ISSUE_PAYLOAD_CONSTRUCTION_FAILED = "compile:payload_construction_failed"
+ISSUE_UNKNOWN_AUTHORED_KEY = "compile:unknown_authored_key"
 
 # Allowed ``details`` keys per issue code. Keep this close to the compiler
 # helpers so the JSON-like payload shape stays explicit and testable.
@@ -32,6 +39,8 @@ _COMPILE_ISSUE_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
     ISSUE_DANGLING_ACTOR_REF: ("reference_key", "missing_ref"),
     ISSUE_DANGLING_LOCATION_REF: ("reference_key", "missing_ref"),
     ISSUE_EMPTY_ENTRY_RESOLUTION: ("requested_entry_ids", "resolution_strategy"),
+    ISSUE_PAYLOAD_CONSTRUCTION_FAILED: ("kind", "fallback_kind", "error", "hint"),
+    ISSUE_UNKNOWN_AUTHORED_KEY: ("key", "kind", "hint"),
 }
 
 
@@ -67,6 +76,7 @@ class _CompileCollector:
     declarations: list[_DeclaredTemplate] = field(default_factory=list)
     declarations_by_template_label: dict[str, list[_DeclaredTemplate]] = field(default_factory=dict)
     pending: list[_PendingDiagnostic] = field(default_factory=list)
+    settled: list[CompileIssue] = field(default_factory=list)
 
     @classmethod
     def from_source_map(cls, source_map: dict[str, Any] | None) -> "_CompileCollector":
@@ -158,6 +168,36 @@ class _CompileCollector:
             )
         )
 
+    def add_settled(
+        self,
+        *,
+        code: str,
+        severity: CompileSeverity,
+        message: str,
+        subject_label: str | None,
+        authored_path: str,
+        details: dict[str, JsonValue] | None = None,
+    ) -> None:
+        """Record a diagnostic that is already final at the point it is found.
+
+        Unlike :meth:`add_pending`, these issues describe the authored payload
+        itself rather than a reference, so nothing declared later can resolve
+        them away.
+        """
+        self.settled.append(
+            CompileIssue(
+                code=code,
+                severity=severity,
+                message=message,
+                subject_label=subject_label,
+                source_ref=self.build_source_ref(
+                    authored_path=authored_path,
+                    label=subject_label,
+                ),
+                details=_sanitize_issue_details(code, details or {}),
+            )
+        )
+
     def has_candidate(self, identifier: str, *, kind: type[Entity]) -> bool:
         for declaration in self.declarations:
             if not issubclass(declaration.payload_kind, kind):
@@ -177,6 +217,7 @@ class _CompileCollector:
     ) -> list[CompileIssue]:
         issues: list[CompileIssue] = []
         issues.extend(self._build_duplicate_issues())
+        issues.extend(self.settled)
         issues.extend(self._build_pending_issues())
         entry_issue = self._build_entry_issue(
             story_label=story_label,
@@ -309,6 +350,202 @@ def _required_kind_for_issue_code(code: str) -> type[Entity]:
     if code == ISSUE_DANGLING_LOCATION_REF:
         return Location
     return Entity
+
+
+# Authored gating is spelled ``conditions:`` (see ``BaseScriptItem`` in the IR
+# schema and the near-native authoring docs). ``availability`` is the runtime
+# field name and takes ``Predicate`` mappings, so a bare list of expression
+# strings authored there fails validation instead of gating anything.
+_CONDITIONS_AUTHORING_HINT = (
+    "Author gating as 'conditions:' (a list of expression strings); "
+    "'availability:' is the runtime field and takes Predicate mappings."
+)
+
+
+def _summarize_construction_error(error: Exception) -> str:
+    """Flatten a payload construction error into one diagnostic line."""
+
+    lines = [
+        stripped
+        for line in str(error).splitlines()
+        if (stripped := line.strip())
+        and not stripped.startswith("For further information visit")
+    ]
+    return " ".join(lines) or error.__class__.__name__
+
+
+def _authoring_hint_for_payload(payload: dict[str, Any]) -> str | None:
+    """Return an authoring hint for construction failures we recognize."""
+
+    availability = payload.get("availability")
+    if isinstance(availability, list) and any(
+        isinstance(item, str) for item in availability
+    ):
+        return _CONDITIONS_AUTHORING_HINT
+    return None
+
+
+def _report_payload_construction_failure(
+    *,
+    collector: _CompileCollector,
+    authored_path: str,
+    label: str,
+    kind: type[Entity],
+    payload: dict[str, Any],
+    error: Exception,
+) -> None:
+    """Record the structural downgrade applied when a payload will not build.
+
+    The compiler still falls back to a bare :class:`TraversableNode` so one bad
+    block does not abort the whole compile, but the downgrade is lossy: the
+    authored kind, its gating, and its role/setting scopes are all dropped. That
+    must never be silent, so it is logged for the authoring loop and collected
+    as an error for bundle preflight.
+    """
+
+    summary = _summarize_construction_error(error)
+    hint = _authoring_hint_for_payload(payload)
+    message = (
+        f"Authored payload {label!r} could not be constructed as "
+        f"{kind.__name__} and was compiled as a degraded "
+        f"{TraversableNode.__name__}: {summary}"
+    )
+    if hint:
+        message = f"{message} {hint}"
+    logger.warning("%s (authored at %s)", message, authored_path)
+    details: dict[str, JsonValue] = {
+        "kind": kind.__name__,
+        "fallback_kind": TraversableNode.__name__,
+        "error": summary,
+    }
+    if hint:
+        details["hint"] = hint
+    collector.add_settled(
+        code=ISSUE_PAYLOAD_CONSTRUCTION_FAILED,
+        severity=CompileSeverity.ERROR,
+        message=message,
+        subject_label=label,
+        authored_path=authored_path,
+        details=details,
+    )
+
+
+# Authored keys the compiler consumes outside the payload model. Anything else
+# that survives normalization is authored data with no home on the payload kind,
+# so it is reported rather than dropped in silence.
+_COMPILER_HANDLED_KEYS = frozenset(
+    {
+        # Resolved into the payload class itself by ``_resolve_kind``.
+        "kind",
+        "block_cls",
+        # Structural children compiled into their own templates.
+        "blocks",
+        "templates",
+        # IR record bookkeeping emitted by ``StoryScript.model_dump`` on the
+        # ``validate_ir`` path. No runtime payload carries these.
+        "ancestor_tags",
+        "forbid_ancestor_tags",
+        "path_pattern",
+        "template_names",
+        "locked",
+        "seq",
+        "origin_id",
+        "parent",
+    }
+)
+
+
+def _is_empty_authored_value(value: Any) -> bool:
+    """Return ``True`` for authored values that carry nothing to lose.
+
+    Call sites hand ``_build_payload`` normalized containers whether or not the
+    author wrote them, so an empty one says nothing about authoring intent.
+    ``False`` and ``0`` are authored content and are deliberately not empty.
+    """
+
+    if value is None:
+        return True
+    if isinstance(value, (str, list, tuple, set, dict)):
+        return len(value) == 0
+    return False
+
+
+def _dropped_key_hint(*, key: str, kind: type[Entity], allowed: set[str]) -> str | None:
+    """Return an authoring hint for a dropped key we recognize."""
+
+    if key in ("conditions", "availability") and "availability" not in allowed:
+        return (
+            f"{kind.__name__} is not a traversable node and carries no "
+            "availability gate; author gating on the block, scene, or action "
+            "that uses it."
+        )
+    near = difflib.get_close_matches(key, sorted(allowed), n=1, cutoff=0.8)
+    if near:
+        return f"Did you mean {near[0]!r}?"
+    return None
+
+
+def _report_dropped_authored_keys(
+    *,
+    collector: _CompileCollector,
+    authored_path: str,
+    label: str,
+    kind: type[Entity],
+    payload: dict[str, Any],
+    allowed: set[str],
+) -> None:
+    """Report authored keys this payload kind cannot carry.
+
+    ``_build_payload`` filters the authored mapping down to the payload kind's
+    own fields. Keys the compiler folded elsewhere have been popped by the time
+    this runs, so whatever is left is authored data that has no home on ``kind``
+    and is about to be discarded. That stays a warning rather than an error: the
+    bundle still compiles and the rest of the payload is unaffected, but the
+    author asked for something they are not getting.
+    """
+
+    for key in sorted(payload):
+        if (
+            key in allowed
+            or key in _COMPILER_HANDLED_KEYS
+            or key.startswith("_")
+            or _is_empty_authored_value(payload[key])
+        ):
+            continue
+        hint = _dropped_key_hint(key=key, kind=kind, allowed=allowed)
+        message = (
+            f"Authored key {key!r} on {label!r} is not a field of "
+            f"{kind.__name__} and was discarded."
+        )
+        if hint:
+            message = f"{message} {hint}"
+        key_path = f"{authored_path}.{key}"
+        logger.warning("%s (authored at %s)", message, key_path)
+        details: dict[str, JsonValue] = {"key": key, "kind": kind.__name__}
+        if hint:
+            details["hint"] = hint
+        collector.add_settled(
+            code=ISSUE_UNKNOWN_AUTHORED_KEY,
+            severity=CompileSeverity.WARNING,
+            message=message,
+            subject_label=label,
+            authored_path=key_path,
+            details=details,
+        )
+
+
+def _payload_specs(payload: Entity, field_name: str) -> list[dict[str, Any]]:
+    """Return one provider-spec field, tolerating a degraded payload.
+
+    A payload that failed construction is downgraded to a bare
+    :class:`TraversableNode` and carries no role or setting scopes. Reading it
+    through ``getattr`` keeps the reported
+    ``compile:payload_construction_failed`` issue as the diagnostic the author
+    sees, instead of an unrelated ``AttributeError`` raised further downstream.
+    """
+
+    specs = getattr(payload, field_name, None)
+    return specs if isinstance(specs, list) else []
 
 
 def _sanitize_issue_details(code: str, details: dict[str, JsonValue]) -> dict[str, JsonValue]:
@@ -529,19 +766,25 @@ class StoryCompiler:
         root_scene_labels = {scene_label for _scene_index, scene_label, _scene_data in scenes}
         for scene_index, scene_label, scene_data in scenes:
             scene_authored_path = _authored_item_path("scenes", scene_index, scene_label)
+            scene_payload_data: dict[str, Any] = {
+                **scene_data,
+                "label": scene_data.get("label") or scene_label,
+                "title": scene_data.get("title") or scene_data.get("text") or "",
+                "roles": self._normalize_list(scene_data.get("roles")),
+                "settings": self._normalize_list(scene_data.get("settings")),
+            }
+            # ``text`` is an accepted authored spelling of a scene ``title``;
+            # drop it once folded in so it is not reported as an ignored key.
+            scene_payload_data.pop("text", None)
             scene_payload = self._build_payload(
                 kind=self._resolve_kind(
                     scene_data.get("kind"),
                     fallback=Scene,
                 ),
-                payload={
-                    **scene_data,
-                    "label": scene_data.get("label") or scene_label,
-                    "title": scene_data.get("title") or scene_data.get("text") or "",
-                    "roles": self._normalize_list(scene_data.get("roles")),
-                    "settings": self._normalize_list(scene_data.get("settings")),
-                },
+                payload=scene_payload_data,
                 default_label=scene_label,
+                collector=collector,
+                authored_path=scene_authored_path,
             )
             collector.add_declaration(
                 template_label=scene_label,
@@ -556,7 +799,7 @@ class StoryCompiler:
             root.add_child(scene_templ)
             self._collect_provider_ref_issues(
                 collector=collector,
-                specs=scene_payload.roles,
+                specs=_payload_specs(scene_payload, "roles"),
                 source_label=scene_label,
                 authored_path_prefix=f"{scene_authored_path}.roles",
                 field_name="roles",
@@ -565,7 +808,7 @@ class StoryCompiler:
             )
             self._collect_provider_ref_issues(
                 collector=collector,
-                specs=scene_payload.settings,
+                specs=_payload_specs(scene_payload, "settings"),
                 source_label=scene_label,
                 authored_path_prefix=f"{scene_authored_path}.settings",
                 field_name="settings",
@@ -650,6 +893,8 @@ class StoryCompiler:
                         "media": self._normalize_list(block_data.get("media")),
                     },
                     default_label=block_label,
+                    collector=collector,
+                    authored_path=block_authored_path,
                 )
                 collector.add_declaration(
                     template_label=qualified_label,
@@ -664,7 +909,7 @@ class StoryCompiler:
                 scene_templ.add_child(block_templ)
                 self._collect_provider_ref_issues(
                     collector=collector,
-                    specs=block_payload.roles,
+                    specs=_payload_specs(block_payload, "roles"),
                     source_label=qualified_label,
                     authored_path_prefix=f"{block_authored_path}.roles",
                     field_name="roles",
@@ -673,7 +918,7 @@ class StoryCompiler:
                 )
                 self._collect_provider_ref_issues(
                     collector=collector,
-                    specs=block_payload.settings,
+                    specs=_payload_specs(block_payload, "settings"),
                     source_label=qualified_label,
                     authored_path_prefix=f"{block_authored_path}.settings",
                     field_name="settings",
@@ -832,6 +1077,8 @@ class StoryCompiler:
                 ),
                 payload={**item_data, "label": item_data.get("label") or label},
                 default_label=label,
+                collector=collector,
+                authored_path=item_authored_path,
             )
             collector.add_declaration(
                 template_label=scoped_label,
@@ -1139,7 +1386,14 @@ class StoryCompiler:
         return mapping.get(kind_name, fallback)
 
     @staticmethod
-    def _build_payload(kind: type[Entity], payload: dict[str, Any], default_label: str) -> Entity:
+    def _build_payload(
+        kind: type[Entity],
+        payload: dict[str, Any],
+        default_label: str,
+        *,
+        collector: _CompileCollector,
+        authored_path: str,
+    ) -> Entity:
         payload = dict(payload)
 
         if isinstance(payload.get("effects"), list):
@@ -1178,16 +1432,21 @@ class StoryCompiler:
 
         if kind is Action:
             if payload.get("successor_ref") is None:
-                mapped_ref = (
-                    payload.get("successor")
-                    or payload.get("next")
-                    or payload.get("target_ref")
-                    or payload.get("target_node")
-                )
+                # Same first-truthy-else-last choice the chained ``or`` made,
+                # kept as a loop so the consumed spelling can be dropped from
+                # the payload instead of being reported as an ignored key.
+                mapped_ref = None
+                mapped_key = None
+                for ref_key in ("successor", "next", "target_ref", "target_node"):
+                    mapped_ref = payload.get(ref_key)
+                    mapped_key = ref_key
+                    if mapped_ref:
+                        break
                 if mapped_ref is not None:
                     payload["successor_ref"] = mapped_ref
+                    payload.pop(mapped_key, None)
             if not payload.get("text") and payload.get("content"):
-                payload["text"] = payload.get("content")
+                payload["text"] = payload.pop("content")
 
         if issubclass(kind, Block) and payload.get("_is_anonymous"):
             payload["is_anonymous"] = True
@@ -1196,10 +1455,28 @@ class StoryCompiler:
         filtered = {k: v for k, v in payload.items() if k in allowed}
         filtered.setdefault("label", payload.get("label") or default_label)
 
+        _report_dropped_authored_keys(
+            collector=collector,
+            authored_path=authored_path,
+            label=filtered.get("label", default_label),
+            kind=kind,
+            payload=payload,
+            allowed=allowed,
+        )
+
         try:
             return kind(**filtered)
-        except Exception:
-            fallback = TraversableNode(label=filtered.get("label", default_label))
+        except Exception as error:
+            label = filtered.get("label", default_label)
+            _report_payload_construction_failure(
+                collector=collector,
+                authored_path=authored_path,
+                label=label,
+                kind=kind,
+                payload=filtered,
+                error=error,
+            )
+            fallback = TraversableNode(label=label)
             if "locals" in payload and isinstance(payload["locals"], dict):
                 fallback.locals.update(payload["locals"])
             return fallback

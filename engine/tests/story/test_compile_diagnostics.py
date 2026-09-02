@@ -5,14 +5,20 @@ Organized by behavior:
 - Structural refs: missing successor, actor, and location refs become issues.
 - Source integrity: duplicate normalized labels are recorded without raising.
 - Entry resolution: invalid or empty entry selection is recorded at compile time.
+- Payload construction: a payload that will not build is downgraded loudly.
+- Unknown keys: authored keys a payload kind cannot carry are reported.
 - Aggregation: one compile can emit multiple deterministic issues.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from tangl.core import Selector
+from tangl.story.episode import Block
 from tangl.story.fabula import CompileSeverity, StoryCompiler
+from tangl.vm import TraversableNode
 
 
 # ============================================================================
@@ -213,6 +219,208 @@ class TestCompileDiagnosticsSourceIntegrity:
         }
         assert issue.source_ref is not None
         assert issue.source_ref.authored_path == "metadata.start_at"
+
+
+# ============================================================================
+# Payload Construction
+# ============================================================================
+
+
+class TestCompileDiagnosticsPayloadConstruction:
+    """Tests for the diagnostic emitted when an authored payload will not build.
+
+    ``conditions:`` is the authored gating surface (``BaseScriptItem`` in the
+    IR schema declares it; nothing declares ``availability:``). Authoring bare
+    strings under the runtime ``availability`` field therefore fails
+    validation, and the compiler downgrades that block to a plain
+    ``TraversableNode``. These tests pin that the downgrade is reported.
+    """
+
+    @staticmethod
+    def _payload(bundle, label: str):
+        templ = bundle.template_registry.find_one(Selector(label=label))
+        assert templ is not None
+        return templ.payload
+
+    def test_authored_conditions_compile_into_availability_predicates(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["conditions"] = ["flag"]
+
+        bundle = _compile(script)
+
+        assert bundle.issues == []
+        payload = self._payload(bundle, "intro.start")
+        assert isinstance(payload, Block)
+        assert [predicate.expr for predicate in payload.availability] == ["flag"]
+
+    def test_availability_string_list_records_construction_failure(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["availability"] = ["flag"]
+
+        bundle = _compile(script)
+
+        assert len(bundle.issues) == 1
+        issue = bundle.issues[0]
+        assert issue.code == "compile:payload_construction_failed"
+        assert issue.severity is CompileSeverity.ERROR
+        assert issue.phase == "compile"
+        assert issue.subject_label == "start"
+        assert issue.details["kind"] == "Block"
+        assert issue.details["fallback_kind"] == "TraversableNode"
+        assert "conditions:" in issue.details["hint"]
+        assert "Predicate" in issue.details["error"]
+        assert issue.source_ref is not None
+        assert issue.source_ref.authored_path == "scenes[0].intro.blocks[0].start"
+
+    def test_construction_failure_is_logged_with_block_and_kind(
+        self,
+        caplog,
+    ) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["availability"] = ["flag"]
+
+        with caplog.at_level(logging.WARNING, logger="tangl.story.fabula.compiler"):
+            _compile(script)
+
+        assert len(caplog.records) == 1
+        message = caplog.records[0].getMessage()
+        assert "'start'" in message
+        assert "Block" in message
+        assert "scenes[0].intro.blocks[0].start" in message
+
+    def test_degraded_payload_does_not_hide_other_diagnostics(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["availability"] = ["flag"]
+        script["scenes"]["intro"]["blocks"]["start"]["roles"] = [
+            {"label": "host", "actor_ref": "missing_actor"},
+        ]
+        script["scenes"]["intro"]["blocks"]["other"] = {
+            "content": "Other",
+            "actions": [{"text": "Go", "successor": "missing"}],
+        }
+
+        bundle = _compile(script)
+
+        payload = self._payload(bundle, "intro.start")
+        assert type(payload) is TraversableNode
+        # The degraded block carries no roles, so its dangling actor ref is not
+        # reachable; the construction issue is what explains that loss.
+        assert [issue.code for issue in bundle.issues] == [
+            "compile:payload_construction_failed",
+            "compile:dangling_successor_ref",
+        ]
+
+    def test_scene_payload_construction_failure_is_recorded(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["availability"] = ["flag"]
+
+        bundle = _compile(script)
+
+        assert len(bundle.issues) == 1
+        issue = bundle.issues[0]
+        assert issue.code == "compile:payload_construction_failed"
+        assert issue.subject_label == "intro"
+        assert issue.details["kind"] == "Scene"
+        assert issue.source_ref is not None
+        assert issue.source_ref.authored_path == "scenes[0].intro"
+
+
+# ============================================================================
+# Unknown Authored Keys
+# ============================================================================
+
+
+class TestCompileDiagnosticsUnknownAuthoredKeys:
+    """Tests for authored keys discarded because the payload kind lacks them.
+
+    The compiler filters authored data down to the payload kind's own fields.
+    Keys it folds elsewhere first (``conditions`` into ``availability``, action
+    successor spellings, scene ``text``) must stay silent; what is left is
+    authored intent that goes nowhere, and is reported as a warning.
+    """
+
+    @staticmethod
+    def _unknown_key_issues(bundle):
+        return [
+            issue
+            for issue in bundle.issues
+            if issue.code == "compile:unknown_authored_key"
+        ]
+
+    def test_location_conditions_are_reported_as_discarded(self) -> None:
+        script = _valid_script()
+        script["locations"]["square"]["conditions"] = ["flag"]
+
+        bundle = _compile(script)
+
+        assert len(bundle.issues) == 1
+        issue = bundle.issues[0]
+        assert issue.code == "compile:unknown_authored_key"
+        assert issue.severity is CompileSeverity.WARNING
+        assert issue.phase == "compile"
+        assert issue.subject_label == "square"
+        assert issue.details["key"] == "conditions"
+        assert issue.details["kind"] == "Location"
+        assert "not a traversable node" in issue.details["hint"]
+        assert issue.source_ref is not None
+        assert issue.source_ref.authored_path == "locations[0].square.conditions"
+
+    def test_misspelled_key_suggests_the_near_field_name(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["contents"] = "Start"
+
+        issues = self._unknown_key_issues(_compile(script))
+
+        assert len(issues) == 1
+        assert issues[0].details["key"] == "contents"
+        assert issues[0].details["hint"] == "Did you mean 'content'?"
+
+    def test_authored_data_lost_to_a_non_block_kind_is_reported(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["kind"] = "Node"
+        script["scenes"]["intro"]["blocks"]["start"]["actions"] = [
+            {"text": "Go", "successor": "intro.start"},
+        ]
+
+        issues = self._unknown_key_issues(_compile(script))
+
+        assert [issue.details["key"] for issue in issues] == ["actions", "content"]
+        assert {issue.details["kind"] for issue in issues} == {"TraversableNode"}
+
+    def test_normalized_containers_the_author_left_empty_are_not_reported(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"] = {"kind": "Node"}
+
+        assert self._unknown_key_issues(_compile(script)) == []
+
+    def test_compiler_handled_keys_are_not_reported(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["kind"] = "Scene"
+        script["scenes"]["intro"]["text"] = "Intro"
+        script["scenes"]["intro"]["templates"] = {
+            "note": {"kind": "Actor", "name": "Note"},
+        }
+        script["actors"]["guide"]["locked"] = False
+        script["actors"]["guide"]["ancestor_tags"] = []
+
+        assert self._unknown_key_issues(_compile(script)) == []
+
+    def test_action_successor_spellings_are_not_reported(self) -> None:
+        script = _valid_script()
+        script["templates"] = {
+            "go": {"kind": "Action", "text": "Go", "target_node": "intro.start"},
+        }
+
+        assert self._unknown_key_issues(_compile(script)) == []
+
+    def test_validated_ir_roundtrip_reports_no_unknown_keys(self) -> None:
+        script = _valid_script()
+        script["metadata"].update({"title": "Compile Diag", "author": "Tests"})
+        validated = StoryCompiler.validate_ir(script)
+
+        bundle = StoryCompiler().compile(validated)
+
+        assert self._unknown_key_issues(bundle) == []
 
 
 # ============================================================================
