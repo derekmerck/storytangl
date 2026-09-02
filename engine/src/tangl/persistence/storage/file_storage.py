@@ -1,6 +1,8 @@
 from pathlib import Path
+from uuid import UUID
 
 from tangl.type_hints import FlatData
+from tangl.utils.is_valid_uuid import is_valid_uuid
 
 class FileStorage:
 
@@ -44,11 +46,15 @@ class FileStorage:
         fp.unlink()
 
     def __len__(self) -> int:
-        return sum(1 for item in self.base_path.iterdir() if item.is_file())
+        return sum(1 for _ in self)
 
     def __iter__(self):
-        return iter(self.base_path.iterdir())
+        suffix = f".{self.ext}"
+        for path in self.base_path.iterdir():
+            if not path.is_file() or not path.name.endswith(suffix):
+                continue
+            key = path.name.removesuffix(suffix)
+            yield UUID(key) if is_valid_uuid(key) else key
 
     def __bool__(self) -> bool:
         return len(self) != 0
-
