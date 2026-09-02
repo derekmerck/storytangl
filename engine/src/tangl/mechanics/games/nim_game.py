@@ -16,16 +16,24 @@ Bounded multi-heap Nim is genuinely strategic. The Grundy value of a heap of
 size ``n`` under a take bound ``k`` is ``n % (k + 1)``, and a position is lost
 for the mover exactly when those values XOR to zero — which is what
 ``nim_optimal`` plays.
+
+Misere play, where taking the last token loses, is a different game and that
+identity does not carry over. It is solved by exhaustive search instead, since
+no closed form is implemented for the bounded multi-heap case.
+
+Only the ordinary take-at-least-one game is supported. A larger minimum take
+creates positions holding tokens with no legal move, and the outcome of a stuck
+board is an undesigned rule rather than a missing branch.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import reduce
+from functools import lru_cache, reduce
 from operator import xor
 import random
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from tangl.journal.intent import QuantityAccepts
 from tangl.journal.fragments import ContentFragment
@@ -41,42 +49,73 @@ from .strategies import opponent_strategies
 DEFAULT_HEAP = "heap"
 
 
+#: Largest board the exact misere recurrence will search. Narrative boards are
+#: far smaller; beyond this the caller is asking for something this solver
+#: cannot answer, and saying so beats returning a guess.
+MAX_EXACT_TOKENS = 60
+
+
+@lru_cache(maxsize=None)
+def _exact_losing(piles: tuple[int, ...], max_take: int, last_token_wins: bool) -> bool:
+    """Return whether the mover is lost, by exhaustive search of the game tree.
+
+    ``piles`` must be sorted and hold no empty heaps, which keeps the memo
+    keyed on positions rather than orderings.
+    """
+
+    if not piles:
+        # Under normal play the previous mover took the last token and won, so
+        # the player facing an empty board has lost. Under misere they won.
+        return last_token_wins
+
+    children = set()
+    for index, count in enumerate(piles):
+        for take in range(1, min(max_take, count) + 1):
+            nxt = list(piles)
+            nxt[index] = count - take
+            children.add(tuple(sorted(value for value in nxt if value > 0)))
+
+    return all(
+        not _exact_losing(child, max_take, last_token_wins) for child in children
+    )
+
+
 def is_losing(piles: list[int], max_take: int, last_token_wins: bool) -> bool:
     """Return whether the player to move is lost under optimal play.
 
-    Normal play (taking the last token wins) is bounded-Nim Grundy: a heap of
-    size ``n`` has value ``n % (max_take + 1)`` and the mover is lost when
-    those XOR to zero.
+    Normal play is bounded-Nim Grundy: a heap of size ``n`` has value
+    ``n % (max_take + 1)`` and the mover is lost when those XOR to zero. That
+    identity is exact and cheap, so it is used directly.
 
-    Misère play (taking the last token loses) is a different game and the
-    normal-play answer is simply wrong for it. Two cases are exact and are the
-    ones that matter:
+    Misere play is a genuinely different game, and the normal-play answer does
+    not describe it — not even approximately. Sweeping three-heap boards under
+    take bounds of two through four, treating the Grundy result as a misere
+    answer disagrees with the exact recurrence in over a hundred positions, so
+    this searches the game tree instead. Results are memoized across calls.
 
-    - a single heap is lost for the mover when ``n % (max_take + 1) == 1``,
-      the modulus shifted by one
-    - once every heap holds at most one token the take bound is irrelevant, and
-      the mover is lost exactly when an odd number of heaps remain
-
-    Between those, this follows the standard misère-Nim convention of playing
-    the normal-play strategy until the endgame. That is exact for unbounded
-    Nim; under a take bound with mixed large heaps it is a heuristic, and is
-    documented as such rather than claimed as theory.
+    Raises
+    ------
+    ValueError
+        If a misere board is larger than :data:`MAX_EXACT_TOKENS`. Returning a
+        heuristic from a function documented as a forced-win test would be
+        worse than declining to answer.
     """
 
-    live = [count for count in piles if count > 0]
+    live = sorted(count for count in piles if count > 0)
     if not live:
-        return True
-
-    modulus = max_take + 1
+        return last_token_wins
 
     if last_token_wins:
-        return reduce(xor, [count % modulus for count in live]) == 0
+        return reduce(xor, [count % (max_take + 1) for count in live]) == 0
 
-    if len(live) == 1:
-        return live[0] % modulus == 1
-    if all(count <= 1 for count in live):
-        return len(live) % 2 == 1
-    return reduce(xor, [count % modulus for count in live]) == 0
+    total = sum(live)
+    if total > MAX_EXACT_TOKENS:
+        raise ValueError(
+            f"Misere analysis needs an exact search; {total} tokens exceeds the "
+            f"{MAX_EXACT_TOKENS}-token bound. No closed form is implemented for "
+            "bounded multi-heap misere play."
+        )
+    return _exact_losing(tuple(live), max_take, last_token_wins)
 
 
 @dataclass(frozen=True)
@@ -101,6 +140,9 @@ class NimGame(Game[NimMove]):
 
     #: Opening heap contents, keyed by token label. One entry is classic Nim.
     opening_heaps: dict[str, int] = Field(default_factory=lambda: {DEFAULT_HEAP: 7})
+    #: Only the ordinary take-at-least-one game is supported. A larger minimum
+    #: creates positions with tokens remaining but no legal move, and who wins
+    #: a stuck board is an undesigned rule rather than a missing branch.
     min_take: int = 1
     max_take: int = 3
     last_token_wins: bool = True
@@ -113,8 +155,13 @@ class NimGame(Game[NimMove]):
             # gain()/spend() mutate the wallet in place, so without an explicit
             # include the recursive exclude_unset dump emits an empty bag and a
             # saved game reloads with no board.
+            #
+            # Deliberately NOT unstructurable: AssetWallet is a plain
+            # BaseModelPlus with no constructor form, so that marker would leave
+            # the live object in the dump and only survive an in-process
+            # hand-back. The field annotation rebuilds it from an ordinary
+            # mapping instead.
             "include": True,
-            "unstructurable": True,
         },
     )
     opponent_next_move: NimMove | None = Field(
@@ -129,6 +176,18 @@ class NimGame(Game[NimMove]):
         default=None,
         json_schema_extra={"reset_field": True},
     )
+
+    @field_validator("min_take")
+    @classmethod
+    def _only_ordinary_takes(cls, value: int) -> int:
+        if value != 1:
+            raise ValueError(
+                "NimGame supports min_take=1 only. A larger minimum leaves "
+                "positions with tokens remaining and no legal move, and the "
+                "outcome of a stuck board is an undesigned rule; the Grundy "
+                "and misere analyses also assume the ordinary game."
+            )
+        return value
 
     @property
     def total_tokens(self) -> int:
