@@ -39,6 +39,47 @@ scratch version never had: `competency_modifier`, `growth_modifier` (training
 gain, deliberately distinct from payout), `forced_outcome`, `domain_override`,
 and currency remaps.
 
+Residue check
+-------------
+
+Review of the first pass asked specifically about three places where value
+would hide before deleting. Checked; the residue is real but narrow.
+
+**Stat currencies are unpaired.** The old domain maps carried a resource *and*
+a depletion currency — `BODY: "stamina"  # cost: fatigue`, `MIND: "wit"  # cost:
+focus`, `SPIRIT: "will"  # cost: temper, stress`. Realized `StatDef` has a
+single `currency_name`. Effects can remap and scale costs
+(`cost_currency_remap`, `cost_modifier`), but a stat does not declare what
+spending it costs. Whether that wants a field or wants fatigue modelled as its
+own stat is a design question, not an oversight to correct blind.
+
+**The specialized domain catalogs are mostly absorbed.** `OpinionatedDomains`
+mapped nine domains to currencies; the fantasy preset already carries
+`body`/`stamina`, `mind`/`focus`, `charm`, and `hidden` — the last taken
+straight from `CRIME: "hidden"`. What did not land is genre content for a game
+that does not exist: `PRESTIGE`/influence, `PRINCESS`/presence,
+`CORRUPTION`/darkness, `BEAUTY`/composure, `COMFORT`/heat. Two smaller
+conventions did not land either: domain **aliases** (`CHARM = COMFORT`,
+`CORRUPTION = CRIME` — one domain, two flavors) and an explicit `ANY` wildcard
+domain, which the automata catalog assumes when it writes `@all-up`. Empty
+`applies_to_tags` covers the wildcard semantically today.
+
+**Two task semantics are genuinely absent.** Most of the old `TaskHandler`
+mapped cleanly onto current names — `can_pay_cost` is `can_afford`,
+`difficulty_delta` is `compute_delta`, `realized_payout` is outcome scaling over
+`_scale_wallet`. Two did not:
+
+- `can_receive_payout` — a **capacity** check before granting a reward. Wallets
+  are uncapped and `earn()` cannot refuse, so nothing can express "you cannot
+  hold any more of this".
+- `_update_task_history` — per-task attempt tracking. There is no attempt count
+  or past-outcome record on `Task`. The journal records what happened
+  narratively; the task does not know it has been tried before, which matters
+  for diminishing returns or one-shot opportunities.
+
+Neither is a reason to keep the scratch code. Both are worth an issue if a world
+wants them.
+
 Recommended retirement
 ----------------------
 
