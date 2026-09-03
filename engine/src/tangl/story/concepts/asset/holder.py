@@ -13,8 +13,11 @@ from .wallet import AssetWallet
 class HasAssets(HasNamespace):
     """Story concept facet for holders of fungible and discrete assets."""
 
-    wallet: AssetWallet = Field(default_factory=AssetWallet)
-    assets: dict[str, Token] = Field(default_factory=dict)
+    wallet: AssetWallet = Field(
+        default_factory=AssetWallet,
+        json_schema_extra={"include": True},
+    )
+    assets: dict[str, Token] = Field(default_factory=dict, exclude=True)
 
     def _asset_key(self, asset: Token, label: str | None = None) -> str:
         key = label or asset.get_label() or asset.token_from
