@@ -1,8 +1,8 @@
 Progression scratch: audit
 ==========================
 
-Inventory only. **Nothing deleted yet** — the recommended retirements are listed
-below for a decision, not applied.
+Audited and retired. The superseded sources are deleted; four badge-related
+files and this ledger remain. Git history holds the rest if anything needs to be re-read.
 
 `scratch/mechanics/progression` carries three generations at once:
 
@@ -80,10 +80,10 @@ mapped cleanly onto current names — `can_pay_cost` is `can_afford`,
 Neither is a reason to keep the scratch code. Both are worth an issue if a world
 wants them.
 
-Recommended retirement
-----------------------
+Retired
+-------
 
-Everything not named in the next section. That is roughly 42 of the 46 files,
+Everything not named in the next section was deleted. That is roughly 42 of the 46 files,
 including all of `stats/`, all of `legacy/` except the two badge sources, all of
 `challenge_block/` except `situational_effect-2.py`, and both test trees. Each
 has a strictly better realized counterpart in the table above.
