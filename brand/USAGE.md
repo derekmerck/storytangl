@@ -28,7 +28,7 @@ Custom tunings for new fonts require updating the brand sheet first.
 | `wordmark.svg` | `brand/assets/wordmark.svg` | SVG with webfont |
 | `glyph.svg` / `glyph-round.svg` | `brand/assets/glyph*.svg` | SVG with webfont |
 | `favicon.svg` | `apps/web/public/favicon.svg`, `docs/src/_static/favicon.svg` | SVG with webfont (browsers cache it locally; fallback to `favicon.ico` for IE11-era) |
-| `README-banner.svg` | `brand/assets/README-banner.svg`; optionally reference in `README.md` above the `# StoryTangl` line | SVG with webfont |
+| `README-banner.svg` | `brand/assets/README-banner.svg`; rasterized to `.github/assets/README-banner.png` and referenced in `README.md` above the `# StoryTan⅁l` line | SVG source; PNG deployment export at 2560×720 |
 | `social-card.svg` | `.github/social-card.svg` as source; rasterize outside the repo before configuring GitHub's social preview | SVG source; PNG deployment export at 1280×640 |
 | `cli-splash.txt` | `apps/cli/src/tangl/cli/assets/splash.txt`, loaded by the cmd2 app on launch | plain text |
 | `palette.css` | `apps/web/src/styles/storytangl-palette.css`; `docs/src/_static/storytangl-palette.css` | CSS |
@@ -59,6 +59,12 @@ No path exports are checked in here. Downstream targets that need outlined
 paths should commit the font-dependent source and path export together in that
 target's asset directory. Do not regenerate paths without confirming the
 typographic tuning matches §1 of the brand sheet (per-font sx/sy/ty values).
+
+For raster targets, use [`scripts/render_brand_assets.py`](../scripts/render_brand_assets.py),
+which embeds the real faces and rasterizes through headless Chrome. Do **not**
+reach for a renderer that resolves fonts from the system — `rsvg-convert`,
+ImageMagick, and CoreText-backed tools all substitute a fallback silently, and
+under a fallback serif the turned-`G` collides with the following `l`.
 
 ## 4. The lockup is the wordmark or the wordmark + glyph — never the glyph alone with text
 

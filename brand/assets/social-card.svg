@@ -33,6 +33,6 @@
 
   <circle cx="1148" cy="540" r="64" fill="#1a1a1a"></circle>
   <g transform="translate(1148 540) rotate(180) scale(0.82 1)">
-    <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="700" font-size="100" fill="#f6f3ea">G</text>
+    <text x="0" y="36.859" text-anchor="middle" font-family="Newsreader, Georgia, &#39;Times New Roman&#39;, serif" font-weight="700" font-size="100" fill="#f6f3ea">G</text>
   </g>
 </svg>

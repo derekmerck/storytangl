@@ -21,7 +21,20 @@ client naturally needs them.
 - `docs/src/_static/favicon.svg`
 - `docs/src/_static/storytangl-palette.css`
 - `docs/src/_static/storytangl-type.css`
-- `.github/social-card.svg` as source for a future raster social preview
+- `.github/social-card.svg` as source for the raster social preview
 - `apps/cli/src/tangl/cli/assets/splash.txt`
 
-PNG/JPG exports are intentionally not committed in this pass.
+## Raster Exports
+
+GitHub cannot load a webfont for an SVG referenced from a README, and the
+turned-G is tuned per font, so README and social-preview artwork ships as PNG:
+
+- `.github/assets/README-banner.png` (2560x720)
+- `.github/assets/social-card.png` (1280x640)
+
+Regenerate both with [`scripts/render_brand_assets.py`](../scripts/render_brand_assets.py),
+which embeds the real faces and rasterizes through headless Chrome. The fonts
+are not vendored; the script's docstring lists the three files to fetch.
+
+The social preview cannot be set through the GitHub API. Upload
+`.github/assets/social-card.png` under repository Settings -> Social preview.

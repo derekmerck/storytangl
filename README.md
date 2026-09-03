@@ -1,9 +1,17 @@
-# StoryTangl
+<p align="center">
+  <img src=".github/assets/README-banner.png"
+       alt="StoryTangl - a research platform for graph-based computational narratology"
+       width="860">
+</p>
 
-**A research platform for graph-based computational narratology.**
+<p align="center">
+  <a href="https://github.com/derekmerck/storytangl/actions/workflows/ci.yml"><img
+     src="https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://storytangl.readthedocs.io/en/latest/"><img
+     src="https://app.readthedocs.org/projects/storytangl/badge/?version=latest" alt="docs"></a>
+</p>
 
-[![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml)
-[![docs](https://app.readthedocs.org/projects/storytangl/badge/?version=latest)](https://storytangl.readthedocs.io/en/latest/)
+# StoryTan⅁l
 
 StoryTangl models interactive narrative as a graph of interdependent
 possibilities that collapses into a specific story through traversal. Authors
@@ -15,6 +23,37 @@ narrative journal.
 The name started as a backronym for *the Abstract Narrative Graph Library*. It
 stuck because the engine's real job is **untangling**: extracting a coherent
 story thread from a combinatorial web of requirements and consequences.
+
+---
+
+## See It Run
+
+```bash
+git clone https://github.com/derekmerck/storytangl.git
+cd storytangl
+poetry install
+poetry run tangl-cli
+```
+
+Inside the shell, `create_user <secret>` registers a local player. Then pick a
+world and start making choices:
+
+<p align="center">
+  <img src=".github/assets/cli-session.png"
+       alt="A StoryTangl CLI session: starting the coronate_the_regent world, provoking a dragon, and being offered a dragonslayer sword"
+       width="620">
+</p>
+
+That warning to the dragon is not flavour text. It grants the player an
+`irritated_dragon` condition, and a later scene tests for it and compels a
+confrontation the story otherwise skips -- while the merchant's sword, offered
+one beat earlier, is the hedge against exactly that. The choice and its payoff
+are never wired directly to each other; the consequence travels as state.
+
+Eighteen reference worlds ship in [`worlds/`](worlds/), from a blackjack
+parlour to a hall-monitor credential check. The same graph also drives a REST
+service, a web client, a pygame port, and a Ren'Py export -- see
+[Run The Reference Apps](#run-the-reference-apps).
 
 ---
 
