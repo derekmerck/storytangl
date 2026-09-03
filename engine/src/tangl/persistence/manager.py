@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import logging
 from uuid import UUID
-from typing import Type, ClassVar, Mapping
+from typing import Type, Mapping
 
 from tangl.type_hints import HasUid, ClassName, FlatData, UnstructuredData
 from tangl.utils.is_valid_uuid import is_valid_uuid
@@ -22,16 +22,25 @@ class PersistenceManager(Mapping[UUID, HasUid]):
       - a flat-data _storage_ backend that implements `read` and `write` for str|bytes, like in-mem, files, redis, mongodb
     """
 
-    kind_map: ClassVar[dict[ClassName, Type[HasUid]]] = dict()
-
     def __init__(self,
                  structuring: StructuringHandlerProtocol = None,
                  serializer: SerializationHandlerProtocol = None,
-                 storage: StorageProtocol = None):
+                 storage: StorageProtocol = None,
+                 kind_map: Mapping[ClassName, Type[HasUid]] | None = None):
 
         self.structuring = structuring
         self.serializer = serializer
         self.storage = storage
+        self.kind_map = dict(kind_map or {})
+
+    def register_kind(self, kind: Type[HasUid]) -> None:
+        """Register one top-level class that this manager may restore."""
+        self.kind_map[kind.__name__] = kind
+
+    def register_kinds(self, *kinds: Type[HasUid]) -> None:
+        """Register the top-level resource classes owned by one composition root."""
+        for kind in kinds:
+            self.register_kind(kind)
 
     def load(self, uid: UUID, data: FlatData = None) -> HasUid:
 
@@ -59,8 +68,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
 
     def save(self, structured: HasUid):
         # stash the incoming classes
-        if structured.__class__.__name__ not in self.kind_map:
-            self.kind_map[structured.__class__.__name__] = structured.__class__
+        self.register_kind(structured.__class__)
 
         if self.structuring:
             unstructured = self.structuring.unstructure( structured )

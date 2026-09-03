@@ -70,5 +70,9 @@ def test_reopened_json_file_manager_values_use_logical_storage_keys(tmp_path) ->
     manager.save(saved)
 
     reopened = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    assert "ManagerModel" not in reopened.kind_map
+    with pytest.raises(KeyError, match="ManagerModel"):
+        list(reopened.values())
+    reopened.register_kind(ManagerModel)
 
     assert list(reopened.values()) == [saved]

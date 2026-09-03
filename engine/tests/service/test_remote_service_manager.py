@@ -231,7 +231,10 @@ class TestRemoteTransportAndAuth:
         created = manager.create_user(secret="new-secret")
         envelope = manager.create_story(user_id=user_id, world_id="demo_world")
 
-        assert created.details == {"user_id": str(user_id)}
+        assert created.details == {
+            "user_id": str(user_id),
+            "user_secret": "new-secret",
+        }
         assert envelope.metadata["world_id"] == "demo_world"
         assert manager._bound_secret == "new-secret"
         assert manager._bound_api_key == "new-key"
@@ -278,7 +281,10 @@ class TestRemoteTransportAndAuth:
         created = manager.create_user()
         envelope = manager.create_story(user_id=user_id, world_id="demo_world")
 
-        assert created.details == {"user_id": str(user_id)}
+        assert created.details == {
+            "user_id": str(user_id),
+            "user_secret": "server-codename",
+        }
         assert envelope.metadata["world_id"] == "demo_world"
         assert manager._bound_secret == "server-codename"
         assert manager._bound_api_key == "generated-key"

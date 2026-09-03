@@ -135,6 +135,8 @@ class ServiceManager:
 
     def __init__(self, persistence_manager: PersistenceManager | None = None) -> None:
         self.persistence = persistence_manager
+        if persistence_manager is not None:
+            persistence_manager.register_kinds(User, Ledger)
 
     @classmethod
     def get_service_methods(cls) -> "OrderedDict[str, ServiceMethodSpec]":

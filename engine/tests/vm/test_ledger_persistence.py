@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import pytest
-
 from tangl.core import Graph
 from tangl.persistence import PersistenceManager
 from tangl.persistence.serializers import JsonSerializationHandler
@@ -13,13 +11,6 @@ from tangl.persistence.storage import InMemoryStorage
 from tangl.persistence.structuring import StructuringHandler
 from tangl.service.user.user import User
 from tangl.vm.runtime.ledger import Ledger
-
-
-@pytest.fixture(autouse=True)
-def clear_kind_map() -> None:
-    PersistenceManager.kind_map.clear()
-    yield
-    PersistenceManager.kind_map.clear()
 
 
 def test_ledger38_json_round_trip_keeps_user_id_and_excludes_runtime_user() -> None:

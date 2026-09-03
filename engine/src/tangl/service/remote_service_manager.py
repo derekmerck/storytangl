@@ -535,6 +535,7 @@ class RemoteServiceManager(ServiceManager):
         return RuntimeInfo.ok(
             message="User created",
             user_id=str(user_info.user_id),
+            user_secret=secret_info.user_secret,
         )
 
     @service_method(

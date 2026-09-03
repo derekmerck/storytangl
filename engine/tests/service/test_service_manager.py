@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
+import sys
 from uuid import UUID
 
 import pytest
@@ -455,16 +458,45 @@ def test_create_user_rerolls_a_generated_codename_collision(
     assert len([item for item in persistence.values() if isinstance(item, User)]) == 2
 
 
+def _run_persisted_user_process(*, storage_path: Path, secret: str) -> tuple[str, int]:
+    source_path = Path(__file__).resolve().parents[2] / "src"
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(source_path), environment.get("PYTHONPATH")) if part
+    )
+    program = "\n".join(
+        [
+            "from pathlib import Path",
+            "import sys",
+            "from tangl.persistence import PersistenceManagerFactory",
+            "from tangl.service.service_manager import ServiceManager",
+            "persistence = PersistenceManagerFactory.json_file(base_path=Path(sys.argv[1]))",
+            "result = ServiceManager(persistence).create_user(secret=sys.argv[2])",
+            "print(f\"{result.details['user_id']};{len(list(persistence.values()))}\")",
+        ]
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program, str(storage_path), secret],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+    user_id, user_count = completed.stdout.strip().split(";", maxsplit=1)
+    return user_id, int(user_count)
+
+
 def test_create_user_restores_persisted_recovery_codename_after_restart(
     tmp_path: Path,
 ) -> None:
-    first_persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
-    first_manager = ServiceManager(first_persistence)
-    created = first_manager.create_user(secret="persistent-codename")
+    created_id, created_count = _run_persisted_user_process(
+        storage_path=tmp_path,
+        secret="persistent-codename",
+    )
+    restored_id, restored_count = _run_persisted_user_process(
+        storage_path=tmp_path,
+        secret="persistent-codename",
+    )
 
-    restarted_persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
-    restarted_manager = ServiceManager(restarted_persistence)
-    restored = restarted_manager.create_user(secret="persistent-codename")
-
-    assert restored.details["user_id"] == created.details["user_id"]
-    assert len([item for item in restarted_persistence.values() if isinstance(item, User)]) == 1
+    assert restored_id == created_id
+    assert created_count == restored_count == 1
