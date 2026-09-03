@@ -1,8 +1,19 @@
 Progression scratch: audit
 ==========================
 
-Inventory only. **Nothing deleted yet** — the recommended retirements are listed
-below for a decision, not applied.
+Inventory only. **Nothing deleted.**
+
+This audit is subordinate to
+``engine/src/tangl/mechanics/progression/STAT_CHALLENGE_DESIGN.rst``, the
+canonical ledger for this tree. That document states the archive stays intact
+pending a source-level harvest and that the ledger alone is not permission for
+bulk deletion, then gives a five-step Bounded Retirement Sequence naming the
+semantics to capture first. It governs; the sort below is a starting point, not
+authority to delete.
+
+Its warning applies directly here: *a matching class name or passing live suite
+is not proof of semantic parity.* Two claims in an earlier revision of this file
+failed exactly that test and are corrected inline.
 
 `scratch/mechanics/progression` carries three generations at once:
 
@@ -34,10 +45,15 @@ Landed, and better
 | `StatCurrency(Fungible)` | `StatDef.currency_name` plus `HasWallet`; the stat/currency link is a field, not a subclass |
 | `governors` / `SecondaryTrait` | `entity/has_stats.py` |
 
-The realized `SituationalEffect` covers the scratch semantics and adds axes the
-scratch version never had: `competency_modifier`, `growth_modifier` (training
-gain, deliberately distinct from payout), `forced_outcome`, `domain_override`,
-and currency remaps.
+The realized `SituationalEffect` adds axes the scratch version never had:
+`competency_modifier`, `growth_modifier` (training gain, deliberately distinct
+from payout), `forced_outcome`, `domain_override`, and currency remaps.
+
+It is **not** a superset. One behavior is unported: scratch gated tags with
+`applies_to_tags.issubset(tags)`, so an effect scoped to `{#combat, #night}`
+required *both*. Realized `applies()` gates on intersection
+(`applies_to_tags & tag_set`) and fires on either. Compound-circumstance effects
+cannot currently be expressed.
 
 Residue check
 -------------
@@ -80,10 +96,14 @@ mapped cleanly onto current names — `can_pay_cost` is `can_afford`,
 Neither is a reason to keep the scratch code. Both are worth an issue if a world
 wants them.
 
-Recommended retirement
-----------------------
+Rough sort, pending the bounded sequence
+----------------------------------------
 
-Everything not named in the next section. That is roughly 42 of the 46 files,
+Everything not named in the next section *appears* superseded — a starting
+point for the harvest in STAT_CHALLENGE_DESIGN.rst, not a deletion list. That
+document names specific semantics to capture from `stats/`,
+`progression-pre25/character.py`, `q_prop.py`, `measured_value.py`,
+`legacy/task.py`, `delta_applier.py`, and `task-2.py` before any of them go. That is roughly 42 of the 46 files,
 including all of `stats/`, all of `legacy/` except the two badge sources, all of
 `challenge_block/` except `situational_effect-2.py`, and both test trees. Each
 has a strictly better realized counterpart in the table above.
@@ -116,10 +136,16 @@ scratch or in the engine:
 
 The realized `SituationalEffect` already has the semantics for most of it —
 `applies_to_tags` is `#x`, the four modifier fields are the axes,
-`domain_override` is `@x-is-y`, and `forced_outcome` covers `@x-prohibited`.
-What is missing is the **authoring shorthand**, plus two operators with no
-realized equivalent: magnitude stacking (`@x-up-up`) and reward inversion
-(`@x-inv`).
+and `domain_override` is `@x-is-y`. What is missing is the **authoring
+shorthand**, plus three operators with no realized equivalent:
+
+- magnitude stacking (`@x-up-up`)
+- reward inversion (`@x-inv`)
+- **prohibition (`@x-prohibited`)**. `forced_outcome` is not an equivalent:
+  `resolve_challenge()` spends the cost before applying the override — its own
+  comment says "Cost is still paid (the attempt happened)" — then derives payout
+  and growth from the forced result. Prohibition is an availability gate, not an
+  outcome override, and the shorthand work must supply one.
 
 This matters because the automata catalog is written in this notation
 (`'@all-up'`, `'@combat-up'`, `'@damage-down'`). Nothing can read it today.
