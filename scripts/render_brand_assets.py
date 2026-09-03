@@ -36,9 +36,31 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # (svg source, css width, css height, device scale, output)
+# The ink palette is a literal inversion of the paper one (brand/USAGE.md sec.7),
+# so the dark artwork is derived from the same SVG rather than authored twice.
+# Authoring a second file would let the two drift, which sec.7 forbids.
+INK = {
+    "#f6f3ea": "#15140f",   # paper       -> ink paper
+    "#eee8d6": "#1f1e18",   # paper-2
+    "#e3dcc4": "#2a2920",   # paper-3
+    "#1a1a1a": "#e8dfc6",   # ink         -> ink ink
+    "#3b3a36": "#c9c2ad",   # ink-2
+    "#6b6a64": "#8a8472",   # ink-3
+    "#93918a": "#6b6a64",   # ink-4
+    "#c9c2ad": "#2f2d24",   # rule
+    "#8a8472": "#4d4a3d",   # rule-strong
+    "#2a4e87": "#8db4ff",   # blue-pencil
+    "#b2542a": "#e07a40",   # burnt
+}
+
+# (svg source, css width, css height, device scale, output, palette)
 TARGETS = [
-    ("brand/assets/README-banner.svg", 1280, 360, 2, ".github/assets/README-banner.png"),
-    ("brand/assets/social-card.svg", 1280, 640, 1, ".github/assets/social-card.png"),
+    ("brand/assets/README-banner.svg", 1280, 360, 2,
+     ".github/assets/README-banner.png", None),
+    ("brand/assets/README-banner.svg", 1280, 360, 2,
+     ".github/assets/README-banner-dark.png", INK),
+    ("brand/assets/social-card.svg", 1280, 640, 1,
+     ".github/assets/social-card.png", None),
 ]
 
 # (css family, css style, filename must contain, filename must not contain)
@@ -84,9 +106,36 @@ def build_faces(fonts: Path) -> str:
     return "\n".join(out)
 
 
+def recolour(svg: str, palette: dict[str, str]) -> str:
+    """Swap every palette hex in one pass.
+
+    A sequence of individual replacements would chain: ink-2's dark value is
+    rule's light value, so replacing one after the other would clobber the
+    colour just written. Substituting on a single scan avoids that.
+    """
+    lookup = {k.lower(): v for k, v in palette.items()}
+    seen = set()
+
+    def swap(m: re.Match[str]) -> str:
+        hexval = m.group(0).lower()
+        if hexval in lookup:
+            seen.add(hexval)
+            return lookup[hexval]
+        return m.group(0)
+
+    out = re.sub(r"#[0-9a-fA-F]{6}\b", swap, svg)
+    unmapped = set(re.findall(r"#[0-9a-fA-F]{6}\b", out)) - set(lookup.values())
+    if unmapped:
+        sys.exit(f"Unmapped colours in dark render: {sorted(unmapped)}; "
+                 "extend INK or fix the source SVG.")
+    return out
+
+
 def render(chrome: str, faces: str, work: Path, svg_rel: str, w: int, h: int,
-           scale: int, out_rel: str) -> None:
+           scale: int, out_rel: str, palette: dict[str, str] | None = None) -> None:
     svg = (ROOT / svg_rel).read_text().replace('<?xml version="1.0"?>\n', "")
+    if palette:
+        svg = recolour(svg, palette)
     svg = re.sub(r"<svg ", f'<svg width="{w}" height="{h}" ', svg, count=1)
     page = work / (Path(out_rel).stem + ".html")
     page.write_text(
@@ -122,8 +171,8 @@ def main() -> None:
 
     chrome = find_chrome(args.chrome)
     faces = build_faces(args.fonts)
-    for svg_rel, w, h, scale, out_rel in TARGETS:
-        render(chrome, faces, args.work, svg_rel, w, h, scale, out_rel)
+    for svg_rel, w, h, scale, out_rel, palette in TARGETS:
+        render(chrome, faces, args.work, svg_rel, w, h, scale, out_rel, palette)
 
 
 if __name__ == "__main__":

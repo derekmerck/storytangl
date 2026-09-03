@@ -29,8 +29,15 @@ client naturally needs them.
 GitHub cannot load a webfont for an SVG referenced from a README, and the
 turned-G is tuned per font, so README and social-preview artwork ships as PNG:
 
-- `.github/assets/README-banner.png` (2560x720)
+- `.github/assets/README-banner.png` (2560x720, paper)
+- `.github/assets/README-banner-dark.png` (2560x720, ink)
 - `.github/assets/social-card.png` (1280x640)
+
+The README swaps the two banners with a `<picture>` element on
+`prefers-color-scheme`. The ink banner is *derived* from the same SVG by
+token substitution, not authored separately, so the two cannot drift out of
+the lockstep USAGE.md section 7 requires. The social preview is a single image
+with no theme swap, so it stays on paper.
 
 Regenerate both with [`scripts/render_brand_assets.py`](../scripts/render_brand_assets.py),
 which embeds the real faces and rasterizes through headless Chrome. The fonts

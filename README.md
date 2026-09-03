@@ -1,7 +1,11 @@
 <p align="center">
-  <img src=".github/assets/README-banner.png"
-       alt="StoryTangl - a research platform for graph-based computational narratology"
-       width="860">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"
+            srcset=".github/assets/README-banner-dark.png">
+    <img src=".github/assets/README-banner.png"
+         alt="StoryTangl - a research platform for graph-based computational narratology"
+         width="860">
+  </picture>
 </p>
 
 <p align="center">
