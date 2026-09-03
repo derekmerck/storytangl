@@ -514,12 +514,16 @@ class RemoteServiceManager(ServiceManager):
     )
     def create_user(self, *, secret: str | None = None, **kwargs: Any) -> RuntimeInfo:
         self._reject_unexpected_kwargs("create_user", kwargs, allowed=set())
-        next_secret = self._require_non_empty_secret(secret, method_name="create_user")
+        params = (
+            {"secret": self._require_non_empty_secret(secret, method_name="create_user")}
+            if secret is not None
+            else None
+        )
         payload = self._request(
             "POST",
             "/user/create",
             auth_required=False,
-            params={"secret": next_secret},
+            params=params,
         )
         secret_info = self._decode_model(UserSecret, payload, label="user secret")
         self._bind_auth_from_secret(secret_info)
@@ -531,6 +535,7 @@ class RemoteServiceManager(ServiceManager):
         return RuntimeInfo.ok(
             message="User created",
             user_id=str(user_info.user_id),
+            user_secret=secret_info.user_secret,
         )
 
     @service_method(
