@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from pydantic import Field, model_validator
 
 from tangl.core import Graph, Node, Selector
+from tangl.loaders import WorldBundle
+from tangl.loaders.compiler import WorldCompiler
 from tangl.persistence import PersistenceManagerFactory
 from tangl.mechanics.credentials import (
     CREDENTIAL_ID_SLOT,
@@ -23,6 +26,7 @@ from tangl.mechanics.credentials.domain import (
     Region,
 )
 from tangl.mechanics.sandbox import SandboxScope
+from tangl.story import World
 
 
 class CredentialPacketOwner(Node):
@@ -40,10 +44,12 @@ class CredentialPacketOwner(Node):
 
 
 @pytest.fixture(autouse=True)
-def reset_credential_definitions():
+def reset_credential_definitions() -> Iterator[None]:
     CredentialDefinition.clear_instances()
+    World.clear_instances()
     yield
     CredentialDefinition.clear_instances()
+    World.clear_instances()
 
 
 def _definition(
@@ -105,6 +111,64 @@ def _credential_graph() -> tuple[
     owner.packet_manager.assign(CREDENTIAL_PACKET_SLOT, work_permit)
     owner.packet_manager.assign(CREDENTIAL_PACKET_SLOT, second_work_permit)
     return graph, id_card, work_permit, second_work_permit
+
+
+def _compile_scoped_credential_world(
+    root: Path,
+    *,
+    label: str,
+    pass_name: str,
+) -> World:
+    package = root / label
+    package.mkdir(parents=True, exist_ok=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "domain.py").write_text(
+        "from tangl.mechanics.credentials import CredentialDefinition\n",
+        encoding="utf-8",
+    )
+    (root / "world.yaml").write_text(
+        f"""label: {label}
+scripts: script.yaml
+domain_module: {label}.domain
+assets:
+  - asset_kind: CredentialDefinition
+    catalog: school
+    source: credential_types.yaml
+""",
+        encoding="utf-8",
+    )
+    (root / "script.yaml").write_text(
+        f"""label: {label}
+metadata:
+  title: {label}
+scenes:
+  hall:
+    blocks:
+      entrance:
+        content: A student approaches.
+""",
+        encoding="utf-8",
+    )
+    (root / "credential_types.yaml").write_text(
+        f"""activity_pass:
+  name: {pass_name}
+  origin_ids: [lower_school]
+  indication: activity
+  document_kind: document
+  requires_id: false
+""",
+        encoding="utf-8",
+    )
+    return WorldCompiler().compile(WorldBundle.load(root))
+
+
+def _catalog_definition(world: World, catalog_id: str) -> CredentialDefinition:
+    catalog = world.assets.values["school"]
+    definition = next(
+        member for member in catalog.members if member.catalog_id == catalog_id
+    )
+    assert isinstance(definition, CredentialDefinition)
+    return definition
 
 
 def _load_graph(payload) -> Graph:
@@ -170,3 +234,81 @@ def test_has_assets_wallet_survives_json_file_persistence(tmp_path: Path) -> Non
 
     assert isinstance(restored_scope, SandboxScope)
     assert restored_scope.player_assets.wallet.amounts == {"coins": 7}
+
+
+def test_json_roundtrip_rebinds_tokens_to_their_world_catalog(tmp_path: Path) -> None:
+    north_root = tmp_path / "north_school"
+    south_root = tmp_path / "south_school"
+    north = _compile_scoped_credential_world(
+        north_root,
+        label="north_school",
+        pass_name="North activity pass",
+    )
+    south = _compile_scoped_credential_world(
+        south_root,
+        label="south_school",
+        pass_name="South activity pass",
+    )
+    north_definition = _catalog_definition(north, "activity_pass")
+    south_definition = _catalog_definition(south, "activity_pass")
+    assert north_definition is not south_definition
+
+    graph = Graph(factory=north)
+    owner = graph.add_node(kind=CredentialPacketOwner, label="checkpoint")
+    pass_token = graph.add_node(
+        kind=CredentialComponent,
+        label="north-activity-pass",
+        token_from="activity_pass",
+    )
+    pass_token.status = CredentialStatus.EXPIRED
+    owner.packet_manager.assign(CREDENTIAL_PACKET_SLOT, pass_token)
+
+    south_graph = Graph(factory=south)
+    south_token = south_graph.add_node(
+        kind=CredentialComponent,
+        label="south-activity-pass",
+        token_from="activity_pass",
+    )
+    assert pass_token.reference_singleton is north_definition
+    assert south_token.reference_singleton is south_definition
+    assert pass_token.reference_singleton is not south_token.reference_singleton
+
+    foreign_token = CredentialComponent(
+        label="foreign-activity-pass",
+        token_from=south_definition.label,
+    )
+    with pytest.raises(LookupError, match="No CredentialDefinition definition"):
+        graph.add(foreign_token)
+
+    persistence = PersistenceManagerFactory.json_file(base_path=tmp_path / "store")
+    persistence.save(graph)
+
+    CredentialDefinition.clear_instances()
+    World.clear_instances()
+    restored_north = _compile_scoped_credential_world(
+        north_root,
+        label="north_school",
+        pass_name="North activity pass",
+    )
+    restored = _load_graph(persistence.load(graph.uid))
+    restored_owner = restored.find_one(Selector(label="checkpoint"))
+    restored_token = restored.find_one(Selector(label="north-activity-pass"))
+
+    assert isinstance(restored_owner, CredentialPacketOwner)
+    assert isinstance(restored_token, CredentialComponent)
+    assert restored.factory is restored_north
+    assert restored_token.uid == pass_token.uid
+    assert restored.get(pass_token.uid) is restored_token
+    assert restored_owner.packet_manager.owner is restored_owner
+    assert restored_owner.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT) == [
+        restored_token,
+    ]
+    assert restored_token.token_from == "activity_pass"
+    assert restored_token.reference_singleton is _catalog_definition(
+        restored_north,
+        "activity_pass",
+    )
+    assert restored_token.status is CredentialStatus.EXPIRED
+    assert sum(
+        item.uid == restored_token.uid for item in restored.members.values()
+    ) == 1

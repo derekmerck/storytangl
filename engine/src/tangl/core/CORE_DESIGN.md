@@ -354,6 +354,14 @@ singleton I reference." v38 separates these: `token_from` references the singlet
 `label` is the Token's own name as a Node. `Token[SwordType](token_from="short sword",
 label="Glamdring")` makes the distinction explicit.
 
+**Graph-owned dereference is factory-scoped.** A token bound to a graph resolves
+`token_from` through that graph's factory catalogs when the factory declares a catalog
+for its definition type. A miss in that declared scope is authoritative. Tokens whose
+type has no factory catalog remain unscoped and use the process-global singleton
+fallback. Catalogs may therefore reuse a bare authored identifier without leaking a
+definition across worlds. The token persists that identifier, while the graph persists
+the factory reference needed to rebind it during constructor-form restoration.
+
 **Delegation rules:**
 - Read: check own fields (including instance_vars) first, then delegate to
   `reference_singleton` via `__getattr__`

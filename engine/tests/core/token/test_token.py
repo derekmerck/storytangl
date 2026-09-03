@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TypeVar
 
 import pytest
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
+from tangl.core.factory import GraphFactory
 from tangl.core.entity import Entity
 from tangl.core.graph import Graph, GraphItem, HierarchicalNode, Node
 from tangl.core.selector import Selector
@@ -67,9 +68,16 @@ class TestTokenCreation:
         with pytest.raises(ValidationError):
             Token[WeaponType](label="sword")
 
-    def test_invalid_ref_raises(self) -> None:
+    def test_unresolved_ref_can_be_constructed(self) -> None:
+        token = Token[WeaponType](token_from="missing", label="x")
+
+        assert token.token_from == "missing"
+        with pytest.raises(ValueError):
+            _ = token.reference_singleton
+
+    def test_empty_ref_raises(self) -> None:
         with pytest.raises(ValidationError):
-            Token[WeaponType](token_from="missing", label="x")
+            Token[WeaponType](token_from="", label="x")
 
     def test_token_from_and_label_separate(self) -> None:
         WeaponType(label="sword", damage="1d6")
@@ -282,6 +290,27 @@ class TestTokenGraphIntegration:
         child = HierToken(token_from="sword", label="Glamdring", registry=graph)
         root.add_child(child)
         assert child.parent is root
+
+    def test_scoped_catalog_ambiguity_fails_loudly(self) -> None:
+        class ScopedType(Singleton):
+            catalog_id: str = Field(
+                json_schema_extra={"is_identifier": True},
+            )
+
+        ScopedType(label="north-pass", catalog_id="activity_pass")
+        ScopedType(label="south-pass", catalog_id="activity_pass")
+        factory = GraphFactory(
+            label="scoped-token-factory",
+            token_types=[ScopedType],
+        )
+        graph = Graph(factory=factory)
+        token = Token[ScopedType](
+            token_from="activity_pass",
+            label="ambiguous-pass",
+        )
+
+        with pytest.raises(ValueError, match="resolved ambiguously"):
+            graph.add(token)
 
 class TestTokenCatalog:
     def test_find_all_uses_singleton_registry(self) -> None:

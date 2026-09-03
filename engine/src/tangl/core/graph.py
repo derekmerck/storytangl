@@ -217,6 +217,20 @@ class Graph(Registry[GraphItem]):
             raise TypeError("Graph factory must be a Singleton-compatible authority")
         self.factory = value
 
+    def resolve_token_definition(
+        self,
+        wrapped_cls: type[Singleton],
+        token_from: str,
+    ) -> Singleton | None:
+        """Resolve a token definition through the bound graph factory, when present."""
+        if self.factory is None:
+            return None
+        return self.factory.resolve_token_definition(
+            wrapped_cls,
+            token_from,
+            graph=self,
+        )
+
     def unstructure(self):
         """Return constructor-form graph data including a singleton factory reference."""
         data = super().unstructure()
@@ -242,22 +256,29 @@ class Graph(Registry[GraphItem]):
             return value
 
         payload = _coerce_kind_refs(dict(data))
-        factory_data = payload.pop("factory", None)
-        graph = super().structure(payload, _ctx=_ctx)
+        factory_data = payload.get("factory")
         if factory_data is None:
-            return graph
+            return super().structure(payload, _ctx=_ctx)
         if isinstance(factory_data, Singleton):
-            graph.bind_factory(factory_data)
-            return graph
-        if not isinstance(factory_data, dict):
+            factory = factory_data
+            payload["factory"] = factory
+        elif not isinstance(factory_data, dict):
             raise TypeError("Persisted graph factory references must be singleton constructor data")
-        factory = Singleton.structure(dict(factory_data))
-        if factory is None:
-            raise LookupError(
-                "Persisted graph factory reference could not be resolved to a registered singleton: "
-                f"{factory_data!r}"
-            )
+        else:
+            factory = Singleton.structure(dict(factory_data))
+            if factory is None:
+                raise LookupError(
+                    "Persisted graph factory reference could not be resolved to a registered singleton: "
+                    f"{factory_data!r}"
+                )
+            payload["factory"] = factory
+        graph = super().structure(payload, _ctx=_ctx)
         graph.bind_factory(factory)
+        from .token import Token
+
+        for member in graph.members.values():
+            if isinstance(member, Token):
+                member.bind_registry(graph)
         return graph
 
     def path_dist(self, a: GraphItem, b: GraphItem) -> int:

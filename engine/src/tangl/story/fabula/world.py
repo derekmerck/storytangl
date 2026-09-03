@@ -349,15 +349,28 @@ class World(TraversableGraphFactory):
         requirement: Any = None,
         graph: Any = None,
     ) -> list[TokenCatalog]:
+        """Return the explicit token catalogs selected by this world."""
         catalogs = _coerce_token_catalogs(
             self.assets,
             caller=caller,
             requirement=requirement,
             graph=graph,
         )
-        if catalogs:
-            return catalogs
-        return list(self._provide_token_catalogs())
+        for module in self.modules:
+            catalogs.extend(
+                _coerce_token_catalogs(
+                    module,
+                    caller=caller,
+                    requirement=requirement,
+                    graph=graph,
+                )
+            )
+        catalogs.extend(self._provide_token_catalogs())
+        return [
+            catalog
+            for index, catalog in enumerate(catalogs)
+            if all(catalog is not earlier for earlier in catalogs[:index])
+        ]
 
     def get_media_inventories(
         self,

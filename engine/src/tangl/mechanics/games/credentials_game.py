@@ -1014,8 +1014,9 @@ class CredentialsGame(PickingGame):
         """Bind assembly packet managers in already materialized cases to ``owner``."""
 
         self._component_manager_owner = owner
-        for case in self.roster:
-            case.bind_packet_manager_owner(owner)
+        if not self.offers:
+            for case in self.roster:
+                case.bind_packet_manager_owner(owner)
         for case in self.materialized:
             case.bind_packet_manager_owner(owner)
 

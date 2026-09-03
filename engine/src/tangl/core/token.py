@@ -38,7 +38,7 @@ from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from tangl.type_hints import Identifier
 
-from .graph import Node
+from .graph import Graph, Node
 from .selector import Selector
 from .singleton import Singleton
 
@@ -114,6 +114,7 @@ class Token(Node, Generic[WST]):
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
     _registry: Any = PrivateAttr(None)
+    _hydrated_referent: Singleton | None = PrivateAttr(default=None)
 
     token_from: str = Field(...)
 
@@ -121,27 +122,42 @@ class Token(Node, Generic[WST]):
     @field_validator("token_from")
     @classmethod
     def _valid_label_for_wrapped_cls(cls, value: str) -> str:
-        if not cls.wrapped_cls.has_instance(value):
-            raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref label `{value}`.")
+        if not value:
+            raise ValueError("Token reference label must not be empty.")
         return value
 
     @model_validator(mode="after")
     def _hydrate_instance_vars_from_referent(self) -> Self:
-        """Backfill unset instance vars from the referenced singleton instance."""
+        """Backfill unset instance vars when a referent is currently resolvable."""
         if self.label is None:
             self.label = self.token_from
+        referent = self.wrapped_cls.get_instance(self.token_from)
+        if referent is None:
+            return self
+        self._hydrate_instance_vars(referent)
+        return self
+
+    def _hydrate_instance_vars(self, referent: WST) -> None:
+        """Copy default instance-local state from a resolved referent."""
         for field_name in self._instance_vars(self.wrapped_cls):
             if field_name in self.model_fields_set:
                 continue
             # If this is a collection or object pointer, we don't want to accidentally
             # mutate the frozen reference's reference data, so initialize with a copy.
-            value = deepcopy( getattr(self.reference_singleton, field_name) )
-            setattr(self, field_name, value)
-        return self
+            setattr(self, field_name, deepcopy(getattr(referent, field_name)))
+        self._hydrated_referent = referent
+
+    def _scoped_reference_singleton(self) -> WST | None:
+        registry = self.__dict__.get("_registry")
+        if registry is None:
+            return None
+        return registry.resolve_token_definition(self.wrapped_cls, self.token_from)
 
     @property
     def reference_singleton(self) -> WST:
-        res = self.wrapped_cls.get_instance(self.token_from)
+        res = self._scoped_reference_singleton()
+        if res is None:
+            res = self.wrapped_cls.get_instance(self.token_from)
         if not res:
             raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.token_from}`.")
         return res
@@ -177,7 +193,7 @@ class Token(Node, Generic[WST]):
     def __repr__(self) -> str:
         return self.wrapped_cls.__repr__(self)
 
-    def bind_registry(self, registry) -> None:
+    def bind_registry(self, registry: Graph | None) -> None:
         """Bind registry pointer using a private dict slot on dynamic wrappers."""
         current = self.__dict__.get("_registry")
         if registry is None:
@@ -186,6 +202,12 @@ class Token(Node, Generic[WST]):
         if current is not None and current is not registry:
             raise ValueError(f"Registry is already set {current!r} != {registry!r}")
         self.__dict__["_registry"] = registry
+        referent = self.reference_singleton
+        hydrated_referent = (self.__pydantic_private__ or {}).get(
+            "_hydrated_referent"
+        )
+        if hydrated_referent is not referent:
+            self._hydrate_instance_vars(referent)
 
     def __getattr__(self, name: str) -> Any:
         """Delegate non-local attribute access to the referenced singleton."""
@@ -275,7 +297,7 @@ class TokenCatalog(Generic[WST]):
         assert self.members is not None
         return self.members
 
-    def has_kind(self, kind: Type[Node]) -> bool:
+    def has_kind(self, kind: Type[Singleton]) -> bool:
         return issubclass(self.wst, kind)
 
     def find_all(
