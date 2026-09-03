@@ -15,6 +15,9 @@
 > and task attempt history — are recorded in
 > `scratch/mechanics/progression/HARVEST.md`, which `devref` does not index.
 > Check it before designing any of those; see `STAT_CHALLENGE_DESIGN.rst`.
+> Four sources were **retained** rather than retired, all for badge work (#421):
+> the terse effect-tag grammar, the nested badge-condition spike, the badge
+> tier-occlusion API, and the effect activation lifecycle.
 
 **Probit-d20** is a generic "rules-light" rpg stat system with intuitive ability and challenge ranks tied to the statistical normal distribution.
 

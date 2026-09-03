@@ -23,8 +23,11 @@ growth scales `GrowthHandler.grow(gain_scale=...)`). A situational
 (fumble/fail/pass/critical); when several apply the most severe wins, so a
 prohibition dominates a blessing. ``HasStatChallenge`` and ``HasTraining`` now
 attach these operations to ordinary story blocks; ``coronate_the_regent`` is the
-compiled-world proof. The phase proposals below are historical design rationale,
-not an up-to-date implementation checklist. Issue #112 owns deferred progression
+compiled-world proof. Everything below the Design Principles section -- the concept proposals, the
+incremental build order, the preset sketch, and the first-pass non-goals -- is
+**historical design rationale, not an implementation checklist.** Those sections
+describe a system that has since been built; read them for intent, not for work
+to do. Issue #112 owns deferred progression
 research, #207 passive drift/recovery, and #208 campaign/meta-resource semantics.
 
 
@@ -112,8 +115,10 @@ The live package already has several strong foundations worth preserving:
 - `SituationalEffect` already captures the simplest useful part of the old
   badge/equipment idea: tag-scoped, stat-scoped modifiers.
 
-The scratch archive still has valuable design signals that should be promoted
-carefully:
+The scratch archive carried design signals worth keeping. It has since been
+harvested and retired; these are the themes it contributed, and
+``scratch/mechanics/progression/HARVEST.md`` records which of them are in this
+package and which are not:
 
 - quality-first rather than number-first narration
 - currencies tied to domains
@@ -557,16 +562,16 @@ This keeps the engine numerically coherent while preserving the authored,
 qualitative feel you want.
 
 
-Recommended Immediate Next Steps
---------------------------------
+Original Next Steps (completed)
+-------------------------------
 
-1. Add a `ChallengeResult` type next to `Task` and `resolve_task()`.
-2. Add a tiny `StatChallenge` wrapper around `Task` with outcome-to-payout
-   mapping.
-3. Add one minimal fantasy preset aimed at `strength`, `magic`, `stamina`,
-   and `mana`.
-4. Add a very small authored proof world with one or two one-shot checks.
-5. Only after that, add effect donors and quality-gated wealth/access.
+The five steps once listed here -- add ``ChallengeResult``, add a
+``StatChallenge`` wrapper, add a fantasy preset, add an authored proof world,
+then add effect donors -- are all done. See the Status section; ``StatChallenge``
+and ``ChallengeResult`` exist, ``Adventure2`` and the fantasy presets ship, and
+``coronate_the_regent`` is the compiled-world proof with donor-based effect
+gathering. The list is removed rather than kept, so nobody rebuilds a primitive
+that is already exported.
 
 
 Non-Goals For The First Pass
