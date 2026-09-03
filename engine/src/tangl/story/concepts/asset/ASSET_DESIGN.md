@@ -39,6 +39,9 @@ field opts into constructor-form persistence after in-place count mutation; the
 field annotation reconstructs the wallet from its ordinary mapping. It does not
 need an independent constructor-form protocol.
 
+The deferred discrete `assets` map remains explicitly excluded from persistence:
+it is not yet the graph-backed ownership model.
+
 ## Deferred Relationship Model
 
 The current `HasAssets.assets` map is a lightweight staging surface. The later

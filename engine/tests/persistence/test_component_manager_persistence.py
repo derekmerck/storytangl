@@ -22,7 +22,7 @@ from tangl.mechanics.credentials.domain import (
     Indication,
     Region,
 )
-from tangl.story.concepts.asset import HasAssets
+from tangl.mechanics.sandbox import SandboxScope
 
 
 class CredentialPacketOwner(Node):
@@ -37,10 +37,6 @@ class CredentialPacketOwner(Node):
     def _bind_packet_owner(self) -> "CredentialPacketOwner":
         self.packet_manager.bind_owner(self)
         return self
-
-
-class AssetWalletOwner(Node, HasAssets):
-    """Graph owner used to prove embedded wallet persistence."""
 
 
 @pytest.fixture(autouse=True)
@@ -164,13 +160,13 @@ def test_component_manager_graph_roundtrip_all_backends(manager) -> None:
 
 def test_has_assets_wallet_survives_json_file_persistence(tmp_path: Path) -> None:
     graph = Graph()
-    owner = graph.add_node(kind=AssetWalletOwner, label="wallet-owner")
-    owner.wallet.gain(coins=7)
+    scope = graph.add_node(kind=SandboxScope, label="wallet-scope")
+    scope.player_assets.wallet.gain(coins=7)
     persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
 
     persistence.save(graph)
     restored = _load_graph(persistence.load(graph.uid))
-    restored_owner = restored.find_one(Selector(label="wallet-owner"))
+    restored_scope = restored.find_one(Selector(label="wallet-scope"))
 
-    assert isinstance(restored_owner, AssetWalletOwner)
-    assert restored_owner.wallet.amounts == {"coins": 7}
+    assert isinstance(restored_scope, SandboxScope)
+    assert restored_scope.player_assets.wallet.amounts == {"coins": 7}
