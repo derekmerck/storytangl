@@ -1,7 +1,10 @@
 Progression scratch: audit
 ==========================
 
-Inventory only. **Nothing deleted.**
+Harvested and retired. The five-step Bounded Retirement Sequence in
+``STAT_CHALLENGE_DESIGN.rst`` was worked through source by source; the results
+are in `HARVEST.md`, which records the semantics that are **not** in the live
+package. This file holds the concept-to-location table.
 
 This audit is subordinate to
 ``engine/src/tangl/mechanics/progression/STAT_CHALLENGE_DESIGN.rst``, the
