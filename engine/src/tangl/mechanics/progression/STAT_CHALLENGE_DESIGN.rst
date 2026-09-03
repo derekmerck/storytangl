@@ -1,6 +1,13 @@
 Stat Challenge Design
 =====================
 
+.. storytangl-topic::
+   :topics: progression
+   :facets: design, notes
+   :relation: documents
+   :related: games, transaction, assembly
+
+
 Status
 ------
 
@@ -205,9 +212,29 @@ need an explicit disposition.
 
 An idea does not have to be implemented before its prototype can be retired.
 It does need a durable statement of the useful semantics, a source pointer, and
-an explicit destination or decision. The current archive remains intact pending
-the source-level harvest below; the ledger alone is not permission for bulk
-deletion.
+an explicit destination or decision.
+
+.. note::
+
+   **The harvest below has been carried out and the archive retired.** Its
+   results live in two files that are *not* indexed by devref, because
+   ``scratch/`` is outside the source patterns:
+
+   - ``scratch/mechanics/progression/HARVEST.md`` — the semantics that are
+     **not** in this package, batch by batch, each with a destination
+   - ``scratch/mechanics/progression/AUDIT.md`` — the concept-to-location table
+     for what did land
+
+   Consult ``HARVEST.md`` before designing anything in the list below. It is
+   written for targeted lookup rather than sequential reading: a problem like
+   "this effect should require *both* tags", "criticals fire too often",
+   "practising should raise the governing attribute", "this task should get
+   harder each attempt", or "authors want ``very good`` in a condition string"
+   each maps to one batch.
+
+   Four sources were retained rather than retired, all for badge work (#421):
+   the terse effect grammar in ``README.md``, the nested badge-condition spike,
+   the badge tier-occlusion API, and the effect activation lifecycle.
 
 Bounded Retirement Sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,6 +266,9 @@ Bounded Retirement Sequence
 Each deletion batch should state the exact files, the surviving idea destination,
 the behavior already covered by live tests, and any deliberately deferred idea.
 No runtime feature work or GitHub issue mutation is implied by this audit.
+
+This contract was honored: ``HARVEST.md`` records all four fields for each of
+the five batches.
 
 
 Design Principles
