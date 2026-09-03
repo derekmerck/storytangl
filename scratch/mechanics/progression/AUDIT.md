@@ -1,0 +1,155 @@
+Progression scratch: audit
+==========================
+
+Inventory only. **Nothing deleted yet** — the recommended retirements are listed
+below for a decision, not applied.
+
+`scratch/mechanics/progression` carries three generations at once:
+
+- `legacy/progression-pre25/` — the oldest, `attr`-based, `Character` and
+  `Badge` era
+- `legacy/` + `challenge_block/` — the middle generation, with literal
+  duplicates left side by side (`task.py` and `task-2.py`,
+  `situational_effect.py` and `situational_effect-2.py`)
+- `stats/` — the newest scratch generation, closest to what shipped
+
+The realized `tangl.mechanics.progression` is 41 modules and ~2,900 lines with
+16 test files. It is not a thin promotion of this tree; it is a rewrite that
+went further on almost every axis.
+
+Landed, and better
+------------------
+
+| Scratch concept | Realized as |
+|---|---|
+| `EnumeratedValue` / `quality.py` | `Quality` (`measures.py`) |
+| `MeasuredValue`, `stat_measures/*` | `Stat` plus `StatHandler` (`linear`, `logint`, `probit`) |
+| `log_int_stat.py` | `LogIntStatHandler` |
+| `normal_stat.py` | `ProbitStatHandler` |
+| `DeltaMapHandler` | `ModifierTotals` / `modifier_stack.py` plus `growth/handlers.py` |
+| `SituationalEffect` (both copies) | `effects/situational.py`, substantially richer |
+| `Task`, `TaskHandler`, `task-2.py` | `tasks/task.py`, `tasks/resolution.py` |
+| `challenge_block/*` | `challenges/`, `story_blocks.py` |
+| `stat_domains/`, `opinionated`, `psychosomatic` | `StatSystemDefinition` plus `presets/` (fantasy, cyberpunk, adventure) and `CanonicalSlot` — data rather than hardcoded enums |
+| `StatCurrency(Fungible)` | `StatDef.currency_name` plus `HasWallet`; the stat/currency link is a field, not a subclass |
+| `governors` / `SecondaryTrait` | `entity/has_stats.py` |
+
+The realized `SituationalEffect` covers the scratch semantics and adds axes the
+scratch version never had: `competency_modifier`, `growth_modifier` (training
+gain, deliberately distinct from payout), `forced_outcome`, `domain_override`,
+and currency remaps.
+
+Recommended retirement
+----------------------
+
+Everything not named in the next section. That is roughly 42 of the 46 files,
+including all of `stats/`, all of `legacy/` except the two badge sources, all of
+`challenge_block/` except `situational_effect-2.py`, and both test trees. Each
+has a strictly better realized counterpart in the table above.
+
+Still on the table
+------------------
+
+Four files, and they are all about **badges** — which is why this audit was
+worth doing before writing that design note.
+
+### 1. The terse effect grammar — specified, never implemented
+
+`README.md` is the only place this exists. There is no parser anywhere, in
+scratch or in the engine:
+
+```
+#x                          activity is in domain x
+@x-up / @x-down             cost down, difficulty down, reward up (and inverse)
+@x-up-up                    magnitude stacking
+@x+cost-up/down             one axis at a time
+@x+difficulty-up/down
+@x+payout-up/down
+@x-cheap/dear               alias for x+cost-down/up
+@x-easy/hard                alias for x+difficulty-down/up
+@x-bonus/malus              alias for x+reward-up/down
+@x-inv                      invert rewards in domain x
+@x-is-y                     remap domain x onto domain y
+@x-prohibited               cannot act in domain x
+```
+
+The realized `SituationalEffect` already has the semantics for most of it —
+`applies_to_tags` is `#x`, the four modifier fields are the axes,
+`domain_override` is `@x-is-y`, and `forced_outcome` covers `@x-prohibited`.
+What is missing is the **authoring shorthand**, plus two operators with no
+realized equivalent: magnitude stacking (`@x-up-up`) and reward inversion
+(`@x-inv`).
+
+This matters because the automata catalog is written in this notation
+(`'@all-up'`, `'@combat-up'`, `'@damage-down'`). Nothing can read it today.
+
+### 2. `legacy/progression-pre25/badge.py` — nested badge conditions
+
+A spike on the hard part. Badges are named `Condition` expressions that may
+reference *other badges by name*:
+
+```python
+badges = {
+    'p1':   Condition(expr="prop1 >= 10"),
+    'both': Condition(expr="p1 and p2"),
+    'three': Condition(expr="both or p2"),
+}
+```
+
+`nested_eval` resolves badge names inside expressions recursively. This is
+exactly the dependency graph that can cycle, and the reason the old tree
+reached for a topological sort. No realized equivalent.
+
+### 3. `legacy/progression-pre25/skilled.py` — the badge API and tier occlusion
+
+The clearest statement of the intended shape:
+
+```python
+Badge(uid=f'{k}_minor', effects=..., conditions=[f'{k} very low'])
+Badge(uid=k,            effects=..., conditions=[f'{k} ok'],        hides=[f'{k}_minor'])
+Badge(uid=f'{k}_major', effects=..., conditions=[f'{k} very good'], hides=[f'{k}_minor', k])
+```
+
+Four fields: `uid`, `effects`, `conditions`, `hides`. Note that `hides` is doing
+**tier occlusion** here — each competence tier conceals the ones below it — not
+just concealment. The automata catalog's `adv_combat hides combat` is the same
+pattern in a different skin, so one mechanism covers both.
+
+Also note the import: `from tangl.story.asset.badge import Badge`. A badge was
+always meant to live in the asset package, which matches "a persistent token
+carrying a fact that is not consumed on use".
+
+Conditions are authored as quality-tier phrases (`"{k} ok"`, `"{k} very good"`)
+using the competence register.
+
+### 4. `challenge_block/situational_effect-2.py` — activation lifecycle
+
+`GlobalEffectType(Lockable, Conditional)` with `active` / `activate()` /
+`deactivate()` is the dynamic-assignment half: an effect that turns itself on
+and off from world state rather than being granted once. Keep as the statement
+of that lifecycle; the code is not a porting target.
+
+The badge socket already exists
+-------------------------------
+
+`effects/donors.py` defines `EffectDonor` — "things that donate situational
+effects" — plus `TagDonor` and `gather_donor_effects()`. That is precisely the
+socket a badge plugs into. There is no `Badge` type in the engine, but the
+interface it would implement is already built and already consumed by challenge
+resolution.
+
+So the badge work is not "add a subsystem". It is: a persistent fact token that
+implements `EffectDonor` and `TagDonor`, plus conditional assignment with
+nested references, plus `hides` occlusion, plus a parser for the shorthand its
+catalogs are written in.
+
+One small nuance worth keeping
+------------------------------
+
+Scratch `EnumeratedValue` read one scale in two registers —
+`V_POOR = V_EASY`, `GOOD = HARD` — so a tier is "good" competence or "hard"
+difficulty depending on which side of the challenge you are reading. Realized
+`Quality` keeps the competence register (`OK`, `GOOD`, `VERY_GOOD`) but not the
+difficulty one, even though `SituationalEffect` carries both
+`difficulty_modifier` and `competency_modifier`. Cheap to add as aliases if
+difficulty authoring ever wants the vocabulary.
