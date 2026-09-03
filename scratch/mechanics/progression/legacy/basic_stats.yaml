@@ -1,0 +1,57 @@
+# Opinionated basic stat domains
+
+body:  # health
+  # heavy, stone, blunt
+  currencies: [stamina, fatigue]  # fatigue reduces stamina
+  none: injured
+  skills:
+    - fight
+    - athletics
+    - heal spirit
+
+mind:  # acuity
+  # bright, sharp, lantern
+  currencies: [wit, confusion]  # confusion reduces wit
+  none: mind-broken
+  skills:
+    - craft
+    - teach
+    - heal body
+
+spirit:  # temper
+  # light, air, cold
+  currencies: [will, corruption]  # corruption reduces will
+  skills:
+    - arcane
+    - artistry
+    - heal mind
+# or perhaps this is double-ended, like love/hate, corruption/spirit
+
+charm:
+  # heat, flame
+  currencies: [beauty, wear]  # or makeup
+  skills:
+    - perform
+comfort:
+  currencies: [heat, satisfaction]  # satisfaction reduces heat
+  skills:
+    - perform
+
+prestige:
+  # gold, paper
+  currencies: [influence, cash, favors]
+  skills:
+    - trade
+    - boss
+princess:
+  currencies: [presence]
+  skills:
+    - etiquette
+
+crime:
+  # dark, shadow, hidden
+  currencies: [hidden, peril]  # gaining peril removes hidden, for princess, hidden might be 'wiles'
+  skills:
+    - sneak
+    - connected
+corruption:
