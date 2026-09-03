@@ -1,0 +1,170 @@
+# Automata upgrade catalog — reference artifact from an old chop-shop demo
+# world that never fully worked. Preserved because it is the most complete
+# statement of the badge shape we have, and because #333 names this catalog as
+# its domain input while it existed nowhere in the repo.
+#
+# Domain input and design evidence. Not a runtime format, not a porting target.
+#
+# What it demonstrates, beyond a list of upgrades:
+#
+#   situational_effects   two payload kinds — terse `@domain-direction` modifier
+#                         markers (grammar in scratch/mechanics/progression/
+#                         README.md) and `grants X` capability grants
+#   grants                badges grant other badges, and components auto-grant
+#                         badges, so assignment is a graph that can cycle
+#   hides                 badge occlusion: adv_combat hides combat, opening
+#                         hides repair — the same shape as a wearable covering
+#                         an ornament
+#   restriction           req_license / illegal — badges are what a credentials
+#                         inspection is looking for
+#   detectable_by         inspection depth as a tier (visual, invasive, tear down)
+#   req_controller_slots  a slot cost, so loadout is constrained optimization
+#   conditions            dynamic assignment predicates over component state
+#   desc / text           the law the restricted badge violates, as data
+
+# Implement as badges.
+
+# Some components automatically grant upgrades, like milspec grants
+# `combat` or parkour grants `racing`.
+
+# `improved` is a catch-all to indicate a variety of aftermarket optimizations.
+
+# Each upgrade with a controller req is only active if the automatron has appropriate
+# controllers loaded.
+
+# infiltrator might have:
+
+# - passing (0) and/or
+# - cloaking mod (2)
+
+# - opening mod (2) and/or
+# - hacking mod (2)
+
+# - concealed_carry (0) mod and/or
+# - built_in_weapons (1)
+
+# --------
+
+# as badges
+
+improved:
+  name: Improved
+  situational_effects:
+    - '@all-up'
+
+hardened:
+  name: Hardened
+  situational_effects:
+    - '@damage-down'
+
+combat:
+  name: Non-lethal Combat Stack
+  situational_effects:
+    - '@combat-up'
+  restriction: req_license  # req skilled stamp or tag + id
+  req_controller_slots: 1
+
+repair:
+  name: Mechanic Kit
+  situation_effects:
+    - grants mechanic
+    # repair, sabotage mechanical devices
+  restriction: req_license  # req skilled stamp or tag + id
+  req_controller_slots: 1
+
+racing:
+  name: Velocity Optimizer
+  situational_effects:
+    - '@speed-up'
+  conditions:
+    - ref.transit.quality >= Q.HIGH
+    - ref.power_plant.quality >= Q.HIGH
+  restriction: req_license  # req luxury stamp or tag + id
+  req_controller_slots: 1
+
+# ----------
+# Restricted
+# ----------
+
+passing:
+  name: Passing
+  conditions:
+    - ref.components.all_styled('simulacrum')
+  situational_effects:
+    - grants passing  # will pass as biological unless inspected
+  restriction: req_license  # for personal servants and other public-facing roles, req skilled or luxury + passing waiver
+  desc: "Automata shall not deceive the makers."
+
+adv_combat:
+  name: Tactical Combat Stack
+  hides: [ combat ]
+  situational_effects:
+    - '@combat-up'
+    - grants adv_combat
+    # unlocks top-tier/lethal combat skills
+  req_controller_slots: 2
+  restriction: req_license  # req skilled or luxury + weapon waiver
+  desc: "Automata shall not harm the makers."
+
+built_in_weapons:
+  name: Inline Weapons Platform
+  situational_effects:
+    - grants ranged_weapon
+    # can engage in ranged combat
+  req_controller_slots: 1
+  restriction: req_license   # req skilled or luxury + weapon waiver
+  desc:  "Automata shall not harm the makers."
+
+# -------
+# Illegal
+# -------
+
+concealed_carry:
+  name: Smuggling Compartments
+  situational_effects:
+    - grants hidden_cargo
+    # cargo, including illegal mods and inline weapons, will not be discovered without invasive inspection
+  restriction: illegal  # req invasive inspection to detect
+  text:  "Automata shall not deceive the makers."
+
+cloaking:
+  name: Active Stealth
+  detectable_by: tear down
+  situational_effects:
+    - grants hidden
+    # will not be noticed by _tech_ surveillance (sensors)
+  restriction: illegal
+  text:  "Automata shall not deceive the makers."
+
+opening:
+  name: B&E Stack
+  hides: [ repair ]
+  situational_effects:
+    - grants mechanic
+    # repair, sabotage mechanical devices
+    - grants mech_knock
+    # access mechanically secured areas
+  restriction: illegal
+  req_controller_slots: 2
+
+hacking:
+  name: ICE
+  situational_effects:
+    - grants hack
+    # control, sabotage tech devices
+    - grants tech_knock
+    # access tech secured devices
+  restriction: illegal
+  req_controller_slots: 2
+
+thinking:
+  name: Independent Executive Function  # IEF
+  situational_effects:
+    - '@tech-up'
+    - grants adv_tech
+    # unlocks top-tier technical skills
+    - grants independent
+    # unlocks autonomous mission assignments
+  restriction: illegal  # req invasive inspection to detect
+  req_controller_slots: 3
+  desc:  "Automata shall obey the makers."
