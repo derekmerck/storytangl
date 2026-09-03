@@ -1,0 +1,10 @@
+# Adjudicated: see AGENTS.md in this directory.
+#
+# These assets are required — engine/tests/loaders/test_repartee_art_packs.py
+# asserts the size, mode and sha256 of every one — so under root AGENTS.md
+# rule 3 they must not depend on Git LFS having materialized. Stored as
+# ordinary git blobs, overriding the repository-wide `*.png` LFS rule.
+#
+# About 1 MB across fourteen files. Source renders stay out of the tree
+# entirely; see AGENTS.md.
+*.png -filter -diff -merge -text export-ignore
