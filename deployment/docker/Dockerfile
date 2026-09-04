@@ -84,9 +84,14 @@ COPY --from=doc_builder /build/docs/html /app/docs
 ENV TANGL_SERVICE__PATHS__CLIENT_DIST='@path /app/client/'
 COPY --from=app_builder /app/dist /app/client
 
-# Install the application (cli + server extras)
+# Install the application (cli + server extras).
+# The wheel is named through a variable because `/app/*.whl[cli,server]` is not
+# a glob plus an extras suffix: `[cli,server]` is a glob character class, so the
+# shell looks for a file ending `.whl` plus one of c/l/i/,/s/e/r/v, finds none,
+# and passes the pattern through to pip literally.
 RUN pip install --upgrade pip \
- && pip install /app/*.whl[cli,server] \
+ && WHEEL="$(ls /app/*.whl)" \
+ && pip install "${WHEEL}[cli,server]" \
  && rm /app/*.whl
 
 EXPOSE 8000
