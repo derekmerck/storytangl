@@ -351,7 +351,7 @@ class TestAsyncServiceFallbacks:
 
         assert payload is not None
         assert payload["fragment_type"] == "media"
-        assert payload["content_format"] == "rit"
+        assert payload["content_format"] == "url"
         assert payload["url"] == "/media/world/demo/placeholder.svg"
 
     def test_story_scoped_pending_media_uses_fallback_asset_scope(self, tmp_path: Path) -> None:

@@ -45,21 +45,23 @@ def _text(value: Any) -> str | None:
     return value.strip() or None
 
 
-# Media payloads name their source by content_format. ``content``/``source`` are
-# not among them; see ``tangl.service.media.media_fragment_to_payload``.
-_SOURCE_KEYS = ("path", "url", "src", "ref")
+# ``content_format`` names the key its source lives under. This used to be a
+# four-way probe because the service could hand back a dereferenced payload
+# still labelled ``"rit"``, so no client could trust the declaration; now that
+# every profile declares what it actually carries, the format is the lookup.
+_SOURCE_KEY_BY_FORMAT = {"url": "url", "path": "path"}
 
 
 def _payload_source(payload: dict[str, Any]) -> str | None:
-    """Return the first usable media source key in a service payload."""
+    """Return the media source a payload declares, or None when it carries none."""
 
-    for key in _SOURCE_KEYS:
-        value = payload.get(key)
-        if isinstance(value, Path):
-            return str(value)
-        if (text := _text(value)) is not None:
-            return text
-    return None
+    key = _SOURCE_KEY_BY_FORMAT.get(str(payload.get("content_format")))
+    if key is None:
+        return None
+    value = payload.get(key)
+    if isinstance(value, Path):
+        return str(value)
+    return _text(value)
 
 
 def _step(fragment: BaseFragment) -> int:

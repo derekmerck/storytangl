@@ -113,6 +113,16 @@ def _relative_url_path_for_rit(
 
 
 def _url_prefix(*, scope: str, world_id: str | None, story_id: str | None) -> str | None:
+    """Return the served prefix for a scope.
+
+    Branches on scope only. Routing some data types to a CMS while others stay on
+    the media server would extend this to ``(scope, data_type) -> resolver`` --
+    and belongs here, in server configuration, rather than on
+    :class:`MediaRenderProfile`. The profile is per-request *client* policy; where
+    the bytes live is per-deployment. One knob for both would let a client reroute
+    storage. See ``MEDIA_DESIGN.md``.
+    """
+
     if scope == "sys":
         return "/media/sys"
     if scope == "story":
@@ -223,9 +233,25 @@ def _base_payload(
     *,
     scope: str,
     media_type: MediaDataType | str | None,
+    content_format: str | None,
 ) -> dict[str, Any]:
+    """Assemble the common media DTO fields.
+
+    ``content_format`` is required rather than defaulted off the fragment
+    because it describes **this payload**, not the fragment it came from. A
+    dereferenced RIT is a URL, or bytes, or a path -- never still a ``"rit"``.
+    Defaulting it made "forgot to relabel" the silent fallback, and a payload
+    labelled ``"rit"`` promises clients an affordance it does not carry: no
+    ``rit_id`` to resolve, and no endpoint to resolve it at.
+
+    ``rit_id`` travels alongside for RIT-backed media so a future RIT-aware
+    client tier is additive rather than a breaking DTO change. See
+    ``MEDIA_DESIGN.md`` for the tiers this leaves open.
+    """
+
     source_id = getattr(fragment, "source_id", None)
-    return {
+    rit_id = getattr(fragment, "rit_id", None)
+    payload = {
         "uid": str(fragment.uid),
         "fragment_type": "media",
         "media_role": getattr(fragment, "media_role", None),
@@ -235,8 +261,11 @@ def _base_payload(
         "media_type": (
             media_type.value if isinstance(media_type, MediaDataType) else media_type
         ),
-        "content_format": getattr(fragment, "content_format", None),
+        "content_format": content_format,
     }
+    if rit_id is not None:
+        payload["rit_id"] = str(rit_id)
+    return payload
 
 
 def _inline_data_payload(
@@ -245,7 +274,6 @@ def _inline_data_payload(
     scope: str,
     result: ResolvedMediaResult,
 ) -> dict[str, Any]:
-    base_payload = _base_payload(fragment, scope=scope, media_type=result.data_type)
     data = result.data
     data_type = result.data_type
 
@@ -258,19 +286,19 @@ def _inline_data_payload(
     if data_type == MediaDataType.VECTOR:
         if isinstance(data, bytes):
             data = data.decode("utf-8")
-        return {**base_payload, "content_format": "xml", "data": data}
-
-    if isinstance(data, bytes):
         return {
-            **base_payload,
-            "content_format": "data",
-            "data": b64encode(data).decode("ascii"),
+            **_base_payload(
+                fragment, scope=scope, media_type=data_type, content_format="xml"
+            ),
+            "data": data,
         }
-    return {
-        **base_payload,
-        "content_format": "data",
-        "data": data,
-    }
+
+    base_payload = _base_payload(
+        fragment, scope=scope, media_type=data_type, content_format="data"
+    )
+    if isinstance(data, bytes):
+        return {**base_payload, "data": b64encode(data).decode("ascii")}
+    return {**base_payload, "data": data}
 
 
 def _passthrough_payload(
@@ -279,11 +307,20 @@ def _passthrough_payload(
     scope: str,
     result: ResolvedMediaResult,
 ) -> dict[str, Any]:
-    base_payload = _base_payload(fragment, scope=scope, media_type=result.data_type)
     if result.url:
-        return {**base_payload, "content_format": "url", "url": result.url}
+        return {
+            **_base_payload(
+                fragment, scope=scope, media_type=result.data_type, content_format="url"
+            ),
+            "url": result.url,
+        }
     if result.path is not None:
-        return {**base_payload, "content_format": "path", "path": str(result.path)}
+        return {
+            **_base_payload(
+                fragment, scope=scope, media_type=result.data_type, content_format="path"
+            ),
+            "path": str(result.path),
+        }
     return _inline_data_payload(fragment=fragment, scope=scope, result=result)
 
 
@@ -299,17 +336,25 @@ def _media_server_payload(
     story_media_root: Path | None = None,
     system_media_root: Path | None = None,
 ) -> dict[str, Any]:
+    content_type = result.data_type
+
     if result.url:
         return {
-            **_base_payload(fragment, scope=scope, media_type=result.data_type),
+            **_base_payload(
+                fragment, scope=scope, media_type=content_type, content_format="url"
+            ),
             "url": result.url,
         }
 
-    content_type = result.data_type
-    payload = _base_payload(fragment, scope=scope, media_type=content_type)
     if content_type in _UNSUPPORTED_MEDIA_TYPES:
-        payload["unsupported_reason"] = "unsupported_media_type"
-        return payload
+        # Nothing is carried, so nothing is declared. A format naming a source
+        # this payload does not have would be the same lie in a smaller hat.
+        return {
+            **_base_payload(
+                fragment, scope=scope, media_type=content_type, content_format=None
+            ),
+            "unsupported_reason": "unsupported_media_type",
+        }
 
     prefix = _url_prefix(scope=scope, world_id=world_id, story_id=story_id)
     media_root = _media_root_for_scope(
@@ -319,8 +364,12 @@ def _media_server_payload(
         system_media_root=system_media_root,
     )
     if prefix is not None and result.path is not None:
-        payload["url"] = f"{prefix}/{_relative_url_path_for_rit(rit, media_root=media_root)}"
-        return payload
+        return {
+            **_base_payload(
+                fragment, scope=scope, media_type=content_type, content_format="url"
+            ),
+            "url": f"{prefix}/{_relative_url_path_for_rit(rit, media_root=media_root)}",
+        }
     return _inline_data_payload(fragment=fragment, scope=scope, result=result)
 
 
@@ -453,10 +502,13 @@ def media_fragment_to_payload(
                 system_media_root=system_media_root,
             )
 
+        # Nothing was dereferenced on this path, so the fragment's own format
+        # is this payload's format -- stated rather than defaulted.
         payload = _base_payload(
             fragment,
             scope=scope,
             media_type=getattr(fragment.content_type, "value", fragment.content_type),
+            content_format=fragment.content_format,
         )
 
         if fragment.content_format == "url":

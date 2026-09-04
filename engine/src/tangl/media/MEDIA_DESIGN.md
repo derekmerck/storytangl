@@ -445,6 +445,56 @@ than a separate sidecar pipeline.
 
 ## Cross-Cutting Design Decisions
 
+### Client Capability Tiers, and What a Payload Declares
+
+A RIT is a structured object the way markdown is a structured language: a capable
+client can accept the structured form and resolve it itself, while a simpler one
+asks the server for something directly usable. `MediaRenderProfile` x
+`MediaContentProfile` is that negotiation, and the client's appetite picks the
+tier.
+
+**The rule.** `content_format` on a DTO describes **what that payload carries**,
+never what the fragment was authored as. A dereferenced RIT is a URL, or bytes, or
+a path — never still a `"rit"`. `_base_payload` therefore takes the representation
+as a required argument: defaulting it made "forgot to relabel" the silent
+fallback, and `MEDIA_SERVER` shipped dereferenced payloads labelled `"rit"` for
+long enough that the web client encoded the lie as a pending-media check.
+
+| Tier | Profile | Payload | Built |
+|---|---|---|---|
+| Inline bytes | `INLINE_DATA` | `content_format: "data"` (b64) or `"xml"` (SVG source) | yes |
+| Served URL | `MEDIA_SERVER` | `content_format: "url"` | yes |
+| In-process path | `PASSTHROUGH` | `content_format: "path"` | yes |
+| RIT reference | *(`RIT_REF`)* | `content_format: "rit"` + `rit_id`, client resolves | **no** |
+
+`rit_id` already travels on every RIT-backed payload. Nothing consumes it, and
+that is the point: the fourth tier becomes additive rather than a breaking DTO
+change whenever a client actually wants it.
+
+**What the fourth tier needs, when someone wants it.** A `RIT_REF` profile, and a
+route — `GET /media/rit/{id}?format=&max_dim=`. There is none today;
+`apps/server/.../media_server.py` is static mounts whose paths derive from the
+RIT's *filename*.
+
+That route is also the only sane home for **rasterize and resize**, which the
+profile cannot express. `MediaContentProfile` chooses a transport
+*representation*, never a *transformation*. `MediaPendingPolicy` already covers
+the lifecycle question (`POLL` / `FALLBACK` / `DISCARD`), which is the axis a pure
+format negotiation like `Accept:` does not have — a markdown-capable client never
+has to wait for its markdown to finish generating.
+
+**Backing-store routing is a third axis and does not belong here.** Serving some
+data types from the media server and others from a CMS is *server configuration*
+with a deployment's lifetime; the render profile is per-request *client* policy.
+One knob for both would let a client reroute storage. `_url_prefix` branches on
+scope alone; a `(scope, data_type) -> resolver` map would land there, configured
+through `tangl.config.settings` beside the rest of `[service.paths]`.
+
+The prose side of this negotiation is declared but inert:
+`ContentFragment.content_format` exists, nothing produces it, and the web client
+escapes markup and renders it as literal text. A `ProseContentProfile` would be
+the symmetric surface, and the rich CLI port is its first plausible consumer.
+
 ### Media as a Symmetric Partner to Prose
 
 The media package handles the *non-textual* output dimension of narrative:

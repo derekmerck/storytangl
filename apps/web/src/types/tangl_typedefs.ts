@@ -288,11 +288,21 @@ export interface AttributedStoryFragment extends BaseStoryFragment {
 export interface MediaStoryFragment extends BaseStoryFragment {
   fragment_type: 'media'
   content?: unknown
-  content_format?: 'url' | 'data' | 'xml' | 'json' | 'rit' | string
+  /**
+   * What this payload carries -- not what the fragment was authored as. The
+   * service dereferences a RIT before sending, so a generated image arrives as
+   * `url`, `data` or `xml` like any other.
+   */
+  content_format?: 'url' | 'data' | 'xml' | 'json' | 'path' | string
   media_role?: MediaRole | string | null
   scope?: string | null
   staging_hints?: Record<string, unknown> | null
-  generation_status?: string | null
+  /**
+   * Present when the payload came from a resource in the inventory. A client
+   * that learns to ask the service for another representation would key on
+   * this; nothing needs it yet.
+   */
+  rit_id?: string | null
   url?: string
   src?: string
   data?: unknown

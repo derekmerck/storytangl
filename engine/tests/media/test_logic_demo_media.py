@@ -100,6 +100,6 @@ def test_logic_demo_output_badge_resolves_to_story_svg(
 
     assert payload is not None
     assert payload["scope"] == "story"
-    assert payload["content_format"] == "rit"
+    assert payload["content_format"] == "url"
     assert payload["url"].startswith(f"/media/story/{story.story_id}/parity_even_badge-")
     assert payload["url"].endswith(".svg")
