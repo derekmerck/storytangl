@@ -10,10 +10,9 @@ from typing import Any, Mapping
 
 JsonMapping = Mapping[str, Any]
 
-#: Fragment types a line-oriented renderer draws nothing for. ``group`` is a
-#: relational overlay tying peer fragments together by id -- its members render
-#: on their own, and the group itself has no content.
-STRUCTURAL_FRAGMENT_TYPES = frozenset({"choice", "control", "group"})
+#: Fragment types a line-oriented renderer draws nothing for. Choices render
+#: through the choice list and control fragments carry no reader-facing text.
+STRUCTURAL_FRAGMENT_TYPES = frozenset({"choice", "control"})
 
 
 def create_terminal_renderer(style: str) -> PlainTerminalRenderer:
@@ -275,9 +274,14 @@ def _plain_fragment_lines(fragment: Any) -> list[str]:
         piece_id = _read(fragment, "piece_id")
         label = _fragment_text(fragment)
         return [f"[{piece_id}] {label}" if piece_id else label]
+    if ftype == "group":
+        return [_group_line(fragment)]
 
     text = _fragment_text(fragment)
-    return [text] if text else []
+    if text:
+        return [text]
+    unsupported = _unsupported_line(fragment)
+    return [unsupported] if unsupported else []
 
 
 def _rich_fragment_renderables(fragment: Any) -> list[Any]:
@@ -303,6 +307,8 @@ def _rich_fragment_renderables(fragment: Any) -> list[Any]:
         label = _fragment_text(fragment)
         text = f"[{piece_id}] {label}" if piece_id else label
         return [_rich_text(text)]
+    if ftype == "group":
+        return [_rich_text(_group_line(fragment), style="dim")]
 
     content_format = _read(fragment, "content_format")
     text = _fragment_text(fragment)
@@ -313,7 +319,10 @@ def _rich_fragment_renderables(fragment: Any) -> list[Any]:
             return [Markdown(text)]
         except ImportError:
             return [_rich_text(text)]
-    return [_rich_text(text)] if text else []
+    if text:
+        return [_rich_text(text)]
+    unsupported = _unsupported_line(fragment)
+    return [_rich_text(unsupported, style="dim")] if unsupported else []
 
 
 def _rich_choices(choices: list[Any], *, no_choices_text: str = "No available choices.") -> Any:
@@ -706,8 +715,8 @@ def _media_name(fragment: Any) -> str:
     """Name a media fragment for the text floor.
 
     The DTO projects RIT-backed media as the resource's name (see
-    ``MediaFragment.dto_overrides``), so ``content`` is normally a plain string
-    by the time it reaches here. The attribute probe stays for fragments still
+    ``MediaFragment._encode_binary_content``), so ``content`` is normally a
+    plain string by the time it reaches here. The attribute probe stays for fragments still
     holding a live resource object, and accepts only string-ish values: feeding
     an object repr through ``_basename`` is what used to splice everything
     after the last path separator into the narrative.
@@ -725,6 +734,76 @@ def _media_name(fragment: Any) -> str:
     if isinstance(content, str) and content.strip():
         return _basename(content.strip())
     return _read(fragment, "media_role") or "media"
+
+
+def _nested_label(fragment: Any) -> str:
+    """Best human-readable label from a fragment's payload or its hints.
+
+    Reads named fields only. The point of the surrounding code is that a
+    payload we cannot render must never be stringified wholesale into the
+    reader's narrative.
+    """
+
+    hints = _read(fragment, "hints") or _read(fragment, "presentation_hints")
+    for source in (fragment, _read(fragment, "content"), hints):
+        if not isinstance(source, Mapping) and source is not fragment:
+            continue
+        for key in ("label_text", "label", "title", "text", "name"):
+            value = _read(source, key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
+
+
+def _group_line(fragment: Any) -> str:
+    """Name a group, and say so when it is empty.
+
+    A group is a relational overlay: its members are peer fragments that render
+    themselves, so this draws the group's own identity and never its contents.
+    An empty one still has to appear -- a targetable zone with nothing in it is
+    a thing the reader can act on, and silence would delete it from the story.
+    """
+
+    name = (
+        _nested_label(fragment)
+        or _stringly(_read(fragment, "zone_role"))
+        or _stringly(_read(fragment, "group_type"))
+        or "group"
+    )
+    members = _read(fragment, "member_ids") or ()
+    return f"[{name}]" if members else f"[{name}] (empty)"
+
+
+def _stringly(value: Any) -> str:
+    """A plain string for a value that may be an enum, or empty."""
+
+    if value is None:
+        return ""
+    text = str(getattr(value, "value", value)).strip()
+    return text.replace("_", " ") if text else ""
+
+
+def _unsupported_line(fragment: Any) -> str:
+    """Placeholder for a fragment this renderer has no case for.
+
+    Extension fragments round-trip through ``fragment_from_dto`` precisely so
+    an unknown one survives to the client, so dropping it silently loses
+    content the contract promises to carry. Named fields only -- the raw
+    payload never reaches the reader.
+    """
+
+    content = _read(fragment, "content")
+    if not content or isinstance(content, str):
+        return ""
+
+    kind = (
+        _stringly(_read(content, "kind") if isinstance(content, Mapping) else None)
+        or _stringly(_read(content, "type") if isinstance(content, Mapping) else None)
+        or _stringly(_read(fragment, "fragment_type"))
+        or "fragment"
+    )
+    label = _nested_label(fragment)
+    return f"[unsupported {kind}] {label}" if label else f"[unsupported {kind}]"
 
 
 def _fragment_text(fragment: Any) -> str:

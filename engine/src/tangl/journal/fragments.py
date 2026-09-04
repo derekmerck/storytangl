@@ -341,24 +341,6 @@ class MediaFragment(ContentFragment, extra="allow"):
             payload["content"] = rit
         return super().structure(payload, _ctx=_ctx)
 
-    def dto_overrides(self) -> UnstructuredData:
-        """Name the resource instead of dumping it.
-
-        ``content`` holds a graph-owned :class:`MediaRIT` for ``rit`` media, and
-        ``model_dump(mode="json")`` has no encoder for it, so it falls back to
-        the object repr -- which then reaches every text client as narrative
-        prose. Clients dereference media through ``rit_id`` and the service
-        media path; the DTO only needs a human-readable name.
-
-        The key stays populated rather than dropped because ``content`` is
-        required for hydration. :meth:`unstructure` can drop it instead, since
-        :meth:`structure` rebinds the RIT from the owning graph.
-        """
-
-        if self.content_format != "rit" or not isinstance(self.content, MediaRIT):
-            return {}
-        return {"content": _rit_display_name(self.content)}
-
     def evolve(self, **updates: Any) -> Self:
         """Copy a live fragment without serializing its graph-owned RIT."""
 
@@ -369,8 +351,21 @@ class MediaFragment(ContentFragment, extra="allow"):
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:
+        """Serialize content by format, never by falling back to ``repr``.
+
+        A graph-owned :class:`MediaRIT` has no JSON encoder, so the bare
+        ``str(content)`` below rendered its whole repr -- which reached text
+        clients as narrative prose. Clients dereference media through
+        ``rit_id`` and the service media path, so the serialized form only
+        needs to name the resource. Persistence is unaffected either way:
+        :meth:`unstructure` drops ``content`` for RIT media entirely and
+        :meth:`structure` rebinds it from the owning graph.
+        """
+
         if self.content_format == "data" and isinstance(content, bytes):
             return b64encode(content).decode("utf-8")
+        if self.content_format == "rit" and isinstance(content, MediaRIT):
+            return _rit_display_name(content)
         return str(content)
 
 
@@ -453,7 +448,6 @@ def fragment_to_dto(
         dto_alias = type(fragment).model_fields[field_name].json_schema_extra["dto_alias"]
         if field_name in payload:
             payload[dto_alias] = payload.pop(field_name)
-    payload.update(fragment.dto_overrides())
     return payload
 
 
