@@ -296,6 +296,15 @@ StoryTangl uses Git LFS for `.png` and `.jpg` files.
 2. **Use SVG primitives** for examples and test worlds.
 3. **Create SVG files only in `tmp_path`** during tests, not in the repo.
 
+Rule 1 has two standing exceptions. Any addition to either must carry a note
+saying why SVG will not serve:
+
+- `worlds/*/media/images/` -- authored world media.
+- `.github/assets/` -- README and social artwork, justified in
+  [`.github/assets/README.md`](.github/assets/README.md). GitHub loads no
+  webfont for an SVG in a README, and the wordmark is font-dependent, so this
+  artwork has to ship rasterized.
+
 ## Miscellaneous
 - No try/except around imports. Declare dependencies in `pyproject.toml`.
 - `Path` objects over raw strings for filesystem paths.
