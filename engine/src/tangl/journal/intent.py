@@ -4,14 +4,29 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+
+from tangl.core.bases import Unstructurable
 
 
 PrimitiveValue: TypeAlias = str | int | float | bool
 
 
-class IntentModel(BaseModel):
-    """Base for UI-facing intent models with forward-compatible extra fields."""
+class IntentModel(Unstructurable):
+    """Base for UI-facing intent models with forward-compatible extra fields.
+
+    Constructor-form capable so that fields holding these value objects can opt
+    into recursion with ``json_schema_extra={"unstructurable": True}``. That
+    matters for the discriminated unions below: ``unstructure()`` elides
+    defaults, and a union tag such as ``kind: Literal["pick"] = "pick"`` is
+    indistinguishable from a default, so a flat ``model_dump`` drops it and the
+    payload can no longer be re-validated against its union. Constructor form
+    carries its own discriminator -- ``kind`` holds the class -- so recursing
+    keeps the tag without re-admitting every other default.
+
+    The DTO projection is a separate path (:func:`tangl.journal.fragments.
+    fragment_to_dto`) and keeps the string ``kind`` literal for wire consumers.
+    """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -96,7 +111,9 @@ class TextAccepts(IntentModel):
     kind: Literal["text"] = "text"
     required: bool = True
     placeholder: str | None = None
-    validators: list[Validator] = Field(default_factory=list)
+    validators: list[Validator] = Field(
+        default_factory=list, json_schema_extra={"unstructurable": True}
+    )
 
 
 class QuantityAccepts(IntentModel):
@@ -139,12 +156,12 @@ NonComposeAccepts: TypeAlias = Annotated[
 
 class ComposePart(IntentModel):
     role: str
-    accepts: NonComposeAccepts
+    accepts: NonComposeAccepts = Field(..., json_schema_extra={"unstructurable": True})
 
 
 class ComposeAccepts(IntentModel):
     kind: Literal["compose"] = "compose"
-    parts: list[ComposePart]
+    parts: list[ComposePart] = Field(..., json_schema_extra={"unstructurable": True})
 
 
 Accepts: TypeAlias = Annotated[
