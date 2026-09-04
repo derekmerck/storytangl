@@ -166,7 +166,7 @@ def _flatten(fragments) -> list:
     for fragment in fragments:
         flat.append(fragment)
         if isinstance(fragment, GroupFragment):
-            flat.extend(_flatten(list(getattr(fragment, "content", []) or [])))
+            flat.extend(_flatten(list(fragment.content or [])))
     return flat
 
 

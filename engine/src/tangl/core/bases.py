@@ -101,6 +101,7 @@ import logging
 import time
 from types import UnionType
 from typing import (
+    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -340,10 +341,12 @@ class Unstructurable(BaseModelPlus):
         if value is None:
             return None
 
-        # ``Annotated[...]`` is opaque to get_origin, so a discriminated union
-        # written as ``Annotated[A | B, Field(discriminator=...)]`` would never
-        # be descended into. Carry the metadata off and keep resolving.
-        while hasattr(annotation, "__metadata__"):
+        # ``get_origin`` reports ``Annotated`` itself, not the wrapped type, so a
+        # discriminated union written as
+        # ``Annotated[A | B, Field(discriminator=...)]`` never reaches the union
+        # branch below. Unwrap once -- nested ``Annotated`` is flattened by
+        # ``typing`` -- and resolve against the type it wraps.
+        if get_origin(annotation) is Annotated:
             annotation = get_args(annotation)[0]
 
         origin = get_origin(annotation)
