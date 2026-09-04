@@ -37,10 +37,16 @@ async def get_worlds(
 @router.get("/secret")
 async def get_key_for_secret(
     service_manager: ServiceManager = Depends(get_service_manager),
-    secret: str = Query(examples=["example-user-secret"], default=None),
+    secret: str = Query(examples=["example-user-secret"]),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
-    """Encode ``secret`` as an API key for clients."""
+    """Derive the API key transport form of a recovery codename.
+
+    ``secret`` is required: this endpoint encodes a codename the caller already
+    holds and never generates one. Generating a codename belongs to
+    ``POST /user/create`` with no secret, which rerolls while one is occupied
+    and persists the resulting user (issue #352).
+    """
 
     _ = render_profile
     require_service_access("get_key_for_secret")
