@@ -29,6 +29,7 @@ from .models import (
     BeginSelection,
     CancelSelection,
     Commit,
+    Finding,
     PendingSelection,
     Piece,
     PickPiece,
@@ -68,6 +69,7 @@ def _merge(turns: list[Turn]) -> Turn:
     staged: dict[tuple[str, ...], StageImage] = {}
     pieces: dict[str, Piece] = {}
     zones: dict[UUID, Zone] = {}
+    findings: dict[str, Finding] = {}
     for turn in turns:
         # Pieces and zones are stage state too, and a re-entrant block restates
         # them every turn. Keyed by identity so a restatement updates the piece
@@ -76,6 +78,8 @@ def _merge(turns: list[Turn]) -> Turn:
             pieces[piece.piece_id] = piece
         for zone in turn.zones:
             zones[zone.uid] = zone
+        for finding in turn.findings:
+            findings[finding.key] = finding
         for image in turn.images:
             # A plate is stage state like a background: a batch that crosses
             # between two maps must not keep the old one and pair it with the
@@ -91,6 +95,7 @@ def _merge(turns: list[Turn]) -> Turn:
     merged.images.extend(staged.values())
     merged.pieces.extend(pieces.values())
     merged.zones.extend(zones.values())
+    merged.findings.extend(findings.values())
     merged.choices.extend(turns[-1].choices if turns else [])
     return merged
 

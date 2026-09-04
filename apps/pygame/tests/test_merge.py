@@ -15,6 +15,7 @@ pytest.importorskip("pygame", reason="pygame-ce is an optional client runtime")
 from tangl.pygame_client.__main__ import _merge  # noqa: E402
 from tangl.pygame_client.models import (  # noqa: E402
     Choice,
+    Finding,
     Line,
     Piece,
     StageImage,
@@ -159,3 +160,20 @@ def test_zones_are_merged_by_uid() -> None:
 
     assert len(merged.zones) == 1
     assert merged.zones[0].label == "Credentials packet"
+
+
+def test_findings_merge_by_key() -> None:
+    """Disclosure accumulates; a restated finding updates rather than repeats."""
+
+    merged = _merge([
+        Turn(step=1, findings=[Finding(key="work permit", value="unsealed", emphasis="warn")]),
+        Turn(step=2, findings=[
+            Finding(key="work permit", value="never sealed by the issuer", emphasis="warn"),
+            Finding(key="packet", value="inconsistent", emphasis="danger"),
+        ]),
+    ])
+
+    assert [(f.key, f.value) for f in merged.findings] == [
+        ("work permit", "never sealed by the issuer"),
+        ("packet", "inconsistent"),
+    ]

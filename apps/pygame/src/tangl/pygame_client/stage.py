@@ -59,11 +59,22 @@ _DEFAULT_SLOTS = ("left", "right", "mid")
 ROW_H = 9
 PROSE_TOP = 24
 
+PANEL_W = 104
+"""Width reserved for the state panel when a turn has state worth showing.
+
+Decision Legibility (§5.1) makes rendering pieces a requirement, not a
+flourish, so the space is taken from the prose rather than shared with it: a
+document that scrolled away is a document the player cannot evaluate.
+"""
+
 INK = (26, 28, 44)
 CREAM = (232, 226, 205)
 TEAL = (63, 96, 99)
 RUST = (168, 92, 56)
 DIM = (120, 118, 110)
+ALERT = (198, 76, 56)
+
+_EMPHASIS_COLOURS = {"ok": TEAL, "warn": RUST, "danger": ALERT, "subtle": DIM}
 
 _ROW_STYLES = {
     "heading": (CREAM, RUST),
@@ -200,14 +211,18 @@ class Stage:
         choices_top = LOGICAL_SIZE[1] - 4 - below * 11
         self._draw_portraits(loaded, floor=choices_top)
 
-        rows = self._rows(turn, unloadable)
+        panelled = self._has_state(turn)
+        width = LOGICAL_SIZE[0] - (PANEL_W if panelled else 0)
+        rows = self._rows(turn, unloadable, columns=(width - 12) // 4)
         capacity = max(1, (choices_top - PROSE_TOP) // ROW_H)
         self.max_scroll = max(0, len(rows) - capacity)
         if turn is not self._last_turn:
             self.scroll = self.max_scroll  # newest text first on a fresh turn
             self._last_turn = turn
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
-        self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity)
+        self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
+        if panelled:
+            self._draw_state_panel(turn, top=2, bottom=choices_top)
         if pending is not None:
             self._draw_selection(turn, pending, top=choices_top)
         else:
@@ -329,7 +344,7 @@ class Stage:
         the only way to continue, are what a fresh turn shows.
         """
 
-        rows = self._rows(turn, [])
+        rows = self._rows(turn, [], columns=74)
         rows.extend(
             _Row(self._choice_label(index, choice), "choice")
             for index, choice in enumerate(turn.choices, start=1)
@@ -416,7 +431,9 @@ class Stage:
             return LOGICAL_SIZE[0] - width - MARGIN
         return (LOGICAL_SIZE[0] - width) // 2
 
-    def _rows(self, turn: Turn, unloadable: list[StageImage]) -> list[_Row]:
+    def _rows(
+        self, turn: Turn, unloadable: list[StageImage], *, columns: int = 74
+    ) -> list[_Row]:
         """Flatten a turn into rendered rows, including media text floors."""
 
         rows: list[_Row] = []
@@ -424,21 +441,21 @@ class Stage:
             if line.speaker is not None:
                 heading = f"{line.speaker} ({line.manner})" if line.manner else line.speaker
                 rows.append(_Row(heading, "heading"))
-                rows.extend(_Row(part, "dialog") for part in self._wrap(line.text, 74))
+                rows.extend(_Row(part, "dialog") for part in self._wrap(line.text, columns))
             else:
-                rows.extend(_Row(part, "narration") for part in self._wrap(line.text, 74))
+                rows.extend(_Row(part, "narration") for part in self._wrap(line.text, columns))
         for image in unloadable:
             text = image.alt_text or f"[{image.role} unavailable]"
-            rows.extend(_Row(part, "alt") for part in self._wrap(text, 74))
+            rows.extend(_Row(part, "alt") for part in self._wrap(text, columns))
         return rows
 
-    def _draw_rows(self, rows: list[_Row], *, capacity: int) -> None:
+    def _draw_rows(self, rows: list[_Row], *, capacity: int, width: int) -> None:
         """Draw one page of rows, bottom-aligned, with a scroll indicator."""
 
         y = PROSE_TOP + max(0, capacity - len(rows)) * ROW_H
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
-            pygame.draw.rect(self.surface, fill, pygame.Rect(6, y, LOGICAL_SIZE[0] - 12, ROW_H))
+            pygame.draw.rect(self.surface, fill, pygame.Rect(6, y, width - 12, ROW_H))
             self.surface.blit(self.font.render(row.text, False, colour), (9, y))
             y += ROW_H
         if self.max_scroll:
@@ -475,6 +492,72 @@ class Stage:
                 action=action,
             )
             y += 11
+
+    @staticmethod
+    def _has_state(turn: Turn) -> bool:
+        return bool(turn.pieces or turn.zones or turn.findings)
+
+    def _draw_state_panel(self, turn: Turn, *, top: int, bottom: int) -> None:
+        """Draw the pieces, zones and findings a choice may reference.
+
+        This is the §5.1 floor made literal: if the player can pick it, the
+        player can see it. Zones render even when empty -- a targetable
+        container with nothing in it is information, not an absence -- and
+        findings keep the engine's own ``emphasis`` word rather than the client
+        re-deriving severity from prose.
+        """
+
+        left = LOGICAL_SIZE[0] - PANEL_W
+        pygame.draw.rect(self.surface, INK, pygame.Rect(left, top, PANEL_W, bottom - top))
+        columns = (PANEL_W - 10) // 4
+        y = top + 2
+        clipped = False
+
+        def row(text: str, colour) -> None:
+            nonlocal y, clipped
+            if y + ROW_H > bottom - ROW_H:
+                # Reserve the last line for the overflow marker below. Silently
+                # dropping state is the failure §5.1 exists to prevent, so an
+                # over-full panel has to admit it rather than look complete.
+                clipped = True
+                return
+            self.surface.blit(self.font.render(text, False, colour), (left + 4, y))
+            y += ROW_H
+
+        def wrapped(text: str, colour, *, indent: str = "") -> None:
+            # Wrap rather than clip: a reason cut mid-word is not a reason, and
+            # every line here exists because a choice may reference it.
+            for part in self._wrap(text, columns - len(indent)):
+                row(f"{indent}{part}", colour)
+
+        # Pieces outside any zone first -- in a credentials shift that is the
+        # traveler, and who you are judging outranks what they handed over.
+        for piece in turn.pieces:
+            if piece.zone_ref is None:
+                wrapped(piece.label or piece.piece_id, CREAM)
+
+        for zone in turn.zones:
+            wrapped((zone.label or zone.role or "zone").upper(), RUST)
+            members = [piece for piece in turn.pieces if piece.zone_ref == zone.uid]
+            for piece in members:
+                name = piece.label or piece.piece_id
+                if not piece.available and piece.unavailable_reason:
+                    name = f"{name} - {piece.unavailable_reason}"
+                wrapped(name, CREAM if piece.available else DIM, indent=" ")
+            if not members:
+                row(" (empty)", DIM)
+
+        if turn.findings:
+            wrapped("FINDINGS", RUST)
+            for finding in turn.findings:
+                colour = _EMPHASIS_COLOURS.get(finding.emphasis or "", CREAM)
+                wrapped(f"{finding.key}: {finding.value}", colour, indent=" ")
+
+        if clipped:
+            self.surface.blit(
+                self.font.render("... more state than fits", False, ALERT),
+                (left + 4, bottom - ROW_H),
+            )
 
     def _draw_selection(self, turn: Turn, pending: PendingSelection, *, top: int) -> None:
         """Draw the pieces a pending choice will accept, numbered like choices.

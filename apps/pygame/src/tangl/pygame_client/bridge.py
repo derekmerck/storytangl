@@ -18,6 +18,7 @@ from tangl.journal.fragments import (
     ChoiceFragment,
     ContentFragment,
     GroupFragment,
+    KvFragment,
     MediaFragment,
     PieceFragment,
 )
@@ -38,6 +39,7 @@ from tangl.service.service_manager import ServiceManager
 
 from .models import (
     Choice,
+    Finding,
     Line,
     MapPlate,
     MapRegion,
@@ -132,10 +134,14 @@ def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
         return list(turn.pieces)
     zone_ref = constraints.target_zone_ref
     kinds = constraints.target_kind
+    # ``available=False`` is the piece saying it cannot satisfy a choice right
+    # now. Offering it anyway would put a guaranteed backend error behind a row
+    # that looks perfectly selectable.
     return [
         piece
         for piece in turn.pieces
-        if (zone_ref is None or str(piece.zone_ref) == zone_ref)
+        if piece.available
+        and (zone_ref is None or str(piece.zone_ref) == zone_ref)
         and (kinds is None or piece.kind in kinds)
     ]
 
@@ -361,7 +367,20 @@ class PygameSessionBridge:
                     text=_text(fragment.content) or "",
                     label=self._label(fragment),
                     zone_ref=fragment.zone_ref,
+                    available=fragment.available,
+                    unavailable_reason=_text(fragment.unavailable_reason),
                 )
+            )
+            return
+
+        if isinstance(fragment, KvFragment):
+            turn.findings.extend(
+                Finding(
+                    key=str(row.key),
+                    value=str(row.value),
+                    emphasis=row.emphasis,
+                )
+                for row in fragment.content
             )
             return
 

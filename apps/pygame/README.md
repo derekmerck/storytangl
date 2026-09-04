@@ -80,6 +80,44 @@ actions to answer.
 speaker bubble; a plain `ContentFragment` renders as narration. The client does
 not parse prose prefixes.
 
+## The State Panel
+
+A turn carrying pieces, zones or findings reserves the right-hand column for
+them. The space is taken from the prose rather than shared with it, because a
+document that scrolled away is a document the player cannot evaluate — and §5.1
+makes rendering it a requirement, not a flourish.
+
+```
+                          Edda Marrow
+  You inspect the         CREDENTIALS PACKET
+  work permit.             passport - already
+  The work permit          inspected
+  was never sealed         work permit - already
+  by the issuer.           inspected
+                           baggage
+  1. Inspect a document    FINDINGS
+  2. Review packet ...      work permit: The work
+```
+
+**A zone renders even when empty.** A targetable container with nothing in it is
+information, not an absence.
+
+**Findings keep the engine's `emphasis` word** — `ok`/`warn`/`danger`/`subtle`
+choose a colour. The client never re-derives severity from the prose.
+
+**A spent piece is dimmed with its reason and cannot be selected.** That is the
+generic `available` / `unavailable_reason` pair, read exactly as it is on a
+choice. `credential_gate` sets it on documents already inspected; before that
+existed, the only way to learn a document was spent was the backend error raised
+after committing it.
+
+**An over-full panel says so.** At 320x200 a nine-choice turn leaves the panel
+about eight rows, and a full packet plus findings can exceed that. It draws
+`... more state than fits` rather than quietly truncating, which is the honest
+failure and a real capability floor of this surface rather than a bug to hide.
+Findings are also on the `case_summary` info channel, so a client with less room
+can offer them on demand instead.
+
 ## The Map View
 
 When the cursor publishes a plate, the client draws it instead of the ordinary

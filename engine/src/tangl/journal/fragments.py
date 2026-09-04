@@ -126,6 +126,16 @@ class PieceFragment(BaseFragment, extra="allow"):
     zone_ref: UUID | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
     presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    available: bool = True
+    """Render disabled when False -- a piece present but not selectable now.
+
+    Mirrors :class:`ChoiceFragment`. A ``pieces`` choice constrained to a zone
+    offers whatever that zone holds, so a spent or blocked member has to say so
+    here; otherwise the only way a player learns it was unselectable is the
+    error raised after committing it (widget vocabulary §7.1).
+    """
+
+    unavailable_reason: str | None = None
 
 
 class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):

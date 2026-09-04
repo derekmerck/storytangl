@@ -12,10 +12,12 @@ from tangl.journal.fragments import (
     ChoiceFragment,
     ContentFragment,
     GroupFragment,
+    KvFragment,
     MediaFragment,
     PieceFragment,
 )
 from tangl.journal.intent import (
+    KvRow,
     PickAccepts,
     PieceConstraints,
     PiecesAccepts,
@@ -296,3 +298,64 @@ def test_remaining_pieces_drops_what_is_already_picked(
     assert [piece.piece_id for piece in remaining_pieces(turn, pending)] == [
         "0:work permit"
     ]
+
+
+def test_kv_fragments_become_findings(bridge: PygameSessionBridge) -> None:
+    """Findings keep the engine's own severity word; the client never re-derives it."""
+
+    turn = bridge.build_turns([
+        KvFragment(
+            content=[
+                KvRow(key="work permit", value="never sealed", emphasis="warn"),
+                KvRow(key="packet consistency", value="does not satisfy", emphasis="danger"),
+            ],
+            step=1,
+        )
+    ])[0]
+
+    assert [(f.key, f.emphasis) for f in turn.findings] == [
+        ("work permit", "warn"),
+        ("packet consistency", "danger"),
+    ]
+
+
+def test_an_unavailable_piece_is_never_offered(bridge: PygameSessionBridge) -> None:
+    """A spent document stays visible but cannot satisfy the choice.
+
+    Offering it would put a guaranteed backend rejection behind a row that looks
+    perfectly selectable.
+    """
+
+    zone = uuid4()
+    turn = bridge.build_turns([
+        GroupFragment(uid=zone, group_type="zone", zone_role="packet", step=1),
+        PieceFragment(
+            piece_id="0:passport",
+            piece_kind="id_card",
+            content="crisp",
+            zone_ref=zone,
+            available=False,
+            unavailable_reason="already inspected",
+            hints=PresentationHints(label_text="passport"),
+            step=1,
+        ),
+        PieceFragment(
+            piece_id="0:permit",
+            piece_kind="permit",
+            content="unsealed",
+            zone_ref=zone,
+            hints=PresentationHints(label_text="work permit"),
+            step=1,
+        ),
+    ])[0]
+    choice = Choice(
+        edge_id=uuid4(),
+        text="Inspect a document",
+        accepts=PiecesAccepts(
+            min=1, max=1, constraints=PieceConstraints(target_zone_ref=str(zone))
+        ),
+    )
+
+    assert [piece.piece_id for piece in turn.pieces] == ["0:passport", "0:permit"]
+    assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["0:permit"]
+    assert turn.pieces[0].unavailable_reason == "already inspected"

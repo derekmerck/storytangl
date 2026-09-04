@@ -11,8 +11,20 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client runtime")
 
-from tangl.pygame_client.models import Choice, Line, Turn  # noqa: E402
-from tangl.pygame_client.stage import LOGICAL_SIZE, SCALE, Stage  # noqa: E402
+from tangl.pygame_client.models import (  # noqa: E402
+    Choice,
+    Finding,
+    Line,
+    Piece,
+    Turn,
+    Zone,
+)
+from tangl.pygame_client.stage import (  # noqa: E402
+    LOGICAL_SIZE,
+    PANEL_W,
+    SCALE,
+    Stage,
+)
 
 
 @pytest.fixture
@@ -142,3 +154,81 @@ def test_unloadable_media_without_alt_text_names_its_role(stage: Stage) -> None:
     rows = stage._rows(Turn(step=1), [image])
 
     assert any("narrative_im" in row.text for row in rows)
+
+
+# ── state panel (§5.1 Decision Legibility) ───────────────────────────────────
+
+
+ZONE = uuid4()
+
+
+def _packet_turn(**overrides) -> Turn:
+    defaults = dict(
+        step=1,
+        lines=[Line(text="Tomas Vey steps forward.")],
+        choices=[Choice(edge_id=uuid4(), text="Inspect a document")],
+        zones=[Zone(uid=ZONE, role="packet", label="Credentials packet")],
+        pieces=[
+            Piece(piece_id="c", kind="candidate", text="Tomas Vey", label="Tomas Vey"),
+            Piece(piece_id="0:passport", kind="id_card", text="crisp",
+                  label="passport", zone_ref=ZONE),
+        ],
+    )
+    defaults.update(overrides)
+    return Turn(**defaults)
+
+
+def test_a_turn_with_state_narrows_the_prose_and_draws_a_panel(stage) -> None:
+    """The panel takes its width from the prose rather than sharing it.
+
+    A document that scrolled away is a document the player cannot evaluate, so
+    the space is reserved rather than contended for.
+    """
+
+    plain = Turn(step=1, lines=[Line(text="word " * 60)])
+    stage.draw(plain)
+    wide = len(stage._rows(plain, [], columns=(LOGICAL_SIZE[0] - 12) // 4))
+
+    panelled = _packet_turn(lines=[Line(text="word " * 60)])
+    stage.draw(panelled)
+    narrow = len(
+        stage._rows(panelled, [], columns=(LOGICAL_SIZE[0] - PANEL_W - 12) // 4)
+    )
+
+    assert narrow > wide, "prose rewraps into the narrower column"
+
+
+def test_a_turn_without_state_draws_no_panel(stage) -> None:
+    assert stage._has_state(Turn(step=1, lines=[Line(text="just prose")])) is False
+    assert stage._has_state(_packet_turn()) is True
+
+
+def test_an_empty_zone_still_renders(stage) -> None:
+    """A targetable container with nothing in it is information, not absence."""
+
+    turn = _packet_turn(pieces=[])
+
+    stage.draw(turn)  # must not raise; the zone header and "(empty)" are drawn
+
+    assert stage._has_state(turn) is True
+
+
+def test_the_panel_admits_when_it_cannot_fit_everything(stage) -> None:
+    """Silently dropping state is the failure §5.1 exists to prevent."""
+
+    crowded = _packet_turn(
+        choices=[Choice(edge_id=uuid4(), text=f"choice {n}") for n in range(9)],
+        pieces=[
+            Piece(piece_id=f"0:doc{n}", kind="id_card", text="x",
+                  label=f"a fairly long document name {n}", zone_ref=ZONE)
+            for n in range(8)
+        ],
+        findings=[
+            Finding(key=f"finding {n}", value="a long explanation " * 3, emphasis="warn")
+            for n in range(4)
+        ],
+    )
+
+    stage.draw(crowded)  # renders the overflow marker rather than lying
+
+    assert stage._has_state(crowded) is True

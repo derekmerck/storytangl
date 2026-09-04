@@ -79,6 +79,22 @@ class Piece:
     text: str
     label: str | None = None
     zone_ref: UUID | None = None
+    available: bool = True
+    unavailable_reason: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class Finding:
+    """One key/value row of disclosed state.
+
+    ``emphasis`` is the engine's own severity word (``ok``/``warn``/``danger``/
+    ``subtle``); the client picks a colour for it and never re-derives severity
+    from the text.
+    """
+
+    key: str
+    value: str
+    emphasis: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -134,6 +150,7 @@ class Turn:
     choices: list[Choice] = field(default_factory=list)
     pieces: list[Piece] = field(default_factory=list)
     zones: list[Zone] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)
     plate: MapPlate | None = None
     """Set from story-info rather than from fragments: geometry is disclosed
     state, not part of the turn's content."""
