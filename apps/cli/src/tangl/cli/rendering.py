@@ -10,6 +10,11 @@ from typing import Any, Mapping
 
 JsonMapping = Mapping[str, Any]
 
+#: Fragment types a line-oriented renderer draws nothing for. ``group`` is a
+#: relational overlay tying peer fragments together by id -- its members render
+#: on their own, and the group itself has no content.
+STRUCTURAL_FRAGMENT_TYPES = frozenset({"choice", "control", "group"})
+
 
 def create_terminal_renderer(style: str) -> PlainTerminalRenderer:
     if style == "plain":
@@ -251,7 +256,7 @@ class RichTerminalRenderer(PlainTerminalRenderer):
 
 def _plain_fragment_lines(fragment: Any) -> list[str]:
     ftype = _read(fragment, "fragment_type")
-    if ftype == "choice" or ftype == "control":
+    if ftype in STRUCTURAL_FRAGMENT_TYPES:
         return []
     if ftype == "attributed":
         who = _read(fragment, "who") or _read(fragment, "speaker") or "Someone"
@@ -277,7 +282,7 @@ def _plain_fragment_lines(fragment: Any) -> list[str]:
 
 def _rich_fragment_renderables(fragment: Any) -> list[Any]:
     ftype = _read(fragment, "fragment_type")
-    if ftype == "choice" or ftype == "control":
+    if ftype in STRUCTURAL_FRAGMENT_TYPES:
         return []
     if ftype == "attributed":
         who = _read(fragment, "who") or _read(fragment, "speaker") or "Someone"
@@ -700,15 +705,18 @@ def _line_pairs(lines: list[str]) -> list[tuple[str, str]]:
 def _media_name(fragment: Any) -> str:
     """Name a media fragment for the text floor.
 
-    ``content`` is a ``MediaRIT`` object for inventory-backed media, so the
-    generic string accessor falls through to the fragment repr. Prefer the
-    resource's own label or path.
+    The DTO projects RIT-backed media as the resource's name (see
+    ``MediaFragment.dto_overrides``), so ``content`` is normally a plain string
+    by the time it reaches here. The attribute probe stays for fragments still
+    holding a live resource object, and accepts only string-ish values: feeding
+    an object repr through ``_basename`` is what used to splice everything
+    after the last path separator into the narrative.
     """
 
     content = _read(fragment, "content")
     for attr in ("label", "path"):
         value = getattr(content, attr, None)
-        if value:
+        if isinstance(value, (str, Path)) and str(value).strip():
             return _basename(str(value))
     for attr in ("text", "fallback_text"):
         value = _read(fragment, attr)
@@ -720,11 +728,19 @@ def _media_name(fragment: Any) -> str:
 
 
 def _fragment_text(fragment: Any) -> str:
+    """Text for a fragment, or empty when it carries none.
+
+    Returns ``""`` rather than ``str(fragment)``. A fragment whose content is
+    not a string is either structural or malformed, and in both cases dumping
+    its repr splices a dict or an object into the reader's narrative. Callers
+    drop empty text, so an unrenderable fragment goes quiet instead.
+    """
+
     for attr in ("content", "text", "label"):
         value = _read(fragment, attr)
         if isinstance(value, str) and value.strip():
             return value.strip().replace("_", " ")
-    return str(fragment)
+    return ""
 
 
 def _choice_label(choice: Any) -> str:

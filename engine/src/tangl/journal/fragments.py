@@ -10,6 +10,7 @@ from __future__ import annotations
 from base64 import b64encode
 from collections.abc import Mapping
 from enum import Enum
+from pathlib import Path
 from typing import Any, Literal, Self
 from uuid import UUID
 
@@ -340,6 +341,24 @@ class MediaFragment(ContentFragment, extra="allow"):
             payload["content"] = rit
         return super().structure(payload, _ctx=_ctx)
 
+    def dto_overrides(self) -> UnstructuredData:
+        """Name the resource instead of dumping it.
+
+        ``content`` holds a graph-owned :class:`MediaRIT` for ``rit`` media, and
+        ``model_dump(mode="json")`` has no encoder for it, so it falls back to
+        the object repr -- which then reaches every text client as narrative
+        prose. Clients dereference media through ``rit_id`` and the service
+        media path; the DTO only needs a human-readable name.
+
+        The key stays populated rather than dropped because ``content`` is
+        required for hydration. :meth:`unstructure` can drop it instead, since
+        :meth:`structure` rebinds the RIT from the owning graph.
+        """
+
+        if self.content_format != "rit" or not isinstance(self.content, MediaRIT):
+            return {}
+        return {"content": _rit_display_name(self.content)}
+
     def evolve(self, **updates: Any) -> Self:
         """Copy a live fragment without serializing its graph-owned RIT."""
 
@@ -394,6 +413,16 @@ _FRAGMENT_DTO_TYPES: dict[str, type[BaseFragment]] = {
 }
 
 
+def _rit_display_name(rit: MediaRIT) -> str:
+    """Human-readable name for a media resource, for text-floor clients."""
+
+    if rit.label and rit.label.strip():
+        return rit.label.strip()
+    if rit.path is not None:
+        return Path(rit.path).name
+    return str(rit.uid)
+
+
 def fragment_to_dto(
     fragment: BaseFragment,
     *,
@@ -424,6 +453,7 @@ def fragment_to_dto(
         dto_alias = type(fragment).model_fields[field_name].json_schema_extra["dto_alias"]
         if field_name in payload:
             payload[dto_alias] = payload.pop(field_name)
+    payload.update(fragment.dto_overrides())
     return payload
 
 
