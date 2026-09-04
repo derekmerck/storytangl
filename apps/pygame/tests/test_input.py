@@ -276,3 +276,111 @@ def test_a_choice_this_port_cannot_collect_renders_inert(
     _run([_key(pygame.K_1)])
 
     assert committed == []
+
+
+# ── variable-size selections, paging, and --advance ──────────────────────────
+
+
+def _packet_frame(monkeypatch, accepts, count: int = 2) -> Choice:
+    choice = Choice(edge_id=uuid4(), text="Inspect", accepts=accepts)
+    frame = Turn(
+        step=1,
+        choices=[choice],
+        zones=[Zone(uid=ZONE, role="packet")],
+        pieces=[
+            Piece(piece_id=f"0:doc{n}", kind="id_card", text="x",
+                  label=f"doc {n}", zone_ref=ZONE)
+            for n in range(count)
+        ],
+    )
+    monkeypatch.setattr(client, "_merge", lambda _turns: frame)
+    monkeypatch.setattr(client, "_turns", lambda _bridge, _envelope: [frame])
+    return choice
+
+
+def test_a_range_selection_waits_for_confirmation(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """min=1 max=2 must not commit on the first pick.
+
+    Between the minimum and the maximum there is no moment the client can infer,
+    so the player says when they are done.
+    """
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=1, max=2))
+
+    _run([_key(pygame.K_1), _key(pygame.K_1)])
+    assert committed == [], "one of a possible two must not auto-commit"
+
+    committed.clear()
+    _run([_key(pygame.K_1), _key(pygame.K_1), _key(pygame.K_8)])
+
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc0"]})]
+
+
+def test_a_range_selection_commits_itself_at_the_maximum(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """At max there is nothing left to decide, so no confirmation is required."""
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=1, max=2))
+
+    _run([_key(pygame.K_1), _key(pygame.K_1), _key(pygame.K_1)])
+
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc0", "0:doc1"]})]
+
+
+def test_an_optional_selection_can_be_submitted_empty(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """min=0 is satisfied before anything is picked."""
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=0, max=2))
+
+    _run([_key(pygame.K_1), _key(pygame.K_8)])
+
+    assert committed == [(choice.edge_id, {"piece_ids": []})]
+
+
+def test_confirm_does_nothing_below_the_minimum(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    _packet_frame(monkeypatch, PiecesAccepts(min=2, max=2))
+
+    _run([_key(pygame.K_1), _key(pygame.K_8)])
+
+    assert committed == []
+
+
+def test_a_long_candidate_list_pages_and_the_numbers_follow(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """Twenty documents must stay on screen and stay selectable.
+
+    Laying them all out put the first rows above the top of the surface, where
+    they were neither readable nor clickable.
+    """
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=1, max=1), count=20)
+
+    # Page once, then take the first row of page two.
+    _run([_key(pygame.K_1), _key(pygame.K_9), _key(pygame.K_1)])
+
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc8"]})]
+
+
+def test_advance_refuses_a_choice_it_cannot_supply_a_value_for(
+    capsys: pytest.CaptureFixture[str], tmp_path
+) -> None:
+    """`--advance` must not send a typed choice's bare activation payload.
+
+    credential_gate's second turn is a `pieces` choice, so a headless walk has
+    to stop and say so rather than commit a move the backend will reject.
+    """
+
+    client.main(["--world", "credential_gate", "--advance", "4",
+                 "--screenshot", str(tmp_path / "frame.png")])
+    message = capsys.readouterr().err
+
+    assert "--advance stopped" in message
+    assert "Inspect a document" in message

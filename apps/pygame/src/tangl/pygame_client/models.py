@@ -188,6 +188,26 @@ class PickPiece:
 
 
 @dataclass(slots=True, frozen=True)
+class ConfirmSelection:
+    """Commit the pieces picked so far. Only offered once the minimum is met.
+
+    A selection whose ``min`` and ``max`` differ has no moment the client can
+    infer -- and a ``min=0`` selection has to be submittable while empty -- so
+    the player says when they are done.
+    """
+
+
+@dataclass(slots=True, frozen=True)
+class PageSelection:
+    """Show the next page of candidates. Client-local."""
+
+
+@dataclass(slots=True, frozen=True)
+class PagePanel:
+    """Show the next page of the state panel. Client-local."""
+
+
+@dataclass(slots=True, frozen=True)
 class CancelSelection:
     """Abandon the pending selection. Client-local.
 
@@ -196,7 +216,15 @@ class CancelSelection:
     """
 
 
-Action = Commit | BeginSelection | PickPiece | CancelSelection
+Action = (
+    Commit
+    | BeginSelection
+    | PickPiece
+    | ConfirmSelection
+    | PageSelection
+    | PagePanel
+    | CancelSelection
+)
 
 
 @dataclass(slots=True)
@@ -213,5 +241,17 @@ class PendingSelection:
         return max(self.choice.accepts.min - len(self.picked), 0)
 
     @property
+    def satisfied(self) -> bool:
+        """True once the selection may be committed.
+
+        A ``min=0`` choice is satisfied before anything is picked, which is the
+        only way an optional selection can be submitted empty.
+        """
+
+        return len(self.picked) >= self.choice.accepts.min
+
+    @property
     def full(self) -> bool:
+        """True once no further piece may be added; the client commits here."""
+
         return len(self.picked) >= self.choice.accepts.max

@@ -19,11 +19,15 @@ from tangl.pygame_client.models import (  # noqa: E402
     Turn,
     Zone,
 )
+from tangl.journal.intent import TextAccepts  # noqa: E402
+from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     LOGICAL_SIZE,
     PANEL_W,
     SCALE,
     Stage,
+    choice_action,
+    unsupported_reason,
 )
 
 
@@ -213,10 +217,8 @@ def test_an_empty_zone_still_renders(stage) -> None:
     assert stage._has_state(turn) is True
 
 
-def test_the_panel_admits_when_it_cannot_fit_everything(stage) -> None:
-    """Silently dropping state is the failure §5.1 exists to prevent."""
-
-    crowded = _packet_turn(
+def _crowded_turn() -> Turn:
+    return _packet_turn(
         choices=[Choice(edge_id=uuid4(), text=f"choice {n}") for n in range(9)],
         pieces=[
             Piece(piece_id=f"0:doc{n}", kind="id_card", text="x",
@@ -229,6 +231,51 @@ def test_the_panel_admits_when_it_cannot_fit_everything(stage) -> None:
         ],
     )
 
-    stage.draw(crowded)  # renders the overflow marker rather than lying
 
-    assert stage._has_state(crowded) is True
+def test_overflowing_panel_state_stays_reachable_by_paging(stage) -> None:
+    """Acknowledging missing state is not the same as showing it.
+
+    An overflow notice told the player something was hidden and gave them no way
+    to read it, which does not meet the §5.1 floor this panel exists for.
+    """
+
+    crowded = _crowded_turn()
+    columns = (PANEL_W - 10) // 4
+    every_row = {text for text, _colour in stage.panel_rows(crowded, columns=columns)}
+    assert len(every_row) > 8, "fixture must actually overflow"
+
+    seen: set[str] = set()
+    for _ in range(8):
+        stage.draw(crowded)
+        rendered = {
+            text
+            for text, _colour in stage.panel_rows(crowded, columns=columns)
+        }
+        seen |= rendered
+        stage.panel_scroll += 1
+
+    # Every row the panel knows about is reachable across its pages.
+    assert every_row <= seen
+    assert any(
+        isinstance(action, PagePanel) for _rect, action in stage.hitboxes
+    ), "paging must be reachable by click, not only by key"
+
+
+def test_a_panel_that_fits_offers_no_pager(stage) -> None:
+    stage.draw(_packet_turn())
+
+    assert not any(isinstance(action, PagePanel) for _rect, action in stage.hitboxes)
+
+
+def test_an_unsupported_map_choice_is_dimmed_and_explains_itself(stage) -> None:
+    """A live-looking hotspot over dead pixels is the failure the map avoids.
+
+    The hitbox already disappeared; the colour and the legend row still implied
+    the choice was on offer.
+    """
+
+    choice = Choice(edge_id=uuid4(), text="Say something", accepts=TextAccepts())
+
+    assert choice_action(choice) is None
+    assert unsupported_reason(choice) == "needs text input"
+    assert "needs text input" in Stage._choice_label(1, choice)

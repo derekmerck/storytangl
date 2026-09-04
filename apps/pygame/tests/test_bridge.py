@@ -359,3 +359,68 @@ def test_an_unavailable_piece_is_never_offered(bridge: PygameSessionBridge) -> N
     assert [piece.piece_id for piece in turn.pieces] == ["0:passport", "0:permit"]
     assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["0:permit"]
     assert turn.pieces[0].unavailable_reason == "already inspected"
+
+
+# ── activation payloads and availability ─────────────────────────────────────
+
+
+def test_an_authored_activation_payload_survives_a_pick() -> None:
+    """The edge's own answer is not discarded by building a payload for it.
+
+    Sending `{}` here dropped whatever the author put on the edge. That the CLI
+    also drops it is a gap on that side, not a licence to regress this one.
+    """
+
+    choice = Choice(edge_id=uuid4(), text="Taunt", payload={"move": "taunt"})
+
+    assert commit_payload(choice) == {"move": "taunt"}
+
+
+def test_a_pick_without_an_authored_payload_sends_an_empty_object() -> None:
+    assert commit_payload(Choice(edge_id=uuid4(), text="Go")) == {}
+
+
+def test_a_non_mapping_activation_payload_travels_verbatim() -> None:
+    choice = Choice(edge_id=uuid4(), text="Go", payload="north")
+
+    assert commit_payload(choice) == "north"
+
+
+def test_collected_values_are_merged_over_the_authored_payload() -> None:
+    """Explicit precedence: authored keys are the base, collected keys win.
+
+    The player's answer to `accepts` is what the choice asked for, so an author
+    default cannot shadow it.
+    """
+
+    choice = Choice(
+        edge_id=uuid4(),
+        text="Inspect",
+        payload={"style": "careful", "piece_ids": ["authored"]},
+        accepts=PiecesAccepts(min=1, max=1),
+    )
+
+    assert commit_payload(choice, ["0:passport"]) == {
+        "style": "careful",
+        "piece_ids": ["0:passport"],
+    }
+
+
+def test_an_unconstrained_choice_still_refuses_unavailable_pieces(
+    bridge: PygameSessionBridge,
+) -> None:
+    """Availability gates both paths, constrained and not.
+
+    A choice with no zone constraint offered every piece, including ones the
+    backend had already marked unselectable.
+    """
+
+    turn = bridge.build_turns([
+        PieceFragment(piece_id="spent", piece_kind="id_card", content="x",
+                      available=False, unavailable_reason="already inspected", step=1),
+        PieceFragment(piece_id="live", piece_kind="id_card", content="y", step=1),
+    ])[0]
+    choice = Choice(edge_id=uuid4(), text="Point", accepts=PiecesAccepts())
+
+    assert [piece.piece_id for piece in turn.pieces] == ["spent", "live"]
+    assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["live"]

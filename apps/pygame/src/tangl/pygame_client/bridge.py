@@ -99,11 +99,15 @@ def commit_payload(choice: Choice, values: Sequence[str] = ()) -> dict[str, Any]
 
     accepts = choice.accepts
     kind = getattr(accepts, "kind", "pick") if accepts is not None else "pick"
+    authored = choice.payload
 
     if kind == "pick":
         if values:
             raise UnsupportedAccepts("This choice does not accept an input value.")
-        return {}
+        # An authored activation payload is the edge's own answer and travels
+        # verbatim, including when it is not a mapping. The CLI drops it, which
+        # is a gap on that side rather than a licence to drop it here.
+        return {} if authored is None else authored
 
     if kind == "pieces":
         minimum, maximum = accepts.min, accepts.max
@@ -111,11 +115,32 @@ def commit_payload(choice: Choice, values: Sequence[str] = ()) -> dict[str, Any]
             raise UnsupportedAccepts(f"Select at least {minimum} piece(s).")
         if len(values) > maximum:
             raise UnsupportedAccepts(f"Select at most {maximum} piece(s).")
-        return {"piece_ids": list(values)}
+        return _merge_authored(authored, {"piece_ids": list(values)})
 
     # text, quantity, place and compose need input surfaces this port does not
     # have yet. Land them with the world that needs one, not speculatively.
     raise UnsupportedAccepts(f"This port cannot collect a {kind!r} value yet.")
+
+
+def _merge_authored(authored: Any, collected: dict[str, Any]) -> dict[str, Any]:
+    """Combine an authored activation payload with what the player supplied.
+
+    Precedence is explicit: authored keys form the base, collected keys win. The
+    player's answer to ``accepts`` is the thing the choice asked for, so it
+    cannot be shadowed by a default the author set on the edge.
+
+    A non-mapping activation payload cannot be merged with named values, so it
+    is dropped rather than guessed at -- and that is worth knowing about.
+    """
+
+    if authored is None:
+        return collected
+    if not isinstance(authored, dict):
+        logger.debug(
+            "Dropping non-mapping activation payload %r for a typed choice", authored
+        )
+        return collected
+    return {**authored, **collected}
 
 
 def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
@@ -129,9 +154,12 @@ def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
     accepts = choice.accepts
     if getattr(accepts, "kind", None) != "pieces":
         return []
+    # ``available=False`` is the piece saying it cannot satisfy a choice right
+    # now, and that holds whether or not the choice narrows by zone.
+    offered = [piece for piece in turn.pieces if piece.available]
     constraints = accepts.constraints
     if constraints is None:
-        return list(turn.pieces)
+        return offered
     zone_ref = constraints.target_zone_ref
     kinds = constraints.target_kind
     # ``available=False`` is the piece saying it cannot satisfy a choice right
@@ -139,9 +167,8 @@ def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
     # that looks perfectly selectable.
     return [
         piece
-        for piece in turn.pieces
-        if piece.available
-        and (zone_ref is None or str(piece.zone_ref) == zone_ref)
+        for piece in offered
+        if (zone_ref is None or str(piece.zone_ref) == zone_ref)
         and (kinds is None or piece.kind in kinds)
     ]
 

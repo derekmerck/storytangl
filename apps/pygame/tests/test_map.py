@@ -94,7 +94,11 @@ def test_a_region_click_commits_what_its_numbered_entry_commits(stage, frame) ->
     quayside = next(r for r in PLATE.regions if r.name == "quayside")
     choice = frame.choices[0]
 
-    assert stage.hit(_centre(quayside)) == Commit(edge_id=choice.edge_id, payload={})
+    # The authored activation payload rides along; a hotspot commits exactly
+    # what the numbered row commits, payload included.
+    assert stage.hit(_centre(quayside)) == Commit(
+        edge_id=choice.edge_id, payload={"move": "quayside"}
+    )
 
 
 def test_a_guarded_region_is_drawn_but_refuses_the_click(stage, frame) -> None:
@@ -183,7 +187,9 @@ def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
 
     # Both the region and the legend row cover this pixel; the legend is on top.
     assert wide.x == 0.0 and wide.y == 0.0  # the region really does cover it
-    assert stage.hit(click) == Commit(edge_id=frame.choices[0].edge_id, payload={})
+    assert stage.hit(click) == Commit(
+        edge_id=frame.choices[0].edge_id, payload=frame.choices[0].payload
+    )
 
 
 def test_a_long_footer_pages_instead_of_covering_the_map(stage, frame):

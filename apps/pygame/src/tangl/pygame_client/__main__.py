@@ -23,14 +23,21 @@ from uuid import UUID
 
 import pygame
 
-from .bridge import PygameSessionBridge, commit_payload, remaining_pieces
+from .bridge import (
+    PygameSessionBridge,
+    UnsupportedAccepts,
+    commit_payload,
+)
 from .models import (
     Action,
     BeginSelection,
     CancelSelection,
     Commit,
+    ConfirmSelection,
     Finding,
     PendingSelection,
+    PagePanel,
+    PageSelection,
     Piece,
     PickPiece,
     StageImage,
@@ -109,6 +116,7 @@ def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
 
 
 def _keyed(
+    stage: Stage,
     frame: Turn,
     pending: PendingSelection | None,
     number: int,
@@ -123,9 +131,13 @@ def _keyed(
     if pending is not None:
         if number == 0:
             return CancelSelection()
-        candidates = remaining_pieces(frame, pending)
-        if number <= len(candidates):
-            return PickPiece(piece_id=candidates[number - 1].piece_id)
+        if number == 8:
+            return ConfirmSelection() if pending.satisfied else None
+        if number == 9:
+            return PageSelection() if stage.selection_pages(frame, pending) > 1 else None
+        page = stage.selection_page(frame, pending)
+        if number <= len(page):
+            return PickPiece(piece_id=page[number - 1].piece_id)
         return None
     if 1 <= number <= len(frame.choices):
         return choice_action(frame.choices[number - 1])
@@ -134,6 +146,7 @@ def _keyed(
 
 def _apply(
     bridge: PygameSessionBridge,
+    stage: Stage,
     frame: Turn,
     pending: PendingSelection | None,
     action: Action,
@@ -146,18 +159,34 @@ def _apply(
             return None, None
         case BeginSelection(choice=choice):
             return PendingSelection(choice=choice), None
+        case PageSelection():
+            stage.selection_scroll += 1
+            return pending, None
+        case PagePanel():
+            stage.panel_scroll += 1
+            return pending, None
         case PickPiece(piece_id=piece_id):
             if pending is None:
                 return None, None
             pending.picked.append(piece_id)
-            if not pending.full and pending.wanted:
-                # More pieces still required; keep collecting.
+            # Only a full selection commits itself. Anything else waits for the
+            # player: between ``min`` and ``max`` there is no moment the client
+            # can infer, and a ``min=0`` choice must be submittable while empty.
+            if not pending.full:
                 return pending, None
-            payload = commit_payload(pending.choice, pending.picked)
-            return None, bridge.choose(pending.choice.edge_id, payload)
+            return None, _commit_pending(bridge, pending)
+        case ConfirmSelection():
+            if pending is None or not pending.satisfied:
+                return pending, None
+            return None, _commit_pending(bridge, pending)
         case Commit(edge_id=edge_id, payload=payload):
             return None, bridge.choose(edge_id, payload)
     return pending, None
+
+
+def _commit_pending(bridge: PygameSessionBridge, pending: PendingSelection):
+    payload = commit_payload(pending.choice, pending.picked)
+    return bridge.choose(pending.choice.edge_id, payload)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -178,11 +207,30 @@ def main(argv: list[str] | None = None) -> int:
     stage = Stage(asset_dir=args.assets, title=f"StoryTangl — {args.world}")
     frame = _frame(bridge, envelope)
 
-    for _ in range(args.advance):
-        available = [choice for choice in frame.choices if choice.available]
-        if not available:
+    for step in range(args.advance):
+        # Only choices that commit outright. A typed choice needs a value this
+        # flag has no way to supply, and sending its bare activation payload
+        # reaches the backend as a malformed move rather than as a skipped turn.
+        commits = [
+            action
+            for choice in frame.choices
+            if isinstance(action := choice_action(choice), Commit)
+        ]
+        if not commits:
+            blocked = [
+                choice.text
+                for choice in frame.choices
+                if choice.available and choice_action(choice) is None
+                or isinstance(choice_action(choice), BeginSelection)
+            ]
+            if blocked:
+                print(
+                    f"--advance stopped after {step} step(s): "
+                    f"{blocked[0]!r} needs a value this flag cannot supply.",
+                    file=sys.stderr,
+                )
             break
-        envelope = bridge.choose(available[0].edge_id, available[0].payload)
+        envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         frame = _frame(bridge, envelope)
 
     stage.draw(frame)
@@ -216,11 +264,11 @@ def main(argv: list[str] | None = None) -> int:
                     stage.scroll_by(1 if event.key == pygame.K_DOWN else 4)
                     stage.draw(frame, pending)
                 elif pygame.K_0 <= event.key <= pygame.K_9:
-                    action = _keyed(frame, pending, event.key - pygame.K_0)
+                    action = _keyed(stage, frame, pending, event.key - pygame.K_0)
 
             if action is None:
                 continue
-            pending, envelope = _apply(bridge, frame, pending, action)
+            pending, envelope = _apply(bridge, stage, frame, pending, action)
             if envelope is not None:
                 frame = _frame(bridge, envelope)
             stage.draw(frame, pending)

@@ -60,6 +60,18 @@ so the same key names the same piece in both ports. Escape or `0` leaves the
 selection without committing — a mode a mouse can enter but only a keyboard can
 leave is not a usable surface, so Cancel is a clickable row too.
 
+**Only a full selection commits itself.** At `max` there is nothing left to
+decide. Anywhere between `min` and `max` there is no moment the client can infer,
+so `8. Confirm` appears once the minimum is met — which is also the only way a
+`min=0` choice can be submitted empty. Below the minimum the row reads
+`Pick N more` and does nothing.
+
+**Long lists page.** Eight candidates at a time, `9. More (2/3)` to advance.
+Numbering restarts per page, so the number a player reads is the key they press
+wherever they are in the list. Twenty documents laid out at once put their first
+rows above the top of the surface, where they were neither readable nor
+clickable.
+
 **Which pieces are offered comes from the choice, not the renderer.** A
 `pieces` choice constrained to `target_zone_ref` is satisfiable only by pieces in
 that zone, so `selectable_pieces` reads the constraint and the candidate — a
@@ -111,12 +123,11 @@ choice. `credential_gate` sets it on documents already inspected; before that
 existed, the only way to learn a document was spent was the backend error raised
 after committing it.
 
-**An over-full panel says so.** At 320x200 a nine-choice turn leaves the panel
-about eight rows, and a full packet plus findings can exceed that. It draws
-`... more state than fits` rather than quietly truncating, which is the honest
-failure and a real capability floor of this surface rather than a bug to hide.
-Findings are also on the `case_summary` info channel, so a client with less room
-can offer them on demand instead.
+**An over-full panel pages.** At 320x200 a nine-choice turn leaves the panel
+about eight rows, and a full packet plus findings exceeds that. It paginates and
+shows `page 1/2`, clickable as well as keyed. An earlier draft drew an overflow
+notice instead: that told the player state was hidden without giving them any way
+to read it, which is not what §5.1 asks for.
 
 ## The Map View
 
@@ -236,7 +247,7 @@ from the type signatures, and a third port would pay the same tax again.
 | media | ordered `scene`/`show` ops, stateful | flat per-turn image list, stateless |
 | speaker | `portrait_tag` for a defined character image | `speaker` string, looked up by role |
 | choices | menu built by the runtime | hitboxes owned by the renderer |
-| typed input | not attempted | two-step numbered selection for `pieces` |
+| typed input | not attempted | two-step numbered selection for `pieces`, paged |
 | turns | one per step, played in sequence | merged into one actionable frame |
 
 The media model is the real divergence: Ren'Py has a persistent stage that
