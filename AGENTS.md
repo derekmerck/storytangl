@@ -229,7 +229,7 @@ full type map and rationale.**
   prefer `repomix_bundle.py` or `tangl-devref` unless you specifically need the
   older dump format.
 - The Sphinx smoke test builds docs into pytest's temporary directory. Do not
-  assume `docs/_build/` exists after the test suite; run an explicit docs build
+  assume `docs/build/html/` exists after the test suite; run an explicit docs build
   if a local server needs static HTML at the configured service path.
 
 ## Feature workflow

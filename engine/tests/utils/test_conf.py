@@ -14,7 +14,7 @@ def test_conf():
     tangl.config.show_settings()
 
     from tangl.config import settings
-    assert str(settings.service.paths.docs).endswith("docs/_build")
+    assert str(settings.service.paths.docs).endswith("docs/build/html")
 
     with pytest.raises(AttributeError):
         assert settings.my_var == "bar"
@@ -31,7 +31,7 @@ def test_conf():
     from tangl.config import settings
 
     assert settings.my_var == "jupiter"
-    assert str(settings.service.paths.docs).endswith("docs/_build")
+    assert str(settings.service.paths.docs).endswith("docs/build/html")
     assert settings.service.hello == "mars"
 
 

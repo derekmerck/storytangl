@@ -32,7 +32,7 @@ RUN poetry build -f wheel -n
 # Stage 3: Build the docs to use in the runtime image
 FROM python_builder AS doc_builder
 
-RUN poetry run python -m sphinx.cmd.build -b html docs docs/html
+RUN poetry run python -m sphinx.cmd.build -b html docs/src docs/html
 
 # Stage 4: Build the web app
 FROM node:lts-alpine AS app_builder
