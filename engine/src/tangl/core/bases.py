@@ -340,6 +340,12 @@ class Unstructurable(BaseModelPlus):
         if value is None:
             return None
 
+        # ``Annotated[...]`` is opaque to get_origin, so a discriminated union
+        # written as ``Annotated[A | B, Field(discriminator=...)]`` would never
+        # be descended into. Carry the metadata off and keep resolving.
+        while hasattr(annotation, "__metadata__"):
+            annotation = get_args(annotation)[0]
+
         origin = get_origin(annotation)
         args = get_args(annotation)
 
@@ -387,6 +393,18 @@ class Unstructurable(BaseModelPlus):
 
         if isinstance(value, dict):
             cls_hint = value.get("kind", annotation)
+            if isinstance(cls_hint, str):
+                # Serialization reduces constructor-form ``kind`` to a class
+                # name. Embedded value objects are not graph entities, so the
+                # Entity name registry cannot resolve them -- but the field
+                # annotation already names the candidate class. Mismatches raise
+                # so a union caller moves on to its next option.
+                if not (isclass(annotation) and annotation.__name__ == cls_hint):
+                    raise TypeError(
+                        f"Constructor-form kind {cls_hint!r} does not name {annotation!r}"
+                    )
+                value = {**value, "kind": annotation}
+                cls_hint = annotation
             if isclass(cls_hint) and hasattr(cls_hint, "structure"):
                 if "_ctx" in signature(cls_hint.structure).parameters:
                     return cls_hint.structure(value, _ctx=_ctx)

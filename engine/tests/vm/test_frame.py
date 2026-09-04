@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from pydantic import ValidationError
 
 from tangl.core import (
     BehaviorRegistry,
@@ -678,3 +679,30 @@ class TestGotoNode:
         frame.goto_node(b)
         assert frame.cursor is b
         assert len(called) == 0
+
+
+class TestStepStamping:
+    """``Frame._with_step`` must stamp or raise, never return unstamped.
+
+    An unstamped record is the ledger's "open, not yet stepped" sentinel, so a
+    silent fallback does not degrade -- it republishes consumed choices to every
+    client against edges the graph has already torn down (#436).
+    """
+
+    def test_an_unstamped_record_is_stamped(self) -> None:
+        stamped = Frame._with_step(SimpleFragment(content="x"), step=4)
+
+        assert stamped.step == 4
+
+    def test_an_already_stamped_record_is_left_alone(self) -> None:
+        original = SimpleFragment(content="x").evolve(step=2)
+
+        assert Frame._with_step(original, step=9).step == 2
+
+    def test_a_record_that_cannot_be_stamped_raises(self) -> None:
+        class UnstampableFragment(SimpleFragment):
+            def evolve(self, **updates):
+                raise ValidationError.from_exception_data("UnstampableFragment", [])
+
+        with pytest.raises(ValidationError):
+            Frame._with_step(UnstampableFragment(content="x"), step=1)
