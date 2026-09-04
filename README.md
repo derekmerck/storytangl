@@ -54,10 +54,41 @@ confrontation the story otherwise skips -- while the merchant's sword, offered
 one beat earlier, is the hedge against exactly that. The choice and its payoff
 are never wired directly to each other; the consequence travels as state.
 
+### The same story, wearing something else
+
+A different world, `repartee_loop`, at the same opening beat -- rendered twice
+through the pygame port:
+
+<p align="center">
+  <img src=".github/assets/repartee-quay.png"
+       alt="The repartee_loop opening beat in the quayside art pack: a clerk reading papers on a harbour dock at golden hour"
+       width="49%">
+  <img src=".github/assets/repartee-spaceport.png"
+       alt="The same beat in the spaceport art pack: a service robot on a night dock under a moon"
+       width="49%">
+</p>
+
+The prose is identical. The choice is identical. The graph, the script, the
+staging hints and the client are all untouched. One line of `world.yaml`
+selects the pack:
+
+```yaml
+media_dir: media_spaceport   # default: media
+```
+
+Structure and presentation are separate objects here, so a reskin is a
+different *reading* of one story rather than a second story.
+
+### Many stories, many skins, many realizations
+
 Eighteen reference worlds ship in [`worlds/`](worlds/), from a blackjack
-parlour to a hall-monitor credential check. The same graph also drives a REST
-service, a web client, a pygame port, and a Ren'Py export -- see
-[Run The Reference Apps](#run-the-reference-apps).
+parlour to a hall-monitor credential check. Each renders through whichever
+surface is asked for -- a text floor, a pixel-art stage, a REST service, a web
+client, a Ren'Py export -- from the same fragment stream, and each accepts
+whatever art pack it is pointed at. See
+[Run The Reference Apps](#run-the-reference-apps), and
+[`worlds/repartee_loop/`](worlds/repartee_loop/) for how a pack is built and
+captured.
 
 ---
 

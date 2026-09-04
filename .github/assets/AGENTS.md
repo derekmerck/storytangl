@@ -30,7 +30,7 @@ scoped `.gitattributes` and amend this file.
 
 ## The budget
 
-Four files, about 470 KB, none of them source.
+Six files, about 810 KB, none of them source.
 
 | File | Used by | Size |
 |------|---------|------|
@@ -38,6 +38,8 @@ Four files, about 470 KB, none of them source.
 | `README-banner-dark.png` | `README.md`, dark theme | 2560x720 |
 | `social-card.png` | repository Settings -> Social preview | 1280x640 |
 | `cli-session.png` | `README.md`, the "See It Run" section | 1136x1492 |
+| `repartee-quay.png` | `README.md`, the reskin pair | 960x600 |
+| `repartee-spaceport.png` | `README.md`, the reskin pair | 960x600 |
 
 ## Regenerating
 
@@ -55,6 +57,19 @@ that gets broken.
 Do not hand-edit these, and do not re-render through a tool that resolves fonts
 from the system — `rsvg-convert`, ImageMagick, and CoreText-backed tools all
 substitute a fallback silently. See `brand/USAGE.md` section 3.
+
+The two `repartee-*` frames are rendered by
+[`scripts/capture_world_frames.py`](../../scripts/capture_world_frames.py),
+which drives the pygame client headlessly once per art pack:
+
+```bash
+poetry run python scripts/capture_world_frames.py --advance 1
+```
+
+They are raster because they are screenshots of a pixel-art renderer; there
+is no vector form to prefer. Both are the same beat at the same advance
+count, so their prose and choices are identical and only the art differs --
+which is the claim a reskin screenshot is making.
 
 `cli-session.png` is a typeset capture of a real `tangl-cli` session, not a
 derived asset, so no script reproduces it. It was captured through a PTY so the

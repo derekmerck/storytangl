@@ -33,6 +33,16 @@ two files — more than every shipped asset here combined — and are referenced
 sha256 from `media_spaceport/provenance/` instead of committed. See
 `worlds/*/incoming/` and `provenance/source-assets/` in the root `.gitignore`.
 
+## Screenshots of a pack
+
+Do not take them by hand. `scripts/capture_world_frames.py` renders one frame
+per pack headlessly and restores `world.yaml` afterwards; see "Capturing a pack"
+in [`README.md`](README.md) for the two traps it exists to absorb. Frames that
+ship in the repository are adjudicated in
+[`.github/assets/AGENTS.md`](../../.github/assets/AGENTS.md), not here — they
+are repository chrome rather than world media, and nothing loads them at
+runtime.
+
 ## Adding to this world
 
 - Conform first: backgrounds and plates to 320x200, sprites trimmed to alpha
