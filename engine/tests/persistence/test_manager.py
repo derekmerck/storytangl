@@ -5,7 +5,7 @@ import pydantic
 import pytest
 
 from tangl.core import Entity
-from tangl.persistence import PersistenceManager
+from tangl.persistence import PersistenceManager, PersistenceManagerFactory
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.persistence.storage import FileStorage
 from tangl.persistence.structuring import StructuringHandler
@@ -62,3 +62,17 @@ def test_json_persistence_round_trip_preserves_entity_templ_hash_bytes(tmp_path)
     assert isinstance(loaded, Entity)
     assert loaded.templ_hash == entity.templ_hash
     assert isinstance(loaded.templ_hash, bytes)
+
+
+def test_reopened_json_file_manager_values_use_logical_storage_keys(tmp_path) -> None:
+    manager = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    saved = ManagerModel(uid=uuid4(), data="persisted")
+    manager.save(saved)
+
+    reopened = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    assert "ManagerModel" not in reopened.kind_map
+    with pytest.raises(KeyError, match="ManagerModel"):
+        list(reopened.values())
+    reopened.register_kind(ManagerModel)
+
+    assert list(reopened.values()) == [saved]

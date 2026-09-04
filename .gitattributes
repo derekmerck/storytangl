@@ -1,5 +1,7 @@
 # use lfs for binary files and ignore them in archive
 *.png filter=lfs diff=lfs merge=lfs -text export-ignore
+*.jpg filter=lfs diff=lfs merge=lfs -text export-ignore
+*.jpeg filter=lfs diff=lfs merge=lfs -text export-ignore
 *.webp filter=lfs diff=lfs merge=lfs -text export-ignore
 
 # Track large "forge-svg" files for svg forge with LFS

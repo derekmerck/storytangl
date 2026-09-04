@@ -290,11 +290,32 @@ full type map and rationale.**
 
 ### Media & Binary Assets (PNG / LFS safety)
 
-StoryTangl uses Git LFS for `.png` and `.jpg` files.
+StoryTangl tracks `.png`, `.jpg`, and `.webp` through Git LFS
+(`.gitattributes`), so binaries do not bloat the git object store. What the
+rules below protect is different: LFS is **not always available**. A fork, a
+mirror, a contributor without `git-lfs`, or a CI job that forgets
+`lfs: true` gets pointer files instead of images, and anything reading their
+bytes fails confusingly rather than skipping.
 
-1. **Never create PNG/JPG files inside the repository.**
-2. **Use SVG primitives** for examples and test worlds.
-3. **Create SVG files only in `tmp_path`** during tests, not in the repo.
+1. **Prefer SVG** for diagrams, primitives, and anything vector-shaped. It
+   diffs, needs no LFS, and needs no render node.
+2. **Never commit source or generation art** — full-resolution renders, source
+   sheets, intermediates. Reference them by sha256 from pack provenance
+   instead. Two 1280x800 sources behind a single demo plate outweigh every
+   shipped asset in this repository combined. A *conformed* sprite sheet that a
+   client reads at runtime is a shipped asset, not source, and is governed by
+   rules 4 and 5 like any other.
+3. **Nothing in CI may depend on LFS having materialized.** A test that reads
+   image bytes must either tolerate a pointer file or read an asset that is not
+   in LFS.
+4. **Required binary assets go in regular git, and must be adjudicated.** An
+   asset a test asserts the bytes of is required. Un-LFS it in a scoped
+   `.gitattributes` *and* record why it must be binary, in an `AGENTS.md` beside
+   it. The `.gitattributes` alone is not the adjudication; it is the mechanism.
+5. **A demo world whose subject is images may ship images.** Pause at dozens,
+   not at one. Conformed to target resolution, described by a pack manifest,
+   named in that world's README.
+6. **Tests write images to `tmp_path`, never into the repository.**
 
 Rule 1 has two standing exceptions. Any addition to either must carry a note
 saying why SVG will not serve:

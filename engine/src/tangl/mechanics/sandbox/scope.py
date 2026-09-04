@@ -27,7 +27,10 @@ class SandboxScope(TraversableNode):
     scheduled_presence: list[ScheduledPresence] = Field(default_factory=list)
     mobs: list[SandboxMob] = Field(default_factory=list)
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
-    player_assets: SandboxInventory = Field(default_factory=SandboxInventory)
+    player_assets: SandboxInventory = Field(
+        default_factory=SandboxInventory,
+        json_schema_extra={"include": True},
+    )
     clock_policy: SandboxClockPolicy = Field(default_factory=SandboxClockPolicy)
     wait_enabled: bool | None = True
     wait_text: str | None = "Wait"

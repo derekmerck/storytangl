@@ -1,4 +1,5 @@
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -95,3 +96,19 @@ def test_data_mutability(storage):
 
     # Assert that data is updated in storage
     assert compare_as_strings(storage["test"], "mutated_value"), "Data should be updated in storage"
+
+
+def test_file_storage_iterates_reusable_configured_extension_keys(tmp_path: Path) -> None:
+    storage = FileStorage(base_path=tmp_path, ext="json")
+    uuid_key = uuid.uuid4()
+    storage[uuid_key] = "uuid value"
+    storage["named-key"] = "named value"
+    (tmp_path / "ignored.txt").write_text("ignored", encoding="utf-8")
+    (tmp_path / "ignored.json").mkdir()
+
+    keys = set(storage)
+
+    assert keys == {uuid_key, "named-key"}
+    assert storage[uuid_key] == "uuid value"
+    assert storage["named-key"] == "named value"
+    assert len(storage) == len(keys)

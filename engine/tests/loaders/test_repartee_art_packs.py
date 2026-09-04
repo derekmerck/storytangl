@@ -30,6 +30,30 @@ def test_demo_ships_both_interchangeable_art_packs() -> None:
     assert {pack.name for pack in PACKS} == {"media", "media_spaceport"}
 
 
+LFS_POINTER_MAGIC = b"version https://git-lfs.github.com/spec/v1"
+
+
+@pytest.mark.parametrize(("pack", "name", "entry"), CASES, ids=lambda v: getattr(v, "name", v))
+def test_shipped_assets_are_real_images_not_lfs_pointers(
+    pack: Path, name: str, entry: dict
+) -> None:
+    """Fail legibly when LFS has not materialized.
+
+    Every assertion below this one reads image bytes, so without LFS they fail
+    as `UnidentifiedImageError` or a hash mismatch — neither of which names the
+    actual problem. These are required assets under root `AGENTS.md` rule 3;
+    see `worlds/repartee_loop/AGENTS.md` for why they are binary at all.
+    """
+
+    shipped = pack / "images" / entry["file"]
+    assert shipped.is_file(), f"{pack.name} declares a missing file"
+    head = shipped.read_bytes()[: len(LFS_POINTER_MAGIC)]
+    assert head != LFS_POINTER_MAGIC, (
+        f"{pack.name}:{name} is an unmaterialized Git LFS pointer. "
+        "Run `git lfs pull`, or check out with LFS enabled."
+    )
+
+
 @pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.name)
 def test_every_pack_declares_a_manifest(pack: Path) -> None:
     assert (pack / "manifest.json").is_file()

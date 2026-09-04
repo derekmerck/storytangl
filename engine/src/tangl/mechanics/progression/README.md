@@ -7,6 +7,18 @@
 :related: games, transaction, assembly
 ```
 
+> **Historical archive.** The prior-generation progression sources have been
+> harvested and retired. Semantics that did *not* survive into this package —
+> the eleven quality registers and `measure_of()` string casting, sampler choice
+> as a criticals-frequency lever, upward governor propagation, growth-by-use on
+> currencies, tier rounding bias and within-tier sampling, all-of tag matching,
+> and task attempt history — are recorded in
+> `scratch/mechanics/progression/HARVEST.md`, which `devref` does not index.
+> Check it before designing any of those; see `STAT_CHALLENGE_DESIGN.rst`.
+> Four sources were **retained** rather than retired, all for badge work (#421):
+> the terse effect-tag grammar, the nested badge-condition spike, the badge
+> tier-occlusion API, and the effect activation lifecycle.
+
 **Probit-d20** is a generic "rules-light" rpg stat system with intuitive ability and challenge ranks tied to the statistical normal distribution.
 
 See also: `STAT_CHALLENGE_DESIGN.rst` for the incremental plan to turn the
