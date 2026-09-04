@@ -37,10 +37,19 @@ async def get_worlds(
 @router.get("/secret")
 async def get_key_for_secret(
     service_manager: ServiceManager = Depends(get_service_manager),
-    secret: str = Query(examples=["example-user-secret"], default=None),
+    secret: str = Query(examples=["example-user-secret"]),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
-    """Encode ``secret`` as an API key for clients."""
+    """Derive the API key transport form of a recovery codename.
+
+    ``secret`` is required. This endpoint only encodes a codename the caller
+    already holds; it never mints one. Minting belongs to ``POST /user/create``
+    with no secret, which rerolls while a codename is occupied and persists the
+    resulting user. A public endpoint that minted without that occupancy check
+    would hand out working keys for codenames already in use -- codenames are
+    low-entropy bearer capabilities, so the derived key is the whole credential
+    (issue #352).
+    """
 
     _ = render_profile
     require_service_access("get_key_for_secret")
