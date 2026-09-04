@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 from pydantic import Field, model_validator
 
@@ -118,6 +118,18 @@ PRIZE_CATALOG = TokenCatalog(
     label="repartee-loop-prizes",
 )
 ReparteePrizeToken = Token._create_wrapper_cls(ReparteePrizeType, "ReparteePrizeToken")
+
+
+def get_token_catalogs(
+    *,
+    caller: Any = None,
+    requirement: Any = None,
+    graph: Graph | None = None,
+) -> list[TokenCatalog]:
+    """Expose this world's bounded phrase and prize definitions."""
+
+    _ = caller, requirement, graph
+    return [PHRASE_CATALOG, PRIZE_CATALOG]
 
 
 class ReparteePrizeManager(ComponentManager[ReparteePrizeToken]):

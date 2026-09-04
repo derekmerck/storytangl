@@ -581,14 +581,17 @@ catalogs = ctx.get_token_catalogs(requirement=requirement)
 offers = TokenProvisioner(catalogs=catalogs).get_dependency_offers(requirement)
 ```
 
-Each catalog wraps one singleton type (`TokenCatalog.wst`) and delegates matching to the
-singleton `_instances` registry (`catalog.find_all(selector=...)`). For each match,
-TokenProvisioner yields a `CREATE | TOKEN` offer whose callback mints
+Each catalog wraps one singleton type (`TokenCatalog.wst`) and matches only its explicit
+members (`catalog.find_all(selector=...)`). For each match, TokenProvisioner yields a
+`CREATE | TOKEN` offer whose callback mints
 `Token[wst](token_from=instance.label, ...)`.
 
 Token creation is always treated as synthetic provisioning. Existing token entities on
-the graph are still discovered by `FindProvisioner` like any other entity. Update/clone
-composition excludes TOKEN offers by policy.
+the graph are still discovered by `FindProvisioner` like any other entity. Once bound,
+a token resolves its definition through an authoritative factory catalog when one is
+declared for its type; a miss there does not fall back. Token types without a factory
+catalog remain unscoped and may use the process-global singleton fallback.
+Update/clone composition excludes TOKEN offers by policy.
 
 #### Offer Selection
 

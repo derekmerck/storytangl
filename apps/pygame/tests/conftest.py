@@ -27,23 +27,5 @@ def clear_story_world_instances() -> Iterator[None]:
 
 @pytest.fixture
 def repartee_world() -> str:
-    """Guarantee the repartee world's phrase singletons are registered.
-
-    ``PhraseType`` definitions register when the world's domain module is
-    imported. A full-suite run can clear those registries after the module is
-    already in ``sys.modules``, so a later compile finds no definitions and
-    badge construction fails validation. Reload only when they are actually
-    missing — an unconditional reload rebinds classes that live instances
-    still reference.
-    """
-
-    import importlib
-    import sys
-
-    from tangl.mechanics.games import PhraseType
-
-    if PhraseType.get_instance("repartee_starter_call") is None:
-        module = sys.modules.get("repartee_loop.domain")
-        if module is not None:
-            importlib.reload(module)
+    """Return the repartee-loop world key."""
     return "repartee_loop"

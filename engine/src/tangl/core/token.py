@@ -36,9 +36,9 @@ from copy import deepcopy
 import pydantic
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
-from tangl.type_hints import Identifier
+from tangl.type_hints import Identifier, UnstructuredData
 
-from .graph import Node
+from .graph import Graph, Node
 from .selector import Selector
 from .singleton import Singleton
 
@@ -114,6 +114,7 @@ class Token(Node, Generic[WST]):
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
     _registry: Any = PrivateAttr(None)
+    _hydrated_referent: Singleton | None = PrivateAttr(default=None)
 
     token_from: str = Field(...)
 
@@ -121,30 +122,75 @@ class Token(Node, Generic[WST]):
     @field_validator("token_from")
     @classmethod
     def _valid_label_for_wrapped_cls(cls, value: str) -> str:
-        if not cls.wrapped_cls.has_instance(value):
-            raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref label `{value}`.")
+        if not value:
+            raise ValueError("Token reference label must not be empty.")
         return value
 
     @model_validator(mode="after")
     def _hydrate_instance_vars_from_referent(self) -> Self:
-        """Backfill unset instance vars from the referenced singleton instance."""
+        """Backfill unset instance vars when a referent is currently resolvable."""
         if self.label is None:
             self.label = self.token_from
+        referent = self.wrapped_cls.get_instance(self.token_from)
+        if referent is None:
+            return self
+        self._hydrate_instance_vars(referent)
+        return self
+
+    def _hydrate_instance_vars(self, referent: WST) -> None:
+        """Copy default instance-local state from a resolved referent."""
+        previous = self._hydrated_referent_value()
         for field_name in self._instance_vars(self.wrapped_cls):
             if field_name in self.model_fields_set:
                 continue
+            if previous is not None and getattr(self, field_name) != getattr(
+                previous,
+                field_name,
+            ):
+                continue
             # If this is a collection or object pointer, we don't want to accidentally
             # mutate the frozen reference's reference data, so initialize with a copy.
-            value = deepcopy( getattr(self.reference_singleton, field_name) )
-            setattr(self, field_name, value)
-        return self
+            self.__dict__[field_name] = deepcopy(getattr(referent, field_name))
+        assert self.__pydantic_private__ is not None
+        self.__pydantic_private__["_hydrated_referent"] = referent
+
+    def _hydrated_referent_value(self) -> WST | None:
+        """Return the referent that supplied the current implicit defaults."""
+        return (self.__pydantic_private__ or {}).get("_hydrated_referent")
+
+    def _resolve_reference(self, registry: Graph | None) -> WST:
+        """Resolve against a proposed graph scope before binding it."""
+        scoped = (
+            registry.resolve_token_definition(self.wrapped_cls, self.token_from)
+            if registry is not None
+            else None
+        )
+        referent = scoped or self.wrapped_cls.get_instance(self.token_from)
+        if referent is None:
+            raise ValueError(
+                f"No instance of `{self.wrapped_cls.__name__}` found for ref label "
+                f"`{self.token_from}`."
+            )
+        return referent
 
     @property
     def reference_singleton(self) -> WST:
-        res = self.wrapped_cls.get_instance(self.token_from)
-        if not res:
-            raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.token_from}`.")
-        return res
+        return self._resolve_reference(self.__dict__.get("_registry"))
+
+    def unstructure(self) -> UnstructuredData:
+        """Persist explicit or mutated instance-local state, not implicit defaults."""
+        data = super().unstructure()
+        referent = self._hydrated_referent_value()
+        if referent is None:
+            return data
+        for field_name in self._instance_vars(self.wrapped_cls):
+            if field_name in self.model_fields_set:
+                continue
+            if getattr(self, field_name) != getattr(referent, field_name):
+                data[field_name] = self.model_dump(include={field_name})[field_name]
+            else:
+                data.pop(field_name, None)
+        return data
 
     # conflate/delegate identity matching
     def has_kind(self, kind: Type[Node]) -> bool:
@@ -177,7 +223,7 @@ class Token(Node, Generic[WST]):
     def __repr__(self) -> str:
         return self.wrapped_cls.__repr__(self)
 
-    def bind_registry(self, registry) -> None:
+    def bind_registry(self, registry: Graph | None) -> None:
         """Bind registry pointer using a private dict slot on dynamic wrappers."""
         current = self.__dict__.get("_registry")
         if registry is None:
@@ -185,6 +231,10 @@ class Token(Node, Generic[WST]):
             return
         if current is not None and current is not registry:
             raise ValueError(f"Registry is already set {current!r} != {registry!r}")
+        referent = self._resolve_reference(registry)
+        hydrated_referent = self._hydrated_referent_value()
+        if hydrated_referent is not referent:
+            self._hydrate_instance_vars(referent)
         self.__dict__["_registry"] = registry
 
     def __getattr__(self, name: str) -> Any:
@@ -275,7 +325,7 @@ class TokenCatalog(Generic[WST]):
         assert self.members is not None
         return self.members
 
-    def has_kind(self, kind: Type[Node]) -> bool:
+    def has_kind(self, kind: Type[Singleton]) -> bool:
         return issubclass(self.wst, kind)
 
     def find_all(

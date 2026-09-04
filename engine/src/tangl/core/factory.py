@@ -250,6 +250,50 @@ class GraphFactory(Singleton):
     def _provide_token_catalogs(self, **kwargs) -> list[TokenCatalog]:
         return [TokenCatalog(wst=cls) for cls in self.token_types]
 
+    def get_token_catalogs(
+        self,
+        *,
+        caller: GraphItem | None = None,
+        requirement: object | None = None,
+        graph: Graph | None = None,
+    ) -> list[TokenCatalog]:
+        """Return the bounded token catalogs authoritative for this factory."""
+        _ = caller, requirement, graph
+        return self._provide_token_catalogs()
+
+    def resolve_token_definition(
+        self,
+        wrapped_cls: type[Singleton],
+        token_from: str,
+        *,
+        graph: Graph | None = None,
+    ) -> Singleton | None:
+        """Resolve one token definition from this factory's bounded catalogs."""
+        matches: list[Singleton] = []
+        catalogs = [
+            catalog
+            for catalog in self.get_token_catalogs(graph=graph)
+            if catalog.has_kind(wrapped_cls)
+        ]
+        if not catalogs:
+            return None
+        for catalog in catalogs:
+            for definition in catalog.find_all(Selector(has_identifier=token_from)):
+                if isinstance(definition, wrapped_cls) and all(
+                    definition is not match for match in matches
+                ):
+                    matches.append(definition)
+        if not matches:
+            raise LookupError(
+                f"No {wrapped_cls.__name__} definition found for token ref {token_from!r}."
+            )
+        if len(matches) > 1:
+            raise ValueError(
+                f"Token ref {token_from!r} resolved ambiguously across "
+                f"{len(matches)} authoritative catalog definitions."
+            )
+        return matches[0]
+
     def _resolve_edge_ref(self, edge: Edge, field_name: str) -> object:
         if not hasattr(edge, field_name):
             raise TypeError(

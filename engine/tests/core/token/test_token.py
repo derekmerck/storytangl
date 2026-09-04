@@ -5,13 +5,15 @@ from __future__ import annotations
 from typing import TypeVar
 
 import pytest
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
+from tangl.core.factory import GraphFactory
 from tangl.core.entity import Entity
 from tangl.core.graph import Graph, GraphItem, HierarchicalNode, Node
 from tangl.core.selector import Selector
 from tangl.core.singleton import Singleton
 from tangl.core.token import Token, TokenCatalog
+from tangl.story.concepts.asset.transaction import AssetTransactionResult
 
 from ..conftest import ArmorType, NPCType, WeaponType
 
@@ -67,9 +69,16 @@ class TestTokenCreation:
         with pytest.raises(ValidationError):
             Token[WeaponType](label="sword")
 
-    def test_invalid_ref_raises(self) -> None:
+    def test_unresolved_ref_can_be_constructed(self) -> None:
+        token = Token[WeaponType](token_from="missing", label="x")
+
+        assert token.token_from == "missing"
+        with pytest.raises(ValueError):
+            _ = token.reference_singleton
+
+    def test_empty_ref_raises(self) -> None:
         with pytest.raises(ValidationError):
-            Token[WeaponType](token_from="missing", label="x")
+            Token[WeaponType](token_from="", label="x")
 
     def test_token_from_and_label_separate(self) -> None:
         WeaponType(label="sword", damage="1d6")
@@ -109,9 +118,11 @@ class TestTokenDelegation:
 
     def test_write_instance_var(self) -> None:
         WeaponType(label="sword", damage="1d6")
-        token = Token[WeaponType](token_from="sword", label="Glamdring", sharpness=2.0)
+        token = Token[WeaponType](token_from="sword", label="Glamdring")
+        assert "sharpness" not in token.model_fields_set
         token.sharpness = 0.5
         assert token.sharpness == 0.5
+        assert "sharpness" in token.model_fields_set
 
     def test_write_delegated_field_raises(self) -> None:
         WeaponType(label="sword", damage="1d6")
@@ -235,6 +246,107 @@ class TestTokenKindMatching:
 
 
 class TestTokenGraphIntegration:
+    def test_mutated_implicit_state_survives_asset_preflight_validation(self) -> None:
+        class MutableType(Singleton):
+            state: dict[str, int] = Field(
+                default_factory=lambda: {"charge": 3},
+                json_schema_extra={"instance_var": True},
+            )
+
+        MutableType(label="lamp")
+        token = Token[MutableType](token_from="lamp", label="brass lamp")
+
+        assert "state" not in token.model_fields_set
+        token.state["charge"] = 2
+
+        result = AssetTransactionResult(accepted=True, asset=token)
+
+        assert result.asset is token
+        assert result.asset.state == {"charge": 2}
+
+    def test_scoped_referent_replaces_implicit_global_defaults(self) -> None:
+        class ScopedType(Singleton):
+            catalog_id: str = Field(json_schema_extra={"is_identifier": True})
+            tone: str = Field("plain", json_schema_extra={"instance_var": True})
+
+        class ScopedFactory(GraphFactory):
+            catalog: TokenCatalog[ScopedType]
+
+            def get_token_catalogs(self, **_kwargs: object) -> list[TokenCatalog]:
+                return [self.catalog]
+
+        ScopedType(label="reply", catalog_id="global", tone="global")
+        scoped = ScopedType(
+            label="world-reply",
+            catalog_id="reply",
+            tone="scoped",
+        )
+        factory = ScopedFactory(
+            label="scoped-factory",
+            catalog=TokenCatalog(ScopedType, members=(scoped,)),
+        )
+        graph = Graph(factory=factory)
+        token = Token[ScopedType](token_from="reply", label="reply-token")
+        overridden = Token[ScopedType](
+            token_from="reply",
+            label="overridden-reply-token",
+            tone="local",
+        )
+
+        assert token.tone == "global"
+        graph.add(token)
+        graph.add(overridden)
+
+        assert token.reference_singleton is scoped
+        assert token.tone == "scoped"
+        assert overridden.tone == "local"
+
+    def test_singleton_authority_without_token_resolver_uses_global_fallback(self) -> None:
+        class BareAuthority(Singleton):
+            pass
+
+        authority = BareAuthority(label="bare-authority")
+        sword = WeaponType(label="sword", damage="1d6")
+        graph = Graph(factory=authority)
+        token = Token[WeaponType](token_from="sword", label="Glamdring")
+
+        graph.add(token)
+
+        assert token.reference_singleton is sword
+
+    def test_failed_scoped_binding_leaves_token_available_for_the_correct_graph(self) -> None:
+        class ScopedType(Singleton):
+            catalog_id: str = Field(json_schema_extra={"is_identifier": True})
+
+        class ScopedFactory(GraphFactory):
+            catalog: TokenCatalog[ScopedType]
+
+            def get_token_catalogs(self, **_kwargs: object) -> list[TokenCatalog]:
+                return [self.catalog]
+
+        north = ScopedType(label="north-pass", catalog_id="north")
+        south = ScopedType(label="south-pass", catalog_id="south")
+        north_graph = Graph(
+            factory=ScopedFactory(
+                label="north-factory",
+                catalog=TokenCatalog(ScopedType, members=(north,)),
+            )
+        )
+        south_graph = Graph(
+            factory=ScopedFactory(
+                label="south-factory",
+                catalog=TokenCatalog(ScopedType, members=(south,)),
+            )
+        )
+        token = Token[ScopedType](token_from="south", label="south-token")
+
+        with pytest.raises(LookupError, match="No ScopedType definition"):
+            north_graph.add(token)
+
+        assert token.__dict__.get("_registry") is None
+        south_graph.add(token)
+        assert token.reference_singleton is south
+
     def test_add_to_graph(self) -> None:
         WeaponType(label="sword", damage="1d6")
         graph = Graph()
@@ -282,6 +394,27 @@ class TestTokenGraphIntegration:
         child = HierToken(token_from="sword", label="Glamdring", registry=graph)
         root.add_child(child)
         assert child.parent is root
+
+    def test_scoped_catalog_ambiguity_fails_loudly(self) -> None:
+        class ScopedType(Singleton):
+            catalog_id: str = Field(
+                json_schema_extra={"is_identifier": True},
+            )
+
+        ScopedType(label="north-pass", catalog_id="activity_pass")
+        ScopedType(label="south-pass", catalog_id="activity_pass")
+        factory = GraphFactory(
+            label="scoped-token-factory",
+            token_types=[ScopedType],
+        )
+        graph = Graph(factory=factory)
+        token = Token[ScopedType](
+            token_from="activity_pass",
+            label="ambiguous-pass",
+        )
+
+        with pytest.raises(ValueError, match="resolved ambiguously"):
+            graph.add(token)
 
 class TestTokenCatalog:
     def test_find_all_uses_singleton_registry(self) -> None:

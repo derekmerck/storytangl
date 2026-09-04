@@ -32,7 +32,10 @@ class CredentialDefinition(Singleton):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    catalog_id: str | None = None
+    catalog_id: str | None = Field(
+        default=None,
+        json_schema_extra={"is_identifier": True},
+    )
     name: str | None = None
     origin_ids: tuple[OriginId, ...] = ()
     valid_period: int | None = None
