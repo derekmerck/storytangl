@@ -169,7 +169,9 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     available: bool = True
     unavailable_reason: str | None = None
     blockers: list[Blocker] | None = None
-    accepts: Accepts | None = None
+    accepts: Accepts | None = Field(
+        None, json_schema_extra={"unstructurable": True}
+    )
     ui_hints: UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
 

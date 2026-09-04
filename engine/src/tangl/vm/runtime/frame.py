@@ -60,7 +60,6 @@ from random import Random
 from typing import Any, Callable, Iterable, Mapping, Optional, TypeAlias
 from uuid import UUID
 
-from pydantic import ValidationError
 
 from tangl.core import (
     Behavior,
@@ -639,23 +638,17 @@ class Frame:
 
     @staticmethod
     def _with_step(record: Record, *, step: int) -> Record:
-        """Return a step-annotated record, preserving immutability."""
+        """Return a step-annotated record, preserving immutability.
+
+        A record that cannot be stamped must fail loudly. An unstamped record is
+        the ledger's "open, not yet stepped" sentinel, so quietly returning one
+        does not degrade -- it republishes a consumed choice to every client as
+        still available, against an edge the graph has already torn down (#436).
+        """
         current = getattr(record, "step", None)
         if isinstance(current, int) and current >= 0:
             return record
-        if hasattr(record, "evolve"):
-            try:
-                return record.evolve(step=step)
-            except (ValidationError, TypeError, ValueError, AttributeError) as exc:
-                logger.debug(
-                    "Unable to stamp step=%s on record uid=%s type=%s: %s",
-                    step,
-                    getattr(record, "uid", None),
-                    type(record).__name__,
-                    exc,
-                )
-                return record
-        return record
+        return record.evolve(step=step)
 
     def _record_redirect(self, *, phase: ResolutionPhase, edge: AnyTraversableEdge) -> None:
         """Capture minimal redirect observability for service/debug surfaces."""
