@@ -56,8 +56,8 @@ wheels/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Sphinx
-docs/_build/
+# Sphinx (docs/Makefile writes BUILDDIR=build)
+docs/build/
 
 # Unit test / coverage reports
 .coverage

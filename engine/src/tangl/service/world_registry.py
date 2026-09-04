@@ -102,10 +102,20 @@ class WorldRegistry:
         self._discover(world_dirs)
 
     def _discover(self, world_dirs: list[Path]) -> None:
+        """Scan every configured search root for world bundles.
+
+        ``world_dirs`` is a search path: a root that is absent is normal, since
+        one configuration is expected to name roots that only exist in some
+        deployments. What is worth reporting is having nothing to scan at all,
+        which is the case that actually leaves the service with no worlds.
+        """
+
+        scanned = 0
         for world_dir in world_dirs:
             if not world_dir.exists():
-                logger.warning("World directory %s does not exist", world_dir)
+                logger.debug("World search root %s is absent, skipping", world_dir)
                 continue
+            scanned += 1
 
             for item in world_dir.iterdir():
                 if not item.is_dir():
@@ -123,6 +133,12 @@ class WorldRegistry:
 
                 self.bundles[bundle.manifest.label] = bundle
                 logger.info("Discovered world: %s", bundle.manifest.label)
+
+        if not scanned:
+            logger.warning(
+                "No world search root exists; no worlds will be available. Searched: %s",
+                ", ".join(str(world_dir) for world_dir in world_dirs) or "(nothing configured)",
+            )
 
     def list_worlds(self) -> list[dict]:
         return [

@@ -54,13 +54,21 @@ media_url = "https://localhost:8000/media"   # media server root
 
 # Data organization
 [service.paths]
-worlds      = [ "@path /app/worlds/" ]      # search paths for tangl world packages
+# worlds: search paths for tangl world packages. Deliberately unset here -- a
+# checkout points it at ./worlds/ in settings.toml and the image sets
+# TANGL_SERVICE__PATHS__WORLDS, the same way docs and client_dist are handled.
+# Shipping /app/worlds as a default only added a phantom root to every local
+# run, because this key is a list and merges rather than replaces.
 client_dist =   "@path /app/client/"        # file path for web client static dist
 docs =          "@path /app/docs/"          # package docs and user guide
 user_data =     "@path /app/data/user/"     # user/story data storage for file-based persistence
 story_media =   "@path /app/data/media/"    # user/story media files
 cache_data =    "@path /app/cache/"         # file loc shelve and pickle cache data
-system_media =  "@path /app/media/sys/"     # shared/system media
+# system_media: optional shared/system media root. Deliberately unset -- no
+# deployment in this repository ships one, and the image does not create
+# /app/media/sys, so defaulting to it only made mount_system_media log a
+# warning about a directory that exists nowhere. Set
+# TANGL_SERVICE__PATHS__SYSTEM_MEDIA to enable the /media/sys mount.
 
 [service.caches]
 shelved = true                          # file-backed shelve caches for media/lang helpers
