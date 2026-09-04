@@ -74,6 +74,7 @@ COPY --from=pkg_builder /build/dist/*.whl /app/
 
 # Collect the worlds (with LFS files)
 COPY --from=pkg_builder /build/worlds /app/worlds
+ENV TANGL_SERVICE__PATHS__WORLDS='["@path /app/worlds/"]'
 
 # Collect the docs built in the doc_builder stage
 ENV TANGL_SERVICE__PATHS__DOCS='@path /app/docs/'
