@@ -921,7 +921,7 @@ class CredentialsGame(PickingGame):
 
     # --- Shift configuration (authored; never reset between candidates) ------
     roster: list[CredentialCase] = Field(
-        default_factory=_default_roster,
+        default_factory=list,
         json_schema_extra={"include": True, "unstructurable": True},
     )
     # Optional lazy roster: when set, candidates are sampled offers materialized
@@ -1010,13 +1010,19 @@ class CredentialsGame(PickingGame):
     )
     _component_manager_owner: object | None = PrivateAttr(default=None)
 
+    @model_validator(mode="after")
+    def _initialize_default_roster(self) -> Self:
+        """Supply the standalone roster only when no authored offers exist."""
+        if not self.roster and not self.offers:
+            self.roster = _default_roster()
+        return self
+
     def bind_component_managers(self, owner: object) -> None:
         """Bind assembly packet managers in already materialized cases to ``owner``."""
 
         self._component_manager_owner = owner
-        if not self.offers:
-            for case in self.roster:
-                case.bind_packet_manager_owner(owner)
+        for case in self.roster:
+            case.bind_packet_manager_owner(owner)
         for case in self.materialized:
             case.bind_packet_manager_owner(owner)
 

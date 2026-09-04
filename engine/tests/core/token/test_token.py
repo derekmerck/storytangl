@@ -243,6 +243,89 @@ class TestTokenKindMatching:
 
 
 class TestTokenGraphIntegration:
+    def test_scoped_referent_replaces_implicit_global_defaults(self) -> None:
+        class ScopedType(Singleton):
+            catalog_id: str = Field(json_schema_extra={"is_identifier": True})
+            tone: str = Field("plain", json_schema_extra={"instance_var": True})
+
+        class ScopedFactory(GraphFactory):
+            catalog: TokenCatalog[ScopedType]
+
+            def get_token_catalogs(self, **_kwargs: object) -> list[TokenCatalog]:
+                return [self.catalog]
+
+        ScopedType(label="reply", catalog_id="global", tone="global")
+        scoped = ScopedType(
+            label="world-reply",
+            catalog_id="reply",
+            tone="scoped",
+        )
+        factory = ScopedFactory(
+            label="scoped-factory",
+            catalog=TokenCatalog(ScopedType, members=(scoped,)),
+        )
+        graph = Graph(factory=factory)
+        token = Token[ScopedType](token_from="reply", label="reply-token")
+        overridden = Token[ScopedType](
+            token_from="reply",
+            label="overridden-reply-token",
+            tone="local",
+        )
+
+        assert token.tone == "global"
+        graph.add(token)
+        graph.add(overridden)
+
+        assert token.reference_singleton is scoped
+        assert token.tone == "scoped"
+        assert overridden.tone == "local"
+
+    def test_singleton_authority_without_token_resolver_uses_global_fallback(self) -> None:
+        class BareAuthority(Singleton):
+            pass
+
+        authority = BareAuthority(label="bare-authority")
+        sword = WeaponType(label="sword", damage="1d6")
+        graph = Graph(factory=authority)
+        token = Token[WeaponType](token_from="sword", label="Glamdring")
+
+        graph.add(token)
+
+        assert token.reference_singleton is sword
+
+    def test_failed_scoped_binding_leaves_token_available_for_the_correct_graph(self) -> None:
+        class ScopedType(Singleton):
+            catalog_id: str = Field(json_schema_extra={"is_identifier": True})
+
+        class ScopedFactory(GraphFactory):
+            catalog: TokenCatalog[ScopedType]
+
+            def get_token_catalogs(self, **_kwargs: object) -> list[TokenCatalog]:
+                return [self.catalog]
+
+        north = ScopedType(label="north-pass", catalog_id="north")
+        south = ScopedType(label="south-pass", catalog_id="south")
+        north_graph = Graph(
+            factory=ScopedFactory(
+                label="north-factory",
+                catalog=TokenCatalog(ScopedType, members=(north,)),
+            )
+        )
+        south_graph = Graph(
+            factory=ScopedFactory(
+                label="south-factory",
+                catalog=TokenCatalog(ScopedType, members=(south,)),
+            )
+        )
+        token = Token[ScopedType](token_from="south", label="south-token")
+
+        with pytest.raises(LookupError, match="No ScopedType definition"):
+            north_graph.add(token)
+
+        assert token.__dict__.get("_registry") is None
+        south_graph.add(token)
+        assert token.reference_singleton is south
+
     def test_add_to_graph(self) -> None:
         WeaponType(label="sword", damage="1d6")
         graph = Graph()

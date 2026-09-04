@@ -29,7 +29,7 @@ from tangl.mechanics.sandbox import SandboxScope
 from tangl.story import World
 
 
-class CredentialPacketOwner(Node):
+class PersistenceCredentialPacketOwner(Node):
     """Graph owner with an embedded component manager."""
 
     packet_manager: CredentialPacketManager = Field(
@@ -38,7 +38,7 @@ class CredentialPacketOwner(Node):
     )
 
     @model_validator(mode="after")
-    def _bind_packet_owner(self) -> "CredentialPacketOwner":
+    def _bind_packet_owner(self) -> "PersistenceCredentialPacketOwner":
         self.packet_manager.bind_owner(self)
         return self
 
@@ -84,7 +84,7 @@ def _credential_graph() -> tuple[
         requires_id=True,
     )
     graph = Graph()
-    owner = graph.add_node(kind=CredentialPacketOwner, label="checkpoint")
+    owner = graph.add_node(kind=PersistenceCredentialPacketOwner, label="checkpoint")
     id_card = graph.add_node(
         kind=CredentialComponent,
         label="matrix-id",
@@ -254,7 +254,7 @@ def test_json_roundtrip_rebinds_tokens_to_their_world_catalog(tmp_path: Path) ->
     assert north_definition is not south_definition
 
     graph = Graph(factory=north)
-    owner = graph.add_node(kind=CredentialPacketOwner, label="checkpoint")
+    owner = graph.add_node(kind=PersistenceCredentialPacketOwner, label="checkpoint")
     pass_token = graph.add_node(
         kind=CredentialComponent,
         label="north-activity-pass",
@@ -294,7 +294,7 @@ def test_json_roundtrip_rebinds_tokens_to_their_world_catalog(tmp_path: Path) ->
     restored_owner = restored.find_one(Selector(label="checkpoint"))
     restored_token = restored.find_one(Selector(label="north-activity-pass"))
 
-    assert isinstance(restored_owner, CredentialPacketOwner)
+    assert isinstance(restored_owner, PersistenceCredentialPacketOwner)
     assert isinstance(restored_token, CredentialComponent)
     assert restored.factory is restored_north
     assert restored_token.uid == pass_token.uid

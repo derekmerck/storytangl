@@ -18,7 +18,7 @@ from __future__ import annotations
 import itertools
 from functools import cached_property
 from fnmatch import fnmatch
-from typing import Any, Iterable, Iterator, Optional
+from typing import Any, Iterable, Iterator, Optional, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import Field
@@ -27,6 +27,19 @@ from .entity import Entity
 from .registry import EntityGroup, HierarchicalGroup, Registry, RegistryAware
 from .selector import Selector
 from .singleton import Singleton
+
+
+@runtime_checkable
+class TokenDefinitionResolver(Protocol):
+    """Optional factory capability for graph-scoped token lookup."""
+
+    def resolve_token_definition(
+        self,
+        wrapped_cls: type[Singleton],
+        token_from: str,
+        *,
+        graph: Graph | None = None,
+    ) -> Singleton | None: ...
 
 
 def _ancestor_list(item: GraphItem | RegistryAware) -> list[GraphItem | RegistryAware]:
@@ -223,7 +236,7 @@ class Graph(Registry[GraphItem]):
         token_from: str,
     ) -> Singleton | None:
         """Resolve a token definition through the bound graph factory, when present."""
-        if self.factory is None:
+        if not isinstance(self.factory, TokenDefinitionResolver):
             return None
         return self.factory.resolve_token_definition(
             wrapped_cls,
@@ -274,11 +287,6 @@ class Graph(Registry[GraphItem]):
             payload["factory"] = factory
         graph = super().structure(payload, _ctx=_ctx)
         graph.bind_factory(factory)
-        from .token import Token
-
-        for member in graph.members.values():
-            if isinstance(member, Token):
-                member.bind_registry(graph)
         return graph
 
     def path_dist(self, a: GraphItem, b: GraphItem) -> int:
