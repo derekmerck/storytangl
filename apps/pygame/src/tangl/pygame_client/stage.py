@@ -17,7 +17,20 @@ import pygame
 
 from dataclasses import dataclass
 
-from .models import Choice, MapPlate, MapRegion, StageImage, Turn
+from .bridge import UnsupportedAccepts, commit_payload, remaining_pieces
+from .models import (
+    Action,
+    BeginSelection,
+    CancelSelection,
+    Choice,
+    Commit,
+    MapPlate,
+    MapRegion,
+    PendingSelection,
+    PickPiece,
+    StageImage,
+    Turn,
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -60,6 +73,34 @@ _ROW_STYLES = {
     "choice": (INK, CREAM),
 }
 
+def choice_action(choice: Choice) -> Action | None:
+    """Return the action a row for ``choice`` performs, or None if it cannot.
+
+    Three outcomes, and the third is the interesting one. A ``pick`` resolves
+    straight to a commit. A ``pieces`` choice opens a selection first. Anything
+    this port cannot collect a value for yields None, so the row renders inert
+    with its reason rather than committing a guessed payload or crashing the
+    frame -- the CLI refuses the same kinds unless handed an explicit payload.
+    """
+
+    if not choice.available:
+        return None
+    if getattr(choice.accepts, "kind", "pick") == "pieces":
+        return BeginSelection(choice=choice)
+    try:
+        return Commit(edge_id=choice.edge_id, payload=commit_payload(choice))
+    except UnsupportedAccepts:
+        return None
+
+
+def unsupported_reason(choice: Choice) -> str | None:
+    """Why an available choice still has no action, for the player to read."""
+
+    if not choice.available or choice_action(choice) is not None:
+        return None
+    return f"needs {getattr(choice.accepts, 'kind', 'unknown')} input"
+
+
 MAP_FOOTER_ROWS = 8
 """Rows the map footer may occupy before it scrolls. A map drawn under a
 footer that grows without limit is a map nobody can see."""
@@ -78,7 +119,7 @@ class Stage:
         self.asset_dir = asset_dir
         self.font = pygame.font.Font(None, 11)
         self._cache: dict[str, pygame.Surface | None] = {}
-        self.hitboxes: list[tuple[pygame.Rect, UUID, object]] = []
+        self.hitboxes: list[tuple[pygame.Rect, Action]] = []
         self.scroll = 0
         self.max_scroll = 0
         self._last_turn: Turn | None = None
@@ -131,19 +172,32 @@ class Stage:
 
     # ── drawing ──────────────────────────────────────────────────────────
 
-    def draw(self, turn: Turn) -> None:
-        """Render one turn and record choice hitboxes for the input layer."""
+    def draw(self, turn: Turn, pending: PendingSelection | None = None) -> None:
+        """Render one turn and record its hitboxes for the input layer.
+
+        While ``pending`` is set the choice list is replaced by the pieces that
+        choice will accept. That is the second half of the two-step click-pick
+        path the Input Parity rule requires: the same numbered list, the same
+        keys, and the same payload the CLI would build.
+        """
 
         self.hitboxes.clear()
         loaded, unloadable = self._resolve_images(turn)
-        if self._draw_map(turn, loaded):
+        # A map is a way to travel, not a way to pick a document; while a
+        # selection is open the plate would offer edges that are not on offer.
+        if pending is None and self._draw_map(turn, loaded):
             pygame.transform.scale(self.surface, self.window.get_size(), self.window)
             pygame.display.flip()
             return
         self._draw_background(loaded)
-        # Choices are laid out first and always reserved, so a long exchange can
-        # never push the only way to continue off the logical surface.
-        choices_top = LOGICAL_SIZE[1] - 4 - len(turn.choices) * 11
+        # Rows below are laid out first and always reserved, so a long exchange
+        # can never push the only way to continue off the logical surface.
+        below = (
+            len(remaining_pieces(turn, pending)) + 1
+            if pending is not None
+            else len(turn.choices)
+        )
+        choices_top = LOGICAL_SIZE[1] - 4 - below * 11
         self._draw_portraits(loaded, floor=choices_top)
 
         rows = self._rows(turn, unloadable)
@@ -154,7 +208,10 @@ class Stage:
             self._last_turn = turn
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
         self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity)
-        self._draw_choices(turn, top=choices_top)
+        if pending is not None:
+            self._draw_selection(turn, pending, top=choices_top)
+        else:
+            self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
 
@@ -256,8 +313,8 @@ class Stage:
         pygame.draw.rect(self.surface, INK, pin)
         self.surface.blit(text, (pin.x + 2, pin.y))
 
-        if choice.available:
-            self.hitboxes.append((rect, choice.edge_id, choice.payload))
+        if (action := choice_action(choice)) is not None:
+            self.hitboxes.append((rect, action))
 
     def _draw_map_footer(self, turn: Turn) -> None:
         """Narration and the full numbered legend, bounded and pageable.
@@ -305,9 +362,9 @@ class Stage:
                 colour = RUST
             text = self.font.render(row.text, False, colour)
             self.surface.blit(text, (4, y))
-            if choice is not None and choice.available:
+            if choice is not None and (action := choice_action(choice)) is not None:
                 rect = pygame.Rect(4, y, text.get_width(), ROW_H)
-                self.hitboxes.append((rect, choice.edge_id, choice.payload))
+                self.hitboxes.append((rect, action))
             y += ROW_H
 
         if self.max_scroll:
@@ -394,29 +451,60 @@ class Stage:
 
         self.scroll = min(max(self.scroll + delta, 0), self.max_scroll)
 
+    def _row(self, index: int, text: str, *, y: int, colour, action: Action | None) -> None:
+        """Draw one numbered row and, when actionable, record its hitbox."""
+
+        surface = self.font.render(f"{index}. {text}", False, colour)
+        rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
+        self.surface.blit(surface, rect.topleft)
+        if action is not None:
+            self.hitboxes.append((rect, action))
+
     def _draw_choices(self, turn: Turn, *, top: int) -> None:
         y = top
         for index, choice in enumerate(turn.choices, start=1):
-            label = f"{index}. {choice.text}"
-            if not choice.available and choice.unavailable_reason:
-                label = f"{label}  — {choice.unavailable_reason}"
-            colour = CREAM if choice.available else DIM
-            surface = self.font.render(label, False, colour)
-            rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
-            self.surface.blit(surface, rect.topleft)
-            if choice.available:
-                self.hitboxes.append((rect, choice.edge_id, choice.payload))
+            action = choice_action(choice)
+            label = choice.text
+            if reason := (choice.unavailable_reason or unsupported_reason(choice)):
+                label = f"{label}  — {reason}"
+            self._row(
+                index,
+                label,
+                y=y,
+                colour=CREAM if action is not None else DIM,
+                action=action,
+            )
             y += 11
 
-    def hit(self, position: tuple[int, int]) -> tuple[UUID, object] | None:
-        """Map a window click to the edge id its choice commits."""
+    def _draw_selection(self, turn: Turn, pending: PendingSelection, *, top: int) -> None:
+        """Draw the pieces a pending choice will accept, numbered like choices.
+
+        Numbering restarts at 1 on purpose: this is the same numbered-list input
+        mode the CLI uses for its positional values, so the same key picks the
+        same piece in both ports.
+        """
+
+        y = top
+        for index, piece in enumerate(remaining_pieces(turn, pending), start=1):
+            self._row(
+                index,
+                piece.label or piece.piece_id,
+                y=y,
+                colour=CREAM,
+                action=PickPiece(piece_id=piece.piece_id),
+            )
+            y += 11
+        self._row(0, "Cancel", y=y, colour=DIM, action=CancelSelection())
+
+    def hit(self, position: tuple[int, int]) -> Action | None:
+        """Map a window click to the action its row performs."""
 
         logical = (position[0] // SCALE, position[1] // SCALE)
         # Reverse draw order: the footer is drawn over the plate, so a legend
         # row sitting on top of a region must win the click it visibly owns.
-        for rect, edge_id, payload in reversed(self.hitboxes):
+        for rect, action in reversed(self.hitboxes):
             if rect.collidepoint(logical):
-                return edge_id, payload
+                return action
         return None
 
     @staticmethod

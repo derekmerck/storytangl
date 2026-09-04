@@ -13,7 +13,14 @@ import pytest
 pytest.importorskip("pygame", reason="pygame-ce is an optional client runtime")
 
 from tangl.pygame_client.__main__ import _merge  # noqa: E402
-from tangl.pygame_client.models import Choice, Line, StageImage, Turn  # noqa: E402
+from tangl.pygame_client.models import (  # noqa: E402
+    Choice,
+    Line,
+    Piece,
+    StageImage,
+    Turn,
+    Zone,
+)
 
 
 def _bg(source: str) -> StageImage:
@@ -107,3 +114,48 @@ def test_a_plate_and_a_background_do_not_displace_each_other() -> None:
     ])
 
     assert {image.role for image in merged.images} == {"narrative_im", "map_im"}
+
+
+def _piece(piece_id: str, *, text: str = "", zone=None) -> Piece:
+    return Piece(piece_id=piece_id, kind="id_card", text=text, zone_ref=zone)
+
+
+def test_restated_pieces_are_merged_by_identity() -> None:
+    """A re-entrant block restates its pieces every turn; the player sees one.
+
+    Concatenating would list the same document twice and make a numbered
+    selection ambiguous.
+    """
+
+    zone = uuid4()
+    merged = _merge([
+        Turn(step=1, pieces=[_piece("0:passport", text="crisp", zone=zone)]),
+        Turn(step=2, pieces=[_piece("0:passport", text="crisp, inspected", zone=zone)]),
+    ])
+
+    assert [piece.piece_id for piece in merged.pieces] == ["0:passport"]
+    assert merged.pieces[0].text == "crisp, inspected", "the later statement wins"
+
+
+def test_distinct_pieces_all_survive() -> None:
+    merged = _merge([
+        Turn(step=1, pieces=[_piece("0:passport"), _piece("0:permit")]),
+        Turn(step=2, pieces=[_piece("0:baggage")]),
+    ])
+
+    assert [piece.piece_id for piece in merged.pieces] == [
+        "0:passport",
+        "0:permit",
+        "0:baggage",
+    ]
+
+
+def test_zones_are_merged_by_uid() -> None:
+    zone = uuid4()
+    merged = _merge([
+        Turn(step=1, zones=[Zone(uid=zone, role="packet")]),
+        Turn(step=2, zones=[Zone(uid=zone, role="packet", label="Credentials packet")]),
+    ])
+
+    assert len(merged.zones) == 1
+    assert merged.zones[0].label == "Credentials packet"

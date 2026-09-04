@@ -45,7 +45,7 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
     stage.draw(_turn(line_count, choice_count=3))
 
     assert len(stage.hitboxes) == 3
-    for rect, _edge_id, _payload in stage.hitboxes:
+    for rect, _action in stage.hitboxes:
         assert rect.bottom <= LOGICAL_SIZE[1]
         assert rect.top >= 0
 
@@ -53,10 +53,10 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
 def test_every_available_choice_is_clickable(stage: Stage) -> None:
     stage.draw(_turn(12, choice_count=3))
 
-    for rect, edge_id, _payload in stage.hitboxes:
+    for rect, action in stage.hitboxes:
         centre = (rect.centerx * SCALE, rect.centery * SCALE)
         assert stage.hit(centre) is not None
-        assert stage.hit(centre)[0] == edge_id
+        assert stage.hit(centre).edge_id == action.edge_id
 
 
 def test_unavailable_choices_are_shown_but_not_clickable(stage: Stage) -> None:
@@ -77,7 +77,7 @@ def test_unavailable_choices_are_shown_but_not_clickable(stage: Stage) -> None:
     stage.draw(turn)
 
     assert len(stage.hitboxes) == 1
-    assert stage.hitboxes[0][1] == turn.choices[1].edge_id
+    assert stage.hitboxes[0][1].edge_id == turn.choices[1].edge_id
 
 
 def test_a_paragraph_longer_than_the_surface_still_renders(stage: Stage) -> None:

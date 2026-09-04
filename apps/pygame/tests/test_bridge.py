@@ -6,14 +6,30 @@ from uuid import uuid4
 
 import pytest
 
+from tangl.journal.content import PresentationHints
 from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
     ContentFragment,
     GroupFragment,
     MediaFragment,
+    PieceFragment,
 )
-from tangl.pygame_client.bridge import PygameSessionBridge
+from tangl.journal.intent import (
+    PickAccepts,
+    PieceConstraints,
+    PiecesAccepts,
+    QuantityAccepts,
+    TextAccepts,
+)
+from tangl.pygame_client.bridge import (
+    PygameSessionBridge,
+    UnsupportedAccepts,
+    commit_payload,
+    remaining_pieces,
+    selectable_pieces,
+)
+from tangl.pygame_client.models import Choice, PendingSelection
 
 
 @pytest.fixture
@@ -147,3 +163,136 @@ def test_undereferenceable_media_degrades_to_payload_text(
     turn = bridge.build_turns([fragment])[0]
     assert turn.images == []
     assert [line.text for line in turn.lines] == ["[a rainy quay]"]
+
+
+# ── typed accepts ────────────────────────────────────────────────────────────
+
+
+def _packet(bridge: PygameSessionBridge, zone_uid, *labels: str):
+    """One zone holding a document piece per label, plus an unzoned candidate."""
+
+    fragments = [
+        PieceFragment(
+            piece_id="candidate-0", piece_kind="candidate", content="Tomas Vey", step=1
+        ),
+        GroupFragment(uid=zone_uid, group_type="zone", zone_role="packet", step=1),
+    ]
+    fragments += [
+        PieceFragment(
+            piece_id=f"0:{label}",
+            piece_kind="id_card",
+            content=f"a {label}",
+            zone_ref=zone_uid,
+            hints=PresentationHints(label_text=label),
+            step=1,
+        )
+        for label in labels
+    ]
+    return bridge.build_turns(fragments)[0]
+
+
+def test_pieces_and_zones_reach_the_turn(bridge: PygameSessionBridge) -> None:
+    zone = uuid4()
+    turn = _packet(bridge, zone, "passport", "work permit")
+
+    assert [piece.piece_id for piece in turn.pieces] == [
+        "candidate-0",
+        "0:passport",
+        "0:work permit",
+    ]
+    assert [zone.role for zone in turn.zones] == ["packet"]
+    assert [piece.label for piece in turn.pieces[1:]] == ["passport", "work permit"]
+
+
+def test_a_zone_constraint_narrows_the_selectable_pieces(
+    bridge: PygameSessionBridge,
+) -> None:
+    """Decision Legibility: only pieces in the named zone can satisfy the choice.
+
+    The candidate is a piece too, and sits outside the packet. Offering it would
+    invite a commit the backend must reject.
+    """
+
+    zone = uuid4()
+    turn = _packet(bridge, zone, "passport")
+    choice = Choice(
+        edge_id=uuid4(),
+        text="Inspect a document",
+        accepts=PiecesAccepts(
+            min=1, max=1, constraints=PieceConstraints(target_zone_ref=str(zone))
+        ),
+    )
+
+    assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["0:passport"]
+
+
+def test_an_unconstrained_pieces_choice_offers_every_piece(
+    bridge: PygameSessionBridge,
+) -> None:
+    turn = _packet(bridge, uuid4(), "passport")
+    choice = Choice(edge_id=uuid4(), text="Point at something", accepts=PiecesAccepts())
+
+    assert len(selectable_pieces(turn, choice)) == len(turn.pieces)
+
+
+@pytest.mark.parametrize(
+    ("accepts", "values", "expected"),
+    [
+        (None, (), {}),
+        (PickAccepts(), (), {}),
+        (PiecesAccepts(min=1, max=1), ("0:passport",), {"piece_ids": ["0:passport"]}),
+        (
+            PiecesAccepts(min=1, max=2),
+            ("a", "b"),
+            {"piece_ids": ["a", "b"]},
+        ),
+    ],
+)
+def test_commit_payload_matches_the_cli_shapes(accepts, values, expected) -> None:
+    """§6.1.1: both ports must build the same payload for the same choice."""
+
+    choice = Choice(edge_id=uuid4(), text="act", accepts=accepts)
+
+    assert commit_payload(choice, values) == expected
+
+
+@pytest.mark.parametrize(
+    ("accepts", "values"),
+    [
+        (PickAccepts(), ("unexpected",)),
+        (PiecesAccepts(min=2, max=2), ("only-one",)),
+        (PiecesAccepts(min=1, max=1), ("one", "two")),
+        (TextAccepts(), ()),
+        (QuantityAccepts(), ()),
+    ],
+)
+def test_commit_payload_refuses_what_it_cannot_build(accepts, values) -> None:
+    """Refusing early keeps a doomed commit off the wire.
+
+    The CLI refuses the same kinds unless handed an explicit payload; guessing a
+    shape here would surface to the player as an opaque backend error instead.
+    """
+
+    choice = Choice(edge_id=uuid4(), text="act", accepts=accepts)
+
+    with pytest.raises(UnsupportedAccepts):
+        commit_payload(choice, values)
+
+
+def test_remaining_pieces_drops_what_is_already_picked(
+    bridge: PygameSessionBridge,
+) -> None:
+    zone = uuid4()
+    turn = _packet(bridge, zone, "passport", "work permit")
+    choice = Choice(
+        edge_id=uuid4(),
+        text="Inspect two",
+        accepts=PiecesAccepts(
+            min=2, max=2, constraints=PieceConstraints(target_zone_ref=str(zone))
+        ),
+    )
+    pending = PendingSelection(choice=choice, picked=["0:passport"])
+
+    assert [piece.piece_id for piece in remaining_pieces(turn, pending)] == [
+        "0:work permit"
+    ]

@@ -37,6 +37,45 @@ rather than merely intended — see the map view below.
 **Unavailable choices render dimmed with their `unavailable_reason`** rather
 than being hidden (§5.1, Decision Legibility).
 
+## Typed Choices
+
+Most choices are answered by their `edge_id` alone. Some want a value first, and
+`accepts.kind` says which (§6.1). This port collects `pieces`; the rest render
+inert with a reason rather than committing a guessed payload.
+
+A `pieces` choice opens a second numbered list of the pieces it will take, and
+the payload is built only once that list has been answered:
+
+```
+1. Inspect a document          ->     1. passport
+2. Choose pass                        2. work permit
+3. Choose deny                        0. Cancel
+```
+
+Three things about that are load-bearing.
+
+**The two lists are numbered independently, both from 1.** The CLI takes the
+same selection as positional values after the choice number (`do 1 0:passport`),
+so the same key names the same piece in both ports. Escape or `0` leaves the
+selection without committing — a mode a mouse can enter but only a keyboard can
+leave is not a usable surface, so Cancel is a clickable row too.
+
+**Which pieces are offered comes from the choice, not the renderer.** A
+`pieces` choice constrained to `target_zone_ref` is satisfiable only by pieces in
+that zone, so `selectable_pieces` reads the constraint and the candidate — a
+piece too, but outside the packet — never appears. That is §5.1 again: the
+player is only offered what the backend will actually accept.
+
+**The finished payload is byte-identical to the CLI's.** `commit_payload` mirrors
+the CLI's `_choice_payload` case for case. Its validation is advisory — the
+backend re-checks and is authoritative (§6.1.2) — and refusing early only keeps a
+doomed commit off the wire.
+
+Every click and key still resolves to `(edge_id, payload)`; `BeginSelection`,
+`PickPiece` and `CancelSelection` are client-local steps that never reach the
+service. That is what keeps Input Parity true for a choice that takes two
+actions to answer.
+
 **Attribution decides presentation.** An `AttributedFragment` renders as a
 speaker bubble; a plain `ContentFragment` renders as narration. The client does
 not parse prose prefixes.
@@ -159,6 +198,7 @@ from the type signatures, and a third port would pay the same tax again.
 | media | ordered `scene`/`show` ops, stateful | flat per-turn image list, stateless |
 | speaker | `portrait_tag` for a defined character image | `speaker` string, looked up by role |
 | choices | menu built by the runtime | hitboxes owned by the renderer |
+| typed input | not attempted | two-step numbered selection for `pieces` |
 | turns | one per step, played in sequence | merged into one actionable frame |
 
 The media model is the real divergence: Ren'Py has a persistent stage that

@@ -17,6 +17,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client runtime")
 
 from tangl.pygame_client.models import (  # noqa: E402
+    Commit,
     Choice,
     Line,
     MapPlate,
@@ -93,7 +94,7 @@ def test_a_region_click_commits_what_its_numbered_entry_commits(stage, frame) ->
     quayside = next(r for r in PLATE.regions if r.name == "quayside")
     choice = frame.choices[0]
 
-    assert stage.hit(_centre(quayside)) == (choice.edge_id, choice.payload)
+    assert stage.hit(_centre(quayside)) == Commit(edge_id=choice.edge_id, payload={})
 
 
 def test_a_guarded_region_is_drawn_but_refuses_the_click(stage, frame) -> None:
@@ -118,14 +119,14 @@ def test_every_choice_stays_reachable_off_the_plate(stage, frame) -> None:
     """The legend is the floor: available choices are clickable there too."""
 
     stage.draw(frame)
-    reachable = {edge_id for _rect, edge_id, _payload in stage.hitboxes}
+    reachable = {action.edge_id for _rect, action in stage.hitboxes}
 
     assert frame.choices[0].edge_id in reachable
     assert frame.choices[1].edge_id not in reachable
     # One box on the plate and one legend row, both committing the same edge.
-    bound = [h for h in stage.hitboxes if h[1] == frame.choices[0].edge_id]
+    bound = [h for h in stage.hitboxes if h[1].edge_id == frame.choices[0].edge_id]
     assert len(bound) == 2
-    assert all(payload == frame.choices[0].payload for _rect, _edge, payload in bound)
+    assert all(action == bound[0][1] for _rect, action in bound)
 
 
 def test_a_turn_without_a_plate_falls_back_to_the_ordinary_layout(stage, frame) -> None:
@@ -136,7 +137,7 @@ def test_a_turn_without_a_plate_falls_back_to_the_ordinary_layout(stage, frame) 
     quayside = next(r for r in PLATE.regions if r.name == "quayside")
 
     assert stage.hit(_centre(quayside)) is None
-    assert {edge for _rect, edge, _payload in stage.hitboxes} == {frame.choices[0].edge_id}
+    assert {a.edge_id for _rect, a in stage.hitboxes} == {frame.choices[0].edge_id}
 
 
 def test_the_plate_named_by_geometry_wins_over_a_stale_one(stage, frame, tmp_path):
@@ -175,14 +176,14 @@ def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
     stage.draw(frame)
 
     legend = next(
-        rect for rect, edge, _p in stage.hitboxes
-        if edge == frame.choices[0].edge_id and rect.h == 9 and rect.x == 4
+        rect for rect, action in stage.hitboxes
+        if action.edge_id == frame.choices[0].edge_id and rect.h == 9 and rect.x == 4
     )
     click = ((legend.x + 1) * SCALE, (legend.y + 1) * SCALE)
 
     # Both the region and the legend row cover this pixel; the legend is on top.
     assert wide.x == 0.0 and wide.y == 0.0  # the region really does cover it
-    assert stage.hit(click) == (frame.choices[0].edge_id, frame.choices[0].payload)
+    assert stage.hit(click) == Commit(edge_id=frame.choices[0].edge_id, payload={})
 
 
 def test_a_long_footer_pages_instead_of_covering_the_map(stage, frame):
@@ -200,7 +201,7 @@ def test_a_long_footer_pages_instead_of_covering_the_map(stage, frame):
     assert stage.max_scroll > 0
     footer_top = LOGICAL_SIZE[1] - MAP_FOOTER_ROWS * ROW_H - 2
     assert footer_top > LOGICAL_SIZE[1] // 2, "footer must not take half the plate"
-    assert all(rect.y >= footer_top for rect, _e, _p in stage.hitboxes)
+    assert all(rect.y >= footer_top for rect, _action in stage.hitboxes)
 
 
 def test_paging_a_long_footer_reaches_the_earlier_rows(stage, frame):
@@ -210,11 +211,11 @@ def test_paging_a_long_footer_reaches_the_earlier_rows(stage, frame):
         Choice(edge_id=uuid4(), text=f"Choice {n}") for n in range(12)
     ]
     stage.draw(frame)
-    bottom = {edge for _r, edge, _p in stage.hitboxes}
+    bottom = {a.edge_id for _r, a in stage.hitboxes}
 
     stage.scroll_by(-stage.max_scroll)
     stage.draw(frame)
-    top = {edge for _r, edge, _p in stage.hitboxes}
+    top = {a.edge_id for _r, a in stage.hitboxes}
 
     assert top != bottom
     assert frame.choices[0].edge_id in top

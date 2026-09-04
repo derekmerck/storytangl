@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from tangl.journal.intent import Accepts
 from tangl.service.response import JsonValue
 
 
@@ -59,6 +60,39 @@ class Choice:
     """Client-visible ``ui:`` tags. A choice claiming ``ui:plate:<plate>:<region>``
     is the one a hitbox on that region commits."""
 
+    accepts: Accepts | None = None
+    """What this choice wants before it can be committed. ``None`` and
+    ``kind="pick"`` both mean the edge id is the whole answer; every other kind
+    needs a value collected first (widget vocabulary §6.1.1)."""
+
+
+@dataclass(slots=True, frozen=True)
+class Piece:
+    """One identified game piece a choice may ask the player to select.
+
+    ``piece_id`` is the world-facing handle a ``pieces`` payload names; the
+    fragment ``uid`` is journal identity and stays out of the commit.
+    """
+
+    piece_id: str
+    kind: str
+    text: str
+    label: str | None = None
+    zone_ref: UUID | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class Zone:
+    """A container fragment pieces belong to.
+
+    An empty zone is still worth drawing: a targetable zone with nothing in it
+    is information, not an absence.
+    """
+
+    uid: UUID
+    role: str | None = None
+    label: str | None = None
+
 
 @dataclass(slots=True, frozen=True)
 class MapRegion:
@@ -92,12 +126,75 @@ class MapPlate:
 
 @dataclass(slots=True)
 class Turn:
-    """One step's worth of images, lines, and choices."""
+    """One step's worth of images, lines, pieces, and choices."""
 
     step: int
     images: list[StageImage] = field(default_factory=list)
     lines: list[Line] = field(default_factory=list)
     choices: list[Choice] = field(default_factory=list)
+    pieces: list[Piece] = field(default_factory=list)
+    zones: list[Zone] = field(default_factory=list)
     plate: MapPlate | None = None
     """Set from story-info rather than from fragments: geometry is disclosed
     state, not part of the turn's content."""
+
+
+# ── input actions ────────────────────────────────────────────────────────────
+#
+# A click or key resolves to one of these rather than straight to a commit. A
+# typed choice needs a value collected before it can go on the wire, and that
+# collection is client-local: only ``Commit`` ever reaches the service, and it
+# carries exactly what the CLI would send for the same choice (Input Parity,
+# widget vocabulary §5.3).
+
+
+@dataclass(slots=True, frozen=True)
+class Commit:
+    """Resolve a choice. The only action that reaches the service."""
+
+    edge_id: UUID
+    payload: JsonValue
+
+
+@dataclass(slots=True, frozen=True)
+class BeginSelection:
+    """Start collecting values for a typed choice. Client-local."""
+
+    choice: "Choice"
+
+
+@dataclass(slots=True, frozen=True)
+class PickPiece:
+    """Add one piece to the pending selection. Client-local."""
+
+    piece_id: str
+
+
+@dataclass(slots=True, frozen=True)
+class CancelSelection:
+    """Abandon the pending selection. Client-local.
+
+    Reachable by click as well as by key: a selection a mouse can enter but only
+    a keyboard can leave is not a usable surface.
+    """
+
+
+Action = Commit | BeginSelection | PickPiece | CancelSelection
+
+
+@dataclass(slots=True)
+class PendingSelection:
+    """A typed choice waiting for the values it needs before it can commit."""
+
+    choice: Choice
+    picked: list[str] = field(default_factory=list)
+
+    @property
+    def wanted(self) -> int:
+        """How many pieces this choice still needs at minimum."""
+
+        return max(self.choice.accepts.min - len(self.picked), 0)
+
+    @property
+    def full(self) -> bool:
+        return len(self.picked) >= self.choice.accepts.max
