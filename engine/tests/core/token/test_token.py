@@ -13,6 +13,7 @@ from tangl.core.graph import Graph, GraphItem, HierarchicalNode, Node
 from tangl.core.selector import Selector
 from tangl.core.singleton import Singleton
 from tangl.core.token import Token, TokenCatalog
+from tangl.story.concepts.asset.transaction import AssetTransactionResult
 
 from ..conftest import ArmorType, NPCType, WeaponType
 
@@ -117,9 +118,11 @@ class TestTokenDelegation:
 
     def test_write_instance_var(self) -> None:
         WeaponType(label="sword", damage="1d6")
-        token = Token[WeaponType](token_from="sword", label="Glamdring", sharpness=2.0)
+        token = Token[WeaponType](token_from="sword", label="Glamdring")
+        assert "sharpness" not in token.model_fields_set
         token.sharpness = 0.5
         assert token.sharpness == 0.5
+        assert "sharpness" in token.model_fields_set
 
     def test_write_delegated_field_raises(self) -> None:
         WeaponType(label="sword", damage="1d6")
@@ -243,6 +246,24 @@ class TestTokenKindMatching:
 
 
 class TestTokenGraphIntegration:
+    def test_mutated_implicit_state_survives_asset_preflight_validation(self) -> None:
+        class MutableType(Singleton):
+            state: dict[str, int] = Field(
+                default_factory=lambda: {"charge": 3},
+                json_schema_extra={"instance_var": True},
+            )
+
+        MutableType(label="lamp")
+        token = Token[MutableType](token_from="lamp", label="brass lamp")
+
+        assert "state" not in token.model_fields_set
+        token.state["charge"] = 2
+
+        result = AssetTransactionResult(accepted=True, asset=token)
+
+        assert result.asset is token
+        assert result.asset.state == {"charge": 2}
+
     def test_scoped_referent_replaces_implicit_global_defaults(self) -> None:
         class ScopedType(Singleton):
             catalog_id: str = Field(json_schema_extra={"is_identifier": True})

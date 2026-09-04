@@ -115,7 +115,6 @@ class Token(Node, Generic[WST]):
 
     _registry: Any = PrivateAttr(None)
     _hydrated_referent: Singleton | None = PrivateAttr(default=None)
-    _implicit_instance_fields: set[str] = PrivateAttr(default_factory=set)
 
     token_from: str = Field(...)
 
@@ -151,30 +150,13 @@ class Token(Node, Generic[WST]):
                 continue
             # If this is a collection or object pointer, we don't want to accidentally
             # mutate the frozen reference's reference data, so initialize with a copy.
-            setattr(self, field_name, deepcopy(getattr(referent, field_name)))
-            self._implicit_instance_field_names().add(field_name)
+            self.__dict__[field_name] = deepcopy(getattr(referent, field_name))
         assert self.__pydantic_private__ is not None
         self.__pydantic_private__["_hydrated_referent"] = referent
 
     def _hydrated_referent_value(self) -> WST | None:
         """Return the referent that supplied the current implicit defaults."""
         return (self.__pydantic_private__ or {}).get("_hydrated_referent")
-
-    def _implicit_instance_field_names(self) -> set[str]:
-        """Return the private marker set for hydrated instance defaults."""
-        assert self.__pydantic_private__ is not None
-        return self.__pydantic_private__.setdefault("_implicit_instance_fields", set())
-
-    @property
-    def model_fields_set(self) -> set[str]:
-        """Expose authored fields without treating hydrated defaults as explicit."""
-        return self.__pydantic_fields_set__ - self._implicit_instance_field_names()
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Treat ordinary token-local assignment as an explicit override."""
-        super().__setattr__(name, value)
-        if name in self._instance_vars(self.wrapped_cls):
-            self._implicit_instance_field_names().discard(name)
 
     def _resolve_reference(self, registry: Graph | None) -> WST:
         """Resolve against a proposed graph scope before binding it."""
