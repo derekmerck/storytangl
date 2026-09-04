@@ -10,6 +10,7 @@ from __future__ import annotations
 from base64 import b64encode
 from collections.abc import Mapping
 from enum import Enum
+from pathlib import Path
 from typing import Any, Literal, Self
 from uuid import UUID
 
@@ -350,8 +351,21 @@ class MediaFragment(ContentFragment, extra="allow"):
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:
+        """Serialize content by format, never by falling back to ``repr``.
+
+        A graph-owned :class:`MediaRIT` has no JSON encoder, so the bare
+        ``str(content)`` below rendered its whole repr -- which reached text
+        clients as narrative prose. Clients dereference media through
+        ``rit_id`` and the service media path, so the serialized form only
+        needs to name the resource. Persistence is unaffected either way:
+        :meth:`unstructure` drops ``content`` for RIT media entirely and
+        :meth:`structure` rebinds it from the owning graph.
+        """
+
         if self.content_format == "data" and isinstance(content, bytes):
             return b64encode(content).decode("utf-8")
+        if self.content_format == "rit" and isinstance(content, MediaRIT):
+            return _rit_display_name(content)
         return str(content)
 
 
@@ -392,6 +406,16 @@ _FRAGMENT_DTO_TYPES: dict[str, type[BaseFragment]] = {
     "piece": PieceFragment,
     "update": ControlFragment,
 }
+
+
+def _rit_display_name(rit: MediaRIT) -> str:
+    """Human-readable name for a media resource, for text-floor clients."""
+
+    if rit.label and rit.label.strip():
+        return rit.label.strip()
+    if rit.path is not None:
+        return Path(rit.path).name
+    return str(rit.uid)
 
 
 def fragment_to_dto(

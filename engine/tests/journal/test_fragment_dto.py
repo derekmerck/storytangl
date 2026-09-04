@@ -6,6 +6,7 @@ unknown-fragment fallback, and discriminator validation.
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,10 +17,12 @@ from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
     ContentFragment,
+    MediaFragment,
     PieceFragment,
     fragment_from_dto,
     fragment_to_dto,
 )
+from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.journal.intent import Blocker, CostPreview, UIHints
 
 
@@ -171,3 +174,64 @@ def test_typed_content_fragment_rejects_extension_discriminator() -> None:
         ContentFragment(fragment_type="custom_card", content="Use BaseFragment instead")
 
     assert "content" in str(exc_info.value)
+
+
+def _rit_fragment(**rit_kwargs: object) -> tuple[MediaRIT, MediaFragment]:
+    rit = MediaRIT(**rit_kwargs)
+    return rit, MediaFragment(
+        content=rit, content_format="rit", media_role="narrative_im"
+    )
+
+
+def test_media_rit_dto_names_the_resource_instead_of_dumping_it() -> None:
+    """Regression: ``model_dump(mode="json")`` has no encoder for a MediaRIT and
+    falls back to its repr, which reached text clients as narrative prose."""
+
+    rit, fragment = _rit_fragment(
+        label="quai_bg.png", path=Path("/w/media/images/quai_bg.png")
+    )
+
+    payload = fragment_to_dto(fragment)
+
+    assert payload["content"] == "quai_bg.png"
+    assert payload["rit_id"] == str(rit.uid)
+    assert "preset_content_hash" not in payload["content"]
+    assert "MediaRITStatus" not in payload["content"]
+
+
+def test_media_rit_dto_round_trips() -> None:
+    _, fragment = _rit_fragment(
+        label="clerk_sprite.png", path=Path("/w/media/images/clerk_sprite.png")
+    )
+
+    restored = fragment_from_dto(fragment_to_dto(fragment))
+
+    assert isinstance(restored, MediaFragment)
+    assert restored.content == "clerk_sprite.png"
+    assert restored.media_role == "narrative_im"
+
+
+def test_media_rit_dto_falls_back_to_the_path_name() -> None:
+    _, fragment = _rit_fragment(path=Path("/w/media/images/salon_bg.png"))
+
+    assert fragment_to_dto(fragment)["content"] == "salon_bg.png"
+
+
+def test_non_rit_media_content_is_left_alone() -> None:
+    fragment = MediaFragment(content="cover.png", content_format="url")
+
+    assert fragment_to_dto(fragment)["content"] == "cover.png"
+
+
+def test_media_rit_persistence_still_drops_content() -> None:
+    """The DTO names the resource; ``unstructure`` still stores only the id,
+    because ``structure`` rebinds the RIT from the owning graph."""
+
+    rit, fragment = _rit_fragment(
+        label="quai_bg.png", path=Path("/w/media/images/quai_bg.png")
+    )
+
+    data = fragment.unstructure()
+
+    assert "content" not in data
+    assert data["rit_id"] == rit.uid
