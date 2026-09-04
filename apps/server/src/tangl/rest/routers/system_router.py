@@ -42,13 +42,10 @@ async def get_key_for_secret(
 ) -> UserSecret:
     """Derive the API key transport form of a recovery codename.
 
-    ``secret`` is required. This endpoint only encodes a codename the caller
-    already holds; it never mints one. Minting belongs to ``POST /user/create``
-    with no secret, which rerolls while a codename is occupied and persists the
-    resulting user. A public endpoint that minted without that occupancy check
-    would hand out working keys for codenames already in use -- codenames are
-    low-entropy bearer capabilities, so the derived key is the whole credential
-    (issue #352).
+    ``secret`` is required: this endpoint encodes a codename the caller already
+    holds and never generates one. Generating a codename belongs to
+    ``POST /user/create`` with no secret, which rerolls while one is occupied
+    and persists the resulting user (issue #352).
     """
 
     _ = render_profile
