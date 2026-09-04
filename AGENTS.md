@@ -236,6 +236,21 @@ full type map and rationale.**
 - Prefer one continuous implementation task and one design/planning task in a
   shared checkout. Do not require a new thread, branch, worktree, or contract
   artifact for every implementation phase.
+- Implementation owns execution against an approved contract; design/planning
+  owns newly discovered architectural decisions. A higher-layer bug may justify
+  a lower-layer repair only when it exposes a violated lower-layer invariant,
+  not merely because teaching the lower layer about the consumer is convenient.
+- Pause implementation for a design checkpoint when a change unexpectedly
+  alters a foundational contract in Core, persistence, VM, or Service. Triggers
+  include identity or authority, ownership or binding, persistence shape or
+  restoration order, phase timing or repeatability, fallback behavior, or a new
+  validation/serialization interception. Crossing three or more layers or
+  needing hidden state to finish a "small" fix is also a pause signal.
+- Keep the escalation lightweight: report the failing behavior, the assumption
+  that proved false, the smallest reproduction, the implicated contracts, and
+  plausible boundaries. Stop before selecting a new architecture. Once the
+  design is settled, return a bounded contract and validation target to
+  implementation.
 - For substantial changes, briefly identify the capability, canonical
   chokepoint, affected surfaces, and validation before editing. Update the
   nearest durable design note when the architectural contract changes.

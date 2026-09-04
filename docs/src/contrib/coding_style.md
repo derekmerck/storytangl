@@ -190,6 +190,28 @@ Avoid taste-only churn. If a change only makes code look nicer but does not
 improve correctness, conceptual fit, maintainability, or learnability, defer
 it.
 
+### Foundational-layer escalation
+
+Implementation should proceed directly while it is executing a settled
+contract. Pause for a design checkpoint when a higher-layer repair unexpectedly
+requires a new decision about Core, persistence, VM, or Service semantics. A
+mechanics or application bug can reveal a genuine lower-layer defect, but the
+repair belongs below only when it restores a lower-layer invariant; lower layers
+should not learn a consumer's workflow merely to make its failure disappear.
+
+Pause when the work changes identity or authority, ownership or binding,
+persistence shape or restoration order, phase timing or repeatability, fallback
+behavior, or validation/serialization lifecycle. Treat a change spanning three
+or more layers, or a small fix that requires hidden bookkeeping, as the same
+kind of signal. This is a review boundary, not a prohibition on foundational
+work.
+
+An escalation needs only the concrete failure, the assumption that proved
+false, the smallest reproduction, the affected contracts, and the plausible
+ownership boundaries. Implementation should stop before choosing a new
+architecture. After that decision is made, resume with a bounded contract and
+explicit cross-layer regression.
+
 ## 16) Dereferencing & Resolution Patterns
 
 StoryTangl maintains strict separation between identity (UUIDs) and references (resolved objects). This enables serialization, event sourcing, and watched access patterns.
