@@ -1,9 +1,21 @@
-# StoryTangl
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"
+            srcset=".github/assets/README-banner-dark.png">
+    <img src=".github/assets/README-banner.png"
+         alt="StoryTangl - a research platform for graph-based computational narratology"
+         width="860">
+  </picture>
+</p>
 
-**A research platform for graph-based computational narratology.**
+<p align="center">
+  <a href="https://github.com/derekmerck/storytangl/actions/workflows/ci.yml"><img
+     src="https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://storytangl.readthedocs.io/en/latest/"><img
+     src="https://app.readthedocs.org/projects/storytangl/badge/?version=latest" alt="docs"></a>
+</p>
 
-[![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml)
-[![docs](https://app.readthedocs.org/projects/storytangl/badge/?version=latest)](https://storytangl.readthedocs.io/en/latest/)
+# StoryTan⅁l
 
 StoryTangl models interactive narrative as a graph of interdependent
 possibilities that collapses into a specific story through traversal. Authors
@@ -15,6 +27,68 @@ narrative journal.
 The name started as a backronym for *the Abstract Narrative Graph Library*. It
 stuck because the engine's real job is **untangling**: extracting a coherent
 story thread from a combinatorial web of requirements and consequences.
+
+---
+
+## See It Run
+
+```bash
+git clone https://github.com/derekmerck/storytangl.git
+cd storytangl
+poetry install
+poetry run tangl-cli
+```
+
+Inside the shell, `create_user <secret>` registers a local player. Then pick a
+world and start making choices:
+
+<p align="center">
+  <img src=".github/assets/cli-session.png"
+       alt="A StoryTangl CLI session: starting the coronate_the_regent world, provoking a dragon, and being offered a dragonslayer sword"
+       width="620">
+</p>
+
+That warning to the dragon is not flavour text. It grants the player an
+`irritated_dragon` condition, and a later scene tests for it and compels a
+confrontation the story otherwise skips -- while the merchant's sword, offered
+one beat earlier, is the hedge against exactly that. The choice and its payoff
+are never wired directly to each other; the consequence travels as state.
+
+### The same story, wearing something else
+
+A different world, `repartee_loop`, at the same opening beat -- rendered twice
+through the pygame port:
+
+<p align="center">
+  <img src=".github/assets/repartee-quay.png"
+       alt="The repartee_loop opening beat in the quayside art pack: a clerk reading papers on a harbour dock at golden hour"
+       width="49%">
+  <img src=".github/assets/repartee-spaceport.png"
+       alt="The same beat in the spaceport art pack: a service robot on a night dock under a moon"
+       width="49%">
+</p>
+
+The prose is identical. The choice is identical. The graph, the script, the
+staging hints and the client are all untouched. One line of `world.yaml`
+selects the pack:
+
+```yaml
+media_dir: media_spaceport   # default: media
+```
+
+Structure and presentation are separate objects here, so a reskin is a
+different *reading* of one story rather than a second story.
+
+### Many stories, many skins, many realizations
+
+Eighteen reference worlds ship in [`worlds/`](worlds/), from a blackjack
+parlour to a hall-monitor credential check. Each renders through whichever
+surface is asked for -- a text floor, a pixel-art stage, a REST service, a web
+client, a Ren'Py export -- from the same fragment stream, and each accepts
+whatever art pack it is pointed at. See
+[Run The Reference Apps](#run-the-reference-apps), and
+[`worlds/repartee_loop/`](worlds/repartee_loop/) for how a pack is built and
+captured.
 
 ---
 

@@ -73,6 +73,29 @@ Nothing else changes — not the script, not the staging hints, not any client.
 night spaceport, with the clerk as a service robot and the dockhand as an
 alien stevedore.
 
+### Capturing a pack
+
+[`scripts/capture_world_frames.py`](../../scripts/capture_world_frames.py)
+renders one frame per pack headlessly, so screenshots of a reskin are
+reproducible rather than taken by hand:
+
+```bash
+poetry run python scripts/capture_world_frames.py --advance 1
+```
+
+Two things about that are easy to get wrong, and the script exists because of
+them. The pygame client's `--assets` flag does **not** switch packs: it only
+applies to relative media sources, and the engine hands the client absolute
+paths resolved through this bundle, so every pack renders identically and the
+flag looks broken. The pack is chosen by `media_dir` above, which is a world
+setting, not a client one. And `pygame-ce` lives in the dev group
+(`poetry install --with dev`), since it is a renderer test dependency rather
+than a runtime one.
+
+Advance the same number of turns for every pack. The prose and choices come out
+identical because the graph is identical; only the art differs, which is the
+claim a reskin screenshot is making.
+
 Each pack carries a `manifest.json` whose top-level `size`, `mode`, and
 `sha256` describe the **shipped** file, with the render as generated recorded
 under `conformed_from`. A test asserts the manifest matches the assets, since
