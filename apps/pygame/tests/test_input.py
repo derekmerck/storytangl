@@ -23,6 +23,7 @@ from tangl.journal.intent import (  # noqa: E402
     TextAccepts,
 )
 from tangl.pygame_client.models import (  # noqa: E402
+    CancelSelection,
     Choice,
     Line,
     PendingSelection,
@@ -366,7 +367,47 @@ def test_a_long_candidate_list_pages_and_the_numbers_follow(
     # Page once, then take the first row of page two.
     _run([_key(pygame.K_1), _key(pygame.K_9), _key(pygame.K_1)])
 
-    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc8"]})]
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc7"]})]
+
+
+def test_the_last_candidate_on_a_page_is_reachable_by_key(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """The bottom row of a full page must not collide with a control key.
+
+    Drawing eight candidates while reserving 8 for Confirm made the last row
+    clickable but unreachable by keyboard -- and once the minimum was met, that
+    key committed instead of picking the row under it.
+    """
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=1, max=1), count=20)
+
+    _run([_key(pygame.K_1), _key(pygame.K_7)])
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc6"]})]
+
+    committed.clear()
+    _run([_key(pygame.K_1), _key(pygame.K_9), _key(pygame.K_7)])
+
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc13"]})]
+
+
+def test_paging_keeps_cycling_past_the_first_wrap(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """Repeated paging returns to page one and keeps going.
+
+    The label wrapped with modulo while the slice clamped separately, so twenty
+    candidates walked 0, 7, 14 and then stuck on the first page while the label
+    carried on counting.
+    """
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=1, max=1), count=20)
+    page = [_key(pygame.K_9)]
+
+    # Three pages, so four advances wrap back onto page two.
+    _run([_key(pygame.K_1), *page * 4, _key(pygame.K_1)])
+
+    assert committed == [(choice.edge_id, {"piece_ids": ["0:doc7"]})]
 
 
 def test_advance_refuses_a_choice_it_cannot_supply_a_value_for(
@@ -384,3 +425,72 @@ def test_advance_refuses_a_choice_it_cannot_supply_a_value_for(
 
     assert "--advance stopped" in message
     assert "Inspect a document" in message
+
+
+def test_the_cancel_row_stays_on_the_surface_below_the_minimum(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """The hint row is drawn whether or not the minimum is met, so it is reserved.
+
+    Counting Confirm only when satisfied left the unsatisfied layout one row
+    short, pushing Cancel to y=196 where it clipped off the bottom.
+    """
+
+    pygame.init()
+    from tangl.pygame_client.stage import LOGICAL_SIZE, Stage
+
+    choice = _packet_frame(monkeypatch, PiecesAccepts(min=2, max=2), count=7)
+    frame = client._merge([])
+    stage = Stage()
+
+    for picked in ([], ["0:doc0"], ["0:doc0", "0:doc1"]):
+        stage.hitboxes.clear()
+        pending = PendingSelection(choice=choice, picked=list(picked))
+        stage.draw(frame, pending)
+        cancels = [
+            rect
+            for rect, action in stage.hitboxes
+            if isinstance(action, CancelSelection)
+        ]
+        assert cancels, f"cancel must be actionable with {len(picked)} picked"
+        assert cancels[0].bottom <= LOGICAL_SIZE[1], (
+            f"cancel clipped off the surface with {len(picked)} picked"
+        )
+    pygame.quit()
+
+
+def test_every_panel_page_is_reachable_from_the_keyboard(
+    monkeypatch: pytest.MonkeyPatch, committed: list[tuple[UUID, JsonValue | None]]
+) -> None:
+    """The panel advertises a tab binding; it has to actually be bound.
+
+    `PagePanel` was emitted only by the pager hitbox, so the state a mouse could
+    reach was unreachable by keyboard.
+    """
+
+    frame = Turn(
+        step=1,
+        choices=[Choice(edge_id=uuid4(), text="wait")],
+        zones=[Zone(uid=ZONE, role="packet")],
+        pieces=[
+            Piece(piece_id=f"0:doc{n}", kind="id_card", text="x",
+                  label=f"a rather long document name {n}", zone_ref=ZONE)
+            for n in range(10)
+        ],
+    )
+    monkeypatch.setattr(client, "_merge", lambda _turns: frame)
+    monkeypatch.setattr(client, "_turns", lambda _bridge, _envelope: [frame])
+
+    seen: list[int] = []
+    original = client.Stage.draw
+
+    def record(self, turn, pending=None):
+        seen.append(self.panel_scroll)
+        return original(self, turn, pending)
+
+    monkeypatch.setattr(client.Stage, "draw", record)
+
+    _run([_key(pygame.K_TAB), _key(pygame.K_TAB)])
+
+    assert seen[-1] > seen[0], "tab must advance the panel page"
+    assert committed == [], "paging the panel commits nothing"

@@ -66,11 +66,13 @@ so `8. Confirm` appears once the minimum is met — which is also the only way a
 `min=0` choice can be submitted empty. Below the minimum the row reads
 `Pick N more` and does nothing.
 
-**Long lists page.** Eight candidates at a time, `9. More (2/3)` to advance.
-Numbering restarts per page, so the number a player reads is the key they press
-wherever they are in the list. Twenty documents laid out at once put their first
-rows above the top of the surface, where they were neither readable nor
-clickable.
+**Long lists page.** Seven candidates at a time, `9. More (2/3)` to advance,
+wrapping back to the first page. Numbering restarts per page, so the number a
+player reads is the key they press wherever they are in the list.
+
+Seven rather than eight because the controls are drawn from the same keypad the
+candidates are — `8` confirms, `9` pages, `0` cancels — and an eighth candidate
+would be clickable but unreachable by key.
 
 **Which pieces are offered comes from the choice, not the renderer.** A
 `pieces` choice constrained to `target_zone_ref` is satisfiable only by pieces in
@@ -78,8 +80,10 @@ that zone, so `selectable_pieces` reads the constraint and the candidate — a
 piece too, but outside the packet — never appears. That is §5.1 again: the
 player is only offered what the backend will actually accept.
 
-**The finished payload is byte-identical to the CLI's.** `commit_payload` mirrors
-the CLI's `_choice_payload` case for case. Its validation is advisory — the
+**The finished payload follows §6.1.1's table**, so a hotspot and a numbered key
+commit the same thing. It is not byte-identical to the CLI in every case: the CLI
+discards an authored activation payload and this port preserves it, which is a gap
+on that side rather than a divergence to copy. Validation here is advisory — the
 backend re-checks and is authoritative (§6.1.2) — and refusing early only keeps a
 doomed commit off the wire.
 
@@ -125,9 +129,9 @@ after committing it.
 
 **An over-full panel pages.** At 320x200 a nine-choice turn leaves the panel
 about eight rows, and a full packet plus findings exceeds that. It paginates and
-shows `page 1/2`, clickable as well as keyed. An earlier draft drew an overflow
-notice instead: that told the player state was hidden without giving them any way
-to read it, which is not what §5.1 asks for.
+shows `page 1/2 tab`; `tab` advances it and the label is a hitbox too. An earlier
+draft drew an overflow notice instead, which told the player state was hidden
+without giving them any way to read it — not what §5.1 asks for.
 
 ## The Map View
 

@@ -85,13 +85,17 @@ class UnsupportedAccepts(ValueError):
     """
 
 
-def commit_payload(choice: Choice, values: Sequence[str] = ()) -> dict[str, Any]:
+def commit_payload(choice: Choice, values: Sequence[str] = ()) -> JsonValue:
     """Build the wire payload for ``choice``, keyed by ``accepts.kind``.
 
-    Mirrors :meth:`tangl.cli.controllers.story_controller.StoryController.
-    _choice_payload`; both ports must produce byte-identical payloads for the
-    same choice, which is the substance of the Input Parity rule (widget
-    vocabulary §5.3, payload table §6.1.1).
+    Follows the payload table at widget vocabulary §6.1.1, so a hotspot and a
+    numbered key commit the same thing and this port stays within the Input
+    Parity rule (§5.3). It is not byte-identical to the CLI in every case: the
+    CLI discards an authored activation payload and this port preserves it,
+    which is a gap on that side rather than a divergence to copy.
+
+    The return is not always a mapping -- a ``pick`` forwards a non-mapping
+    activation payload verbatim -- so the type is the wire's, not a dict.
 
     Validation here is advisory. The backend re-checks and is authoritative
     (§6.1.2); refusing early only keeps a doomed commit off the wire.

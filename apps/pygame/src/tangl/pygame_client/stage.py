@@ -115,12 +115,21 @@ def unsupported_reason(choice: Choice) -> str | None:
     return f"needs {getattr(choice.accepts, 'kind', 'unknown')} input"
 
 
-SELECTION_ROWS = 8
+SELECTION_ROWS = 7
 """Candidates shown at once before the list pages.
+
+Seven, not eight, because the control keys are drawn from the same numeric
+keypad the candidates are: ``8`` confirms, ``9`` pages, ``0`` cancels. An eighth
+candidate would be clickable but unreachable by key -- and once the minimum was
+met, ``8`` would commit instead of picking the row the player is looking at.
 
 A twenty-document packet would otherwise lay its first rows above the top of the
 surface, where they are neither readable nor clickable.
 """
+
+CONFIRM_KEY = 8
+PAGE_KEY = 9
+CANCEL_KEY = 0
 
 MAP_FOOTER_ROWS = 8
 """Rows the map footer may occupy before it scrolls. A map drawn under a
@@ -589,7 +598,7 @@ class Stage:
             y += ROW_H
 
         if pages > 1:
-            label = f"page {page + 1}/{pages}  \u21e5"
+            label = f"page {page + 1}/{pages}  tab"
             surface = self.font.render(label, False, ALERT)
             rect = pygame.Rect(left + 4, bottom - ROW_H, surface.get_width(), ROW_H)
             self.surface.blit(surface, rect.topleft)
@@ -604,10 +613,20 @@ class Stage:
         """
 
         candidates = remaining_pieces(turn, pending)
-        start = self.selection_scroll * SELECTION_ROWS
-        if start >= len(candidates):
-            start = 0
+        start = self.selection_index(turn, pending) * SELECTION_ROWS
         return candidates[start : start + SELECTION_ROWS]
+
+    def selection_index(self, turn: Turn, pending: PendingSelection) -> int:
+        """The normalized page number, wrapping cleanly on repeated paging.
+
+        The slice and the label must agree. Wrapping the label with modulo while
+        clamping the slice separately made repeated paging over twenty
+        candidates walk 0, 8, 16 and then stick at 0 while the label kept
+        counting -- and the set shrinks as pieces are picked, so the page count
+        moves under the reader.
+        """
+
+        return self.selection_scroll % self.selection_pages(turn, pending)
 
     def selection_pages(self, turn: Turn, pending: PendingSelection) -> int:
         candidates = remaining_pieces(turn, pending)
@@ -616,9 +635,10 @@ class Stage:
     def _selection_rows(self, turn: Turn, pending: PendingSelection) -> int:
         """How many rows the selection surface needs, paging included."""
 
-        extra = 1  # cancel
-        if pending.satisfied:
-            extra += 1
+        # Cancel, plus the confirm-or-hint row that is drawn either way. Counting
+        # confirm only when satisfied pushed Cancel off the bottom of the surface
+        # for an unsatisfied selection.
+        extra = 2
         if self.selection_pages(turn, pending) > 1:
             extra += 1
         return len(self.selection_page(turn, pending)) + extra
@@ -639,8 +659,14 @@ class Stage:
 
         pages = self.selection_pages(turn, pending)
         if pages > 1:
-            page = (self.selection_scroll % pages) + 1
-            self._row(9, f"More ({page}/{pages})", y=y, colour=CREAM, action=PageSelection())
+            page = self.selection_index(turn, pending) + 1
+            self._row(
+                PAGE_KEY,
+                f"More ({page}/{pages})",
+                y=y,
+                colour=CREAM,
+                action=PageSelection(),
+            )
             y += 11
 
         if pending.satisfied:
@@ -649,18 +675,24 @@ class Stage:
             # keyboard can finish is not a usable surface.
             picked = len(pending.picked)
             self._row(
-                8,
+                CONFIRM_KEY,
                 f"Confirm ({picked} selected)",
                 y=y,
                 colour=CREAM,
                 action=ConfirmSelection(),
             )
             y += 11
-        elif pending.wanted:
-            self._row(8, f"Pick {pending.wanted} more", y=y, colour=DIM, action=None)
+        else:
+            self._row(
+                CONFIRM_KEY,
+                f"Pick {pending.wanted} more",
+                y=y,
+                colour=DIM,
+                action=None,
+            )
             y += 11
 
-        self._row(0, "Cancel", y=y, colour=DIM, action=CancelSelection())
+        self._row(CANCEL_KEY, "Cancel", y=y, colour=DIM, action=CancelSelection())
 
     def hit(self, position: tuple[int, int]) -> Action | None:
         """Map a window click to the action its row performs."""

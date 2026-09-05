@@ -44,7 +44,15 @@ from .models import (
     Turn,
     Zone,
 )
-from .stage import BACKGROUND_ROLES, MAP_ROLES, Stage, choice_action
+from .stage import (
+    BACKGROUND_ROLES,
+    CANCEL_KEY,
+    CONFIRM_KEY,
+    MAP_ROLES,
+    PAGE_KEY,
+    Stage,
+    choice_action,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -129,11 +137,13 @@ def _keyed(
     """
 
     if pending is not None:
-        if number == 0:
+        # The control bindings are the ones the renderer draws, so a candidate
+        # can never share a number with Confirm or More.
+        if number == CANCEL_KEY:
             return CancelSelection()
-        if number == 8:
+        if number == CONFIRM_KEY:
             return ConfirmSelection() if pending.satisfied else None
-        if number == 9:
+        if number == PAGE_KEY:
             return PageSelection() if stage.selection_pages(frame, pending) > 1 else None
         page = stage.selection_page(frame, pending)
         if number <= len(page):
@@ -257,6 +267,8 @@ def main(argv: list[str] | None = None) -> int:
                         stage.draw(frame)
                     else:
                         running = False
+                elif event.key == pygame.K_TAB:
+                    action = PagePanel()
                 elif event.key in (pygame.K_UP, pygame.K_PAGEUP):
                     stage.scroll_by(-1 if event.key == pygame.K_UP else -4)
                     stage.draw(frame, pending)
