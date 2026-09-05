@@ -216,7 +216,7 @@ class TestComfyStoryLifecycle:
         )
 
         assert payload is not None
-        assert payload["content_format"] == "rit"
+        assert payload["content_format"] == "url"
         assert payload["scope"] == "story"
         assert payload["url"].startswith(f"/media/story/{story.story_id}/hero_portrait-")
         assert payload["url"].endswith(".png")
@@ -287,7 +287,7 @@ class TestComfyStoryLifecycle:
         )
 
         assert payload is not None
-        assert payload["content_format"] == "rit"
+        assert payload["content_format"] == "url"
         assert payload["scope"] == "story"
         assert payload["url"].startswith(f"/media/story/{story.story_id}/hero_portrait-")
         assert payload["url"].endswith(".png")

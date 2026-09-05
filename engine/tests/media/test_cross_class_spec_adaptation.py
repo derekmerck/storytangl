@@ -211,6 +211,6 @@ def test_cross_class_adaptation_provisions_and_reuses_story_svg(
     )
 
     assert payload is not None
-    assert payload["content_format"] == "rit"
+    assert payload["content_format"] == "url"
     assert payload["scope"] == "story"
     assert payload["url"].endswith(".svg")

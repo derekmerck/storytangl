@@ -102,19 +102,23 @@ def test_choice_forwards_the_activation_payload(bridge: PygameSessionBridge) -> 
     assert turns[0].choices[0].payload == {"move": "taunt"}
 
 
-# ``src``/``ref`` are also accepted, for parity with the Ren'Py bridge, but
-# ``tangl.service.media`` only ever emits ``path``, ``url``, or ``data``.
 @pytest.mark.parametrize("key", ["path", "url"])
-def test_media_sources_are_read_from_service_payload_keys(
+def test_media_sources_are_read_from_the_declared_format(
     monkeypatch: pytest.MonkeyPatch, bridge: PygameSessionBridge, key: str
 ) -> None:
-    """Service payloads name media by ``path``/``url``, never ``content``."""
+    """``content_format`` names the key its source lives under.
+
+    This was a four-key probe while the service could hand back a dereferenced
+    payload still labelled ``"rit"``. Now every profile declares what it carries,
+    so the declaration is the lookup rather than a guess.
+    """
 
     monkeypatch.setattr(
         "tangl.pygame_client.bridge.media_fragment_to_payload",
         lambda fragment, **_: {
             "fragment_type": "media",
             "media_role": "narrative_im",
+            "content_format": key,
             key: "/assets/bg_quay.png",
         },
     )
