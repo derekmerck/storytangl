@@ -230,8 +230,11 @@ def main(argv: list[str] | None = None) -> int:
             blocked = [
                 choice.text
                 for choice in frame.choices
-                if choice.available and choice_action(choice) is None
-                or isinstance(choice_action(choice), BeginSelection)
+                if choice.available
+                and (
+                    choice_action(choice) is None
+                    or isinstance(choice_action(choice), BeginSelection)
+                )
             ]
             if blocked:
                 print(

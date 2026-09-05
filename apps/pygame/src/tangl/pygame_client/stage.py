@@ -565,6 +565,27 @@ class Stage:
 
         return rows
 
+    def panel_page(
+        self,
+        rows: list[tuple[str, tuple[int, int, int]]],
+        *,
+        capacity: int,
+    ) -> tuple[int, int, list[tuple[str, tuple[int, int, int]]]]:
+        """Split panel rows into the page currently on screen.
+
+        Returned rather than computed inline so a test can assert what is
+        *visible*, not merely what the panel knows about. Asserting against the
+        full row model passes whether or not paging works at all.
+        """
+
+        if len(rows) <= capacity:
+            return 0, 1, rows
+        capacity -= 1  # the pager occupies the last line
+        capacity = max(capacity, 1)
+        pages = max(1, -(-len(rows) // capacity))
+        page = self.panel_scroll % pages
+        return page, pages, rows[page * capacity : page * capacity + capacity]
+
     def _draw_state_panel(self, turn: Turn, *, top: int, bottom: int) -> None:
         """Draw the pieces, zones and findings a choice may reference.
 
@@ -584,13 +605,7 @@ class Stage:
         rows = self.panel_rows(turn, columns=columns)
         capacity = max(1, (bottom - top - 4) // ROW_H)
 
-        if len(rows) > capacity:
-            capacity -= 1  # reserve the last line for the pager
-            pages = max(1, -(-len(rows) // max(capacity, 1)))
-            page = self.panel_scroll % pages
-            visible = rows[page * capacity : page * capacity + capacity]
-        else:
-            pages, page, visible = 1, 0, rows
+        page, pages, visible = self.panel_page(rows, capacity=capacity)
 
         y = top + 2
         for text, colour in visible:

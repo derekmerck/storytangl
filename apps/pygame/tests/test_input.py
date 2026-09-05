@@ -494,3 +494,33 @@ def test_every_panel_page_is_reachable_from_the_keyboard(
 
     assert seen[-1] > seen[0], "tab must advance the panel page"
     assert committed == [], "paging the panel commits nothing"
+
+
+def test_advance_does_not_blame_an_unavailable_choice(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path
+) -> None:
+    """An unavailable choice is not what stopped `--advance`.
+
+    `A and B or C` binds as `(A and B) or C`, so an unavailable `pieces` choice
+    was reported as needing a value it was never going to be asked for.
+    """
+
+    frame = Turn(
+        step=1,
+        choices=[
+            Choice(
+                edge_id=uuid4(),
+                text="Inspect a document",
+                available=False,
+                unavailable_reason="the counter is closed",
+                accepts=PiecesAccepts(min=1, max=1),
+            )
+        ],
+    )
+    monkeypatch.setattr(client, "_merge", lambda _turns: frame)
+    monkeypatch.setattr(client, "_turns", lambda _bridge, _envelope: [frame])
+
+    client.main(["--world", WORLD, "--advance", "2",
+                 "--screenshot", str(tmp_path / "frame.png")])
+
+    assert "Inspect a document" not in capsys.readouterr().err

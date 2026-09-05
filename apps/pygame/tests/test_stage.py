@@ -237,25 +237,43 @@ def test_overflowing_panel_state_stays_reachable_by_paging(stage) -> None:
 
     An overflow notice told the player something was hidden and gave them no way
     to read it, which does not meet the §5.1 floor this panel exists for.
+
+    Asserted against the *visible* slice: `panel_rows` returns everything the
+    panel knows about regardless of the page, so checking it would pass whether
+    or not paging worked.
     """
 
     crowded = _crowded_turn()
     columns = (PANEL_W - 10) // 4
-    every_row = {text for text, _colour in stage.panel_rows(crowded, columns=columns)}
-    assert len(every_row) > 8, "fixture must actually overflow"
+    rows = stage.panel_rows(crowded, columns=columns)
+    capacity = 8
+    _page, pages, _visible = stage.panel_page(rows, capacity=capacity)
+    assert pages > 1, "fixture must actually overflow"
 
     seen: set[str] = set()
-    for _ in range(8):
-        stage.draw(crowded)
-        rendered = {
-            text
-            for text, _colour in stage.panel_rows(crowded, columns=columns)
-        }
-        seen |= rendered
+    for _ in range(pages):
+        _page, _pages, visible = stage.panel_page(rows, capacity=capacity)
+        assert len(visible) < len(rows), "a page must be a slice, not everything"
+        seen |= {text for text, _colour in visible}
         stage.panel_scroll += 1
 
-    # Every row the panel knows about is reachable across its pages.
-    assert every_row <= seen
+    assert {text for text, _colour in rows} <= seen, "every row must reach a page"
+
+
+def test_panel_paging_wraps_back_to_the_first_page(stage) -> None:
+    crowded = _crowded_turn()
+    rows = stage.panel_rows(crowded, columns=(PANEL_W - 10) // 4)
+    first = stage.panel_page(rows, capacity=8)
+
+    _page, pages, _visible = first
+    stage.panel_scroll += pages
+
+    assert stage.panel_page(rows, capacity=8) == first
+
+
+def test_the_panel_pager_is_reachable_by_click(stage) -> None:
+    stage.draw(_crowded_turn())
+
     assert any(
         isinstance(action, PagePanel) for _rect, action in stage.hitboxes
     ), "paging must be reachable by click, not only by key"
