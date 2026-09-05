@@ -37,9 +37,101 @@ rather than merely intended — see the map view below.
 **Unavailable choices render dimmed with their `unavailable_reason`** rather
 than being hidden (§5.1, Decision Legibility).
 
+## Typed Choices
+
+Most choices are answered by their `edge_id` alone. Some want a value first, and
+`accepts.kind` says which (§6.1). This port collects `pieces`; the rest render
+inert with a reason rather than committing a guessed payload.
+
+A `pieces` choice opens a second numbered list of the pieces it will take, and
+the payload is built only once that list has been answered:
+
+```
+1. Inspect a document          ->     1. passport
+2. Choose pass                        2. work permit
+3. Choose deny                        0. Cancel
+```
+
+Three things about that are load-bearing.
+
+**The two lists are numbered independently, both from 1.** The CLI takes the
+same selection as positional values after the choice number (`do 1 0:passport`),
+so the same key names the same piece in both ports. Escape or `0` leaves the
+selection without committing — a mode a mouse can enter but only a keyboard can
+leave is not a usable surface, so Cancel is a clickable row too.
+
+**Only a full selection commits itself.** At `max` there is nothing left to
+decide. Anywhere between `min` and `max` there is no moment the client can infer,
+so `8. Confirm` appears once the minimum is met — which is also the only way a
+`min=0` choice can be submitted empty. Below the minimum the row reads
+`Pick N more` and does nothing.
+
+**Long lists page.** Seven candidates at a time, `9. More (2/3)` to advance,
+wrapping back to the first page. Numbering restarts per page, so the number a
+player reads is the key they press wherever they are in the list.
+
+Seven rather than eight because the controls are drawn from the same keypad the
+candidates are — `8` confirms, `9` pages, `0` cancels — and an eighth candidate
+would be clickable but unreachable by key.
+
+**Which pieces are offered comes from the choice, not the renderer.** A
+`pieces` choice constrained to `target_zone_ref` is satisfiable only by pieces in
+that zone, so `selectable_pieces` reads the constraint and the candidate — a
+piece too, but outside the packet — never appears. That is §5.1 again: the
+player is only offered what the backend will actually accept.
+
+**The finished payload follows §6.1.1's table**, so a hotspot and a numbered key
+commit the same thing. It is not byte-identical to the CLI in every case: the CLI
+discards an authored activation payload and this port preserves it, which is a gap
+on that side rather than a divergence to copy. Validation here is advisory — the
+backend re-checks and is authoritative (§6.1.2) — and refusing early only keeps a
+doomed commit off the wire.
+
+Every click and key still resolves to `(edge_id, payload)`; `BeginSelection`,
+`PickPiece` and `CancelSelection` are client-local steps that never reach the
+service. That is what keeps Input Parity true for a choice that takes two
+actions to answer.
+
 **Attribution decides presentation.** An `AttributedFragment` renders as a
 speaker bubble; a plain `ContentFragment` renders as narration. The client does
 not parse prose prefixes.
+
+## The State Panel
+
+A turn carrying pieces, zones or findings reserves the right-hand column for
+them. The space is taken from the prose rather than shared with it, because a
+document that scrolled away is a document the player cannot evaluate — and §5.1
+makes rendering it a requirement, not a flourish.
+
+```
+                          Edda Marrow
+  You inspect the         CREDENTIALS PACKET
+  work permit.             passport - already
+  The work permit          inspected
+  was never sealed         work permit - already
+  by the issuer.           inspected
+                           baggage
+  1. Inspect a document    FINDINGS
+  2. Review packet ...      work permit: The work
+```
+
+**A zone renders even when empty.** A targetable container with nothing in it is
+information, not an absence.
+
+**Findings keep the engine's `emphasis` word** — `ok`/`warn`/`danger`/`subtle`
+choose a colour. The client never re-derives severity from the prose.
+
+**A spent piece is dimmed with its reason and cannot be selected.** That is the
+generic `available` / `unavailable_reason` pair, read exactly as it is on a
+choice. `credential_gate` sets it on documents already inspected; before that
+existed, the only way to learn a document was spent was the backend error raised
+after committing it.
+
+**An over-full panel pages.** At 320x200 a nine-choice turn leaves the panel
+about eight rows, and a full packet plus findings exceeds that. It paginates and
+shows `page 1/2 tab`; `tab` advances it and the label is a hitbox too. An earlier
+draft drew an overflow notice instead, which told the player state was hidden
+without giving them any way to read it — not what §5.1 asks for.
 
 ## The Map View
 
@@ -159,6 +251,7 @@ from the type signatures, and a third port would pay the same tax again.
 | media | ordered `scene`/`show` ops, stateful | flat per-turn image list, stateless |
 | speaker | `portrait_tag` for a defined character image | `speaker` string, looked up by role |
 | choices | menu built by the runtime | hitboxes owned by the renderer |
+| typed input | not attempted | two-step numbered selection for `pieces`, paged |
 | turns | one per step, played in sequence | merged into one actionable frame |
 
 The media model is the real divergence: Ren'Py has a persistent stage that

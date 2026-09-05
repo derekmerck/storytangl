@@ -11,8 +11,24 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client runtime")
 
-from tangl.pygame_client.models import Choice, Line, Turn  # noqa: E402
-from tangl.pygame_client.stage import LOGICAL_SIZE, SCALE, Stage  # noqa: E402
+from tangl.pygame_client.models import (  # noqa: E402
+    Choice,
+    Finding,
+    Line,
+    Piece,
+    Turn,
+    Zone,
+)
+from tangl.journal.intent import TextAccepts  # noqa: E402
+from tangl.pygame_client.models import PagePanel  # noqa: E402
+from tangl.pygame_client.stage import (  # noqa: E402
+    LOGICAL_SIZE,
+    PANEL_W,
+    SCALE,
+    Stage,
+    choice_action,
+    unsupported_reason,
+)
 
 
 @pytest.fixture
@@ -45,7 +61,7 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
     stage.draw(_turn(line_count, choice_count=3))
 
     assert len(stage.hitboxes) == 3
-    for rect, _edge_id, _payload in stage.hitboxes:
+    for rect, _action in stage.hitboxes:
         assert rect.bottom <= LOGICAL_SIZE[1]
         assert rect.top >= 0
 
@@ -53,10 +69,10 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
 def test_every_available_choice_is_clickable(stage: Stage) -> None:
     stage.draw(_turn(12, choice_count=3))
 
-    for rect, edge_id, _payload in stage.hitboxes:
+    for rect, action in stage.hitboxes:
         centre = (rect.centerx * SCALE, rect.centery * SCALE)
         assert stage.hit(centre) is not None
-        assert stage.hit(centre)[0] == edge_id
+        assert stage.hit(centre).edge_id == action.edge_id
 
 
 def test_unavailable_choices_are_shown_but_not_clickable(stage: Stage) -> None:
@@ -77,7 +93,7 @@ def test_unavailable_choices_are_shown_but_not_clickable(stage: Stage) -> None:
     stage.draw(turn)
 
     assert len(stage.hitboxes) == 1
-    assert stage.hitboxes[0][1] == turn.choices[1].edge_id
+    assert stage.hitboxes[0][1].edge_id == turn.choices[1].edge_id
 
 
 def test_a_paragraph_longer_than_the_surface_still_renders(stage: Stage) -> None:
@@ -142,3 +158,124 @@ def test_unloadable_media_without_alt_text_names_its_role(stage: Stage) -> None:
     rows = stage._rows(Turn(step=1), [image])
 
     assert any("narrative_im" in row.text for row in rows)
+
+
+# ── state panel (§5.1 Decision Legibility) ───────────────────────────────────
+
+
+ZONE = uuid4()
+
+
+def _packet_turn(**overrides) -> Turn:
+    defaults = dict(
+        step=1,
+        lines=[Line(text="Tomas Vey steps forward.")],
+        choices=[Choice(edge_id=uuid4(), text="Inspect a document")],
+        zones=[Zone(uid=ZONE, role="packet", label="Credentials packet")],
+        pieces=[
+            Piece(piece_id="c", kind="candidate", text="Tomas Vey", label="Tomas Vey"),
+            Piece(piece_id="0:passport", kind="id_card", text="crisp",
+                  label="passport", zone_ref=ZONE),
+        ],
+    )
+    defaults.update(overrides)
+    return Turn(**defaults)
+
+
+def test_a_turn_with_state_narrows_the_prose_and_draws_a_panel(stage) -> None:
+    """The panel takes its width from the prose rather than sharing it.
+
+    A document that scrolled away is a document the player cannot evaluate, so
+    the space is reserved rather than contended for.
+    """
+
+    plain = Turn(step=1, lines=[Line(text="word " * 60)])
+    stage.draw(plain)
+    wide = len(stage._rows(plain, [], columns=(LOGICAL_SIZE[0] - 12) // 4))
+
+    panelled = _packet_turn(lines=[Line(text="word " * 60)])
+    stage.draw(panelled)
+    narrow = len(
+        stage._rows(panelled, [], columns=(LOGICAL_SIZE[0] - PANEL_W - 12) // 4)
+    )
+
+    assert narrow > wide, "prose rewraps into the narrower column"
+
+
+def test_a_turn_without_state_draws_no_panel(stage) -> None:
+    assert stage._has_state(Turn(step=1, lines=[Line(text="just prose")])) is False
+    assert stage._has_state(_packet_turn()) is True
+
+
+def test_an_empty_zone_still_renders(stage) -> None:
+    """A targetable container with nothing in it is information, not absence."""
+
+    turn = _packet_turn(pieces=[])
+
+    stage.draw(turn)  # must not raise; the zone header and "(empty)" are drawn
+
+    assert stage._has_state(turn) is True
+
+
+def _crowded_turn() -> Turn:
+    return _packet_turn(
+        choices=[Choice(edge_id=uuid4(), text=f"choice {n}") for n in range(9)],
+        pieces=[
+            Piece(piece_id=f"0:doc{n}", kind="id_card", text="x",
+                  label=f"a fairly long document name {n}", zone_ref=ZONE)
+            for n in range(8)
+        ],
+        findings=[
+            Finding(key=f"finding {n}", value="a long explanation " * 3, emphasis="warn")
+            for n in range(4)
+        ],
+    )
+
+
+def test_overflowing_panel_state_stays_reachable_by_paging(stage) -> None:
+    """Acknowledging missing state is not the same as showing it.
+
+    An overflow notice told the player something was hidden and gave them no way
+    to read it, which does not meet the §5.1 floor this panel exists for.
+    """
+
+    crowded = _crowded_turn()
+    columns = (PANEL_W - 10) // 4
+    every_row = {text for text, _colour in stage.panel_rows(crowded, columns=columns)}
+    assert len(every_row) > 8, "fixture must actually overflow"
+
+    seen: set[str] = set()
+    for _ in range(8):
+        stage.draw(crowded)
+        rendered = {
+            text
+            for text, _colour in stage.panel_rows(crowded, columns=columns)
+        }
+        seen |= rendered
+        stage.panel_scroll += 1
+
+    # Every row the panel knows about is reachable across its pages.
+    assert every_row <= seen
+    assert any(
+        isinstance(action, PagePanel) for _rect, action in stage.hitboxes
+    ), "paging must be reachable by click, not only by key"
+
+
+def test_a_panel_that_fits_offers_no_pager(stage) -> None:
+    stage.draw(_packet_turn())
+
+    assert not any(isinstance(action, PagePanel) for _rect, action in stage.hitboxes)
+
+
+def test_an_unsupported_map_choice_is_dimmed_and_explains_itself(stage) -> None:
+    """A live-looking hotspot over dead pixels is the failure the map avoids.
+
+    The hitbox already disappeared; the colour and the legend row still implied
+    the choice was on offer.
+    """
+
+    choice = Choice(edge_id=uuid4(), text="Say something", accepts=TextAccepts())
+
+    assert choice_action(choice) is None
+    assert unsupported_reason(choice) == "needs text input"
+    assert "needs text input" in Stage._choice_label(1, choice)

@@ -281,3 +281,42 @@ def test_credential_gate_shift_completes_through_the_service() -> None:
     )
     assert "3 of 3 calls correct" in prose
     assert "last traveler clears the counter" in prose
+
+
+def test_an_inspected_document_is_marked_unavailable() -> None:
+    """A spent document stays in the packet and says it cannot be inspected again.
+
+    The inspect move refuses it (`Document piece is not inspectable`), but a
+    `pieces` choice constrained to the packet offers whatever the packet holds.
+    Without this the only way a player learns a document is spent is the error
+    raised after committing it -- Decision Legibility, widget vocabulary §5.1.
+    """
+
+    manager, user, _ = _service_session()
+    envelope = _commit(manager, user, manager.get_story_update(user_id=user.uid),
+                       "Work the scheduled shift")
+    documents = [
+        fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, PieceFragment) and fragment.zone_ref is not None
+    ]
+    assert documents
+    assert all(document.available for document in documents), "nothing inspected yet"
+
+    passport = next(
+        document
+        for document in documents
+        if document.presentation_hints.label_text == "passport"
+    )
+    envelope = _commit(manager, user, envelope, "Inspect a document",
+                       {"piece_ids": [passport.piece_id]})
+
+    spent = next(
+        fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, PieceFragment)
+        and fragment.piece_id == passport.piece_id
+    )
+    assert spent.available is False
+    assert spent.unavailable_reason == "already inspected"
+    assert spent.piece_id == passport.piece_id, "same piece, updated in place"

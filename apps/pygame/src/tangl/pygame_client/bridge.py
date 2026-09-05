@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -17,7 +18,9 @@ from tangl.journal.fragments import (
     ChoiceFragment,
     ContentFragment,
     GroupFragment,
+    KvFragment,
     MediaFragment,
+    PieceFragment,
 )
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service.media import (
@@ -34,7 +37,18 @@ from tangl.service.response import (
 )
 from tangl.service.service_manager import ServiceManager
 
-from .models import Choice, Line, MapPlate, MapRegion, StageImage, Turn
+from .models import (
+    Choice,
+    Finding,
+    Line,
+    MapPlate,
+    MapRegion,
+    PendingSelection,
+    Piece,
+    StageImage,
+    Turn,
+    Zone,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +74,122 @@ def _payload_source(payload: dict[str, Any]) -> str | None:
         if (text := _text(value)) is not None:
             return text
     return None
+
+
+class UnsupportedAccepts(ValueError):
+    """Raised for an ``accepts`` kind this port cannot collect a value for.
+
+    Better than committing a guess: the CLI reference port refuses the same
+    kinds unless handed an explicit payload, and a wrong payload shape reaches
+    the player as an opaque backend error.
+    """
+
+
+def commit_payload(choice: Choice, values: Sequence[str] = ()) -> JsonValue:
+    """Build the wire payload for ``choice``, keyed by ``accepts.kind``.
+
+    Follows the payload table at widget vocabulary §6.1.1, so a hotspot and a
+    numbered key commit the same thing and this port stays within the Input
+    Parity rule (§5.3). It is not byte-identical to the CLI in every case: the
+    CLI discards an authored activation payload and this port preserves it,
+    which is a gap on that side rather than a divergence to copy.
+
+    The return is not always a mapping -- a ``pick`` forwards a non-mapping
+    activation payload verbatim -- so the type is the wire's, not a dict.
+
+    Validation here is advisory. The backend re-checks and is authoritative
+    (§6.1.2); refusing early only keeps a doomed commit off the wire.
+    """
+
+    accepts = choice.accepts
+    kind = getattr(accepts, "kind", "pick") if accepts is not None else "pick"
+    authored = choice.payload
+
+    if kind == "pick":
+        if values:
+            raise UnsupportedAccepts("This choice does not accept an input value.")
+        # An authored activation payload is the edge's own answer and travels
+        # verbatim, including when it is not a mapping. The CLI drops it, which
+        # is a gap on that side rather than a licence to drop it here.
+        return {} if authored is None else authored
+
+    if kind == "pieces":
+        minimum, maximum = accepts.min, accepts.max
+        if len(values) < minimum:
+            raise UnsupportedAccepts(f"Select at least {minimum} piece(s).")
+        if len(values) > maximum:
+            raise UnsupportedAccepts(f"Select at most {maximum} piece(s).")
+        return _merge_authored(authored, {"piece_ids": list(values)})
+
+    # text, quantity, place and compose need input surfaces this port does not
+    # have yet. Land them with the world that needs one, not speculatively.
+    raise UnsupportedAccepts(f"This port cannot collect a {kind!r} value yet.")
+
+
+def _merge_authored(authored: Any, collected: dict[str, Any]) -> dict[str, Any]:
+    """Combine an authored activation payload with what the player supplied.
+
+    Precedence is explicit: authored keys form the base, collected keys win. The
+    player's answer to ``accepts`` is the thing the choice asked for, so it
+    cannot be shadowed by a default the author set on the edge.
+
+    A non-mapping activation payload cannot be merged with named values, so it
+    is dropped rather than guessed at -- and that is worth knowing about.
+    """
+
+    if authored is None:
+        return collected
+    if not isinstance(authored, dict):
+        logger.debug(
+            "Dropping non-mapping activation payload %r for a typed choice", authored
+        )
+        return collected
+    return {**authored, **collected}
+
+
+def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
+    """Return the pieces ``choice`` will accept, in stream order.
+
+    Decision Legibility (§5.1): a choice constrained to a zone may only be
+    satisfied by pieces the player can see in that zone, so the constraint is
+    read here rather than left to the renderer to guess.
+    """
+
+    accepts = choice.accepts
+    if getattr(accepts, "kind", None) != "pieces":
+        return []
+    # ``available=False`` is the piece saying it cannot satisfy a choice right
+    # now, and that holds whether or not the choice narrows by zone.
+    offered = [piece for piece in turn.pieces if piece.available]
+    constraints = accepts.constraints
+    if constraints is None:
+        return offered
+    zone_ref = constraints.target_zone_ref
+    kinds = constraints.target_kind
+    # ``available=False`` is the piece saying it cannot satisfy a choice right
+    # now. Offering it anyway would put a guaranteed backend error behind a row
+    # that looks perfectly selectable.
+    return [
+        piece
+        for piece in offered
+        if (zone_ref is None or str(piece.zone_ref) == zone_ref)
+        and (kinds is None or piece.kind in kinds)
+    ]
+
+
+def remaining_pieces(turn: Turn, pending: PendingSelection) -> list[Piece]:
+    """Pieces still on offer for a pending selection, in stream order.
+
+    Already-picked pieces drop out so a ``max > 1`` selection cannot name the
+    same piece twice, and so the numbered list the player reads always matches
+    what is still choosable.
+    """
+
+    return [
+        piece
+        for piece in selectable_pieces(turn, pending.choice)
+        if piece.piece_id not in pending.picked
+    ]
 
 
 def _step(fragment: BaseFragment) -> int:
@@ -219,13 +349,27 @@ class PygameSessionBridge:
         return [turns[step] for step in sorted(turns)]
 
     def _flatten(self, fragments: list[BaseFragment]) -> list[BaseFragment]:
+        """Flatten grouping fragments, keeping the ones that are not decoration.
+
+        A ``zone`` is a container the player acts against -- a ``pieces`` choice
+        names one in its constraints -- so it survives flattening. Every other
+        grouping is presentational and its members stand on their own.
+        """
+
         flat: list[BaseFragment] = []
         for fragment in fragments:
             if isinstance(fragment, GroupFragment):
-                flat.extend(self._flatten(list(getattr(fragment, "content", []) or [])))
+                if fragment.group_type == "zone":
+                    flat.append(fragment)
+                flat.extend(self._flatten(list(fragment.content or [])))
                 continue
             flat.append(fragment)
         return flat
+
+    @staticmethod
+    def _label(fragment: BaseFragment) -> str | None:
+        hints = fragment.presentation_hints
+        return None if hints is None else _text(getattr(hints, "label_text", None))
 
     def _append(self, turn: Turn, fragment: BaseFragment) -> None:
         if isinstance(fragment, ChoiceFragment):
@@ -233,14 +377,50 @@ class PygameSessionBridge:
                 Choice(
                     edge_id=fragment.edge_id,
                     text=_text(fragment.text) or "(unnamed choice)",
-                    available=bool(getattr(fragment, "available", True)),
-                    unavailable_reason=_text(getattr(fragment, "unavailable_reason", None)),
+                    available=fragment.available,
+                    unavailable_reason=_text(fragment.unavailable_reason),
                     payload=fragment.activation_payload,
                     tags=frozenset(
                         tag
                         for tag in (getattr(fragment, "tags", None) or ())
                         if isinstance(tag, str)
                     ),
+                    accepts=fragment.accepts,
+                )
+            )
+            return
+
+        if isinstance(fragment, PieceFragment):
+            turn.pieces.append(
+                Piece(
+                    piece_id=fragment.piece_id,
+                    kind=fragment.piece_kind,
+                    text=_text(fragment.content) or "",
+                    label=self._label(fragment),
+                    zone_ref=fragment.zone_ref,
+                    available=fragment.available,
+                    unavailable_reason=_text(fragment.unavailable_reason),
+                )
+            )
+            return
+
+        if isinstance(fragment, KvFragment):
+            turn.findings.extend(
+                Finding(
+                    key=str(row.key),
+                    value=str(row.value),
+                    emphasis=row.emphasis,
+                )
+                for row in fragment.content
+            )
+            return
+
+        if isinstance(fragment, GroupFragment):
+            turn.zones.append(
+                Zone(
+                    uid=fragment.uid,
+                    role=_text(fragment.zone_role),
+                    label=self._label(fragment),
                 )
             )
             return
