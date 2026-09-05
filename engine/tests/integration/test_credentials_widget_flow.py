@@ -281,3 +281,121 @@ def test_credential_gate_shift_completes_through_the_service() -> None:
     )
     assert "3 of 3 calls correct" in prose
     assert "last traveler clears the counter" in prose
+
+
+def test_an_inspected_document_is_marked_unavailable_in_place() -> None:
+    """A spent document stays the same fragment, in the same packet, and says so.
+
+    The inspect move refuses it (`Document piece is not inspectable`), but a
+    `pieces` choice constrained to the packet offers whatever the packet holds.
+    Without this the only way a player learns a document is spent is the error
+    raised after committing it -- Decision Legibility, widget vocabulary §5.1.
+
+    Identity is asserted on `uid`, not `piece_id`: a replacement fragment
+    reusing the same `piece_id` would satisfy a looser lookup while breaking
+    every control reference pointing at the original.
+    """
+
+    manager, user, _ = _service_session()
+    envelope = _commit(manager, user, manager.get_story_update(user_id=user.uid),
+                       "Work the scheduled shift")
+    packet = next(
+        fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, GroupFragment) and fragment.zone_role == "packet"
+    )
+    documents = [
+        fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, PieceFragment) and fragment.zone_ref is not None
+    ]
+    assert documents
+    assert all(document.available for document in documents), "nothing inspected yet"
+
+    passport = next(
+        document
+        for document in documents
+        if document.presentation_hints.label_text == "passport"
+    )
+    original_uid = passport.uid
+
+    envelope = _commit(manager, user, envelope, "Inspect a document",
+                       {"piece_ids": [passport.piece_id]})
+
+    spent = next(
+        fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, PieceFragment) and fragment.uid == original_uid
+    )
+    assert spent.available is False
+    assert spent.unavailable_reason == "already inspected"
+    assert spent.piece_id == passport.piece_id
+    assert spent.zone_ref == packet.uid, "a spent document stays in the packet"
+
+    restated = next(
+        fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, GroupFragment) and fragment.zone_role == "packet"
+    )
+    assert spent.uid in restated.member_ids, "and stays a member of it"
+
+
+def test_only_the_inspected_document_of_a_packet_is_marked_spent() -> None:
+    """Availability is per document, not per packet.
+
+    The first traveler carries a single document, so a one-document fixture
+    cannot tell "this one is spent" apart from "the packet is closed". Edda
+    carries three.
+    """
+
+    rulings = {"Tomas Vey": "Choose pass"}
+    manager, user, _ = _service_session()
+    envelope = _commit(manager, user, manager.get_story_update(user_id=user.uid),
+                       "Work the scheduled shift")
+
+    # Clear the first traveler to reach one with several documents.
+    for _ in range(6):
+        pieces = [
+            fragment
+            for fragment in _flatten(envelope.fragments)
+            if isinstance(fragment, PieceFragment)
+        ]
+        candidate = next(
+            (piece.content for piece in pieces if piece.piece_kind == "candidate"), None
+        )
+        documents = [piece for piece in pieces if piece.zone_ref is not None]
+        if len(documents) > 1:
+            break
+        offered = {fragment.text for fragment in _offered(envelope)}
+        ruling = rulings.get(candidate)
+        if ruling in offered:
+            envelope = _commit(manager, user, envelope, ruling)
+        elif "Inspect a document" in offered:
+            live = next(document for document in documents if document.available)
+            envelope = _commit(manager, user, envelope, "Inspect a document",
+                               {"piece_ids": [live.piece_id]})
+        else:
+            break
+    else:
+        raise AssertionError("never reached a multi-document packet")
+
+    assert len(documents) > 1
+    target = next(document for document in documents if document.available)
+    envelope = _commit(manager, user, envelope, "Inspect a document",
+                       {"piece_ids": [target.piece_id]})
+
+    after = {
+        fragment.uid: fragment
+        for fragment in _flatten(envelope.fragments)
+        if isinstance(fragment, PieceFragment)
+    }
+    assert after[target.uid].available is False
+    siblings = [
+        after[document.uid]
+        for document in documents
+        if document.uid != target.uid and document.uid in after
+    ]
+    assert siblings, "the other documents must still be projected"
+    assert all(sibling.available for sibling in siblings), (
+        "inspecting one document must not close the rest of the packet"
+    )

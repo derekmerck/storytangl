@@ -2413,6 +2413,10 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         doc_uids: list[uuid.UUID] = []
         doc_pieces: list[BaseFragment] = []
         component_labels: set[str] = set()
+        # A spent document stays in the packet and stays visible, but the
+        # inspect move refuses it. Say so on the piece rather than letting the
+        # player discover it by committing (widget vocabulary §5.1).
+        spent = set(game.inspected_documents)
         component_documents = self._document_components(game)
         card_projections = {
             projection.component_id: projection
@@ -2482,6 +2486,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     zone_ref=packet_uid,
                     properties=properties,
                     hints=PresentationHints(label_text=label),
+                    available=label not in spent,
+                    unavailable_reason="already inspected" if label in spent else None,
                 )
             )
             projection = card_projections.get(component.uid)
@@ -2508,6 +2514,8 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
                     content=description,
                     zone_ref=packet_uid,
                     hints=PresentationHints(label_text=label),
+                    available=label not in spent,
+                    unavailable_reason="already inspected" if label in spent else None,
                 )
             )
 
