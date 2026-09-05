@@ -148,6 +148,24 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('gen:portrait')
   })
 
+  it('treats a blank media url as unresolved', () => {
+    // A payload can arrive with an empty string where a source should be; that
+    // is an absent source, not a resolved one.
+    const fragments: Record<string, StoryFragment> = {
+      media: {
+        uid: 'media',
+        fragment_type: 'media',
+        content_format: 'url',
+        url: '',
+        media_role: 'dialog_im',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['media'])
+
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
+  })
+
   it('renders generated media once the service has dereferenced it', () => {
     // A resolved RIT arrives as an ordinary url payload, carrying rit_id so a
     // RIT-aware client could ask for another representation. Placeholdering it

@@ -467,9 +467,12 @@ long enough that the web client encoded the lie as a pending-media check.
 | In-process path | `PASSTHROUGH` | `content_format: "path"` | yes |
 | RIT reference | *(`RIT_REF`)* | `content_format: "rit"` + `rit_id`, client resolves | **no** |
 
-`rit_id` already travels on every RIT-backed payload. Nothing consumes it, and
-that is the point: the fourth tier becomes additive rather than a breaking DTO
-change whenever a client actually wants it.
+`rit_id` already travels on every RIT-backed payload, naming **the resource that
+payload represents** — which is not always the fragment's own. A pending resource
+served through a static fallback carries the fallback's bytes, so it carries the
+fallback's identity; reading it off the fragment would describe one asset with
+another's id. It is useful provenance now, and it is the handle the fourth tier
+would key on later. That is not a claim the fourth tier already works.
 
 **What the fourth tier needs, when someone wants it.** A `RIT_REF` profile, and a
 route — `GET /media/rit/{id}?format=&max_dim=`. There is none today;

@@ -117,19 +117,23 @@ export const normalizeEnvelope = (
   }
 }
 
+/** A blank string is not a source; treat it as absent so callers need not. */
+const nonEmpty = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.length > 0 ? value : undefined
+
 export const mediaContentUrl = (fragment: MediaStoryFragment): string | undefined => {
-  if (fragment.content_format === 'url' && typeof fragment.content === 'string') {
-    return fragment.content
+  if (fragment.content_format === 'url') {
+    const contentUrl = nonEmpty(fragment.content)
+    if (contentUrl !== undefined) {
+      return contentUrl
+    }
   }
-  if (typeof fragment.url === 'string') {
-    return fragment.url
-  }
-  if (typeof fragment.src === 'string') {
-    return fragment.src
+  const named = nonEmpty(fragment.url) ?? nonEmpty(fragment.src)
+  if (named !== undefined) {
+    return named
   }
   if (isRecord(fragment.content)) {
-    const contentUrl = fragment.content.url ?? fragment.content.src
-    return typeof contentUrl === 'string' ? contentUrl : undefined
+    return nonEmpty(fragment.content.url) ?? nonEmpty(fragment.content.src)
   }
   return undefined
 }

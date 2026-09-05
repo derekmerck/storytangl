@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from tangl.core import Selector
 from tangl.journal.fragments import MediaFragment
@@ -234,6 +235,7 @@ def _base_payload(
     scope: str,
     media_type: MediaDataType | str | None,
     content_format: str | None,
+    rit_id: UUID | None,
 ) -> dict[str, Any]:
     """Assemble the common media DTO fields.
 
@@ -244,13 +246,15 @@ def _base_payload(
     labelled ``"rit"`` promises clients an affordance it does not carry: no
     ``rit_id`` to resolve, and no endpoint to resolve it at.
 
-    ``rit_id`` travels alongside for RIT-backed media so a future RIT-aware
-    client tier is additive rather than a breaking DTO change. See
-    ``MEDIA_DESIGN.md`` for the tiers this leaves open.
+    ``rit_id`` is required for the same reason, and names the resource this
+    payload actually represents -- which is not always the fragment's own. A
+    pending resource served through a static fallback carries the fallback's
+    bytes, so reading identity off the fragment would describe one asset with
+    another's id. It is provenance for the representation, useful now and the
+    handle a RIT-aware client tier would key on later; see ``MEDIA_DESIGN.md``.
     """
 
     source_id = getattr(fragment, "source_id", None)
-    rit_id = getattr(fragment, "rit_id", None)
     payload = {
         "uid": str(fragment.uid),
         "fragment_type": "media",
@@ -273,6 +277,7 @@ def _inline_data_payload(
     fragment: MediaFragment,
     scope: str,
     result: ResolvedMediaResult,
+    rit_id: UUID | None,
 ) -> dict[str, Any]:
     data = result.data
     data_type = result.data_type
@@ -288,13 +293,21 @@ def _inline_data_payload(
             data = data.decode("utf-8")
         return {
             **_base_payload(
-                fragment, scope=scope, media_type=data_type, content_format="xml"
+                fragment,
+                scope=scope,
+                media_type=data_type,
+                content_format="xml",
+                rit_id=rit_id,
             ),
             "data": data,
         }
 
     base_payload = _base_payload(
-        fragment, scope=scope, media_type=data_type, content_format="data"
+        fragment,
+        scope=scope,
+        media_type=data_type,
+        content_format="data",
+        rit_id=rit_id,
     )
     if isinstance(data, bytes):
         return {**base_payload, "data": b64encode(data).decode("ascii")}
@@ -306,22 +319,33 @@ def _passthrough_payload(
     fragment: MediaFragment,
     scope: str,
     result: ResolvedMediaResult,
+    rit_id: UUID | None,
 ) -> dict[str, Any]:
     if result.url:
         return {
             **_base_payload(
-                fragment, scope=scope, media_type=result.data_type, content_format="url"
+                fragment,
+                scope=scope,
+                media_type=result.data_type,
+                content_format="url",
+                rit_id=rit_id,
             ),
             "url": result.url,
         }
     if result.path is not None:
         return {
             **_base_payload(
-                fragment, scope=scope, media_type=result.data_type, content_format="path"
+                fragment,
+                scope=scope,
+                media_type=result.data_type,
+                content_format="path",
+                rit_id=rit_id,
             ),
             "path": str(result.path),
         }
-    return _inline_data_payload(fragment=fragment, scope=scope, result=result)
+    return _inline_data_payload(
+        fragment=fragment, scope=scope, result=result, rit_id=rit_id
+    )
 
 
 def _media_server_payload(
@@ -341,7 +365,11 @@ def _media_server_payload(
     if result.url:
         return {
             **_base_payload(
-                fragment, scope=scope, media_type=content_type, content_format="url"
+                fragment,
+                scope=scope,
+                media_type=content_type,
+                content_format="url",
+                rit_id=rit.uid,
             ),
             "url": result.url,
         }
@@ -351,7 +379,11 @@ def _media_server_payload(
         # this payload does not have would be the same lie in a smaller hat.
         return {
             **_base_payload(
-                fragment, scope=scope, media_type=content_type, content_format=None
+                fragment,
+                scope=scope,
+                media_type=content_type,
+                content_format=None,
+                rit_id=rit.uid,
             ),
             "unsupported_reason": "unsupported_media_type",
         }
@@ -366,11 +398,17 @@ def _media_server_payload(
     if prefix is not None and result.path is not None:
         return {
             **_base_payload(
-                fragment, scope=scope, media_type=content_type, content_format="url"
+                fragment,
+                scope=scope,
+                media_type=content_type,
+                content_format="url",
+                rit_id=rit.uid,
             ),
             "url": f"{prefix}/{_relative_url_path_for_rit(rit, media_root=media_root)}",
         }
-    return _inline_data_payload(fragment=fragment, scope=scope, result=result)
+    return _inline_data_payload(
+        fragment=fragment, scope=scope, result=result, rit_id=rit.uid
+    )
 
 
 def _resolved_rit_payload(
@@ -386,10 +424,16 @@ def _resolved_rit_payload(
     story_media_root: Path | None = None,
     system_media_root: Path | None = None,
 ) -> dict[str, Any]:
+    # ``rit`` is the resource this payload represents, which on a static
+    # fallback is not the fragment's own. Identity follows the bytes.
     if profile.content_profile == MediaContentProfile.INLINE_DATA:
-        return _inline_data_payload(fragment=fragment, scope=scope, result=result)
+        return _inline_data_payload(
+            fragment=fragment, scope=scope, result=result, rit_id=rit.uid
+        )
     if profile.content_profile == MediaContentProfile.PASSTHROUGH:
-        return _passthrough_payload(fragment=fragment, scope=scope, result=result)
+        return _passthrough_payload(
+            fragment=fragment, scope=scope, result=result, rit_id=rit.uid
+        )
     return _media_server_payload(
         fragment=fragment,
         rit=rit,
@@ -509,6 +553,7 @@ def media_fragment_to_payload(
             scope=scope,
             media_type=getattr(fragment.content_type, "value", fragment.content_type),
             content_format=fragment.content_format,
+            rit_id=fragment.rit_id,
         )
 
         if fragment.content_format == "url":

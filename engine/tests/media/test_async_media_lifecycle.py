@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -423,3 +423,105 @@ class TestAsyncServiceFallbacks:
         )
 
         assert media_fragment_to_payload(fragment) is None
+
+
+class TestRepresentedIdentity:
+    """``rit_id`` must name the resource the payload actually carries.
+
+    On a static fallback the URL, media type and scope all describe the
+    fallback asset while the fragment still points at the pending original, so
+    reading identity off the fragment described one asset with another's id.
+    """
+
+    @staticmethod
+    def _pending_fragment(fallback_name: str) -> MediaFragment:
+        return MediaFragment(
+            content=MediaRIT(
+                status=MediaRITStatus.PENDING,
+                adapted_spec_hash="pending-identity",
+                derivation_spec={"fallback_ref": fallback_name},
+                data_type=MediaDataType.VECTOR,
+            ),
+            content_format="rit",
+            content_type=MediaDataType.VECTOR,
+            media_role="avatar_im",
+            scope="world",
+            fallback_text="Portrait pending.",
+        )
+
+    @staticmethod
+    def _fallback_uid(inventory: MediaInventory) -> UUID:
+        (rit,) = list(inventory.registry.values())
+        return rit.uid
+
+    @pytest.mark.parametrize(
+        "content_profile",
+        [
+            MediaContentProfile.MEDIA_SERVER,
+            MediaContentProfile.PASSTHROUGH,
+            MediaContentProfile.INLINE_DATA,
+        ],
+        ids=lambda profile: profile.value,
+    )
+    def test_a_static_fallback_is_identified_by_the_asset_it_serves(
+        self, tmp_path: Path, content_profile: MediaContentProfile
+    ) -> None:
+        inventory, fallback_path = _fallback_inventory(tmp_path)
+        fragment = self._pending_fragment(fallback_path.name)
+        pending_uid = fragment.rit_id
+
+        payload = media_fragment_to_payload(
+            fragment,
+            render_profile=MediaRenderProfile(
+                content_profile=content_profile, static_inventories=(inventory,)
+            ),
+            world_id="demo",
+            world_media_root=tmp_path,
+        )
+
+        assert payload is not None
+        assert payload["rit_id"] == str(self._fallback_uid(inventory))
+        assert payload["rit_id"] != str(pending_uid), (
+            "the payload carries the fallback's bytes, so it must carry the "
+            "fallback's identity"
+        )
+
+    def test_a_failed_media_fallback_is_identified_by_the_asset_it_serves(
+        self, tmp_path: Path
+    ) -> None:
+        inventory, fallback_path = _fallback_inventory(tmp_path)
+        fragment = self._pending_fragment(fallback_path.name)
+        fragment.content.status = MediaRITStatus.FAILED
+        pending_uid = fragment.rit_id
+
+        payload = media_fragment_to_payload(
+            fragment,
+            render_profile=MediaRenderProfile(static_inventories=(inventory,)),
+            world_id="demo",
+            world_media_root=tmp_path,
+        )
+
+        assert payload is not None
+        assert payload["rit_id"] == str(self._fallback_uid(inventory))
+        assert payload["rit_id"] != str(pending_uid)
+
+    def test_an_ordinarily_resolved_resource_keeps_its_own_identity(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "portrait.svg"
+        path.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
+        rit = MediaRIT(path=path, data_type=MediaDataType.VECTOR, label=path.name)
+        fragment = MediaFragment(
+            content=rit,
+            content_format="rit",
+            content_type=MediaDataType.VECTOR,
+            media_role="avatar_im",
+            scope="world",
+        )
+
+        payload = media_fragment_to_payload(
+            fragment, world_id="demo", world_media_root=tmp_path
+        )
+
+        assert payload is not None
+        assert payload["rit_id"] == str(rit.uid)
