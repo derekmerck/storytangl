@@ -1,4 +1,5 @@
 import type { KvRow, MediaStoryFragment, PrimitiveValue, StoryFragment } from '@/types'
+import { mediaContentUrl, mediaData } from './fragmentUtils'
 
 export const contentClass = (fragment: StoryFragment): string[] => {
   const hints = fragment.hints ?? fragment.presentation_hints
@@ -33,8 +34,15 @@ export const mediaRole = (fragment: MediaStoryFragment): string =>
     ? fragment.media_role
     : 'media'
 
+/**
+ * Pending means the service could not give us a source, not that the fragment
+ * started life as a RIT. `content_format` describes what a payload carries, so
+ * a resolved generated image arrives as `url` like any other -- sniffing for
+ * `'rit'` here placeholdered every generated image the service had already
+ * dereferenced.
+ */
 export const isPendingMedia = (fragment: MediaStoryFragment): boolean =>
-  fragment.content_format === 'rit' || fragment.generation_status === 'pending'
+  mediaContentUrl(fragment) === undefined && mediaData(fragment) === undefined
 
 const mediaShape = (fragment: MediaStoryFragment): string | undefined => {
   const shape = fragment.staging_hints?.media_shape

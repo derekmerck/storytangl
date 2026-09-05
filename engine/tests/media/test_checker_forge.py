@@ -227,7 +227,7 @@ class TestCheckerForgeIntegration:
 
         assert payload is not None
         assert payload["scope"] == "story"
-        assert payload["content_format"] == "rit"
+        assert payload["content_format"] == "url"
         assert payload["url"].startswith(f"/media/story/{story.story_id}/checker_scene-")
         assert payload["url"].endswith(".png")
 

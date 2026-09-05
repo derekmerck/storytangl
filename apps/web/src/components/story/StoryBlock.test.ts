@@ -130,13 +130,14 @@ describe('StoryBlock', () => {
     expect(image.props('src')).toBe('https://example.com/student-id.svg')
   })
 
-  it('renders pending RIT media placeholders', () => {
+  it('renders a placeholder for media the service could not resolve', () => {
+    // Pending is the absence of a source, not a format. The service sends this
+    // shape while generation is still in flight.
     const fragments: Record<string, StoryFragment> = {
       media: {
         uid: 'media',
         fragment_type: 'media',
         content: 'gen:portrait',
-        content_format: 'rit',
         media_role: 'dialog_im',
       },
     }
@@ -145,6 +146,47 @@ describe('StoryBlock', () => {
 
     expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('gen:portrait')
+  })
+
+  it('treats a blank media url as unresolved', () => {
+    // A payload can arrive with an empty string where a source should be; that
+    // is an absent source, not a resolved one.
+    const fragments: Record<string, StoryFragment> = {
+      media: {
+        uid: 'media',
+        fragment_type: 'media',
+        content_format: 'url',
+        url: '',
+        media_role: 'dialog_im',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['media'])
+
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
+  })
+
+  it('renders generated media once the service has dereferenced it', () => {
+    // A resolved RIT arrives as an ordinary url payload, carrying rit_id so a
+    // RIT-aware client could ask for another representation. Placeholdering it
+    // because it began life as a RIT hid every generated image in the app.
+    const fragments: Record<string, StoryFragment> = {
+      media: {
+        uid: 'media',
+        fragment_type: 'media',
+        content_format: 'url',
+        url: '/media/story/abc/hero_portrait-1.png',
+        rit_id: '2f1e5a90-0000-4000-8000-000000000000',
+        media_role: 'dialog_im',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['media'])
+
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(false)
+    const image = wrapper.findComponent({ name: 'VImg' })
+    // A served media path is relative, so remapURL points it at the API host.
+    expect(image.props('src')).toContain('/media/story/abc/hero_portrait-1.png')
   })
 
   it('renders dialog groups from attributed and media fragments', () => {
