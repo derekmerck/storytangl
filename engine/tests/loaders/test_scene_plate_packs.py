@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from PIL import Image
 
 WORLDS = Path(__file__).resolve().parents[3] / "worlds"
@@ -56,10 +57,17 @@ def test_the_manifest_matches_the_shipped_bytes(pack, name, entry) -> None:
     """Conforming an image after writing its manifest is how the two drift."""
 
     shipped = pack / "images" / entry["file"]
-    image = Image.open(shipped)
 
-    assert list(image.size) == entry["size"]
-    assert image.mode == entry["mode"]
+    with Image.open(shipped) as image:
+        # `open` reads the header and defers the pixels, so a truncated plate
+        # reports its declared size and mode quite happily. The manifest hash
+        # cannot catch that either -- it is generated from the shipped file, so
+        # a corrupt commit is recorded faithfully. Decoding is the only
+        # assertion here that proves the bytes are an image.
+        image.load()
+
+        assert list(image.size) == entry["size"]
+        assert image.mode == entry["mode"]
     assert hashlib.sha256(shipped.read_bytes()).hexdigest() == entry["sha256"]
 
 
@@ -72,18 +80,47 @@ def test_plates_are_conformed_to_the_client_surface(pack, name, entry) -> None:
     assert entry["conformed_from"]["transform"]
 
 
+def _staged_media_names(node) -> set[str]:
+    """Every ``name`` under a block's ``media:`` list, anywhere in the script.
+
+    Walks the parsed document rather than the raw text. A substring search over
+    the file counts a filename in a comment, in narration, or in a commented-out
+    block as a reference -- which is precisely the case this test exists to
+    catch, since a plate nothing stages is a plate that should not ship.
+    """
+
+    found: set[str] = set()
+    if isinstance(node, dict):
+        media = node.get("media")
+        if isinstance(media, list):
+            found |= {
+                item["name"]
+                for item in media
+                if isinstance(item, dict) and isinstance(item.get("name"), str)
+            }
+        for value in node.values():
+            found |= _staged_media_names(value)
+    elif isinstance(node, list):
+        for value in node:
+            found |= _staged_media_names(value)
+    return found
+
+
 @pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.parent.name)
 def test_every_named_asset_is_referenced_by_the_world(pack) -> None:
     """An unused plate is an asset with no consumer, which does not ship."""
 
     manifest = json.loads((pack / "manifest.json").read_text())
-    script = (pack.parent / "script.yaml").read_text()
+    script = yaml.safe_load((pack.parent / "script.yaml").read_text())
+    staged = _staged_media_names(script)
     unused = [
         entry["file"]
         for entry in manifest["assets"].values()
-        if entry["file"] not in script
+        if entry["file"] not in staged
     ]
-    assert not unused, f"{pack.parent.name} ships plates nothing references: {unused}"
+
+    assert staged, f"{pack.parent.name} stages no media at all"
+    assert not unused, f"{pack.parent.name} ships plates nothing stages: {unused}"
 
 
 @pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.parent.name)
