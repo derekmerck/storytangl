@@ -1,0 +1,85 @@
+{
+  "pack": "coronate-manuscript",
+  "assets": {
+    "audience_bg": {
+      "file": "audience_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "bc1d74b99c5409358b932ca66006829d4f941440bc2d4c3254f00826f694a777",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    },
+    "border_market_bg": {
+      "file": "border_market_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "f0c0591f6529a98ada6f01cf7c32b0c14dd4337ce510b1ebe614d6acef20818b",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    },
+    "coronation_bg": {
+      "file": "coronation_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "0418f89a4e16187b272ba76e211fb8c9854153639aa4d15b639d0d751eccf5ea",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    },
+    "dragon_bg": {
+      "file": "dragon_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "7890b8df949c87f0a6c9aa219c37d0ce817f0d3d0dbfa152eb45b501ee0837d9",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    },
+    "study_bg": {
+      "file": "study_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "0e300efee7d7ae9231e4747033e8d1920fc76ebe50c58d1ea61994680396b566",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    }
+  }
+}

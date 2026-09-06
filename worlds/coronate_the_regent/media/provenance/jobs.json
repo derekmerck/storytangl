@@ -1,0 +1,55 @@
+{
+  "endpoint": "configured-worker",
+  "workflow": "scripts/examples/comfy/flux2_klein9_ref_scene.json.j2",
+  "models": {
+    "unet": "flux-2-klein-9b-kv-fp8.safetensors",
+    "clip": "qwen_3_8b_fp8mixed.safetensors",
+    "vae": "flux2-vae.safetensors"
+  },
+  "params": {
+    "width": 1280,
+    "height": 800,
+    "steps": 4,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "Flux2Scheduler"
+  },
+  "references": {
+    "city_hall_mezz": "b53bed7884f1739a93cde42271f323011e3253059c354359accfeb5351378bb7",
+    "kells": "321265b39f2a78be782dbfcbb62114db55a5ad5decf5877074f6b727a4029867",
+    "bosch_haywain": "d09c0e37671e5e2d34246259a7ed22fc06a1c8f4902f1630e253a882a6e4d4d5",
+    "cleves_manna": "aa33f08f52251f86badcf3f68ef42cf58e44ef84370b8b7510a4b4da57c913f7"
+  },
+  "jobs": {
+    "audience_bg": {
+      "prompt": "A castle audience hall seen down its length: an empty carved throne on a low dais beneath a canopy, tall banded columns to either side, a patterned tile floor running toward the viewer, high windows throwing light across the stone.\n\nRender scene as 8-bit computer graphics pixel art in the manner of an illuminated manuscript: flat stacked planes, restrained palette of deep burgundy, midnight blue, parchment cream and gold leaf with gold used sparingly as accent; foliate ornament worked into the architecture itself rather than as a margin; ordered dither for gradients; crisp readable contour silhouettes; flat even lighting; no text, no lettering, no numerals, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame, no decorative margin; deserted and unoccupied, no people, no figures, nobody, empty center staging area kept clear",
+      "reference": "kells",
+      "reference_sha256": "321265b39f2a78be782dbfcbb62114db55a5ad5decf5877074f6b727a4029867",
+      "seed": 7
+    },
+    "border_market_bg": {
+      "prompt": "A border market at the edge of a walled town: empty timber stalls under striped awnings, stacked barrels and baskets, a cart with its shafts down, a town gate and watchtower behind, low hills beyond.\n\nRender scene as 8-bit computer graphics pixel art in the manner of an illuminated manuscript: flat stacked planes, restrained palette of deep burgundy, midnight blue, parchment cream and gold leaf with gold used sparingly as accent; foliate ornament worked into the architecture itself rather than as a margin; ordered dither for gradients; crisp readable contour silhouettes; flat even lighting; no text, no lettering, no numerals, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame, no decorative margin; deserted and unoccupied, no people, no figures, nobody, empty center staging area kept clear",
+      "reference": "bosch_haywain",
+      "reference_sha256": "d09c0e37671e5e2d34246259a7ed22fc06a1c8f4902f1630e253a882a6e4d4d5",
+      "seed": 7
+    },
+    "coronation_bg": {
+      "prompt": "A cathedral interior prepared for a coronation: an empty dais with a cushion bearing a crown, ranks of vacant carved stalls to either side, tall interlaced arches and a great rose window, banners hanging between the piers.\n\nRender scene as 8-bit computer graphics pixel art in the manner of an illuminated manuscript: flat stacked planes, restrained palette of deep burgundy, midnight blue, parchment cream and gold leaf with gold used sparingly as accent; foliate ornament worked into the architecture itself rather than as a margin, with dense celtic interlace worked into the arches and the banners; ordered dither for gradients; crisp readable contour silhouettes; flat even lighting; no text, no lettering, no numerals, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame, no decorative margin; deserted and unoccupied, no people, no figures, nobody, empty center staging area kept clear",
+      "reference": "kells",
+      "reference_sha256": "321265b39f2a78be782dbfcbb62114db55a5ad5decf5877074f6b727a4029867",
+      "seed": 7
+    },
+    "dragon_bg": {
+      "prompt": "A scorched hillside above a burning village, with a vast dragon's shadow falling across the ground and smoke rolling off the rooftops below. Broken fences, a cracked road, embers in the air. The dragon itself is out of frame.\n\nRender scene as 8-bit computer graphics pixel art in the manner of an illuminated manuscript: flat stacked planes, restrained palette of deep burgundy, midnight blue, parchment cream and gold leaf with gold used sparingly as accent; foliate ornament worked into the architecture itself rather than as a margin, shifted toward ember orange and soot black against the burgundy and midnight blue; ordered dither for gradients; crisp readable contour silhouettes; flat even lighting; no text, no lettering, no numerals, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame, no decorative margin; deserted and unoccupied, no people, no figures, nobody, empty center staging area kept clear",
+      "reference": "bosch_haywain",
+      "reference_sha256": "d09c0e37671e5e2d34246259a7ed22fc06a1c8f4902f1630e253a882a6e4d4d5",
+      "seed": 7
+    },
+    "study_bg": {
+      "prompt": "A regent's study in a stone castle: a writing desk bearing an open book and a burning candle, shelves of rolled scrolls behind, a tall narrow arched window with night sky beyond.\n\nRender scene as 8-bit computer graphics pixel art in the manner of an illuminated manuscript: flat stacked planes, restrained palette of deep burgundy, midnight blue, parchment cream and gold leaf with gold used sparingly as accent; foliate ornament worked into the architecture itself rather than as a margin; ordered dither for gradients; crisp readable contour silhouettes; flat even lighting; no text, no lettering, no numerals, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame, no decorative margin; no people, empty center staging area",
+      "reference": "cleves_manna",
+      "reference_sha256": "aa33f08f52251f86badcf3f68ef42cf58e44ef84370b8b7510a4b4da57c913f7",
+      "seed": 41
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "endpoint": "configured-worker",
+  "workflow": "scripts/examples/comfy/flux2_klein9_ref_scene.json.j2",
+  "models": {
+    "unet": "flux-2-klein-9b-kv-fp8.safetensors",
+    "clip": "qwen_3_8b_fp8mixed.safetensors",
+    "vae": "flux2-vae.safetensors"
+  },
+  "params": {
+    "width": 1280,
+    "height": 800,
+    "steps": 4,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "Flux2Scheduler"
+  },
+  "references": {
+    "city_hall_mezz": "b53bed7884f1739a93cde42271f323011e3253059c354359accfeb5351378bb7",
+    "kells": "321265b39f2a78be782dbfcbb62114db55a5ad5decf5877074f6b727a4029867",
+    "bosch_haywain": "d09c0e37671e5e2d34246259a7ed22fc06a1c8f4902f1630e253a882a6e4d4d5",
+    "cleves_manna": "aa33f08f52251f86badcf3f68ef42cf58e44ef84370b8b7510a4b4da57c913f7"
+  },
+  "jobs": {
+    "hall_desk_bg": {
+      "prompt": "An unattended hall monitor's station inside a brutalist civic building: an empty desk bearing a closed ledger and a paper tray, standing on a brick-paved mezzanine beneath a deep coffered concrete ceiling. Heavy board-formed concrete piers, a low balcony railing, daylight entering from tall windows across the far side. The building is deserted.\n\nRender scene as 8-bit computer graphics pixel art, limited palette of raw concrete grey, warm brick red, bone cream and shadowed brown; ordered dither for gradients; crisp readable contour silhouettes; flat lighting; no text, no lettering, no numerals, no signage, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame; deserted and unoccupied, no people, no figures, no person, nobody, no silhouettes of people, empty center staging area kept clear",
+      "reference": "city_hall_mezz",
+      "reference_sha256": "b53bed7884f1739a93cde42271f323011e3253059c354359accfeb5351378bb7",
+      "seed": 7
+    },
+    "hallway_bg": {
+      "prompt": "A deserted corridor in an eco-brutalist university building: board-formed concrete walls, a long run of steel lockers down one side, heavy industrial double doors at the far end, a brick-paved floor, clerestory daylight from above. Pennants and a trophy case suggested along the wall.\n\nRender scene as 8-bit computer graphics pixel art, limited palette of raw concrete grey, warm brick red, bone cream and shadowed brown; ordered dither for gradients; crisp readable contour silhouettes; flat lighting; no text, no lettering, no numerals, no signage, no watermark, no signature; full bleed, image fills the canvas edge to edge, no border, no frame; deserted and unoccupied, no people, no figures, nobody, empty center staging area kept clear",
+      "reference": "city_hall_mezz",
+      "reference_sha256": "b53bed7884f1739a93cde42271f323011e3253059c354359accfeb5351378bb7",
+      "seed": 7
+    }
+  }
+}

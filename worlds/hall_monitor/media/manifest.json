@@ -1,0 +1,37 @@
+{
+  "pack": "hall-monitor-brutalist",
+  "assets": {
+    "hall_desk_bg": {
+      "file": "hall_desk_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "5ce5c8df3997d9c131edfdb4dd12e87a6f58e873969741deec5e2cdbe50fb26e",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    },
+    "hallway_bg": {
+      "file": "hallway_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "9fdc9b3d1fea9cc18716f5f4cc53a83c43f787667e20830134b38ba59ef569fa",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "transform": "resize to 320x200 logical surface, nearest-neighbour"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+# Adjudicated: see media/AGENTS.md in this directory.
+#
+# These plates are required — engine/tests/loaders/test_scene_plate_packs.py
+# asserts the size, mode and sha256 of every one — so under root AGENTS.md
+# rule 3 they must not depend on Git LFS having materialized. Stored as
+# ordinary git blobs, overriding the repository-wide `*.png` LFS rule.
+#
+# About 556 KB across 5 files. The 1280x800 source renders stay out of the
+# tree entirely and are reconstructible from media/provenance/jobs.json.
+*.png -filter -diff -merge -text export-ignore
