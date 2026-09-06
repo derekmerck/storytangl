@@ -90,6 +90,12 @@ encounter: its packet is fresh, while its bearer is the same live graph subject.
 
 ## Art
 
+<p align="center">
+  <img src="../../.github/assets/hall-monitor-desk.png" alt="The monitor's station" width="620">
+</p>
+
+The monitor's station. The packet panel on the right is the same `zone` and `piece` fragments the CLI prints as numbered rows -- the student's ID and a doctor's note, with the typed inspect choice below.
+
 `media/` ships a small brutalist civic pack of block backgrounds, conformed to the
 client's 320x200 logical surface. Two plates cover the world: the hall, and the monitor's desk.
 

@@ -15,6 +15,12 @@ earlier, is the hedge against exactly that. Neither choice references the other.
 
 ## Art
 
+<p align="center">
+  <img src="../../.github/assets/coronate-merchant.png" alt="The border market in week three: the envoy has returned, the dragon is irritated, and the merchant's sword is the hedge against a confrontation the story has not yet forced" width="620">
+</p>
+
+The border market in week three: the envoy has returned, the dragon is irritated, and the merchant's sword is the hedge against a confrontation the story has not yet forced.
+
 `media/` ships five illuminated-manuscript plates, conformed to the client's
 320x200 logical surface. Five plates cover twenty-three blocks: beats reuse
 locations, so every training week shares the study, both dragon beats share the

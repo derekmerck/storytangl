@@ -60,6 +60,17 @@ table of hitbox coordinates it cannot draw.
 
 ## Art packs
 
+<p align="center">
+  <img src="../../.github/assets/repartee-quay.png"
+       alt="The repartee_loop opening beat in the quayside pack" width="49%">
+  <img src="../../.github/assets/repartee-spaceport.png"
+       alt="The same beat in the spaceport pack" width="49%">
+</p>
+
+The same beat in both packs. Identical prose, identical choice, identical graph,
+script, staging hints and client -- one line of `world.yaml` selects the pack.
+
+
 Assets are world-owned and resolved by name through the bundle's media
 registry, so an alternative art pack is a sibling directory holding the same
 asset names. Swapping is one line in `world.yaml`:
