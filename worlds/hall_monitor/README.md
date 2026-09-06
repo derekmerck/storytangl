@@ -87,3 +87,23 @@ encounter: its packet is fresh, while its bearer is the same live graph subject.
 - Service world resolution reuses one compiled world per configured directory
   set. This prevents repeated service reads from recompiling the same singleton
   world during media and journal delivery.
+
+## Art
+
+<p align="center">
+  <img src="../../.github/assets/hall-monitor-desk.png" alt="The monitor's station" width="620">
+</p>
+
+The monitor's station. The packet panel on the right is the same `zone` and `piece` fragments the CLI prints as numbered rows -- the student's ID and a doctor's note, with the typed inspect choice below.
+
+`media/` ships a small brutalist civic pack of block backgrounds, conformed to the
+client's 320x200 logical surface. Two plates cover the world: the hall, and the monitor's desk.
+
+The world plays identically without them — every plate is `media_role:
+narrative_im`, which any client may ignore, and the CLI never asks for one. Art
+is additive here in the same sense as in `repartee_loop`.
+
+`media/manifest.json` records what ships; `media/provenance/jobs.json` records
+the workflow, models, parameters, prompts, seeds and reference-image hashes that
+produced it, with the worker endpoint redacted. `media/AGENTS.md` adjudicates why
+these files are committed binaries.

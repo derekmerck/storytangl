@@ -498,10 +498,19 @@ class Stage:
         self.scroll = min(max(self.scroll + delta, 0), self.max_scroll)
 
     def _row(self, index: int, text: str, *, y: int, colour, action: Action | None) -> None:
-        """Draw one numbered row and, when actionable, record its hitbox."""
+        """Draw one numbered row and, when actionable, record its hitbox.
+
+        Rows sit directly on the scene, so they carry their own backing. Prose
+        has had one since the beginning; choices did not, and cream text over a
+        pale plate -- a sunlit market, a parchment floor -- was unreadable
+        exactly where the art was working hardest.
+        """
 
         surface = self.font.render(f"{index}. {text}", False, colour)
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
+        backing = rect.inflate(6, 2)
+        backing.left = 5
+        pygame.draw.rect(self.surface, INK, backing)
         self.surface.blit(surface, rect.topleft)
         if action is not None:
             self.hitboxes.append((rect, action))

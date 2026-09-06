@@ -42,6 +42,16 @@ def _choice_id(payload: dict[str, object], text: str) -> str:
     raise AssertionError(f"No {text!r} choice in {fragments!r}")
 
 
+def _card_media(payload: dict) -> list[dict]:
+    """Media fragments that are the credential card, not the block's scenery."""
+
+    return [
+        fragment
+        for fragment in _fragments(payload, "media")
+        if fragment.get("media_role") == "credential_card"
+    ]
+
+
 def _fragments(payload: dict[str, object], fragment_type: str) -> list[dict[str, object]]:
     """Return one response's client-visible fragments of ``fragment_type``."""
 
@@ -180,7 +190,9 @@ def test_hall_monitor_delivers_subject_mismatch_card_without_hidden_truth(
         for fragment in _fragments(payload, "piece")
         if fragment.get("hints", {}).get("label_text") == "student ID"
     )
-    media = _fragments(payload, "media")
+    # Filter to the card: the world also stages block backgrounds, and this
+    # test is about the assembled credential, not about the absence of scenery.
+    media = _card_media(payload)
     relation = next(
         fragment
         for fragment in _fragments(payload, "group")
@@ -198,7 +210,7 @@ def test_hall_monitor_delivers_subject_mismatch_card_without_hidden_truth(
 
     reloaded = client.get("story/update", headers=headers)
     assert reloaded.status_code == 200
-    reloaded_media = _fragments(reloaded.json(), "media")
+    reloaded_media = _card_media(reloaded.json())
     assert [fragment["uid"] for fragment in reloaded_media] == [media[0]["uid"]]
 
 
@@ -267,7 +279,7 @@ def test_hall_monitor_keeps_the_text_floor_when_card_becomes_pending(
         fragment.get("hints", {}).get("label_text") == "student ID"
         for fragment in _fragments(payload, "piece")
     )
-    assert _fragments(payload, "media") == []
+    assert _card_media(payload) == []
     assert not any(
         fragment.get("group_type") == "piece_media"
         for fragment in _fragments(payload, "group")

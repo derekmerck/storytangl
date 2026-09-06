@@ -10,6 +10,11 @@ scenes:
     title: "Main Hall"
     blocks:
       entrance:
+        media:
+          - name: hallway_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: |
           The warning bell has rung. Students begin moving between classrooms,
           activities, and the front office.
@@ -18,6 +23,11 @@ scenes:
             successor: morning_shift
 
       morning_shift:
+        media:
+          - name: hall_desk_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         kind: "hall_monitor.domain.HallMonitorBlock"
         encounters: 5
         disposition_distribution:
@@ -37,6 +47,11 @@ scenes:
             predicate: game_lost
 
       victory:
+        media:
+          - name: hallway_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: |
           The morning bell settles the halls. Every student was handled correctly.
         actions:
@@ -44,6 +59,11 @@ scenes:
             successor: attendance_note
 
       defeat:
+        media:
+          - name: hallway_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: |
           The passing period ends with an unresolved mistake on the attendance sheet.
         actions:
@@ -51,11 +71,21 @@ scenes:
             successor: attendance_note
 
       attendance_note:
+        media:
+          - name: hall_desk_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         kind: "hall_monitor.domain.HallMonitorConsequenceBlock"
         content: |
           The attendance office has filed one note from the morning shift.
 
       returning_student:
+        media:
+          - name: hall_desk_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         kind: "hall_monitor.domain.HallMonitorReturnBlock"
         content: |
           A student waits at the hall desk with new paperwork.
@@ -68,5 +98,10 @@ scenes:
             predicate: game_lost
 
       return_complete:
+        media:
+          - name: hallway_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         content: |
           The final bell rings across the now-quiet hall.

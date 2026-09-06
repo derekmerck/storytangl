@@ -45,8 +45,15 @@ world and start making choices:
 <p align="center">
   <img src=".github/assets/cli-session.png"
        alt="A StoryTangl CLI session: starting the coronate_the_regent world, provoking a dragon, and being offered a dragonslayer sword"
-       width="620">
+       width="49%">
+  <img src=".github/assets/coronate-merchant.png"
+       alt="The same beat in the pygame port: the border market, the irritated dragon, and the merchant's offer"
+       width="49%">
 </p>
+
+The same world, the same beat, two surfaces. The text floor is not a fallback for
+the pixel one -- they are two readings of one fragment stream, and neither knows
+the other exists.
 
 That warning to the dragon is not flavour text. It grants the player an
 `irritated_dragon` condition, and a later scene tests for it and compels a
