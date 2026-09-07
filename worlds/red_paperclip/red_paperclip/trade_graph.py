@@ -50,6 +50,9 @@ class Trader(BaseModel):
     name: str
     hub: str
     here: str = ""
+    gone: str = ""
+    """What they are doing once they have nothing left to trade."""
+
     offers: str = ""
     accepts: list[str] = Field(default_factory=list)
     lines: dict[str, str] = Field(default_factory=dict)
@@ -90,6 +93,15 @@ class Trader(BaseModel):
         return (
             f"{self.short_name} will trade {items[self.offers].name} "
             f"for {items[held].name}"
+        )
+
+    def gone_text(self, items: dict[str, TradeItem]) -> str:
+        """Return what to say about this trader once they are spent."""
+        if self.gone:
+            return self.gone
+        return (
+            f"{self.short_name} has nothing left to trade for "
+            f"{items[self.offers].name}."
         )
 
     def refusal(self, held: str, items: dict[str, TradeItem]) -> str:
@@ -153,6 +165,8 @@ class TradeGraph(BaseModel):
             self.items[label].ending = value
         elif attribute == "here" and label in self.traders:
             self.traders[label].here = value
+        elif attribute == "gone" and label in self.traders:
+            self.traders[label].gone = value
         else:
             raise TradeParseError(f"no {attribute!r} to set on {label!r}")
 

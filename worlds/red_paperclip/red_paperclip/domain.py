@@ -29,6 +29,8 @@ from uuid import UUID
 
 from tangl.core import Graph, Priority, Selector
 from tangl.core.runtime_op import Effect, Predicate
+from tangl.core import BaseFragment
+from tangl.journal.fragments import ContentFragment
 from tangl.journal.intent import Blocker, KvRow
 from tangl.mechanics.sandbox import SandboxLocation, SandboxMob, SandboxScope
 from tangl.mechanics.sandbox.story_info import SandboxStoryInfoProjector
@@ -42,6 +44,7 @@ from tangl.service.response import (
 from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
 from tangl.story import Action, StoryGraph
 from tangl.vm import Ledger, on_gather_ns, on_provision
+from tangl.vm.dispatch import on_compose_journal
 from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.runtime.frame import PhaseCtx
 
@@ -355,6 +358,54 @@ def contribute_red_paperclip_symbols(
         "journey_count": int(_state(caller)["world_turn"]),
         "paperclip_trade": lambda trader: _trade(caller, str(trader)),
     }
+
+
+@on_compose_journal(
+    wants_caller_kind=RedPaperclipHub,
+    wants_exact_kind=False,
+    priority=Priority.LATE,
+)
+def compose_spent_trader_lines(
+    *,
+    caller: RedPaperclipHub,
+    ctx: VmPhaseCtx,
+    fragments: list[BaseFragment],
+    **_kw: object,
+) -> list[BaseFragment] | None:
+    """Say what a trader with nothing left is doing instead.
+
+    Their rows are gone, which is right — an offer that no longer exists is
+    not a refusal — but they are still standing in the hub, and a person
+    described as mending a net while silently offering nothing is the kind of
+    gap that turns a puzzle into a hunt. The row was right to go; the fact
+    belongs in the prose, so it goes there.
+    """
+
+    _ = ctx
+    scope = _maybe_scope(caller)
+    if scope is None:
+        return None
+    spent = set(_spent(caller))
+    lines = {
+        mob.uid: TRADES.traders[mob.get_label()].gone_text(TRADES.items)
+        for mob in scope.mobs
+        if mob.get_label() in spent
+    }
+    if not lines:
+        return None
+
+    swapped = False
+    composed: list[BaseFragment] = []
+    for fragment in fragments:
+        # Type first: only a content fragment carries the source that says
+        # which mob spoke, and a choice fragment has no `source_id` at all.
+        line = lines.get(fragment.source_id) if isinstance(fragment, ContentFragment) else None
+        if line is not None:
+            composed.append(fragment.model_copy(update={"content": line}))
+            swapped = True
+        else:
+            composed.append(fragment)
+    return composed if swapped else None
 
 
 # ---------------------------------------------------------- story info

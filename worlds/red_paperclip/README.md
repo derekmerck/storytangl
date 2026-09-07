@@ -45,7 +45,11 @@ and one that cannot gets the same numbered list.
 
 **Traders are `SandboxMob`s.** They are parked in a hub with `present_text`, so
 who is in front of you is composed into the journal by
-`compose_sandbox_mob_journal` without this world writing any of it.
+`compose_sandbox_mob_journal` without this world writing any of it. A spent
+trader's line is swapped for their `.gone` text by a world compose handler:
+their rows are dropped, because an offer that no longer exists is not a
+refusal, but they are still standing there and something has to account for
+the silence.
 
 **Trades are ordinary actions** projected by a world authority, one per
 `(trader, item they accept)`, self-looping, with `holding == 'x'` as the guard

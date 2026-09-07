@@ -361,6 +361,28 @@ class TestRedPaperclipWorld:
         for action in _actions(ledger):
             assert action.ui_hints.model_dump().get("trader") != "mira"
 
+    def test_a_spent_trader_says_so_in_the_prose(self) -> None:
+        """The row goes; the account of it does not.
+
+        A trader with nothing left is not a refused offer, so their rows are
+        dropped — but they are still standing in the hub, and describing them
+        mending a net while silently offering nothing is the gap that turns a
+        puzzle into a hunt.
+        """
+
+        ledger = _start()
+        _go(ledger, "harbor")
+        _trade(ledger, "mira")
+        _go(ledger, "road")
+        _go(ledger, "harbor")
+
+        content = _content(ledger)[-4:]
+
+        assert any("nothing else to spare" in line for line in content)
+        assert not any("spool of orange twine" in line for line in content)
+        # Her neighbours are untouched: they still have their one thing.
+        assert any("re-lashing a rack" in line for line in content)
+
     def test_the_two_trade_trap_ends_the_story_early(self) -> None:
         ledger = _start()
 

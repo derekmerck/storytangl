@@ -16,8 +16,10 @@
 #
 # A trade line may carry the line the journal prints, d2-style, after a
 # colon. Attributes hang off a dotted key: `.here` is what you see when a
-# trader is in front of you, `.ending` is how the story ends if you are
-# still holding that item when nobody will trade for it any more.
+# trader is in front of you, `.gone` is what you see once they have traded
+# their one thing away, and `.ending` is how the story ends if you are still
+# holding that item when nobody will trade for it any more. `.gone` is
+# optional; without it a trader says plainly that they have nothing left.
 #
 # Paste it into d2 or read it top to bottom. Both work.
 
@@ -77,6 +79,7 @@ stuffed_marlin.ending: |
 
 mira: Mira, who mends nets @ harbor
 mira.here: Mira has a net across her knees and a spool of orange twine.
+mira.gone: Mira has the paperclip worked into the net and nothing else to spare.
 
 finn: Finn at the boat racks @ harbor
 finn.here: Finn is re-lashing a rack that does not need re-lashing.
@@ -98,12 +101,14 @@ panel_van -> gunnar: The harbourmaster has wanted a van since the spring. He sig
 
 wick: Wick, at the tarp table @ market
 wick.here: Wick is arranging brass on a tarp in no order at all.
+wick.gone: Wick has nothing brass left on the tarp worth trading for.
 
 cass: Cass, in off the day boat @ market
 cass.here: Cass has crates to shift and is short of hands.
 
 pia: Pia, who bakes @ market
 pia.here: Pia is out of things to sell by nine and stays until noon anyway.
+pia.gone: Pia gave away the jar and will not start another this year.
 
 hollis: Hollis, closing the cafe @ market
 hollis.here: Hollis is boxing up a cafe one shelf at a time.
