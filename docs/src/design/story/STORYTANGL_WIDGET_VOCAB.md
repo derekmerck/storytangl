@@ -8,7 +8,8 @@ not StoryTangl engine layers. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
 **Source of truth (for engine model alignment):**
 - `tangl.journal.fragments` (fragment types)
-- `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
+- `tangl.service.response` (`RuntimeEnvelope`)
+- `tangl.presentation.projection` (`ProjectedState`, section value union)
 - `tangl.presentation.hints` (`PresentationHints`, `StagingHints`)
 - `tangl.presentation.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
 - `tangl.presentation.values` (`KvRow`, `PrimitiveValue`)
