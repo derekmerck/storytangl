@@ -109,7 +109,7 @@ def _write_story_bundle(
         (package_dir / "domain.py").write_text(
             "\n".join(
                 [
-                    "from tangl.presentation.intent import KvRow",
+                    "from tangl.presentation.values import KvRow",
                     "from tangl.service import KvListValue, ProjectedSection, ProjectedState",
                     "",
                     "class DemoProjector:",

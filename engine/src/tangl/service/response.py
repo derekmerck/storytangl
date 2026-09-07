@@ -22,8 +22,9 @@ from pydantic import (
 
 from tangl.core import BaseFragment
 from tangl.info import __url__
-from tangl.presentation.intent import KvRow, PrimitiveValue
-from tangl.presentation.hints import PresentationHints
+from tangl.presentation.hints import PresentationHints as _PresentationHints
+from tangl.presentation.values import KvRow as _KvRow
+from tangl.presentation.values import PrimitiveValue as _PrimitiveValue
 from tangl.journal.fragments import (
     KvFragment,
     MediaFragment,
@@ -366,14 +367,14 @@ class ScalarValue(BaseModel):
     """Single scalar projected-state payload."""
 
     value_type: Literal["scalar"] = "scalar"
-    value: PrimitiveValue
+    value: _PrimitiveValue
 
 
 class KvListValue(BaseModel):
     """Ordered key-value payload."""
 
     value_type: Literal["kv_list"] = "kv_list"
-    items: list[KvRow]
+    items: list[_KvRow]
 
 
 class ProjectedItem(BaseModel):
@@ -396,7 +397,7 @@ class TableValue(BaseModel):
 
     value_type: Literal["table"] = "table"
     columns: list[str]
-    rows: list[list[PrimitiveValue]]
+    rows: list[list[_PrimitiveValue]]
 
     @model_validator(mode="after")
     def _validate_row_lengths(self) -> Self:
@@ -431,7 +432,7 @@ class ProjectedSection(BaseModel):
     title: str
     kind: str | None = None
     value: SectionValue
-    hints: PresentationHints | None = None
+    hints: _PresentationHints | None = None
 
 
 class ProjectedState(InfoModel):

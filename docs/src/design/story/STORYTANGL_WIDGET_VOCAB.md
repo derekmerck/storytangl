@@ -11,6 +11,7 @@ not StoryTangl engine layers. **This document is target-truth.**
 - `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
 - `tangl.presentation.hints` (`PresentationHints`, `StagingHints`)
 - `tangl.presentation.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
+- `tangl.presentation.values` (`KvRow`, `PrimitiveValue`)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual
@@ -675,7 +676,7 @@ for `KvFragment` and the simpler `{key, value}` form for
 `ProjectedKVItem`.
 
 ```python
-# tangl/journal/intent.py (Tier P1; ratifies the unified shape)
+# tangl/presentation/values.py (Tier P1; ratifies the unified shape)
 class KvRow(BaseModel, extra="allow"):
     """Unified key/value row for both scene-bound and projected surfaces."""
     key: str
@@ -1085,10 +1086,10 @@ dictionary-shaped sub-surfaces to promote.
 ### 6.1 Typed `Accepts`
 
 The engine's `ChoiceFragment.accepts` is a Pydantic discriminated union in
-`tangl/journal/intent.py`:
+`tangl.presentation.intent`:
 
 ```python
-# tangl/journal/intent.py — Tier P1
+# tangl/presentation/intent.py — Tier P1
 from typing import Annotated, Literal, TypeAlias
 from pydantic import BaseModel, ConfigDict, Field
 

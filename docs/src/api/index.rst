@@ -9,5 +9,6 @@ Curated API reference grouped by subsystem rather than a single flat package pag
    core/index
    vm/index
    story/index
+   presentation/index
    service/index
    server/index

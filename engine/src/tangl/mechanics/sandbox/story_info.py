@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from typing import Protocol, cast
 
 from tangl.core import Selector, Token
-from tangl.presentation.intent import KvRow
+from tangl.presentation.values import KvRow
 from tangl.service.response import (
     InfoAffordance,
     ItemListValue,

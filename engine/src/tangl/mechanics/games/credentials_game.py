@@ -25,8 +25,9 @@ if TYPE_CHECKING:
 
 from tangl.core import BaseFragment, TokenCatalog
 from tangl.core.bases import BaseModelPlus, Unstructurable
-from tangl.presentation.intent import KvRow, PieceConstraints, PiecesAccepts, PickAccepts
+from tangl.presentation.intent import PieceConstraints, PiecesAccepts, PickAccepts
 from tangl.presentation.hints import PresentationHints
+from tangl.presentation.values import KvRow
 from tangl.journal.fragments import (
     ContentFragment,
     GroupFragment,

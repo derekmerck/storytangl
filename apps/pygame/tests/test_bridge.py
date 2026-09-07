@@ -17,13 +17,13 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.presentation.intent import (
-    KvRow,
     PickAccepts,
     PieceConstraints,
     PiecesAccepts,
     QuantityAccepts,
     TextAccepts,
 )
+from tangl.presentation.values import KvRow
 from tangl.pygame_client.bridge import (
     PygameSessionBridge,
     UnsupportedAccepts,

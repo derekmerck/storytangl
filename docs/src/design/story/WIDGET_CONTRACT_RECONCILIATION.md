@@ -220,7 +220,7 @@ others.
   transient UX direction carried beside it.
 - Updated web, CLI, Tk/reference planning, REST, remote-client hydration, and
   conformance fixtures to the same request and response shapes.
-- Added typed journal `Blocker(code, message, refs)` values. **Impact:**
+- Added typed presentation `Blocker(code, message, refs)` values. **Impact:**
   authored player-facing explanations survive action materialization, while
   generated VM resolver diagnostics are normalized at the story/journal
   boundary without exposing VM blocker objects as the UI contract.
@@ -401,7 +401,7 @@ references; webapp behavior aligns to v1.6.
 API maps them.
 
 - Engine PR sequence:
-  1. ✅ Typed `Blocker` model in `tangl/journal/intent.py`.
+  1. ✅ Typed `Blocker` model in `tangl.presentation.intent`.
   2. ✅ Plural typed `CostPreview` authoring and service/client projection.
   3. ✅ Typed direct/find `EdgeResolutionRequest` and `UxEvent`.
   4. ✅ Typed `metadata.grammar` model and visible-surface synthesis.

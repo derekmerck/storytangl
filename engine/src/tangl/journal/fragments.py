@@ -1,8 +1,8 @@
 """Canonical journal fragment surface.
 
-This module is the stable import home for repo-owned reusable fragment and hint
-types. Legacy subpackages under ``tangl.journal`` re-export from here for
-compatibility.
+This module is the stable import home for repo-owned reusable fragment types.
+Presentation values belong to :mod:`tangl.presentation`; journal compatibility
+subpackages re-export only fragment types.
 """
 
 from __future__ import annotations
@@ -22,8 +22,12 @@ from pydantic import (
 )
 
 from tangl.core import BaseFragment, Graph, Registry, Selector
-from tangl.presentation.hints import PresentationHints, StagingHints
-from tangl.presentation.intent import Accepts, Blocker, KvRow, UIHints
+from tangl.presentation.hints import PresentationHints as _PresentationHints
+from tangl.presentation.hints import StagingHints as _StagingHints
+from tangl.presentation.intent import Accepts as _Accepts
+from tangl.presentation.intent import Blocker as _Blocker
+from tangl.presentation.intent import UIHints as _UIHints
+from tangl.presentation.values import KvRow as _KvRow
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, UnstructuredData
@@ -43,7 +47,7 @@ class ContentFragment(BaseFragment):
     content: Any = None
     source_id: UUID | None = None
     content_format: str | None = Field(None, alias="format")
-    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    presentation_hints: _PresentationHints | None = Field(None, alias="hints")
 
 
 class GroupFragment(BaseFragment, extra="allow"):
@@ -58,7 +62,7 @@ class GroupFragment(BaseFragment, extra="allow"):
     group_type: str | Enum | None = None
     member_ids: list[UUID] = Field(default_factory=list)
     zone_role: str | None = None
-    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    presentation_hints: _PresentationHints | None = Field(None, alias="hints")
 
     def members(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
         return [
@@ -107,7 +111,7 @@ class PieceFragment(BaseFragment, extra="allow"):
     display_state: str | None = None
     zone_ref: UUID | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
-    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    presentation_hints: _PresentationHints | None = Field(None, alias="hints")
     available: bool = True
     """Render disabled when False -- a piece present but not selectable now.
 
@@ -124,7 +128,7 @@ class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
     """Ordered key-value fragment for info-like surfaces."""
 
     fragment_type: Literal["kv"] = "kv"
-    content: list[KvRow] = Field(default_factory=list)
+    content: list[_KvRow] = Field(default_factory=list)
 
 
 UI_TAG_PREFIX = "ui:"
@@ -160,11 +164,11 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
-    blockers: list[Blocker] | None = None
-    accepts: Accepts | None = Field(
+    blockers: list[_Blocker] | None = None
+    accepts: _Accepts | None = Field(
         None, json_schema_extra={"unstructurable": True}
     )
-    ui_hints: UIHints | None = None
+    ui_hints: _UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
 
 
@@ -199,7 +203,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     content: MediaRIT | Pathlike | bytes | str | dict
     content_format: ContentFormatType
     rit_id: UUID | None = None
-    staging_hints: StagingHints | None = None
+    staging_hints: _StagingHints | None = None
     media_role: str | None = None
     scope: str | None = "world"
     fragment_type: Literal["media"] = "media"

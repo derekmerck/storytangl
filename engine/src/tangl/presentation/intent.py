@@ -1,4 +1,4 @@
-"""Typed interaction and key/value intent contracts for presentation values."""
+"""Typed interaction-intent contracts for presentation values."""
 
 from __future__ import annotations
 
@@ -7,9 +7,6 @@ from typing import Annotated, Any, Literal, TypeAlias
 from pydantic import ConfigDict, Field
 
 from tangl.core.bases import Unstructurable
-
-
-PrimitiveValue: TypeAlias = str | int | float | bool
 
 
 class IntentModel(Unstructurable):
@@ -30,19 +27,6 @@ class IntentModel(Unstructurable):
     """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
-
-
-class KvRow(IntentModel):
-    """Unified key/value row for scene-bound and projected-state surfaces."""
-
-    key: str
-    value: PrimitiveValue
-    max: PrimitiveValue | None = None
-    delta: int | float | None = None
-    unit: str | None = None
-    hint: Literal["bar", "fraction", "delta", "tag"] | None = None
-    emphasis: Literal["ok", "warn", "danger", "subtle"] | None = None
-    presentation_hints: dict[str, Any] | None = Field(None, alias="hints")
 
 
 class CostPreview(IntentModel):
@@ -194,14 +178,12 @@ __all__ = [
     "ComposePart",
     "CostPreview",
     "EnumValidator",
-    "KvRow",
     "LengthValidator",
     "NonComposeAccepts",
     "PickAccepts",
     "PieceConstraints",
     "PiecesAccepts",
     "PlaceAccepts",
-    "PrimitiveValue",
     "QuantityAccepts",
     "RegexValidator",
     "TextAccepts",

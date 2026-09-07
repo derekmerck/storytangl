@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from tangl.presentation.intent import Accepts, Blocker, CostPreview, KvRow, UIHints
+from tangl.presentation.intent import Accepts, Blocker, CostPreview, UIHints
+from tangl.presentation.values import KvRow
 
 
 def test_accepts_union_validates_piece_and_compose_shapes() -> None:
@@ -48,6 +49,12 @@ def test_kvrow_accepts_semantic_display_fields() -> None:
     assert row.value == 6
     assert row.max == 10
     assert row.unit == "gallons"
+
+
+def test_kvrow_constructor_form_round_trip_preserves_display_fields() -> None:
+    row = KvRow(key="fuel", value=6, max=10, unit="gallons", hint="bar")
+
+    assert KvRow.structure(row.unstructure()) == row
 
 
 def test_blocker_preserves_portable_fields_and_optional_details() -> None:

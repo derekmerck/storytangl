@@ -26,7 +26,7 @@ from tangl.service import (
     ServiceManager,
     TableValue,
 )
-from tangl.presentation.intent import KvRow
+from tangl.presentation.values import KvRow
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
 from tangl.vm.runtime.frame import PhaseCtx

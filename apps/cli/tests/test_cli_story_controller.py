@@ -9,7 +9,7 @@ from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment
 from tangl.presentation.intent import Blocker, CostPreview, UIHints
-from tangl.presentation.intent import KvRow
+from tangl.presentation.values import KvRow
 from tangl.service.response import (
     BadgeListValue,
     DirectEdgeRequest,

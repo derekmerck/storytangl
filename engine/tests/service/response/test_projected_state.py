@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.presentation.hints import PresentationHints
-from tangl.presentation.intent import KvRow
+from tangl.presentation.values import KvRow
 from tangl.service.response import (
     BadgeListValue,
     InfoAffordance,

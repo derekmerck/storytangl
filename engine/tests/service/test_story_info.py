@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from tangl.core import Graph
 from tangl.persistence.factory import PersistenceManagerFactory
-from tangl.presentation.intent import KvRow
+from tangl.presentation.values import KvRow
 from tangl.service import build_service_manager
 from tangl.service.response import (
     InfoAffordance,

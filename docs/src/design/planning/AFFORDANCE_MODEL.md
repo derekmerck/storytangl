@@ -615,7 +615,7 @@ Classifying them against "who generated this edge / who owns its cleanup?"
 
 **The core tension:** the unambiguously-lifecycle fields `source` and `scope`
 ride inside `ui_hints`, whose model docstring (`UIHints`,
-`journal/intent.py`) declares it *"Advisory renderer hints for choices"* — a
+`tangl.presentation.intent`) declares it *"Advisory renderer hints for choices"* — a
 **presentation channel**. Cleanup ownership is lifecycle and should not hide in a
 presentation channel. Menu and game projectors, by contrast, historically
 carried *no* `ui_hints` at all; their only attribution was the discriminator tag

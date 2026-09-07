@@ -9,10 +9,9 @@ from .intent import (
     Accepts,
     Blocker,
     CostPreview,
-    KvRow,
-    PrimitiveValue,
     UIHints,
 )
+from .values import KvRow, PrimitiveValue
 
 __all__ = [
     "Accepts",

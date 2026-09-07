@@ -10,3 +10,10 @@ alternate journal. Journal fragments retain their identity, provenance,
 persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
+
+## Status
+
+Current — Slice 1 owns interaction intent, display values, and rendering or
+staging hints. It has no presentation dispatch, projected-state types, UX
+events, widget classes, client bindings, or transport policy; those remain
+outside this slice.
