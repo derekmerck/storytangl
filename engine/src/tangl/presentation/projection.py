@@ -27,7 +27,7 @@ class InfoState(BaseModel):
     available_kinds: list[str] = Field(default_factory=list)
 
 
-class StoryInfoRequest(BaseModel):
+class ProjectionRequest(BaseModel):
     """Opaque projected-state request descriptor from a client."""
 
     kind: str | None = None
@@ -153,6 +153,6 @@ __all__ = [
     "ProjectedState",
     "ScalarValue",
     "SectionValue",
-    "StoryInfoRequest",
+    "ProjectionRequest",
     "TableValue",
 ]

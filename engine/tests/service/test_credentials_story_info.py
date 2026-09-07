@@ -25,7 +25,7 @@ from tangl.mechanics.games import (
 )
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.presentation.projection import KvListValue, ScalarValue, StoryInfoRequest, TableValue
+from tangl.presentation.projection import KvListValue, ProjectionRequest, ScalarValue, TableValue
 from tangl.story import Block
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -77,7 +77,7 @@ def _block_and_ctx() -> tuple[CredentialsBlock, PhaseCtx]:
 
 
 def _sections(block, ctx, **request_kwargs):
-    state = do_get_story_info(block, ctx=ctx, request=StoryInfoRequest(**request_kwargs))
+    state = do_get_story_info(block, ctx=ctx, request=ProjectionRequest(**request_kwargs))
     return {section.section_id: section for section in state.sections}
 
 

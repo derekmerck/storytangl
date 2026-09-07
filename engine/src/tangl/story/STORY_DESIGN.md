@@ -48,7 +48,8 @@ World/factory authority is the canonical story runtime model.
 - `World.create_story(...)` calls inherited graph materialization, then runs
   story-only post-passes through `StoryMaterializer`.
 - `Graph.get_authorities()` delegates through the bound factory, so runtime
-  authority is `graph -> world/factory -> dispatch registries`.
+  authority is `graph -> presentation/story base registries -> world/factory
+  registries`.
 - Template, token, and media lookup should go through world/factory authority
   methods, not through VM-owned story discovery seams.
 
@@ -169,7 +170,7 @@ surviving fields onto `World` and wires in adjunct resources such as:
 - class registry / imported domain modules
 - media/resources/assets
 - optional extra template registries
-- story info projector
+- world-owned presentation contributors through ordinary dispatch authorities
 
 The compiled bundle may still exist as an internal helper during loading, but it
 is not the canonical runtime contract for story execution.

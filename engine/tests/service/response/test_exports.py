@@ -22,7 +22,6 @@ def test_service_response_types_importable() -> None:
         UserSecret,
         coerce_runtime_info,
     )
-    from tangl.service.story_info import DefaultStoryInfoProjector, StoryInfoProjector
 
     assert AuthoringDiagnostic is not None
     assert CommandEdgeQuery is not None
@@ -40,8 +39,6 @@ def test_service_response_types_importable() -> None:
     assert RuntimeInfo is not None
     assert UserSecret is not None
     assert coerce_runtime_info is not None
-    assert DefaultStoryInfoProjector is not None
-    assert StoryInfoProjector is not None
 
 
 def test_service_package_exports_include_manager_first_contract() -> None:
@@ -51,7 +48,6 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "AuthoringDiagnostic",
         "BlockingMode",
         "CommandEdgeQuery",
-        "DefaultStoryInfoProjector",
         "DirectEdgeRequest",
         "EdgeQuery",
         "EdgeResolutionRequest",
@@ -71,7 +67,6 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "ServiceMethodSpec",
         "ServiceSession",
         "ServiceWriteback",
-        "StoryInfoProjector",
         "SystemInfo",
         "UserAuthInfo",
         "UserInfo",
@@ -83,8 +78,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "do_advertise_info_channels",
         "do_get_story_info",
         "get_service_method_spec",
-        "on_advertise_info_channels",
-        "on_get_story_info",
+        "service_dispatch",
         "service_method",
         "user_id_by_key",
     }

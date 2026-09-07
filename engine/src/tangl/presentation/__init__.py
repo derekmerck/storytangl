@@ -13,6 +13,11 @@ from .intent import (
     UIHints,
 )
 from .values import KvRow, PrimitiveValue
+from .dispatch import (
+    on_advertise_info_channels,
+    on_get_story_info,
+    presentation_dispatch,
+)
 from .projection import (
     BadgeListValue,
     InfoAffordance,
@@ -24,7 +29,7 @@ from .projection import (
     ProjectedState,
     ScalarValue,
     SectionValue,
-    StoryInfoRequest,
+    ProjectionRequest,
     TableValue,
 )
 
@@ -43,14 +48,17 @@ __all__ = [
     "KvRow",
     "PresentationHints",
     "PrimitiveValue",
+    "ProjectionRequest",
     "ProjectedItem",
     "ProjectedSection",
     "ProjectedState",
     "ScalarValue",
     "SectionValue",
     "StagingHints",
-    "StoryInfoRequest",
     "TableValue",
     "UIHints",
     "UxEvent",
+    "on_advertise_info_channels",
+    "on_get_story_info",
+    "presentation_dispatch",
 ]

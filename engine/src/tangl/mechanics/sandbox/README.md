@@ -105,9 +105,9 @@ Current first-pass surface:
 - `tangl.mechanics.sandbox.incremental`: optional adapter that lets hosted
   `IncrementalGame` blocks project allocation choices into a sandbox location
   and resolve production/upkeep as a sandbox tick observer.
-- `tangl.mechanics.sandbox.story_info.SandboxStoryInfoProjector`: optional
-  adapter for the existing service story-info seam. It projects disclosed
-  sandbox state into ordinary `ProjectedState` sections for clients that want
+- `tangl.mechanics.sandbox.story_info`: generic presentation contributors for
+  disclosed sandbox state. Service folds them with world and runtime-local
+  authorities into ordinary `ProjectedState` sections for clients that want
   status rails, inventory panels, map modals, or ebook-style summaries.
 - `map_plate` / `map_regions` story-info channels: plate geometry for clients
   that draw maps, advertised only by a location that owns a plate and served

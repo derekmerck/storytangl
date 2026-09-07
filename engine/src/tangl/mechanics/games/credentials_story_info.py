@@ -1,6 +1,6 @@
 """Story-info channels for the credentials checkpoint shift (Bridge.2b).
 
-Registers ``advertise`` / ``get_story_info`` dispatch handlers (the side-channel
+Registers ``advertise`` / ``get_story_info`` presentation handlers (the side-channel
 surface from ``STORYTANGL_WIDGET_VOCAB.md`` §1.6) so a client can pull
 supplementary projected state on demand: the day's rules, the player's shift
 progress, and the findings surfaced so far for the active candidate.
@@ -16,18 +16,18 @@ itself"):
   active candidate (inspection + mediation outcomes). No unrevealed packet
   truth, no expected disposition.
 
-Service-layer imports are isolated to this module (mirroring
-``tangl.mechanics.sandbox.story_info``); importing it registers the handlers.
+Importing this module registers generic presentation contributors without a
+dependency on Service.
 """
 from __future__ import annotations
 
-from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
 from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
     ProjectedSection,
     ScalarValue,
-    StoryInfoRequest,
+    ProjectionRequest,
     TableValue,
 )
 from tangl.presentation.values import KvRow
@@ -91,7 +91,7 @@ def project_credentials_info(
     *,
     caller: HasGame,
     ctx: PhaseCtx,
-    request: StoryInfoRequest,
+    request: ProjectionRequest,
     **_kw: object,
 ) -> list[ProjectedSection] | None:
     """Project the requested credentials channels for the active shift."""

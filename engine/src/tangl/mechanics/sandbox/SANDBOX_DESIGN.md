@@ -913,17 +913,15 @@ surface. The backend owns world truth, action availability, hidden schedules,
 and mutation. A client receives only the facts the current reader/player is
 allowed to know.
 
-Sandbox attaches through the service story-info dispatch seam. Service remains
-generic; sandbox handlers advertise and fulfill ordinary channel requests for
-location, time, inventory, local presence, exits, and map state. The older
-`SandboxStoryInfoProjector` remains as a compatibility/convenience wrapper over
-the same disclosed sections for worlds that still install a world projector
-directly. Both paths emit ordinary `ProjectedState` sections using the existing
-`kv_list`, `item_list`, and `table` value types. They do not add sandbox widgets
-or require a SugarCube-like interface. A web client may render those sections as
-a room header, inventory panel, time chip, map modal, or roster; a CLI may print
-them as status lines; an ebook compiler may ignore them or fold them into
-generated prose.
+Sandbox attaches through the presentation contributor registry. Service remains
+generic and folds sandbox handlers with world and runtime-local authorities for
+ordinary channel requests covering location, time, inventory, local presence,
+exits, and map state. The handlers emit ordinary `ProjectedState` sections using
+the existing `kv_list`, `item_list`, and `table` value types. They do not add
+sandbox widgets or require a SugarCube-like interface. A web client may render
+those sections as a room header, inventory panel, time chip, map modal, or roster;
+a CLI may print them as status lines; an ebook compiler may ignore them or fold
+them into generated prose.
 
 Current disclosed sections are intentionally conservative:
 
@@ -936,10 +934,10 @@ Current disclosed sections are intentionally conservative:
 - present visible mobs;
 - visible authored exits.
 
-Explicit story-info channel requests use the same service `get_story_info`
-dispatch task. The dispatch handler is explicit-only so it can coexist with
-worlds that still install `SandboxStoryInfoProjector` as a broad fallback
-projector without duplicating default sections. Status-like channels
+Explicit story-info channel requests use the Service `get_story_info` operation
+and the presentation contribution task. The sandbox handler is explicit-only;
+Service provides its own small session fallback without duplicating default
+sections. Status-like channels
 (`location`, `world_time`, `inventory`, `presence`, `exits`, `fixtures`, and
 `local_assets`) return the matching portable section. The `kind="map"` provider
 emits ordinary `ProjectedState` sections (`sandbox_map_summary`,

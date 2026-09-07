@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.core import EntityTemplate, Selector, TemplateRegistry
+from tangl.presentation.dispatch import presentation_dispatch
 from tangl.vm import TraversableGraph
 
 from .dispatch import story_dispatch
@@ -160,7 +161,7 @@ class StoryGraph(TraversableGraph):
 
     def get_authorities(self) -> list[object]:
         """Return story + application/world authority registries when available."""
-        registries: list[object] = [story_dispatch]
+        registries: list[object] = [story_dispatch, presentation_dispatch]
         for registry in super().get_authorities():
             if registry not in registries:
                 registries.append(registry)

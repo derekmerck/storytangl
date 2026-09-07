@@ -20,3 +20,6 @@ also presentation-owned; Service envelopes carry them without defining them.
 
 .. automodule:: tangl.presentation.projection
    :members:
+
+.. automodule:: tangl.presentation.dispatch
+   :members:

@@ -13,7 +13,7 @@ from tangl.presentation.projection import (
     ProjectedSection,
     ProjectedState,
     ScalarValue,
-    StoryInfoRequest,
+    ProjectionRequest,
     TableValue,
 )
 from tangl.presentation.values import KvRow
@@ -142,8 +142,8 @@ def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
     }
 
 
-def test_story_info_request_gathers_explicit_and_opaque_query_kinds() -> None:
-    request = StoryInfoRequest(
+def test_projection_request_gathers_explicit_and_opaque_query_kinds() -> None:
+    request = ProjectionRequest(
         kind="status",
         kinds=["inventory"],
         query={"kinds": ["location", "presence"], "type": "map"},

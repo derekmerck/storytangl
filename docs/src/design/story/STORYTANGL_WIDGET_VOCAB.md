@@ -482,7 +482,7 @@ cheap.
 implements `info_affordances` with `query` descriptors against `/story/info`,
 and the CLI reference floor exposes the same affordances through `?` /
 slash-command output. **Status (engine):** defines typed `InfoAffordance`,
-`InfoState`, and `StoryInfoRequest` models, advertises available channels on
+`InfoState`, and `ProjectionRequest` models, advertises available channels on
 runtime envelopes, and routes `/story/info` through the service-info dispatch
 surface. Fine-grained dirty-kind tracking remains conservative in v1.
 

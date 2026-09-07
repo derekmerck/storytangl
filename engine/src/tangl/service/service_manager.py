@@ -18,9 +18,12 @@ from tangl.presentation.events import GrammarHint, GrammarNoun, GrammarVerb, UxE
 from tangl.presentation.projection import (
     InfoAffordance,
     InfoState,
+    KvListValue,
+    ProjectionRequest,
+    ProjectedSection,
     ProjectedState,
-    StoryInfoRequest,
 )
+from tangl.presentation.values import KvRow
 from tangl.story import InitMode, World, do_find_edges
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.get_code_name import get_code_name
@@ -56,7 +59,6 @@ from .service_method import (
     service_method,
 )
 from .system_info import get_system_info, reset_system
-from .story_info import filter_projected_state, resolve_story_info_projector
 from .user import User
 from .world_registry import (
     WorldRegistry,
@@ -334,6 +336,34 @@ class ServiceManager:
         }
 
     @staticmethod
+    def _default_story_info(ledger: Ledger, request: ProjectionRequest) -> ProjectedState:
+        """Return the small Service-owned session fallback when no provider owns it."""
+        requested = request.requested_kinds()
+        if requested and not {"session", "stats"}.intersection(requested):
+            return ProjectedState()
+
+        items: list[KvRow] = []
+        if ledger.cursor.label:
+            items.append(KvRow(key="Cursor", value=ledger.cursor.label))
+        items.extend(
+            [
+                KvRow(key="Step", value=ledger.step),
+                KvRow(key="Turn", value=ledger.turn),
+                KvRow(key="Journal size", value=len(ledger.get_journal())),
+            ]
+        )
+        return ProjectedState(
+            sections=[
+                ProjectedSection(
+                    section_id="session",
+                    title="Session",
+                    kind="stats",
+                    value=KvListValue(items=items),
+                )
+            ]
+        )
+
+    @staticmethod
     def _build_runtime_envelope(
         ledger: Ledger,
         *,
@@ -581,20 +611,16 @@ class ServiceManager:
             write_back=False,
             user_auth=user_auth,
         ) as session:
-            request = StoryInfoRequest(
+            request = ProjectionRequest(
                 kind=kind,
                 kinds=list(kinds or []),
                 query=query,
             )
             ctx = self._make_story_info_ctx(session.ledger)
             state = do_get_story_info(session.ledger.cursor, ctx=ctx, request=request)
-
-            projector = resolve_story_info_projector(session.ledger)
-            fallback = filter_projected_state(
-                projector.project(ledger=session.ledger),
-                request=request,
-            )
-            return ProjectedState(sections=[*state.sections, *fallback.sections])
+            if state.sections:
+                return state
+            return self._default_story_info(session.ledger, request)
 
     @service_method(
         access=ServiceAccess.CLIENT,

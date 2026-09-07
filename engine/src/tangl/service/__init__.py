@@ -29,8 +29,7 @@ from .exceptions import (
 from .dispatch import (
     do_advertise_info_channels,
     do_get_story_info,
-    on_advertise_info_channels,
-    on_get_story_info,
+    service_dispatch,
 )
 from .response import (
     AuthoringDiagnostic,
@@ -68,7 +67,6 @@ from .service_method import (
     get_service_method_spec,
     service_method,
 )
-from .story_info import DefaultStoryInfoProjector, StoryInfoProjector
 from .world_registry import WorldRegistry
 
 __all__ = [
@@ -77,7 +75,6 @@ __all__ = [
     "AuthoringDiagnostic",
     "BlockingMode",
     "CommandEdgeQuery",
-    "DefaultStoryInfoProjector",
     "DirectEdgeRequest",
     "EdgeQuery",
     "EdgeResolutionRequest",
@@ -102,7 +99,6 @@ __all__ = [
     "ServiceMethodSpec",
     "ServiceSession",
     "ServiceWriteback",
-    "StoryInfoProjector",
     "SystemInfo",
     "UserAuthInfo",
     "UserInfo",
@@ -115,8 +111,7 @@ __all__ = [
     "do_advertise_info_channels",
     "do_get_story_info",
     "get_service_method_spec",
-    "on_advertise_info_channels",
-    "on_get_story_info",
+    "service_dispatch",
     "service_method",
     "user_id_by_key",
 ]

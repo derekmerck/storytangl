@@ -159,12 +159,16 @@ rails, command-line inspection, and future rich panels. The endpoint accepts an
 optional `kind`, comma-separated `kinds`, and opaque JSON `query` descriptor.
 Clients pass query descriptors back without interpreting them.
 
-Story-info has two service dispatch tasks:
+Service exposes two story-info entry points and folds the presentation registry
+with story, world, and runtime-local authorities:
 
 - `advertise_info_channels` gathers presentation `InfoAffordance` values for the next
   `RuntimeEnvelope.metadata.info_affordances` list.
 - `get_story_info` gathers presentation `ProjectedSection` values for a concrete
-  presentation `StoryInfoRequest`.
+  presentation `ProjectionRequest`.
+
+If no contributor returns a section, Service supplies its private minimal session
+projection. It is fallback behavior, not a pluggable provider seam.
 
 The fulfillment task is additive: several handlers may contribute sections for
 a multi-kind request. V1 does not deduplicate `section_id` values or apply

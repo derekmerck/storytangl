@@ -9,8 +9,8 @@ from tangl.journal.fragments import ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.sandbox import SandboxLocation
-from tangl.presentation.projection import KvListValue
-from tangl.service.story_info import resolve_story_info_projector
+from tangl.presentation.projection import KvListValue, ProjectionRequest
+from tangl.service.dispatch import do_get_story_info
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -101,7 +101,11 @@ class TestAdventureSandboxWorld:
 
         _choose(ledger, contribution="deposit_treasure", asset="gold_nugget")
 
-        projected = resolve_story_info_projector(ledger).project(ledger=ledger)
+        projected = do_get_story_info(
+            ledger.cursor,
+            ctx=PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor.uid),
+            request=ProjectionRequest(kind="score"),
+        )
         score_section = next(
             section
             for section in projected.sections
