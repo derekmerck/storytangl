@@ -64,6 +64,7 @@ def test_choice_blocker_dto_round_trip_preserves_typed_contract() -> None:
             "code": "needs_key",
             "message": "The brass key is required.",
             "refs": ["piece-key"],
+            "replaces_text": False,
         }
     ]
     assert isinstance(restored, ChoiceFragment)

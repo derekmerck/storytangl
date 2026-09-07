@@ -66,6 +66,7 @@ def _story_script(
                 "code": "needs_permit",
                 "message": "A valid permit is required.",
                 "refs": ["permit-status"],
+            "replaces_text": False,
             }
         ]
 
@@ -342,6 +343,7 @@ def test_story_envelope_preserves_typed_choice_blockers(
             "code": "needs_permit",
             "message": "A valid permit is required.",
             "refs": ["permit-status"],
+            "replaces_text": False,
         }
     ]
 
