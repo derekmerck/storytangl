@@ -31,6 +31,12 @@ See [composed_beat_demo/README.md](composed_beat_demo/README.md) for details.
 demo with location links, inventory, a lamp, a lockable grate, darkness, and a
 present mob interaction.
 
+### red_paperclip/
+**One Red Paperclip** - A trading-graph puzzle. Six hubs, twenty-one traders,
+and a `trades.d2` data file that reads as a graph because it is one.
+
+See [red_paperclip/README.md](red_paperclip/README.md) for details.
+
 ### ed_queue_demo/
 **ED Queue Demo** - A deterministic queueing/DES mechanics proof rendered
 through normal StoryTangl journal fragments.
