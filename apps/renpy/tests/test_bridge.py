@@ -144,6 +144,7 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
             "code": "missing_key",
             "message": "The brass key is required.",
             "refs": ["piece-key"],
+            "replaces_text": False,
         },
     )
     assert turns[0].choices[1].cost_previews == (

@@ -392,6 +392,9 @@ class Stage:
         Practice Yard", and the client is not allowed to shorten it — that
         would mean parsing prose it does not own — so the names stay in the
         legend and the number is what ties the two together.
+
+        A refused region pins `x`, because the number would be a key that does
+        nothing. See :meth:`_marker`.
         """
 
         rect = pygame.Rect(
@@ -408,7 +411,10 @@ class Stage:
         colour = CREAM if action is not None else DIM
         pygame.draw.rect(self.surface, colour, rect, width=1)
 
-        text = self.font.render(str(index), False, colour)
+        # `x` rather than a number for a refused region, for the same reason
+        # its legend row carries one: the pin is the key, and this box has no
+        # key. Dimmed box, `x` pin, `x)` row -- the three still tie together.
+        text = self.font.render(self._pin(index, choice), False, colour)
         pin = pygame.Rect(rect.x + 1, rect.y + 1, text.get_width() + 4, ROW_H)
         pygame.draw.rect(self.surface, INK, pin)
         self.surface.blit(text, (pin.x + 2, pin.y))
@@ -447,7 +453,9 @@ class Stage:
         visible = rows[self.scroll : self.scroll + capacity]
         y = LOGICAL_SIZE[1] - capacity * ROW_H - 2
         # Choices are keyed by their number rather than by row order, so a
-        # scrolled-away choice stays selectable from the keyboard.
+        # scrolled-away choice stays selectable from the keyboard. Two refused
+        # rows with the same text now share a key, since both are labelled
+        # `x)`; that is harmless because neither has an action to recover.
         by_label = {
             self._choice_label(index, choice): choice
             for index, choice in enumerate(turn.choices, start=1)
@@ -478,8 +486,37 @@ class Stage:
             )
 
     @staticmethod
+    def _pin(index: int, choice: Choice) -> str:
+        """Return the key that commits this choice, or `x` when it has none.
+
+        One function for both surfaces. The plate's pin and the row's marker
+        are the same claim about the same choice, and deriving them separately
+        is how a box ends up numbered while its legend row is not.
+        """
+
+        return "x" if choice_action(choice) is None else str(index)
+
+    @staticmethod
+    def _marker(index: int, choice: Choice) -> str:
+        """Return what goes in front of a row: its key, or that it has none.
+
+        Numbering is positional, so the number a row shows is the key that
+        commits it. A row this port cannot commit has no key, and printing its
+        position invites a press that silently does nothing — so it prints
+        `x)` instead. Live rows therefore run 1, 3, 6 rather than 1, 2, 3: the
+        gaps are the refusals, and every number on screen works.
+
+        Whether the ports should agree on *which* number names a given edge is
+        a separate and open question (#452) — the CLI numbers only the live
+        rows, so the same edge can be 2 there and 3 here.
+        """
+
+        pin = Stage._pin(index, choice)
+        return "x)" if pin == "x" else f"{pin}."
+
+    @staticmethod
     def _choice_label(index: int, choice: Choice) -> str:
-        label = f"{index}. {choice.text}"
+        label = f"{Stage._marker(index, choice)} {choice.text}"
         # An available choice this port cannot collect a value for still needs
         # to say why, or its dimmed legend row reads as an engine refusal.
         if reason := (choice.unavailable_reason or unsupported_reason(choice)):
@@ -677,7 +714,7 @@ class Stage:
 
         self.scroll = min(max(self.scroll + delta, 0), self.max_scroll)
 
-    def _row(self, index: int, text: str, *, y: int, colour, action: Action | None) -> None:
+    def _row(self, marker: str, text: str, *, y: int, colour, action: Action | None) -> None:
         """Draw one numbered row and, when actionable, record its hitbox.
 
         Rows sit directly on the scene, so they carry their own backing. Prose
@@ -686,7 +723,7 @@ class Stage:
         exactly where the art was working hardest.
         """
 
-        surface = self.font.render(self._clip(f"{index}. {text}"), False, colour)
+        surface = self.font.render(self._clip(f"{marker} {text}"), False, colour)
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
         backing = rect.inflate(6, 2)
         backing.left = 5
@@ -703,7 +740,7 @@ class Stage:
             if reason := (choice.unavailable_reason or unsupported_reason(choice)):
                 label = f"{label}  — {reason}"
             self._row(
-                index,
+                self._marker(index, choice),
                 label,
                 y=y,
                 colour=CREAM if action is not None else DIM,
@@ -957,7 +994,7 @@ class Stage:
             if piece.piece_id in on_surface:
                 continue
             self._row(
-                numbering[piece.piece_id],
+                f"{numbering[piece.piece_id]}.",
                 piece.label or piece.piece_id,
                 y=y,
                 colour=CREAM,
@@ -969,7 +1006,7 @@ class Stage:
         if pages > 1:
             page = self.selection_index(turn, pending) + 1
             self._row(
-                PAGE_KEY,
+                f"{PAGE_KEY}.",
                 f"More ({page}/{pages})",
                 y=y,
                 colour=CREAM,
@@ -983,7 +1020,7 @@ class Stage:
             # keyboard can finish is not a usable surface.
             picked = len(pending.picked)
             self._row(
-                CONFIRM_KEY,
+                f"{CONFIRM_KEY}.",
                 f"Confirm ({picked} selected)",
                 y=y,
                 colour=CREAM,
@@ -991,8 +1028,11 @@ class Stage:
             )
             y += 11
         else:
+            # Keeps its number where a refused choice would print `x)`: this is
+            # a control with a fixed binding, and the number is what the panel
+            # is teaching. It starts working the moment the minimum is met.
             self._row(
-                CONFIRM_KEY,
+                f"{CONFIRM_KEY}.",
                 f"Pick {pending.wanted} more",
                 y=y,
                 colour=DIM,
@@ -1000,7 +1040,7 @@ class Stage:
             )
             y += 11
 
-        self._row(CANCEL_KEY, "Cancel", y=y, colour=DIM, action=CancelSelection())
+        self._row(f"{CANCEL_KEY}.", "Cancel", y=y, colour=DIM, action=CancelSelection())
 
     def hit(self, position: tuple[int, int]) -> Action | None:
         """Map a window click to the action its row performs."""

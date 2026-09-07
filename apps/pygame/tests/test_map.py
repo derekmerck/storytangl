@@ -110,6 +110,27 @@ def test_a_guarded_region_is_drawn_but_refuses_the_click(stage, frame) -> None:
     assert stage.hit(_centre(salon)) is None
 
 
+def test_a_refused_region_pins_x_where_a_live_one_pins_its_number(
+    stage, frame
+) -> None:
+    """The pin is the key, and a refused box has no key.
+
+    Dimmed box, `x` pin and `x)` legend row are the same refusal said three
+    times in the same vocabulary; a number there would be a press that does
+    nothing.
+    """
+
+    live, guarded = frame.choices[0], frame.choices[1]
+
+    # The plate's pin and the legend's marker come from one function, so a
+    # box cannot end up numbered while its row is not.
+    assert stage._pin(1, live) == "1"
+    assert stage._pin(2, guarded) == "x"
+    assert stage._marker(1, live) == "1."
+    assert stage._marker(2, guarded) == "x)"
+    assert stage._choice_label(2, guarded).startswith("x) ")
+
+
 def test_a_region_no_choice_claims_is_inert(stage, frame) -> None:
     """The plate names a lighthouse; nothing offers travel there."""
 

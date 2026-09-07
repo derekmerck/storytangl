@@ -500,6 +500,7 @@ def test_story_update_preserves_choice_payload_contracts(
             "code": "needs_permit",
             "message": "A valid permit is required.",
             "refs": ["permit-status"],
+            "replaces_text": False,
         }
     ]
     grammar = update.json()["metadata"]["grammar"]

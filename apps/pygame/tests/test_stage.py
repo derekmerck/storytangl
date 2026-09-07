@@ -66,6 +66,37 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
         assert rect.top >= 0
 
 
+def test_a_refused_row_shows_no_number_to_press(stage: Stage) -> None:
+    """Every number on screen works, and the gaps are the refusals.
+
+    Numbering stays positional -- the number a row shows is the key that
+    commits it -- so live rows run 1, 3 rather than 1, 2 when a refusal sits
+    between them. Printing the refusal's position would invite a press that
+    silently does nothing.
+    """
+
+    live = Choice(edge_id=uuid4(), text="Back to the road")
+    refused = Choice(
+        edge_id=uuid4(),
+        text="Mira would take a doorknob, but you don't have one.",
+        available=False,
+    )
+    second_live = Choice(edge_id=uuid4(), text="Trade with Finn")
+    turn = Turn(
+        step=1,
+        lines=[Line(text="At the harbour.")],
+        choices=[live, refused, second_live],
+    )
+
+    assert stage._marker(1, live) == "1."
+    assert stage._marker(2, refused) == "x)"
+    assert stage._marker(3, second_live) == "3."
+
+    stage.draw(turn)
+
+    assert len(stage.hitboxes) == 2
+
+
 def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> None:
     """A choice row cannot wrap, so an overlong one has to say it was cut.
 
