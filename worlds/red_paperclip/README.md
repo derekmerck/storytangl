@@ -114,6 +114,15 @@ second world needs the same shape — a swap that is one transaction rather than
 two transfers — that is the moment to promote a trade mechanic into
 `tangl.mechanics.sandbox`, not now.
 
+That is a verdict about *one slot*, not about the asset system. A world holding
+several durables at once, spending them on different things, wants real tokens
+— `mira.has(thing)` is the truthful question, and "spent" becomes derived
+rather than tracked in a list beside the holding. This world would pay for that
+by suppressing three generic projections to buy a query it can already answer
+with a string compare, which is the wrong trade at one slot and the right one
+at several. The condition to watch for is a multi-inventory with consumables,
+not a second trading world.
+
 ## Playing it
 
 ```bash
