@@ -1,4 +1,4 @@
-"""Sandbox projected-state adapter contracts."""
+"""Sandbox projected-state provider contracts."""
 
 from __future__ import annotations
 
@@ -6,13 +6,6 @@ import pytest
 from pydantic import Field
 
 from tangl.core import Graph, Selector, Token
-from tangl.presentation.projection import (
-    ItemListValue,
-    KvListValue,
-    ProjectedSection,
-    ProjectionRequest,
-    TableValue,
-)
 from tangl.mechanics.sandbox import (
     ChargeFacet,
     ContainerFacet,
@@ -29,7 +22,18 @@ from tangl.mechanics.sandbox import (
     SandboxVisibilityRule,
     SwitchableFacet,
 )
-from tangl.mechanics.sandbox.story_info import sandbox_status_sections
+from tangl.mechanics.sandbox.story_info import (
+    advertise_sandbox_info_channels,
+    project_sandbox_map_info,
+    sandbox_status_sections,
+)
+from tangl.presentation.projection import (
+    ItemListValue,
+    KvListValue,
+    ProjectedSection,
+    ProjectionRequest,
+    TableValue,
+)
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
 from tangl.story.concepts.asset import AssetType
 from tangl.vm.runtime.frame import PhaseCtx
@@ -68,6 +72,18 @@ def _section_by_id(sections: list[ProjectedSection]) -> dict[str, ProjectedSecti
 def _item_labels(section: ProjectedSection) -> list[str]:
     assert isinstance(section.value, ItemListValue)
     return [item.label for item in section.value.items]
+
+
+def _project_sandbox_info(
+    location: SandboxLocation,
+    ctx: PhaseCtx,
+    request: ProjectionRequest,
+) -> list[ProjectedSection]:
+    return project_sandbox_map_info(
+        caller=location,
+        ctx=ctx,
+        request=request,
+    ) or []
 
 
 def test_sandbox_story_info_projects_disclosed_location_state() -> None:
@@ -185,7 +201,7 @@ def test_sandbox_story_info_hides_suppressed_surroundings_but_keeps_inventory() 
     ]
 
 
-def test_sandbox_advertises_map_info_channel() -> None:
+def test_service_dispatch_fold_advertises_sandbox_map_info_channel() -> None:
     graph = Graph(label="tiny_cave")
     road = SandboxLocation(label="road", location_name="End of Road")
     graph.add(road)
@@ -253,7 +269,7 @@ def test_sandbox_dispatch_projects_requested_status_channels() -> None:
     assert _item_labels(sections["sandbox_exits"]) == ["east"]
 
 
-def test_sandbox_dispatch_filters_requested_status_channels() -> None:
+def test_sandbox_provider_filters_requested_status_channels() -> None:
     graph = Graph(label="tiny_cave")
     road = SandboxLocation(
         label="road",
@@ -266,26 +282,26 @@ def test_sandbox_dispatch_filters_requested_status_channels() -> None:
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 
-    projected = do_get_story_info(
+    projected = _project_sandbox_info(
         road,
-        ctx=ctx,
-        request=ProjectionRequest(kind="location"),
+        ctx,
+        ProjectionRequest(kind="location"),
     )
-    assert [section.section_id for section in projected.sections] == [
+    assert [section.section_id for section in projected] == [
         "sandbox_location"
     ]
 
-    map_nodes = do_get_story_info(
+    map_nodes = _project_sandbox_info(
         road,
-        ctx=ctx,
-        request=ProjectionRequest(kind="map_nodes"),
+        ctx,
+        ProjectionRequest(kind="map_nodes"),
     )
-    assert [section.section_id for section in map_nodes.sections] == [
+    assert [section.section_id for section in map_nodes] == [
         "sandbox_map_nodes"
     ]
 
 
-def test_sandbox_dispatch_empty_request_stays_explicit_only() -> None:
+def test_sandbox_provider_empty_request_stays_explicit_only() -> None:
     graph = Graph(label="tiny_cave")
     road = SandboxLocation(
         label="road",
@@ -298,13 +314,13 @@ def test_sandbox_dispatch_empty_request_stays_explicit_only() -> None:
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 
-    projected = do_get_story_info(
+    projected = _project_sandbox_info(
         road,
-        ctx=ctx,
-        request=ProjectionRequest(),
+        ctx,
+        ProjectionRequest(),
     )
 
-    assert projected.sections == []
+    assert projected == []
 
 
 def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
@@ -332,12 +348,12 @@ def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 
-    projected = do_get_story_info(
+    projected = _project_sandbox_info(
         road,
-        ctx=ctx,
-        request=ProjectionRequest(kind="map"),
+        ctx,
+        ProjectionRequest(kind="map"),
     )
-    sections = _section_by_id(projected.sections)
+    sections = _section_by_id(projected)
 
     assert set(sections) == {
         "sandbox_map_summary",
@@ -386,12 +402,12 @@ def test_sandbox_map_honors_visibility_suppression() -> None:
     ledger = Ledger.from_graph(graph, entry_id=cave.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=cave.uid, step=ledger.step)
 
-    projected = do_get_story_info(
+    projected = _project_sandbox_info(
         cave,
-        ctx=ctx,
-        request=ProjectionRequest(kind="map"),
+        ctx,
+        ProjectionRequest(kind="map"),
     )
-    sections = _section_by_id(projected.sections)
+    sections = _section_by_id(projected)
 
     assert _item_labels(sections["sandbox_map_nodes"]) == ["Dark Cave"]
     edges = sections["sandbox_map_edges"].value
@@ -425,13 +441,13 @@ def test_sandbox_plate_geometry_projects_when_asked_for_by_name() -> None:
     ledger = Ledger.from_graph(graph, entry_id=hub.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
 
-    projected = do_get_story_info(
+    projected = _project_sandbox_info(
         hub,
-        ctx=ctx,
-        request=ProjectionRequest(kinds=["map_plate", "map_regions"]),
+        ctx,
+        ProjectionRequest(kinds=["map_plate", "map_regions"]),
     )
 
-    sections = _section_by_id(projected.sections)
+    sections = _section_by_id(projected)
     plate = sections["sandbox_map_plate"]
     assert isinstance(plate.value, KvListValue)
     assert [(row.key, row.value) for row in plate.value.items] == [
@@ -456,11 +472,11 @@ def test_sandbox_map_channel_stays_reader_facing() -> None:
     ledger = Ledger.from_graph(graph, entry_id=hub.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
 
-    projected = do_get_story_info(hub, ctx=ctx, request=ProjectionRequest(kind="map"))
+    projected = _project_sandbox_info(hub, ctx, ProjectionRequest(kind="map"))
 
-    assert "sandbox_map_nodes" in _section_by_id(projected.sections)
-    assert "sandbox_map_plate" not in _section_by_id(projected.sections)
-    assert "sandbox_map_regions" not in _section_by_id(projected.sections)
+    assert "sandbox_map_nodes" in _section_by_id(projected)
+    assert "sandbox_map_plate" not in _section_by_id(projected)
+    assert "sandbox_map_regions" not in _section_by_id(projected)
 
 
 def test_sandbox_plate_channel_is_advertised_only_by_the_plate_owner() -> None:
@@ -471,8 +487,12 @@ def test_sandbox_plate_channel_is_advertised_only_by_the_plate_owner() -> None:
     hub_ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
     mill_ctx = PhaseCtx(graph=graph, cursor_id=mill.uid, step=ledger.step)
 
-    hub_kinds = {a.kind for a in do_advertise_info_channels(hub, ctx=hub_ctx)}
-    mill_kinds = {a.kind for a in do_advertise_info_channels(mill, ctx=mill_ctx)}
+    hub_kinds = {
+        a.kind for a in advertise_sandbox_info_channels(caller=hub, ctx=hub_ctx)
+    }
+    mill_kinds = {
+        a.kind for a in advertise_sandbox_info_channels(caller=mill, ctx=mill_ctx)
+    }
 
     assert "map_plate" in hub_kinds
     assert "map_plate" not in mill_kinds
