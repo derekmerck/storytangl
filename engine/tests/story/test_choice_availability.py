@@ -26,7 +26,7 @@ import pytest
 
 from tangl.core import EntityTemplate, Graph, Selector, TemplateRegistry
 from tangl.core.runtime_op import Predicate
-from tangl.journal.intent import Blocker
+from tangl.presentation.intent import Blocker
 from tangl.story.concepts import Actor, Location, Role, Setting
 from tangl.story.episode import Action, Block, Scene
 from tangl.story.fragments import ChoiceFragment, ContentFragment

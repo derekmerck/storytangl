@@ -3,7 +3,8 @@ from uuid import UUID
 
 import pytest
 
-from tangl.journal.content import ContentFragment, PresentationHints
+from tangl.journal.content import ContentFragment
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.ux import ControlFragment
 
 

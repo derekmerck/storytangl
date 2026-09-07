@@ -10,7 +10,7 @@ from tangl.journal.fragments import (
     DialogFragment,
     MediaFragment,
 )
-from tangl.journal.intent import Blocker, CostPreview, UIHints
+from tangl.presentation.intent import Blocker, CostPreview, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.renpy import RenPySessionBridge

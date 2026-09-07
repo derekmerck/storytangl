@@ -19,7 +19,7 @@ from tangl.pygame_client.models import (  # noqa: E402
     Turn,
     Zone,
 )
-from tangl.journal.intent import TextAccepts  # noqa: E402
+from tangl.presentation.intent import TextAccepts  # noqa: E402
 from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     LOGICAL_SIZE,

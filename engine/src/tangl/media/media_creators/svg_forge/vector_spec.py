@@ -15,7 +15,7 @@ from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
 from tangl.media.media_creators.media_spec import MediaResolutionClass, MediaSpec
-from tangl.journal.fragments import StagingHints
+from tangl.presentation.hints import StagingHints
 
 class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
     """

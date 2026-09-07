@@ -15,7 +15,7 @@ from tangl.journal.fragments import (
     DialogFragment,
     MediaFragment,
 )
-from tangl.journal.intent import PickAccepts, QuantityAccepts
+from tangl.presentation.intent import PickAccepts, QuantityAccepts
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service.media import (

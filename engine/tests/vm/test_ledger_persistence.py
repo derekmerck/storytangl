@@ -6,7 +6,7 @@ from uuid import UUID
 
 from tangl.core import Graph
 from tangl.journal.fragments import ChoiceFragment
-from tangl.journal.intent import PieceConstraints, PiecesAccepts
+from tangl.presentation.intent import PieceConstraints, PiecesAccepts
 from tangl.persistence import PersistenceManager
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.persistence.storage import InMemoryStorage

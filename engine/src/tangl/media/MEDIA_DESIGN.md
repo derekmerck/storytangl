@@ -8,7 +8,9 @@
 ```
 
 > Status: Current contract
-> Authority: Canonical journal fragment types live in `tangl.journal.fragments`; `tangl.journal.media` remains a compatibility re-export surface.
+> Authority: Canonical journal fragment types live in `tangl.journal.fragments`;
+> presentation hints live in `tangl.presentation.hints`; `tangl.journal.media`
+> remains a fragment-only compatibility re-export surface.
 >
 > Architectural intent, design decisions, and rationale for the canonical media
 > package of the StoryTangl narrative engine.
@@ -52,9 +54,10 @@ Core     → Entity, Registry, Record primitives used by media types
 
 Media types are imported by story (for dependency wiring) and by service (for
 dereferencing). Media does not import from story or service. The
-`tangl.journal.fragments` module defines `MediaFragment` and `StagingHints` as
-cross-cutting output types that both story and service consume; the
-`tangl.journal.media` package remains a compatibility re-export.
+`tangl.journal.fragments` defines `MediaFragment` as cross-cutting journal
+output. `tangl.presentation.hints` defines the advisory `StagingHints` value
+that it carries; the `tangl.journal.media` package remains a fragment-only
+compatibility re-export.
 
 ### Litmus Test
 
@@ -123,8 +126,8 @@ tangl.media
 ├── Scoping        → story_media.py                           (story-scoped ResourceManager factory)
 │                  → system_media.py                          (system-scoped ResourceManager singleton)
 └── Journal (separate package)
-                   → tangl.journal.media/media_fragment.py    (MediaFragment: journal output type)
-                   → tangl.journal.media/staging_hints.py     (StagingHints: client presentation metadata)
+                   → tangl.journal.fragments                  (MediaFragment: journal output type)
+                   → tangl.presentation.hints                 (StagingHints: client presentation metadata)
 ```
 
 ---
@@ -289,11 +292,13 @@ World-scoped managers are created by loader/compiler infrastructure during world
 loading and attached to world facets.
 
 
-### MediaFragment and StagingHints (`tangl.journal.fragments`)
+### MediaFragment and StagingHints
 
-These live in `tangl.journal.fragments`, not in `tangl.media`, because they are
-cross-cutting output types consumed by both story (emission) and service
-(dereferencing). `tangl.journal.media` remains a compatibility import path.
+`MediaFragment` lives in `tangl.journal.fragments`, not in `tangl.media`,
+because it is cross-cutting journal output consumed by both story (emission)
+and service (dereferencing). `StagingHints` lives in `tangl.presentation.hints`
+because it is client-facing staging vocabulary. `tangl.journal.media` remains a
+fragment-only compatibility import path.
 
 **`MediaFragment(ContentFragment)`** carries:
 

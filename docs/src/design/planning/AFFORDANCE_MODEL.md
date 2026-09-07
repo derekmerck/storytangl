@@ -548,7 +548,7 @@ physical halves for readability; same rows, same order.
 | Adventure magic words | Anchor loop in `project_adventure_world_actions` (same file) | `AdventureMagicAnchor` — latent command sponsored by location | Location | Anchor target location | affordance | dynamic | existing (the offer is discovery-gated, not provisioned) | episode | many |
 | Adventure treasure deposit / scoring | Deposit loop in `project_adventure_world_actions` + `apply_adventure_world_action` (UPDATE, same file) | Deposit-site flag × carried treasure-trait assets | Location (deposit site) | None — self-loop; transfer + accounting happen in UPDATE | affordance | dynamic | existing | episode (self-loop) | many |
 | Incremental / cycle moves | `project_sandbox_incremental_game_moves` (+ UPDATE handler, tick observer) (`mechanics/sandbox/incremental.py`) | Hosted `HasGame[IncrementalGame]` under sandbox scope | Location (host discovered via scope) | None — self-loop per move; requirement = host READY, non-terminal | affordance (host offers moves through the location) | dynamic | existing | episode (self-loop) | many |
-| Story-info / `InfoAffordance` — **ADJACENT, not a convergence candidate** | `service_info_dispatch` (`service/dispatch.py`) + `mechanics/sandbox/story_info.py`; routed via `/story/info` | Info channels advertised per envelope | Current cursor / ledger | n/a — query channel (kind + opaque query), no graph edge | affordance-like disclosure surface | dynamic | existing | concept (`ProjectedState` sections; never traversed) | many |
+| Story-info / `InfoAffordance` — **ADJACENT, not a convergence candidate** | Service dispatch folds `presentation_dispatch` + world/runtime authorities; routed via `/story/info` | Info channels advertised per envelope | Current cursor / ledger | n/a — query channel (kind + opaque query), no graph edge | affordance-like disclosure surface | dynamic | existing | concept (`ProjectedState` sections; never traversed) | many |
 
 **Part 2 — lifecycle, ownership, and drift** (same rows)
 
@@ -615,7 +615,7 @@ Classifying them against "who generated this edge / who owns its cleanup?"
 
 **The core tension:** the unambiguously-lifecycle fields `source` and `scope`
 ride inside `ui_hints`, whose model docstring (`UIHints`,
-`journal/intent.py`) declares it *"Advisory renderer hints for choices"* — a
+`tangl.presentation.intent`) declares it *"Advisory renderer hints for choices"* — a
 **presentation channel**. Cleanup ownership is lifecycle and should not hide in a
 presentation channel. Menu and game projectors, by contrast, historically
 carried *no* `ui_hints` at all; their only attribution was the discriminator tag

@@ -1,8 +1,8 @@
 """Canonical journal fragment surface.
 
-This module is the stable import home for repo-owned reusable fragment and hint
-types. Legacy subpackages under ``tangl.journal`` re-export from here for
-compatibility.
+This module is the stable import home for repo-owned reusable fragment types.
+Presentation values belong to :mod:`tangl.presentation`; journal compatibility
+subpackages re-export only fragment types.
 """
 
 from __future__ import annotations
@@ -16,35 +16,21 @@ from uuid import UUID
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
-    ConfigDict,
     Field,
     field_serializer,
-    field_validator,
     model_validator,
 )
 
 from tangl.core import BaseFragment, Graph, Registry, Selector
-from tangl.journal.intent import Accepts, Blocker, KvRow, UIHints
+from tangl.presentation.hints import PresentationHints as _PresentationHints
+from tangl.presentation.hints import StagingHints as _StagingHints
+from tangl.presentation.intent import Accepts as _Accepts
+from tangl.presentation.intent import Blocker as _Blocker
+from tangl.presentation.intent import UIHints as _UIHints
+from tangl.presentation.values import KvRow as _KvRow
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.type_hints import Identifier, Pathlike, StyleClass, StyleDict, StyleId, UnstructuredData
-
-
-class PresentationHints(BaseModel, extra="allow"):
-    """Advisory styling metadata for text and projected-state payloads."""
-
-    model_config = ConfigDict(frozen=True)
-
-    style_name: StyleId | None = None
-    style_tags: list[StyleClass] = Field(default_factory=list)
-    style_dict: StyleDict = Field(default_factory=dict)
-    icon: str | None = None
-
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
-        kwargs.setdefault("by_alias", True)
-        kwargs.setdefault("exclude_none", True)
-        return super().model_dump(*args, **kwargs)
+from tangl.type_hints import Identifier, Pathlike, UnstructuredData
 
 
 class ContentFragment(BaseFragment):
@@ -61,7 +47,7 @@ class ContentFragment(BaseFragment):
     content: Any = None
     source_id: UUID | None = None
     content_format: str | None = Field(None, alias="format")
-    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    presentation_hints: _PresentationHints | None = Field(None, alias="hints")
 
 
 class GroupFragment(BaseFragment, extra="allow"):
@@ -76,7 +62,7 @@ class GroupFragment(BaseFragment, extra="allow"):
     group_type: str | Enum | None = None
     member_ids: list[UUID] = Field(default_factory=list)
     zone_role: str | None = None
-    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    presentation_hints: _PresentationHints | None = Field(None, alias="hints")
 
     def members(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
         return [
@@ -125,7 +111,7 @@ class PieceFragment(BaseFragment, extra="allow"):
     display_state: str | None = None
     zone_ref: UUID | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
-    presentation_hints: PresentationHints | None = Field(None, alias="hints")
+    presentation_hints: _PresentationHints | None = Field(None, alias="hints")
     available: bool = True
     """Render disabled when False -- a piece present but not selectable now.
 
@@ -142,7 +128,7 @@ class KvFragment(BaseFragment, extra="allow", arbitrary_types_allowed=True):
     """Ordered key-value fragment for info-like surfaces."""
 
     fragment_type: Literal["kv"] = "kv"
-    content: list[KvRow] = Field(default_factory=list)
+    content: list[_KvRow] = Field(default_factory=list)
 
 
 UI_TAG_PREFIX = "ui:"
@@ -178,11 +164,11 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
-    blockers: list[Blocker] | None = None
-    accepts: Accepts | None = Field(
+    blockers: list[_Blocker] | None = None
+    accepts: _Accepts | None = Field(
         None, json_schema_extra={"unstructurable": True}
     )
-    ui_hints: UIHints | None = None
+    ui_hints: _UIHints | None = None
     activation_payload: Any = Field(None, alias="payload")
 
 
@@ -207,87 +193,6 @@ class ControlFragment(BaseFragment, extra="allow"):
         return registry.find_one(Selector.from_identifier(self.reference_id))
 
 
-ShapeName = Literal["landscape", "portrait", "square", "avatar", "banner", "bg"]
-PositionName = Literal["top", "bottom", "left", "right", "cover", "inline"]
-SizeName = Literal["small", "medium", "large"]
-TransitionName = Literal[
-    "fade_in",
-    "fade_out",
-    "remove",
-    "from_right",
-    "from_left",
-    "from_top",
-    "from_bottom",
-    "to_right",
-    "to_left",
-    "to_top",
-    "to_bottom",
-    "update",
-    "scale",
-    "rotate",
-]
-DurationName = Literal["short", "medium", "long"]
-TimingName = Literal["start", "stop", "pause", "restart", "loop"]
-
-# Coarse staging grid, named from the viewer's side of the screen. Deliberately
-# not theatrical: "stage left" is the performer's left and therefore the
-# audience's right, which reads backwards here and is rejected outright rather
-# than silently accepted (see StagingHints._normalize_axis).
-#
-# Subdivisions are the planned extension, keeping these three as the cardinals:
-# left_left, left, left_right, mid_left, mid, mid_right, right_left, right,
-# right_right — for staging crowds by nudging off a cardinal rather than by
-# hardcoded pixel offsets.
-MediaXName = Literal["left", "mid", "right"]
-MediaYName = Literal["top", "mid", "bottom"]
-
-_AXIS_ALIASES = {"screen_left": "left", "screen_right": "right", "center": "mid",
-                 "centre": "mid", "middle": "mid"}
-_AXIS_REJECTED = {"stage_left", "stage_right"}
-
-
-class StagingHints(BaseModel, extra="allow"):
-    """Client-facing media staging hints."""
-
-    media_shape: ShapeName | float | None = None
-    media_size: SizeName | tuple[int, int] | tuple[float, float] | float | None = None
-    media_position: PositionName | tuple[int, int] | tuple[float, float] | None = None
-    media_transition: TransitionName | None = None
-    media_duration: DurationName | float | None = None
-    media_timing: TimingName | None = None
-
-    @field_validator("media_x", "media_y", mode="before")
-    @classmethod
-    def _normalize_axis(cls, value: Any) -> Any:
-        """Accept screen-relative aliases; refuse theatrical ones outright."""
-
-        if not isinstance(value, str):
-            return value
-        name = value.strip().lower()
-        if name in _AXIS_REJECTED:
-            raise ValueError(
-                f"{value!r} is not a staging position. Theatrical 'stage left' is "
-                "the performer's left and the viewer's right, which inverts this "
-                "vocabulary. Use 'left' or 'right', named from the viewer's side."
-            )
-        return _AXIS_ALIASES.get(name, name)
-    media_x: MediaXName | None = None
-    """Horizontal staging slot, named from the viewer's side of the screen."""
-
-    media_y: MediaYName | None = None
-    """Vertical staging level."""
-
-    media_flip_h: bool | None = None
-    """Mirror the asset horizontally when staged.
-
-    Orthogonal to :attr:`media_position` (where it sits) and
-    :attr:`media_transition` (how it arrives, including ``from_left`` and
-    ``from_right``). Sprite art has a fixed facing, so a sprite reused on the
-    other side of a stage needs mirroring independently of either. Ports honour
-    the hints they understand and ignore the rest.
-    """
-
-
 ContentFormatType = Literal["url", "data", "xml", "json", "rit"]
 
 
@@ -298,7 +203,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     content: MediaRIT | Pathlike | bytes | str | dict
     content_format: ContentFormatType
     rit_id: UUID | None = None
-    staging_hints: StagingHints | None = None
+    staging_hints: _StagingHints | None = None
     media_role: str | None = None
     scope: str | None = "world"
     fragment_type: Literal["media"] = "media"
@@ -488,7 +393,6 @@ def fragment_from_dto(payload: object) -> BaseFragment:
 __all__ = [
     "AttributedFragment",
     "BlockFragment",
-    "Blocker",
     "ChoiceFragment",
     "ContentFragment",
     "ContentFormatType",
@@ -498,12 +402,8 @@ __all__ = [
     "GroupFragment",
     "JournalMarkerFragment",
     "KvFragment",
-    "KvRow",
     "MediaFragment",
     "PieceFragment",
-    "PresentationHints",
-    "StagingHints",
-    "UIHints",
     "UI_TAG_PREFIX",
     "client_visible_tags",
     "fragment_from_dto",

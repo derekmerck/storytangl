@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from tangl.journal.intent import Accepts
+from tangl.presentation.intent import Accepts
 from tangl.service.response import JsonValue
 
 

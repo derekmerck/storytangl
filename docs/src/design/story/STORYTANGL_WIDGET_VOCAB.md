@@ -7,9 +7,12 @@ in `WIDGET_CONTRACT_RECONCILIATION.md`. These are presentation-contract views,
 not StoryTangl engine layers. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
 **Source of truth (for engine model alignment):**
-- `tangl.journal.fragments` (fragment types, presentation hints)
-- `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
-- `tangl.journal.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
+- `tangl.journal.fragments` (fragment types)
+- `tangl.service.response` (`RuntimeEnvelope`)
+- `tangl.presentation.projection` (`ProjectedState`, section value union)
+- `tangl.presentation.hints` (`PresentationHints`, `StagingHints`)
+- `tangl.presentation.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
+- `tangl.presentation.values` (`KvRow`, `PrimitiveValue`)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual
@@ -321,7 +324,7 @@ resolvable by future control fragments.
 ### 1.3 ProjectedState
 
 ```python
-# tangl/service/response.py — current shape (Tier S)
+# tangl/presentation/projection.py — current shape (Tier S)
 class ProjectedState(InfoModel):
     sections: list[ProjectedSection] = Field(default_factory=list)
 
@@ -480,7 +483,7 @@ cheap.
 implements `info_affordances` with `query` descriptors against `/story/info`,
 and the CLI reference floor exposes the same affordances through `?` /
 slash-command output. **Status (engine):** defines typed `InfoAffordance`,
-`InfoState`, and `StoryInfoRequest` models, advertises available channels on
+`InfoState`, and `ProjectionRequest` models, advertises available channels on
 runtime envelopes, and routes `/story/info` through the service-info dispatch
 surface. Fine-grained dirty-kind tracking remains conservative in v1.
 
@@ -674,7 +677,7 @@ for `KvFragment` and the simpler `{key, value}` form for
 `ProjectedKVItem`.
 
 ```python
-# tangl/journal/intent.py (Tier P1; ratifies the unified shape)
+# tangl/presentation/values.py (Tier P1; ratifies the unified shape)
 class KvRow(BaseModel, extra="allow"):
     """Unified key/value row for both scene-bound and projected surfaces."""
     key: str
@@ -1084,10 +1087,10 @@ dictionary-shaped sub-surfaces to promote.
 ### 6.1 Typed `Accepts`
 
 The engine's `ChoiceFragment.accepts` is a Pydantic discriminated union in
-`tangl/journal/intent.py`:
+`tangl.presentation.intent`:
 
 ```python
-# tangl/journal/intent.py — Tier P1
+# tangl/presentation/intent.py — Tier P1
 from typing import Annotated, Literal, TypeAlias
 from pydantic import BaseModel, ConfigDict, Field
 

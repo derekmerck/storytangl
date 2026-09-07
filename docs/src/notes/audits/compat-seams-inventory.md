@@ -27,7 +27,7 @@ by a bare `input` string plus an optional `payload_type`, instead of the typed
 member of the `Accepts` union.
 
 **Backend status.** Dead on the backend. The engine `Accepts` union
-(`engine/src/tangl/journal/intent.py`) emits only the six typed kinds; no engine
+(`engine/src/tangl/presentation/intent.py`) emits only the six typed kinds; no engine
 or server path produces `payload_type` or an `input`-keyed accept (the
 `payload_kind` / `has_payload_kind` symbols in `core` are unrelated template
 machinery).

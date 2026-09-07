@@ -1,4 +1,4 @@
-"""Story-info side-channel contracts for the credentials shift (Bridge.2b).
+"""Story-info provider contracts for the credentials shift (Bridge.2b).
 
 Exercises the advertise / get_story_info dispatch handlers and the disclosure
 discipline: rules are public, progress shows the player's own rulings without
@@ -7,10 +7,10 @@ correctness, and case_summary shows only surfaced findings.
 
 from __future__ import annotations
 
+from engine.tests.mechanics.games.credentials_helpers import (
+    make_credential_case as CredentialCase,
+)
 from tangl.core import Graph
-
-# Importing the module registers its dispatch handlers.
-import tangl.mechanics.games.credentials_story_info  # noqa: F401
 from tangl.mechanics.games import (
     CredentialDisposition,
     CredentialStatus,
@@ -23,9 +23,15 @@ from tangl.mechanics.games import (
     Restrictions,
     RestrictionLevel,
 )
-from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.service.response import KvListValue, ScalarValue, StoryInfoRequest, TableValue
+from tangl.mechanics.games.credentials_story_info import project_credentials_info
+from tangl.presentation.projection import (
+    KvListValue,
+    ProjectedSection,
+    ProjectionRequest,
+    ScalarValue,
+    TableValue,
+)
+from tangl.service.dispatch import do_advertise_info_channels
 from tangl.story import Block
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -76,13 +82,21 @@ def _block_and_ctx() -> tuple[CredentialsBlock, PhaseCtx]:
     return block, ctx
 
 
-def _sections(block, ctx, **request_kwargs):
-    state = do_get_story_info(block, ctx=ctx, request=StoryInfoRequest(**request_kwargs))
-    return {section.section_id: section for section in state.sections}
+def _sections(
+    block: CredentialsBlock,
+    ctx: PhaseCtx,
+    **request_kwargs: object,
+) -> dict[str, ProjectedSection]:
+    sections = project_credentials_info(
+        caller=block,
+        ctx=ctx,
+        request=ProjectionRequest(**request_kwargs),
+    )
+    return {section.section_id: section for section in sections or []}
 
 
 class TestAdvertise:
-    def test_advertises_three_channels(self) -> None:
+    def test_service_dispatch_fold_advertises_three_channels(self) -> None:
         block, ctx = _block_and_ctx()
         kinds = {a.kind for a in do_advertise_info_channels(block, ctx=ctx)}
         assert kinds == {"rules", "roster_progress", "case_summary"}

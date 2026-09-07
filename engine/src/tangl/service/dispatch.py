@@ -3,38 +3,25 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Callable
-
 from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Selector
+from tangl.presentation.dispatch import presentation_dispatch
+from tangl.presentation.projection import (
+    InfoAffordance,
+    ProjectionRequest,
+    ProjectedSection,
+    ProjectedState,
+)
 
-from .response import InfoAffordance, ProjectedSection, ProjectedState, StoryInfoRequest
-
-
-service_info_dispatch = BehaviorRegistry(
-    label="service_info_dispatch",
-    default_dispatch_layer=DispatchLayer.APPLICATION,
+service_dispatch = BehaviorRegistry(
+    label="service_dispatch",
+    default_dispatch_layer=DispatchLayer.SYSTEM,
 )
 
 
-def _make_on_hook(task: str) -> Callable:
-    """Create a registration decorator for a service-info task."""
-
-    def on_hook(func=None, **kwargs):
-        if func is None:
-            return lambda f: service_info_dispatch.register(func=f, task=task, **kwargs)
-        return service_info_dispatch.register(func=func, task=task, **kwargs)
-
-    on_hook.__name__ = f"on_{task}"
-    on_hook.__doc__ = f"Register a handler for the ``{task}`` task."
-    return on_hook
-
-
-on_advertise_info_channels = _make_on_hook("advertise_info_channels")
-on_get_story_info = _make_on_hook("get_story_info")
-
-
 def _execute(task: str, *, caller: object, ctx: object, **kwargs: object) -> list[object]:
-    receipts = service_info_dispatch.execute_all(
+    receipts = BehaviorRegistry.chain_execute_all(
+        service_dispatch,
+        presentation_dispatch,
         task=task,
         call_kwargs={"caller": caller, **kwargs},
         ctx=ctx,
@@ -55,7 +42,7 @@ def do_get_story_info(
     caller: object,
     *,
     ctx: object,
-    request: StoryInfoRequest,
+    request: ProjectionRequest,
 ) -> ProjectedState:
     """Gather projected-state sections for ``request``."""
     sections: list[ProjectedSection] = []
@@ -110,7 +97,5 @@ def _coerce_sections(value: object) -> list[ProjectedSection]:
 __all__ = [
     "do_advertise_info_channels",
     "do_get_story_info",
-    "on_advertise_info_channels",
-    "on_get_story_info",
-    "service_info_dispatch",
+    "service_dispatch",
 ]

@@ -7,8 +7,8 @@ from tangl.journal.fragments import (
     ContentFragment,
     GroupFragment,
     MediaFragment,
-    PresentationHints,
 )
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.media import MediaFragment as LegacyMediaFragment
 from tangl.journal.prose import ChoiceFragment as LegacyChoiceFragment
 from tangl.story.fragments import ChoiceFragment as StoryChoiceFragment

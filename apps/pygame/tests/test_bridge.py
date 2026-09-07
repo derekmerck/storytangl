@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.journal.content import PresentationHints
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
@@ -16,14 +16,14 @@ from tangl.journal.fragments import (
     MediaFragment,
     PieceFragment,
 )
-from tangl.journal.intent import (
-    KvRow,
+from tangl.presentation.intent import (
     PickAccepts,
     PieceConstraints,
     PiecesAccepts,
     QuantityAccepts,
     TextAccepts,
 )
+from tangl.presentation.values import KvRow
 from tangl.pygame_client.bridge import (
     PygameSessionBridge,
     UnsupportedAccepts,

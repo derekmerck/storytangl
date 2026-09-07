@@ -31,6 +31,21 @@
 Imports go down only. VM imports Core. Story imports VM and Core.
 Service imports all three. **Nothing imports upward.** If you need
 upward knowledge, pass it as a callback or protocol parameter.
+The lifecycle-layer DAG remains **Core ← VM ← Story ← Service**.
+
+`tangl.presentation` sits alongside that DAG as a domain-neutral dependency-
+floor package, not a fifth lifecycle layer:
+
+```
+Journal / Story / Service / optional mechanics
+                       ↓
+              tangl.presentation
+                       ↓
+       Pydantic / Core / shared type hints
+```
+
+Presentation owns portable syntax only. It is not a widget library, renderer,
+authority source, transport surface, or alternate journal.
 
 Each layer has a `_DESIGN.md` file in its source directory that describes
 the intended shape in detail. Read the relevant one before adding or
@@ -529,7 +544,9 @@ shaping.
 
 The canonical public service object. Its explicit methods implement use cases
 such as story creation and advancement, story-info projection, user management,
-and world/system inspection.
+and world/system inspection. Story-info keeps Service's outer dispatch and folds
+presentation, story/world, and runtime-local authorities through the ordinary
+behavior chain; worlds do not supply separate projector objects.
 
 `ServiceSession` is the live user/ledger/frame bundle opened for one operation.
 `ServiceManager.open_session(...)` loads or derives those resources and applies

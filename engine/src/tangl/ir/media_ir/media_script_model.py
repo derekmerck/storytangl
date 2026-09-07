@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import AnyUrl, BaseModel, model_validator
 
-from tangl.journal.fragments import StagingHints
+from tangl.presentation.hints import StagingHints
 from tangl.media.media_role import MediaRole
 from tangl.media.type_hints import Media
 from tangl.type_hints import UniqueLabel

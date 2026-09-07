@@ -10,7 +10,7 @@ from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.games import CallResponseExchange, GameResult
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.service.response import StoryInfoRequest
+from tangl.presentation.projection import ProjectionRequest
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -258,7 +258,7 @@ class TestReparteeLoopWorld:
         state = do_get_story_info(
             ledger.cursor,
             ctx=ctx,
-            request=StoryInfoRequest(kinds=["map_plate", "map_regions"]),
+            request=ProjectionRequest(kinds=["map_plate", "map_regions"]),
         )
         sections = {section.section_id: section for section in state.sections}
         regions = sections["sandbox_map_regions"]
@@ -273,7 +273,7 @@ class TestReparteeLoopWorld:
         gazetteer = do_get_story_info(
             ledger.cursor,
             ctx=ctx,
-            request=StoryInfoRequest(kind="map"),
+            request=ProjectionRequest(kind="map"),
         )
         assert not any(
             section.section_id.startswith("sandbox_map_region")

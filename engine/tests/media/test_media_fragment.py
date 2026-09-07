@@ -5,7 +5,8 @@ from base64 import b64encode
 import pytest
 
 from tangl.core import Graph
-from tangl.journal.media import MediaFragment, StagingHints
+from tangl.journal.media import MediaFragment
+from tangl.presentation.hints import StagingHints
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaRITStatus, MediaResourceInventoryTag as MediaRIT
 from tangl.service.media import media_fragment_to_payload

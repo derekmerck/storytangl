@@ -6,7 +6,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.journal.fragments import ContentFragment
-from tangl.journal.intent import PieceConstraints, PiecesAccepts
+from tangl.presentation.intent import PieceConstraints, PiecesAccepts
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
 from tangl.story import Action, Block
 from tangl.mechanics.games.handlers import (

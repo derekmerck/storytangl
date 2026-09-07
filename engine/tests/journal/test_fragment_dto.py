@@ -23,7 +23,7 @@ from tangl.journal.fragments import (
     fragment_to_dto,
 )
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.journal.intent import Blocker, CostPreview, UIHints
+from tangl.presentation.intent import Blocker, CostPreview, UIHints
 
 
 def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
