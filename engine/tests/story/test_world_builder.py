@@ -31,7 +31,6 @@ def test_world_builder_populates_canonical_fields_and_aliases() -> None:
     extra = SimpleNamespace(label="builder_extra_authority")
     assets = SimpleNamespace(label="assets")
     resources = SimpleNamespace(label="resources")
-    projector = SimpleNamespace(project=lambda *, ledger: ledger)
 
     world = WorldBuilder().build(
         label="builder_world_runtime",
@@ -42,7 +41,6 @@ def test_world_builder_populates_canonical_fields_and_aliases() -> None:
         extra_authorities=[extra],
         class_registry={"Actor": Actor},
         modules=["builder.domain"],
-        story_info_projector=projector,
     )
 
     assert world.templates is bundle.template_registry
@@ -55,7 +53,6 @@ def test_world_builder_populates_canonical_fields_and_aliases() -> None:
     assert world.resources is resources
     assert world.class_registry["Actor"] is Actor
     assert world.dispatch is dispatch
-    assert world.get_story_info_projector() is projector
     assert world.get_authorities() == [dispatch, extra]
 
 
@@ -67,13 +64,11 @@ def test_world_builder_coerces_legacy_domain_and_extra_template_registries() -> 
         payload=Actor(label="npc", name="NPC"),
         registry=extra_templates,
     )
-    projector = SimpleNamespace(project=lambda *, ledger: ledger)
     domain = SimpleNamespace(
         dispatch_registry=BehaviorRegistry(label="legacy_domain_dispatch"),
         class_registry={"Actor": Actor},
         modules=["legacy.domain"],
         get_authorities=lambda: [],
-        get_story_info_projector=lambda: projector,
     )
 
     world = WorldBuilder().build(
@@ -88,6 +83,5 @@ def test_world_builder_coerces_legacy_domain_and_extra_template_registries() -> 
     assert world.templates is bundle.template_registry
     assert world.class_registry["Actor"] is Actor
     assert world.dispatch.label == "legacy_domain_dispatch"
-    assert world.get_story_info_projector() is projector
     assert registries[0] is bundle.template_registry
     assert extra_templates in registries

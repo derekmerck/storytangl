@@ -6,22 +6,19 @@ from collections.abc import Sequence
 from typing import Protocol, cast
 
 from tangl.core import Selector, Token
-from tangl.presentation.values import KvRow
-from tangl.service.response import (
+from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.projection import (
     InfoAffordance,
     ItemListValue,
     KvListValue,
     ProjectedItem,
     ProjectedSection,
-    ProjectedState,
-    StoryInfoRequest,
+    ProjectionRequest,
     TableValue,
 )
-from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
-from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
+from tangl.presentation.values import KvRow
 from tangl.story.concepts.asset import HasAssets
 from tangl.vm.runtime.frame import PhaseCtx
-from tangl.vm.runtime.ledger import Ledger
 
 from .handlers import (
     sandbox_player_assets,
@@ -74,20 +71,11 @@ class ProjectedAssetSurface(Protocol):
         ...
 
 
-class SandboxStoryInfoProjector:
-    """Project disclosed sandbox state into generic ``ProjectedState`` sections."""
+class _SandboxInfoSections:
+    """Build disclosed sandbox sections for presentation contributors."""
 
     def __init__(self, *, period_labels: Sequence[str] = DEFAULT_PERIOD_LABELS) -> None:
         self.period_labels = tuple(period_labels)
-
-    def project(self, *, ledger: Ledger) -> ProjectedState:
-        """Return portable state sections for the current sandbox location."""
-        cursor = ledger.cursor
-        if not isinstance(cursor, SandboxLocation):
-            return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
-
-        ctx = PhaseCtx(graph=ledger.graph, cursor_id=cursor.uid)
-        return ProjectedState(sections=self.sections_for(cursor, ctx=ctx))
 
     def sections_for(
         self,
@@ -203,6 +191,15 @@ class SandboxStoryInfoProjector:
         )
 
 
+def sandbox_status_sections(
+    location: SandboxLocation,
+    *,
+    ctx: PhaseCtx,
+) -> list[ProjectedSection]:
+    """Return all disclosed status sections for one sandbox location."""
+    return _SandboxInfoSections().sections_for(location, ctx=ctx)
+
+
 @on_advertise_info_channels(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -296,7 +293,7 @@ def project_sandbox_map_info(
     *,
     caller: SandboxLocation,
     ctx: PhaseCtx,
-    request: StoryInfoRequest,
+    request: ProjectionRequest,
     **_kw: object,
 ) -> list[ProjectedSection] | None:
     """Project requested disclosed sandbox channels for side-panel clients."""
@@ -307,7 +304,7 @@ def project_sandbox_map_info(
         return None
 
     sections: list[ProjectedSection] = []
-    status_sections = SandboxStoryInfoProjector().sections_for(caller, ctx=ctx)
+    status_sections = sandbox_status_sections(caller, ctx=ctx)
     sections.extend(
         section
         for section in status_sections
@@ -710,7 +707,7 @@ __all__ = [
     "MAP_KIND",
     "MAP_PLATE_KIND",
     "MAP_REGIONS_KIND",
-    "SandboxStoryInfoProjector",
     "advertise_sandbox_info_channels",
     "project_sandbox_map_info",
+    "sandbox_status_sections",
 ]

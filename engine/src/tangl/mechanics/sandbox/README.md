@@ -105,9 +105,9 @@ Current first-pass surface:
 - `tangl.mechanics.sandbox.incremental`: optional adapter that lets hosted
   `IncrementalGame` blocks project allocation choices into a sandbox location
   and resolve production/upkeep as a sandbox tick observer.
-- `tangl.mechanics.sandbox.story_info.SandboxStoryInfoProjector`: optional
-  adapter for the existing service story-info seam. It projects disclosed
-  sandbox state into ordinary `ProjectedState` sections for clients that want
+- `tangl.mechanics.sandbox.story_info`: generic presentation contributors for
+  disclosed sandbox state. Service folds them with world and runtime-local
+  authorities into ordinary `ProjectedState` sections for clients that want
   status rails, inventory panels, map modals, or ebook-style summaries.
 - `map_plate` / `map_regions` story-info channels: plate geometry for clients
   that draw maps, advertised only by a location that owns a plate and served
@@ -278,12 +278,13 @@ local metadata rather than a general VM receipt model, but it keeps dynamic
 choices explainable and leaves a clear promotion path if non-sandbox systems
 need the same debug surface.
 
-Projected state is a disclosed-status surface, not world truth. The optional
-service projector emits only generic `kv_list` and `item_list` sections such as
-current location, world time, player inventory, visible local assets, visible
-fixtures, visible mobs, and visible exits. Darkness and other visibility rules
-filter that surface the same way they filter local affordances. Hidden mobs,
-undisclosed schedules, secret exits, and puzzle truth stay backend-only.
+Projected state is a disclosed-status surface, not world truth. Sandbox
+presentation contributors emit domain-neutral sections for current location,
+world time, player inventory, visible local assets, visible fixtures, visible
+mobs, and visible exits; Service folds them through the ordinary behavior chain.
+Darkness and other visibility rules filter that surface the same way they filter
+local affordances. Hidden mobs, undisclosed schedules, secret exits, and puzzle
+truth stay backend-only.
 
 Humane sandbox design matters. Sandboxes are useful because they let a story
 project ordinary choices into spatial, temporal, and social terms: where to go,

@@ -103,8 +103,9 @@ operate on that same widget-shaped payload surface.
 The reference CLI stores runtime updates from `RuntimeEnvelope.to_dto()` before
 rendering, while still accepting lightweight object-shaped stubs in tests and
 diagnostic harnesses.
-The same pattern applies to `ProjectedState`: service methods own the typed
-section/value model, `ProjectedState.to_dto()` emits the client-facing
+The same pattern applies to `ProjectedState`: Service owns the operation and
+transport hydration, while presentation owns the typed section/value model;
+`ProjectedState.to_dto()` emits the client-facing
 `value_type` discriminated DTO surface, REST and CLI use that projection, and
 remote Python clients decode it back into typed projected-state values.
 
@@ -154,7 +155,7 @@ fragments as `BaseFragment` and restore internal `seq`, `step`, and `tags`
 defaults, so the transport schema deliberately avoids that shape drift.
 
 `RuntimeEnvelope.metadata.grammar` is a reserved typed sub-key rather than a
-second command model. The service synthesizes `GrammarHint` values from the
+second command model. Service synthesizes presentation-owned `GrammarHint` values from the
 current visible fragment surface: choice text supplies exact examples and verb
 frames, while visible pieces supply noun-to-piece mappings. This projection is
 an intentionally modest auto-derived floor: it does not infer aliases,

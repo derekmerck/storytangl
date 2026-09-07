@@ -33,9 +33,9 @@ Core         → Timeless graph/entity/dispatch primitives
 - `@service_method(...)` is bounded descriptive metadata on manager methods:
   access class, context class, writeback policy, blocking hint, optional
   capability tag, and optional operation id.
-- Typed response models are the public payload contract:
-  `RuntimeEnvelope`, `ProjectedState`, `RuntimeInfo`, `UserInfo`, `WorldInfo`,
-  `SystemInfo`, and `UserSecret`.
+- Typed service responses and presentation payloads are the public contract:
+  `RuntimeEnvelope`, `RuntimeInfo`, `UserInfo`, `WorldInfo`, `SystemInfo`,
+  `UserSecret`, and presentation-owned `ProjectedState`.
 
 The deleted orchestrator/controller/gateway/token stack is no longer part of
 the service design. Any remaining transport glue should derive from
@@ -140,8 +140,8 @@ Explicitly unsupported in current remote mode:
 The canonical response contract is typed Python models:
 
 - Story session methods return `RuntimeEnvelope` directly.
-- Informational reads return typed info models such as `ProjectedState`,
-  `UserInfo`, `WorldInfo`, and `SystemInfo`.
+- Informational reads return typed payloads such as presentation-owned
+  `ProjectedState`, `UserInfo`, `WorldInfo`, and `SystemInfo`.
 - Mutation acknowledgements return `RuntimeInfo`.
 
 Service does not own transport formatting. HTML transforms, media URL shaping,
@@ -154,17 +154,21 @@ representation.
 ## Story-Info Channels
 
 `get_story_info` is the generic side-channel for supplementary projected state.
-It returns `ProjectedState`, the same portable section model used by status
+It returns presentation-owned `ProjectedState`, the same portable section model used by status
 rails, command-line inspection, and future rich panels. The endpoint accepts an
 optional `kind`, comma-separated `kinds`, and opaque JSON `query` descriptor.
 Clients pass query descriptors back without interpreting them.
 
-Story-info has two service dispatch tasks:
+Service exposes two story-info entry points and folds the presentation registry
+with story, world, and runtime-local authorities:
 
-- `advertise_info_channels` gathers `InfoAffordance` values for the next
+- `advertise_info_channels` gathers presentation `InfoAffordance` values for the next
   `RuntimeEnvelope.metadata.info_affordances` list.
-- `get_story_info` gathers `ProjectedSection` values for a concrete
-  `StoryInfoRequest`.
+- `get_story_info` gathers presentation `ProjectedSection` values for a concrete
+  presentation `ProjectionRequest`.
+
+If no contributor returns a section, Service supplies its private minimal session
+projection. It is fallback behavior, not a pluggable provider seam.
 
 The fulfillment task is additive: several handlers may contribute sections for
 a multi-kind request. V1 does not deduplicate `section_id` values or apply

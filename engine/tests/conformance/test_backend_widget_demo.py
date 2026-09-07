@@ -9,7 +9,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from tangl.service.response import ProjectedState, RuntimeEnvelope
+from tangl.presentation.projection import ProjectedState
+from tangl.service.response import RuntimeEnvelope
 
 
 ROOT = Path(__file__).parents[3]

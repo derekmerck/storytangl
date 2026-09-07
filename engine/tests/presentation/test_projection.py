@@ -3,8 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.presentation.hints import PresentationHints
-from tangl.presentation.values import KvRow
-from tangl.service.response import (
+from tangl.presentation.projection import (
     BadgeListValue,
     InfoAffordance,
     InfoState,
@@ -14,9 +13,10 @@ from tangl.service.response import (
     ProjectedSection,
     ProjectedState,
     ScalarValue,
-    StoryInfoRequest,
+    ProjectionRequest,
     TableValue,
 )
+from tangl.presentation.values import KvRow
 
 
 def _fixture() -> ProjectedState:
@@ -27,10 +27,7 @@ def _fixture() -> ProjectedState:
                 title="Stats",
                 kind="stats",
                 value=KvListValue(
-                    items=[
-                        KvRow(key="Health", value=9),
-                        KvRow(key="Gold", value=14),
-                    ]
+                    items=[KvRow(key="Health", value=9), KvRow(key="Gold", value=14)]
                 ),
             ),
             ProjectedSection(
@@ -70,51 +67,24 @@ def _fixture() -> ProjectedState:
     )
 
 
-def _render_cli(state: ProjectedState) -> list[str]:
-    lines: list[str] = []
-    for section in state.sections:
-        lines.append(section.title)
-        value = section.value
-        if isinstance(value, KvListValue):
-            lines.extend(f"{item.key}: {item.value}" for item in value.items)
-        elif isinstance(value, ItemListValue):
-            lines.extend(item.label for item in value.items)
-        elif isinstance(value, TableValue):
-            lines.extend(" | ".join(str(cell) for cell in row) for row in value.rows)
-        elif isinstance(value, BadgeListValue):
-            lines.append(", ".join(value.items))
-        elif isinstance(value, ScalarValue):
-            lines.append(str(value.value))
-    return lines
-
-
-def _render_web_payload(state: ProjectedState) -> list[dict[str, object]]:
-    return [section.model_dump(mode="python") for section in state.sections]
-
-
 def test_projected_state_round_trips_through_model_dump_and_validate() -> None:
     state = _fixture()
 
-    payload = state.model_dump(mode="python")
-    restored = ProjectedState.model_validate(payload)
-
-    assert restored == state
+    assert ProjectedState.model_validate(state.model_dump(mode="python")) == state
 
 
 def test_projected_state_to_dto_preserves_value_discriminators() -> None:
     state = _fixture()
-
     payload = state.to_dto()
-    restored = ProjectedState.model_validate(payload)
 
     assert payload["sections"][0]["value"]["value_type"] == "kv_list"
     assert payload["sections"][1]["hints"]["style_name"] == "sidebar"
     assert payload["sections"][2]["value"]["value_type"] == "table"
     assert payload["sections"][4]["value"]["value_type"] == "scalar"
-    assert restored == state
+    assert ProjectedState.model_validate(payload) == state
 
 
-def test_projected_state_preserves_section_order() -> None:
+def test_projected_state_preserves_section_order_and_custom_kinds() -> None:
     state = _fixture()
 
     assert [section.section_id for section in state.sections] == [
@@ -124,30 +94,22 @@ def test_projected_state_preserves_section_order() -> None:
         "flags",
         "weight",
     ]
-
-
-def test_projected_state_preserves_custom_kind_strings() -> None:
-    state = _fixture()
-
     assert state.sections[2].kind == "quest_log"
     assert state.sections[4].kind == "custom_metrics"
 
 
-def test_cliish_adapter_renders_ordered_sections_without_graph_access() -> None:
-    lines = _render_cli(_fixture())
+def test_adapters_can_render_ordered_sections_without_graph_access() -> None:
+    state = _fixture()
+    lines = [
+        item.label if isinstance(section.value, ItemListValue) else section.title
+        for section in state.sections
+        for item in (section.value.items if isinstance(section.value, ItemListValue) else [section])
+    ]
 
-    assert lines[:4] == ["Stats", "Health: 9", "Gold: 14", "Inventory"]
-    assert "Lantern" in lines
-    assert "Find the key | active" in lines
-
-
-def test_webish_adapter_produces_json_ready_section_blocks() -> None:
-    payload = _render_web_payload(_fixture())
-
-    assert payload[0]["section_id"] == "stats"
-    assert payload[1]["hints"]["style_name"] == "sidebar"
-    assert payload[2]["value"]["value_type"] == "table"
-    assert payload[4]["kind"] == "custom_metrics"
+    assert lines == ["Stats", "Lantern", "Key", "Quests", "Flags", "Weight"]
+    assert [section.model_dump(mode="python") for section in state.sections][1]["hints"][
+        "style_name"
+    ] == "sidebar"
 
 
 def test_table_value_rejects_rows_with_wrong_width() -> None:
@@ -165,11 +127,7 @@ def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
         shortcuts=["m"],
         query={"type": "map", "scope": "known"},
     )
-    state = InfoState(
-        version=7,
-        dirty_kinds=["map"],
-        available_kinds=["map", "inventory"],
-    )
+    state = InfoState(version=7, dirty_kinds=["map"], available_kinds=["map", "inventory"])
 
     assert affordance.model_dump(mode="python") == {
         "kind": "map",
@@ -184,16 +142,11 @@ def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
     }
 
 
-def test_story_info_request_gathers_explicit_and_opaque_query_kinds() -> None:
-    request = StoryInfoRequest(
+def test_projection_request_gathers_explicit_and_opaque_query_kinds() -> None:
+    request = ProjectionRequest(
         kind="status",
         kinds=["inventory"],
         query={"kinds": ["location", "presence"], "type": "map"},
     )
 
-    assert request.requested_kinds() == [
-        "status",
-        "inventory",
-        "location",
-        "presence",
-    ]
+    assert request.requested_kinds() == ["status", "inventory", "location", "presence"]

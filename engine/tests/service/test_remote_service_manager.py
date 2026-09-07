@@ -16,13 +16,11 @@ import requests
 from tangl.core import BaseFragment
 from tangl.journal.fragments import BlockFragment, ChoiceFragment
 from tangl.persistence import PersistenceManagerFactory
+from tangl.presentation.projection import KvListValue, ProjectedState, TableValue
 from tangl.service import (
     CommandEdgeQuery,
     DirectEdgeRequest,
     FindEdgeRequest,
-    KvListValue,
-    ProjectedState,
-    TableValue,
 )
 from tangl.service.bootstrap import build_service_manager
 from tangl.service.exceptions import AccessDeniedError, InvalidOperationError, ServiceError

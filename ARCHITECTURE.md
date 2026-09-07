@@ -544,7 +544,9 @@ shaping.
 
 The canonical public service object. Its explicit methods implement use cases
 such as story creation and advancement, story-info projection, user management,
-and world/system inspection.
+and world/system inspection. Story-info keeps Service's outer dispatch and folds
+presentation, story/world, and runtime-local authorities through the ordinary
+behavior chain; worlds do not supply separate projector objects.
 
 `ServiceSession` is the live user/ledger/frame bundle opened for one operation.
 `ServiceManager.open_session(...)` loads or derives those resources and applies

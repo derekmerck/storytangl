@@ -6,13 +6,12 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.presentation.events import GrammarHint, UxEvent
 from tangl.service.response import (
     CommandEdgeQuery,
     EdgeResolutionRequest,
-    GrammarHint,
     RuntimeEnvelope,
     RuntimeEnvelopePayload,
-    UxEvent,
 )
 
 

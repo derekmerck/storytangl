@@ -227,8 +227,6 @@ class World(TraversableGraphFactory):
     ---
     - :meth:`create_story` is the public story initialization entry point.
     - :meth:`get_authorities` exposes world-owned dispatch registries.
-    - :meth:`get_story_info_projector` returns the world-owned projector when
-      present.
     - :meth:`find_template` and :meth:`find_templates` resolve directly against
       the world's template registry.
     """
@@ -250,7 +248,6 @@ class World(TraversableGraphFactory):
     class_registry: dict[str, Any] = Field(default_factory=dict)
     modules: list[Any] = Field(default_factory=list)
     extra_authorities: list[Any] = Field(default_factory=list)
-    story_info_projector: Any | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -306,10 +303,6 @@ class World(TraversableGraphFactory):
                 continue
             authorities.append(authority)
         return authorities
-
-    def get_story_info_projector(self) -> Any | None:
-        """Return the world-owned story-info projector when present."""
-        return self.story_info_projector
 
     def get_entry_cursor(self, graph: StoryGraph) -> Any | None:
         """Return the default story entry, falling back to generic VM rules."""
@@ -670,7 +663,6 @@ class World(TraversableGraphFactory):
         templates: Any | None = None,
         assets: Any | None = None,
         resources: Any | None = None,
-        story_info_projector: Any | None = None,
     ) -> "World":
         from .builder import WorldBuilder
 
@@ -684,5 +676,4 @@ class World(TraversableGraphFactory):
             resources=resources,
             extra_template_registries=_coerce_template_registries(templates),
             domain=domain,
-            story_info_projector=story_info_projector,
         )

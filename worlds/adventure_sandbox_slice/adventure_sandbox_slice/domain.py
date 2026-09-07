@@ -4,7 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from tangl.core import Graph, Priority, Selector, Token
+from tangl.core import BehaviorRegistry, Graph, Priority, Selector, Token
+from tangl.presentation.projection import KvListValue, ProjectionRequest, ProjectedSection
 from tangl.presentation.values import KvRow
 from tangl.mechanics.sandbox import (
     ChargeFacet,
@@ -22,15 +23,14 @@ from tangl.mechanics.sandbox import (
     SwitchableFacet,
 )
 from tangl.mechanics.sandbox.handlers import sandbox_player_assets
-from tangl.service.response import KvListValue, ProjectedSection, ProjectedState
-from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
 from tangl.story import Action, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager
-from tangl.vm import Ledger, on_gather_ns, on_provision, on_update
+from tangl.vm import on_gather_ns, on_provision, on_update
 from tangl.vm.ctx import VmPhaseCtx
 
 
 TREASURE_LABEL = "gold_nugget"
+adventure_dispatch = BehaviorRegistry(label="adventure_sandbox.presentation_dispatch")
 
 
 class AdventureMagicAnchor(BaseModel):
@@ -257,37 +257,43 @@ def _rewrite_movement_hazards(
             )
 
 
-class AdventureSandboxStoryInfoProjector:
-    """Adventure-specific story-info wrapper for world-owned sections."""
-
-    def project(self, *, ledger: Ledger) -> ProjectedState:
-        cursor = ledger.cursor
-        if not isinstance(cursor, AdventureSandboxLocation):
-            return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
-        return ProjectedState(
-            sections=[
-                ProjectedSection(
-                    section_id="adventure_score",
-                    title="Score",
-                    kind="score",
-                    value=KvListValue(
-                        items=[
-                            KvRow(key="Score", value=_adventure_score(cursor), max=350),
-                            KvRow(
-                                key="Deposited",
-                                value=len(_deposited_treasures(cursor)),
-                                unit="treasure",
-                            ),
-                        ]
-                    ),
+def project_adventure_score(
+    *,
+    caller: AdventureSandboxLocation,
+    request: ProjectionRequest,
+    **_kw: object,
+) -> ProjectedSection | None:
+    """Contribute the Adventure score when a client requests it."""
+    if "score" not in request.requested_kinds():
+        return None
+    return ProjectedSection(
+        section_id="adventure_score",
+        title="Score",
+        kind="score",
+        value=KvListValue(
+            items=[
+                KvRow(key="Score", value=_adventure_score(caller), max=350),
+                KvRow(
+                    key="Deposited",
+                    value=len(_deposited_treasures(caller)),
+                    unit="treasure",
                 ),
             ]
-        )
+        ),
+    )
 
 
-def get_story_info_projector() -> AdventureSandboxStoryInfoProjector:
-    """Return the Adventure-specific projected-state adapter."""
-    return AdventureSandboxStoryInfoProjector()
+adventure_dispatch.register(
+    project_adventure_score,
+    task="get_story_info",
+    wants_caller_kind=AdventureSandboxLocation,
+    wants_exact_kind=False,
+)
+
+
+def get_authorities() -> list[BehaviorRegistry]:
+    """Expose the world's ordinary presentation authority."""
+    return [adventure_dispatch]
 
 
 def _ensure_adventure_sandbox(graph: Graph) -> None:

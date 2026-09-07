@@ -8,11 +8,11 @@ from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
+from tangl.presentation.projection import ProjectedState
 from tangl.service.response import (
     CommandEdgeQuery,
     DirectEdgeRequest,
     FindEdgeRequest,
-    ProjectedState,
     RuntimeEnvelope,
 )
 

@@ -73,7 +73,7 @@ The public payload vocabulary is typed:
 - story-session operations return `RuntimeEnvelope`;
 - `RuntimeEnvelope.fragments` contains the actual `BaseFragment` descendants
   emitted through the journal pipeline;
-- supplementary reads return models such as `ProjectedState`, `UserInfo`,
+- supplementary reads return presentation-owned `ProjectedState` and service models such as `UserInfo`,
   `WorldInfo`, and `SystemInfo`;
 - mutation acknowledgements return `RuntimeInfo`.
 
@@ -87,7 +87,7 @@ Transport adapters own wire serialization, media URL shaping, and other
 client-specific presentation.
 
 Story-info is the supplementary projection channel. Providers may contribute
-typed `ProjectedSection` values, but those values are disclosed views rather
+presentation-owned typed `ProjectedSection` values, but those values are disclosed views rather
 than authority state. A client hint or hotspot never bypasses ordinary action
 selection for mutation.
 

@@ -17,7 +17,8 @@ from uuid import UUID
 
 import pytest
 
-from tangl.service.response import ProjectedState, RuntimeEnvelope
+from tangl.presentation.projection import ProjectedState
+from tangl.service.response import RuntimeEnvelope
 
 
 FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"

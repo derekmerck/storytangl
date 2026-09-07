@@ -23,8 +23,6 @@ class WorldBuilder:
     @staticmethod
     def _coerce_domain(
         domain: Any | None,
-        *,
-        story_info_projector: Any | None,
     ) -> dict[str, Any]:
         if domain is None:
             return {}
@@ -38,18 +36,11 @@ class WorldBuilder:
         class_registry = getattr(domain, "class_registry", None)
         modules = getattr(domain, "modules", None)
 
-        projector = story_info_projector
-        if projector is None:
-            get_projector = getattr(domain, "get_story_info_projector", None)
-            if callable(get_projector):
-                projector = get_projector()
-
         return {
             "dispatch": dispatch if isinstance(dispatch, BehaviorRegistry) else None,
             "extra_authorities": authorities,
             "class_registry": dict(class_registry or {}),
             "modules": list(modules or []),
-            "story_info_projector": projector,
         }
 
     def build(
@@ -63,16 +54,12 @@ class WorldBuilder:
         extra_authorities: list[Any] | None = None,
         class_registry: dict[str, Any] | None = None,
         modules: list[Any] | None = None,
-        story_info_projector: Any | None = None,
         dispatch: BehaviorRegistry | None = None,
         extra_template_registries: list[TemplateRegistry] | None = None,
         domain: Any | None = None,
     ) -> World:
         if domain is not None:
-            coerced = self._coerce_domain(
-                domain,
-                story_info_projector=story_info_projector,
-            )
+            coerced = self._coerce_domain(domain)
             if dispatch is None:
                 dispatch = coerced.get("dispatch")
             if extra_authorities is None:
@@ -81,8 +68,6 @@ class WorldBuilder:
                 class_registry = dict(coerced.get("class_registry") or {})
             if modules is None:
                 modules = list(coerced.get("modules") or [])
-            if story_info_projector is None:
-                story_info_projector = coerced.get("story_info_projector")
 
         if dispatch is None:
             dispatch = BehaviorRegistry(label=f"{label}.world_dispatch")
@@ -110,6 +95,5 @@ class WorldBuilder:
             class_registry=class_registry,
             modules=modules,
             extra_authorities=extra,
-            story_info_projector=story_info_projector,
         )
         return world

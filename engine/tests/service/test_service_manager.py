@@ -13,11 +13,11 @@ import pytest
 from tangl.core import BaseFragment, Selector
 from tangl.journal.fragments import BlockFragment, ChoiceFragment, ContentFragment
 from tangl.persistence import PersistenceManagerFactory
+from tangl.presentation.projection import ProjectedState
 from tangl.service.response import (
     CommandEdgeQuery,
     DirectEdgeRequest,
     FindEdgeRequest,
-    ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
     UserInfo,

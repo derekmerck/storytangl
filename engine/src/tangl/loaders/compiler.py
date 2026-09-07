@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 from tangl.story.fabula.compiler import StoryTemplateBundle
@@ -23,7 +23,6 @@ class _WorldDomainAdjuncts:
 
         self.dispatch_registry = BehaviorRegistry(label="world_domain_dispatch")
         self._authorities: list[Any] = [self.dispatch_registry]
-        self._story_info_projector_factories: list[Callable[[], Any]] = []
         self.modules: list[Any] = []
         self.class_registry: dict[str, Any] = {}
         self.story_codecs: dict[str, StoryCodec] = {}
@@ -37,10 +36,6 @@ class _WorldDomainAdjuncts:
             for authority in get_authorities() or ():
                 if authority not in self._authorities:
                     self._authorities.append(authority)
-
-        get_story_info_projector = getattr(module, "get_story_info_projector", None)
-        if callable(get_story_info_projector):
-            self._story_info_projector_factories.append(get_story_info_projector)
 
         get_story_codecs = getattr(module, "get_story_codecs", None)
         if callable(get_story_codecs):
@@ -61,13 +56,6 @@ class _WorldDomainAdjuncts:
 
     def get_authorities(self) -> list[Any]:
         return list(self._authorities)
-
-    def get_story_info_projector(self) -> Any | None:
-        for factory in self._story_info_projector_factories:
-            projector = factory()
-            if projector is not None:
-                return projector
-        return None
 
 
 class _WorldAssetsFacet:
@@ -142,9 +130,6 @@ class WorldCompiler:
             extra_authorities=domain_adjuncts.get_authorities() if domain_adjuncts is not None else None,
             class_registry=domain_adjuncts.class_registry if domain_adjuncts is not None else None,
             modules=domain_adjuncts.modules if domain_adjuncts is not None else None,
-            story_info_projector=(
-                domain_adjuncts.get_story_info_projector() if domain_adjuncts is not None else None
-            ),
         )
         return world
 
@@ -219,11 +204,6 @@ class WorldCompiler:
                     else None
                 ),
                 modules=world_domain_adjuncts.modules if world_domain_adjuncts is not None else None,
-                story_info_projector=(
-                    world_domain_adjuncts.get_story_info_projector()
-                    if world_domain_adjuncts is not None
-                    else None
-                ),
             )
             worlds[story_key] = world
 

@@ -14,7 +14,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service import (
+from tangl.presentation.projection import (
     BadgeListValue,
     InfoAffordance,
     ItemListValue,
@@ -23,14 +23,13 @@ from tangl.service import (
     ProjectedSection,
     ProjectedState,
     ScalarValue,
-    ServiceManager,
     TableValue,
 )
 from tangl.presentation.values import KvRow
+from tangl.service import ServiceManager
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
 from tangl.vm.runtime.frame import PhaseCtx
-from tangl.vm.runtime.ledger import Ledger
 
 
 DIAGNOSTIC_DIR = Path(__file__).parent / "diagnostics"
@@ -43,10 +42,10 @@ _UUID_PATTERN = re.compile(
 )
 
 
-class _WidgetDemoProjector:
-    """Project generic widget-contract state without bundle-specific concepts."""
+class _WidgetDemoSections:
+    """Build the diagnostic sections for the current dispatch context."""
 
-    def project(self, *, ledger: Ledger) -> ProjectedState:
+    def build(self, *, cursor_label: str, step: int) -> ProjectedState:
         return ProjectedState(
             sections=[
                 ProjectedSection(
@@ -55,8 +54,8 @@ class _WidgetDemoProjector:
                     kind="stats",
                     value=KvListValue(
                         items=[
-                            KvRow(key="Cursor", value=ledger.cursor.label),
-                            KvRow(key="Step", value=ledger.step),
+                            KvRow(key="Cursor", value=cursor_label),
+                            KvRow(key="Step", value=step),
                         ],
                     ),
                 ),
@@ -105,6 +104,16 @@ class _WidgetDemoProjector:
                 ),
             ],
         )
+
+
+def _project_widget_demo(
+    *,
+    caller: object,
+    ctx: PhaseCtx,
+    **_kw: object,
+) -> ProjectedState:
+    """Contribute the diagnostic projection through the world's authority."""
+    return _WidgetDemoSections().build(cursor_label=caller.label, step=ctx.step)
 
 
 def _script_data() -> dict[str, object]:
@@ -206,14 +215,12 @@ def build_demo_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         user = User(label="widget-contract-user")
         persistence.save(user)
 
-        world = World.from_script_data(
-            script_data=_script_data(),
-            story_info_projector=_WidgetDemoProjector(),
-        )
+        world = World.from_script_data(script_data=_script_data())
         world.dispatch.register(
             _advertise_info_channels,
             task="advertise_info_channels",
         )
+        world.dispatch.register(_project_widget_demo, task="get_story_info")
 
         envelope = manager.create_story(
             user_id=user.uid,
