@@ -300,6 +300,42 @@ def test_a_card_is_clickable_exactly_when_it_carries_a_number(stage) -> None:
     assert clickable == set(stage.selection_numbers)
 
 
+def test_a_spent_piece_stays_on_the_desk_and_keeps_its_reason(stage, frame) -> None:
+    """Marked on the desk, explained in the column.
+
+    A spent document stays in the packet and stays visible; the inspect move
+    refuses it. §7.1 wants it to say so rather than let the player find out from
+    the error after committing. A card is about forty pixels wide, so it can
+    carry the mark but not the reason -- which means an unavailable piece must
+    not be dropped from the panel just because the desk drew it.
+    """
+
+    frame.pieces = [
+        Piece(
+            piece_id="0:passport",
+            kind="id_card",
+            text="a passport",
+            label="passport",
+            zone_ref=ZONE_UID,
+            available=False,
+            unavailable_reason="already inspected",
+        )
+    ]
+    pending = PendingSelection(choice=frame.choices[0])
+    stage.draw(frame, pending)
+
+    # Drawn, and not on offer by either route.
+    assert "0:passport" in {piece.piece_id for _s, piece, _b in stage.slot_boxes}
+    assert "0:passport" not in stage.selection_numbers
+    assert stage.hit(_centre(_box(stage, "papers"))) is None
+
+    # And the reason is still readable somewhere. Joined and re-spaced because
+    # the column wraps at its width, so the phrase legitimately spans two rows.
+    placed = place_pieces(SURFACE, frame.pieces)
+    rows = " ".join(text for text, _colour in stage.panel_rows(frame, columns=24, placed=placed))
+    assert "already inspected" in " ".join(rows.split())
+
+
 # ── what the surface owes the rest of the frame ──────────────────────────
 
 

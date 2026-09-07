@@ -581,6 +581,10 @@ class Stage:
         label = piece.label or piece.piece_id
         if number is not None:
             label = f"{number}. {label}"
+        elif not piece.available:
+            # The same mark an inactive choice row carries. It says the card is
+            # not on offer; the panel row still says why.
+            label = f"(x) {label}"
         for index, line in enumerate(self._wrap(label, max(1, (box.w - 4) // 4))):
             y = box.y + 3 + index * ROW_H
             if y + ROW_H > box.bottom:
@@ -708,6 +712,20 @@ class Stage:
             y += 11
 
     @staticmethod
+    def _shown(placed: list[tuple[SurfaceSlot, Piece]]) -> set[str]:
+        """Pieces the desk represents completely enough to drop from the panel.
+
+        An unavailable piece is not one of them. The card can say *that* it is
+        spent -- dimmed, marked, carrying no number -- but a card is about forty
+        pixels wide and cannot say *why*, and the reason is the whole point:
+        widget vocabulary §7.1 wants a blocked member to announce itself rather
+        than let the player discover it from the error after committing. So it
+        stays in the column, where its reason has room.
+        """
+
+        return {piece.piece_id for _slot, piece in placed if piece.available}
+
+    @staticmethod
     def _panel_zones(turn: Turn, shown: set[str]) -> list[Zone]:
         """Zones the panel still owes the player a heading for.
 
@@ -737,7 +755,7 @@ class Stage:
         could not place still earns one.
         """
 
-        shown = {piece.piece_id for _, piece in placed}
+        shown = cls._shown(placed)
         return bool(
             [piece for piece in turn.pieces if piece.piece_id not in shown]
             or turn.findings
@@ -762,7 +780,7 @@ class Stage:
         # Whatever the surface drew, the player is already looking at. The panel
         # is for the remainder -- a piece whose kind no slot holds, or a whole
         # packet on a world that declares no surface at all.
-        shown = {piece.piece_id for _, piece in placed}
+        shown = self._shown(placed)
 
         def wrapped(text: str, colour, *, indent: str = "") -> None:
             for part in self._wrap(text, columns - len(indent)):
