@@ -17,7 +17,7 @@ pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client r
 
 from tangl.pygame_client import __main__ as client  # noqa: E402
 from tangl.pygame_client.bridge import PygameSessionBridge  # noqa: E402
-from tangl.journal.intent import (  # noqa: E402
+from tangl.presentation.intent import (  # noqa: E402
     PieceConstraints,
     PiecesAccepts,
     TextAccepts,

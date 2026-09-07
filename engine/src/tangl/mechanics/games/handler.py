@@ -19,7 +19,7 @@ from .strategies import opponent_strategies, scoring_strategies
 
 if TYPE_CHECKING:
     from tangl.core import BaseFragment
-    from tangl.journal.intent import Accepts
+    from tangl.presentation.intent import Accepts
     from tangl.vm.ctx import VmPhaseCtx
 
 GameT = TypeVar("GameT", bound=Game)

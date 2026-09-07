@@ -16,35 +16,17 @@ from uuid import UUID
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
-    ConfigDict,
     Field,
     field_serializer,
-    field_validator,
     model_validator,
 )
 
 from tangl.core import BaseFragment, Graph, Registry, Selector
-from tangl.journal.intent import Accepts, Blocker, KvRow, UIHints
+from tangl.presentation.hints import PresentationHints, StagingHints
+from tangl.presentation.intent import Accepts, Blocker, KvRow, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.type_hints import Identifier, Pathlike, StyleClass, StyleDict, StyleId, UnstructuredData
-
-
-class PresentationHints(BaseModel, extra="allow"):
-    """Advisory styling metadata for text and projected-state payloads."""
-
-    model_config = ConfigDict(frozen=True)
-
-    style_name: StyleId | None = None
-    style_tags: list[StyleClass] = Field(default_factory=list)
-    style_dict: StyleDict = Field(default_factory=dict)
-    icon: str | None = None
-
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
-        kwargs.setdefault("by_alias", True)
-        kwargs.setdefault("exclude_none", True)
-        return super().model_dump(*args, **kwargs)
+from tangl.type_hints import Identifier, Pathlike, UnstructuredData
 
 
 class ContentFragment(BaseFragment):
@@ -205,87 +187,6 @@ class ControlFragment(BaseFragment, extra="allow"):
 
     def reference(self, registry: Registry[BaseFragment]) -> BaseFragment:
         return registry.find_one(Selector.from_identifier(self.reference_id))
-
-
-ShapeName = Literal["landscape", "portrait", "square", "avatar", "banner", "bg"]
-PositionName = Literal["top", "bottom", "left", "right", "cover", "inline"]
-SizeName = Literal["small", "medium", "large"]
-TransitionName = Literal[
-    "fade_in",
-    "fade_out",
-    "remove",
-    "from_right",
-    "from_left",
-    "from_top",
-    "from_bottom",
-    "to_right",
-    "to_left",
-    "to_top",
-    "to_bottom",
-    "update",
-    "scale",
-    "rotate",
-]
-DurationName = Literal["short", "medium", "long"]
-TimingName = Literal["start", "stop", "pause", "restart", "loop"]
-
-# Coarse staging grid, named from the viewer's side of the screen. Deliberately
-# not theatrical: "stage left" is the performer's left and therefore the
-# audience's right, which reads backwards here and is rejected outright rather
-# than silently accepted (see StagingHints._normalize_axis).
-#
-# Subdivisions are the planned extension, keeping these three as the cardinals:
-# left_left, left, left_right, mid_left, mid, mid_right, right_left, right,
-# right_right — for staging crowds by nudging off a cardinal rather than by
-# hardcoded pixel offsets.
-MediaXName = Literal["left", "mid", "right"]
-MediaYName = Literal["top", "mid", "bottom"]
-
-_AXIS_ALIASES = {"screen_left": "left", "screen_right": "right", "center": "mid",
-                 "centre": "mid", "middle": "mid"}
-_AXIS_REJECTED = {"stage_left", "stage_right"}
-
-
-class StagingHints(BaseModel, extra="allow"):
-    """Client-facing media staging hints."""
-
-    media_shape: ShapeName | float | None = None
-    media_size: SizeName | tuple[int, int] | tuple[float, float] | float | None = None
-    media_position: PositionName | tuple[int, int] | tuple[float, float] | None = None
-    media_transition: TransitionName | None = None
-    media_duration: DurationName | float | None = None
-    media_timing: TimingName | None = None
-
-    @field_validator("media_x", "media_y", mode="before")
-    @classmethod
-    def _normalize_axis(cls, value: Any) -> Any:
-        """Accept screen-relative aliases; refuse theatrical ones outright."""
-
-        if not isinstance(value, str):
-            return value
-        name = value.strip().lower()
-        if name in _AXIS_REJECTED:
-            raise ValueError(
-                f"{value!r} is not a staging position. Theatrical 'stage left' is "
-                "the performer's left and the viewer's right, which inverts this "
-                "vocabulary. Use 'left' or 'right', named from the viewer's side."
-            )
-        return _AXIS_ALIASES.get(name, name)
-    media_x: MediaXName | None = None
-    """Horizontal staging slot, named from the viewer's side of the screen."""
-
-    media_y: MediaYName | None = None
-    """Vertical staging level."""
-
-    media_flip_h: bool | None = None
-    """Mirror the asset horizontally when staged.
-
-    Orthogonal to :attr:`media_position` (where it sits) and
-    :attr:`media_transition` (how it arrives, including ``from_left`` and
-    ``from_right``). Sprite art has a fixed facing, so a sprite reused on the
-    other side of a stage needs mirroring independently of either. Ports honour
-    the hints they understand and ignore the rest.
-    """
 
 
 ContentFormatType = Literal["url", "data", "xml", "json", "rit"]
@@ -488,7 +389,6 @@ def fragment_from_dto(payload: object) -> BaseFragment:
 __all__ = [
     "AttributedFragment",
     "BlockFragment",
-    "Blocker",
     "ChoiceFragment",
     "ContentFragment",
     "ContentFormatType",
@@ -498,12 +398,8 @@ __all__ = [
     "GroupFragment",
     "JournalMarkerFragment",
     "KvFragment",
-    "KvRow",
     "MediaFragment",
     "PieceFragment",
-    "PresentationHints",
-    "StagingHints",
-    "UIHints",
     "UI_TAG_PREFIX",
     "client_visible_tags",
     "fragment_from_dto",

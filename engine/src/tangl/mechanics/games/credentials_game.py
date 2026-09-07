@@ -25,15 +25,14 @@ if TYPE_CHECKING:
 
 from tangl.core import BaseFragment, TokenCatalog
 from tangl.core.bases import BaseModelPlus, Unstructurable
-from tangl.journal.intent import PieceConstraints, PiecesAccepts, PickAccepts
+from tangl.presentation.intent import KvRow, PieceConstraints, PiecesAccepts, PickAccepts
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.fragments import (
     ContentFragment,
     GroupFragment,
     KvFragment,
-    KvRow,
     MediaFragment,
     PieceFragment,
-    PresentationHints,
 )
 from tangl.media.media_creators.composition_forge.composition_inputs import (
     CompositionInputUnavailable,

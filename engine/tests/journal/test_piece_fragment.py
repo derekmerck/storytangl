@@ -11,9 +11,9 @@ from uuid import UUID
 
 from tangl.journal.fragments import (
     PieceFragment,
-    PresentationHints,
     fragment_to_dto,
 )
+from tangl.presentation.hints import PresentationHints
 
 
 def test_piece_fragment_serializes_to_fixture_shape() -> None:

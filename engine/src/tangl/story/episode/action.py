@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import field_serializer
 
-from tangl.journal.intent import Accepts, Blocker, UIHints
+from tangl.presentation.intent import Accepts, Blocker, UIHints
 from tangl.vm import ResolutionPhase, TraversableEdge
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from tangl.journal.intent import Accepts, Blocker, CostPreview, KvRow, UIHints
+from tangl.presentation.intent import Accepts, Blocker, CostPreview, KvRow, UIHints
 
 
 def test_accepts_union_validates_piece_and_compose_shapes() -> None:

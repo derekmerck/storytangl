@@ -9,7 +9,8 @@ import pytest
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.prose.dialog import DialogMuBlock
-from tangl.journal.fragments import AttributedFragment, GroupFragment, PresentationHints
+from tangl.journal.fragments import AttributedFragment, GroupFragment
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.presence.look import BodyPhenotype, EyeColor, HairColor, HairStyle, Look, SkinTone

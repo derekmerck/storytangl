@@ -20,7 +20,7 @@ from tangl.core import Priority, Record, Selector
 from tangl.prose import DialogHandler
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
-from tangl.journal.intent import Blocker
+from tangl.presentation.intent import Blocker
 from tangl.vm import (
     Affordance,
     Dependency,

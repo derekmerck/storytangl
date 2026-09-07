@@ -1,4 +1,4 @@
-from tangl.journal.content import PresentationHints
+from tangl.presentation.hints import PresentationHints
 
 ### TestPresentationHints:
 def test_presentation_hints():
@@ -18,4 +18,3 @@ def test_presentation_hints_defaults():
     assert hints.style_tags == []
     assert hints.style_dict == {}
     assert hints.icon is None
-

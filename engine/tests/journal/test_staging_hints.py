@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from tangl.journal.fragments import StagingHints
+from tangl.presentation.hints import StagingHints
 
 
 @pytest.mark.parametrize(

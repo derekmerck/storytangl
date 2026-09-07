@@ -1,4 +1,4 @@
-"""Typed interaction and key/value intent contracts for journal fragments."""
+"""Typed interaction and key/value intent contracts for presentation values."""
 
 from __future__ import annotations
 
@@ -24,8 +24,9 @@ class IntentModel(Unstructurable):
     carries its own discriminator -- ``kind`` holds the class -- so recursing
     keeps the tag without re-admitting every other default.
 
-    The DTO projection is a separate path (:func:`tangl.journal.fragments.
-    fragment_to_dto`) and keeps the string ``kind`` literal for wire consumers.
+    The DTO projection is a separate path
+    (:func:`tangl.journal.fragments.fragment_to_dto`) and keeps the string
+    ``kind`` literal for wire consumers.
     """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
@@ -145,11 +146,7 @@ class PlaceAccepts(IntentModel):
 
 
 NonComposeAccepts: TypeAlias = Annotated[
-    PickAccepts
-    | TextAccepts
-    | QuantityAccepts
-    | PiecesAccepts
-    | PlaceAccepts,
+    PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts | PlaceAccepts,
     Field(discriminator="kind"),
 ]
 

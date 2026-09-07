@@ -22,10 +22,10 @@ Service-layer imports are isolated to this module (mirroring
 from __future__ import annotations
 
 from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.intent import KvRow
 from tangl.service.response import (
     InfoAffordance,
     KvListValue,
-    KvRow,
     ProjectedSection,
     ScalarValue,
     StoryInfoRequest,

@@ -8,13 +8,13 @@ import pytest
 from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment
-from tangl.journal.intent import Blocker, CostPreview, UIHints
+from tangl.presentation.intent import Blocker, CostPreview, UIHints
+from tangl.presentation.intent import KvRow
 from tangl.service.response import (
     BadgeListValue,
     DirectEdgeRequest,
     FindEdgeRequest,
     KvListValue,
-    KvRow,
     ProjectedSection,
     ProjectedState,
     RuntimeEnvelope,

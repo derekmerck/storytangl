@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.journal.fragments import PresentationHints
+from tangl.presentation.hints import PresentationHints
+from tangl.presentation.intent import KvRow
 from tangl.service.response import (
     BadgeListValue,
     InfoAffordance,
@@ -10,7 +11,6 @@ from tangl.service.response import (
     ItemListValue,
     KvListValue,
     ProjectedItem,
-    KvRow,
     ProjectedSection,
     ProjectedState,
     ScalarValue,

@@ -22,11 +22,11 @@ from pydantic import (
 
 from tangl.core import BaseFragment
 from tangl.info import __url__
-from tangl.journal.intent import KvRow, PrimitiveValue
+from tangl.presentation.intent import KvRow, PrimitiveValue
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.fragments import (
     KvFragment,
     MediaFragment,
-    PresentationHints,
     fragment_to_dto,
 )
 from tangl.service.user.user import User
@@ -511,11 +511,9 @@ __all__ = [
     "ItemListValue",
     "JsonValue",
     "KvListValue",
-    "KvRow",
     "MediaNative",
     "NativeResponse",
     "PreflightReport",
-    "PrimitiveValue",
     "ProjectedItem",
     "ProjectedSection",
     "ProjectedState",

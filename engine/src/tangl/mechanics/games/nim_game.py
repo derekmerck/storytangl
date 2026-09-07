@@ -35,7 +35,7 @@ from typing import ClassVar
 
 from pydantic import Field, field_validator
 
-from tangl.journal.intent import QuantityAccepts
+from tangl.presentation.intent import QuantityAccepts
 from tangl.journal.fragments import ContentFragment
 from tangl.story.concepts.asset import AssetWallet
 from tangl.vm.ctx import VmPhaseCtx

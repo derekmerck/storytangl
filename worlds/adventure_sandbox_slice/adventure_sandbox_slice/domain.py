@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from tangl.core import Graph, Priority, Selector, Token
-from tangl.journal.intent import KvRow
+from tangl.presentation.intent import KvRow
 from tangl.mechanics.sandbox import (
     ChargeFacet,
     ContainerFacet,

@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 from uuid import UUID
 
-from tangl.journal.fragments import AttributedFragment, ContentFragment, PresentationHints
+from tangl.journal.fragments import AttributedFragment, ContentFragment
+from tangl.presentation.hints import PresentationHints
 from tangl.utils.sanitize_str import sanitize_str
 
 from .mu_block import MuBlock, MuBlockHandler

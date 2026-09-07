@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.journal.content import PresentationHints
+from tangl.presentation.hints import PresentationHints
 from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
@@ -16,7 +16,7 @@ from tangl.journal.fragments import (
     MediaFragment,
     PieceFragment,
 )
-from tangl.journal.intent import (
+from tangl.presentation.intent import (
     KvRow,
     PickAccepts,
     PieceConstraints,

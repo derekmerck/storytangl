@@ -7,9 +7,10 @@ in `WIDGET_CONTRACT_RECONCILIATION.md`. These are presentation-contract views,
 not StoryTangl engine layers. **This document is target-truth.**
 **Audience:** anyone implementing a StoryTangl client (Vue, CLI, tkinter, Godot, Ren'Py, bespoke), or extending the engine's emitted contract
 **Source of truth (for engine model alignment):**
-- `tangl.journal.fragments` (fragment types, presentation hints)
+- `tangl.journal.fragments` (fragment types)
 - `tangl.service.response` (`RuntimeEnvelope`, `ProjectedState`, section value union)
-- `tangl.journal.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
+- `tangl.presentation.hints` (`PresentationHints`, `StagingHints`)
+- `tangl.presentation.intent` (typed `Accepts`/`UIHints`/`Blocker`/`CostPreview` — see §6)
 
 This document defines the framework-independent rendering contract for the
 engine's `RuntimeEnvelope.fragments` and `ProjectedState.sections`. Visual

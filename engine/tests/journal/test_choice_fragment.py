@@ -1,9 +1,9 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from tangl.journal.fragments import fragment_to_dto
-from tangl.journal.intent import (
+from tangl.presentation.intent import (
     ComposeAccepts,
     ComposePart,
     LengthValidator,
@@ -82,6 +82,23 @@ class TestTypedAcceptsSurvivesConstructorForm:
         fragment = ChoiceFragment(edge_id=uuid4(), text="act", accepts=PiecesAccepts())
 
         assert fragment_to_dto(fragment)["accepts"]["kind"] == "pieces"
+
+    def test_dto_preserves_the_exact_choice_wire_shape(self) -> None:
+        fragment = ChoiceFragment(
+            uid=UUID("00000000-0000-4000-8000-000000000001"),
+            edge_id=UUID("00000000-0000-4000-8000-000000000002"),
+            text="Inspect",
+            accepts=PiecesAccepts(),
+        )
+
+        assert fragment_to_dto(fragment) == {
+            "uid": "00000000-0000-4000-8000-000000000001",
+            "fragment_type": "choice",
+            "edge_id": "00000000-0000-4000-8000-000000000002",
+            "text": "Inspect",
+            "available": True,
+            "accepts": {"kind": "pieces", "min": 1, "max": 1},
+        }
 
     def test_unstructure_still_elides_ordinary_defaults(self) -> None:
         # The tag is identity, not state: recursing must not re-admit defaults.

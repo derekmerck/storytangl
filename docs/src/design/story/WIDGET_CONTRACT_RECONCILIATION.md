@@ -324,7 +324,7 @@ others.
 ### 2026-05 — engine current (engine baseline)
 
 - Engine emits typed `Accepts`, `UIHints`, and `Blocker` models from
-  `tangl.journal.intent`.
+  `tangl.presentation.intent`.
 - Authored fixed action costs use `UIHints.cost_previews`; input-specific
   previews use the relevant typed `Accepts.cost_previews`. Both survive the
   service, REST, remote-client, and reference-port paths as signed
