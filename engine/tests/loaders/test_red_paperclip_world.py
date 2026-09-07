@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import pytest
 import yaml
@@ -19,9 +20,6 @@ from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
-from red_paperclip.domain import RedPaperclipHub, _holding, _state
-from red_paperclip.trade_graph import TradeGraph, TradeParseError
-
 
 def _repo_worlds_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "worlds"
@@ -29,6 +27,17 @@ def _repo_worlds_dir() -> Path:
 
 def _red_paperclip_root() -> Path:
     return _repo_worlds_dir() / "red_paperclip"
+
+
+# `WorldCompiler` puts a bundle root on `sys.path` when it compiles the bundle
+# (`loaders/compiler.py:340`), which is how a world's `domain_module` is found
+# at all -- but collection runs before any of that, and CI carries no world
+# directories on PYTHONPATH. Same need as `test_coronate_situational._domain`.
+if str(_red_paperclip_root()) not in sys.path:
+    sys.path.insert(0, str(_red_paperclip_root()))
+
+from red_paperclip.domain import RedPaperclipHub, _holding, _state  # noqa: E402
+from red_paperclip.trade_graph import TradeGraph, TradeParseError  # noqa: E402
 
 
 def _start() -> Ledger:
