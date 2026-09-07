@@ -37,6 +37,7 @@ from tangl.pygame_client.models import (  # noqa: E402
 )
 from tangl.pygame_client.stage import (  # noqa: E402
     CREAM,
+    SELECTION_ROWS,
     LOGICAL_SIZE,
     PROSE_TOP,
     SCALE,
@@ -141,14 +142,21 @@ def test_a_piece_no_slot_holds_is_absent_from_the_surface(frame) -> None:
     assert "0:ticket" not in {piece.piece_id for _, piece in placed}
 
 
-def test_two_slots_of_one_kind_fill_in_order() -> None:
-    """Pieces in stream order against slots in declared order, every turn."""
+def test_two_slots_of_one_kind_fill_in_declared_order() -> None:
+    """Pieces in stream order against slots in *declared* order, every turn.
+
+    The slot names here sort the opposite way from the order they are declared
+    in, deliberately. An earlier version of this test used ``left``/``right``,
+    which are alphabetical *and* declared in that order -- so it passed whether
+    the pipeline preserved authored order or silently sorted, which is exactly
+    what it was sorting.
+    """
 
     surface = Surface(
         name="desk",
         slots=(
-            SurfaceSlot(name="left", holds="id_card", x=0.1, y=0.6, w=0.2, h=0.2),
-            SurfaceSlot(name="right", holds="id_card", x=0.4, y=0.6, w=0.2, h=0.2),
+            SurfaceSlot(name="zulu", holds="id_card", x=0.1, y=0.6, w=0.2, h=0.2),
+            SurfaceSlot(name="alpha", holds="id_card", x=0.4, y=0.6, w=0.2, h=0.2),
         ),
     )
     pieces = [
@@ -158,7 +166,7 @@ def test_two_slots_of_one_kind_fill_in_order() -> None:
 
     placed = [(slot.name, piece.piece_id) for slot, piece in place_pieces(surface, pieces)]
 
-    assert placed == [("left", "first"), ("right", "second")]
+    assert placed == [("zulu", "first"), ("alpha", "second")]
 
 
 # ── input parity ─────────────────────────────────────────────────────────
@@ -235,6 +243,61 @@ def test_an_empty_slot_refuses_the_click_while_picking(stage, frame) -> None:
 
     # Nothing filled it, so it was never drawn and there is nothing to click.
     assert "permit" not in {slot.name for slot, _piece, _box in stage.slot_boxes}
+
+
+def test_a_card_is_clickable_exactly_when_it_carries_a_number(stage) -> None:
+    """The pagination witness, and the invariant underneath it.
+
+    With more candidates than a page holds, the surface can draw a card whose
+    piece is on another page. Such a card has no number, so the keyboard cannot
+    reach it -- and it must not be reachable by mouse either, or the two input
+    routes disagree about what is on offer. Clickable iff numbered is the whole
+    rule, and it is asserted as an equality so neither side can drift.
+    """
+
+    count = SELECTION_ROWS + 2
+    surface = Surface(
+        name="wide_desk",
+        slots=tuple(
+            SurfaceSlot(
+                name=f"slot{i}",
+                holds="id_card",
+                x=0.02 + 0.32 * (i % 3),
+                y=0.02 + 0.32 * (i // 3),
+                w=0.28,
+                h=0.28,
+            )
+            for i in range(count)
+        ),
+    )
+    pieces = [_piece(f"doc{i}", "id_card", label=f"document {i}") for i in range(count)]
+    turn = Turn(
+        step=1,
+        pieces=pieces,
+        zones=[Zone(uid=ZONE_UID, role="packet", label="Credentials packet")],
+        choices=[
+            Choice(
+                edge_id=uuid4(),
+                text="Inspect a document",
+                accepts=PiecesAccepts(
+                    min=1, max=1, constraints=PieceConstraints(target_zone_ref=str(ZONE_UID))
+                ),
+            )
+        ],
+        surface=surface,
+    )
+    pending = PendingSelection(choice=turn.choices[0])
+    stage.draw(turn, pending)
+
+    drawn = {piece.piece_id for _slot, piece, _box in stage.slot_boxes}
+    clickable = {
+        action.piece_id for _rect, action in stage.hitboxes if isinstance(action, PickPiece)
+    }
+
+    # More cards are drawn than any one page can offer -- otherwise this proves
+    # nothing about paging.
+    assert len(drawn) > len(stage.selection_numbers)
+    assert clickable == set(stage.selection_numbers)
 
 
 # ── what the surface owes the rest of the frame ──────────────────────────

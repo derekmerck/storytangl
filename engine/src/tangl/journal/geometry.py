@@ -16,7 +16,7 @@ wrong, so it has to be refused in one place.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class NormalizedRect(BaseModel):
@@ -25,6 +25,16 @@ class NormalizedRect(BaseModel):
     Carries no notion of what it contains. Binding is by name, decided by
     whichever model subclasses this and by the client that joins it against
     live state.
+    """
+
+    model_config = ConfigDict(allow_inf_nan=False)
+    """Refuse NaN and infinity before the bounds rule runs.
+
+    The bounds rule cannot catch NaN on its own: every comparison with NaN is
+    false, so ``w=nan`` passes ``w <= 0`` and then passes ``x + w > 1.0`` as
+    well, and arrives intact at a renderer that turns it into a pixel rect.
+    (``x=nan`` happens to be caught by the origin check and infinities by the
+    extent check, which is precisely why this was easy to miss.)
     """
 
     x: float

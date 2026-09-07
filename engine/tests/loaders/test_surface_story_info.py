@@ -97,6 +97,27 @@ def test_the_band_travels_as_numbers_not_as_prose() -> None:
     assert [rows[f"Band {axis}"] for axis in "xywh"] == [0.0, 0.62, 1.0, 0.38]
 
 
+def test_slots_arrive_in_the_order_the_world_declared_them() -> None:
+    """Authored order, not lexical.
+
+    Where a surface declares two slots for one kind, this order decides which
+    piece lands in which, so sorting the projection would overrule the author --
+    and would do it invisibly whenever the two orders happened to agree.
+
+    `credential_gate` is a real witness precisely because its declaration order
+    and its alphabetical order differ.
+    """
+
+    ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
+    state = do_get_story_info(
+        ledger.cursor, ctx=ctx, request=StoryInfoRequest(kinds=["surface_slots"])
+    )
+    names = [row[0] for row in state.sections[0].value.rows]
+
+    assert names == ["traveler", "papers", "permit", "ticket", "loose_page"]
+    assert names != sorted(names), "world chosen as a witness no longer discriminates"
+
+
 def test_two_worlds_running_one_mechanic_serve_their_own_furniture() -> None:
     """The point of declaring it per block: same pieces, different desk."""
 
@@ -167,6 +188,25 @@ def test_a_slot_may_not_escape_its_plate() -> None:
 
     with pytest.raises(ValidationError):
         SurfaceSlot(holds="id_card", x=0.1, y=0.1, w=0.0, h=0.2)
+
+
+def test_a_rect_may_not_be_nan() -> None:
+    """The bounds rule cannot catch NaN on its own.
+
+    Every comparison with NaN is false, so ``w=nan`` slips past ``w <= 0`` and
+    then past ``x + w > 1.0`` as well, and reaches a renderer that turns it into
+    a pixel rect. ``x=nan`` happens to be caught by the origin check and
+    infinities by the extent check, which is what made the hole easy to miss --
+    so the width and height cases are the ones asserted here.
+    """
+
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValidationError):
+            SurfaceSlot(holds="id_card", x=0.1, y=0.1, w=bad, h=0.2)
+        with pytest.raises(ValidationError):
+            SurfaceSlot(holds="id_card", x=0.1, y=0.1, w=0.2, h=bad)
+        with pytest.raises(ValidationError):
+            SandboxMapRegion(x=0.1, y=0.1, w=bad, h=0.2)
 
 
 def test_the_map_plate_still_enforces_the_rule_it_now_shares() -> None:

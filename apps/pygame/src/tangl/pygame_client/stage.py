@@ -528,14 +528,16 @@ class Stage:
         for slot, _piece in placed:
             floor = min(floor, self._rect_in(rect, slot.x, slot.y, slot.w, slot.h).top)
 
+        # The page, not every remaining candidate. `numbers` is built from
+        # `selection_page`, so taking clickability from anywhere else lets a card
+        # on another page be picked by mouse while carrying no number and being
+        # unreachable by key -- the same drift the numbering was already
+        # centralized to avoid, one step further along.
+        offered = set(numbers)
+
         # Nearer the viewer is drawn later. Depth comes off the slot's own
         # baseline rather than a separate declaration, so the two can never
         # disagree about which piece is in front.
-        offered = (
-            {piece.piece_id for piece in remaining_pieces(turn, pending)}
-            if pending is not None
-            else set()
-        )
         for slot, piece in sorted(placed, key=lambda pair: pair[0].y + pair[0].h):
             self._draw_piece(
                 slot,

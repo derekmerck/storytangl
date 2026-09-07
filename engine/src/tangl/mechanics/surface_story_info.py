@@ -37,12 +37,13 @@ SURFACE_SLOTS_SECTION = "surface_slots"
 def _surface(caller: HasSurface) -> Surface | None:
     """Return the caller's surface when it has one.
 
-    Handlers register for every ``HasSurface`` caller, and the mixin's default is
+    Handlers register for every ``HasSurface`` caller, so the field is there by
+    contract and is read as such -- a defensive ``getattr`` would turn a wrongly
+    typed surface into a world that silently has no desk. The mixin's default is
     ``None``: owning the capability is not the same as declaring the furniture.
     """
 
-    surface = getattr(caller, "surface", None)
-    return surface if isinstance(surface, Surface) else None
+    return caller.surface
 
 
 @on_advertise_info_channels(wants_caller_kind=HasSurface, wants_exact_kind=False)
@@ -125,11 +126,16 @@ def _plate_section(surface: Surface) -> ProjectedSection:
 
 
 def _slots_section(surface: Surface) -> ProjectedSection:
-    """Every slot, with the piece kind it holds, in a stable order.
+    """Every slot, with the piece kind it holds, in the order the world declared.
 
-    Sorted by name so a surface with two slots for the same kind fills them the
-    same way every time. Nothing else decides the order: the client pairs live
-    pieces against these rows as they arrive.
+    Authored order, not lexical. Where a surface declares two slots for one kind,
+    this order is what decides which piece lands in which -- so sorting here
+    would quietly overrule the author, and would do it invisibly whenever the
+    two orders happened to agree.
+
+    This is the one place the surface deliberately parts company with the map
+    plate, which does sort: a region is claimed by name and one at a time, so
+    its order carries no meaning. A slot's order does.
     """
 
     return ProjectedSection(
@@ -140,7 +146,7 @@ def _slots_section(surface: Surface) -> ProjectedSection:
             columns=["Slot", "Holds", "x", "y", "w", "h"],
             rows=[
                 [name, slot.holds, slot.x, slot.y, slot.w, slot.h]
-                for name, slot in sorted(surface.slots.items())
+                for name, slot in surface.slots.items()
             ],
         ),
     )
