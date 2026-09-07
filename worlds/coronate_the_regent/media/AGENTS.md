@@ -4,9 +4,13 @@ Five 320x200 PNGs, committed to regular git rather than LFS.
 
 **They are required.** All five are named in `script.yaml` as block media across the
 training weeks, the prince's audience, the merchant, the dragon and the coronation.
-No test decodes their pixels; `test_scene_plate_packs.py` checks the manifest against size,
-mode and sha256, so a checkout without `git-lfs` still passes (`AGENTS.md` media
-rule 3).
+`test_scene_plate_packs.py` decodes every one of them — `Image.load()`, then the
+sha256 of the bytes — because `open` reads a header and defers the pixels, so a
+truncated plate reports its declared size quite happily. That decode is exactly
+why they are not in LFS (`AGENTS.md` media rule 3): a test that reads bytes
+cannot depend on LFS having materialized, so the bytes have to be in every
+checkout. For the same reason they must survive `git archive`, which is pinned
+by `test_shipped_assets_survive_archive.py`.
 
 **They cannot be SVG.** Rule 1 prefers vector where the subject is vector-shaped.
 These are dithered raster scenes carrying tens of thousands of colours.
