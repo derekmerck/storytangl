@@ -5,6 +5,13 @@
 # rule 3 they must not depend on Git LFS having materialized. Stored as
 # ordinary git blobs, overriding the repository-wide `*.png` LFS rule.
 #
+# `-export-ignore` is unset explicitly, not merely omitted. The root rule
+# pairs `export-ignore` with LFS because an LFS pointer in an archive is
+# useless, and an attribute this file does not mention stays inherited --
+# so dropping the word would leave these excluded from `git archive` while
+# looking fixed. These are the one set of PNGs that can survive an archive,
+# and the tests above require them to.
+#
 # About 556 KB across 5 files. The 1280x800 source renders stay out of the
 # tree entirely and are reconstructible from media/provenance/jobs.json.
-*.png -filter -diff -merge -text export-ignore
+*.png -filter -diff -merge -text -export-ignore

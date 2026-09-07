@@ -3,11 +3,13 @@
 Two 320x200 PNGs, committed to regular git rather than LFS.
 
 **They are required.** Both are named in `script.yaml` as block media, so the world
-renders differently without them. Nothing reads their *bytes* — `test_scene_plate_packs.py`
-asserts the manifest matches size, mode and sha256, which is a property of the files
-being present and conformed, not of any test decoding pixels. A checkout without
-`git-lfs` therefore still passes, which is the reason they are not in LFS
-(`AGENTS.md` media rule 3).
+renders differently without them. `test_scene_plate_packs.py` reads their bytes: it
+decodes each plate with `Image.load()` and hashes the file, because `open` reads a
+header and defers the pixels, so a truncated plate reports its declared size and
+mode quite happily. That decode is the reason they are not in LFS (`AGENTS.md`
+media rule 3) — a test that reads bytes cannot depend on LFS having materialized,
+so the bytes have to be in every checkout. For the same reason they must survive
+`git archive`, which is pinned by `test_shipped_assets_survive_archive.py`.
 
 **They cannot be SVG.** Rule 1 prefers vector for anything vector-shaped. These are
 dithered raster scenes with tens of thousands of colours; there is no vector form.
