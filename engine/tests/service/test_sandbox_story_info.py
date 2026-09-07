@@ -6,6 +6,13 @@ import pytest
 from pydantic import Field
 
 from tangl.core import Graph, Selector, Token
+from tangl.presentation.projection import (
+    ItemListValue,
+    KvListValue,
+    ProjectedSection,
+    StoryInfoRequest,
+    TableValue,
+)
 from tangl.mechanics.sandbox import (
     ChargeFacet,
     ContainerFacet,
@@ -24,13 +31,6 @@ from tangl.mechanics.sandbox import (
 )
 from tangl.mechanics.sandbox.story_info import SandboxStoryInfoProjector
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.service.response import (
-    ItemListValue,
-    KvListValue,
-    ProjectedSection,
-    StoryInfoRequest,
-    TableValue,
-)
 from tangl.story.concepts.asset import AssetType
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger

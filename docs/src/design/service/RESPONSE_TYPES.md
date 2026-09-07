@@ -51,7 +51,8 @@ See `FRAGMENT_STREAM_CONTRACT.md` for the detailed client-facing contract.
 
 **Use when:** Endpoint queries metadata without side effects.
 
-**Return type:** Subclass of `InfoModel` (ProjectedState, UserInfo, WorldInfo, SystemInfo)
+**Return type:** `ProjectedState` or a Service `InfoModel` such as `UserInfo`,
+`WorldInfo`, or `SystemInfo`.
 
 **Examples:**
 - `get_story_info()` - projected current-state sections

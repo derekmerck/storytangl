@@ -22,8 +22,7 @@ Service-layer imports are isolated to this module (mirroring
 from __future__ import annotations
 
 from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
-from tangl.presentation.values import KvRow
-from tangl.service.response import (
+from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
     ProjectedSection,
@@ -31,6 +30,7 @@ from tangl.service.response import (
     StoryInfoRequest,
     TableValue,
 )
+from tangl.presentation.values import KvRow
 from tangl.vm.runtime.frame import PhaseCtx
 
 from .credentials_game import CredentialsGame

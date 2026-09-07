@@ -4,15 +4,15 @@ from types import SimpleNamespace
 
 from tangl.core import Graph
 from tangl.persistence.factory import PersistenceManagerFactory
-from tangl.presentation.values import KvRow
-from tangl.service import build_service_manager
-from tangl.service.response import (
+from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
     ProjectedSection,
     ProjectedState,
     StoryInfoRequest,
 )
+from tangl.presentation.values import KvRow
+from tangl.service import build_service_manager
 from tangl.service.story_info import (
     DEFAULT_STORY_INFO_PROJECTOR,
     DefaultStoryInfoProjector,

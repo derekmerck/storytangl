@@ -6,8 +6,7 @@ from collections.abc import Sequence
 from typing import Protocol, cast
 
 from tangl.core import Selector, Token
-from tangl.presentation.values import KvRow
-from tangl.service.response import (
+from tangl.presentation.projection import (
     InfoAffordance,
     ItemListValue,
     KvListValue,
@@ -17,6 +16,7 @@ from tangl.service.response import (
     StoryInfoRequest,
     TableValue,
 )
+from tangl.presentation.values import KvRow
 from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
 from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
 from tangl.story.concepts.asset import HasAssets

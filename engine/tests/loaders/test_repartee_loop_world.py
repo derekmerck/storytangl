@@ -10,7 +10,7 @@ from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.games import CallResponseExchange, GameResult
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.service.response import StoryInfoRequest
+from tangl.presentation.projection import StoryInfoRequest
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger

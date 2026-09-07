@@ -5,14 +5,13 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from tangl.vm.runtime.ledger import Ledger
-from tangl.presentation.values import KvRow
-
-from .response import (
+from tangl.presentation.projection import (
     KvListValue,
     ProjectedSection,
     ProjectedState,
     StoryInfoRequest,
 )
+from tangl.presentation.values import KvRow
 
 
 @runtime_checkable

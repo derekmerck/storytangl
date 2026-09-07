@@ -14,7 +14,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service import (
+from tangl.presentation.projection import (
     BadgeListValue,
     InfoAffordance,
     ItemListValue,
@@ -23,10 +23,10 @@ from tangl.service import (
     ProjectedSection,
     ProjectedState,
     ScalarValue,
-    ServiceManager,
     TableValue,
 )
 from tangl.presentation.values import KvRow
+from tangl.service import ServiceManager
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
 from tangl.vm.runtime.frame import PhaseCtx

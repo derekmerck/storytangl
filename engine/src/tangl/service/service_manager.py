@@ -14,6 +14,13 @@ import yaml
 from tangl.core import BaseFragment
 from tangl.journal.fragments import ChoiceFragment, PieceFragment
 from tangl.persistence import PersistenceManager
+from tangl.presentation.events import GrammarHint, GrammarNoun, GrammarVerb, UxEvent
+from tangl.presentation.projection import (
+    InfoAffordance,
+    InfoState,
+    ProjectedState,
+    StoryInfoRequest,
+)
 from tangl.story import InitMode, World, do_find_edges
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.get_code_name import get_code_name
@@ -30,21 +37,13 @@ from .response import (
     DirectEdgeRequest,
     EdgeResolutionRequest,
     FindEdgeRequest,
-    GrammarHint,
-    GrammarNoun,
-    GrammarVerb,
-    InfoAffordance,
-    InfoState,
     JsonValue,
     PreflightReport,
-    ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
-    StoryInfoRequest,
     SystemInfo,
     UserInfo,
     UserSecret,
-    UxEvent,
     WorldInfo,
 )
 from .service_method import (

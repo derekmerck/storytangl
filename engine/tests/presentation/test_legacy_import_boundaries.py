@@ -15,6 +15,22 @@ MOVED_NAMES = (
     "StagingHints",
     "KvRow",
     "PrimitiveValue",
+    "UxEvent",
+    "GrammarHint",
+    "GrammarNoun",
+    "GrammarVerb",
+    "InfoAffordance",
+    "InfoState",
+    "StoryInfoRequest",
+    "ProjectedState",
+    "ProjectedSection",
+    "ScalarValue",
+    "KvListValue",
+    "ProjectedItem",
+    "ItemListValue",
+    "TableValue",
+    "BadgeListValue",
+    "SectionValue",
 )
 
 

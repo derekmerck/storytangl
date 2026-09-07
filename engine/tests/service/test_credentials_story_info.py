@@ -25,7 +25,7 @@ from tangl.mechanics.games import (
 )
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.service.response import KvListValue, ScalarValue, StoryInfoRequest, TableValue
+from tangl.presentation.projection import KvListValue, ScalarValue, StoryInfoRequest, TableValue
 from tangl.story import Block
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger

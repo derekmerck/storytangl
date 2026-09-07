@@ -33,7 +33,7 @@ def _imported_tangl_modules(path: Path) -> list[str]:
     return modules
 
 
-def test_presentation_imports_only_its_dependency_floor() -> None:
+def test_presentation_imports_only_its_dependency_floor_recursively() -> None:
     violations = [
         module
         for path in PRESENTATION.rglob("*.py")

@@ -6,35 +6,24 @@ from __future__ import annotations
 def test_service_response_types_importable() -> None:
     from tangl.service.response import (
         AuthoringDiagnostic,
-        BadgeListValue,
         CommandEdgeQuery,
         DirectEdgeRequest,
         EdgeQuery,
         EdgeResolutionRequest,
         FindEdgeRequest,
         FragmentStream,
-        InfoAffordance,
         InfoModel,
-        InfoState,
-        ItemListValue,
         JsonValue,
-        KvListValue,
         MediaNative,
         NativeResponse,
         PreflightReport,
-        ProjectedSection,
-        ProjectedState,
         RuntimeEnvelope,
         RuntimeInfo,
-        ScalarValue,
-        StoryInfoRequest,
-        UxEvent,
         UserSecret,
         coerce_runtime_info,
     )
     from tangl.service.story_info import DefaultStoryInfoProjector, StoryInfoProjector
 
-    assert BadgeListValue is not None
     assert AuthoringDiagnostic is not None
     assert CommandEdgeQuery is not None
     assert DirectEdgeRequest is not None
@@ -42,22 +31,13 @@ def test_service_response_types_importable() -> None:
     assert EdgeResolutionRequest is not None
     assert FindEdgeRequest is not None
     assert FragmentStream is not None
-    assert InfoAffordance is not None
     assert InfoModel is not None
-    assert InfoState is not None
-    assert ItemListValue is not None
     assert JsonValue is not None
-    assert KvListValue is not None
     assert MediaNative is not None
     assert NativeResponse is not None
     assert PreflightReport is not None
-    assert ProjectedSection is not None
-    assert ProjectedState is not None
     assert RuntimeEnvelope is not None
     assert RuntimeInfo is not None
-    assert ScalarValue is not None
-    assert StoryInfoRequest is not None
-    assert UxEvent is not None
     assert UserSecret is not None
     assert coerce_runtime_info is not None
     assert DefaultStoryInfoProjector is not None
@@ -69,7 +49,6 @@ def test_service_package_exports_include_manager_first_contract() -> None:
 
     expected = {
         "AuthoringDiagnostic",
-        "BadgeListValue",
         "BlockingMode",
         "CommandEdgeQuery",
         "DefaultStoryInfoProjector",
@@ -78,23 +57,14 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "EdgeResolutionRequest",
         "FindEdgeRequest",
         "FragmentStream",
-        "InfoAffordance",
         "InfoModel",
-        "InfoState",
-        "ItemListValue",
         "JsonValue",
-        "KvListValue",
         "MediaNative",
         "NativeResponse",
         "PreflightReport",
-        "ProjectedItem",
-        "ProjectedSection",
-        "ProjectedState",
         "RuntimeEnvelope",
         "RuntimeInfo",
         "RemoteServiceManager",
-        "ScalarValue",
-        "SectionValue",
         "ServiceAccess",
         "ServiceContext",
         "ServiceManager",
@@ -102,10 +72,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "ServiceSession",
         "ServiceWriteback",
         "StoryInfoProjector",
-        "StoryInfoRequest",
         "SystemInfo",
-        "TableValue",
-        "UxEvent",
         "UserAuthInfo",
         "UserInfo",
         "UserSecret",

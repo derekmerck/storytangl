@@ -16,6 +16,8 @@ from pydantic import ValidationError as PydanticValidationError
 
 from tangl.core import BaseFragment
 from tangl.journal.fragments import fragment_from_dto
+from tangl.presentation.events import UxEvent
+from tangl.presentation.projection import ProjectedState
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.persistence import PersistenceManager
 from tangl.type_hints import Identifier, UnstructuredData
@@ -32,13 +34,11 @@ from .exceptions import (
 from .response import (
     EdgeResolutionRequest,
     JsonValue,
-    ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
     SystemInfo,
     UserInfo,
     UserSecret,
-    UxEvent,
     WorldInfo,
 )
 from .service_manager import ServiceManager, ServiceSession

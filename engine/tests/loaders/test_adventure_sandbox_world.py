@@ -9,7 +9,7 @@ from tangl.journal.fragments import ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.sandbox import SandboxLocation
-from tangl.service.response import KvListValue
+from tangl.presentation.projection import KvListValue
 from tangl.service.story_info import resolve_story_info_projector
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode

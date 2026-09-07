@@ -6,9 +6,12 @@ from collections.abc import Iterable
 from typing import Callable
 
 from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Selector
-
-from .response import InfoAffordance, ProjectedSection, ProjectedState, StoryInfoRequest
-
+from tangl.presentation.projection import (
+    InfoAffordance,
+    ProjectedSection,
+    ProjectedState,
+    StoryInfoRequest,
+)
 
 service_info_dispatch = BehaviorRegistry(
     label="service_info_dispatch",
