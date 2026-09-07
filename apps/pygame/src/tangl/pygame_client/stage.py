@@ -56,6 +56,9 @@ class _Row:
     text: str
     kind: str
 
+REFUSED_PIN = "X"
+"""What a map region pins when no key commits it. See :meth:`Stage._pin`."""
+
 LOGICAL_SIZE = (320, 200)
 SCALE = 3
 
@@ -487,14 +490,19 @@ class Stage:
 
     @staticmethod
     def _pin(index: int, choice: Choice) -> str:
-        """Return the key that commits this choice, or `x` when it has none.
+        """Return the key that commits this choice, or `X` when it has none.
 
         One function for both surfaces. The plate's pin and the row's marker
         are the same claim about the same choice, and deriving them separately
         is how a box ends up numbered while its legend row is not.
+
+        Capital, because at 11px the default font renders a lowercase `x` as a
+        3x4 blob indistinguishable from a filled square, while `X` keeps its
+        crossbars. The legend keeps `x)`, where the bracket carries the shape
+        and the pair matches what the CLI prints.
         """
 
-        return "x" if choice_action(choice) is None else str(index)
+        return REFUSED_PIN if choice_action(choice) is None else str(index)
 
     @staticmethod
     def _marker(index: int, choice: Choice) -> str:
@@ -512,7 +520,7 @@ class Stage:
         """
 
         pin = Stage._pin(index, choice)
-        return "x)" if pin == "x" else f"{pin}."
+        return "x)" if pin == REFUSED_PIN else f"{pin}."
 
     @staticmethod
     def _choice_label(index: int, choice: Choice) -> str:

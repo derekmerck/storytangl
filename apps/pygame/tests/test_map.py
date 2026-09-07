@@ -125,7 +125,7 @@ def test_a_refused_region_pins_x_where_a_live_one_pins_its_number(
     # The plate's pin and the legend's marker come from one function, so a
     # box cannot end up numbered while its row is not.
     assert stage._pin(1, live) == "1"
-    assert stage._pin(2, guarded) == "x"
+    assert stage._pin(2, guarded) == "X"  # legible at 11px; `x` is not
     assert stage._marker(1, live) == "1."
     assert stage._marker(2, guarded) == "x)"
     assert stage._choice_label(2, guarded).startswith("x) ")
