@@ -57,10 +57,22 @@ is how you learn that Wick would take a fish pen — decision legibility
 the puzzle. A trader who has already given away their one thing projects
 nothing at all: the offer no longer exists to be dimmed.
 
-Two consequences worth knowing about. Every dimmed row currently ends in
-`guard_failed_or_unavailable`, because a world has no way to say why a choice
-was refused (#450) — and this world is where that costs the most, since six of
-the seven rows in a hub are refusals. And PLANNING runs before UPDATE, so the
+Each refused row says what it would have taken, because six of the seven rows
+in a hub are refusals and `guard_failed_or_unavailable` teaches a player
+nothing about a district they are trying to learn:
+
+```
+x) Mira will trade a fish-shaped pen for a hand-turned brass doorknob
+   [blockers: Mira would take a hand-turned brass doorknob, but you have nothing like it to offer.]
+```
+
+That is an authored `Blocker` on the projected edge — `Action.blockers`, which
+`_choice_blockers` prefers over anything it computes. The choice text stays
+true in both states and the blocker carries the part that is only true in one,
+which is why the text says "will trade" rather than "your paperclip for her
+pen": a row is planned before the reader's holding is known to it.
+
+And PLANNING runs before UPDATE, so the
 frame that takes Mira's pen was planned while she still had it: her rows
 survive into that one journal and the next plan drops them. They are refused
 while they survive without needing a second guard, because a trader never

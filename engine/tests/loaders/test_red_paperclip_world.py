@@ -236,6 +236,31 @@ class TestRedPaperclipWorld:
         assert holding.available(ctx=_ctx(ledger))
         assert not wanting.available(ctx=_ctx(ledger))
 
+    def test_a_refused_trade_says_what_it_would_take(self) -> None:
+        """The refusal is the puzzle, so it is written rather than coded.
+
+        `unavailable_reason` alone is `guard_failed_or_unavailable`, which
+        tells a player nothing about a district they are trying to learn.
+        """
+
+        ledger = _start()
+        _go(ledger, "harbor")
+
+        refused = next(
+            fragment
+            for fragment in ledger.get_journal()
+            if isinstance(fragment, ChoiceFragment)
+            and _hint(fragment, "trader") == "mira"
+            and _hint(fragment, "given") == "brass_doorknob"
+        )
+
+        assert refused.available is False
+        assert refused.unavailable_reason == "not_holding"
+        assert refused.blockers[0].message == (
+            "Mira would take a hand-turned brass doorknob, "
+            "but you have nothing like it to offer."
+        )
+
     def test_trading_up_to_the_lighthouse(self) -> None:
         ledger = _start()
 

@@ -204,6 +204,27 @@ class TestPredicateGating:
 
         assert fragments and fragments[0].unavailable_reason == "guard_failed_or_unavailable"
 
+    def test_authored_blocker_names_the_reason_as_well_as_the_message(self) -> None:
+        """One refusal, one vocabulary.
+
+        A world that writes its own blocker is saying why the guard failed. If
+        the reason code stayed generic beside it, the fragment would carry two
+        different accounts of one refusal, and a client keying on the code
+        would still show `guard_failed_or_unavailable` to a reader.
+        """
+
+        _graph, start, _end, action = _graph_with_choice(guard_expr="False")
+        action.blockers = [
+            Blocker(code="not_holding", message="You have nothing like it to offer.")
+        ]
+        ctx = _simple_ctx()
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].available is False
+        assert fragments[0].unavailable_reason == "not_holding"
+        assert fragments[0].blockers[0].message == "You have nothing like it to offer."
+
     def test_failing_predicate_emits_portable_blocker(self) -> None:
         _graph, start, _end, _action = _graph_with_choice(guard_expr="False")
         ctx = _simple_ctx()

@@ -29,7 +29,7 @@ from uuid import UUID
 
 from tangl.core import Graph, Priority, Selector
 from tangl.core.runtime_op import Effect, Predicate
-from tangl.journal.intent import KvRow
+from tangl.journal.intent import Blocker, KvRow
 from tangl.mechanics.sandbox import SandboxLocation, SandboxMob, SandboxScope
 from tangl.mechanics.sandbox.story_info import SandboxStoryInfoProjector
 from tangl.service.response import (
@@ -285,6 +285,12 @@ def project_red_paperclip_trades(
                 successor_id=caller.uid,
                 text=trader.offer_text(held, TRADES.items),
                 availability=[Predicate(expr=f"holding == {held!r}")],
+                blockers=[
+                    Blocker(
+                        code="not_holding",
+                        message=trader.refusal(held, TRADES.items),
+                    )
+                ],
                 effects=[Effect(expr=f"paperclip_trade({trader.label!r})")],
                 journal_text=trader.line_for(held, TRADES.items),
                 payload=_trade_payload(trade=trader.label, given=held),

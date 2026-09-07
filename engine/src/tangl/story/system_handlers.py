@@ -272,6 +272,13 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
         return "missing_dependency"
 
     if not edge.available(ctx=ctx):
+        # An authored blocker names this refusal in the world's own vocabulary
+        # and carries a code alongside its message; reporting the generic code
+        # beside a specific message would say two different things about one
+        # refusal. The coarse code stays the floor for a guard that says
+        # nothing about itself.
+        if edge.blockers:
+            return edge.blockers[0].code
         return "guard_failed_or_unavailable"
 
     return None

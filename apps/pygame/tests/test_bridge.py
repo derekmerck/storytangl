@@ -17,6 +17,7 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.presentation.intent import (
+    Blocker,
     PickAccepts,
     PieceConstraints,
     PiecesAccepts,
@@ -74,6 +75,59 @@ def test_choices_carry_edge_id_and_availability(bridge: PygameSessionBridge) -> 
     assert choice.edge_id == edge_id
     assert choice.available is False
     assert choice.unavailable_reason == "You have no reply yet."
+
+
+def test_a_written_refusal_is_shown_over_the_reason_code(
+    bridge: PygameSessionBridge,
+) -> None:
+    """`unavailable_reason` is a code; a blocker message is a sentence.
+
+    Rendering the code puts `guard_failed_or_unavailable` in front of a reader
+    who cannot act on it. A world that wrote a sentence about the refusal gets
+    to have the sentence shown.
+    """
+
+    turns = bridge.build_turns(
+        [
+            ChoiceFragment(
+                text="Mira will trade a fish-shaped pen for a brass doorknob",
+                edge_id=uuid4(),
+                available=False,
+                unavailable_reason="not_holding",
+                blockers=[
+                    Blocker(
+                        code="not_holding",
+                        message="Mira would take a brass doorknob, but you have none.",
+                    )
+                ],
+                step=1,
+            )
+        ]
+    )
+
+    (choice,) = turns[0].choices
+    assert choice.unavailable_reason == (
+        "Mira would take a brass doorknob, but you have none."
+    )
+
+
+def test_a_refusal_with_no_message_falls_back_to_the_code(
+    bridge: PygameSessionBridge,
+) -> None:
+    turns = bridge.build_turns(
+        [
+            ChoiceFragment(
+                text="Cross the bridge",
+                edge_id=uuid4(),
+                available=False,
+                unavailable_reason="missing_dependency",
+                step=1,
+            )
+        ]
+    )
+
+    (choice,) = turns[0].choices
+    assert choice.unavailable_reason == "missing_dependency"
 
 
 def test_turns_group_by_step_in_order(bridge: PygameSessionBridge) -> None:

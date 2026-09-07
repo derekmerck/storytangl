@@ -686,7 +686,7 @@ class Stage:
         exactly where the art was working hardest.
         """
 
-        surface = self.font.render(f"{index}. {text}", False, colour)
+        surface = self.font.render(self._clip(f"{index}. {text}"), False, colour)
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
         backing = rect.inflate(6, 2)
         backing.left = 5
@@ -1012,6 +1012,25 @@ class Stage:
             if rect.collidepoint(logical):
                 return action
         return None
+
+    def _clip(self, text: str) -> str:
+        """Return `text` shortened until the row fits the frame.
+
+        A choice row is one line by construction — the number a reader presses
+        has to stay with the words it names — so a long one cannot wrap and
+        used to run off the right edge instead, taking the end of the sentence
+        with it silently. Trimming to an ellipsis at least says that there was
+        more. Measured rather than counted: the font is proportional, so a
+        column budget would clip the wrong worlds.
+        """
+
+        limit = LOGICAL_SIZE[0] - 12
+        if self.font.size(text)[0] <= limit:
+            return text
+        clipped = text
+        while clipped and self.font.size(f"{clipped}…")[0] > limit:
+            clipped = clipped[:-1]
+        return f"{clipped.rstrip()}…"
 
     @staticmethod
     def _wrap(text: str, width: int) -> list[str]:

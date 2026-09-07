@@ -66,6 +66,29 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
         assert rect.top >= 0
 
 
+def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> None:
+    """A choice row cannot wrap, so an overlong one has to say it was cut.
+
+    The number a reader presses has to stay on the line with the words it
+    names. Before this, a long row ran off the right edge and took the end of
+    its own sentence with it, with nothing on screen to say so.
+    """
+
+    long_choice = Choice(
+        edge_id=uuid4(),
+        text=(
+            "Bree will trade a wooden-winged glider for a pallet of unclaimed "
+            "freight — Bree would take a pallet of unclaimed freight, but you "
+            "have nothing like it to offer."
+        ),
+    )
+    stage.draw(Turn(step=1, lines=[Line(text="At the strip.")], choices=[long_choice]))
+
+    ((rect, _action),) = stage.hitboxes
+    assert rect.right <= LOGICAL_SIZE[0]
+    assert stage._clip(long_choice.text).endswith("…")
+
+
 def test_every_available_choice_is_clickable(stage: Stage) -> None:
     stage.draw(_turn(12, choice_count=3))
 

@@ -482,6 +482,23 @@ class PygameSessionBridge:
         hints = fragment.presentation_hints
         return None if hints is None else _text(getattr(hints, "label_text", None))
 
+    @staticmethod
+    def _refusal(fragment: ChoiceFragment) -> str | None:
+        """Return what to show a player about a refused choice.
+
+        `unavailable_reason` is a code and a blocker message is a sentence,
+        and they are the same refusal at two altitudes. A renderer that shows
+        the code puts `guard_failed_or_unavailable` in front of a reader who
+        has no way to act on it, so prefer the sentence when a world wrote
+        one and keep the code as the floor.
+        """
+
+        for blocker in fragment.blockers or ():
+            message = _text(blocker.message)
+            if message:
+                return message
+        return _text(fragment.unavailable_reason)
+
     def _append(self, turn: Turn, fragment: BaseFragment) -> None:
         if isinstance(fragment, ChoiceFragment):
             turn.choices.append(
@@ -489,7 +506,7 @@ class PygameSessionBridge:
                     edge_id=fragment.edge_id,
                     text=_text(fragment.text) or "(unnamed choice)",
                     available=fragment.available,
-                    unavailable_reason=_text(fragment.unavailable_reason),
+                    unavailable_reason=self._refusal(fragment),
                     payload=fragment.activation_payload,
                     tags=frozenset(
                         tag

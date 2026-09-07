@@ -84,11 +84,19 @@ class Trader(BaseModel):
 
         Who, then what you get, then what it costs — in that order, because a
         narrow client truncates the tail and the tail is the thing the reader
-        already knows: they are holding it.
+        already knows: they are holding it. Phrased so it stays true whether
+        or not the reader can take it; why they cannot is the blocker's job.
         """
         return (
-            f"{self.short_name}: {items[self.offers].name} "
+            f"{self.short_name} will trade {items[self.offers].name} "
             f"for {items[held].name}"
+        )
+
+    def refusal(self, held: str, items: dict[str, TradeItem]) -> str:
+        """Return why this trade is not on offer to the reader right now."""
+        return (
+            f"{self.short_name} would take {items[held].name}, "
+            "but you have nothing like it to offer."
         )
 
 
