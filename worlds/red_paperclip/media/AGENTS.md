@@ -6,10 +6,13 @@ regular git rather than LFS.
 **They are required.** Every one is named in `script.yaml` as block media, and
 the map plate is load-bearing beyond decoration: without it the road is a
 numbered list rather than a clickable district, which is the feature this world
-exists to exercise in the pygame client. Nothing reads their *pixels* —
-`test_scene_plate_packs.py` asserts the manifest matches size, mode and
-sha256 — so a checkout without `git-lfs` still passes, which is the reason they
-are not in LFS (root `AGENTS.md` media rule 3).
+exists to exercise in the pygame client. `test_scene_plate_packs.py` reads
+their bytes: it decodes each plate with `Image.load()` and hashes the file,
+because `open` reads a header and defers the pixels, so a truncated plate
+reports its declared size and mode quite happily. That decode is why they are
+not in LFS (root `AGENTS.md` media rule 3) — a test that reads bytes cannot
+depend on LFS having materialized — and for the same reason they must survive
+`git archive`, which `test_shipped_assets_survive_archive.py` pins.
 
 **They cannot be SVG.** Rule 1 prefers vector for anything vector-shaped. These
 are dithered raster scenes with tens of thousands of colours; there is no vector
