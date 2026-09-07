@@ -1,0 +1,138 @@
+{
+  "pack": "red-paperclip-district",
+  "assets": {
+    "airfield_bg": {
+      "file": "airfield_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "e7c413d3fcef4a65a7954c706311cc274a445b2d3d7a6fb2621bfc3698aade08",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "e739df60b86c196c2d9e91ffd26bd6303aabea47905405a90e2d84bed6dc98bb",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "campus_bg": {
+      "file": "campus_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "9ddab048041f39e31b4567f59c5905011628d0ab84f55dcad913a217e2504589",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "3a69ea17b243dbe7c6269176d92714e4bbb2a5307821f284a1e79d76dc9a870d",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "district_map": {
+      "file": "district_map.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "ba506ca390a485194063cdcb131312d4e38cb211115f1dbaaee8271dc02682c5",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "ef7b581ee4ad887b2b0d207af98ab75de5c87b6f293710d423a37edb87ba1df6",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "garage_bg": {
+      "file": "garage_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "b22cae408624d3a2370b45a2197de5cd79beef969359d5b7107983f8ebc44f3e",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "fcf94c99cde6a33a728395463afbe7f945729c35203ddf1f2a35931c85766f2b",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "harbor_bg": {
+      "file": "harbor_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "5fbb4d2e10a0f2f358ecaef4bb0562d1912ff23efb3a73a43babafd97baa7b50",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "35452ae162578b4509f728cd3e33f54e2e8ca582b32f9f9c755ebd30fa4b2280",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "market_bg": {
+      "file": "market_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "02832224cadb451e9e761bb827fbbee62b513f229416c39b174bb9820e90ccf6",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "e30493d70deb6beb3df5de39c9558bb9788043794456d85648262b9da74be247",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    },
+    "station_bg": {
+      "file": "station_bg.png",
+      "size": [
+        320,
+        200
+      ],
+      "mode": "RGB",
+      "sha256": "0fa7c8df0f6eff9bc8e8c2e35faa0a621ba1bec3d05a00f872bac60200f9f130",
+      "conformed_from": {
+        "size": [
+          1280,
+          800
+        ],
+        "sha256": "7ec3a559081e528a5d5974f9a340fd52842ff8837e30a144a444e26e15165f37",
+        "transform": "resize to 320x200, nearest-neighbour"
+      }
+    }
+  },
+  "conformance": {
+    "note": "Top-level fields describe the shipped file.",
+    "target": {
+      "background": [
+        320,
+        200
+      ],
+      "resample": "nearest"
+    }
+  },
+  "review_notes": [
+    "Generated on the project render node; the receipt in provenance/ redacts the endpoint, so it records the workflow but cannot be resumed.",
+    "The plate's six regions are named in script.yaml and were measured against this image; re-rendering the plate means re-measuring them."
+  ]
+}

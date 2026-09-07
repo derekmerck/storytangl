@@ -18,7 +18,11 @@ import yaml
 from PIL import Image
 
 WORLDS = Path(__file__).resolve().parents[3] / "worlds"
-PACKS = [WORLDS / "hall_monitor" / "media", WORLDS / "coronate_the_regent" / "media"]
+PACKS = [
+    WORLDS / "hall_monitor" / "media",
+    WORLDS / "coronate_the_regent" / "media",
+    WORLDS / "red_paperclip" / "media",
+]
 LFS_POINTER_MAGIC = b"version https://git-lfs.github.com/spec/v1"
 LOGICAL_SIZE = (320, 200)
 
@@ -137,4 +141,10 @@ def test_generation_is_reconstructible_without_the_endpoint(pack) -> None:
     assert set(jobs["jobs"]) == set(manifest["assets"])
     for name, job in jobs["jobs"].items():
         assert job["prompt"].strip(), f"{name} records no prompt"
-        assert job["reference_sha256"], f"{name} records no reference hash"
+        # Whether a render was conditioned on an image is part of the record,
+        # so the field is required and an explicit ``null`` is an answer. A
+        # text-only pack that simply omitted it would be indistinguishable
+        # from a reference-conditioned one whose hash went unrecorded.
+        assert "reference_sha256" in job, f"{name} does not say what conditioned it"
+        if job["reference_sha256"] is not None:
+            assert job["reference_sha256"].strip(), f"{name} records an empty hash"

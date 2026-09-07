@@ -1,0 +1,61 @@
+{
+  "endpoint": "configured-worker",
+  "workflow": "scripts/examples/comfy/flux2_klein9_scene.json.j2",
+  "models": {
+    "unet": "flux-2-klein-9b-kv-fp8.safetensors",
+    "clip": "qwen_3_8b_fp8mixed.safetensors",
+    "vae": "flux2-vae.safetensors"
+  },
+  "params": {
+    "width": 1280,
+    "height": 800,
+    "steps": 4,
+    "cfg": 1,
+    "sampler": "euler"
+  },
+  "references": {},
+  "jobs": {
+    "airfield_bg": {
+      "prompt": "a grass airfield seen at eye level, late afternoon: a mown strip, two corrugated hangars with their doors open, a windsock on a pole, a light aircraft parked on the grass, a wooden-winged glider under a cover; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    },
+    "campus_bg": {
+      "prompt": "a small college quad seen at eye level, late afternoon: a brick lecture building, mown lawns, a bike rack crowded with green bicycles, a noticeboard, a plywood film-society flat leaning on a wall; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    },
+    "district_map": {
+      "prompt": "oblique bird's eye view of a small coastal town district in late afternoon light, one loop of road connecting six places: a working fishing harbour with boats and a fuel dock at the lower left, a rail halt with two platforms and a freight dock at the upper left, an open-air market square of striped stall tarps in the middle, a college quad with lawns and bicycle racks at the upper right, a car repair garage with three open bays and a yard of parts on the right, a grass airfield with a mown strip, two hangars and a windsock at the lower right; trees and low rooftops between them; full bleed, image fills the canvas edge to edge, no border, no frame, no people; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    },
+    "garage_bg": {
+      "prompt": "a roadside car repair garage seen at eye level, late afternoon: three open bays with a car on a lift, a cluttered parts room, a yard of engines and stacked tyres, an outboard motor clamped to a water barrel; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    },
+    "harbor_bg": {
+      "prompt": "a small working fishing harbour seen at eye level, late afternoon: a stone quay, two fishing boats tied alongside, a fuel dock with a pump, stacked crab traps and orange net floats, the harbourmaster's office at the top of a concrete ramp; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    },
+    "market_bg": {
+      "prompt": "an open-air market square seen at eye level, late afternoon: rows of orange and blue striped stall tarps over trestle tables, a bakery stall gone empty, a cafe being packed into cardboard boxes on the pavement, cobbles; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    },
+    "station_bg": {
+      "prompt": "a small two-platform rail halt seen at eye level, late afternoon: a freight dock stacked with unclaimed pallets, a shuttered ticket office window, a lost-property hatch, a goods wagon on the far track; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+      "reference": null,
+      "reference_sha256": null,
+      "seed": 11
+    }
+  }
+}

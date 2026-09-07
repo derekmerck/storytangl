@@ -82,9 +82,27 @@ PYTHONPATH=engine/src:apps/pygame/src:worlds/red_paperclip \
 PYTHONPATH=engine/src:worlds/red_paperclip python -m pytest engine/tests/loaders/test_red_paperclip_world.py
 ```
 
-The map plate is not drawn yet: `script.yaml` names `district_map.png` and no
-such image exists, so every client falls back to the numbered list, which is
-the behaviour that is supposed to happen when a world has no art.
+## The art
+
+<p align="center">
+  <img src="../../.github/assets/red-paperclip-district.png"
+       alt="The district plate with its six regions boxed and numbered" width="80%">
+</p>
+
+Seven plates in `media/`, conformed to the client's own 320x200 and recorded in
+`manifest.json` with the hash of the render they came from. `provenance/` keeps
+the workflow that made each one, with the endpoint redacted the way
+`repartee_loop` does it — an archived record rather than a resumable one.
+
+The six regions were measured against the plate after it was drawn, which is
+the way round it has to be: the geometry lives in `script.yaml` and the art
+knows nothing about it, so re-rendering the plate means re-measuring them.
+
+At six travel choices the legend fills the lower third of the frame and covers
+part of the harbour and airfield boxes. Nothing is lost — the legend row is the
+same choice as the hitbox, and hit-testing runs in reverse draw order so the
+row wins the pixels it covers — but a plate with more than about five live
+regions wants its landmarks in the upper half.
 
 ## Authoring it
 

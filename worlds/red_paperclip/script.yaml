@@ -27,16 +27,21 @@ scenes:
       road:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "The Road"
+        media:
+          - name: district_map.png
+            media_role: map_im
         map:
           name: district
           plate: district_map.png
+          # Measured against district_map.png. Re-render the plate and these
+          # move: the geometry is world-owned, not derived from the art.
           regions:
-            station: {x: 0.05, y: 0.06, w: 0.26, h: 0.20}
-            campus: {x: 0.66, y: 0.08, w: 0.28, h: 0.22}
-            market: {x: 0.36, y: 0.36, w: 0.28, h: 0.22}
-            garage: {x: 0.70, y: 0.44, w: 0.25, h: 0.20}
-            harbor: {x: 0.04, y: 0.60, w: 0.30, h: 0.30}
-            airfield: {x: 0.60, y: 0.72, w: 0.34, h: 0.22}
+            station: {x: 0.06, y: 0.00, w: 0.30, h: 0.20}
+            campus: {x: 0.58, y: 0.00, w: 0.31, h: 0.23}
+            market: {x: 0.31, y: 0.25, w: 0.34, h: 0.30}
+            garage: {x: 0.79, y: 0.25, w: 0.21, h: 0.22}
+            harbor: {x: 0.00, y: 0.56, w: 0.40, h: 0.40}
+            airfield: {x: 0.66, y: 0.54, w: 0.34, h: 0.42}
         content: |
           One loop of road, six places on it, and {holding_name} in your hand.
 
@@ -44,6 +49,11 @@ scenes:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "Sandpoint Harbour"
         plates: [district:harbor]
+        media:
+          - name: harbor_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         links:
           out:
             target: road
@@ -56,6 +66,11 @@ scenes:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "Ferryman's Market"
         plates: [district:market]
+        media:
+          - name: market_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         links:
           out:
             target: road
@@ -68,6 +83,11 @@ scenes:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "The Ring Road Garage"
         plates: [district:garage]
+        media:
+          - name: garage_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         links:
           out:
             target: road
@@ -80,6 +100,11 @@ scenes:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "Miller College"
         plates: [district:campus]
+        media:
+          - name: campus_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         links:
           out:
             target: road
@@ -92,6 +117,11 @@ scenes:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "The Rail Halt"
         plates: [district:station]
+        media:
+          - name: station_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         links:
           out:
             target: road
@@ -104,6 +134,11 @@ scenes:
         kind: "red_paperclip.domain.RedPaperclipHub"
         location_name: "The Grass Airfield"
         plates: [district:airfield]
+        media:
+          - name: airfield_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
         links:
           out:
             target: road
