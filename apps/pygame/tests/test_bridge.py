@@ -111,6 +111,39 @@ def test_a_written_refusal_is_shown_over_the_reason_code(
     )
 
 
+def test_a_replacing_blocker_becomes_the_choice_text(
+    bridge: PygameSessionBridge,
+) -> None:
+    """One line rather than an offer and a paraphrase of the same offer.
+
+    At 320px that is the difference between reading a sentence and reading
+    half of two.
+    """
+
+    turns = bridge.build_turns(
+        [
+            ChoiceFragment(
+                text="Mira will trade a fish-shaped pen for a brass doorknob",
+                edge_id=uuid4(),
+                available=False,
+                unavailable_reason="not_holding",
+                blockers=[
+                    Blocker(
+                        code="not_holding",
+                        message="Mira would take a brass doorknob, but you don't have one.",
+                        replaces_text=True,
+                    )
+                ],
+                step=1,
+            )
+        ]
+    )
+
+    (choice,) = turns[0].choices
+    assert choice.text == "Mira would take a brass doorknob, but you don't have one."
+    assert choice.unavailable_reason is None
+
+
 def test_a_refusal_with_no_message_falls_back_to_the_code(
     bridge: PygameSessionBridge,
 ) -> None:

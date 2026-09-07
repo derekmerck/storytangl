@@ -43,6 +43,21 @@ class Blocker(IntentModel):
     code: str
     message: str
     refs: list[str] = Field(default_factory=list)
+    replaces_text: bool = False
+    """Whether this message stands in for the choice text rather than annotating it.
+
+    A refusal is usually written as a clause about a choice the reader can
+    already read — "Requirements are not met." beside "Cross the bridge". When
+    the world writes a whole sentence instead — "Mira would take a doorknob,
+    but you have nothing like it to offer" — repeating the offer alongside it
+    says the same thing twice, and a narrow client has to drop half of one of
+    them to fit.
+
+    Setting this says the message is complete on its own, so a client may
+    render it *instead of* the choice text. Only the author of the message
+    knows that, which is why it travels with the message rather than being
+    guessed at by a renderer. A client that ignores the flag renders both and
+    is merely wordier, so it is safe to leave unread."""
 
 
 class PieceConstraints(IntentModel):

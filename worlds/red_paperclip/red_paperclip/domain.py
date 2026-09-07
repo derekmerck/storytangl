@@ -289,6 +289,7 @@ def project_red_paperclip_trades(
                     Blocker(
                         code="not_holding",
                         message=trader.refusal(held, TRADES.items),
+                        replaces_text=True,
                     )
                 ],
                 effects=[Effect(expr=f"paperclip_trade({trader.label!r})")],

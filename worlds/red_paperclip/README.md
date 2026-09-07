@@ -62,15 +62,24 @@ in a hub are refusals and `guard_failed_or_unavailable` teaches a player
 nothing about a district they are trying to learn:
 
 ```
-x) Mira will trade a fish-shaped pen for a hand-turned brass doorknob
-   [blockers: Mira would take a hand-turned brass doorknob, but you have nothing like it to offer.]
+1. Back to the road
+2. Mira will trade a fish-shaped pen for a red paperclip
+x) Mira would take a hand-turned brass doorknob, but you don't have one to offer.
+x) Finn would take a green three-speed bicycle, but you don't have one to offer.
+x) Gunnar would take a 9.9 horsepower outboard, but you don't have one to offer.
 ```
 
 That is an authored `Blocker` on the projected edge — `Action.blockers`, which
-`_choice_blockers` prefers over anything it computes. The choice text stays
-true in both states and the blocker carries the part that is only true in one,
-which is why the text says "will trade" rather than "your paperclip for her
-pen": a row is planned before the reader's holding is known to it.
+`_choice_blockers` prefers over anything it computes — carrying
+`replaces_text`, which says the message is a whole sentence rather than a
+clause about the offer, so a client may render it *instead of* the row. It is
+safe to ignore: a client that does renders both and is merely wordier.
+
+The two texts are written to be true at different times. The offer stays true
+whether or not the reader can take it, which is why it says "will trade"
+rather than "your paperclip for her pen" — a row is planned before the
+reader's holding is known to it. The refusal is only true when it is shown,
+which is what earns it the whole line.
 
 And PLANNING runs before UPDATE, so the
 frame that takes Mira's pen was planned while she still had it: her rows

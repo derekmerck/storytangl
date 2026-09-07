@@ -262,6 +262,7 @@ def test_render_block_choice_missing_successor_uses_preview_blockers_when_depend
         "code": "no_template",
         "message": "No template.",
         "refs": [],
+        "replaces_text": False,
     }
 
 

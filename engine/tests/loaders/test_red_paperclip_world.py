@@ -258,8 +258,11 @@ class TestRedPaperclipWorld:
         assert refused.unavailable_reason == "not_holding"
         assert refused.blockers[0].message == (
             "Mira would take a hand-turned brass doorknob, "
-            "but you have nothing like it to offer."
+            "but you don't have one to offer."
         )
+        # The sentence stands on its own, so a client may render it instead of
+        # the offer rather than beside a paraphrase of the same offer.
+        assert refused.blockers[0].replaces_text is True
 
     def test_trading_up_to_the_lighthouse(self) -> None:
         ledger = _start()

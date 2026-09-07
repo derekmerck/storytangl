@@ -293,6 +293,7 @@ def test_preview_blocks_missing_container_hard_dep_without_side_effects() -> Non
         "code": "immediate_dependency_unresolvable",
         "message": "A required dependency is unavailable.",
         "refs": [],
+        "replaces_text": False,
     }
 
     assert {item.uid for item in graph.values()} == before_item_ids

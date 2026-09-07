@@ -140,6 +140,10 @@ class PlainTerminalRenderer:
                 active_index += 1
                 continue
 
+            if replacement := _choice_refusal_text(choice):
+                lines.append(f"x) {replacement}{_choice_cost_suffix(choice)}")
+                continue
+
             reason = _read(choice, "unavailable_reason")
             reason_text = f" [locked: {reason}]" if reason else " [locked]"
             lines.append(
@@ -353,8 +357,9 @@ def _rich_choices(choices: list[Any], *, no_choices_text: str = "No available ch
 
         reason = _read(choice, "unavailable_reason")
         state = f"locked: {reason}" if reason else "locked"
-        blockers = _choice_blocker_messages(choice)
-        if blockers:
+        if replacement := _choice_refusal_text(choice):
+            label, state = replacement, "locked"
+        elif blockers := _choice_blocker_messages(choice):
             state = f"{state}; blockers: {'; '.join(blockers)}"
         costs = _choice_cost_text(choice)
         if costs:
@@ -832,6 +837,19 @@ def _choice_active(choice: Any) -> bool:
     if available is not None:
         return bool(available)
     return bool(_read(choice, "active", True))
+
+
+def _choice_refusal_text(choice: Any) -> str | None:
+    """Return the blocker message that stands in for a refused choice's text.
+
+    A world says so per blocker; nothing here decides whether a sentence is
+    complete. First one wins, the same rule the message itself follows.
+    """
+
+    for blocker in _read(choice, "blockers", ()) or ():
+        if _read(blocker, "replaces_text") and (message := _read(blocker, "message")):
+            return str(message)
+    return None
 
 
 def _choice_blocker_messages(choice: Any) -> list[str]:

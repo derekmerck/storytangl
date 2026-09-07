@@ -483,30 +483,40 @@ class PygameSessionBridge:
         return None if hints is None else _text(getattr(hints, "label_text", None))
 
     @staticmethod
-    def _refusal(fragment: ChoiceFragment) -> str | None:
-        """Return what to show a player about a refused choice.
+    def _refused_row(fragment: ChoiceFragment) -> tuple[str, str | None]:
+        """Return the text and refusal to draw for one choice.
 
         `unavailable_reason` is a code and a blocker message is a sentence,
         and they are the same refusal at two altitudes. A renderer that shows
         the code puts `guard_failed_or_unavailable` in front of a reader who
-        has no way to act on it, so prefer the sentence when a world wrote
-        one and keep the code as the floor.
+        has no way to act on it, so prefer the sentence when a world wrote one
+        and keep the code as the floor.
+
+        A blocker marked `replaces_text` says its message is complete on its
+        own, so it becomes the row and nothing is appended: one line rather
+        than an offer and a paraphrase of the same offer, which at 320px is
+        the difference between a sentence and half of two.
         """
 
+        text = _text(fragment.text) or "(unnamed choice)"
         for blocker in fragment.blockers or ():
             message = _text(blocker.message)
-            if message:
-                return message
-        return _text(fragment.unavailable_reason)
+            if not message:
+                continue
+            if blocker.replaces_text:
+                return message, None
+            return text, message
+        return text, _text(fragment.unavailable_reason)
 
     def _append(self, turn: Turn, fragment: BaseFragment) -> None:
         if isinstance(fragment, ChoiceFragment):
+            text, refusal = self._refused_row(fragment)
             turn.choices.append(
                 Choice(
                     edge_id=fragment.edge_id,
-                    text=_text(fragment.text) or "(unnamed choice)",
+                    text=text,
                     available=fragment.available,
-                    unavailable_reason=self._refusal(fragment),
+                    unavailable_reason=refusal,
                     payload=fragment.activation_payload,
                     tags=frozenset(
                         tag

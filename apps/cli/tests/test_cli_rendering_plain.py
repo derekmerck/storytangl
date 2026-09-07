@@ -154,3 +154,59 @@ def test_media_object_repr_is_never_spliced_into_the_line() -> None:
 
     assert "object at 0x" not in line
     assert "SimpleNamespace" not in line
+
+
+def _choice_lines(choice: object) -> list[str]:
+    renderer = PlainTerminalRenderer()
+    scene = SimpleNamespace(fragment_type="content", content="At the harbour.")
+    return [
+        str(line)
+        for line in renderer.story_update(fragments=[scene], choices=[choice])
+    ]
+
+
+def test_a_replacing_blocker_becomes_the_refused_row() -> None:
+    """A whole sentence stands in for the offer instead of annotating it.
+
+    Without the flag the row reads the offer, then a code, then a paraphrase
+    of the offer -- three accounts of one refusal, and at any width the reader
+    loses the end of it.
+    """
+
+    choice = SimpleNamespace(
+        text="Mira will trade a fish-shaped pen for a brass doorknob",
+        available=False,
+        unavailable_reason="not_holding",
+        blockers=[
+            SimpleNamespace(
+                code="not_holding",
+                message="Mira would take a brass doorknob, but you don't have one.",
+                replaces_text=True,
+            )
+        ],
+    )
+
+    (line,) = [row for row in _choice_lines(choice) if row.startswith("x)")]
+
+    assert line == "x) Mira would take a brass doorknob, but you don't have one."
+
+
+def test_an_annotating_blocker_still_reads_beside_the_choice() -> None:
+    """The default is unchanged: most refusals are clauses, not sentences."""
+
+    choice = SimpleNamespace(
+        text="Cross the bridge",
+        available=False,
+        unavailable_reason="missing_dependency",
+        blockers=[
+            SimpleNamespace(
+                code="missing_dependency",
+                message="The bridge is out.",
+                replaces_text=False,
+            )
+        ],
+    )
+
+    (line,) = [row for row in _choice_lines(choice) if row.startswith("x)")]
+
+    assert line == "x) Cross the bridge [locked: missing_dependency] [blockers: The bridge is out.]"

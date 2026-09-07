@@ -236,6 +236,8 @@ class TestPredicateGating:
             "code": "guard_failed_or_unavailable",
             "message": "Requirements are not met.",
             "refs": [],
+        "replaces_text": False,
+            "replaces_text": False,
         }
 
     def test_compound_and_predicate_fails_when_any_term_false(self) -> None:
@@ -354,6 +356,8 @@ class TestDependencyGating:
             "code": "no_offers",
             "message": "No matching option is currently available.",
             "refs": [],
+        "replaces_text": False,
+            "replaces_text": False,
         }
 
     def test_satisfied_dependency_does_not_block(self) -> None:

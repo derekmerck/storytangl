@@ -96,7 +96,7 @@ class Trader(BaseModel):
         """Return why this trade is not on offer to the reader right now."""
         return (
             f"{self.short_name} would take {items[held].name}, "
-            "but you have nothing like it to offer."
+            "but you don't have one to offer."
         )
 
 
