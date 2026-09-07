@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tangl.core import Token, contribute_ns
+from tangl.journal.geometry import NormalizedRect
 from tangl.story import MenuBlock
 from tangl.story.concepts.asset import HasAssets
 
@@ -51,46 +52,15 @@ class SandboxExit(BaseModel):
     through: str | None = None
 
 
-class SandboxMapRegion(BaseModel):
+class SandboxMapRegion(NormalizedRect):
     """One named hitbox on a visual map plate, in normalized plate coordinates.
 
-    Origin is the plate's top-left corner and every value is a fraction of the
-    plate, so a region survives any rendered size. The region carries no notion
-    of what it leads to: binding is by name against whichever choices claim it.
+    The region carries no notion of what it leads to: binding is by name against
+    whichever choices claim it. Shape, bounds rule and disclosure row all come
+    from :class:`~tangl.journal.geometry.NormalizedRect`, which a game block's
+    surface slots share — the two measure the same way because they are the same
+    kind of thing seen from different owners.
     """
-
-    x: float
-    y: float
-    w: float
-    h: float
-
-    @model_validator(mode="after")
-    def _validate_bounds(self) -> "SandboxMapRegion":
-        """Refuse a rectangle a plate cannot contain.
-
-        Caught here rather than in a renderer because every client would have
-        to rediscover it, and a hitbox off the edge of the plate is silently
-        unclickable rather than visibly wrong.
-        """
-
-        if self.w <= 0 or self.h <= 0:
-            raise ValueError(
-                f"map region must have positive extent, got w={self.w}, h={self.h}"
-            )
-        if not (0.0 <= self.x and 0.0 <= self.y):
-            raise ValueError(
-                f"map region origin must be inside the plate, got x={self.x}, y={self.y}"
-            )
-        if self.x + self.w > 1.0 or self.y + self.h > 1.0:
-            raise ValueError(
-                "map region must lie wholly inside the plate: "
-                f"x+w={self.x + self.w}, y+h={self.y + self.h} exceed 1.0"
-            )
-        return self
-
-    def as_row(self, name: str) -> list[str | float]:
-        """Return the disclosure row for this region."""
-        return [name, self.x, self.y, self.w, self.h]
 
 
 class SandboxMap(BaseModel):

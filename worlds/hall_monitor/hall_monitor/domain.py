@@ -21,6 +21,7 @@ from tangl.mechanics.credentials import (
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.presence.look import HairColor, HasSimpleLook
 from tangl.mechanics.games import HasGame
+from tangl.mechanics.surface import HasSurface
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
     CredentialCaseResult,
@@ -44,6 +45,10 @@ from tangl.mechanics.games.credentials_roster import (
     ShiftSpec,
     generate_roster,
 )
+# Importing the surface story-info module registers the surface_plate /
+# surface_slots channels on the service dispatch when this world loads.
+import tangl.mechanics.surface_story_info  # noqa: F401
+
 from tangl.story import Action, Block, on_journal
 from tangl.story.presentation import render_text_as
 from tangl.vm import on_provision, on_update
@@ -484,7 +489,7 @@ class HallMonitorConsequence(BaseModelPlus):
     outcome: Literal["inhaler_withheld", "inhaler_allowed"]
 
 
-class HallMonitorBlock(HasGame, Block):
+class HallMonitorBlock(HasGame, HasSurface, Block):
     """Script-configured Hall Monitor scenario instance."""
 
     encounters: int = 5

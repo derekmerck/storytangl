@@ -13,6 +13,7 @@ from tangl.mechanics.credentials import (
     RestrictionLevel,
 )
 from tangl.mechanics.games import HasGame
+from tangl.mechanics.surface import HasSurface
 from tangl.mechanics.games.credentials_game import (
     CredentialDisposition,
     CredentialPresentationProfile,
@@ -29,6 +30,10 @@ from tangl.mechanics.games.credentials_roster import (
 # (rules / roster_progress / case_summary) on the service dispatch when this
 # world loads. Mirrors how the adventure sandbox world pulls in its map channel.
 import tangl.mechanics.games.credentials_story_info  # noqa: F401
+
+# And the surface channels (surface_plate / surface_slots), which are keyed
+# off HasSurface rather than off any mechanic.
+import tangl.mechanics.surface_story_info  # noqa: F401
 
 from tangl.story import Block
 
@@ -145,7 +150,7 @@ class GateCredentialsGame(CredentialsGame):
     )
 
 
-class CredentialGateBlock(HasGame, Block):
+class CredentialGateBlock(HasGame, HasSurface, Block):
     """Story block hosting the staged credential shift."""
 
     _game_class = GateCredentialsGame
@@ -218,7 +223,7 @@ class SampledGateGame(CredentialsGame):
     )
 
 
-class SampledGateBlock(HasGame, Block):
+class SampledGateBlock(HasGame, HasSurface, Block):
     """Story block hosting the procedurally sampled shift."""
 
     _game_class = SampledGateGame

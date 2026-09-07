@@ -111,6 +111,40 @@ class Zone:
 
 
 @dataclass(slots=True, frozen=True)
+class SurfaceSlot:
+    """One place on a surface, and the piece kind that lies there.
+
+    ``holds`` is mechanic vocabulary the client never interprets -- it only
+    checks it against :attr:`Piece.kind`. That is the whole join: the world says
+    where an id card lies, the mechanic says which pieces are id cards, and
+    neither names the other.
+    """
+
+    name: str
+    holds: str
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass(slots=True, frozen=True)
+class Surface:
+    """A surface pieces rest on: an extent, and named slots measured on it.
+
+    Geometry only, in fractions of whatever rect the client hands the stage.
+    Which slots are filled this turn is decided by intersecting ``holds`` against
+    the live pieces, never by anything stored here -- so a surface is stable
+    reference data that outlives any single turn, exactly like a map plate.
+    """
+
+    name: str
+    image: str | None = None
+    band: tuple[float, float, float, float] | None = None
+    slots: tuple[SurfaceSlot, ...] = ()
+
+
+@dataclass(slots=True, frozen=True)
 class MapRegion:
     """One named hitbox, in fractions of the plate."""
 
@@ -154,6 +188,10 @@ class Turn:
     plate: MapPlate | None = None
     """Set from story-info rather than from fragments: geometry is disclosed
     state, not part of the turn's content."""
+
+    surface: Surface | None = None
+    """Also from story-info, and for the same reason: the furniture changes when
+    the block changes, not when the player acts."""
 
 
 # ── input actions ────────────────────────────────────────────────────────────
