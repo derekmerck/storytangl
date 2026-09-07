@@ -324,7 +324,7 @@ resolvable by future control fragments.
 ### 1.3 ProjectedState
 
 ```python
-# tangl/service/response.py — current shape (Tier S)
+# tangl/presentation/projection.py — current shape (Tier S)
 class ProjectedState(InfoModel):
     sections: list[ProjectedSection] = Field(default_factory=list)
 
