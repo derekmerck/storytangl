@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from tangl.core import Selector
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.service.response import KvListValue
@@ -18,7 +18,7 @@ from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
-from red_paperclip.domain import RedPaperclipHub
+from red_paperclip.domain import RedPaperclipHub, _holding, _state
 from red_paperclip.trade_graph import TradeGraph, TradeParseError
 
 
@@ -81,7 +81,21 @@ def _go(ledger: Ledger, hub: str) -> None:
 
 
 def _trade(ledger: Ledger, trader: str) -> Action:
-    return _choose(ledger, contribution="trade", trader=trader)
+    """Take the trade this trader offers for what is being held.
+
+    Keyed on the holding, because a trader who accepts several things has a
+    row per accepted item and all but one of them are dimmed.
+    """
+    return _choose(
+        ledger,
+        contribution="trade",
+        trader=trader,
+        given=_holding(ledger.cursor),
+    )
+
+
+def _hint(fragment: ChoiceFragment, key: str) -> object:
+    return fragment.ui_hints.model_dump().get(key) if fragment.ui_hints else None
 
 
 def _content(ledger: Ledger) -> list[str]:
@@ -125,6 +139,26 @@ class TestRedPaperclipTradeGraph:
         assert lengths["sourdough_starter"] == 2
         assert lengths["lighthouse_keys"] == 4
         assert lengths["ostrich_share"] == 6
+
+    def test_a_trader_may_not_accept_what_they_offer(self) -> None:
+        """The rule that makes a planned-then-spent row harmless.
+
+        A trade is planned before its own effect runs, so a trader's rows
+        outlive the trade that spends them by one frame. They are refused
+        anyway — the holding has changed and no row of theirs can match it —
+        and this is the reason no row can: nobody trades a thing for itself.
+        """
+
+        source = (
+            "clip: a clip\n"
+            "pen: a pen\n"
+            "mira: Mira @ harbor\n"
+            "clip -> mira -> pen\n"
+            "pen -> mira\n"
+        )
+
+        with pytest.raises(TradeParseError, match="for itself"):
+            TradeGraph.parse(source).check()
 
     def test_a_trader_may_only_have_one_thing_to_give(self) -> None:
         source = (
@@ -217,14 +251,61 @@ class TestRedPaperclipWorld:
         assert any("one ruled line left for you" in line for line in content)
         assert any("a red paperclip -> a fish-shaped pen" in line for line in content)
 
+    def test_the_solver_plan_is_playable(self) -> None:
+        """Walk the plan the solver returns for the emitted contract.
+
+        `python -m red_paperclip --asp ostrich_share` writes this world in the
+        vocabulary of the archived proof of concept, and its minimum-horizon
+        plan is thirteen moves: six trades and seven journeys, with two pairs
+        of trades taken in one hub. Playing it here is the differential check
+        that the emitted model and the running world are the same game — a
+        model that disagreed would produce a plan that stalls partway.
+        """
+
+        ledger = _start()
+
+        _go(ledger, "harbor")
+        _trade(ledger, "mira")
+        _go(ledger, "road")
+        _go(ledger, "market")
+        _trade(ledger, "cass")
+        _go(ledger, "road")
+        _go(ledger, "garage")
+        _trade(ledger, "olsen")
+        _trade(ledger, "rusev")
+        _go(ledger, "road")
+        _go(ledger, "airfield")
+        _trade(ledger, "ilse")
+        _trade(ledger, "whina")
+
+        assert _holding(ledger.cursor) == "ostrich_share"
+        assert int(_state(ledger.cursor)["world_turn"]) == 7
+
+        _choose(ledger, contribution="stop")
+
+        assert ledger.cursor.label == "ending"
+        assert any("being looked at" in line for line in _content(ledger))
+
     def test_a_spent_trader_stops_offering(self) -> None:
         ledger = _start()
         _go(ledger, "harbor")
         _trade(ledger, "mira")
 
-        # Mira gave away the one pen she had, so her trades are not dimmed —
-        # they are gone. What is left is the doorknob she took, which nobody
-        # can trade for again.
+        # PLANNING runs before UPDATE, so the frame that takes the pen was
+        # planned while Mira still had it and her rows survive into this one
+        # journal. They must be refused while they do: read as the client
+        # reads them, not through a provisioning pass the client never makes.
+        surviving = [
+            fragment
+            for fragment in ledger.get_journal()
+            if isinstance(fragment, ChoiceFragment)
+            and _hint(fragment, "trader") == "mira"
+        ]
+        assert surviving, "expected Mira's planned rows to survive her own trade"
+        assert not any(fragment.available for fragment in surviving[-2:])
+
+        # The next plan drops them: a trader with nothing to give is not a
+        # dimmed offer, it is no offer.
         for action in _actions(ledger):
             assert action.ui_hints.model_dump().get("trader") != "mira"
 

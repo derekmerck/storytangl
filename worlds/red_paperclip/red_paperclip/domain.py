@@ -260,6 +260,13 @@ def project_red_paperclip_trades(
     dimmed, and reading it is how you learn that Wick would take a fish pen.
     A trader who has already given their one thing away projects nothing at
     all, because the offer no longer exists to be dimmed.
+
+    PLANNING runs before UPDATE, so the frame that takes Mira's pen was
+    planned while she still had it: her rows survive into that one journal
+    and are dropped by the next plan. They are refused while they survive
+    without needing a second guard, because a trader never accepts what they
+    offer — `TradeGraph.check` refuses that outright — so no surviving row can
+    match what the completed trade just put in your hand.
     """
     if not caller.auto_provision:
         return None

@@ -57,6 +57,15 @@ is how you learn that Wick would take a fish pen — decision legibility
 the puzzle. A trader who has already given away their one thing projects
 nothing at all: the offer no longer exists to be dimmed.
 
+Two consequences worth knowing about. Every dimmed row currently ends in
+`guard_failed_or_unavailable`, because a world has no way to say why a choice
+was refused (#450) — and this world is where that costs the most, since six of
+the seven rows in a hub are refusals. And PLANNING runs before UPDATE, so the
+frame that takes Mira's pen was planned while she still had it: her rows
+survive into that one journal and the next plan drops them. They are refused
+while they survive without needing a second guard, because a trader never
+accepts what they offer.
+
 ### Why the holding is not a sandbox asset
 
 Sandbox assets model things you can pick up and put down, and the generic
@@ -138,5 +147,32 @@ as well as trades.
 
 That makes this world a generated second fixture for that proposal's first
 lane — bounded reachability, finishability, and resource traps — next to the
-hand-written apartment-management scenario. It adds no dependency here: the
+hand-written apartment-management scenario now restored to
+`docs/src/notes/research/formal_solver_poc/`. It adds no dependency here: the
 emitter is text, and nothing in the world or the engine imports a solver.
+
+With `clingo` installed (`poetry install --extras solver`) the archived
+`engine.lp` plans over it unmodified:
+
+```
+minimum horizon 13: 13 actions, 6 trades
+  t= 0  go_road_harbor          t= 7  trade_olsen_crab_trap
+  t= 1  trade_mira_red_paperclip  t= 8  trade_rusev_outboard_motor
+  ...                           t=11  trade_ilse_panel_van
+                                t=12  trade_whina_auckland_tickets
+```
+
+Two things fall out of that which the Python report cannot see. The optimum is
+**six trades and seven journeys**, not six trades — travel is half the cost, and
+`routes()` counts only trades. And the plan takes two pairs of trades in one
+hub, which is the actual arbitrage insight: cluster your trades by where the
+traders stand.
+
+Forcing the sourdough into the trace (`:- not forced. forced :-
+occurs(trade_pia_brass_doorknob, T).`) is UNSAT at every horizon to 18 — the
+trap proven fatal the same way `eat_icecream` is in the apartment scenario.
+
+`test_the_solver_plan_is_playable` walks that thirteen-move plan through an
+ordinary `Ledger`. A model that had drifted from the running world would
+produce a plan that stalls partway, so the test is the differential check that
+the contract and the game are the same game.
