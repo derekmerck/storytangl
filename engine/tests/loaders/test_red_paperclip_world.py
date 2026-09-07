@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tangl.core import Selector
 from tangl.journal.fragments import ChoiceFragment, ContentFragment
@@ -139,6 +140,29 @@ class TestRedPaperclipTradeGraph:
         assert lengths["sourdough_starter"] == 2
         assert lengths["lighthouse_keys"] == 4
         assert lengths["ostrich_share"] == 6
+
+    def test_the_emitted_model_travels_through_the_real_map(self) -> None:
+        """The ASP model's hub is read from the world, not named twice.
+
+        Travel is half the cost of a plan, so a model that kept its own idea
+        of which place is the map would silently describe a different world
+        the first time one was renamed.
+        """
+
+        from red_paperclip.__main__ import asp, map_hub
+
+        script = yaml.safe_load(
+            (_red_paperclip_root() / "script.yaml").read_text()
+        )
+        owner = [
+            label
+            for scene in script["scenes"].values()
+            for label, block in scene["blocks"].items()
+            if isinstance(block, dict) and "map" in block
+        ]
+
+        assert map_hub() == owner[0]
+        assert f"init(at({owner[0]}))." in asp(TradeGraph.load(), "ostrich_share")
 
     def test_a_trader_may_not_accept_what_they_offer(self) -> None:
         """The rule that makes a planned-then-spent row harmless.
