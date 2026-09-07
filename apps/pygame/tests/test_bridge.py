@@ -144,6 +144,63 @@ def test_a_replacing_blocker_becomes_the_choice_text(
     assert choice.unavailable_reason is None
 
 
+def test_a_replacement_wins_over_an_annotation_written_before_it(
+    bridge: PygameSessionBridge,
+) -> None:
+    """The flag is a claim about a message, not about a position in the list.
+
+    Stopping at the first annotation would let the order blockers happen to be
+    written in decide how the row reads.
+    """
+
+    turns = bridge.build_turns(
+        [
+            ChoiceFragment(
+                text="Mira will trade a fish-shaped pen for a brass doorknob",
+                edge_id=uuid4(),
+                available=False,
+                unavailable_reason="not_holding",
+                blockers=[
+                    Blocker(code="closed", message="The stall is shut."),
+                    Blocker(
+                        code="not_holding",
+                        message="Mira would take a brass doorknob, but you don't have one.",
+                        replaces_text=True,
+                    ),
+                ],
+                step=1,
+            )
+        ]
+    )
+
+    (choice,) = turns[0].choices
+    assert choice.text == "Mira would take a brass doorknob, but you don't have one."
+    assert choice.unavailable_reason is None
+
+
+def test_the_first_annotation_is_kept_when_nothing_replaces(
+    bridge: PygameSessionBridge,
+) -> None:
+    turns = bridge.build_turns(
+        [
+            ChoiceFragment(
+                text="Cross the bridge",
+                edge_id=uuid4(),
+                available=False,
+                blockers=[
+                    Blocker(code="closed", message="The bridge is out."),
+                    Blocker(code="late", message="And it is dark."),
+                ],
+                step=1,
+            )
+        ]
+    )
+
+    (choice,) = turns[0].choices
+    assert choice.text == "Cross the bridge"
+    assert choice.unavailable_reason == "The bridge is out."
+
+
 def test_a_refusal_with_no_message_falls_back_to_the_code(
     bridge: PygameSessionBridge,
 ) -> None:

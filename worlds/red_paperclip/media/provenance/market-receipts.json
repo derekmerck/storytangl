@@ -652,7 +652,7 @@
           "filename": "rp_market_00001_.png",
           "subfolder": "",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-tender-austin-49773b/8fbd7c6e-bf72-43b4-8499-a0ffecdca0a0/scratchpad/bg/market/08faf28e97a6da7640afd39b49fb284c1e07cf561f214aa62d7958cf53f6d648/000-rp_market_00001_.png",
+          "path": "generation-artifacts/raw/08faf28e97a6da7640afd39b49fb284c1e07cf561f214aa62d7958cf53f6d648/000-rp_market_00001_.png",
           "sha256": "e30493d70deb6beb3df5de39c9558bb9788043794456d85648262b9da74be247"
         }
       ],

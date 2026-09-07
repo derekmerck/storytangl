@@ -33,6 +33,15 @@ is an ending; an item with no `.ending` gets a plain one.
 a trader with two things to give, a trade naming an item that does not exist, a
 trader with nothing to trade at all.
 
+Those checks are structural and run at load. The expensive question — can a
+reader be stranded holding something the graph says is tradeable, because every
+trader who takes it is already spent — is not answerable from the edges, so it
+lives in the authoring tool instead. `dead_ends()` walks the reachable
+`(holding, spent)` states, which is the whole runtime state of this game;
+around a thousand of them here. `endings()` reads topology and says what the
+sinks are, and the two can disagree: a graph with no sinks at all can still
+stop you every time.
+
 ## What the engine already did
 
 The compile in `red_paperclip/domain.py` is three handlers, because sandbox
@@ -149,6 +158,7 @@ PYTHONPATH=worlds/red_paperclip python -m red_paperclip
 ```
 21 items, 21 traders, 6 hubs: harbor, market, garage, campus, station, airfield
 unreachable: nothing
+dead ends: none (every stop is on an item nobody trades for)
 
 ends the story:
   sourdough_starter    2 trades: wick -> pia

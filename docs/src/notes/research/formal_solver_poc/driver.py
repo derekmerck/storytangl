@@ -13,9 +13,13 @@ Three queries against engine.lp + world.lp:
                  cascade-bound (exist in no market).
 """
 import clingo, sys
+from pathlib import Path
 
 MAX_H = 20
-FILES = ["engine.lp", "world.lp"]
+# Resolved against this file rather than the working directory: the example is
+# run from wherever it is read, and a relative load silently finds nothing.
+HERE = Path(__file__).resolve().parent
+FILES = [str(HERE / "engine.lp"), str(HERE / "world.lp")]
 
 def solve(horizon, extra=""):
     """Ground and solve at a fixed horizon; return plan or None."""
@@ -75,7 +79,7 @@ def provenance():
       #show cascade_bound/1. #show seeded/1.
     """
     ctl = clingo.Control()
-    ctl.load("world.lp")
+    ctl.load(str(HERE / "world.lp"))
     ctl.add("base", [], prog)
     ctl.ground([("base", [])])
     with ctl.solve(yield_=True) as h:
@@ -106,7 +110,7 @@ def chekhov():
       #show unfired_gun/1. #show unsatisfiable/1.
     """
     ctl = clingo.Control()
-    ctl.load("world.lp")
+    ctl.load(str(HERE / "world.lp"))
     ctl.add("base", [], prog)
     ctl.ground([("base", [])])
     found = False

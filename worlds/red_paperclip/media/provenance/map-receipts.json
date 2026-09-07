@@ -651,7 +651,7 @@
           "filename": "rp_district_map_00001_.png",
           "subfolder": "",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-tender-austin-49773b/8fbd7c6e-bf72-43b4-8499-a0ffecdca0a0/scratchpad/images/8d968e68ecc1aafb284f8a9ec87f77f675b0af816580d5bbbd2dabdf3b8e25b7/000-rp_district_map_00001_.png",
+          "path": "generation-artifacts/raw/8d968e68ecc1aafb284f8a9ec87f77f675b0af816580d5bbbd2dabdf3b8e25b7/000-rp_district_map_00001_.png",
           "sha256": "ef7b581ee4ad887b2b0d207af98ab75de5c87b6f293710d423a37edb87ba1df6"
         }
       ],

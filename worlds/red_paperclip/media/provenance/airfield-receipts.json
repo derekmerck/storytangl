@@ -652,7 +652,7 @@
           "filename": "rp_airfield_00001_.png",
           "subfolder": "",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-tender-austin-49773b/8fbd7c6e-bf72-43b4-8499-a0ffecdca0a0/scratchpad/bg/airfield/ad7a565962d91324e168a4c88c82b2ba563bd45b90eba1f78c5c8b7d3d3224f0/000-rp_airfield_00001_.png",
+          "path": "generation-artifacts/raw/ad7a565962d91324e168a4c88c82b2ba563bd45b90eba1f78c5c8b7d3d3224f0/000-rp_airfield_00001_.png",
           "sha256": "e739df60b86c196c2d9e91ffd26bd6303aabea47905405a90e2d84bed6dc98bb"
         }
       ],

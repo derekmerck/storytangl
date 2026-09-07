@@ -30,7 +30,7 @@ scoped `.gitattributes` and amend this file.
 
 ## The budget
 
-Six files, about 810 KB, none of them source.
+Nine files, about 1.2 MB, none of them source.
 
 | File | Used by | Size |
 |------|---------|------|
@@ -40,6 +40,14 @@ Six files, about 810 KB, none of them source.
 | `cli-session.png` | `README.md`, the "See It Run" section | 1136x1492 |
 | `repartee-quay.png` | `README.md`, the reskin pair | 960x600 |
 | `repartee-spaceport.png` | `README.md`, the reskin pair | 960x600 |
+| `coronate-merchant.png` | `README.md` and `worlds/coronate_the_regent/README.md` | 960x600 |
+| `hall-monitor-desk.png` | `worlds/hall_monitor/README.md` | 960x600 |
+| `red-paperclip-district.png` | `worlds/red_paperclip/README.md`, the map view | 960x600 |
+
+Three of those rows were added late. `coronate-merchant.png` and
+`hall-monitor-desk.png` shipped without them, which is the rule below going
+unenforced rather than a decision — the count read six while the directory held
+eight.
 
 ## Regenerating
 
@@ -70,6 +78,20 @@ They are raster because they are screenshots of a pixel-art renderer; there
 is no vector form to prefer. Both are the same beat at the same advance
 count, so their prose and choices are identical and only the art differs --
 which is the claim a reskin screenshot is making.
+
+The three single-world frames come from the same script and are raster for the
+same reason:
+
+```bash
+poetry run python scripts/capture_world_frames.py --world red_paperclip \
+    --advance 1 --pack district=media --prefix red-paperclip-
+```
+
+`red-paperclip-district.png` shows the road as a clickable plate -- boxed
+regions, the choice number pinned in each live one and `X` in each refused one
+-- which is a claim about what the renderer draws *over* the art, so a vector
+of the plate alone would not make it. The same holds for the other two: what
+they show is the client, not the picture.
 
 `cli-session.png` is a typeset capture of a real `tangl-cli` session, not a
 derived asset, so no script reproduces it. It was captured through a PTY so the

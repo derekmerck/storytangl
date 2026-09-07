@@ -472,7 +472,10 @@ class Stage:
                 colour = DIM
             elif row.kind == "heading":
                 colour = RUST
-            text = self.font.render(row.text, False, colour)
+            # Clipped like an ordinary row: a legend line is one line for the
+            # same reason, and the hitbox is sized from what was drawn rather
+            # than from what was asked for, so it cannot reach past the frame.
+            text = self.font.render(self._clip(row.text), False, colour)
             self.surface.blit(text, (4, y))
             if action is not None:
                 rect = pygame.Rect(4, y, text.get_width(), ROW_H)

@@ -651,7 +651,7 @@
           "filename": "rp_harbor_00001_.png",
           "subfolder": "",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-tender-austin-49773b/8fbd7c6e-bf72-43b4-8499-a0ffecdca0a0/scratchpad/bg/harbor/7c81fffe20b7e7b51b9d95a4578bb7942cea4f4f3d179f1edcd226e67dd94eb4/000-rp_harbor_00001_.png",
+          "path": "generation-artifacts/raw/7c81fffe20b7e7b51b9d95a4578bb7942cea4f4f3d179f1edcd226e67dd94eb4/000-rp_harbor_00001_.png",
           "sha256": "35452ae162578b4509f728cd3e33f54e2e8ca582b32f9f9c755ebd30fa4b2280"
         }
       ],

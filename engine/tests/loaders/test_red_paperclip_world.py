@@ -173,6 +173,45 @@ class TestRedPaperclipTradeGraph:
         assert map_hub() == owner[0]
         assert f"init(at({owner[0]}))." in asp(TradeGraph.load(), "ostrich_share")
 
+    def test_no_reader_can_be_stranded_on_a_tradeable_item(self) -> None:
+        """Every stop in this world is a stop the graph admits to.
+
+        `endings()` reads edges and names the sinks. A reader can also be
+        stopped holding something whose every acceptor they have already
+        spent, which is invisible to that reading -- so the claim is checked
+        by walking the states instead.
+        """
+
+        trades = TradeGraph.load()
+
+        assert trades.dead_ends() == []
+        terminal = {item.label for item in trades.endings()}
+        assert {holding for holding, _spent in trades.stuck_states()} == terminal
+
+    def test_a_dead_end_the_topology_cannot_see_is_found(self) -> None:
+        """A graph with no sinks at all, which still always strands you.
+
+        Trade the paperclip for the pen, the pen for the mug, and the only
+        trader who takes a mug is the one already spent on the paperclip. `endings()`
+        returns nothing here -- correctly, since every item has an acceptor --
+        and the game stops anyway.
+        """
+
+        trades = TradeGraph.parse(
+            "red_paperclip: a red paperclip\n"
+            "pen: a pen\n"
+            "mug: a mug\n"
+            "one: Trader One @ harbor\n"
+            "two: Trader Two @ harbor\n"
+            "red_paperclip -> one -> pen\n"
+            "mug -> one\n"
+            "pen -> two -> mug\n"
+        )
+        trades.check()
+
+        assert trades.endings() == []
+        assert trades.dead_ends() == ["mug"]
+
     def test_a_trader_may_not_accept_what_they_offer(self) -> None:
         """The rule that makes a planned-then-spent row harmless.
 

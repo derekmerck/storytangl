@@ -652,7 +652,7 @@
           "filename": "rp_station_00001_.png",
           "subfolder": "",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-tender-austin-49773b/8fbd7c6e-bf72-43b4-8499-a0ffecdca0a0/scratchpad/bg/station/8853666c13749d9e9f83423c2e1f3cd8e4223bbf7b4e7ac4fc905d4eaaaffb1a/000-rp_station_00001_.png",
+          "path": "generation-artifacts/raw/8853666c13749d9e9f83423c2e1f3cd8e4223bbf7b4e7ac4fc905d4eaaaffb1a/000-rp_station_00001_.png",
           "sha256": "7ec3a559081e528a5d5974f9a340fd52842ff8837e30a144a444e26e15165f37"
         }
       ],

@@ -249,8 +249,72 @@ class TradeGraph(BaseModel):
         return routes
 
     def endings(self) -> list[TradeItem]:
-        """Return the items the story can end on, in file order."""
+        """Return the items nobody in the world ever trades for.
+
+        Topology only. This is a statement about the graph, not about a
+        playthrough: an item with acceptors can still strand a reader whose
+        every acceptor is already spent. Those are dynamic dead ends and they
+        do not appear here — see :meth:`dead_ends`, which finds them by
+        walking states rather than by reading edges.
+        """
         return [item for item in self.items.values() if self.is_terminal(item.label)]
+
+    def stuck_states(
+        self,
+        start: str = START_ITEM,
+        *,
+        limit: int = 200_000,
+    ) -> list[tuple[str, frozenset[str]]]:
+        """Return every reachable state in which no trade is left to make.
+
+        The runtime state of this game is exactly `(holding, spent traders)`,
+        so the whole space is walkable. It stays small because reachability is
+        narrow -- around a thousand states for the shipped world -- but a
+        denser graph could grow it, which is why this lives in the authoring
+        tool rather than in :meth:`check`. Cheap structural checks belong at
+        load; exhaustive ones belong where an author is asking.
+        """
+        seen: set[tuple[str, frozenset[str]]] = set()
+        stuck: list[tuple[str, frozenset[str]]] = []
+        queue = deque([(start, frozenset())])
+        while queue:
+            state = queue.popleft()
+            if state in seen:
+                continue
+            seen.add(state)
+            if len(seen) > limit:
+                raise TradeParseError(
+                    f"more than {limit} reachable states; the graph has grown "
+                    "past what this walk was meant for"
+                )
+            holding, spent = state
+            live = [
+                trader
+                for trader in self.acceptors(holding)
+                if trader.label not in spent
+            ]
+            if not live:
+                stuck.append(state)
+                continue
+            for trader in live:
+                queue.append((trader.offers, spent | {trader.label}))
+        return stuck
+
+    def dead_ends(self, start: str = START_ITEM) -> list[str]:
+        """Return items a reader can be stranded on that are not endings.
+
+        A trade graph can strand somebody without any sink to show for it:
+        hold an item whose every acceptor you have already spent and the story
+        stops on an item the graph says is tradeable. That reads as a bug to a
+        player and is invisible to :meth:`endings`.
+        """
+        return sorted(
+            {
+                holding
+                for holding, _spent in self.stuck_states(start)
+                if not self.is_terminal(holding)
+            }
+        )
 
 
 def _block(lines: deque[str]) -> str:

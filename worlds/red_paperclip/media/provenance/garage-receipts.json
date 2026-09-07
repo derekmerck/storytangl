@@ -652,7 +652,7 @@
           "filename": "rp_garage_00001_.png",
           "subfolder": "",
           "type": "output",
-          "path": "/private/tmp/claude-501/-Users-derek-dev-storytangl-claude--claude-worktrees-tender-austin-49773b/8fbd7c6e-bf72-43b4-8499-a0ffecdca0a0/scratchpad/bg/garage/33846d94061ca4fce96f3412607c2ad77ecfde571e2219ab2bf1c34766e3be3b/000-rp_garage_00001_.png",
+          "path": "generation-artifacts/raw/33846d94061ca4fce96f3412607c2ad77ecfde571e2219ab2bf1c34766e3be3b/000-rp_garage_00001_.png",
           "sha256": "fcf94c99cde6a33a728395463afbe7f945729c35203ddf1f2a35931c85766f2b"
         }
       ],

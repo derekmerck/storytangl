@@ -51,6 +51,15 @@ def report(trades: TradeGraph) -> str:
     lines.append(
         "unreachable: " + (", ".join(unreachable) if unreachable else "nothing")
     )
+    stranded = trades.dead_ends()
+    lines.append(
+        "dead ends: "
+        + (
+            ", ".join(stranded)
+            if stranded
+            else "none (every stop is on an item nobody trades for)"
+        )
+    )
     lines.append("")
     lines.append("ends the story:")
     for item in sorted(trades.endings(), key=lambda i: len(routes.get(i.label, []))):

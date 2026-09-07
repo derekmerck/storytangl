@@ -18,7 +18,7 @@ the canonical mechanics/demo policy remains in
 # Interactive Narrative Capability Matrix
 
 *Revision 2. Changes from r1: per-row facet tags, an explicit falsifier, a dual scorecard separating
-build value from argument value, and relocation of all engine-internals and shipped-format claims to
+build value from argument value, and relocation of most engine-internals and shipped-format claims to
 a clearly marked unverified appendix.*
 
 ---

@@ -8,6 +8,7 @@ commit exactly what selecting its numbered entry commits.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -129,6 +130,29 @@ def test_a_refused_region_pins_x_where_a_live_one_pins_its_number(
     assert stage._marker(1, live) == "1."
     assert stage._marker(2, guarded) == "x)"
     assert stage._choice_label(2, guarded).startswith("x) ")
+
+
+def test_a_legend_row_is_clipped_like_any_other_row(stage, frame) -> None:
+    """The footer draws over the plate, so a long row cannot run off it.
+
+    Ordinary choice rows were clipped; legend rows rendered raw text, which is
+    the same defect on the surface where it is least visible -- the overflow
+    leaves the frame rather than colliding with anything.
+    """
+
+    long_choice = Choice(
+        edge_id=uuid4(),
+        tags=frozenset({"ui:plate:quay:quayside"}),
+        text=(
+            "Go to The Quayside, past the cranes and the fuel dock and the "
+            "long row of chandlers that have been shut since the spring"
+        ),
+        payload={"move": "quayside"},
+    )
+    stage.draw(replace(frame, choices=[long_choice]))
+
+    for rect, _action in stage.hitboxes:
+        assert rect.right <= LOGICAL_SIZE[0]
 
 
 def test_a_region_no_choice_claims_is_inert(stage, frame) -> None:
