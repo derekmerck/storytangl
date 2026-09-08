@@ -13,7 +13,7 @@ from tangl.mechanics.credentials import (
     RestrictionLevel,
 )
 from tangl.mechanics.games import HasGame
-from tangl.mechanics.surface import HasSurface
+from tangl.presentation.surface import HasSurface
 from tangl.mechanics.games.credentials_game import (
     CredentialDisposition,
     CredentialPresentationProfile,

@@ -8,6 +8,11 @@ worlds running the same mechanic serve different geometry over identical pieces.
 The other claim is that this costs nothing where it is not used. A block with no
 surface must advertise no channel and project no section -- otherwise every
 world pays for a desk it does not have.
+
+Delivery only. The surface vocabulary itself is exercised in
+``engine/tests/presentation/test_surface.py``, which imports no mechanic; what is
+tested here is that a world's declaration reaches a client through the ordinary
+Service operation, with generic contributions folded in.
 """
 
 from __future__ import annotations
@@ -21,13 +26,13 @@ from tangl.core import Selector
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.sandbox.location import SandboxMapRegion
-from tangl.mechanics.surface import HasSurface, Surface, SurfaceSlot
+from tangl.presentation.surface import HasSurface
 from tangl.mechanics.surface_story_info import (
     advertise_surface_info_channels,
     project_surface_info,
 )
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
-from tangl.service.response import StoryInfoRequest
+from tangl.presentation.projection import ProjectionRequest
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
 from tangl.vm.runtime.frame import PhaseCtx
@@ -65,7 +70,7 @@ def _slots(ledger: Ledger, ctx: PhaseCtx) -> dict[str, list]:
     state = do_get_story_info(
         ledger.cursor,
         ctx=ctx,
-        request=StoryInfoRequest(kinds=["surface_plate", "surface_slots"]),
+        request=ProjectionRequest(kinds=["surface_plate", "surface_slots"]),
     )
     sections = {section.section_id: section for section in state.sections}
     table = sections["surface_slots"]
@@ -89,7 +94,7 @@ def test_the_band_travels_as_numbers_not_as_prose() -> None:
 
     ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
     state = do_get_story_info(
-        ledger.cursor, ctx=ctx, request=StoryInfoRequest(kinds=["surface_plate"])
+        ledger.cursor, ctx=ctx, request=ProjectionRequest(kinds=["surface_plate"])
     )
     rows = {row.key: row.value for row in state.sections[0].value.items}
 
@@ -110,7 +115,7 @@ def test_slots_arrive_in_the_order_the_world_declared_them() -> None:
 
     ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
     state = do_get_story_info(
-        ledger.cursor, ctx=ctx, request=StoryInfoRequest(kinds=["surface_slots"])
+        ledger.cursor, ctx=ctx, request=ProjectionRequest(kinds=["surface_slots"])
     )
     names = [row[0] for row in state.sections[0].value.rows]
 
@@ -150,7 +155,7 @@ def test_a_block_that_could_have_a_surface_but_declares_none_publishes_nothing()
         project_surface_info(
             caller=Counter(),
             ctx=None,
-            request=StoryInfoRequest(kinds=["surface_plate", "surface_slots"]),
+            request=ProjectionRequest(kinds=["surface_plate", "surface_slots"]),
         )
         is None
     )
@@ -171,42 +176,9 @@ def test_a_block_with_no_surface_publishes_nothing() -> None:
     state = do_get_story_info(
         ledger.cursor,
         ctx=ctx,
-        request=StoryInfoRequest(kinds=["surface_plate", "surface_slots"]),
+        request=ProjectionRequest(kinds=["surface_plate", "surface_slots"]),
     )
     assert [s for s in state.sections if s.kind.startswith("surface")] == []
-
-
-def test_a_slot_may_not_escape_its_plate() -> None:
-    """The bounds rule the surface shares with the sandbox map plate.
-
-    A rectangle off the edge draws nothing while looking well-formed in a world
-    file, so it is refused where it is written rather than where it is drawn.
-    """
-
-    with pytest.raises(ValidationError):
-        SurfaceSlot(holds="id_card", x=0.9, y=0.1, w=0.2, h=0.2)
-
-    with pytest.raises(ValidationError):
-        SurfaceSlot(holds="id_card", x=0.1, y=0.1, w=0.0, h=0.2)
-
-
-def test_a_rect_may_not_be_nan() -> None:
-    """The bounds rule cannot catch NaN on its own.
-
-    Every comparison with NaN is false, so ``w=nan`` slips past ``w <= 0`` and
-    then past ``x + w > 1.0`` as well, and reaches a renderer that turns it into
-    a pixel rect. ``x=nan`` happens to be caught by the origin check and
-    infinities by the extent check, which is what made the hole easy to miss --
-    so the width and height cases are the ones asserted here.
-    """
-
-    for bad in (float("nan"), float("inf")):
-        with pytest.raises(ValidationError):
-            SurfaceSlot(holds="id_card", x=0.1, y=0.1, w=bad, h=0.2)
-        with pytest.raises(ValidationError):
-            SurfaceSlot(holds="id_card", x=0.1, y=0.1, w=0.2, h=bad)
-        with pytest.raises(ValidationError):
-            SandboxMapRegion(x=0.1, y=0.1, w=bad, h=0.2)
 
 
 def test_the_map_plate_still_enforces_the_rule_it_now_shares() -> None:
@@ -220,6 +192,9 @@ def test_the_map_plate_still_enforces_the_rule_it_now_shares() -> None:
     with pytest.raises(ValidationError):
         SandboxMapRegion(x=0.9, y=0.1, w=0.2, h=0.2)
 
+    with pytest.raises(ValidationError):
+        SandboxMapRegion(x=0.1, y=0.1, w=float("nan"), h=0.2)
+
     assert SandboxMapRegion(x=0.03, y=0.13, w=0.25, h=0.30).as_row("quayside") == [
         "quayside",
         0.03,
@@ -229,12 +204,3 @@ def test_the_map_plate_still_enforces_the_rule_it_now_shares() -> None:
     ]
 
 
-def test_a_surface_may_declare_slots_nothing_ever_fills() -> None:
-    """Geometry outlives whatever happens to be on the desk this turn."""
-
-    surface = Surface(
-        name="desk",
-        slots={"bust_of_dear_leader": SurfaceSlot(holds="ornament", x=0.8, y=0.1, w=0.1, h=0.1)},
-    )
-
-    assert surface.slots["bust_of_dear_leader"].holds == "ornament"

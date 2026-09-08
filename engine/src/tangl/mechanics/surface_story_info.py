@@ -5,26 +5,30 @@ map plate geometry does: it is *reference state*, not turn content. It changes
 when the furniture changes, not when the player acts, so a client fetches it once
 by name and a client that cannot draw surfaces never pays for it at all.
 
-Registered against :class:`~tangl.mechanics.surface.HasSurface` rather than
+Registered against :class:`~tangl.presentation.surface.HasSurface` rather than
 against any mechanic, so a block publishes these channels by owning a surface and
 nothing else. Importing this module registers the handlers; the credentials
 worlds pull it in the way the adventure sandbox pulls in its map channel.
+
+The contribution goes on ``presentation_dispatch`` and this module imports no
+Service. Service stays the outer operation: it fires the task, folds this
+registry with the story/world authorities, and prepares the response. Nothing
+here knows an envelope exists.
 """
 
 from __future__ import annotations
 
-from tangl.service.dispatch import on_advertise_info_channels, on_get_story_info
-from tangl.service.response import (
+from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
-    KvRow,
     ProjectedSection,
-    StoryInfoRequest,
+    ProjectionRequest,
     TableValue,
 )
+from tangl.presentation.surface import HasSurface, Surface
+from tangl.presentation.values import KvRow
 from tangl.vm.runtime.frame import PhaseCtx
-
-from .surface import HasSurface, Surface
 
 SURFACE_PLATE_KIND = "surface_plate"
 SURFACE_SLOTS_KIND = "surface_slots"
@@ -75,7 +79,7 @@ def project_surface_info(
     *,
     caller: HasSurface,
     ctx: PhaseCtx,
-    request: StoryInfoRequest,
+    request: ProjectionRequest,
     **_kw: object,
 ) -> list[ProjectedSection] | None:
     """Project the requested surface channels, when asked for by name."""

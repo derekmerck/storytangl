@@ -21,7 +21,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client runtime")
 
-from tangl.journal.intent import PieceConstraints, PiecesAccepts  # noqa: E402
+from tangl.presentation.intent import PieceConstraints, PiecesAccepts  # noqa: E402
 from tangl.pygame_client.__main__ import _keyed  # noqa: E402
 from tangl.pygame_client.bridge import place_pieces  # noqa: E402
 from tangl.pygame_client.models import (  # noqa: E402

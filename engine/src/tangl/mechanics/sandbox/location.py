@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tangl.core import Token, contribute_ns
-from tangl.journal.geometry import NormalizedRect
+from tangl.presentation.geometry import NormalizedRect
 from tangl.story import MenuBlock
 from tangl.story.concepts.asset import HasAssets
 
@@ -57,7 +57,7 @@ class SandboxMapRegion(NormalizedRect):
 
     The region carries no notion of what it leads to: binding is by name against
     whichever choices claim it. Shape, bounds rule and disclosure row all come
-    from :class:`~tangl.journal.geometry.NormalizedRect`, which a game block's
+    from :class:`~tangl.presentation.geometry.NormalizedRect`, which a block's
     surface slots share — the two measure the same way because they are the same
     kind of thing seen from different owners.
     """

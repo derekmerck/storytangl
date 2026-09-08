@@ -5,13 +5,14 @@ the plate's top-left corner, so it survives any rendered size. That is the only
 form of geometry that crosses the contract: the engine never learns a client's
 pixel dimensions, and a client never learns a world's.
 
-Lives beside :class:`~tangl.journal.fragments.StagingHints` because it is the
-same kind of thing — client-facing presentation vocabulary carried alongside the
-journal rather than mechanics owned by any one of them. Both the sandbox map
-plate and a game block's surface measure themselves this way, and the bounds
-rule below is the reason they share a base rather than each keeping a copy: a
-rectangle that escapes its plate is silently unclickable rather than visibly
-wrong, so it has to be refused in one place.
+Lives beside :class:`~tangl.presentation.hints.StagingHints` because it is the
+same kind of thing — domain-neutral vocabulary describing how a client may
+arrange what it is given, owned by neither the narrative history that carries it
+nor the mechanics that happen to declare it. Both the sandbox map plate and a
+block's surface measure themselves this way, and the bounds rule below is the
+reason they share a base rather than each keeping a copy: a rectangle that
+escapes its plate is silently unclickable rather than visibly wrong, so it has
+to be refused in one place.
 """
 
 from __future__ import annotations

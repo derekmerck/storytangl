@@ -63,13 +63,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from tangl.journal.geometry import NormalizedRect
+from .geometry import NormalizedRect
 
 
 class SurfaceSlot(NormalizedRect):
     """One place on a surface, and the kind of piece that lies there.
 
-    Shares :class:`~tangl.journal.geometry.NormalizedRect` with the sandbox map's
+    Shares :class:`~tangl.presentation.geometry.NormalizedRect` with the sandbox map's
     regions: same normalized coordinates, same refusal to sit outside its plate.
     """
 

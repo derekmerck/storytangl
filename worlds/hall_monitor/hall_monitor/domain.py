@@ -21,7 +21,7 @@ from tangl.mechanics.credentials import (
 from tangl.mechanics.assembly import ComponentManager, Slot
 from tangl.mechanics.presence.look import HairColor, HasSimpleLook
 from tangl.mechanics.games import HasGame
-from tangl.mechanics.surface import HasSurface
+from tangl.presentation.surface import HasSurface
 from tangl.mechanics.games.credentials_game import (
     CredentialCase,
     CredentialCaseResult,
