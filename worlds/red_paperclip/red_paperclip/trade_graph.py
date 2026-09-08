@@ -153,6 +153,13 @@ class TradeGraph(BaseModel):
         return graph
 
     def _declare(self, label: str, value: str) -> None:
+        # Items and traders share one authored namespace, so a repeat is a
+        # mistake in either direction: declaring an item twice loses the first
+        # name silently, and reusing a name across kinds leaves trades pointing
+        # at whichever declaration came last.
+        if label in self.items or label in self.traders:
+            kind = "an item" if label in self.items else "a trader"
+            raise TradeParseError(f"{label!r} is already declared as {kind}")
         name, at, hub = value.partition(" @ ")
         if at:
             self.traders[label] = Trader(label=label, name=name.strip(), hub=hub.strip())

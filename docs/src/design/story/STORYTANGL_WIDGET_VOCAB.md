@@ -815,6 +815,13 @@ because a printed number is a promise that pressing it does something:
 | pygame | map region | `1` pinned | `X` pinned |
 | pygame | piece card | `1.` on the card | `(x)` on the card |
 
+**A port MUST NOT print a key it will not accept.** Positional numbering runs
+past nine, and a port whose keyboard binding stops there has to say so
+somewhere. pygame runs `1`-`9` then `a`-`z` (skipping lowercase `x`, its mark
+for a row without a key) and prints nothing at all past the end of that
+alphabet, leaving the row clickable. An ordinal nothing accepts is the same
+broken promise as a number on a refused row, one position further along.
+
 **The mark is client-local; the mapping is not.** Every port derives
 both the ordinal and the mark through one function, so a row, a map
 hitbox and a keyboard binding cannot disagree about whether a choice is

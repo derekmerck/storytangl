@@ -52,6 +52,7 @@ from .stage import (
     PAGE_KEY,
     Stage,
     choice_action,
+    position_for_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -285,6 +286,13 @@ def main(argv: list[str] | None = None) -> int:
                     stage.draw(frame, pending)
                 elif pygame.K_0 <= event.key <= pygame.K_9:
                     action = _keyed(stage, frame, pending, event.key - pygame.K_0)
+                elif pending is None and (
+                    position := position_for_key(event.unicode)
+                ) is not None:
+                    # Letters reach the choice list only. The selection panel
+                    # binds digits to its own controls, so a letter there would
+                    # mean two things at once.
+                    action = _keyed(stage, frame, pending, position)
 
             if action is None:
                 continue

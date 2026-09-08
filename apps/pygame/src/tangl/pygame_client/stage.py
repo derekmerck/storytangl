@@ -99,6 +99,26 @@ _ROW_STYLES = {
     "choice": (INK, CREAM),
 }
 
+def key_for_position(index: int) -> str | None:
+    """Return the key bound to a one-based choice position, if there is one.
+
+    One function for the marker a row prints, the pin a map region carries and
+    the key the event loop resolves, so a printed key and an accepted key
+    cannot come apart. Positions past the alphabet have no key.
+    """
+
+    if 1 <= index <= len(CHOICE_KEYS):
+        return CHOICE_KEYS[index - 1]
+    return None
+
+
+def position_for_key(key: str) -> int | None:
+    """Return the one-based choice position a key selects, if any."""
+
+    found = CHOICE_KEYS.find(key)
+    return found + 1 if found >= 0 else None
+
+
 def choice_action(choice: Choice) -> Action | None:
     """Return the action a row for ``choice`` performs, or None if it cannot.
 
@@ -145,6 +165,16 @@ CANCEL_KEY = 0
 
 SURFACE_CONTOUR = 1
 SURFACE_WASH = 140
+CHOICE_KEYS = "123456789abcdefghijklmnopqrstuvwyz"
+"""Keys a choice may be bound to, by position.
+
+Digits first because a reader expects them, then letters. Lowercase `x` is
+missing on purpose: it is this port's mark for a row that has no key, and a
+key that looks like the absence of one is worse than no key at all.
+
+A printed key is a promise, so a choice past the end of this alphabet prints
+no key rather than an ordinal nothing will accept. It stays clickable."""
+
 CHOICE_PITCH = 11
 """Vertical step between choice rows, one more than the backing they carry."""
 
@@ -529,7 +559,9 @@ class Stage:
         and the pair matches what the CLI prints.
         """
 
-        return REFUSED_PIN if choice_action(choice) is None else str(index)
+        if choice_action(choice) is None:
+            return REFUSED_PIN
+        return key_for_position(index) or ""
 
     @staticmethod
     def _marker(index: int, choice: Choice) -> str:
@@ -541,13 +573,14 @@ class Stage:
         `x)` instead. Live rows therefore run 1, 3, 6 rather than 1, 2, 3: the
         gaps are the refusals, and every number on screen works.
 
-        Whether the ports should agree on *which* number names a given edge is
-        a separate and open question (#452) — the CLI numbers only the live
-        rows, so the same edge can be 2 there and 3 here.
+        Settled in the widget vocabulary at §2.6.1 and followed by the CLI, so
+        an edge carries the same position in both ports.
         """
 
         pin = Stage._pin(index, choice)
-        return "x)" if pin == REFUSED_PIN else f"{pin}."
+        if pin == REFUSED_PIN:
+            return "x)"
+        return f"{pin}." if pin else " "
 
     @staticmethod
     def _choice_label(index: int, choice: Choice) -> str:

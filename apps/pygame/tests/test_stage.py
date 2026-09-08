@@ -22,11 +22,14 @@ from tangl.pygame_client.models import (  # noqa: E402
 from tangl.presentation.intent import TextAccepts  # noqa: E402
 from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
+    CHOICE_KEYS,
     LOGICAL_SIZE,
     PANEL_W,
     SCALE,
     Stage,
     choice_action,
+    key_for_position,
+    position_for_key,
     unsupported_reason,
 )
 
@@ -95,6 +98,37 @@ def test_a_refused_row_shows_no_number_to_press(stage: Stage) -> None:
     stage.draw(turn)
 
     assert len(stage.hitboxes) == 2
+
+
+def test_a_printed_key_is_one_the_client_accepts(stage: Stage) -> None:
+    """Every marker on screen resolves back to the row that printed it.
+
+    `str(index)` printed `10.` for the tenth choice while the event loop read
+    one keypad key, so the number promised something nothing would take.
+    """
+
+    for position in range(1, len(CHOICE_KEYS) + 1):
+        key = key_for_position(position)
+        assert key is not None
+        assert position_for_key(key) == position
+
+    # Lowercase x is the mark for a row with no key, so it binds to nothing.
+    assert position_for_key("x") is None
+    assert "x" not in CHOICE_KEYS
+
+
+def test_a_choice_past_the_alphabet_prints_no_key(stage: Stage) -> None:
+    """Past the last key a row prints nothing rather than an ordinal.
+
+    It stays clickable; what it must not do is name a key that does not work.
+    """
+
+    beyond = len(CHOICE_KEYS) + 1
+    live = Choice(edge_id=uuid4(), text="One more than there are keys")
+
+    assert key_for_position(beyond) is None
+    assert stage._pin(beyond, live) == ""
+    assert stage._marker(beyond, live).strip() == ""
 
 
 def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> None:

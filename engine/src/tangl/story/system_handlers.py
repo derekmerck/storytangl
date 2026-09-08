@@ -277,11 +277,28 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
         # beside a specific message would say two different things about one
         # refusal. The coarse code stays the floor for a guard that says
         # nothing about itself.
-        if edge.blockers:
-            return edge.blockers[0].code
-        return "guard_failed_or_unavailable"
+        authored = _authored_blocker(edge)
+        return authored.code if authored is not None else "guard_failed_or_unavailable"
 
     return None
+
+
+def _authored_blocker(edge: Action) -> Blocker | None:
+    """Return the authored blocker that speaks for this refusal.
+
+    The same rule a client uses to pick which message to show -- the first
+    that replaces the choice text, otherwise the first -- so the code reported
+    as `unavailable_reason` and the sentence a reader is shown come from one
+    blocker. Taking `blockers[0]` here while a client scanned for the first
+    `replaces_text` let a choice report `closed` while saying the sentence
+    belonging to `not_holding`.
+    """
+
+    blockers = edge.blockers or ()
+    for blocker in blockers:
+        if blocker.replaces_text:
+            return blocker
+    return blockers[0] if blockers else None
 
 
 def _dependency_blocker(dep: Dependency) -> Blocker:
@@ -300,14 +317,15 @@ def _dependency_blocker(dep: Dependency) -> Blocker:
 
 
 def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
-    """Return structured blocker diagnostics for an unavailable choice edge."""
-    if edge.blockers:
-        return [
-            blocker.model_copy(
-                update={"message": _render_text(blocker.message, source=edge, ctx=ctx)}
-            )
-            for blocker in edge.blockers
-        ]
+    """Return structured blocker diagnostics for an unavailable choice edge.
+
+    Structural failures are engine-owned and come first, in the same order
+    `_choice_unavailable_reason` checks them. Authored blockers describe a
+    guard, and a world cannot speak for a missing successor or an unresolved
+    dependency -- returning them ahead of the structure let a choice report
+    `missing_dependency` while showing the author's explanation of something
+    else entirely.
+    """
 
     if edge.successor is None:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
@@ -339,6 +357,15 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
         return blockers
 
     if not edge.available(ctx=ctx):
+        if edge.blockers:
+            return [
+                blocker.model_copy(
+                    update={
+                        "message": _render_text(blocker.message, source=edge, ctx=ctx)
+                    }
+                )
+                for blocker in edge.blockers
+            ]
         return [
             Blocker(
                 code="guard_failed_or_unavailable",

@@ -232,6 +232,27 @@ class TestRedPaperclipTradeGraph:
         with pytest.raises(TradeParseError, match="for itself"):
             TradeGraph.parse(source).check()
 
+    @pytest.mark.parametrize(
+        ("source", "kind"),
+        [
+            ("pen: a pen\npen: another pen\n", "an item"),
+            ("mira: Mira @ harbor\nmira: Mira again @ market\n", "a trader"),
+            ("pen: a pen\npen: Pen the trader @ harbor\n", "an item"),
+            ("mira: Mira @ harbor\nmira: a mira\n", "a trader"),
+        ],
+        ids=["item twice", "trader twice", "item then trader", "trader then item"],
+    )
+    def test_a_label_may_be_declared_once(self, source: str, kind: str) -> None:
+        """Items and traders share one namespace, so a repeat is a mistake.
+
+        Assigning straight into the dicts lost the first declaration without
+        saying so, and a label used for both kinds left trades pointing at
+        whichever came last.
+        """
+
+        with pytest.raises(TradeParseError, match=f"already declared as {kind}"):
+            TradeGraph.parse(source)
+
     def test_a_trader_may_only_have_one_thing_to_give(self) -> None:
         source = (
             "clip: a clip\n"
