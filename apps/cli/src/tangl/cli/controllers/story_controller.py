@@ -9,6 +9,8 @@ from uuid import UUID
 from cmd2 import CommandSet, with_argparser, with_default_category
 
 from tangl.presentation.projection import ProjectedState
+
+from ..rendering import _choice_blocker_messages, _choice_refusal_text
 from tangl.service.response import (
     CommandEdgeQuery,
     DirectEdgeRequest,
@@ -266,22 +268,46 @@ class StoryController(CommandSet):
         help="Explicit JSON object for place, compose, or extension choices",
     )
 
+    @staticmethod
+    def _refusal(choice: _CachedChoice) -> str:
+        """Return why a refused choice cannot be taken, in the world's words.
+
+        Through the renderer's own helpers, so the sentence a reader is given
+        for typing a refused number is the sentence already printed beside it
+        rather than a second opinion assembled here.
+        """
+
+        replacement = _choice_refusal_text(choice)
+        if replacement:
+            return replacement
+        messages = _choice_blocker_messages(choice)
+        if messages:
+            return "; ".join(messages)
+        return choice.unavailable_reason or "no reason given"
+
     @with_argparser(choose_parser)
     def do_do(self, args: argparse.Namespace) -> None:
         if not self._require_story_context():
             return
 
-        active_choices = [choice for choice in self._current_choices if choice.available]
-        if not active_choices:
+        choices = list(self._current_choices)
+        if not choices:
             self._cmd.poutput("No cached choices. Run `story` to refresh choices first.")
             return
 
         index = args.action
-        if index < 1 or index > len(active_choices):
+        if index < 1 or index > len(choices):
             self._cmd.poutput("Choice out of range.")
             return
 
-        choice = active_choices[index - 1]
+        # Positional, matching what the renderer prints. Numbering only the
+        # live rows meant this number named a different choice depending on
+        # what happened to be available, and a reader typing the number beside
+        # a refused row silently committed its neighbour.
+        choice = choices[index - 1]
+        if not choice.available:
+            self._cmd.poutput(f"{index} is not available: {self._refusal(choice)}")
+            return
         try:
             choice_payload = self._choice_payload(choice, args.values, args.payload)
         except ValueError as exc:

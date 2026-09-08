@@ -231,12 +231,54 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
     story_controller._render_current_story_update()
 
     output = "\n".join(cli.outputs)
-    assert "1. Go north [cost: time -1 minute]" in output
+    # Positional: the vault is choice one and keeps its number out of
+    # circulation, so "Go north" is two rather than sliding up to one.
+    assert "2. Go north [cost: time -1 minute]" in output
     assert (
         "x) Open vault [locked: Requires keycard] "
         "[blockers: The security keycard is required.]"
         in output
     )
+
+
+def test_typing_a_refused_number_refuses_it(
+    story_controller: StoryController,
+) -> None:
+    """The number beside a refused row belongs to that row.
+
+    Numbering only the live choices meant this number named whichever live
+    choice happened to be first, so a reader aiming at the vault silently went
+    north instead.
+    """
+
+    cli = story_controller._cmd
+    story_controller._apply_runtime_envelope(
+        RuntimeEnvelope(
+            fragments=[
+                ChoiceFragment(
+                    edge_id=uuid4(),
+                    text="Open vault",
+                    available=False,
+                    unavailable_reason="needs_keycard",
+                    blockers=[
+                        Blocker(
+                            code="needs_keycard",
+                            message="The security keycard is required.",
+                        )
+                    ],
+                ),
+                ChoiceFragment(edge_id=uuid4(), text="Go north"),
+            ]
+        )
+    )
+
+    cli.outputs.clear()
+    story_controller.do_do("1")
+
+    output = "\n".join(cli.outputs)
+    assert "1 is not available: The security keycard is required." in output
+    # Nothing was committed on the reader's behalf.
+    assert not [name for name, _payload in cli.calls if name == "resolve_choice"]
 
 
 def test_cli_combines_action_and_input_cost_previews(
