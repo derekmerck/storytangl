@@ -808,10 +808,12 @@ position is reserved — the numbers around it do not close up — but the
 number itself is replaced by an x-like mark in the port's own format,
 because a printed number is a promise that pressing it does something:
 
-| port | available | locked |
-|---|---|---|
-| CLI | `1.` | `x)` |
-| pygame | `1.` | `x)`, and `X` pinned on a map region |
+| port | surface | available | locked |
+|---|---|---|---|
+| CLI | row | `1.` | `x)` |
+| pygame | row | `1.` | `x)` |
+| pygame | map region | `1` pinned | `X` pinned |
+| pygame | piece card | `1.` on the card | `(x)` on the card |
 
 **The mark is client-local; the mapping is not.** Every port derives
 both the ordinal and the mark through one function, so a row, a map
@@ -821,8 +823,20 @@ must — pygame pins `X` rather than `x` because at 11px the default font
 rasterizes a lowercase `x` as a featureless blob — and MUST be
 justified and applied consistently across every surface in that port.
 
-**Conformance, as of this writing.** The CLI and pygame ports implement
-the above. The other two do not, and neither gap is a rendering detail:
+**Conformance, as of this writing.** The CLI implements the above. pygame
+implements it for rows and map regions and diverges on piece cards, and
+the other two ports do not implement it at all:
+
+- **pygame piece cards** mark `(x)` — a third spelling — and key it on
+  `piece.available` rather than on whether the choice has a number.
+  Those two conditions usually coincide and come apart exactly where it
+  matters: a piece that is available but not on the current selection
+  page carries no number and no hitbox, and is as unreachable as a
+  refused one while looking ordinary. Latent rather than live, since no
+  shipped packet is larger than a selection page. Left alone
+  deliberately — the surface work in #443 would retire these marks
+  entirely by moving the refusal onto a hover, so unifying the spelling
+  first would be work done twice.
 
 - **Web** assigns no positional number at all. `StoryAction.vue` reads a
   hotkey only from an authored `ui_hints.hotkey`, so §2.6's A11y rule —
