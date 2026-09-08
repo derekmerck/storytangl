@@ -145,10 +145,16 @@ Options that change how a world compiles — media distribution mode, for exampl
 are build parameters: change the parameter and reload, rather than expecting one
 registration to serve several configurations.
 
-Domain modules contribute through a small set of parallel hooks, each read once
-when the module is imported: `get_authorities()`, `get_story_codecs()`, and
-`get_media_index_handlers()`, plus the `class_registry` collected automatically
-from the module's `Entity` subclasses.
+Domain modules contribute through a small set of parallel hooks:
+`get_authorities()`, `get_story_codecs()`, and `get_media_index_handlers()`, plus
+the `class_registry` collected automatically from the module's `Entity`
+subclasses.
+
+The module itself is imported once and cached, but the hooks are called on every
+domain-adjunct load, which is once per world-facet build: once per `compile()`,
+once per `compile_anthology()` and shared across all its stories, and again for
+`encode()`. Hooks should therefore be cheap and free of side effects — they
+declare contributions, they do not perform setup.
 
 That domain module also contributes a `class_registry` of its `Entity`
 subclasses, and authored `kind` names resolve through it. Resolution order is

@@ -12,7 +12,7 @@ from .codec import CodecRegistry, DecodeResult, EncodeResult, StoryCodec
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler
 
 if TYPE_CHECKING:
-    from tangl.media.media_resource.resource_manager import ResourceManager
+    from tangl.media.media_resource.resource_manager import IndexHandler, ResourceManager
 
 
 class _WorldDomainAdjuncts:
@@ -26,7 +26,7 @@ class _WorldDomainAdjuncts:
         self.modules: list[Any] = []
         self.class_registry: dict[str, Any] = {}
         self.story_codecs: dict[str, StoryCodec] = {}
-        self.media_index_handlers: list[Any] = []
+        self.media_index_handlers: list["IndexHandler"] = []
 
     def load_domain_module(self, domain_module: str) -> None:
         module = importlib.import_module(domain_module)
@@ -47,6 +47,7 @@ class _WorldDomainAdjuncts:
             for handler in get_media_index_handlers() or ():
                 if handler not in self.media_index_handlers:
                     self.media_index_handlers.append(handler)
+
 
         try:
             from tangl.core import Entity

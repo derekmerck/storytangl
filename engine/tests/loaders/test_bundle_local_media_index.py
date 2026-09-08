@@ -22,6 +22,7 @@ from __future__ import annotations
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
 INDEXED: list[str] = []
+HOOK_CALLS: list[str] = []
 
 
 def tag_local_media(caller: MediaRIT, *, ctx: object) -> MediaRIT:
@@ -35,6 +36,7 @@ def tag_local_media(caller: MediaRIT, *, ctx: object) -> MediaRIT:
 
 
 def get_media_index_handlers() -> list[object]:
+    HOOK_CALLS.append("media")
     return [tag_local_media]
 '''
 
@@ -131,3 +133,37 @@ def test_media_indexing_works_without_the_hook(tmp_path: Path) -> None:
         "sign-north.svg"
     ]
     assert not {tag for tag in _tags(world) if tag.startswith("local:")}
+
+
+def test_hooks_are_invoked_per_domain_adjunct_load_not_once_per_import(
+    tmp_path: Path,
+) -> None:
+    """Pin the lifecycle the design doc states.
+
+    The module is imported once and cached, but the hooks run on every
+    domain-adjunct load - once per ``compile()`` and again for ``encode()``.
+    Documenting "read once at import" would be wrong, and a contributor who
+    believed it might do setup work in a hook. If this behavior is ever made
+    once-per-compiler, this test and STORY_DESIGN.md change together.
+    """
+    module_name = _write_media_bundle(
+        tmp_path,
+        label="media_lifecycle",
+        domain_source=DOMAIN_SOURCE,
+    )
+
+    World.clear_instances()
+    try:
+        compiler = WorldCompiler()
+        bundle = WorldRegistry([tmp_path]).bundles["media_lifecycle"]
+        world = compiler.compile(bundle)
+        domain_module = importlib.import_module(module_name)
+        after_compile = list(domain_module.HOOK_CALLS)
+
+        compiler.encode(bundle, world.bundle)
+        after_encode = list(domain_module.HOOK_CALLS)
+    finally:
+        World.clear_instances()
+
+    assert after_compile == ["media"]
+    assert after_encode == ["media", "media"]
