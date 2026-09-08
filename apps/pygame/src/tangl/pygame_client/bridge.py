@@ -46,6 +46,8 @@ from .models import (
     PendingSelection,
     Piece,
     StageImage,
+    Surface,
+    SurfaceSlot,
     Turn,
     Zone,
 )
@@ -179,6 +181,33 @@ def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
     ]
 
 
+def place_pieces(surface: Surface, pieces: Sequence[Piece]) -> list[tuple[SurfaceSlot, Piece]]:
+    """Pair each slot with the live piece lying in it, in slot order.
+
+    The join is ``slot.holds`` against ``piece.kind`` and nothing else, so a
+    world can re-measure or replace its furniture without a mechanic noticing.
+
+    Both directions degrade to nothing rather than to a guess. A slot no piece
+    fills is simply absent from the result -- nothing drawn, nothing clickable --
+    which is how an empty in-tray differs from a document that is present and
+    refused. A piece no slot holds is likewise absent from the surface and stays
+    in the numbered list, which §5.3 keeps reachable regardless.
+
+    Where a surface declares two slots for one kind, pieces fill them in stream
+    order against slots in declared order, so the same packet lands the same way
+    every turn.
+    """
+
+    unplaced = list(pieces)
+    placed: list[tuple[SurfaceSlot, Piece]] = []
+    for slot in surface.slots:
+        for index, piece in enumerate(unplaced):
+            if piece.kind == slot.holds:
+                placed.append((slot, unplaced.pop(index)))
+                break
+    return placed
+
+
 def remaining_pieces(turn: Turn, pending: PendingSelection) -> list[Piece]:
     """Pieces still on offer for a pending selection, in stream order.
 
@@ -284,17 +313,7 @@ class PygameSessionBridge:
         cannot draw maps never pays for it.
         """
 
-        if self.user_id is None or self.ledger_id is None:
-            return None
-        state = self.service_manager.get_story_info(
-            user_id=self.user_id,
-            ledger_id=self.ledger_id,
-            kinds=["map_plate", "map_regions"],
-        )
-        sections = {
-            section.get("section_id"): section
-            for section in (state.to_dto().get("sections") or [])
-        }
+        sections = self._info_sections(["map_plate", "map_regions"])
         summary = sections.get("sandbox_map_plate")
         if summary is None:
             return None
@@ -310,6 +329,96 @@ class PygameSessionBridge:
             image=_text(rows.get("Image")),
             regions=self._regions(sections.get("sandbox_map_regions")),
         )
+
+    def _info_sections(self, kinds: list[str]) -> dict[Any, dict[str, Any]]:
+        """Fetch story-info sections by kind, keyed by section id.
+
+        Shared by every disclosure read so the request and the lookup cannot
+        drift apart: a channel asked for under one name and read back under
+        another returns nothing and looks exactly like a world that has none.
+        """
+
+        if self.user_id is None or self.ledger_id is None:
+            return {}
+        state = self.service_manager.get_story_info(
+            user_id=self.user_id,
+            ledger_id=self.ledger_id,
+            kinds=kinds,
+        )
+        return {
+            section.get("section_id"): section
+            for section in (state.to_dto().get("sections") or [])
+        }
+
+    def surface(self) -> Surface | None:
+        """Return the surface the active block publishes, or None where none is.
+
+        Requested by name for the same reason the map plate is: a client that
+        renders zones as a list never asks, and so never pays for geometry it
+        cannot draw.
+        """
+
+        sections = self._info_sections(["surface_plate", "surface_slots"])
+        summary = sections.get("surface_plate")
+        if summary is None:
+            return None
+        rows = {
+            row.get("key"): row.get("value")
+            for row in (summary.get("value", {}).get("items") or [])
+        }
+        name = _text(rows.get("Name"))
+        if name is None:
+            return None
+        return Surface(
+            name=name,
+            image=_text(rows.get("Image")),
+            band=self._band(rows),
+            slots=self._slots(sections.get("surface_slots")),
+        )
+
+    @staticmethod
+    def _band(rows: dict[Any, Any]) -> tuple[float, float, float, float] | None:
+        """Read the surface's own extent, or None when it declares none.
+
+        All four or nothing: a band missing a dimension is not a smaller band,
+        it is a world file that cannot be drawn from, and guessing the fourth
+        number would put furniture somewhere nobody authored.
+        """
+
+        try:
+            return tuple(float(rows[f"Band {axis}"]) for axis in "xywh")  # type: ignore[return-value]
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _slots(section: dict[str, Any] | None) -> tuple[SurfaceSlot, ...]:
+        """Read slot rows, skipping any the table cannot express as numbers."""
+
+        if section is None:
+            return ()
+        value = section.get("value") or {}
+        columns = list(value.get("columns") or [])
+        slots: list[SurfaceSlot] = []
+        for row in value.get("rows") or []:
+            fields = dict(zip(columns, row))
+            name = _text(fields.get("Slot"))
+            holds = _text(fields.get("Holds"))
+            if name is None or holds is None:
+                continue
+            try:
+                slots.append(
+                    SurfaceSlot(
+                        name=name,
+                        holds=holds,
+                        x=float(fields["x"]),
+                        y=float(fields["y"]),
+                        w=float(fields["w"]),
+                        h=float(fields["h"]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                logger.debug("Unusable surface slot row: %r", row)
+        return tuple(slots)
 
     @staticmethod
     def _regions(section: dict[str, Any] | None) -> tuple[MapRegion, ...]:

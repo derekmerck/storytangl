@@ -17,7 +17,12 @@ import pygame
 
 from dataclasses import dataclass
 
-from .bridge import UnsupportedAccepts, commit_payload, remaining_pieces
+from .bridge import (
+    UnsupportedAccepts,
+    commit_payload,
+    place_pieces,
+    remaining_pieces,
+)
 from .models import (
     Action,
     BeginSelection,
@@ -30,9 +35,13 @@ from .models import (
     PagePanel,
     PageSelection,
     PendingSelection,
+    Piece,
     PickPiece,
     StageImage,
+    Surface,
+    SurfaceSlot,
     Turn,
+    Zone,
 )
 
 
@@ -131,6 +140,19 @@ CONFIRM_KEY = 8
 PAGE_KEY = 9
 CANCEL_KEY = 0
 
+SURFACE_CONTOUR = 1
+SURFACE_WASH = 140
+"""How the client paints a surface band: a wash of this alpha plus a lit edge.
+
+A darkened band with a contour along its top reads as a surface projecting away
+from the viewer, which is why a desk needs no art. The wash rather than a fill
+because a world may already have a desk in its background -- `hall_monitor` does
+-- and an opaque rectangle would paint over the very thing it is describing.
+Over flat colour the same wash still reads as a distinct band.
+
+The rectangle comes from the world; the colour, wash and contour are the
+client's, and a port with a different palette owes nothing here."""
+
 MAP_FOOTER_ROWS = 8
 """Rows the map footer may occupy before it scrolls. A map drawn under a
 footer that grows without limit is a map nobody can see."""
@@ -150,10 +172,19 @@ class Stage:
         self.font = pygame.font.Font(None, 11)
         self._cache: dict[str, pygame.Surface | None] = {}
         self.hitboxes: list[tuple[pygame.Rect, Action]] = []
+        self.slot_boxes: list[tuple[SurfaceSlot, Piece, pygame.Rect]] = []
+        """Where each placed piece was drawn this frame.
+
+        Recorded for the same reason hitboxes are: it is the only honest
+        answer to where a piece is, and anything that recomputes it from the
+        slot fractions is a second derivation that can drift.
+        """
         self.scroll = 0
         self.max_scroll = 0
         self.selection_scroll = 0
         self.panel_scroll = 0
+        self.prose_floor = LOGICAL_SIZE[1]
+        self.selection_numbers: dict[str, int] = {}
         self._last_turn: Turn | None = None
 
     # ── assets ───────────────────────────────────────────────────────────
@@ -214,6 +245,7 @@ class Stage:
         """
 
         self.hitboxes.clear()
+        self.slot_boxes.clear()
         loaded, unloadable = self._resolve_images(turn)
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
@@ -224,18 +256,43 @@ class Stage:
         self._draw_background(loaded)
         # Rows below are laid out first and always reserved, so a long exchange
         # can never push the only way to continue off the logical surface.
+        # Placement is pure data -- slots against piece kinds, no pixels -- so it
+        # settles first. Everything downstream depends on it: the rows the
+        # selection still needs, and therefore where the choice list starts, and
+        # therefore the rect the surface itself is measured into.
+        placed = place_pieces(turn.surface, turn.pieces) if turn.surface else []
+        on_surface = {piece.piece_id for _slot, piece in placed}
+        # One numbering, drawn in two places. `_keyed` resolves a number key
+        # against `selection_page`, so a card that labelled itself by its own
+        # count would agree with the keyboard only until a piece was picked.
+        numbers = (
+            {}
+            if pending is None
+            else {
+                piece.piece_id: index
+                for index, piece in enumerate(self.selection_page(turn, pending), start=1)
+            }
+        )
+        self.selection_numbers = numbers
         below = (
-            self._selection_rows(turn, pending)
+            self._selection_rows(turn, pending, on_surface=on_surface)
             if pending is not None
             else len(turn.choices)
         )
         choices_top = LOGICAL_SIZE[1] - 4 - below * 11
         self._draw_portraits(loaded, floor=choices_top)
-
-        panelled = self._has_state(turn)
+        panelled = self._has_state(turn, placed=placed)
         width = LOGICAL_SIZE[0] - (PANEL_W if panelled else 0)
+        stage_rect = pygame.Rect(0, PROSE_TOP, width, choices_top - PROSE_TOP)
+        # Recorded because it is a seam: the surface decides it and the prose
+        # layout consumes it, and a test that re-derives it from row counts
+        # instead passes whether or not the two agree.
+        self.prose_floor = self._draw_surface(
+            turn, placed, rect=stage_rect, pending=pending, numbers=numbers
+        )
+        prose_floor = self.prose_floor
         rows = self._rows(turn, unloadable, columns=(width - 12) // 4)
-        capacity = max(1, (choices_top - PROSE_TOP) // ROW_H)
+        capacity = max(1, (prose_floor - PROSE_TOP) // ROW_H)
         self.max_scroll = max(0, len(rows) - capacity)
         if turn is not self._last_turn:
             self.scroll = self.max_scroll  # newest text first on a fresh turn
@@ -243,9 +300,11 @@ class Stage:
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
         self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
         if panelled:
-            self._draw_state_panel(turn, top=2, bottom=choices_top)
+            self._draw_state_panel(turn, top=2, bottom=choices_top, placed=placed)
         if pending is not None:
-            self._draw_selection(turn, pending, top=choices_top)
+            self._draw_selection(
+                turn, pending, top=choices_top, on_surface=on_surface, numbers=numbers
+            )
         else:
             self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
@@ -427,6 +486,127 @@ class Stage:
             return f"{label} — {reason}"
         return label
 
+    # ── surface ──────────────────────────────────────────────────────────
+
+    def _draw_surface(
+        self,
+        turn: Turn,
+        placed: list[tuple[SurfaceSlot, Piece]],
+        *,
+        rect: pygame.Rect,
+        pending: PendingSelection | None,
+        numbers: dict[str, int],
+    ) -> int:
+        """Draw the surface and the pieces resting on it. Returns the prose floor.
+
+        The world declares fractions; ``rect`` is the client's own stage area,
+        already narrowed for the state panel. That is what normalized geometry is
+        for -- the world never learns this client's pixels, and a second desk
+        with different coordinates needs nothing here.
+
+        Prose stops above everything the surface draws, not merely above the band,
+        and that is the whole point of moving the packet onto a desk: the lower
+        stage is the desk, and the desk is what the player is looking at. Taking
+        the floor from the band alone would let a slot standing behind the desk
+        be painted over by the very text it was making room for.
+        """
+
+        surface = turn.surface
+        if surface is None:
+            return rect.bottom
+
+        floor = rect.bottom
+        if surface.band is not None:
+            band = self._rect_in(rect, *surface.band)
+            wash = pygame.Surface(band.size, pygame.SRCALPHA)
+            wash.fill((*INK, SURFACE_WASH))
+            self.surface.blit(wash, band.topleft)
+            pygame.draw.rect(
+                self.surface, CREAM, pygame.Rect(band.x, band.y, band.w, SURFACE_CONTOUR)
+            )
+            floor = band.top
+        for slot, _piece in placed:
+            floor = min(floor, self._rect_in(rect, slot.x, slot.y, slot.w, slot.h).top)
+
+        # The page, not every remaining candidate. `numbers` is built from
+        # `selection_page`, so taking clickability from anywhere else lets a card
+        # on another page be picked by mouse while carrying no number and being
+        # unreachable by key -- the same drift the numbering was already
+        # centralized to avoid, one step further along.
+        offered = set(numbers)
+
+        # Nearer the viewer is drawn later. Depth comes off the slot's own
+        # baseline rather than a separate declaration, so the two can never
+        # disagree about which piece is in front.
+        for slot, piece in sorted(placed, key=lambda pair: pair[0].y + pair[0].h):
+            self._draw_piece(
+                slot,
+                piece,
+                rect=rect,
+                pickable=piece.piece_id in offered,
+                picked=pending is not None and piece.piece_id in pending.picked,
+                number=numbers.get(piece.piece_id),
+            )
+        return floor
+
+    def _draw_piece(
+        self,
+        slot: SurfaceSlot,
+        piece: Piece,
+        *,
+        rect: pygame.Rect,
+        pickable: bool,
+        picked: bool,
+        number: int | None = None,
+    ) -> None:
+        """Draw one piece in its slot, and make it clickable when it is on offer.
+
+        A piece is drawn whenever it is on the surface and clickable only while a
+        selection wants it. Nothing here can commit: a click yields ``PickPiece``,
+        exactly what the key yields.
+
+        The card carries ``number`` when one is on offer, and that is what buys
+        the room: §5.3 Input Parity wants every click reachable by keyboard, not
+        a second list saying so. A card the player can see, click and type the
+        number of satisfies it outright, so the row it would have occupied is
+        given back to the desk.
+        """
+
+        box = self._rect_in(rect, slot.x, slot.y, slot.w, slot.h)
+        self.slot_boxes.append((slot, piece, box))
+        edge = RUST if picked else (CREAM if piece.available else DIM)
+        pygame.draw.rect(self.surface, CREAM if piece.available else INK, box)
+        pygame.draw.rect(self.surface, edge, box, 1)
+
+        label = piece.label or piece.piece_id
+        if number is not None:
+            label = f"{number}. {label}"
+        elif not piece.available:
+            # The same mark an inactive choice row carries. It says the card is
+            # not on offer; the panel row still says why.
+            label = f"(x) {label}"
+        for index, line in enumerate(self._wrap(label, max(1, (box.w - 4) // 4))):
+            y = box.y + 3 + index * ROW_H
+            if y + ROW_H > box.bottom:
+                break
+            self.surface.blit(
+                self.font.render(line, False, INK if piece.available else DIM),
+                (box.x + 3, y),
+            )
+        if pickable:
+            self.hitboxes.append((box, PickPiece(piece_id=piece.piece_id)))
+
+    @staticmethod
+    def _rect_in(rect: pygame.Rect, x: float, y: float, w: float, h: float) -> pygame.Rect:
+        """Map one normalized rectangle into a pixel rect."""
+
+        return pygame.Rect(
+            rect.x + round(x * rect.w),
+            rect.y + round(y * rect.h),
+            max(1, round(w * rect.w)),
+            max(1, round(h * rect.h)),
+        )
+
     def _draw_background(
         self, loaded: list[tuple[StageImage, pygame.Surface]]
     ) -> None:
@@ -532,10 +712,63 @@ class Stage:
             y += 11
 
     @staticmethod
-    def _has_state(turn: Turn) -> bool:
-        return bool(turn.pieces or turn.zones or turn.findings)
+    def _shown(placed: list[tuple[SurfaceSlot, Piece]]) -> set[str]:
+        """Pieces the desk represents completely enough to drop from the panel.
 
-    def panel_rows(self, turn: Turn, *, columns: int) -> list[tuple[str, tuple[int, int, int]]]:
+        An unavailable piece is not one of them. The card can say *that* it is
+        spent -- dimmed, marked, carrying no number -- but a card is about forty
+        pixels wide and cannot say *why*, and the reason is the whole point:
+        widget vocabulary §7.1 wants a blocked member to announce itself rather
+        than let the player discover it from the error after committing. So it
+        stays in the column, where its reason has room.
+        """
+
+        return {piece.piece_id for _slot, piece in placed if piece.available}
+
+    @staticmethod
+    def _panel_zones(turn: Turn, shown: set[str]) -> list[Zone]:
+        """Zones the panel still owes the player a heading for.
+
+        A zone whose every member is laid out on the desk is redundant. An
+        *empty* zone is not: a targetable container with nothing in it is
+        information, not an absence, and that holds whether or not there is a
+        surface. Written once because ``_has_state`` and ``panel_rows`` have to
+        agree -- a panel that decides to draw and then finds nothing to say is
+        a quarter of the width spent on a blank column.
+        """
+
+        zones: list[Zone] = []
+        for zone in turn.zones:
+            members = [piece for piece in turn.pieces if piece.zone_ref == zone.uid]
+            if not members or any(piece.piece_id not in shown for piece in members):
+                zones.append(zone)
+        return zones
+
+    @classmethod
+    def _has_state(
+        cls, turn: Turn, *, placed: list[tuple[SurfaceSlot, Piece]] = []
+    ) -> bool:
+        """True when there is state the surface did not already show.
+
+        A packet entirely laid out on a desk needs no column repeating it, and on
+        a 320x200 stage that column is a quarter of the width. What the surface
+        could not place still earns one.
+        """
+
+        shown = cls._shown(placed)
+        return bool(
+            [piece for piece in turn.pieces if piece.piece_id not in shown]
+            or turn.findings
+            or cls._panel_zones(turn, shown)
+        )
+
+    def panel_rows(
+        self,
+        turn: Turn,
+        *,
+        columns: int,
+        placed: list[tuple[SurfaceSlot, Piece]] = [],
+    ) -> list[tuple[str, tuple[int, int, int]]]:
         """Flatten the state panel into wrapped, coloured rows.
 
         Built as data so it can be paged. An overflow notice admitted state was
@@ -544,6 +777,10 @@ class Stage:
         """
 
         rows: list[tuple[str, tuple[int, int, int]]] = []
+        # Whatever the surface drew, the player is already looking at. The panel
+        # is for the remainder -- a piece whose kind no slot holds, or a whole
+        # packet on a world that declares no surface at all.
+        shown = self._shown(placed)
 
         def wrapped(text: str, colour, *, indent: str = "") -> None:
             for part in self._wrap(text, columns - len(indent)):
@@ -552,12 +789,16 @@ class Stage:
         # Pieces outside any zone first -- in a credentials shift that is the
         # traveler, and who you are judging outranks what they handed over.
         for piece in turn.pieces:
-            if piece.zone_ref is None:
+            if piece.zone_ref is None and piece.piece_id not in shown:
                 wrapped(piece.label or piece.piece_id, CREAM)
 
-        for zone in turn.zones:
+        for zone in self._panel_zones(turn, shown):
+            members = [
+                piece
+                for piece in turn.pieces
+                if piece.zone_ref == zone.uid and piece.piece_id not in shown
+            ]
             wrapped((zone.label or zone.role or "zone").upper(), RUST)
-            members = [piece for piece in turn.pieces if piece.zone_ref == zone.uid]
             for piece in members:
                 name = piece.label or piece.piece_id
                 if not piece.available and piece.unavailable_reason:
@@ -595,7 +836,14 @@ class Stage:
         page = self.panel_scroll % pages
         return page, pages, rows[page * capacity : page * capacity + capacity]
 
-    def _draw_state_panel(self, turn: Turn, *, top: int, bottom: int) -> None:
+    def _draw_state_panel(
+        self,
+        turn: Turn,
+        *,
+        top: int,
+        bottom: int,
+        placed: list[tuple[SurfaceSlot, Piece]] = [],
+    ) -> None:
         """Draw the pieces, zones and findings a choice may reference.
 
         This is the §5.1 floor made literal: if the player can pick it, the
@@ -611,7 +859,7 @@ class Stage:
         left = LOGICAL_SIZE[0] - PANEL_W
         pygame.draw.rect(self.surface, INK, pygame.Rect(left, top, PANEL_W, bottom - top))
         columns = (PANEL_W - 10) // 4
-        rows = self.panel_rows(turn, columns=columns)
+        rows = self.panel_rows(turn, columns=columns, placed=placed)
         capacity = max(1, (bottom - top - 4) // ROW_H)
 
         page, pages, visible = self.panel_page(rows, capacity=capacity)
@@ -656,8 +904,19 @@ class Stage:
         candidates = remaining_pieces(turn, pending)
         return max(1, -(-len(candidates) // SELECTION_ROWS))
 
-    def _selection_rows(self, turn: Turn, pending: PendingSelection) -> int:
-        """How many rows the selection surface needs, paging included."""
+    def _selection_rows(
+        self,
+        turn: Turn,
+        pending: PendingSelection,
+        *,
+        on_surface: set[str] = frozenset(),
+    ) -> int:
+        """How many rows the selection surface needs, paging included.
+
+        A piece already drawn on the desk, wearing its number, needs no row --
+        which is the whole saving. The controls are never on the desk and are
+        always counted.
+        """
 
         # Cancel, plus the confirm-or-hint row that is drawn either way. Counting
         # confirm only when satisfied pushed Cancel off the bottom of the surface
@@ -665,15 +924,40 @@ class Stage:
         extra = 2
         if self.selection_pages(turn, pending) > 1:
             extra += 1
-        return len(self.selection_page(turn, pending)) + extra
+        listed = [
+            piece
+            for piece in self.selection_page(turn, pending)
+            if piece.piece_id not in on_surface
+        ]
+        return len(listed) + extra
 
-    def _draw_selection(self, turn: Turn, pending: PendingSelection, *, top: int) -> None:
-        """Draw the pieces a pending choice will accept, plus its controls."""
+    def _draw_selection(
+        self,
+        turn: Turn,
+        pending: PendingSelection,
+        *,
+        top: int,
+        on_surface: set[str] = frozenset(),
+        numbers: dict[str, int] | None = None,
+    ) -> None:
+        """Draw the pieces a pending choice will accept, plus its controls.
+
+        Pieces the desk is already showing are skipped: they carry the same
+        number on their card. The numbers themselves are handed in rather than
+        counted here, so the row, the card and the key never disagree about
+        which piece is number two.
+        """
 
         y = top
-        for index, piece in enumerate(self.selection_page(turn, pending), start=1):
+        page = self.selection_page(turn, pending)
+        numbering = numbers or {
+            piece.piece_id: index for index, piece in enumerate(page, start=1)
+        }
+        for piece in page:
+            if piece.piece_id in on_surface:
+                continue
             self._row(
-                index,
+                numbering[piece.piece_id],
                 piece.label or piece.piece_id,
                 y=y,
                 colour=CREAM,

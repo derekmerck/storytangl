@@ -27,6 +27,24 @@ scenes:
 
       standard_challenge:
         kind: "credential_gate.domain.CredentialGateBlock"
+        # The counter this shift is worked on. Block-scoped: the largest span
+        # over which its shape is guaranteed not to change. Coordinates are
+        # fractions of whatever rect the client gives the stage, so the world
+        # never learns the client's pixels and the client never learns the
+        # world's. A slot names the piece_kind that lies there; nothing on the
+        # pieces points back here, which is what lets a second counter serve the
+        # same line with different geometry.
+        surface:
+          name: checkpoint_counter
+          band: {x: 0.0, y: 0.62, w: 1.0, h: 0.38}
+          slots:
+            # A nameplate at the back of the counter. A sprite standing here
+            # wants a taller slot, and moving it is a line of this file.
+            traveler:   {holds: candidate, x: 0.34, y: 0.50, w: 0.32, h: 0.10}
+            papers:     {holds: id_card,   x: 0.04, y: 0.66, w: 0.21, h: 0.26}
+            permit:     {holds: permit,    x: 0.28, y: 0.66, w: 0.21, h: 0.26}
+            ticket:     {holds: ticket,    x: 0.52, y: 0.66, w: 0.21, h: 0.26}
+            loose_page: {holds: document,  x: 0.76, y: 0.66, w: 0.21, h: 0.26}
         content: |
           A short, hand-picked line: three travelers, each almost in order.
         continues:
@@ -39,6 +57,24 @@ scenes:
 
       sampled_challenge:
         kind: "credential_gate.domain.SampledGateBlock"
+        # The counter this shift is worked on. Block-scoped: the largest span
+        # over which its shape is guaranteed not to change. Coordinates are
+        # fractions of whatever rect the client gives the stage, so the world
+        # never learns the client's pixels and the client never learns the
+        # world's. A slot names the piece_kind that lies there; nothing on the
+        # pieces points back here, which is what lets a second counter serve the
+        # same line with different geometry.
+        surface:
+          name: checkpoint_counter
+          band: {x: 0.0, y: 0.62, w: 1.0, h: 0.38}
+          slots:
+            # A nameplate at the back of the counter. A sprite standing here
+            # wants a taller slot, and moving it is a line of this file.
+            traveler:   {holds: candidate, x: 0.34, y: 0.50, w: 0.32, h: 0.10}
+            papers:     {holds: id_card,   x: 0.04, y: 0.66, w: 0.21, h: 0.26}
+            permit:     {holds: permit,    x: 0.28, y: 0.66, w: 0.21, h: 0.26}
+            ticket:     {holds: ticket,    x: 0.52, y: 0.66, w: 0.21, h: 0.26}
+            loose_page: {holds: document,  x: 0.76, y: 0.66, w: 0.21, h: 0.26}
         content: |
           A randomized line drawn from today's quota; you won't know each
           traveler's mix until they reach the counter.

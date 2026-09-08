@@ -116,10 +116,15 @@ def _merge(turns: list[Turn]) -> Turn:
 
 
 def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
-    """Merge a batch into one actionable frame and attach the current plate."""
+    """Merge a batch into one actionable frame and attach its disclosed geometry.
+
+    Both the map plate and the surface are reference state fetched by name, so
+    they are attached here rather than accumulated out of the fragment stream.
+    """
 
     frame = _merge(_turns(bridge, envelope))
     frame.plate = bridge.map_plate()
+    frame.surface = bridge.surface()
     return frame
 
 

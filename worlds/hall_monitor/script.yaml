@@ -29,6 +29,17 @@ scenes:
             staging_hints:
               media_shape: landscape
         kind: "hall_monitor.domain.HallMonitorBlock"
+        # A school hall desk: shorter than the checkpoint counter and dressed
+        # for two documents rather than four. Same contract, different
+        # furniture -- which is the point of declaring it per block.
+        surface:
+          name: hall_desk
+          band: {x: 0.0, y: 0.66, w: 1.0, h: 0.34}
+          slots:
+            student:  {holds: candidate, x: 0.32, y: 0.54, w: 0.34, h: 0.10}
+            pass_id:  {holds: id_card,   x: 0.08, y: 0.70, w: 0.24, h: 0.24}
+            note:     {holds: document,  x: 0.38, y: 0.70, w: 0.24, h: 0.24}
+            permit:   {holds: permit,    x: 0.68, y: 0.70, w: 0.24, h: 0.24}
         encounters: 5
         disposition_distribution:
           pass: 0.50

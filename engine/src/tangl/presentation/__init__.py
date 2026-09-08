@@ -4,6 +4,7 @@ Presentation values are advisory. They do not authorize actions, render a
 widget tree, own transport, or establish narrative truth.
 """
 
+from .geometry import NormalizedRect
 from .hints import PresentationHints, StagingHints
 from .events import GrammarHint, GrammarNoun, GrammarVerb, UxEvent
 from .intent import (
@@ -12,6 +13,7 @@ from .intent import (
     CostPreview,
     UIHints,
 )
+from .surface import HasSurface, Surface, SurfaceSlot
 from .values import KvRow, PrimitiveValue
 from .dispatch import (
     on_advertise_info_channels,
@@ -35,26 +37,30 @@ from .projection import (
 
 __all__ = [
     "Accepts",
-    "Blocker",
     "BadgeListValue",
+    "Blocker",
     "CostPreview",
     "GrammarHint",
     "GrammarNoun",
     "GrammarVerb",
+    "HasSurface",
     "InfoAffordance",
     "InfoState",
     "ItemListValue",
     "KvListValue",
     "KvRow",
+    "NormalizedRect",
     "PresentationHints",
     "PrimitiveValue",
-    "ProjectionRequest",
     "ProjectedItem",
     "ProjectedSection",
     "ProjectedState",
+    "ProjectionRequest",
     "ScalarValue",
     "SectionValue",
     "StagingHints",
+    "Surface",
+    "SurfaceSlot",
     "TableValue",
     "UIHints",
     "UxEvent",

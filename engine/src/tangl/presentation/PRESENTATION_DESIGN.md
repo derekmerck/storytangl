@@ -22,3 +22,14 @@ mechanics. Service retains operations, outer dispatch, response
 envelopes, and remote hydration; its fold includes this registry with story,
 world, and runtime-local authorities. There is no widget class, client binding,
 or transport policy here.
+
+Slice 3 adds surface geometry: `NormalizedRect`, and the `Surface` / `SurfaceSlot`
+/ `HasSurface` vocabulary for describing an extent with named slots on it. A slot
+names the `piece_kind` that lies there and nothing more. Slot rectangles are
+advisory: they say where a thing would be drawn, never that it may be chosen —
+current offered-choice state remains the only source of selectable behaviour.
+
+Geometry arrived here from two places that were only ever its first consumers:
+the rectangle sat in `journal` because a fragment carried it, and the surface
+types sat in `mechanics` because a game block declared one. Neither owned the
+vocabulary, which is the same accident this whole extraction undoes.
