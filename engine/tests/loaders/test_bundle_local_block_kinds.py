@@ -13,7 +13,8 @@ from pathlib import Path
 
 from tangl.loaders.compiler import WorldCompiler
 from tangl.service.world_registry import WorldRegistry
-from tangl.story import World
+from tangl.story import Block, World
+from tangl.story.fabula import StoryCompiler
 from tangl.story.fabula.compiler import ISSUE_UNRESOLVED_KIND
 
 
@@ -106,28 +107,71 @@ def test_domain_module_block_kinds_resolve_through_the_ordinary_world_path(
     assert counts.get("Block", 0) == 0, counts
 
 
-def test_cardinal_kind_names_win_over_a_contributed_class(tmp_path: Path) -> None:
+def _resolved_block_kind(
+    kind: str,
+    *,
+    class_registry: dict[str, type] | None = None,
+) -> tuple[type, list[str]]:
+    """Compile one authored block and return its resolved class and issue codes.
+
+    Asserting on the compiled class itself rather than its name matters here:
+    a class that shadows a cardinal name necessarily *has* that name, so a
+    name-based assertion cannot tell the two apart.
+    """
+    bundle = StoryCompiler().compile(
+        {"label": "probe", "scenes": {"s": {"blocks": {"b": {"kind": kind}}}}},
+        class_registry=class_registry,
+    )
+    resolved = next(
+        type(template.payload)
+        for template in bundle.template_registry.values()
+        if getattr(getattr(template, "payload", None), "label", None) == "b"
+    )
+    return resolved, [issue.code for issue in bundle.issues]
+
+
+def test_cardinal_kind_names_win_over_a_contributed_class() -> None:
     """A bundle cannot quietly redefine the cardinal vocabulary.
 
-    The domain module exports classes by name, so a world could otherwise
-    shadow ``Block`` itself. Cardinal names resolve first.
+    The domain module exports classes by name, so a world can hand back a class
+    literally called ``Block``. Cardinal names resolve first, so the core class
+    is what compiles.
     """
-    bundle_root = _write_kind_bundle(
-        tmp_path,
-        label="kinds_shadow",
-        kinds={"plain": "Block"},
-    )
-    (bundle_root / "kinds_shadow_domain.py").write_text(
-        DOMAIN_SOURCE
-        + '\n\nclass Block(Block):  # noqa: F811 - deliberately shadows the cardinal name\n'
-        '    """A world-local class that tries to take the cardinal name."""\n',
-        encoding="utf-8",
-    )
 
-    counts = _materialized_kinds(tmp_path, "kinds_shadow")
+    class Shadow(Block):
+        """A world-local class trying to take the cardinal name."""
 
-    assert counts.get("Block") == 1, counts
-    assert "Workshop" not in counts
+    Shadow.__name__ = "Block"
+
+    resolved, issues = _resolved_block_kind("Block", class_registry={"Block": Shadow})
+
+    assert resolved is Block
+    assert resolved is not Shadow
+    assert issues == []
+
+
+def test_authored_cardinal_kind_matching_the_section_fallback_is_resolved() -> None:
+    """``kind: Block`` inside ``blocks`` is a hit, not a miss.
+
+    The cardinal lookup used to answer with the fallback on a miss, which made a
+    successful mapping indistinguishable from an absent one whenever the mapped
+    class happened to be the section default. That produced a false
+    ``compile:unresolved_kind`` on ordinary authored input and let a same-named
+    contributed class through despite cardinal precedence.
+    """
+    resolved, issues = _resolved_block_kind("Block")
+
+    assert resolved is Block
+    assert ISSUE_UNRESOLVED_KIND not in issues
+
+
+def test_bundle_contributed_kind_still_resolves_end_to_end(tmp_path: Path) -> None:
+    """Cardinal precedence does not block a world's own names."""
+    _write_kind_bundle(tmp_path, label="kinds_mixed", kinds={"shop": "Workshop"})
+
+    counts = _materialized_kinds(tmp_path, "kinds_mixed")
+
+    assert counts.get("Workshop") == 1, counts
 
 
 def test_unresolved_kind_is_reported_rather_than_silently_downgraded(

@@ -32,6 +32,22 @@ ISSUE_PAYLOAD_CONSTRUCTION_FAILED = "compile:payload_construction_failed"
 ISSUE_UNKNOWN_AUTHORED_KEY = "compile:unknown_authored_key"
 ISSUE_UNRESOLVED_KIND = "compile:unresolved_kind"
 
+# The cardinal story vocabulary. Authored ``kind`` names resolve here first,
+# so a world bundle cannot redefine a name the core already owns.
+_CARDINAL_KINDS: dict[str, type[Entity]] = {
+    "Actor": Actor,
+    "Location": Location,
+    "Role": Actor,
+    "Setting": Location,
+    "Scene": Scene,
+    "Block": Block,
+    "MenuBlock": MenuBlock,
+    "Action": Action,
+    "Node": TraversableNode,
+    "TraversableNode": TraversableNode,
+}
+
+
 # Allowed ``details`` keys per issue code. Keep this close to the compiler
 # helpers so the JSON-like payload shape stays explicit and testable.
 _COMPILE_ISSUE_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
@@ -1388,30 +1404,28 @@ class StoryCompiler:
         should not look like a world that never declared any.
         """
         if isinstance(raw_kind, type):
-            mapped = self._map_external_kind(raw_kind.__name__, fallback=fallback)
-            if mapped is not fallback or raw_kind is fallback:
-                return mapped
+            cardinal = self._map_external_kind(raw_kind.__name__)
+            if cardinal is not None:
+                return cardinal
             if issubclass(raw_kind, Entity):
                 return raw_kind
             return fallback
 
         if isinstance(raw_kind, str):
-            mapped = self._map_external_kind(raw_kind.split(".")[-1], fallback=fallback)
-            if mapped is not fallback:
-                return mapped
-            contributed = self._map_contributed_kind(
-                raw_kind.split(".")[-1],
-                collector=collector,
-            )
+            kind_name = raw_kind.split(".")[-1]
+            cardinal = self._map_external_kind(kind_name)
+            if cardinal is not None:
+                return cardinal
+            contributed = self._map_contributed_kind(kind_name, collector=collector)
             if contributed is not None:
                 return contributed
             try:
                 module_name, class_name = raw_kind.rsplit(".", 1)
                 cls = getattr(import_module(module_name), class_name)
                 if isinstance(cls, type):
-                    mapped = self._map_external_kind(cls.__name__, fallback=fallback)
-                    if mapped is not fallback:
-                        return mapped
+                    cardinal = self._map_external_kind(cls.__name__)
+                    if cardinal is not None:
+                        return cardinal
                     if issubclass(cls, Entity):
                         return cls
             except Exception:
@@ -1467,20 +1481,15 @@ class StoryCompiler:
         )
 
     @staticmethod
-    def _map_external_kind(kind_name: str, *, fallback: type[Entity]) -> type[Entity]:
-        mapping: dict[str, type[Entity]] = {
-            "Actor": Actor,
-            "Location": Location,
-            "Role": Actor,
-            "Setting": Location,
-            "Scene": Scene,
-            "Block": Block,
-            "MenuBlock": MenuBlock,
-            "Action": Action,
-            "Node": TraversableNode,
-            "TraversableNode": TraversableNode,
-        }
-        return mapping.get(kind_name, fallback)
+    def _map_external_kind(kind_name: str) -> type[Entity] | None:
+        """Resolve a cardinal vocabulary name, or ``None`` if the core does not name it.
+
+        Returning ``None`` rather than a fallback keeps "the core does not know
+        this name" distinguishable from "the core maps this name to the same
+        class the section already defaults to". Collapsing those two made
+        ``kind: Block`` inside ``blocks`` look unresolved.
+        """
+        return _CARDINAL_KINDS.get(kind_name)
 
     @staticmethod
     def _build_payload(
