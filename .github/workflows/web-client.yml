@@ -4,7 +4,7 @@ on:
   # Opt-in on PRs by adding the "ci:web" label.
   pull_request:
     branches: ["**"]
-    types: ["labeled"]
+    types: ["labeled", "synchronize", "reopened"]
   # Keep main honest when web files actually change.
   push:
     branches: ["main"]
