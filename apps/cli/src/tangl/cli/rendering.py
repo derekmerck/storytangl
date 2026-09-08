@@ -128,16 +128,22 @@ class PlainTerminalRenderer:
             return [no_choices_text]
 
         lines: list[Any] = ["Choices:"]
-        active_index = 1
-        for choice in choices:
+        # Positional: the number a reader types is the choice's place in the
+        # list, so a refused row takes its number out of circulation rather
+        # than handing it to the next live one. Live rows run 1, 3, 6 with the
+        # gaps where the refusals are.
+        for index, choice in enumerate(choices, start=1):
             label = _choice_label(choice)
             if _choice_active(choice):
                 hint = _choice_input_hint(choice)
                 lines.append(
-                    f"{active_index}. {label}{f' {hint}' if hint else ''}"
+                    f"{index}. {label}{f' {hint}' if hint else ''}"
                     f"{_choice_cost_suffix(choice)}"
                 )
-                active_index += 1
+                continue
+
+            if replacement := _choice_refusal_text(choice):
+                lines.append(f"x) {replacement}{_choice_cost_suffix(choice)}")
                 continue
 
             reason = _read(choice, "unavailable_reason")
@@ -338,8 +344,7 @@ def _rich_choices(choices: list[Any], *, no_choices_text: str = "No available ch
     table.add_column()
     table.add_column(style="dim")
 
-    active_index = 1
-    for choice in choices:
+    for index, choice in enumerate(choices, start=1):
         label = _choice_label(choice)
         if _choice_active(choice):
             details = " · ".join(
@@ -347,14 +352,14 @@ def _rich_choices(choices: list[Any], *, no_choices_text: str = "No available ch
                 for detail in (_choice_input_hint(choice), _choice_cost_text(choice))
                 if detail
             )
-            table.add_row(str(active_index), label, details)
-            active_index += 1
+            table.add_row(str(index), label, details)
             continue
 
         reason = _read(choice, "unavailable_reason")
         state = f"locked: {reason}" if reason else "locked"
-        blockers = _choice_blocker_messages(choice)
-        if blockers:
+        if replacement := _choice_refusal_text(choice):
+            label, state = replacement, "locked"
+        elif blockers := _choice_blocker_messages(choice):
             state = f"{state}; blockers: {'; '.join(blockers)}"
         costs = _choice_cost_text(choice)
         if costs:
@@ -832,6 +837,19 @@ def _choice_active(choice: Any) -> bool:
     if available is not None:
         return bool(available)
     return bool(_read(choice, "active", True))
+
+
+def _choice_refusal_text(choice: Any) -> str | None:
+    """Return the blocker message that stands in for a refused choice's text.
+
+    A world says so per blocker; nothing here decides whether a sentence is
+    complete. First one wins, the same rule the message itself follows.
+    """
+
+    for blocker in _read(choice, "blockers", ()) or ():
+        if _read(blocker, "replaces_text") and (message := _read(blocker, "message")):
+            return str(message)
+    return None
 
 
 def _choice_blocker_messages(choice: Any) -> list[str]:

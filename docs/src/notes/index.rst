@@ -16,4 +16,5 @@ state of the codebase without defining the canonical architecture.
    media_resurrection_plan
    migration/index
    audits/index
+   research/index
    reference/index

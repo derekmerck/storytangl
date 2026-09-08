@@ -1,0 +1,152 @@
+label: red_paperclip
+
+metadata:
+  title: "One Red Paperclip"
+  description: "Trade up, or trade yourself into a corner."
+  start_at: district.intro
+
+scenes:
+  district:
+    title: "One Red Paperclip"
+    blocks:
+      intro:
+        content: |
+          You have a red paperclip. Somebody in this district will take it off
+          you and give you something better, and somebody will take that.
+
+          Keep going until nobody wants what you are holding. Whatever that
+          turns out to be is how the story ends, so choose the corner you get
+          stuck in.
+        actions:
+          - text: "Take the paperclip and go"
+            successor: road
+
+      # The road is the map: standing here is standing on it, and travel is
+      # ordinary choices. The plate names six regions; each hub below claims
+      # one, and neither knows the other's claim.
+      road:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "The Road"
+        media:
+          - name: district_map.png
+            media_role: map_im
+        map:
+          name: district
+          plate: district_map.png
+          # Measured against district_map.png. Re-render the plate and these
+          # move: the geometry is world-owned, not derived from the art.
+          regions:
+            station: {x: 0.06, y: 0.00, w: 0.30, h: 0.20}
+            campus: {x: 0.58, y: 0.00, w: 0.31, h: 0.23}
+            market: {x: 0.31, y: 0.25, w: 0.34, h: 0.30}
+            garage: {x: 0.79, y: 0.25, w: 0.21, h: 0.22}
+            harbor: {x: 0.00, y: 0.56, w: 0.40, h: 0.40}
+            airfield: {x: 0.66, y: 0.54, w: 0.34, h: 0.42}
+        content: |
+          One loop of road, six places on it, and {holding_name} in your hand.
+
+      harbor:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "Sandpoint Harbour"
+        plates: [district:harbor]
+        media:
+          - name: harbor_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        links:
+          out:
+            target: road
+            text: "Back to the road"
+        content: |
+          Working boats, a fuel dock, and the harbourmaster's office at the
+          top of the ramp. Everything here is for mending something else.
+
+      market:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "Ferryman's Market"
+        plates: [district:market]
+        media:
+          - name: market_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        links:
+          out:
+            target: road
+            text: "Back to the road"
+        content: |
+          Tarps on trestle tables, a bakery stall going empty, and a cafe
+          being taken apart into boxes.
+
+      garage:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "The Ring Road Garage"
+        plates: [district:garage]
+        media:
+          - name: garage_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        links:
+          out:
+            target: road
+            text: "Back to the road"
+        content: |
+          Three bays, a parts room nobody else can navigate, and a yard of
+          things that will be worth something to somebody.
+
+      campus:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "Miller College"
+        plates: [district:campus]
+        media:
+          - name: campus_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        links:
+          out:
+            target: road
+            text: "Back to the road"
+        content: |
+          A quad, a bike rack that is more bicycles than rack, and a film
+          society four days behind schedule.
+
+      station:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "The Rail Halt"
+        plates: [district:station]
+        media:
+          - name: station_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        links:
+          out:
+            target: road
+            text: "Back to the road"
+        content: |
+          Two platforms, a freight dock signing for things nobody ordered,
+          and a lost-property window that is usually shut.
+
+      airfield:
+        kind: "red_paperclip.domain.RedPaperclipHub"
+        location_name: "The Grass Airfield"
+        plates: [district:airfield]
+        media:
+          - name: airfield_bg.png
+            media_role: narrative_im
+            staging_hints:
+              media_shape: landscape
+        links:
+          out:
+            target: road
+            text: "Back to the road"
+        content: |
+          A mown strip, two hangars, and a windsock that has been busy all
+          week. Things leave from here.
+
+      ending:
+        content: |
+          And that is where the trading stopped.

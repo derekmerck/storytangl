@@ -1,0 +1,220 @@
+# The Red Paperclip trade graph.
+#
+# This file is the world. Hubs and their prose live in script.yaml; every
+# item, every trader, and every trade you can make lives here, in three
+# kinds of line:
+#
+#   <item>: <name>                    an item you can hold
+#   <trader>: <name> @ <hub>          a trader, standing in one hub
+#   <held> -> <trader> -> <offered>   a trade
+#
+# A trader has exactly one thing to give, so the offered item is declared
+# once and every later line naming that trader inherits it:
+#
+#   red_paperclip -> mira -> fish_pen   Mira gives the pen for the paperclip
+#   brass_doorknob -> mira              ...and for a doorknob too
+#
+# A trade line may carry the line the journal prints, d2-style, after a
+# colon. Attributes hang off a dotted key: `.here` is what you see when a
+# trader is in front of you, `.gone` is what you see once they have traded
+# their one thing away, and `.ending` is how the story ends if you are still
+# holding that item when nobody will trade for it any more. `.gone` is
+# optional; without it a trader says plainly that they have nothing left.
+#
+# Paste it into d2 or read it top to bottom. Both work.
+
+
+# ── items ──────────────────────────────────────────────────────────────
+
+red_paperclip: a red paperclip
+fish_pen: a fish-shaped pen
+brass_doorknob: a hand-turned brass doorknob
+crab_trap: a folding crab trap
+accordion: a wheezing accordion
+bicycle: a green three-speed bicycle
+camp_stove: a two-burner camp stove
+neon_sign: a neon OPEN sign
+pa_system: a portable PA system
+espresso_machine: a temperamental espresso machine
+kayak: a fibreglass sea kayak
+outboard_motor: a 9.9 horsepower outboard
+panel_van: a rust-free panel van
+freight_pallet: a pallet of unclaimed freight
+glider: a wooden-winged glider
+auckland_tickets: two open-jaw tickets to Auckland
+
+# ── the ends of the line ────────────────────────────────────────────────
+
+lighthouse_keys: the keys to the Rock Point light
+lighthouse_keys.ending: |
+  Nobody trades for a lighthouse. You climb the stair on the first
+  evening and find the lamp housing swept, the log book open, and one
+  ruled line left for you at the bottom of the page.
+
+film_role: a speaking part in a feature
+film_role.ending: |
+  Nobody trades for a speaking part; it is yours or it is nothing. Two
+  years later a stranger on a ferry will place your face and be unable
+  to say from where.
+
+ostrich_share: a one-third share in an ostrich farm outside Otorohanga
+ostrich_share.ending: |
+  Nobody at this end of the world will trade you anything for a third
+  of an ostrich farm in the Waikato, which is how you come to be
+  standing in one at six in the morning, being looked at.
+
+sourdough_starter: a jar of hundred-year-old sourdough starter
+sourdough_starter.ending: |
+  Nobody trades for a starter. You feed it flour and water on the
+  Sunday and it comes up like it never left, and that is the end of the
+  travelling.
+
+stuffed_marlin: a mounted blue marlin
+stuffed_marlin.ending: |
+  Nobody wants the marlin. Not one person. It goes over the door where
+  the coats should be and stays there for the rest of your life.
+
+
+# ── the harbour ─────────────────────────────────────────────────────────
+
+mira: Mira, who mends nets @ harbor
+mira.here: Mira has a net across her knees and a spool of orange twine.
+mira.gone: Mira has the paperclip worked into the net and nothing else to spare.
+
+finn: Finn at the boat racks @ harbor
+finn.here: Finn is re-lashing a rack that does not need re-lashing.
+
+gunnar: Gunnar, the harbourmaster @ harbor
+gunnar.here: The harbourmaster watches the channel from the office step.
+
+red_paperclip -> mira -> fish_pen: Mira works the paperclip into a torn net, hands you the pen, and does not look up again.
+brass_doorknob -> mira: Mira turns the doorknob over twice, keeps it, and gives you the pen.
+
+bicycle -> finn -> kayak: Finn wheels the bicycle away and points you at the kayak on the bottom rack.
+accordion -> finn: Finn takes the accordion for the clubhouse and lets the kayak go.
+
+outboard_motor -> gunnar -> lighthouse_keys: The harbourmaster needs a motor more than he needs a lighthouse he is not allowed to sell. The keys are cold.
+panel_van -> gunnar: The harbourmaster has wanted a van since the spring. He signs the light over to you on the office step.
+
+
+# ── the market ──────────────────────────────────────────────────────────
+
+wick: Wick, at the tarp table @ market
+wick.here: Wick is arranging brass on a tarp in no order at all.
+wick.gone: Wick has nothing brass left on the tarp worth trading for.
+
+cass: Cass, in off the day boat @ market
+cass.here: Cass has crates to shift and is short of hands.
+
+pia: Pia, who bakes @ market
+pia.here: Pia is out of things to sell by nine and stays until noon anyway.
+pia.gone: Pia gave away the jar and will not start another this year.
+
+hollis: Hollis, closing the cafe @ market
+hollis.here: Hollis is boxing up a cafe one shelf at a time.
+
+red_paperclip -> wick -> brass_doorknob: Wick clips the paperclip to a ledger he will never read again and lets you take the doorknob.
+fish_pen -> wick: Wick has a granddaughter who would like the fish pen. The doorknob is yours.
+
+fish_pen -> cass -> crab_trap: Cass signs for a delivery with the fish pen and gives you the trap out of the stern.
+accordion -> cass: Cass wants the accordion for the boat. Take the trap.
+
+brass_doorknob -> pia -> sourdough_starter: Pia has been shutting that door with a screwdriver for a year. She gives you the jar and tells you how to feed it.
+camp_stove -> pia: The stove is worth more than the jar and Pia says so twice before trading anyway.
+
+neon_sign -> hollis -> espresso_machine: Hollis takes the sign for the new place and lets the machine go. It works when it wants to.
+pa_system -> hollis: Hollis is done with the cafe but not with the band. The machine is yours.
+
+
+# ── the ring road garage ────────────────────────────────────────────────
+
+teo: Teo, who fixes everything @ garage
+teo.here: Teo is fixing something that is not his and not urgent.
+
+dot: Dot in the parts bay @ garage
+dot.here: Dot knows what is in every drawer and will not tell you.
+
+olsen: Olsen in the engine bay @ garage
+olsen.here: Olsen has an outboard clamped to a barrel of water, running.
+
+rusev: Rusev, under the van @ garage
+rusev.here: Rusev is under a van that no longer needs him under it.
+
+brass_doorknob -> teo -> camp_stove: Teo has a door that has been shut with a nail since March. The stove is in the back.
+crab_trap -> teo: Teo takes the trap for his brother and hands over the stove.
+
+camp_stove -> dot -> neon_sign: Dot trades the sign off the old shop front for a stove she can use at the counter.
+bicycle -> dot: Dot wants the bicycle for the parts run. The sign comes down.
+
+crab_trap -> olsen -> outboard_motor: Olsen is owed a trap by someone who left. Yours settles it, and the outboard is running when you get it.
+kayak -> olsen: Olsen takes the kayak for the lake house and clamps the outboard to your side of the bench.
+
+outboard_motor -> rusev -> panel_van: Rusev wants the outboard for a boat he has not bought. The van starts on the second turn.
+espresso_machine -> rusev: Rusev's waiting room has been coffee-less since the machine before this one. Take the van.
+
+
+# ── miller college ──────────────────────────────────────────────────────
+
+junie: Junie, who plays for change on the quad @ campus
+junie.here: Junie has an open case and eleven dollars in it.
+
+gus: Gus at the bike rack @ campus
+gus.here: Gus has three bicycles and needs none of them.
+
+devi: Devi, of the film society @ campus
+devi.here: Devi is arguing about a shooting schedule with nobody in particular.
+
+petra: Petra, who is making a feature @ campus
+petra.here: Petra is making a feature and is four days behind.
+
+fish_pen -> junie -> accordion: Junie signs a form with the fish pen and gives you the accordion, which she says is beyond her.
+camp_stove -> junie: Junie plays outdoors in October. The stove is worth more to her than the accordion.
+
+fish_pen -> gus -> bicycle: Gus needs a pen for the sign-out sheet more than he needs a third bicycle.
+crab_trap -> gus: Gus takes the trap for a house he is moving into and wheels the green three-speed out.
+
+accordion -> devi -> pa_system: Devi has wanted an accordion for the soundtrack since August. The PA is under the stage.
+neon_sign -> devi: The sign is going in the film. The PA is yours.
+
+panel_van -> petra -> film_role: Petra needs a van for four days. She offers you a van's worth of speaking part, and writes it down so it is real.
+
+
+# ── the rail halt ───────────────────────────────────────────────────────
+
+yusuf: Yusuf on the freight dock @ station
+yusuf.here: Yusuf is signing for things that were never ordered.
+
+marta: Marta in the ticket office @ station
+marta.here: Marta has the only working clock on the platform.
+
+lost_property: the lost-property window @ station
+lost_property.here: The lost-property window is open, which is rare.
+
+panel_van -> yusuf -> freight_pallet: Yusuf trades the pallet nobody has claimed for a van the depot has needed all year. He does not tell you what is on it.
+bicycle -> yusuf: Yusuf trades the unclaimed pallet for something he can ride to the far end of the yard.
+
+espresso_machine -> marta -> auckland_tickets: The tickets have been unclaimed for six weeks and the ticket office has been coffee-less for longer.
+glider -> marta: Marta's brother flies. The tickets are yours, open-jaw, dated whenever you like.
+
+freight_pallet -> lost_property -> stuffed_marlin: The window takes the pallet without comment and gives you the largest thing behind it.
+kayak -> lost_property: The window will not take the kayak as lost property but will take it as a trade. You get the marlin.
+
+
+# ── the grass airfield ──────────────────────────────────────────────────
+
+bree: Bree, who flies the mail @ airfield
+bree.here: Bree has the mail plane open and half of it on the grass.
+
+ilse: Ilse, who charters @ airfield
+ilse.here: Ilse charters to the islands and back, weather allowing.
+
+whina: Whina, going home to Otorohanga @ airfield
+whina.here: Whina is going home for good and is one seat short of it.
+
+freight_pallet -> bree -> glider: Bree takes the pallet on the strength of the manifest alone and rolls the glider out of the far shed.
+kayak -> bree: Bree has wanted a kayak longer than she has wanted the glider gone.
+
+glider -> ilse -> auckland_tickets: Ilse has a hangar and no glider in it. The tickets are open-jaw and she has held them since March.
+panel_van -> ilse: Ilse needs a van at the strip more than she needs two seats she cannot use.
+
+auckland_tickets -> whina -> ostrich_share: Whina needs the second seat. What she has to trade is a third of a farm at the other end of the world, and she is entirely serious about it.

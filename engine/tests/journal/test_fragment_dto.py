@@ -52,6 +52,7 @@ def test_choice_blocker_dto_round_trip_preserves_typed_contract() -> None:
                 code="needs_key",
                 message="The brass key is required.",
                 refs=["piece-key"],
+                replaces_text=True,
             )
         ],
     )
@@ -59,16 +60,21 @@ def test_choice_blocker_dto_round_trip_preserves_typed_contract() -> None:
     payload = fragment_to_dto(fragment)
     restored = fragment_from_dto(payload)
 
+    # `replaces_text` is carried as `True` rather than left at its default, so
+    # the round trip proves the field survives the wire instead of proving that
+    # two absent values agree.
     assert payload["blockers"] == [
         {
             "code": "needs_key",
             "message": "The brass key is required.",
             "refs": ["piece-key"],
+            "replaces_text": True,
         }
     ]
     assert isinstance(restored, ChoiceFragment)
     assert restored.blockers is not None
     assert restored.blockers[0].code == "needs_key"
+    assert restored.blockers[0].replaces_text is True
 
 
 def test_choice_cost_preview_dto_round_trip_preserves_typed_contract() -> None:

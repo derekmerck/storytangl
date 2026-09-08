@@ -173,8 +173,23 @@ in reverse draw order and a legend row wins the pixels it visibly covers.
 The pin carries only the number. A 70px box cannot hold "Go to The Practice
 Yard", and shortening it would mean parsing prose the client does not own, so
 the names stay in the legend below and the number ties the two together. Every
-choice appears there, boxed or not, which keeps the CLI floor literally on
-screen: same number, same edge, whichever the reader clicks.
+choice appears there, boxed or not.
+
+A refused region pins `X` instead, and its legend row reads `x)`. Numbering is
+positional over the whole list, which the widget vocabulary settles in §2.6.1
+and the CLI follows: the key a row shows is the key that commits it, and a row
+this port cannot commit has no key, because printing its position would invite
+a press that silently does nothing. Live rows therefore run 1, 3, 6 — the gaps
+are the refusals, and every key on screen works.
+
+Capital `X` on the plate rather than lowercase, because at 11px the default
+font rasterizes a lowercase `x` as a featureless blob; the legend keeps `x)`,
+where the bracket carries the shape.
+
+Keys run `1`-`9` and then `a`-`z`, skipping lowercase `x` since that is the
+mark for a row without one. Past the end of that alphabet a row prints no key
+at all and stays clickable — an unreachable ordinal would be the same broken
+promise as a number on a refused row.
 
 `map_im` is deliberately outside `BACKGROUND_ROLES`. A plate is full-frame but
 is not scenery, and a client with no map view must not stage it as a backdrop —

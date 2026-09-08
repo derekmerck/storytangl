@@ -351,6 +351,15 @@ export interface Blocker {
   code: string
   message: string
   refs?: FragmentId[]
+  /**
+   * Whether `message` stands in for the choice text rather than annotating it.
+   *
+   * Most refusals are clauses about a choice the reader can already read.
+   * When a world writes a whole sentence instead, repeating the offer beside
+   * it says the same thing twice, and this says so. Safe to ignore: a client
+   * that does renders both and is merely wordier.
+   */
+  replaces_text?: boolean
   [key: string]: unknown
 }
 

@@ -1,0 +1,662 @@
+{
+  "version": 1,
+  "endpoint": "configured-worker",
+  "template": "{\n  \"4\": {\n    \"inputs\": {\n      \"unet_name\": \"flux-2-klein-9b-kv-fp8.safetensors\",\n      \"weight_dtype\": \"default\"\n    },\n    \"class_type\": \"UNETLoader\",\n    \"_meta\": {\n      \"title\": \"Load Diffusion Model\"\n    }\n  },\n  \"5\": {\n    \"inputs\": {\n      \"clip_name\": \"qwen_3_8b_fp8mixed.safetensors\",\n      \"type\": \"flux2\",\n      \"device\": \"default\"\n    },\n    \"class_type\": \"CLIPLoader\",\n    \"_meta\": {\n      \"title\": \"Load CLIP\"\n    }\n  },\n  \"6\": {\n    \"inputs\": {\n      \"vae_name\": \"flux2-vae.safetensors\"\n    },\n    \"class_type\": \"VAELoader\",\n    \"_meta\": {\n      \"title\": \"Load VAE\"\n    }\n  },\n  \"7\": {\n    \"inputs\": {\n      \"text\": {{ prompt | tojson }},\n      \"clip\": [\n        \"5\",\n        0\n      ]\n    },\n    \"class_type\": \"CLIPTextEncode\",\n    \"_meta\": {\n      \"title\": \"CLIP Text Encode (Prompt)\"\n    }\n  },\n  \"8\": {\n    \"inputs\": {\n      \"conditioning\": [\n        \"7\",\n        0\n      ]\n    },\n    \"class_type\": \"ConditioningZeroOut\",\n    \"_meta\": {\n      \"title\": \"Conditioning Zero Out\"\n    }\n  },\n  \"12\": {\n    \"inputs\": {\n      \"width\": {{ width }},\n      \"height\": {{ height }},\n      \"batch_size\": 1\n    },\n    \"class_type\": \"EmptyFlux2LatentImage\",\n    \"_meta\": {\n      \"title\": \"Empty Flux 2 Latent\"\n    }\n  },\n  \"13\": {\n    \"inputs\": {\n      \"steps\": {{ steps }},\n      \"width\": {{ width }},\n      \"height\": {{ height }}\n    },\n    \"class_type\": \"Flux2Scheduler\",\n    \"_meta\": {\n      \"title\": \"Flux2Scheduler\"\n    }\n  },\n  \"14\": {\n    \"inputs\": {\n      \"noise_seed\": {{ seed }}\n    },\n    \"class_type\": \"RandomNoise\",\n    \"_meta\": {\n      \"title\": \"RandomNoise\"\n    }\n  },\n  \"15\": {\n    \"inputs\": {\n      \"cfg\": {{ cfg }},\n      \"model\": [\n        \"22\",\n        0\n      ],\n      \"positive\": [\n        \"7\",\n        0\n      ],\n      \"negative\": [\n        \"8\",\n        0\n      ]\n    },\n    \"class_type\": \"CFGGuider\",\n    \"_meta\": {\n      \"title\": \"CFG Guider\"\n    }\n  },\n  \"16\": {\n    \"inputs\": {\n      \"sampler_name\": \"euler\"\n    },\n    \"class_type\": \"KSamplerSelect\",\n    \"_meta\": {\n      \"title\": \"KSamplerSelect\"\n    }\n  },\n  \"17\": {\n    \"inputs\": {\n      \"noise\": [\n        \"14\",\n        0\n      ],\n      \"guider\": [\n        \"15\",\n        0\n      ],\n      \"sampler\": [\n        \"16\",\n        0\n      ],\n      \"sigmas\": [\n        \"13\",\n        0\n      ],\n      \"latent_image\": [\n        \"12\",\n        0\n      ]\n    },\n    \"class_type\": \"SamplerCustomAdvanced\",\n    \"_meta\": {\n      \"title\": \"SamplerCustomAdvanced\"\n    }\n  },\n  \"18\": {\n    \"inputs\": {\n      \"samples\": [\n        \"17\",\n        0\n      ],\n      \"vae\": [\n        \"6\",\n        0\n      ]\n    },\n    \"class_type\": \"VAEDecode\",\n    \"_meta\": {\n      \"title\": \"VAE Decode\"\n    }\n  },\n  \"22\": {\n    \"inputs\": {\n      \"model\": [\n        \"4\",\n        0\n      ]\n    },\n    \"class_type\": \"FluxKVCache\",\n    \"_meta\": {\n      \"title\": \"Flux KV Cache\"\n    }\n  },\n  \"20\": {\n    \"inputs\": {\n      \"filename_prefix\": {{ prefix | tojson }},\n      \"images\": [\n        \"18\",\n        0\n      ]\n    },\n    \"class_type\": \"SaveImage\",\n    \"_meta\": {\n      \"title\": \"Save Image\"\n    }\n  }\n}\n",
+  "jobs": [
+    {
+      "request_sha256": "08faf28e97a6da7640afd39b49fb284c1e07cf561f214aa62d7958cf53f6d648",
+      "params": {
+        "width": 1280,
+        "height": 800,
+        "steps": 4,
+        "cfg": 1,
+        "prefix": "rp_market",
+        "prompt": "an open-air market square seen at eye level, late afternoon: rows of orange and blue striped stall tarps over trestle tables, a bakery stall gone empty, a cafe being packed into cardboard boxes on the pavement, cobbles; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+        "seed": 11
+      },
+      "sources": {},
+      "workflow": {
+        "4": {
+          "inputs": {
+            "unet_name": "flux-2-klein-9b-kv-fp8.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "Load Diffusion Model"
+          }
+        },
+        "5": {
+          "inputs": {
+            "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+            "type": "flux2",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "Load CLIP"
+          }
+        },
+        "6": {
+          "inputs": {
+            "vae_name": "flux2-vae.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "Load VAE"
+          }
+        },
+        "7": {
+          "inputs": {
+            "text": "an open-air market square seen at eye level, late afternoon: rows of orange and blue striped stall tarps over trestle tables, a bakery stall gone empty, a cafe being packed into cardboard boxes on the pavement, cobbles; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+            "clip": [
+              "5",
+              0
+            ]
+          },
+          "class_type": "CLIPTextEncode",
+          "_meta": {
+            "title": "CLIP Text Encode (Prompt)"
+          }
+        },
+        "8": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "Conditioning Zero Out"
+          }
+        },
+        "12": {
+          "inputs": {
+            "width": 1280,
+            "height": 800,
+            "batch_size": 1
+          },
+          "class_type": "EmptyFlux2LatentImage",
+          "_meta": {
+            "title": "Empty Flux 2 Latent"
+          }
+        },
+        "13": {
+          "inputs": {
+            "steps": 4,
+            "width": 1280,
+            "height": 800
+          },
+          "class_type": "Flux2Scheduler",
+          "_meta": {
+            "title": "Flux2Scheduler"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise_seed": 11
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "RandomNoise"
+          }
+        },
+        "15": {
+          "inputs": {
+            "cfg": 1,
+            "model": [
+              "22",
+              0
+            ],
+            "positive": [
+              "7",
+              0
+            ],
+            "negative": [
+              "8",
+              0
+            ]
+          },
+          "class_type": "CFGGuider",
+          "_meta": {
+            "title": "CFG Guider"
+          }
+        },
+        "16": {
+          "inputs": {
+            "sampler_name": "euler"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "KSamplerSelect"
+          }
+        },
+        "17": {
+          "inputs": {
+            "noise": [
+              "14",
+              0
+            ],
+            "guider": [
+              "15",
+              0
+            ],
+            "sampler": [
+              "16",
+              0
+            ],
+            "sigmas": [
+              "13",
+              0
+            ],
+            "latent_image": [
+              "12",
+              0
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "SamplerCustomAdvanced"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": [
+              "17",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "VAE Decode"
+          }
+        },
+        "22": {
+          "inputs": {
+            "model": [
+              "4",
+              0
+            ]
+          },
+          "class_type": "FluxKVCache",
+          "_meta": {
+            "title": "Flux KV Cache"
+          }
+        },
+        "20": {
+          "inputs": {
+            "filename_prefix": "rp_market",
+            "images": [
+              "18",
+              0
+            ]
+          },
+          "class_type": "SaveImage",
+          "_meta": {
+            "title": "Save Image"
+          }
+        }
+      },
+      "submitted_workflow": {
+        "4": {
+          "inputs": {
+            "unet_name": "flux-2-klein-9b-kv-fp8.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "Load Diffusion Model"
+          }
+        },
+        "5": {
+          "inputs": {
+            "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+            "type": "flux2",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "Load CLIP"
+          }
+        },
+        "6": {
+          "inputs": {
+            "vae_name": "flux2-vae.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "Load VAE"
+          }
+        },
+        "7": {
+          "inputs": {
+            "text": "an open-air market square seen at eye level, late afternoon: rows of orange and blue striped stall tarps over trestle tables, a bakery stall gone empty, a cafe being packed into cardboard boxes on the pavement, cobbles; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+            "clip": [
+              "5",
+              0
+            ]
+          },
+          "class_type": "CLIPTextEncode",
+          "_meta": {
+            "title": "CLIP Text Encode (Prompt)"
+          }
+        },
+        "8": {
+          "inputs": {
+            "conditioning": [
+              "7",
+              0
+            ]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "Conditioning Zero Out"
+          }
+        },
+        "12": {
+          "inputs": {
+            "width": 1280,
+            "height": 800,
+            "batch_size": 1
+          },
+          "class_type": "EmptyFlux2LatentImage",
+          "_meta": {
+            "title": "Empty Flux 2 Latent"
+          }
+        },
+        "13": {
+          "inputs": {
+            "steps": 4,
+            "width": 1280,
+            "height": 800
+          },
+          "class_type": "Flux2Scheduler",
+          "_meta": {
+            "title": "Flux2Scheduler"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise_seed": 11
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "RandomNoise"
+          }
+        },
+        "15": {
+          "inputs": {
+            "cfg": 1,
+            "model": [
+              "22",
+              0
+            ],
+            "positive": [
+              "7",
+              0
+            ],
+            "negative": [
+              "8",
+              0
+            ]
+          },
+          "class_type": "CFGGuider",
+          "_meta": {
+            "title": "CFG Guider"
+          }
+        },
+        "16": {
+          "inputs": {
+            "sampler_name": "euler"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "KSamplerSelect"
+          }
+        },
+        "17": {
+          "inputs": {
+            "noise": [
+              "14",
+              0
+            ],
+            "guider": [
+              "15",
+              0
+            ],
+            "sampler": [
+              "16",
+              0
+            ],
+            "sigmas": [
+              "13",
+              0
+            ],
+            "latent_image": [
+              "12",
+              0
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "SamplerCustomAdvanced"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": [
+              "17",
+              0
+            ],
+            "vae": [
+              "6",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "VAE Decode"
+          }
+        },
+        "22": {
+          "inputs": {
+            "model": [
+              "4",
+              0
+            ]
+          },
+          "class_type": "FluxKVCache",
+          "_meta": {
+            "title": "Flux KV Cache"
+          }
+        },
+        "20": {
+          "inputs": {
+            "filename_prefix": "rp_market",
+            "images": [
+              "18",
+              0
+            ]
+          },
+          "class_type": "SaveImage",
+          "_meta": {
+            "title": "Save Image"
+          }
+        }
+      },
+      "prompt_id": "1b523de6-d0d1-4ae0-940a-6fd5735380e4",
+      "status": "completed",
+      "submitted_at": 1788757619.69745,
+      "history": {
+        "prompt": [
+          850,
+          "1b523de6-d0d1-4ae0-940a-6fd5735380e4",
+          {
+            "4": {
+              "inputs": {
+                "unet_name": "flux-2-klein-9b-kv-fp8.safetensors",
+                "weight_dtype": "default"
+              },
+              "class_type": "UNETLoader",
+              "_meta": {
+                "title": "Load Diffusion Model"
+              }
+            },
+            "5": {
+              "inputs": {
+                "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+                "type": "flux2",
+                "device": "default"
+              },
+              "class_type": "CLIPLoader",
+              "_meta": {
+                "title": "Load CLIP"
+              }
+            },
+            "6": {
+              "inputs": {
+                "vae_name": "flux2-vae.safetensors"
+              },
+              "class_type": "VAELoader",
+              "_meta": {
+                "title": "Load VAE"
+              }
+            },
+            "7": {
+              "inputs": {
+                "text": "an open-air market square seen at eye level, late afternoon: rows of orange and blue striped stall tarps over trestle tables, a bakery stall gone empty, a cafe being packed into cardboard boxes on the pavement, cobbles; full bleed, image fills the canvas edge to edge, no border, no frame, no people, empty center staging area; render scene with 8-bit dithered palette style, limited palette of muted teal, weathered sand, rust orange, bone cream, deep indigo; ordered Bayer dither for all gradients; crisp readable silhouettes; flat lighting; no text, no lettering, no watermark, no signature",
+                "clip": [
+                  "5",
+                  0
+                ]
+              },
+              "class_type": "CLIPTextEncode",
+              "_meta": {
+                "title": "CLIP Text Encode (Prompt)"
+              }
+            },
+            "8": {
+              "inputs": {
+                "conditioning": [
+                  "7",
+                  0
+                ]
+              },
+              "class_type": "ConditioningZeroOut",
+              "_meta": {
+                "title": "Conditioning Zero Out"
+              }
+            },
+            "12": {
+              "inputs": {
+                "width": 1280,
+                "height": 800,
+                "batch_size": 1
+              },
+              "class_type": "EmptyFlux2LatentImage",
+              "_meta": {
+                "title": "Empty Flux 2 Latent"
+              }
+            },
+            "13": {
+              "inputs": {
+                "steps": 4,
+                "width": 1280,
+                "height": 800
+              },
+              "class_type": "Flux2Scheduler",
+              "_meta": {
+                "title": "Flux2Scheduler"
+              }
+            },
+            "14": {
+              "inputs": {
+                "noise_seed": 11
+              },
+              "class_type": "RandomNoise",
+              "_meta": {
+                "title": "RandomNoise"
+              }
+            },
+            "15": {
+              "inputs": {
+                "cfg": 1.0,
+                "model": [
+                  "22",
+                  0
+                ],
+                "positive": [
+                  "7",
+                  0
+                ],
+                "negative": [
+                  "8",
+                  0
+                ]
+              },
+              "class_type": "CFGGuider",
+              "_meta": {
+                "title": "CFG Guider"
+              }
+            },
+            "16": {
+              "inputs": {
+                "sampler_name": "euler"
+              },
+              "class_type": "KSamplerSelect",
+              "_meta": {
+                "title": "KSamplerSelect"
+              }
+            },
+            "17": {
+              "inputs": {
+                "noise": [
+                  "14",
+                  0
+                ],
+                "guider": [
+                  "15",
+                  0
+                ],
+                "sampler": [
+                  "16",
+                  0
+                ],
+                "sigmas": [
+                  "13",
+                  0
+                ],
+                "latent_image": [
+                  "12",
+                  0
+                ]
+              },
+              "class_type": "SamplerCustomAdvanced",
+              "_meta": {
+                "title": "SamplerCustomAdvanced"
+              }
+            },
+            "18": {
+              "inputs": {
+                "samples": [
+                  "17",
+                  0
+                ],
+                "vae": [
+                  "6",
+                  0
+                ]
+              },
+              "class_type": "VAEDecode",
+              "_meta": {
+                "title": "VAE Decode"
+              }
+            },
+            "22": {
+              "inputs": {
+                "model": [
+                  "4",
+                  0
+                ]
+              },
+              "class_type": "FluxKVCache",
+              "_meta": {
+                "title": "Flux KV Cache"
+              }
+            },
+            "20": {
+              "inputs": {
+                "filename_prefix": "rp_market",
+                "images": [
+                  "18",
+                  0
+                ]
+              },
+              "class_type": "SaveImage",
+              "_meta": {
+                "title": "Save Image"
+              }
+            }
+          },
+          {
+            "create_time": 1788757619723
+          },
+          [
+            "20"
+          ]
+        ],
+        "outputs": {
+          "20": {
+            "images": [
+              {
+                "filename": "rp_market_00001_.png",
+                "subfolder": "",
+                "type": "output"
+              }
+            ]
+          }
+        },
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "1b523de6-d0d1-4ae0-940a-6fd5735380e4",
+                "timestamp": 1788757619725
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [
+                  "4",
+                  "5",
+                  "6",
+                  "12",
+                  "13",
+                  "14",
+                  "16",
+                  "22"
+                ],
+                "prompt_id": "1b523de6-d0d1-4ae0-940a-6fd5735380e4",
+                "timestamp": 1788757619731
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "1b523de6-d0d1-4ae0-940a-6fd5735380e4",
+                "timestamp": 1788757628080
+              }
+            ]
+          ]
+        },
+        "meta": {
+          "20": {
+            "node_id": "20",
+            "display_node": "20",
+            "parent_node": null,
+            "real_node_id": "20"
+          }
+        }
+      },
+      "downloads": [
+        {
+          "filename": "rp_market_00001_.png",
+          "subfolder": "",
+          "type": "output",
+          "path": "generation-artifacts/raw/08faf28e97a6da7640afd39b49fb284c1e07cf561f214aa62d7958cf53f6d648/000-rp_market_00001_.png",
+          "sha256": "e30493d70deb6beb3df5de39c9558bb9788043794456d85648262b9da74be247"
+        }
+      ],
+      "error": null
+    }
+  ]
+}

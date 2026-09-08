@@ -787,7 +787,84 @@ into the same player-facing shape at the story journal boundary.
 | **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices. Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. Up/down cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target at least 44x44 on touch. Locked choices remain focusable for screen reader stability. |
 | **Fallback** | Unknown `accepts.kind` → plain button posting empty payload, with warning. Unknown `ui_hints.widget` → default widget for `accepts.kind`. |
 
-**Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1) Pay the forty silver.` … `> ` prompt; `(locked: reason)` suffix for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: `menu:` block; `if`-gated for locked; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
+**Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1. Pay the forty silver.` … `> ` prompt; `x)` in place of the number for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: `menu:` block; `if`-gated for locked; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
+
+#### 2.6.1 Numbering a list that contains locked choices
+
+The number is **positional over the whole presented list**, locked
+choices included. It is not an ordinal over the available subset.
+
+That follows from the container rule above and from §5.3, and it is
+worth stating separately because the alternative is tempting and wrong.
+Numbering only the live choices keeps the sequence contiguous, at the
+cost of making a number mean a different choice depending on what
+happens to be available this turn — so a reader typing the number
+printed beside a refused row commits its neighbour instead, silently.
+Positional numbering costs a gapped sequence (1, 3, 6) and buys a
+number that always names the row it is printed beside.
+
+**A locked choice does not show a number it cannot honour.** Its
+position is reserved — the numbers around it do not close up — but the
+number itself is replaced by an x-like mark in the port's own format,
+because a printed number is a promise that pressing it does something:
+
+| port | surface | available | locked |
+|---|---|---|---|
+| CLI | row | `1.` | `x)` |
+| pygame | row | `1.` | `x)` |
+| pygame | map region | `1` pinned | `X` pinned |
+| pygame | piece card | `1.` on the card | `(x)` on the card |
+
+**A port MUST NOT print a key it will not accept.** Positional numbering runs
+past nine, and a port whose keyboard binding stops there has to say so
+somewhere. pygame runs `1`-`9` then `a`-`z` (skipping lowercase `x`, its mark
+for a row without a key) and prints nothing at all past the end of that
+alphabet, leaving the row clickable. An ordinal nothing accepts is the same
+broken promise as a number on a refused row, one position further along.
+
+**The mark is client-local; the mapping is not.** Every port derives
+both the ordinal and the mark through one function, so a row, a map
+hitbox and a keyboard binding cannot disagree about whether a choice is
+reachable. Deviations from the CLI's spelling are permitted where a port
+must — pygame pins `X` rather than `x` because at 11px the default font
+rasterizes a lowercase `x` as a featureless blob — and MUST be
+justified and applied consistently across every surface in that port.
+
+**Conformance, as of this writing.** The CLI implements the above. pygame
+implements it for rows and map regions and diverges on piece cards, and
+the other two ports do not implement it at all:
+
+- **pygame piece cards** mark `(x)` — a third spelling — and key it on
+  `piece.available` rather than on whether the choice has a number.
+  Those two conditions usually coincide and come apart exactly where it
+  matters: a piece that is available but not on the current selection
+  page carries no number and no hitbox, and is as unreachable as a
+  refused one while looking ordinary. Latent rather than live, since no
+  shipped packet is larger than a selection page. Left alone
+  deliberately — the surface work in #443 would retire these marks
+  entirely by moving the refusal onto a hover, so unifying the spelling
+  first would be work done twice.
+
+- **Web** assigns no positional number at all. `StoryAction.vue` reads a
+  hotkey only from an authored `ui_hints.hotkey`, so §2.6's A11y rule —
+  position is the default hotkey — is unimplemented, and there is
+  consequently no number for a locked choice to replace. It does render
+  the choice as a disabled button with `unavailable_reason` beneath and
+  `blockers[]` beside, so it meets §5.1 while missing the numbering rule
+  entirely.
+- **Ren'Py** filters locked choices out before building the menu
+  (`script.rpy`: `visible_choices = [c for c in turn.choices if
+  c.available]`). That is a §5.1 gap rather than a numbering one: a
+  refused choice is not dimmed, it is absent, and a player cannot learn
+  from the menu that the option exists or why it is closed.
+
+A port that also draws choices as something other than rows (a map
+region, a piece on a surface) marks those the same way and for the same
+reason, keyed on **whether the choice has a number**, not on
+`available`. The two usually coincide and come apart exactly where it
+matters: a piece that is available but not on the current selection
+page has no number and no hitbox, and is as unreachable as a refused
+one.
 
 ### 2.7 `control` — Silent fragment mutation
 
@@ -1066,7 +1143,8 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
 - A command bar with a typeahead grammar overlay MUST also accept plain text
   submission with no overlay. The CLI port renders only plain text and submits
   the same typed `find_edge` request.
-- A choice list's positional hotkey numbering (§2.6) is the keyboard
+- A choice list's positional hotkey numbering (§2.6, and §2.6.1 for
+  what a locked choice does with its position) is the keyboard
   realization of the same choice list visible as buttons. Ports MAY add
   hotkeys; ports MUST keep the visible buttons reachable by tap/click.
 - An info-affordance bar (§1.6) is one way to expose info channels.
@@ -1301,6 +1379,7 @@ class Blocker(BaseModel, extra="allow"):
     code: str                             # author-stable, e.g. "needs_key"
     message: str                          # player-facing, may be templated
     refs: list[str] = Field(default_factory=list)  # uids referenced by message
+    replaces_text: bool = False           # message stands in for choice.text
 ```
 
 Each blocker entry combines an author-stable identifier (for predicates
@@ -1308,6 +1387,42 @@ and testing), a player-facing message (which MAY reference rendered
 state per §5.1), and a list of UIDs the message references. The
 Decision Legibility Contract requires every UID in `refs` to be
 rendered.
+
+**`unavailable_reason` and `blockers[]` are the same refusal at two
+altitudes.** The reason is a code — stable, matchable, meaningless to a
+reader. A blocker message is a sentence written for one. A client
+showing a refusal to a player SHOULD prefer the message and keep the
+code as its floor; a client keying behaviour off the refusal MUST use
+the code. When a world authors a blocker, the two agree: the engine
+reports the authored blocker's `code` as `unavailable_reason` rather
+than a generic one, so a single refusal is never described two ways.
+
+**`replaces_text` says the message is a whole sentence rather than a
+clause about the choice.** The default is a clause — "Requirements are
+not met." beside "Cross the bridge" — and a client renders both. When
+a world writes a message that is complete on its own, repeating the
+choice text beside it states the same thing twice and forces a narrow
+port to truncate one of them:
+
+```
+x) Mira will trade a fish-shaped pen for a hand-turned brass doorknob
+   [blockers: Mira would take a hand-turned brass doorknob, but you
+    don't have one to offer.]
+
+x) Mira would take a hand-turned brass doorknob, but you don't have
+   one to offer.
+```
+
+Only the author of a message knows which it is, so the flag travels
+with the message rather than being inferred by a renderer, and it sits
+on the blocker rather than on the fragment so a choice carrying one
+clause and one sentence can still say which is which. A client MAY
+ignore it: ignoring renders both and is merely wordier, which is why
+this is a presentation affordance and not a contract change. A client
+that honours it and finds several blockers takes the first with
+`replaces_text` set, falling back to the first message otherwise —
+scanning all of them, because the flag is a claim about a message and
+not about a position in the list.
 
 ### 6.4 `RuntimeEnvelope.ux_events`
 

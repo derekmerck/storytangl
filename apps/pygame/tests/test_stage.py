@@ -22,11 +22,14 @@ from tangl.pygame_client.models import (  # noqa: E402
 from tangl.presentation.intent import TextAccepts  # noqa: E402
 from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
+    CHOICE_KEYS,
     LOGICAL_SIZE,
     PANEL_W,
     SCALE,
     Stage,
     choice_action,
+    key_for_position,
+    position_for_key,
     unsupported_reason,
 )
 
@@ -64,6 +67,91 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
     for rect, _action in stage.hitboxes:
         assert rect.bottom <= LOGICAL_SIZE[1]
         assert rect.top >= 0
+
+
+def test_a_refused_row_shows_no_number_to_press(stage: Stage) -> None:
+    """Every number on screen works, and the gaps are the refusals.
+
+    Numbering stays positional -- the number a row shows is the key that
+    commits it -- so live rows run 1, 3 rather than 1, 2 when a refusal sits
+    between them. Printing the refusal's position would invite a press that
+    silently does nothing.
+    """
+
+    live = Choice(edge_id=uuid4(), text="Back to the road")
+    refused = Choice(
+        edge_id=uuid4(),
+        text="Mira would take a doorknob, but you don't have one.",
+        available=False,
+    )
+    second_live = Choice(edge_id=uuid4(), text="Trade with Finn")
+    turn = Turn(
+        step=1,
+        lines=[Line(text="At the harbour.")],
+        choices=[live, refused, second_live],
+    )
+
+    assert stage._marker(1, live) == "1."
+    assert stage._marker(2, refused) == "x)"
+    assert stage._marker(3, second_live) == "3."
+
+    stage.draw(turn)
+
+    assert len(stage.hitboxes) == 2
+
+
+def test_a_printed_key_is_one_the_client_accepts(stage: Stage) -> None:
+    """Every marker on screen resolves back to the row that printed it.
+
+    `str(index)` printed `10.` for the tenth choice while the event loop read
+    one keypad key, so the number promised something nothing would take.
+    """
+
+    for position in range(1, len(CHOICE_KEYS) + 1):
+        key = key_for_position(position)
+        assert key is not None
+        assert position_for_key(key) == position
+
+    # Lowercase x is the mark for a row with no key, so it binds to nothing.
+    assert position_for_key("x") is None
+    assert "x" not in CHOICE_KEYS
+
+
+def test_a_choice_past_the_alphabet_prints_no_key(stage: Stage) -> None:
+    """Past the last key a row prints nothing rather than an ordinal.
+
+    It stays clickable; what it must not do is name a key that does not work.
+    """
+
+    beyond = len(CHOICE_KEYS) + 1
+    live = Choice(edge_id=uuid4(), text="One more than there are keys")
+
+    assert key_for_position(beyond) is None
+    assert stage._pin(beyond, live) == ""
+    assert stage._marker(beyond, live).strip() == ""
+
+
+def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> None:
+    """A choice row cannot wrap, so an overlong one has to say it was cut.
+
+    The number a reader presses has to stay on the line with the words it
+    names. Before this, a long row ran off the right edge and took the end of
+    its own sentence with it, with nothing on screen to say so.
+    """
+
+    long_choice = Choice(
+        edge_id=uuid4(),
+        text=(
+            "Bree will trade a wooden-winged glider for a pallet of unclaimed "
+            "freight — Bree would take a pallet of unclaimed freight, but you "
+            "have nothing like it to offer."
+        ),
+    )
+    stage.draw(Turn(step=1, lines=[Line(text="At the strip.")], choices=[long_choice]))
+
+    ((rect, _action),) = stage.hitboxes
+    assert rect.right <= LOGICAL_SIZE[0]
+    assert stage._clip(long_choice.text).endswith("…")
 
 
 def test_every_available_choice_is_clickable(stage: Stage) -> None:

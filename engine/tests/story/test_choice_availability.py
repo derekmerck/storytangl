@@ -204,6 +204,74 @@ class TestPredicateGating:
 
         assert fragments and fragments[0].unavailable_reason == "guard_failed_or_unavailable"
 
+    def test_authored_blocker_names_the_reason_as_well_as_the_message(self) -> None:
+        """One refusal, one vocabulary.
+
+        A world that writes its own blocker is saying why the guard failed. If
+        the reason code stayed generic beside it, the fragment would carry two
+        different accounts of one refusal, and a client keying on the code
+        would still show `guard_failed_or_unavailable` to a reader.
+        """
+
+        _graph, start, _end, action = _graph_with_choice(guard_expr="False")
+        action.blockers = [
+            Blocker(code="not_holding", message="You have nothing like it to offer.")
+        ]
+        ctx = _simple_ctx()
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].available is False
+        assert fragments[0].unavailable_reason == "not_holding"
+        assert fragments[0].blockers[0].message == "You have nothing like it to offer."
+
+    def test_the_reported_code_belongs_to_the_message_a_reader_sees(self) -> None:
+        """One refusal, one blocker speaking for it.
+
+        A client scans for the first blocker that replaces the choice text, so
+        taking `blockers[0]` for the code let a choice report `closed` while
+        showing the sentence belonging to `not_holding`.
+        """
+
+        _graph, start, _end, action = _graph_with_choice(guard_expr="False")
+        action.blockers = [
+            Blocker(code="closed", message="The stall is shut."),
+            Blocker(
+                code="not_holding",
+                message="You have nothing like it to offer.",
+                replaces_text=True,
+            ),
+        ]
+        ctx = _simple_ctx()
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        shown = next(
+            blocker for blocker in fragments[0].blockers if blocker.replaces_text
+        )
+        assert fragments[0].unavailable_reason == shown.code == "not_holding"
+
+    def test_a_structural_failure_outranks_an_authored_one(self) -> None:
+        """A world cannot speak for a dependency it does not own.
+
+        Authored blockers used to be returned ahead of every structural check
+        while the reason code checked structure first, so a choice could
+        report `missing_dependency` and explain something else.
+        """
+
+        _graph, start, _end, action = _graph_with_choice()
+        action.successor_id = None
+        action.blockers = [Blocker(code="authored", message="Authored explanation.")]
+        ctx = _simple_ctx()
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments[0].available is False
+        assert fragments[0].unavailable_reason == "missing_successor"
+        assert [blocker.code for blocker in fragments[0].blockers] == [
+            "missing_successor"
+        ]
+
     def test_failing_predicate_emits_portable_blocker(self) -> None:
         _graph, start, _end, _action = _graph_with_choice(guard_expr="False")
         ctx = _simple_ctx()
@@ -215,6 +283,7 @@ class TestPredicateGating:
             "code": "guard_failed_or_unavailable",
             "message": "Requirements are not met.",
             "refs": [],
+            "replaces_text": False,
         }
 
     def test_compound_and_predicate_fails_when_any_term_false(self) -> None:
@@ -333,6 +402,7 @@ class TestDependencyGating:
             "code": "no_offers",
             "message": "No matching option is currently available.",
             "refs": [],
+            "replaces_text": False,
         }
 
     def test_satisfied_dependency_does_not_block(self) -> None:

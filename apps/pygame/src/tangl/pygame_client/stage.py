@@ -56,6 +56,9 @@ class _Row:
     text: str
     kind: str
 
+REFUSED_PIN = "X"
+"""What a map region pins when no key commits it. See :meth:`Stage._pin`."""
+
 LOGICAL_SIZE = (320, 200)
 SCALE = 3
 
@@ -95,6 +98,26 @@ _ROW_STYLES = {
     "alt": (INK, DIM),
     "choice": (INK, CREAM),
 }
+
+def key_for_position(index: int) -> str | None:
+    """Return the key bound to a one-based choice position, if there is one.
+
+    One function for the marker a row prints, the pin a map region carries and
+    the key the event loop resolves, so a printed key and an accepted key
+    cannot come apart. Positions past the alphabet have no key.
+    """
+
+    if 1 <= index <= len(CHOICE_KEYS):
+        return CHOICE_KEYS[index - 1]
+    return None
+
+
+def position_for_key(key: str) -> int | None:
+    """Return the one-based choice position a key selects, if any."""
+
+    found = CHOICE_KEYS.find(key)
+    return found + 1 if found >= 0 else None
+
 
 def choice_action(choice: Choice) -> Action | None:
     """Return the action a row for ``choice`` performs, or None if it cannot.
@@ -142,6 +165,30 @@ CANCEL_KEY = 0
 
 SURFACE_CONTOUR = 1
 SURFACE_WASH = 140
+CHOICE_KEYS = "123456789abcdefghijklmnopqrstuvwyz"
+"""Keys a choice may be bound to, by position.
+
+Digits first because a reader expects them, then letters. Lowercase `x` is
+missing on purpose: it is this port's mark for a row that has no key, and a
+key that looks like the absence of one is worse than no key at all.
+
+A printed key is a promise, so a choice past the end of this alphabet prints
+no key rather than an ordinal nothing will accept. It stays clickable."""
+
+CHOICE_PITCH = 11
+"""Vertical step between choice rows, one more than the backing they carry."""
+
+ROW_TEXT_LEFT = 8
+"""Left edge of row text. The backing sits three pixels outside it, so a row
+and a legend line share one margin however each surface lays them out."""
+
+TEXT_WASH = 210
+"""Opacity of a text backing, out of 255.
+
+Opaque backings were readable and hid the scene behind a slab. A wash keeps
+the contrast the text needs -- cream on near-black is a long way from the
+palette's midtones -- while leaving the art legible underneath, the way a
+terminal shows a wallpaper through its window."""
 """How the client paints a surface band: a wash of this alpha plus a lit edge.
 
 A darkened band with a contour along its top reads as a surface projecting away
@@ -392,6 +439,9 @@ class Stage:
         Practice Yard", and the client is not allowed to shorten it — that
         would mean parsing prose it does not own — so the names stay in the
         legend and the number is what ties the two together.
+
+        A refused region pins `x`, because the number would be a key that does
+        nothing. See :meth:`_marker`.
         """
 
         rect = pygame.Rect(
@@ -408,9 +458,12 @@ class Stage:
         colour = CREAM if action is not None else DIM
         pygame.draw.rect(self.surface, colour, rect, width=1)
 
-        text = self.font.render(str(index), False, colour)
+        # `x` rather than a number for a refused region, for the same reason
+        # its legend row carries one: the pin is the key, and this box has no
+        # key. Dimmed box, `x` pin, `x)` row -- the three still tie together.
+        text = self.font.render(self._pin(index, choice), False, colour)
         pin = pygame.Rect(rect.x + 1, rect.y + 1, text.get_width() + 4, ROW_H)
-        pygame.draw.rect(self.surface, INK, pin)
+        self._wash(pin, INK)
         self.surface.blit(text, (pin.x + 2, pin.y))
 
         if action is not None:
@@ -447,13 +500,14 @@ class Stage:
         visible = rows[self.scroll : self.scroll + capacity]
         y = LOGICAL_SIZE[1] - capacity * ROW_H - 2
         # Choices are keyed by their number rather than by row order, so a
-        # scrolled-away choice stays selectable from the keyboard.
+        # scrolled-away choice stays selectable from the keyboard. Two refused
+        # rows with the same text now share a key, since both are labelled
+        # `x)`; that is harmless because neither has an action to recover.
         by_label = {
             self._choice_label(index, choice): choice
             for index, choice in enumerate(turn.choices, start=1)
         }
         for row in visible:
-            pygame.draw.rect(self.surface, INK, pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H))
             choice = by_label.get(row.text) if row.kind == "choice" else None
             action = choice_action(choice) if choice is not None else None
             colour = CREAM
@@ -461,10 +515,24 @@ class Stage:
                 colour = DIM
             elif row.kind == "heading":
                 colour = RUST
-            text = self.font.render(row.text, False, colour)
-            self.surface.blit(text, (4, y))
+            # Clipped like an ordinary row: a legend line is one line for the
+            # same reason, and the hitbox is sized from what was drawn rather
+            # than from what was asked for, so it cannot reach past the frame.
+            text = self.font.render(self._clip(row.text), False, colour)
+            self._wash(
+                self._backing(
+                    text,
+                    left=ROW_TEXT_LEFT,
+                    y=y,
+                    kind=row.kind,
+                    width=LOGICAL_SIZE[0] - 2 * (ROW_TEXT_LEFT - 3),
+                    pitch=ROW_H,
+                ),
+                INK,
+            )
+            self.surface.blit(text, (ROW_TEXT_LEFT, y))
             if action is not None:
-                rect = pygame.Rect(4, y, text.get_width(), ROW_H)
+                rect = pygame.Rect(ROW_TEXT_LEFT, y, text.get_width(), ROW_H)
                 self.hitboxes.append((rect, action))
             y += ROW_H
 
@@ -478,8 +546,45 @@ class Stage:
             )
 
     @staticmethod
+    def _pin(index: int, choice: Choice) -> str:
+        """Return the key that commits this choice, or `X` when it has none.
+
+        One function for both surfaces. The plate's pin and the row's marker
+        are the same claim about the same choice, and deriving them separately
+        is how a box ends up numbered while its legend row is not.
+
+        Capital, because at 11px the default font renders a lowercase `x` as a
+        3x4 blob indistinguishable from a filled square, while `X` keeps its
+        crossbars. The legend keeps `x)`, where the bracket carries the shape
+        and the pair matches what the CLI prints.
+        """
+
+        if choice_action(choice) is None:
+            return REFUSED_PIN
+        return key_for_position(index) or ""
+
+    @staticmethod
+    def _marker(index: int, choice: Choice) -> str:
+        """Return what goes in front of a row: its key, or that it has none.
+
+        Numbering is positional, so the number a row shows is the key that
+        commits it. A row this port cannot commit has no key, and printing its
+        position invites a press that silently does nothing — so it prints
+        `x)` instead. Live rows therefore run 1, 3, 6 rather than 1, 2, 3: the
+        gaps are the refusals, and every number on screen works.
+
+        Settled in the widget vocabulary at §2.6.1 and followed by the CLI, so
+        an edge carries the same position in both ports.
+        """
+
+        pin = Stage._pin(index, choice)
+        if pin == REFUSED_PIN:
+            return "x)"
+        return f"{pin}." if pin else " "
+
+    @staticmethod
     def _choice_label(index: int, choice: Choice) -> str:
-        label = f"{index}. {choice.text}"
+        label = f"{Stage._marker(index, choice)} {choice.text}"
         # An available choice this port cannot collect a value for still needs
         # to say why, or its dimmed legend row reads as an engine refusal.
         if reason := (choice.unavailable_reason or unsupported_reason(choice)):
@@ -658,14 +763,75 @@ class Stage:
             rows.extend(_Row(part, "alt") for part in self._wrap(text, columns))
         return rows
 
+    @staticmethod
+    def _backing(
+        rendered: pygame.Surface,
+        *,
+        left: int,
+        y: int,
+        kind: str,
+        width: int,
+        pitch: int,
+    ) -> pygame.Rect:
+        """Return the backing rect for one drawn row.
+
+        A choice hugs its own text, so the scene shows between rows and the
+        wash matches the hitbox, which is sized from the same text. Prose is a
+        block, because a ragged right edge on wrapped narration reads as
+        damage rather than as shape.
+
+        One function for both surfaces. The map legend draws prose and choices
+        through the same loop as the scene draws them through two, and before
+        this they disagreed: the legend washed every row edge to edge, so a
+        plate acquired a slab across its foot while the scene above it showed
+        the art between the rows.
+        """
+
+        # `left` is where the text starts; the backing begins three pixels
+        # before it, for every kind. Prose used to start exactly at its first
+        # glyph while a choice was padded, so on one surface the wash hugged
+        # the "O" of the narration and cleared the number of the row beneath
+        # it. Same padding now, so the two share a left edge.
+        if kind == "choice":
+            # One pixel short of the pitch, so consecutive rows always show a
+            # hairline of scene between them however the caller spaces them.
+            # That gap is what makes a row read as a separate thing to click.
+            return pygame.Rect(
+                max(0, left - 3), y, rendered.get_width() + 6, pitch - 1
+            )
+        return pygame.Rect(max(0, left - 3), y, width, ROW_H)
+
+    def _wash(self, rect: pygame.Rect, colour: tuple[int, int, int]) -> None:
+        """Lay a translucent backing under text.
+
+        One function for every backing in the client, so a prose row, a choice
+        row, the state column and a map pin cannot drift to different
+        opacities and read as different surfaces.
+        """
+
+        wash = pygame.Surface(rect.size, pygame.SRCALPHA)
+        wash.fill((*colour, TEXT_WASH))
+        self.surface.blit(wash, rect.topleft)
+
     def _draw_rows(self, rows: list[_Row], *, capacity: int, width: int) -> None:
         """Draw one page of rows, bottom-aligned, with a scroll indicator."""
 
         y = PROSE_TOP + max(0, capacity - len(rows)) * ROW_H
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
-            pygame.draw.rect(self.surface, fill, pygame.Rect(6, y, width - 12, ROW_H))
-            self.surface.blit(self.font.render(row.text, False, colour), (9, y))
+            rendered = self.font.render(row.text, False, colour)
+            self._wash(
+                self._backing(
+                    rendered,
+                    left=9,
+                    y=y,
+                    kind=row.kind,
+                    width=width - 12,
+                    pitch=ROW_H,
+                ),
+                fill,
+            )
+            self.surface.blit(rendered, (9, y))
             y += ROW_H
         if self.max_scroll:
             marker = f"{self.scroll + 1}/{self.max_scroll + 1}  \u2191\u2193"
@@ -677,7 +843,7 @@ class Stage:
 
         self.scroll = min(max(self.scroll + delta, 0), self.max_scroll)
 
-    def _row(self, index: int, text: str, *, y: int, colour, action: Action | None) -> None:
+    def _row(self, marker: str, text: str, *, y: int, colour, action: Action | None) -> None:
         """Draw one numbered row and, when actionable, record its hitbox.
 
         Rows sit directly on the scene, so they carry their own backing. Prose
@@ -686,11 +852,19 @@ class Stage:
         exactly where the art was working hardest.
         """
 
-        surface = self.font.render(f"{index}. {text}", False, colour)
+        surface = self.font.render(self._clip(f"{marker} {text}"), False, colour)
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
-        backing = rect.inflate(6, 2)
-        backing.left = 5
-        pygame.draw.rect(self.surface, INK, backing)
+        self._wash(
+            self._backing(
+                surface,
+                left=8,
+                y=y,
+                kind="choice",
+                width=LOGICAL_SIZE[0],
+                pitch=CHOICE_PITCH,
+            ),
+            INK,
+        )
         self.surface.blit(surface, rect.topleft)
         if action is not None:
             self.hitboxes.append((rect, action))
@@ -703,7 +877,7 @@ class Stage:
             if reason := (choice.unavailable_reason or unsupported_reason(choice)):
                 label = f"{label}  — {reason}"
             self._row(
-                index,
+                self._marker(index, choice),
                 label,
                 y=y,
                 colour=CREAM if action is not None else DIM,
@@ -857,7 +1031,7 @@ class Stage:
         """
 
         left = LOGICAL_SIZE[0] - PANEL_W
-        pygame.draw.rect(self.surface, INK, pygame.Rect(left, top, PANEL_W, bottom - top))
+        self._wash(pygame.Rect(left, top, PANEL_W, bottom - top), INK)
         columns = (PANEL_W - 10) // 4
         rows = self.panel_rows(turn, columns=columns, placed=placed)
         capacity = max(1, (bottom - top - 4) // ROW_H)
@@ -957,7 +1131,7 @@ class Stage:
             if piece.piece_id in on_surface:
                 continue
             self._row(
-                numbering[piece.piece_id],
+                f"{numbering[piece.piece_id]}.",
                 piece.label or piece.piece_id,
                 y=y,
                 colour=CREAM,
@@ -969,7 +1143,7 @@ class Stage:
         if pages > 1:
             page = self.selection_index(turn, pending) + 1
             self._row(
-                PAGE_KEY,
+                f"{PAGE_KEY}.",
                 f"More ({page}/{pages})",
                 y=y,
                 colour=CREAM,
@@ -983,7 +1157,7 @@ class Stage:
             # keyboard can finish is not a usable surface.
             picked = len(pending.picked)
             self._row(
-                CONFIRM_KEY,
+                f"{CONFIRM_KEY}.",
                 f"Confirm ({picked} selected)",
                 y=y,
                 colour=CREAM,
@@ -991,8 +1165,11 @@ class Stage:
             )
             y += 11
         else:
+            # Keeps its number where a refused choice would print `x)`: this is
+            # a control with a fixed binding, and the number is what the panel
+            # is teaching. It starts working the moment the minimum is met.
             self._row(
-                CONFIRM_KEY,
+                f"{CONFIRM_KEY}.",
                 f"Pick {pending.wanted} more",
                 y=y,
                 colour=DIM,
@@ -1000,7 +1177,7 @@ class Stage:
             )
             y += 11
 
-        self._row(CANCEL_KEY, "Cancel", y=y, colour=DIM, action=CancelSelection())
+        self._row(f"{CANCEL_KEY}.", "Cancel", y=y, colour=DIM, action=CancelSelection())
 
     def hit(self, position: tuple[int, int]) -> Action | None:
         """Map a window click to the action its row performs."""
@@ -1012,6 +1189,25 @@ class Stage:
             if rect.collidepoint(logical):
                 return action
         return None
+
+    def _clip(self, text: str) -> str:
+        """Return `text` shortened until the row fits the frame.
+
+        A choice row is one line by construction — the number a reader presses
+        has to stay with the words it names — so a long one cannot wrap and
+        used to run off the right edge instead, taking the end of the sentence
+        with it silently. Trimming to an ellipsis at least says that there was
+        more. Measured rather than counted: the font is proportional, so a
+        column budget would clip the wrong worlds.
+        """
+
+        limit = LOGICAL_SIZE[0] - 12
+        if self.font.size(text)[0] <= limit:
+            return text
+        clipped = text
+        while clipped and self.font.size(f"{clipped}…")[0] > limit:
+            clipped = clipped[:-1]
+        return f"{clipped.rstrip()}…"
 
     @staticmethod
     def _wrap(text: str, width: int) -> list[str]:

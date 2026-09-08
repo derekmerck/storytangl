@@ -8,6 +8,7 @@ commit exactly what selecting its numbered entry commits.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -25,7 +26,12 @@ from tangl.pygame_client.models import (  # noqa: E402
     StageImage,
     Turn,
 )
-from tangl.pygame_client.stage import LOGICAL_SIZE, SCALE, Stage  # noqa: E402
+from tangl.pygame_client.stage import (  # noqa: E402
+    LOGICAL_SIZE,
+    ROW_TEXT_LEFT,
+    SCALE,
+    Stage,
+)
 
 PLATE = MapPlate(
     name="quay",
@@ -110,6 +116,75 @@ def test_a_guarded_region_is_drawn_but_refuses_the_click(stage, frame) -> None:
     assert stage.hit(_centre(salon)) is None
 
 
+def test_a_refused_region_pins_x_where_a_live_one_pins_its_number(
+    stage, frame
+) -> None:
+    """The pin is the key, and a refused box has no key.
+
+    Dimmed box, `x` pin and `x)` legend row are the same refusal said three
+    times in the same vocabulary; a number there would be a press that does
+    nothing.
+    """
+
+    live, guarded = frame.choices[0], frame.choices[1]
+
+    # The plate's pin and the legend's marker come from one function, so a
+    # box cannot end up numbered while its row is not.
+    assert stage._pin(1, live) == "1"
+    assert stage._pin(2, guarded) == "X"  # legible at 11px; `x` is not
+    assert stage._marker(1, live) == "1."
+    assert stage._marker(2, guarded) == "x)"
+    assert stage._choice_label(2, guarded).startswith("x) ")
+
+
+def test_a_legend_row_is_clipped_like_any_other_row(stage, frame) -> None:
+    """The footer draws over the plate, so a long row cannot run off it.
+
+    Ordinary choice rows were clipped; legend rows rendered raw text, which is
+    the same defect on the surface where it is least visible -- the overflow
+    leaves the frame rather than colliding with anything.
+    """
+
+    long_choice = Choice(
+        edge_id=uuid4(),
+        tags=frozenset({"ui:plate:quay:quayside"}),
+        text=(
+            "Go to The Quayside, past the cranes and the fuel dock and the "
+            "long row of chandlers that have been shut since the spring"
+        ),
+        payload={"move": "quayside"},
+    )
+    stage.draw(replace(frame, choices=[long_choice]))
+
+    for rect, _action in stage.hitboxes:
+        assert rect.right <= LOGICAL_SIZE[0]
+
+
+def test_a_legend_row_backs_only_its_own_text(stage, frame) -> None:
+    """The legend obeys the same backing rule as a scene row.
+
+    It used to wash every row edge to edge, so a plate acquired a slab across
+    its foot while the scene above showed the art between its rows -- and the
+    slab did not even match the hitbox, which was already sized from the text.
+    """
+
+    live = frame.choices[0]
+    rendered = stage.font.render(stage._choice_label(1, live), False, (0, 0, 0))
+    backing = stage._backing(
+        rendered, left=8, y=0, kind="choice", width=LOGICAL_SIZE[0] - 10, pitch=9
+    )
+
+    assert backing.width < LOGICAL_SIZE[0]
+    assert backing.width == rendered.get_width() + 6
+    # Prose stays a block: a ragged edge on wrapped narration reads as damage.
+    prose = stage._backing(
+        rendered, left=8, y=0, kind="narration", width=200, pitch=9
+    )
+    assert prose.width == 200
+    # Both begin three pixels before the text, so their left edges agree.
+    assert prose.left == backing.left
+
+
 def test_a_region_no_choice_claims_is_inert(stage, frame) -> None:
     """The plate names a lighthouse; nothing offers travel there."""
 
@@ -179,9 +254,13 @@ def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
     frame.plate = MapPlate(name="quay", image="quay_map.png", regions=(wide,))
     stage.draw(frame)
 
+    # Identified by the row inset rather than a literal, so a layout change
+    # moves the test with the code instead of breaking it.
     legend = next(
         rect for rect, action in stage.hitboxes
-        if action.edge_id == frame.choices[0].edge_id and rect.h == 9 and rect.x == 4
+        if action.edge_id == frame.choices[0].edge_id
+        and rect.h == 9
+        and rect.x == ROW_TEXT_LEFT
     )
     click = ((legend.x + 1) * SCALE, (legend.y + 1) * SCALE)
 
