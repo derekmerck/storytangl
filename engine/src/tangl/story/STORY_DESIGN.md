@@ -124,6 +124,18 @@ contributions overlay the application's built-in registry without changing it,
 then lower their private source representation directly to cardinal story data.
 The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
 
+That domain module also contributes a `class_registry` of its `Entity`
+subclasses, and authored `kind` names resolve through it. Resolution order is
+the cardinal vocabulary, then the world's contributed classes, then a dotted
+import path. Cardinal names win, so a bundle cannot quietly redefine `Block` or
+`Scene`; everything the core does not already name is the world's to supply.
+This is the same registry the asset compiler uses for `asset_kind`, so a bundle
+contributes block kinds and asset kinds through one pathway rather than by
+subclassing `StoryCompiler`. An authored kind that resolves to nothing records a
+`compile:unresolved_kind` issue instead of silently compiling as the fallback,
+because a world losing its own block kinds should not look like a world that
+never declared any.
+
 `StoryCompiler.decompile()` is the inverse semantic projection: it recovers a
 portable, deterministic cardinal mapping from a compiled template bundle for a
 later codec to encode. It canonicalizes hierarchy and payload kinds rather than
