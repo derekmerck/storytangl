@@ -145,6 +145,13 @@ CANCEL_KEY = 0
 
 SURFACE_CONTOUR = 1
 SURFACE_WASH = 140
+TEXT_WASH = 210
+"""Opacity of a text backing, out of 255.
+
+Opaque backings were readable and hid the scene behind a slab. A wash keeps
+the contrast the text needs -- cream on near-black is a long way from the
+palette's midtones -- while leaving the art legible underneath, the way a
+terminal shows a wallpaper through its window."""
 """How the client paints a surface band: a wash of this alpha plus a lit edge.
 
 A darkened band with a contour along its top reads as a surface projecting away
@@ -419,7 +426,7 @@ class Stage:
         # key. Dimmed box, `x` pin, `x)` row -- the three still tie together.
         text = self.font.render(self._pin(index, choice), False, colour)
         pin = pygame.Rect(rect.x + 1, rect.y + 1, text.get_width() + 4, ROW_H)
-        pygame.draw.rect(self.surface, INK, pin)
+        self._wash(pin, INK)
         self.surface.blit(text, (pin.x + 2, pin.y))
 
         if action is not None:
@@ -464,7 +471,7 @@ class Stage:
             for index, choice in enumerate(turn.choices, start=1)
         }
         for row in visible:
-            pygame.draw.rect(self.surface, INK, pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H))
+            self._wash(pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H), INK)
             choice = by_label.get(row.text) if row.kind == "choice" else None
             action = choice_action(choice) if choice is not None else None
             colour = CREAM
@@ -706,13 +713,25 @@ class Stage:
             rows.extend(_Row(part, "alt") for part in self._wrap(text, columns))
         return rows
 
+    def _wash(self, rect: pygame.Rect, colour: tuple[int, int, int]) -> None:
+        """Lay a translucent backing under text.
+
+        One function for every backing in the client, so a prose row, a choice
+        row, the state column and a map pin cannot drift to different
+        opacities and read as different surfaces.
+        """
+
+        wash = pygame.Surface(rect.size, pygame.SRCALPHA)
+        wash.fill((*colour, TEXT_WASH))
+        self.surface.blit(wash, rect.topleft)
+
     def _draw_rows(self, rows: list[_Row], *, capacity: int, width: int) -> None:
         """Draw one page of rows, bottom-aligned, with a scroll indicator."""
 
         y = PROSE_TOP + max(0, capacity - len(rows)) * ROW_H
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
-            pygame.draw.rect(self.surface, fill, pygame.Rect(6, y, width - 12, ROW_H))
+            self._wash(pygame.Rect(6, y, width - 12, ROW_H), fill)
             self.surface.blit(self.font.render(row.text, False, colour), (9, y))
             y += ROW_H
         if self.max_scroll:
@@ -738,7 +757,7 @@ class Stage:
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
         backing = rect.inflate(6, 2)
         backing.left = 5
-        pygame.draw.rect(self.surface, INK, backing)
+        self._wash(backing, INK)
         self.surface.blit(surface, rect.topleft)
         if action is not None:
             self.hitboxes.append((rect, action))
@@ -905,7 +924,7 @@ class Stage:
         """
 
         left = LOGICAL_SIZE[0] - PANEL_W
-        pygame.draw.rect(self.surface, INK, pygame.Rect(left, top, PANEL_W, bottom - top))
+        self._wash(pygame.Rect(left, top, PANEL_W, bottom - top), INK)
         columns = (PANEL_W - 10) // 4
         rows = self.panel_rows(turn, columns=columns, placed=placed)
         capacity = max(1, (bottom - top - 4) // ROW_H)

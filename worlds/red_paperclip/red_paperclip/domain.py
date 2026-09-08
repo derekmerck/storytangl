@@ -31,6 +31,14 @@ from tangl.core import BaseFragment, BehaviorRegistry, Graph, Priority, Selector
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.sandbox import SandboxLocation, SandboxMob, SandboxScope
+
+# Load-bearing despite being unused: the sandbox package deliberately does not
+# import its own story-info adapter, so a world that wants ordinary sandbox
+# disclosure -- location, time, exits, presence, and the map plate geometry the
+# pygame client needs to draw a district -- has to ask for the module by name.
+# Dropping this line costs the world every one of those sections and nothing
+# says so; the map simply stops being a map.
+import tangl.mechanics.sandbox.story_info  # noqa: F401
 from tangl.presentation.intent import Blocker
 from tangl.presentation.projection import (
     ItemListValue,

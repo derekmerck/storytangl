@@ -257,6 +257,29 @@ class TestRedPaperclipWorld:
         assert bundle.manifest.label == "red_paperclip"
         assert bundle.manifest.metadata["title"] == "One Red Paperclip"
 
+    def test_the_road_publishes_its_plate_geometry(self) -> None:
+        """The sandbox disclosure channels reach a client for this world.
+
+        They arrive only because the domain module imports
+        `tangl.mechanics.sandbox.story_info` for its side effect -- the package
+        does not import its own adapter, so the handlers register on demand.
+        Dropping that import costs every sandbox section silently, and the
+        first visible symptom is a map that stops being a map.
+        """
+
+        ledger = _start()
+
+        projected = do_get_story_info(
+            ledger.cursor,
+            ctx=_ctx(ledger),
+            request=ProjectionRequest(kinds=["map_plate", "map_regions", "location"]),
+        )
+        section_ids = {section.section_id for section in projected.sections}
+
+        assert "sandbox_map_plate" in section_ids
+        assert "sandbox_map_regions" in section_ids
+        assert "sandbox_location" in section_ids
+
     def test_the_road_offers_travel_to_every_hub(self) -> None:
         ledger = _start()
 
