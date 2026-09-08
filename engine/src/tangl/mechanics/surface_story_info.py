@@ -10,10 +10,30 @@ against any mechanic, so a block publishes these channels by owning a surface an
 nothing else. Importing this module registers the handlers; the credentials
 worlds pull it in the way the adventure sandbox pulls in its map channel.
 
-The contribution goes on ``presentation_dispatch`` and this module imports no
+Why this lives in mechanics
+---------------------------
+Because mechanics sits at the intersection and may draw on either side. Knowing
+what assets exist and how they are laid out is ordinary mechanics work -- a
+checkpoint knows it has a counter with documents on it -- so the module belongs
+here rather than being pushed up or down to satisfy a diagram.
+
+What was wrong was not where the work happened but the vocabulary it reached for.
+Describing a desk by importing Service made this module a party to the request:
+it saw the projector seam, the response types, the shape of an answer being
+prepared. None of that is its business. It needs to say *what is there and where*
+in terms any client could read, and stop.
+
+That the two got conflated is not surprising. Service was the first thing that
+wanted to serve a projection, so serving and describing were folded together
+while they had exactly one consumer between them -- the same accident that put
+the rectangle in ``journal`` because a fragment carried it, and the surface types
+beside a game block because a block declared one. Three instances of one mistake,
+and #449 unpicks all three.
+
+So the contribution goes on ``presentation_dispatch`` and this module imports no
 Service. Service stays the outer operation: it fires the task, folds this
-registry with the story/world authorities, and prepares the response. Nothing
-here knows an envelope exists.
+registry with the story and world authorities, and prepares the response.
+Nothing here knows an envelope exists, or a client, or a DTO.
 """
 
 from __future__ import annotations
