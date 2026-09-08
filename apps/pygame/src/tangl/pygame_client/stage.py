@@ -145,6 +145,13 @@ CANCEL_KEY = 0
 
 SURFACE_CONTOUR = 1
 SURFACE_WASH = 140
+CHOICE_PITCH = 11
+"""Vertical step between choice rows, one more than the backing they carry."""
+
+ROW_TEXT_LEFT = 8
+"""Left edge of row text. The backing sits three pixels outside it, so a row
+and a legend line share one margin however each surface lays them out."""
+
 TEXT_WASH = 210
 """Opacity of a text backing, out of 255.
 
@@ -484,13 +491,18 @@ class Stage:
             text = self.font.render(self._clip(row.text), False, colour)
             self._wash(
                 self._backing(
-                    text, left=4, y=y, kind=row.kind, width=LOGICAL_SIZE[0] - 8
+                    text,
+                    left=ROW_TEXT_LEFT,
+                    y=y,
+                    kind=row.kind,
+                    width=LOGICAL_SIZE[0] - 2 * (ROW_TEXT_LEFT - 3),
+                    pitch=ROW_H,
                 ),
                 INK,
             )
-            self.surface.blit(text, (4, y))
+            self.surface.blit(text, (ROW_TEXT_LEFT, y))
             if action is not None:
-                rect = pygame.Rect(4, y, text.get_width(), ROW_H)
+                rect = pygame.Rect(ROW_TEXT_LEFT, y, text.get_width(), ROW_H)
                 self.hitboxes.append((rect, action))
             y += ROW_H
 
@@ -726,6 +738,7 @@ class Stage:
         y: int,
         kind: str,
         width: int,
+        pitch: int,
     ) -> pygame.Rect:
         """Return the backing rect for one drawn row.
 
@@ -741,13 +754,19 @@ class Stage:
         the art between the rows.
         """
 
+        # `left` is where the text starts; the backing begins three pixels
+        # before it, for every kind. Prose used to start exactly at its first
+        # glyph while a choice was padded, so on one surface the wash hugged
+        # the "O" of the narration and cleared the number of the row beneath
+        # it. Same padding now, so the two share a left edge.
         if kind == "choice":
-            backing = pygame.Rect(
-                left, y, rendered.get_width(), rendered.get_height()
-            ).inflate(6, 2)
-            backing.left = max(0, left - 3)
-            return backing
-        return pygame.Rect(left, y, width, ROW_H)
+            # One pixel short of the pitch, so consecutive rows always show a
+            # hairline of scene between them however the caller spaces them.
+            # That gap is what makes a row read as a separate thing to click.
+            return pygame.Rect(
+                max(0, left - 3), y, rendered.get_width() + 6, pitch - 1
+            )
+        return pygame.Rect(max(0, left - 3), y, width, ROW_H)
 
     def _wash(self, rect: pygame.Rect, colour: tuple[int, int, int]) -> None:
         """Lay a translucent backing under text.
@@ -769,7 +788,14 @@ class Stage:
             fill, colour = _ROW_STYLES[row.kind]
             rendered = self.font.render(row.text, False, colour)
             self._wash(
-                self._backing(rendered, left=6, y=y, kind=row.kind, width=width - 12),
+                self._backing(
+                    rendered,
+                    left=9,
+                    y=y,
+                    kind=row.kind,
+                    width=width - 12,
+                    pitch=ROW_H,
+                ),
                 fill,
             )
             self.surface.blit(rendered, (9, y))
@@ -796,7 +822,14 @@ class Stage:
         surface = self.font.render(self._clip(f"{marker} {text}"), False, colour)
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
         self._wash(
-            self._backing(surface, left=8, y=y, kind="choice", width=LOGICAL_SIZE[0]),
+            self._backing(
+                surface,
+                left=8,
+                y=y,
+                kind="choice",
+                width=LOGICAL_SIZE[0],
+                pitch=CHOICE_PITCH,
+            ),
             INK,
         )
         self.surface.blit(surface, rect.topleft)

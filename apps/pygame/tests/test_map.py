@@ -26,7 +26,12 @@ from tangl.pygame_client.models import (  # noqa: E402
     StageImage,
     Turn,
 )
-from tangl.pygame_client.stage import LOGICAL_SIZE, SCALE, Stage  # noqa: E402
+from tangl.pygame_client.stage import (  # noqa: E402
+    LOGICAL_SIZE,
+    ROW_TEXT_LEFT,
+    SCALE,
+    Stage,
+)
 
 PLATE = MapPlate(
     name="quay",
@@ -166,14 +171,18 @@ def test_a_legend_row_backs_only_its_own_text(stage, frame) -> None:
     live = frame.choices[0]
     rendered = stage.font.render(stage._choice_label(1, live), False, (0, 0, 0))
     backing = stage._backing(
-        rendered, left=4, y=0, kind="choice", width=LOGICAL_SIZE[0] - 8
+        rendered, left=8, y=0, kind="choice", width=LOGICAL_SIZE[0] - 10, pitch=9
     )
 
     assert backing.width < LOGICAL_SIZE[0]
     assert backing.width == rendered.get_width() + 6
     # Prose stays a block: a ragged edge on wrapped narration reads as damage.
-    prose = stage._backing(rendered, left=6, y=0, kind="narration", width=200)
+    prose = stage._backing(
+        rendered, left=8, y=0, kind="narration", width=200, pitch=9
+    )
     assert prose.width == 200
+    # Both begin three pixels before the text, so their left edges agree.
+    assert prose.left == backing.left
 
 
 def test_a_region_no_choice_claims_is_inert(stage, frame) -> None:
@@ -245,9 +254,13 @@ def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
     frame.plate = MapPlate(name="quay", image="quay_map.png", regions=(wide,))
     stage.draw(frame)
 
+    # Identified by the row inset rather than a literal, so a layout change
+    # moves the test with the code instead of breaking it.
     legend = next(
         rect for rect, action in stage.hitboxes
-        if action.edge_id == frame.choices[0].edge_id and rect.h == 9 and rect.x == 4
+        if action.edge_id == frame.choices[0].edge_id
+        and rect.h == 9
+        and rect.x == ROW_TEXT_LEFT
     )
     click = ((legend.x + 1) * SCALE, (legend.y + 1) * SCALE)
 
