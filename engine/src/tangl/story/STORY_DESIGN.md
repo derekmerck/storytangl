@@ -124,6 +124,32 @@ contributions overlay the application's built-in registry without changing it,
 then lower their private source representation directly to cardinal story data.
 The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
 
+Codec resolution is ordered by **specificity**, not by who registered it:
+
+1. an application registration bound to a specific world's singleton label
+2. a bundle contribution from that world's domain module
+3. an application registration for the codec type generally
+
+A bundle contribution is inherently world-scoped, so it outranks a generic type
+registration: if core ships a weak `passages` codec, a world that ships its own
+gets its own. The application still has the last word, because it can always
+register more precisely — a bad codec inside a world bundle can be replaced from
+core by importing it, fixing it, and binding the result to that world's label,
+without editing the world. Tier 1 is the designed shape and is **not implemented
+yet**; today resolution is tiers 2 and 3 only, and a bundle contribution wins
+unconditionally over the application registry.
+
+Codec construction parameters are not part of this hook. `get_story_codecs()`
+returns constructed instances, so a contribution carries one configuration.
+Options that change how a world compiles — media distribution mode, for example —
+are build parameters: change the parameter and reload, rather than expecting one
+registration to serve several configurations.
+
+Domain modules contribute through a small set of parallel hooks, each read once
+when the module is imported: `get_authorities()`, `get_story_codecs()`, and
+`get_media_index_handlers()`, plus the `class_registry` collected automatically
+from the module's `Entity` subclasses.
+
 That domain module also contributes a `class_registry` of its `Entity`
 subclasses, and authored `kind` names resolve through it. Resolution order is
 the cardinal vocabulary, then the world's contributed classes, then a dotted

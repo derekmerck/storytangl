@@ -26,6 +26,7 @@ class _WorldDomainAdjuncts:
         self.modules: list[Any] = []
         self.class_registry: dict[str, Any] = {}
         self.story_codecs: dict[str, StoryCodec] = {}
+        self.media_index_handlers: list[Any] = []
 
     def load_domain_module(self, domain_module: str) -> None:
         module = importlib.import_module(domain_module)
@@ -40,6 +41,12 @@ class _WorldDomainAdjuncts:
         get_story_codecs = getattr(module, "get_story_codecs", None)
         if callable(get_story_codecs):
             self.story_codecs.update(get_story_codecs())
+
+        get_media_index_handlers = getattr(module, "get_media_index_handlers", None)
+        if callable(get_media_index_handlers):
+            for handler in get_media_index_handlers() or ():
+                if handler not in self.media_index_handlers:
+                    self.media_index_handlers.append(handler)
 
         try:
             from tangl.core import Entity
@@ -266,6 +273,9 @@ class WorldCompiler:
         resources_facet = self.media_compiler.index(
             bundle.media_dir,
             organization_hints=bundle.manifest.media_organization,
+            index_handlers=(
+                domain_facet.media_index_handlers if domain_facet is not None else ()
+            ),
         )
         return domain_facet, assets_facet, resources_facet
 
