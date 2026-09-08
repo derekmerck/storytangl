@@ -58,7 +58,7 @@ _COMPILE_ISSUE_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
     ISSUE_EMPTY_ENTRY_RESOLUTION: ("requested_entry_ids", "resolution_strategy"),
     ISSUE_PAYLOAD_CONSTRUCTION_FAILED: ("kind", "fallback_kind", "error", "hint"),
     ISSUE_UNKNOWN_AUTHORED_KEY: ("key", "kind", "hint"),
-    ISSUE_UNRESOLVED_KIND: ("kind", "fallback_kind", "known_kinds"),
+    ISSUE_UNRESOLVED_KIND: ("kind", "fallback_kind", "known_kinds", "error"),
 }
 
 
@@ -1389,8 +1389,8 @@ class StoryCompiler:
         raw_kind: Any,
         *,
         fallback: type[Entity],
-        collector: "_CompileCollector | None" = None,
-        authored_path: str | None = None,
+        collector: "_CompileCollector",
+        authored_path: str,
     ) -> type[Entity]:
         """Resolve an authored ``kind`` to an Entity class.
 
@@ -1419,22 +1419,28 @@ class StoryCompiler:
             contributed = self._map_contributed_kind(kind_name, collector=collector)
             if contributed is not None:
                 return contributed
-            try:
-                module_name, class_name = raw_kind.rsplit(".", 1)
-                cls = getattr(import_module(module_name), class_name)
-                if isinstance(cls, type):
-                    cardinal = self._map_external_kind(cls.__name__)
-                    if cardinal is not None:
-                        return cardinal
-                    if issubclass(cls, Entity):
-                        return cls
-            except Exception:
-                pass
+            import_error: Exception | None = None
+            # Only a dotted name claims to be an import path. A bare name that
+            # resolved to nothing is a plain unknown kind, and reporting a
+            # rsplit ValueError against it would be noise, not a reason.
+            if "." in raw_kind:
+                try:
+                    module_name, class_name = raw_kind.rsplit(".", 1)
+                    cls = getattr(import_module(module_name), class_name)
+                    if isinstance(cls, type):
+                        cardinal = self._map_external_kind(cls.__name__)
+                        if cardinal is not None:
+                            return cardinal
+                        if issubclass(cls, Entity):
+                            return cls
+                except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+                    import_error = exc
             self._report_unresolved_kind(
                 raw_kind,
                 fallback=fallback,
                 collector=collector,
                 authored_path=authored_path,
+                error=import_error,
             )
 
         return fallback
@@ -1443,11 +1449,9 @@ class StoryCompiler:
     def _map_contributed_kind(
         kind_name: str,
         *,
-        collector: "_CompileCollector | None",
+        collector: "_CompileCollector",
     ) -> type[Entity] | None:
         """Resolve a name through the world's contributed class registry."""
-        if collector is None:
-            return None
         candidate = collector.class_registry.get(kind_name)
         if isinstance(candidate, type) and issubclass(candidate, Entity):
             return candidate
@@ -1458,12 +1462,20 @@ class StoryCompiler:
         raw_kind: str,
         *,
         fallback: type[Entity],
-        collector: "_CompileCollector | None",
-        authored_path: str | None,
+        collector: "_CompileCollector",
+        authored_path: str,
+        error: Exception | None = None,
     ) -> None:
-        if collector is None or authored_path is None:
-            return
-        known = sorted(collector.class_registry)
+        details: dict[str, JsonValue] = {
+            "kind": raw_kind,
+            "fallback_kind": fallback.__name__,
+            "known_kinds": sorted(collector.class_registry),
+        }
+        # A dotted path that failed to import is a different authoring problem
+        # from a name nobody declared: one is a typo, the other is a broken
+        # domain module. Carry the reason so the author can tell them apart.
+        if error is not None:
+            details["error"] = f"{type(error).__name__}: {error}"
         collector.add_settled(
             code=ISSUE_UNRESOLVED_KIND,
             severity=CompileSeverity.WARNING,
@@ -1473,11 +1485,7 @@ class StoryCompiler:
             ),
             subject_label=raw_kind,
             authored_path=authored_path,
-            details={
-                "kind": raw_kind,
-                "fallback_kind": fallback.__name__,
-                "known_kinds": known,
-            },
+            details=details,
         )
 
     @staticmethod

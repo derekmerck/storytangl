@@ -203,3 +203,59 @@ def test_unresolved_kind_is_reported_rather_than_silently_downgraded(
     assert issues[0].details["kind"] == "NoSuchKind"
     assert issues[0].details["fallback_kind"] == "Block"
     assert "Workshop" in issues[0].details["known_kinds"]
+
+
+def _unresolved_issues(script: dict) -> list:
+    """Compile a script and return only its unresolved-kind issues."""
+    bundle = StoryCompiler().compile(script)
+    return [issue for issue in bundle.issues if issue.code == ISSUE_UNRESOLVED_KIND]
+
+
+def test_scene_kind_path_reports_unresolved_kinds() -> None:
+    """The scene call site carries the collector too.
+
+    ``_resolve_kind`` runs at three sites - scene kinds, block kinds, and
+    generic section entries. Covering only the block path would let a
+    regression that drops the collector from either of the others pass.
+    """
+    issues = _unresolved_issues(
+        {
+            "label": "probe",
+            "scenes": {"s": {"kind": "NoSuchScene", "blocks": {"b": {}}}},
+        }
+    )
+
+    assert len(issues) == 1, issues
+    assert issues[0].details["kind"] == "NoSuchScene"
+    assert issues[0].details["fallback_kind"] == "Scene"
+    assert issues[0].source_ref.authored_path == "scenes[0].s"
+
+
+def test_section_kind_path_reports_unresolved_kinds() -> None:
+    """The generic ``_compile_section`` call site carries the collector too."""
+    issues = _unresolved_issues(
+        {
+            "label": "probe",
+            "templates": {"t": {"kind": "NoSuchTemplate"}},
+            "scenes": {"s": {"blocks": {"b": {}}}},
+        }
+    )
+
+    assert len(issues) == 1, issues
+    assert issues[0].details["kind"] == "NoSuchTemplate"
+    assert issues[0].source_ref.authored_path == "templates[0].t"
+
+
+def test_unresolved_dotted_kind_carries_the_import_reason() -> None:
+    """A broken import and an undeclared name are different authoring problems."""
+    typo = _unresolved_issues(
+        {"label": "p", "scenes": {"s": {"blocks": {"b": {"kind": "NoSuchKind"}}}}}
+    )
+    broken = _unresolved_issues(
+        {"label": "p", "scenes": {"s": {"blocks": {"b": {"kind": "no.such.mod.Thing"}}}}}
+    )
+
+    # A bare name is not a claim to be an import path, so there is no reason to
+    # report - a rsplit failure would be noise rather than a diagnosis.
+    assert "error" not in typo[0].details
+    assert broken[0].details["error"].startswith("ModuleNotFoundError")
