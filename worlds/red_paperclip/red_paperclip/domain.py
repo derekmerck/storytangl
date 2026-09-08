@@ -27,31 +27,32 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from tangl.core import Graph, Priority, Selector
+from tangl.core import BaseFragment, BehaviorRegistry, Graph, Priority, Selector
 from tangl.core.runtime_op import Effect, Predicate
-from tangl.core import BaseFragment
 from tangl.journal.fragments import ContentFragment
-from tangl.journal.intent import Blocker, KvRow
 from tangl.mechanics.sandbox import SandboxLocation, SandboxMob, SandboxScope
-from tangl.mechanics.sandbox.story_info import SandboxStoryInfoProjector
-from tangl.service.response import (
+from tangl.presentation.intent import Blocker
+from tangl.presentation.projection import (
     ItemListValue,
     KvListValue,
     ProjectedItem,
     ProjectedSection,
-    ProjectedState,
+    ProjectionRequest,
 )
-from tangl.service.story_info import DEFAULT_STORY_INFO_PROJECTOR
+from tangl.presentation.values import KvRow
 from tangl.story import Action, StoryGraph
-from tangl.vm import Ledger, on_gather_ns, on_provision
+from tangl.vm import on_gather_ns, on_provision
 from tangl.vm.dispatch import on_compose_journal
 from tangl.vm.ctx import VmPhaseCtx
-from tangl.vm.runtime.frame import PhaseCtx
 
 from .trade_graph import START_ITEM, TradeGraph, Trader
 
 
 TRADES = TradeGraph.load()
+
+red_paperclip_dispatch = BehaviorRegistry(
+    label="red_paperclip.presentation_dispatch"
+)
 
 SCOPE_LABEL = "the_district"
 ENDING_BLOCK = "ending"
@@ -410,21 +411,28 @@ def compose_spent_trader_lines(
 
 # ---------------------------------------------------------- story info
 
-class RedPaperclipStoryInfoProjector:
-    """Sandbox status, plus the two numbers this game is scored on."""
+def project_red_paperclip_holding(
+    *,
+    caller: RedPaperclipHub,
+    request: ProjectionRequest,
+    **_kw: object,
+) -> list[ProjectedSection] | None:
+    """Contribute what is being held and how it was got.
 
-    def __init__(self) -> None:
-        self.sandbox = SandboxStoryInfoProjector()
+    Only these two sections. Location, time, exits and presence are ordinary
+    sandbox disclosure and the sandbox handler contributes them for every
+    world; reproducing them here would give this one a second, divergent copy
+    of a surface it does not own.
+    """
 
-    def project(self, *, ledger: Ledger) -> ProjectedState:
-        """Return the holding and the chain alongside ordinary sandbox state."""
-        cursor = ledger.cursor
-        if not isinstance(cursor, RedPaperclipHub):
-            return DEFAULT_STORY_INFO_PROJECTOR.project(ledger=ledger)
+    requested = set(request.requested_kinds())
+    if not requested or requested.isdisjoint({"status", "history"}):
+        return None
 
-        ctx = PhaseCtx(graph=ledger.graph, cursor_id=cursor.uid)
-        holding = _holding(cursor)
-        sections = [
+    holding = _holding(caller)
+    sections: list[ProjectedSection] = []
+    if "status" in requested:
+        sections.append(
             ProjectedSection(
                 section_id="red_paperclip_holding",
                 title="Holding",
@@ -432,14 +440,17 @@ class RedPaperclipStoryInfoProjector:
                 value=KvListValue(
                     items=[
                         KvRow(key="Holding", value=TRADES.items[holding].name),
-                        KvRow(key="Trades", value=len(_chain(cursor)) - 1),
+                        KvRow(key="Trades", value=len(_chain(caller)) - 1),
                         KvRow(
                             key="Journeys",
-                            value=int(_state(cursor)["world_turn"]),
+                            value=int(_state(caller)["world_turn"]),
                         ),
                     ]
                 ),
-            ),
+            )
+        )
+    if "history" in requested:
+        sections.append(
             ProjectedSection(
                 section_id="red_paperclip_chain",
                 title="Chain",
@@ -447,18 +458,25 @@ class RedPaperclipStoryInfoProjector:
                 value=ItemListValue(
                     items=[
                         ProjectedItem(label=TRADES.items[label].name)
-                        for label in _chain(cursor)
+                        for label in _chain(caller)
                     ]
                 ),
-            ),
-        ]
-        sections.extend(self.sandbox.sections_for(cursor, ctx=ctx))
-        return ProjectedState(sections=sections)
+            )
+        )
+    return sections or None
 
 
-def get_story_info_projector() -> RedPaperclipStoryInfoProjector:
-    """Return the Red Paperclip projected-state adapter."""
-    return RedPaperclipStoryInfoProjector()
+red_paperclip_dispatch.register(
+    project_red_paperclip_holding,
+    task="get_story_info",
+    wants_caller_kind=RedPaperclipHub,
+    wants_exact_kind=False,
+)
+
+
+def get_authorities() -> list[BehaviorRegistry]:
+    """Expose the world's ordinary presentation authority."""
+    return [red_paperclip_dispatch]
 
 
 RedPaperclipHub.model_rebuild(_types_namespace={"UUID": UUID})

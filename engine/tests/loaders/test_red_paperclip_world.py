@@ -12,8 +12,8 @@ from tangl.core import Selector
 from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
-from tangl.service.response import KvListValue
-from tangl.service.story_info import resolve_story_info_projector
+from tangl.presentation.projection import KvListValue, ProjectionRequest
+from tangl.service.dispatch import do_get_story_info
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -327,7 +327,14 @@ class TestRedPaperclipWorld:
         _go(ledger, "harbor")
         _trade(ledger, "gunnar")
 
-        projected = resolve_story_info_projector(ledger).project(ledger=ledger)
+        # Through the ordinary dispatch path a client uses, not through a
+        # world-specific projector: the world contributes sections, it does
+        # not own the projection.
+        projected = do_get_story_info(
+            ledger.cursor,
+            ctx=_ctx(ledger),
+            request=ProjectionRequest(kind="status"),
+        )
         holding = next(
             section
             for section in projected.sections
