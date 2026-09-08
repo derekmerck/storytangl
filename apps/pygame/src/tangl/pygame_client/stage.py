@@ -471,7 +471,6 @@ class Stage:
             for index, choice in enumerate(turn.choices, start=1)
         }
         for row in visible:
-            self._wash(pygame.Rect(0, y, LOGICAL_SIZE[0], ROW_H), INK)
             choice = by_label.get(row.text) if row.kind == "choice" else None
             action = choice_action(choice) if choice is not None else None
             colour = CREAM
@@ -483,6 +482,12 @@ class Stage:
             # same reason, and the hitbox is sized from what was drawn rather
             # than from what was asked for, so it cannot reach past the frame.
             text = self.font.render(self._clip(row.text), False, colour)
+            self._wash(
+                self._backing(
+                    text, left=4, y=y, kind=row.kind, width=LOGICAL_SIZE[0] - 8
+                ),
+                INK,
+            )
             self.surface.blit(text, (4, y))
             if action is not None:
                 rect = pygame.Rect(4, y, text.get_width(), ROW_H)
@@ -713,6 +718,37 @@ class Stage:
             rows.extend(_Row(part, "alt") for part in self._wrap(text, columns))
         return rows
 
+    @staticmethod
+    def _backing(
+        rendered: pygame.Surface,
+        *,
+        left: int,
+        y: int,
+        kind: str,
+        width: int,
+    ) -> pygame.Rect:
+        """Return the backing rect for one drawn row.
+
+        A choice hugs its own text, so the scene shows between rows and the
+        wash matches the hitbox, which is sized from the same text. Prose is a
+        block, because a ragged right edge on wrapped narration reads as
+        damage rather than as shape.
+
+        One function for both surfaces. The map legend draws prose and choices
+        through the same loop as the scene draws them through two, and before
+        this they disagreed: the legend washed every row edge to edge, so a
+        plate acquired a slab across its foot while the scene above it showed
+        the art between the rows.
+        """
+
+        if kind == "choice":
+            backing = pygame.Rect(
+                left, y, rendered.get_width(), rendered.get_height()
+            ).inflate(6, 2)
+            backing.left = max(0, left - 3)
+            return backing
+        return pygame.Rect(left, y, width, ROW_H)
+
     def _wash(self, rect: pygame.Rect, colour: tuple[int, int, int]) -> None:
         """Lay a translucent backing under text.
 
@@ -731,8 +767,12 @@ class Stage:
         y = PROSE_TOP + max(0, capacity - len(rows)) * ROW_H
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
-            self._wash(pygame.Rect(6, y, width - 12, ROW_H), fill)
-            self.surface.blit(self.font.render(row.text, False, colour), (9, y))
+            rendered = self.font.render(row.text, False, colour)
+            self._wash(
+                self._backing(rendered, left=6, y=y, kind=row.kind, width=width - 12),
+                fill,
+            )
+            self.surface.blit(rendered, (9, y))
             y += ROW_H
         if self.max_scroll:
             marker = f"{self.scroll + 1}/{self.max_scroll + 1}  \u2191\u2193"
@@ -755,9 +795,10 @@ class Stage:
 
         surface = self.font.render(self._clip(f"{marker} {text}"), False, colour)
         rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
-        backing = rect.inflate(6, 2)
-        backing.left = 5
-        self._wash(backing, INK)
+        self._wash(
+            self._backing(surface, left=8, y=y, kind="choice", width=LOGICAL_SIZE[0]),
+            INK,
+        )
         self.surface.blit(surface, rect.topleft)
         if action is not None:
             self.hitboxes.append((rect, action))

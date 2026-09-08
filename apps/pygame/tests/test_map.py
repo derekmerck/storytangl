@@ -155,6 +155,27 @@ def test_a_legend_row_is_clipped_like_any_other_row(stage, frame) -> None:
         assert rect.right <= LOGICAL_SIZE[0]
 
 
+def test_a_legend_row_backs_only_its_own_text(stage, frame) -> None:
+    """The legend obeys the same backing rule as a scene row.
+
+    It used to wash every row edge to edge, so a plate acquired a slab across
+    its foot while the scene above showed the art between its rows -- and the
+    slab did not even match the hitbox, which was already sized from the text.
+    """
+
+    live = frame.choices[0]
+    rendered = stage.font.render(stage._choice_label(1, live), False, (0, 0, 0))
+    backing = stage._backing(
+        rendered, left=4, y=0, kind="choice", width=LOGICAL_SIZE[0] - 8
+    )
+
+    assert backing.width < LOGICAL_SIZE[0]
+    assert backing.width == rendered.get_width() + 6
+    # Prose stays a block: a ragged edge on wrapped narration reads as damage.
+    prose = stage._backing(rendered, left=6, y=0, kind="narration", width=200)
+    assert prose.width == 200
+
+
 def test_a_region_no_choice_claims_is_inert(stage, frame) -> None:
     """The plate names a lighthouse; nothing offers travel there."""
 
