@@ -120,6 +120,9 @@ class WorldCompiler:
             source_map=decode_result.source_map,
             codec_state=decode_result.codec_state,
             codec_id=codec_id,
+            class_registry=(
+                domain_adjuncts.class_registry if domain_adjuncts is not None else None
+            ),
         )
         world = WorldBuilder().build(
             label=bundle.manifest.story_label(story_key),
@@ -182,6 +185,11 @@ class WorldCompiler:
                 source_map=decode_result.source_map,
                 codec_state=decode_result.codec_state,
                 codec_id=codec_id,
+                class_registry=(
+                    world_domain_adjuncts.class_registry
+                    if world_domain_adjuncts is not None
+                    else None
+                ),
             )
             world = WorldBuilder().build(
                 label=bundle.manifest.story_label(story_key),

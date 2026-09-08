@@ -30,6 +30,7 @@ ISSUE_DANGLING_LOCATION_REF = "compile:dangling_location_ref"
 ISSUE_EMPTY_ENTRY_RESOLUTION = "compile:empty_entry_resolution"
 ISSUE_PAYLOAD_CONSTRUCTION_FAILED = "compile:payload_construction_failed"
 ISSUE_UNKNOWN_AUTHORED_KEY = "compile:unknown_authored_key"
+ISSUE_UNRESOLVED_KIND = "compile:unresolved_kind"
 
 # Allowed ``details`` keys per issue code. Keep this close to the compiler
 # helpers so the JSON-like payload shape stays explicit and testable.
@@ -41,6 +42,7 @@ _COMPILE_ISSUE_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
     ISSUE_EMPTY_ENTRY_RESOLUTION: ("requested_entry_ids", "resolution_strategy"),
     ISSUE_PAYLOAD_CONSTRUCTION_FAILED: ("kind", "fallback_kind", "error", "hint"),
     ISSUE_UNKNOWN_AUTHORED_KEY: ("key", "kind", "hint"),
+    ISSUE_UNRESOLVED_KIND: ("kind", "fallback_kind", "known_kinds"),
 }
 
 
@@ -77,28 +79,39 @@ class _CompileCollector:
     declarations_by_template_label: dict[str, list[_DeclaredTemplate]] = field(default_factory=dict)
     pending: list[_PendingDiagnostic] = field(default_factory=list)
     settled: list[CompileIssue] = field(default_factory=list)
+    # Entity classes contributed by the world's domain module. Authored
+    # ``kind`` names resolve through this after the cardinal vocabulary.
+    class_registry: dict[str, type] = field(default_factory=dict)
 
     @classmethod
-    def from_source_map(cls, source_map: dict[str, Any] | None) -> "_CompileCollector":
+    def from_source_map(
+        cls,
+        source_map: dict[str, Any] | None,
+        *,
+        class_registry: dict[str, type] | None = None,
+    ) -> "_CompileCollector":
+        registry = dict(class_registry or {})
         if not isinstance(source_map, dict):
-            return cls()
+            return cls(class_registry=registry)
         refs = source_map.get("__source_files__")
         if isinstance(refs, list):
             if len(refs) != 1:
-                return cls()
+                return cls(class_registry=registry)
             first = refs[0]
         elif refs is not None:
             first = refs
         else:
-            return cls()
+            return cls(class_registry=registry)
         if isinstance(first, dict):
             return cls(
                 default_source_path=_coerce_text(first.get("path")),
                 default_story_key=_coerce_text(first.get("story_key")),
+                class_registry=registry,
             )
         return cls(
             default_source_path=_coerce_text(getattr(first, "path", None)),
             default_story_key=_coerce_text(getattr(first, "story_key", None)),
+            class_registry=registry,
         )
 
     def build_source_ref(
@@ -699,6 +712,7 @@ class StoryCompiler:
         source_map: dict[str, Any] | None = None,
         codec_state: dict[str, Any] | None = None,
         codec_id: str | None = None,
+        class_registry: dict[str, type] | None = None,
     ) -> StoryTemplateBundle:
         """Compile authored story data into a reusable template bundle.
 
@@ -707,6 +721,11 @@ class StoryCompiler:
 
         Raw dicts are compiled directly. Use :meth:`validate_ir` separately
         when authored near-native data should be linted against the IR schema.
+
+        ``class_registry`` carries the Entity classes contributed by the
+        world's domain module. Authored ``kind`` names resolve against it after
+        the cardinal vocabulary, which is how a bundle contributes its own
+        block kinds without subclassing this compiler.
         """
         if isinstance(script_data, StoryScript):
             data = script_data.model_dump(by_alias=True, exclude_none=True)
@@ -717,7 +736,10 @@ class StoryCompiler:
 
         metadata = dict(data.get("metadata") or {})
         locals_ns = dict(data.get("globals") or data.get("locals") or {})
-        collector = _CompileCollector.from_source_map(source_map)
+        collector = _CompileCollector.from_source_map(
+            source_map,
+            class_registry=class_registry,
+        )
 
         registry = TemplateRegistry(label=f"{label}_templates")
         root = TemplateGroup(
@@ -752,7 +774,12 @@ class StoryCompiler:
         root_scene_labels = {scene_label for _scene_index, scene_label, _scene_data in scenes}
         for scene_index, scene_label, scene_data in scenes:
             scene_authored_path = _authored_item_path("scenes", scene_index, scene_label)
-            scene_kind = self._resolve_kind(scene_data.get("kind"), fallback=Scene)
+            scene_kind = self._resolve_kind(
+                scene_data.get("kind"),
+                fallback=Scene,
+                collector=collector,
+                authored_path=scene_authored_path,
+            )
             scene_kind_fields = getattr(scene_kind, "model_fields", {})
             scene_roles = self._normalize_list(scene_data.get("roles"))
             scene_settings = self._normalize_list(scene_data.get("settings"))
@@ -876,6 +903,8 @@ class StoryCompiler:
                         block_data.get("kind")
                         or block_data.get("block_cls"),
                         fallback=Block,
+                        collector=collector,
+                        authored_path=block_authored_path,
                     ),
                     payload={
                         **block_data,
@@ -1069,6 +1098,8 @@ class StoryCompiler:
                 kind=self._resolve_kind(
                     item_data.get("kind"),
                     fallback=fallback_kind,
+                    collector=collector,
+                    authored_path=item_authored_path,
                 ),
                 payload={**item_data, "label": item_data.get("label") or label},
                 default_label=label,
@@ -1337,7 +1368,25 @@ class StoryCompiler:
             return None
         return f"{scene_label}.{blocks[next_index][1]}"
 
-    def _resolve_kind(self, raw_kind: Any, *, fallback: type[Entity]) -> type[Entity]:
+    def _resolve_kind(
+        self,
+        raw_kind: Any,
+        *,
+        fallback: type[Entity],
+        collector: "_CompileCollector | None" = None,
+        authored_path: str | None = None,
+    ) -> type[Entity]:
+        """Resolve an authored ``kind`` to an Entity class.
+
+        Resolution order is cardinal vocabulary, then the world's contributed
+        ``class_registry``, then a dotted import path. The cardinal names win so
+        a bundle cannot quietly redefine ``Block`` or ``Scene``; everything the
+        core does not already name is the world's to supply.
+
+        An authored name that resolves to nothing is reported rather than
+        silently downgraded to ``fallback``. A world losing its own block kinds
+        should not look like a world that never declared any.
+        """
         if isinstance(raw_kind, type):
             mapped = self._map_external_kind(raw_kind.__name__, fallback=fallback)
             if mapped is not fallback or raw_kind is fallback:
@@ -1350,6 +1399,12 @@ class StoryCompiler:
             mapped = self._map_external_kind(raw_kind.split(".")[-1], fallback=fallback)
             if mapped is not fallback:
                 return mapped
+            contributed = self._map_contributed_kind(
+                raw_kind.split(".")[-1],
+                collector=collector,
+            )
+            if contributed is not None:
+                return contributed
             try:
                 module_name, class_name = raw_kind.rsplit(".", 1)
                 cls = getattr(import_module(module_name), class_name)
@@ -1360,9 +1415,56 @@ class StoryCompiler:
                     if issubclass(cls, Entity):
                         return cls
             except Exception:
-                return fallback
+                pass
+            self._report_unresolved_kind(
+                raw_kind,
+                fallback=fallback,
+                collector=collector,
+                authored_path=authored_path,
+            )
 
         return fallback
+
+    @staticmethod
+    def _map_contributed_kind(
+        kind_name: str,
+        *,
+        collector: "_CompileCollector | None",
+    ) -> type[Entity] | None:
+        """Resolve a name through the world's contributed class registry."""
+        if collector is None:
+            return None
+        candidate = collector.class_registry.get(kind_name)
+        if isinstance(candidate, type) and issubclass(candidate, Entity):
+            return candidate
+        return None
+
+    @staticmethod
+    def _report_unresolved_kind(
+        raw_kind: str,
+        *,
+        fallback: type[Entity],
+        collector: "_CompileCollector | None",
+        authored_path: str | None,
+    ) -> None:
+        if collector is None or authored_path is None:
+            return
+        known = sorted(collector.class_registry)
+        collector.add_settled(
+            code=ISSUE_UNRESOLVED_KIND,
+            severity=CompileSeverity.WARNING,
+            message=(
+                f"Authored kind '{raw_kind}' did not resolve; "
+                f"compiled as '{fallback.__name__}'."
+            ),
+            subject_label=raw_kind,
+            authored_path=authored_path,
+            details={
+                "kind": raw_kind,
+                "fallback_kind": fallback.__name__,
+                "known_kinds": known,
+            },
+        )
 
     @staticmethod
     def _map_external_kind(kind_name: str, *, fallback: type[Entity]) -> type[Entity]:
