@@ -811,7 +811,6 @@ because a printed number is a promise that pressing it does something:
 | port | available | locked |
 |---|---|---|
 | CLI | `1.` | `x)` |
-| web | `1.` | `x.` |
 | pygame | `1.` | `x)`, and `X` pinned on a map region |
 
 **The mark is client-local; the mapping is not.** Every port derives
@@ -821,6 +820,22 @@ reachable. Deviations from the CLI's spelling are permitted where a port
 must — pygame pins `X` rather than `x` because at 11px the default font
 rasterizes a lowercase `x` as a featureless blob — and MUST be
 justified and applied consistently across every surface in that port.
+
+**Conformance, as of this writing.** The CLI and pygame ports implement
+the above. The other two do not, and neither gap is a rendering detail:
+
+- **Web** assigns no positional number at all. `StoryAction.vue` reads a
+  hotkey only from an authored `ui_hints.hotkey`, so §2.6's A11y rule —
+  position is the default hotkey — is unimplemented, and there is
+  consequently no number for a locked choice to replace. It does render
+  the choice as a disabled button with `unavailable_reason` beneath and
+  `blockers[]` beside, so it meets §5.1 while missing the numbering rule
+  entirely.
+- **Ren'Py** filters locked choices out before building the menu
+  (`script.rpy`: `visible_choices = [c for c in turn.choices if
+  c.available]`). That is a §5.1 gap rather than a numbering one: a
+  refused choice is not dimmed, it is absent, and a player cannot learn
+  from the menu that the option exists or why it is closed.
 
 A port that also draws choices as something other than rows (a map
 region, a piece on a surface) marks those the same way and for the same
