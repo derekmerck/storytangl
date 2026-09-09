@@ -143,9 +143,19 @@ available escape hatch.
 
 Codec construction parameters are likewise unsolved. `get_story_codecs()`
 returns constructed instances, so a contribution carries exactly one
-configuration, and options that change how a world compiles — media distribution
-mode, for example — are today build parameters changed by editing and reloading
-rather than anything the hook can express.
+configuration and the hook cannot express a second.
+
+That gap is narrower than it first looks, because much of what tempts an author
+to parameterize a codec does not belong there. Graph initialization depth is
+already a runtime per-story toggle — `InitMode.LAZY` / `InitMode.EAGER` on
+`World.create_story()`, surfaced per request by the service manager — and
+governs the initial shape of a new graph. Which media a template prefers when it
+emits an instance onto a graph is a property of the template, not of the source
+format's reader. A codec decodes source into cardinal data; policy that decides
+what a graph looks like at birth, or what a template emits when it instantiates,
+belongs to the runtime toggle or the template respectively. Before adding a
+construction parameter here, check that the option is really about *reading the
+source* and not about one of those.
 
 Domain modules contribute through a small set of parallel hooks:
 `get_authorities()`, `get_story_codecs()`, and `get_media_index_handlers()`, plus
