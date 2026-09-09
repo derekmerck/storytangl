@@ -119,7 +119,7 @@ describe('StoryFlow', () => {
     const wrapper = mountFlow()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Requires Sleight of Hand')
+    expect(wrapper.text()).toContain('Sleight of Hand 1, need 2.')
     expect(wrapper.find('input').exists()).toBe(true)
     expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('late evening')

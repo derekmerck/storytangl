@@ -2,13 +2,15 @@
 import { computed, ref, watch } from 'vue'
 
 import ChoiceInputView from './ChoiceInputView.vue'
-import type { Blocker, ChoiceStoryFragment, CostPreview, StoryFragment } from '@/types'
+import type { ChoiceStoryFragment, CostPreview, StoryFragment } from '@/types'
+import { choiceKeyForPosition, choicePresentation } from './choicePresentation'
 import { isRecord } from './fragmentUtils'
 
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
   disabled?: boolean
+  position: number
 }>()
 
 const emit = defineEmits<{
@@ -21,10 +23,9 @@ const payloadValid = ref(true)
 const edgeId = computed(() => props.choice.edge_id)
 const available = computed(() => props.choice.available !== false)
 const busy = computed(() => props.disabled === true)
-const hotkey = computed(() => {
-  const value = props.choice.ui_hints?.hotkey
-  return typeof value === 'string' ? value : undefined
-})
+const hotkey = computed(() => choiceKeyForPosition(props.choice, props.position))
+const marker = computed(() => (available.value ? hotkey.value : 'x'))
+const presentation = computed(() => choicePresentation(props.choice))
 const iconName = computed(() => {
   const icon = props.choice.ui_hints?.icon ?? props.choice.icon
   if (typeof icon !== 'string' || !icon) {
@@ -108,16 +109,6 @@ const hasPayloadInput = computed(() => {
 })
 const canCommit = computed(() => available.value && !busy.value && payloadValid.value)
 
-const blockers = computed<Blocker[]>(() => {
-  const values = props.choice.blockers
-  if (!Array.isArray(values)) {
-    return []
-  }
-  return values.filter(
-    (blocker): blocker is Blocker => isRecord(blocker) && typeof blocker.message === 'string',
-  )
-})
-
 const buttonStyle = computed<Record<string, string | number> | undefined>(() => {
   const styleSource = props.choice.style ?? props.choice.style_dict
   if (!isRecord(styleSource)) {
@@ -167,9 +158,9 @@ const handleClick = () => {
         :data-hotkey="hotkey"
         @click="handleClick"
       >
-        <span v-if="hotkey" class="choice-hotkey">{{ hotkey }}</span>
+        <span v-if="marker" class="choice-hotkey">{{ marker }}</span>
         <v-icon v-if="iconName" :icon="iconName" start />
-        <span>{{ choice.text }}</span>
+        <span>{{ presentation.text }}</span>
       </v-btn>
 
       <ChoiceInputView
@@ -181,19 +172,16 @@ const handleClick = () => {
         @commit="handleClick"
       />
 
-      <div v-if="!available && choice.unavailable_reason" class="choice-reason">
-        {{ choice.unavailable_reason }}
-      </div>
-
-      <div v-if="blockers.length" class="choice-blockers" data-testid="choice-blockers">
-        <div
-          v-for="blocker in blockers"
-          :key="blocker.code ?? blocker.message"
-          class="choice-blocker"
-        >
-          <span class="choice-blocker-message">{{ blocker.message }}</span>
+      <div
+        v-if="!available && presentation.refusal"
+        class="choice-reason"
+        :class="{ 'choice-blockers': presentation.refusalFromBlocker }"
+        :data-testid="presentation.refusalFromBlocker ? 'choice-blockers' : undefined"
+      >
+        <div class="choice-blocker">
+          <span class="choice-blocker-message">{{ presentation.refusal }}</span>
           <span
-            v-for="blockerRef in blocker.refs ?? []"
+            v-for="blockerRef in presentation.refusalRefs"
             :key="blockerRef"
             class="choice-blocker-ref"
           >

@@ -13,7 +13,13 @@ from tangl.journal.fragments import (
 from tangl.presentation.intent import Blocker, CostPreview, UIHints
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.renpy import RenPySessionBridge
+from tangl.renpy import (
+    CHOICE_KEYS,
+    RenPyChoice,
+    RenPySessionBridge,
+    choice_key_for_position,
+    present_choices,
+)
 from tangl.service import DirectEdgeRequest, RuntimeEnvelope, RuntimeInfo
 
 
@@ -138,7 +144,7 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
     assert [choice.text for choice in turns[0].choices] == ["Step inside", "Open the cellar"]
     assert turns[0].choices[0].available is True
     assert turns[0].choices[1].available is False
-    assert turns[0].choices[1].unavailable_reason == "missing_key"
+    assert turns[0].choices[1].unavailable_reason == "The brass key is required."
     assert turns[0].choices[1].blockers == (
         {
             "code": "missing_key",
@@ -169,6 +175,77 @@ def test_build_turns_groups_by_step_and_preserves_unavailable_choices() -> None:
         ],
     }
     assert [line.text for line in turns[1].lines] == ["A later beat."]
+
+
+def test_refused_choice_stays_visible_and_reserves_its_position() -> None:
+    bridge = RenPySessionBridge(service_manager=FakeServiceManager())
+    refused_edge_id = uuid4()
+    live_edge_id = uuid4()
+    replacement = "Mira would trade, but you do not have the doorknob."
+
+    turns = bridge.build_turns(
+        [
+            ChoiceFragment(
+                edge_id=refused_edge_id,
+                text="Trade the paperclip",
+                available=False,
+                unavailable_reason="not_holding",
+                blockers=[
+                    Blocker(code="closed", message="The stall is shut."),
+                    Blocker(
+                        code="not_holding",
+                        message=replacement,
+                        replaces_text=True,
+                    ),
+                ],
+                step=0,
+            ),
+            ChoiceFragment(
+                edge_id=live_edge_id,
+                text="Return to the road",
+                step=0,
+            ),
+        ]
+    )
+
+    choices = present_choices(turns[0].choices)
+
+    assert len(choices) == 2
+    assert choices[0].text == replacement
+    assert choices[0].text.count(replacement) == 1
+    assert choices[0].marker == "x)"
+    assert choices[0].key is None
+    assert choices[0].available is False
+    assert choices[1].marker == "2."
+    assert choices[1].key == "2"
+    assert choices[1].edge_id == live_edge_id
+
+
+def test_choice_keys_cross_nine_skip_x_and_end_without_a_marker() -> None:
+    choice = RenPyChoice(edge_id=uuid4(), text="Choose")
+
+    assert choice_key_for_position(choice, 9) == "9"
+    assert choice_key_for_position(choice, 10) == "a"
+    assert "x" not in CHOICE_KEYS
+    assert choice_key_for_position(choice, len(CHOICE_KEYS) + 1) is None
+    assert present_choices([choice] * (len(CHOICE_KEYS) + 1))[-1].marker == ""
+
+
+def test_authored_hotkey_overrides_only_an_available_choice() -> None:
+    available = RenPyChoice(
+        edge_id=uuid4(),
+        text="Choose",
+        ui_hints={"hotkey": "q"},
+    )
+    locked = RenPyChoice(
+        edge_id=uuid4(),
+        text="Cannot choose",
+        available=False,
+        ui_hints={"hotkey": "q"},
+    )
+
+    assert choice_key_for_position(available, 1) == "q"
+    assert choice_key_for_position(locked, 1) is None
 
 
 def test_build_turns_adapts_media_and_reuses_stable_portrait_tags(tmp_path: Path) -> None:

@@ -41,7 +41,7 @@ init -100 python:
 init python:
     from renpy.display.im import Image
 
-    from tangl.renpy import RenPySessionBridge
+    from tangl.renpy import RenPySessionBridge, present_choices
 
 
     def tangl_character_for(line):
@@ -71,13 +71,42 @@ init python:
         for line in turn.lines:
             tangl_character_for(line)(line.text)
 
-        visible_choices = [choice for choice in turn.choices if choice.available]
-        if not visible_choices:
+        choices = present_choices(turn.choices)
+        if not choices:
             return None
 
-        return renpy.display_menu(
-            [(choice.text, choice.edge_id) for choice in visible_choices]
-        )
+        return renpy.call_screen("tangl_choice_menu", choices=choices)
+
+
+screen tangl_choice_menu(choices):
+    modal True
+
+    frame:
+        align (0.5, 0.85)
+        padding (24, 18)
+
+        vbox:
+            spacing 10
+
+            for choice in choices:
+                if choice.key is not None:
+                    key choice.key action Return(choice.edge_id)
+
+                hbox:
+                    spacing 8
+
+                    text choice.marker:
+                        xminimum 24
+
+                    vbox:
+                        textbutton choice.text:
+                            sensitive choice.available
+                            action Return(choice.edge_id)
+
+                        if not choice.available and choice.unavailable_reason:
+                            text choice.unavailable_reason:
+                                color "#888888"
+                                size 18
 
 
 label start:
