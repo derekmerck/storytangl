@@ -124,26 +124,28 @@ contributions overlay the application's built-in registry without changing it,
 then lower their private source representation directly to cardinal story data.
 The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
 
-Codec resolution is ordered by **specificity**, not by who registered it:
+**Today a bundle contribution always wins.** `_resolve_story_codec()` consults
+the bundle's contributions before the application registry and takes the first
+hit, with no way for an application to keep a codec it configured deliberately.
+That is a real limitation, not a settled design: an application that constructs
+a codec with particular options and hands it to `WorldCompiler` will find it
+silently replaced by the bundle's own, differently configured instance.
 
-1. an application registration bound to a specific world's singleton label
-2. a bundle contribution from that world's domain module
-3. an application registration for the codec type generally
+The intended shape is resolution ordered by **specificity** rather than by who
+registered it — an application registration bound to a specific world's
+singleton label, then a bundle contribution, then a generic registration for the
+codec type. A bundle contribution is inherently world-scoped, so it would still
+outrank a generic type registration, while an application could reclaim
+precedence by binding to a world's label and so repair a bad bundle codec
+without editing that bundle. **That world-label tier does not exist.** There is
+no API for it, and nothing below the top of this paragraph should be read as an
+available escape hatch.
 
-A bundle contribution is inherently world-scoped, so it outranks a generic type
-registration: if core ships a weak `passages` codec, a world that ships its own
-gets its own. The application still has the last word, because it can always
-register more precisely — a bad codec inside a world bundle can be replaced from
-core by importing it, fixing it, and binding the result to that world's label,
-without editing the world. Tier 1 is the designed shape and is **not implemented
-yet**; today resolution is tiers 2 and 3 only, and a bundle contribution wins
-unconditionally over the application registry.
-
-Codec construction parameters are not part of this hook. `get_story_codecs()`
-returns constructed instances, so a contribution carries one configuration.
-Options that change how a world compiles — media distribution mode, for example —
-are build parameters: change the parameter and reload, rather than expecting one
-registration to serve several configurations.
+Codec construction parameters are likewise unsolved. `get_story_codecs()`
+returns constructed instances, so a contribution carries exactly one
+configuration, and options that change how a world compiles — media distribution
+mode, for example — are today build parameters changed by editing and reloading
+rather than anything the hook can express.
 
 Domain modules contribute through a small set of parallel hooks:
 `get_authorities()`, `get_story_codecs()`, and `get_media_index_handlers()`, plus
