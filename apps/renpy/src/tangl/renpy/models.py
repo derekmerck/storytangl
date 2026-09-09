@@ -6,6 +6,7 @@ from uuid import UUID
 
 
 RenPyMediaAction = Literal["scene", "show"]
+CHOICE_KEYS = "123456789abcdefghijklmnopqrstuvwyz"
 
 
 @dataclass(slots=True, frozen=True)
@@ -46,6 +47,62 @@ class RenPyChoice:
     accepts: dict[str, Any] | None = None
     ui_hints: dict[str, Any] | None = None
     choice_payload: Any = None
+
+
+@dataclass(slots=True, frozen=True)
+class RenPyMenuChoice:
+    """One choice with the marker and key used by the Ren'Py screen."""
+
+    edge_id: UUID
+    text: str
+    available: bool
+    unavailable_reason: str | None
+    marker: str
+    key: str | None
+
+
+def choice_key_for_position(choice: RenPyChoice, position: int) -> str | None:
+    """Return the accepted key for one presented position, if any."""
+
+    if not choice.available:
+        return None
+    hotkey = None if choice.ui_hints is None else choice.ui_hints.get("hotkey")
+    if isinstance(hotkey, str) and hotkey.strip():
+        return hotkey.strip()
+    if 1 <= position <= len(CHOICE_KEYS):
+        return CHOICE_KEYS[position - 1]
+    return None
+
+
+def present_choices(choices: list[RenPyChoice]) -> list[RenPyMenuChoice]:
+    """Add positional markers without dropping locked choices."""
+
+    presented: list[RenPyMenuChoice] = []
+    seen: dict[str, tuple[int, RenPyChoice]] = {}
+    for position, choice in enumerate(choices, start=1):
+        key = choice_key_for_position(choice, position)
+        if key is not None:
+            previous = seen.get(key)
+            if previous is not None:
+                previous_position, previous_choice = previous
+                raise ValueError(
+                    f'Duplicate Ren\'Py choice hotkey "{key}" for positions '
+                    f"{previous_position} ({previous_choice.edge_id}) and "
+                    f"{position} ({choice.edge_id})"
+                )
+            seen[key] = (position, choice)
+        marker = "x)" if not choice.available else f"{key}." if key else ""
+        presented.append(
+            RenPyMenuChoice(
+                edge_id=choice.edge_id,
+                text=choice.text,
+                available=choice.available,
+                unavailable_reason=choice.unavailable_reason,
+                marker=marker,
+                key=key,
+            )
+        )
+    return presented
 
 
 @dataclass(slots=True)

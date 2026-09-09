@@ -421,6 +421,111 @@ describe('StoryBlock', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual(['edge-1', undefined])
   })
 
+  it('keeps a refused row visible while the following live choice retains its key', () => {
+    const replacement = 'Mira would trade, but you do not have the doorknob.'
+    const fragments: Record<string, StoryFragment> = {
+      refused: {
+        uid: 'refused',
+        fragment_type: 'choice',
+        edge_id: 'edge-refused',
+        text: 'Trade the paperclip',
+        available: false,
+        unavailable_reason: 'not_holding',
+        blockers: [
+          { code: 'closed', message: 'The stall is shut.' },
+          {
+            code: 'not_holding',
+            message: replacement,
+            replaces_text: true,
+          },
+        ],
+      },
+      live: {
+        uid: 'live',
+        fragment_type: 'choice',
+        edge_id: 'edge-live',
+        text: 'Return to the road',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['refused', 'live'])
+    const buttons = wrapper.findAll('button')
+    const refusedButton = buttons[0]!
+    const liveButton = buttons[1]!
+
+    expect(buttons).toHaveLength(2)
+    expect(refusedButton.text()).toContain('x')
+    expect(wrapper.findAll('.choice-row')[0]!.attributes('data-hotkey')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('Trade the paperclip')
+    expect(wrapper.text().split(replacement)).toHaveLength(2)
+    expect(liveButton.text()).toContain('2')
+    expect(wrapper.findAll('.choice-row')[1]!.attributes('data-hotkey')).toBe('2')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '2' }))
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge-live', undefined])
+  })
+
+  it('suppresses choice hotkeys while a text control has focus', async () => {
+    const fragments: Record<string, StoryFragment> = {
+      choice: {
+        uid: 'choice',
+        fragment_type: 'choice',
+        edge_id: 'edge-text',
+        text: 'Name the trade',
+        accepts: { kind: 'text' },
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['choice'])
+    const input = wrapper.find('input')
+    await input.trigger('focus')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
+
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+  })
+
+  it('focuses an available choice input before its payload can commit', async () => {
+    const fragments: Record<string, StoryFragment> = {
+      choice: {
+        uid: 'choice',
+        fragment_type: 'choice',
+        edge_id: 'edge-text',
+        text: 'Name the trade',
+        available: true,
+        accepts: { kind: 'text' },
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['choice'])
+    const input = wrapper.find('input')
+    const focus = vi.spyOn(input.element, 'focus')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.choice-row').attributes('data-hotkey')).toBe('1')
+    expect(wrapper.find('.choice-row').classes()).not.toContain('choice-row--locked')
+    expect((wrapper.find('button.choice-button').element as HTMLButtonElement).disabled).toBe(true)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
+
+    expect(focus).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await input.trigger('keydown.enter')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await input.setValue('Brass doorknob')
+    await input.trigger('keydown.enter')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge-text',
+      { text: 'Brass doorknob' },
+    ])
+  })
+
   it('renders unknown fragments as fallbacks', () => {
     const fragments: Record<string, StoryFragment> = {
       weird: {

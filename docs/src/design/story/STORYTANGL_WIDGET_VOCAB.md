@@ -784,10 +784,10 @@ into the same player-facing shape at the story journal boundary.
 | **Optional** | `available` (default `true`); `unavailable_reason`; `blockers[]`; `accepts`; `ui_hints`; `activation_payload` |
 | **Container rule** | Always emitted within the active `scene` group. Order is presented order; positional hotkey numbering follows order. |
 | **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, place, compose}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
-| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices. Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. Up/down cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target at least 44x44 on touch. Locked choices remain focusable for screen reader stability. |
+| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`w`, `y`, `z`; `x` is reserved for the unavailable marker). `ui_hints.hotkey` overrides the default for specific choices. Duplicate resolved hotkeys are invalid and clients raise. Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. Up/down cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target at least 44x44 on touch. Locked choices remain focusable for screen reader stability. |
 | **Fallback** | Unknown `accepts.kind` → plain button posting empty payload, with warning. Unknown `ui_hints.widget` → default widget for `accepts.kind`. |
 
-**Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1. Pay the forty silver.` … `> ` prompt; `x)` in place of the number for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: `menu:` block; `if`-gated for locked; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
+**Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1. Pay the forty silver.` … `> ` prompt; `x)` in place of the number for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: custom choice screen with insensitive locked rows; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
 
 #### 2.6.1 Numbering a list that contains locked choices
 
@@ -830,9 +830,10 @@ must — pygame pins `X` rather than `x` because at 11px the default font
 rasterizes a lowercase `x` as a featureless blob — and MUST be
 justified and applied consistently across every surface in that port.
 
-**Conformance, as of this writing.** The CLI implements the above. pygame
-implements it for rows and map regions and diverges on piece cards, and
-the other two ports do not implement it at all:
+**Conformance, as of this writing.** The CLI implements the above. Web and
+Ren'Py derive both printed markers and accepted keys from the same positional
+mapping. pygame implements it for rows and map regions and diverges on piece
+cards:
 
 - **pygame piece cards** mark `(x)` — a third spelling — and key it on
   `piece.available` rather than on whether the choice has a number.
@@ -845,18 +846,15 @@ the other two ports do not implement it at all:
   entirely by moving the refusal onto a hover, so unifying the spelling
   first would be work done twice.
 
-- **Web** assigns no positional number at all. `StoryAction.vue` reads a
-  hotkey only from an authored `ui_hints.hotkey`, so §2.6's A11y rule —
-  position is the default hotkey — is unimplemented, and there is
-  consequently no number for a locked choice to replace. It does render
-  the choice as a disabled button with `unavailable_reason` beneath and
-  `blockers[]` beside, so it meets §5.1 while missing the numbering rule
-  entirely.
-- **Ren'Py** filters locked choices out before building the menu
-  (`script.rpy`: `visible_choices = [c for c in turn.choices if
-  c.available]`). That is a §5.1 gap rather than a numbering one: a
-  refused choice is not dimmed, it is absent, and a player cannot learn
-  from the menu that the option exists or why it is closed.
+- **Web** uses the whole presented choice list for positional keys and replaces
+  a locked row's key with `x`. Authored `ui_hints.hotkey` values override the
+  default only for available choices. The same resolved key is printed and
+  used for keyboard activation, and choice hotkeys are suppressed while a text
+  control has focus.
+- **Ren'Py** presents locked choices as insensitive rows rather than filtering
+  them out. Its custom choice screen uses the same whole-list position for the
+  row marker and accepted key, so a locked row reserves its position and shows
+  `x)` while the following live choice keeps its original key.
 
 A port that also draws choices as something other than rows (a map
 region, a piece on a surface) marks those the same way and for the same
@@ -1345,7 +1343,7 @@ Concrete `place` (edge variant) — "lay track on the Toledo-Chicago connection"
 
 ```python
 class UIHints(BaseModel, extra="allow"):
-    hotkey: str | None = None             # "1"-"9", "a"-"z", or symbolic
+    hotkey: str | None = None             # explicit per-choice override
     icon: str | None = None
     emphasis: Literal["primary", "subtle", "warning", "danger"] | None = None
     widget: str | None = None             # variant override id from bundle.widgets
@@ -1355,6 +1353,15 @@ class UIHints(BaseModel, extra="allow"):
 `UIHints` is deliberately open (`extra="allow"`) — it's a hint surface,
 not a contract surface. Authors may add hints freely; ports ignore
 unknowns. The named fields are documented hints with defined semantics.
+
+`hotkey` overrides the positional default for one choice; it is not a
+numbering template. Avoid authored digit hotkeys unless every choice in the
+list is explicitly keyed. In most cases, put choices in the desired order and
+rely on positional defaults. After applying authored overrides and excluding
+locked or unkeyed rows, a client normalizes resolved keys exactly as its
+keyboard matching does. Duplicate resolved hotkeys are invalid: the client
+raises an error identifying the duplicate key and the implicated choices or
+positions.
 
 #### 6.2.1 Genre-specific UIHints sub-shapes (Tier P3)
 

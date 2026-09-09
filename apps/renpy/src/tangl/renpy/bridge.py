@@ -193,6 +193,7 @@ class RenPySessionBridge:
             return
 
         if isinstance(fragment, ChoiceFragment):
+            text, refusal = self._refused_choice(fragment)
             cost_previews = [
                 *(
                     fragment.ui_hints.cost_previews
@@ -208,9 +209,9 @@ class RenPySessionBridge:
             turn.choices.append(
                 RenPyChoice(
                     edge_id=fragment.edge_id,
-                    text=_non_empty_text(fragment.text) or str(fragment.edge_id),
+                    text=text,
                     available=fragment.available,
-                    unavailable_reason=fragment.unavailable_reason,
+                    unavailable_reason=refusal,
                     blockers=tuple(
                         blocker.model_dump(mode="python", exclude_none=True)
                         for blocker in fragment.blockers or []
@@ -243,6 +244,22 @@ class RenPySessionBridge:
             return
 
         logger.debug("Ignoring unsupported Ren'Py fragment type: %s", type(fragment).__name__)
+
+    @staticmethod
+    def _refused_choice(fragment: ChoiceFragment) -> tuple[str, str | None]:
+        """Prefer written refusal text and collapse a whole-sentence replacement."""
+
+        text = _non_empty_text(fragment.text) or str(fragment.edge_id)
+        annotation: str | None = None
+        for blocker in fragment.blockers or ():
+            message = _non_empty_text(blocker.message)
+            if message is None:
+                continue
+            if blocker.replaces_text:
+                return message, None
+            if annotation is None:
+                annotation = message
+        return text, annotation or _non_empty_text(fragment.unavailable_reason)
 
     def _append_attributed_fragment(
         self,
