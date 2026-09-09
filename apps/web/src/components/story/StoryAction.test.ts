@@ -13,10 +13,10 @@ const mountWithVuetify = (props: {
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
   disabled?: boolean
-  position?: number
+  hotkey?: string
 }) =>
   mount(StoryAction, {
-    props: { position: 1, ...props },
+    props: { hotkey: '1', ...props },
     global: {
       plugins: [vuetify],
     },

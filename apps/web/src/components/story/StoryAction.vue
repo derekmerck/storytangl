@@ -3,14 +3,14 @@ import { computed, ref, watch } from 'vue'
 
 import ChoiceInputView from './ChoiceInputView.vue'
 import type { ChoiceStoryFragment, CostPreview, StoryFragment } from '@/types'
-import { choiceKeyForPosition, choicePresentation } from './choicePresentation'
+import { choicePresentation } from './choicePresentation'
 import { isRecord } from './fragmentUtils'
 
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
   disabled?: boolean
-  position: number
+  hotkey?: string
 }>()
 
 const emit = defineEmits<{
@@ -23,7 +23,7 @@ const payloadValid = ref(true)
 const edgeId = computed(() => props.choice.edge_id)
 const available = computed(() => props.choice.available !== false)
 const busy = computed(() => props.disabled === true)
-const hotkey = computed(() => choiceKeyForPosition(props.choice, props.position))
+const hotkey = computed(() => props.hotkey)
 const marker = computed(() => (available.value ? hotkey.value : 'x'))
 const presentation = computed(() => choicePresentation(props.choice))
 const iconName = computed(() => {
@@ -146,7 +146,11 @@ const handleClick = () => {
 
 <template>
   <v-col cols="12" class="py-1">
-    <div class="choice-row" :class="{ 'choice-row--locked': !available }">
+    <div
+      class="choice-row"
+      :class="{ 'choice-row--locked': !available }"
+      :data-hotkey="hotkey"
+    >
       <v-btn
         class="ma-1 text-start choice-button"
         variant="outlined"
@@ -155,7 +159,6 @@ const handleClick = () => {
         :style="buttonStyle"
         :disabled="!canCommit"
         :aria-disabled="!canCommit"
-        :data-hotkey="hotkey"
         @click="handleClick"
       >
         <span v-if="marker" class="choice-hotkey">{{ marker }}</span>

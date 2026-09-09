@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChoiceStoryFragment } from '@/types'
-import { CHOICE_KEYS, choiceKeyForPosition, choicePresentation } from './choicePresentation'
+import {
+  CHOICE_KEYS,
+  choiceKeyForPosition,
+  choiceKeysForList,
+  choicePresentation,
+} from './choicePresentation'
 
 const choice = (overrides: Partial<ChoiceStoryFragment> = {}): ChoiceStoryFragment => ({
   uid: 'choice',
@@ -24,6 +29,23 @@ describe('choice presentation', () => {
     expect(
       choiceKeyForPosition(choice({ available: false, ui_hints: { hotkey: 'q' } }), 1)
     ).toBeUndefined()
+    expect(
+      choiceKeysForList([
+        choice({ available: false, ui_hints: { hotkey: 'q' } }),
+        choice({ edge_id: 'edge-live', ui_hints: { hotkey: 'q' } }),
+      ])
+    ).toEqual([undefined, 'q'])
+  })
+
+  it('rejects duplicate resolved hotkeys after web keyboard normalization', () => {
+    expect(() =>
+      choiceKeysForList([
+        choice({ edge_id: 'edge-first', ui_hints: { hotkey: 'Q' } }),
+        choice({ edge_id: 'edge-second', ui_hints: { hotkey: 'q' } }),
+      ])
+    ).toThrow(
+      'Duplicate choice hotkey "q" for positions 1 (edge-first) and 2 (edge-second)'
+    )
   })
 
   it('lets a later replacement blocker become the row exactly once', () => {

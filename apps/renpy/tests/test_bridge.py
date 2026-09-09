@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID, uuid4
 
+import pytest
+
 from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
@@ -246,6 +248,29 @@ def test_authored_hotkey_overrides_only_an_available_choice() -> None:
 
     assert choice_key_for_position(available, 1) == "q"
     assert choice_key_for_position(locked, 1) is None
+    assert [choice.key for choice in present_choices([locked, available])] == [None, "q"]
+
+
+def test_duplicate_resolved_hotkeys_fail_loudly() -> None:
+    first = RenPyChoice(
+        edge_id=uuid4(),
+        text="First",
+        ui_hints={"hotkey": "q"},
+    )
+    second = RenPyChoice(
+        edge_id=uuid4(),
+        text="Second",
+        ui_hints={"hotkey": "q"},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            rf'Duplicate Ren\'Py choice hotkey "q" for positions 1 '
+            rf"\({first.edge_id}\) and 2 \({second.edge_id}\)"
+        ),
+    ):
+        present_choices([first, second])
 
 
 def test_build_turns_adapts_media_and_reuses_stable_portrait_tags(tmp_path: Path) -> None:

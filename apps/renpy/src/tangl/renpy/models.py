@@ -78,8 +78,19 @@ def present_choices(choices: list[RenPyChoice]) -> list[RenPyMenuChoice]:
     """Add positional markers without dropping locked choices."""
 
     presented: list[RenPyMenuChoice] = []
+    seen: dict[str, tuple[int, RenPyChoice]] = {}
     for position, choice in enumerate(choices, start=1):
         key = choice_key_for_position(choice, position)
+        if key is not None:
+            previous = seen.get(key)
+            if previous is not None:
+                previous_position, previous_choice = previous
+                raise ValueError(
+                    f'Duplicate Ren\'Py choice hotkey "{key}" for positions '
+                    f"{previous_position} ({previous_choice.edge_id}) and "
+                    f"{position} ({choice.edge_id})"
+                )
+            seen[key] = (position, choice)
         marker = "x)" if not choice.available else f"{key}." if key else ""
         presented.append(
             RenPyMenuChoice(

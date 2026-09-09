@@ -455,11 +455,11 @@ describe('StoryBlock', () => {
 
     expect(buttons).toHaveLength(2)
     expect(refusedButton.text()).toContain('x')
-    expect(refusedButton.attributes('data-hotkey')).toBeUndefined()
+    expect(wrapper.findAll('.choice-row')[0]!.attributes('data-hotkey')).toBeUndefined()
     expect(wrapper.text()).not.toContain('Trade the paperclip')
     expect(wrapper.text().split(replacement)).toHaveLength(2)
     expect(liveButton.text()).toContain('2')
-    expect(liveButton.attributes('data-hotkey')).toBe('2')
+    expect(wrapper.findAll('.choice-row')[1]!.attributes('data-hotkey')).toBe('2')
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
     expect(wrapper.emitted('doAction')).toBeUndefined()
@@ -486,6 +486,44 @@ describe('StoryBlock', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
 
     expect(wrapper.emitted('doAction')).toBeUndefined()
+  })
+
+  it('focuses an available choice input before its payload can commit', async () => {
+    const fragments: Record<string, StoryFragment> = {
+      choice: {
+        uid: 'choice',
+        fragment_type: 'choice',
+        edge_id: 'edge-text',
+        text: 'Name the trade',
+        available: true,
+        accepts: { kind: 'text' },
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['choice'])
+    const input = wrapper.find('input')
+    const focus = vi.spyOn(input.element, 'focus')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.choice-row').attributes('data-hotkey')).toBe('1')
+    expect(wrapper.find('.choice-row').classes()).not.toContain('choice-row--locked')
+    expect((wrapper.find('button.choice-button').element as HTMLButtonElement).disabled).toBe(true)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
+
+    expect(focus).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await input.trigger('keydown.enter')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await input.setValue('Brass doorknob')
+    await input.trigger('keydown.enter')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge-text',
+      { text: 'Brass doorknob' },
+    ])
   })
 
   it('renders unknown fragments as fallbacks', () => {

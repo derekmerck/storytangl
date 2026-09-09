@@ -20,6 +20,28 @@ export const choiceKeyForPosition = (
   return nonEmpty(choice.ui_hints?.hotkey) ?? CHOICE_KEYS[position - 1]
 }
 
+export const choiceKeysForList = (choices: ChoiceStoryFragment[]): Array<string | undefined> => {
+  const keys = choices.map((choice, index) => choiceKeyForPosition(choice, index + 1))
+  const seen = new Map<string, { position: number; edgeId: string }>()
+
+  keys.forEach((key, index) => {
+    if (key === undefined) {
+      return
+    }
+    const normalized = key.toLowerCase()
+    const previous = seen.get(normalized)
+    if (previous) {
+      throw new Error(
+        `Duplicate choice hotkey "${normalized}" for positions ${previous.position} ` +
+          `(${previous.edgeId}) and ${index + 1} (${choices[index]!.edge_id})`
+      )
+    }
+    seen.set(normalized, { position: index + 1, edgeId: choices[index]!.edge_id })
+  })
+
+  return keys
+}
+
 export const choicePresentation = (choice: ChoiceStoryFragment) => {
   const blockers = choice.blockers ?? []
   const replacement = blockers.find((blocker) => blocker.replaces_text && nonEmpty(blocker.message))

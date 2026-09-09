@@ -18,6 +18,7 @@ import {
   isPieceFragment,
   isRollFragment,
 } from './fragmentUtils'
+import { choiceKeysForList } from './choicePresentation'
 
 const props = defineProps<{
   scene: StorySceneModel
@@ -41,6 +42,7 @@ const sceneMembers = computed(() =>
 const choices = computed<ChoiceStoryFragment[]>(() =>
   sceneMembers.value.filter(isChoiceFragment),
 )
+const choiceHotkeys = computed(() => choiceKeysForList(choices.value))
 const flowMembers = computed(() =>
   sceneMembers.value.filter(
     (fragment) =>
@@ -75,13 +77,25 @@ const handleChoiceKey = (event: KeyboardEvent) => {
     return
   }
   const key = event.key.toLowerCase()
-  const button = Array.from(
-    sceneRoot.value?.querySelectorAll<HTMLButtonElement>('button[data-hotkey]:not(:disabled)') ?? [],
+  const row = Array.from(
+    sceneRoot.value?.querySelectorAll<HTMLElement>('.choice-row[data-hotkey]') ?? [],
   ).find((candidate) => candidate.dataset.hotkey?.toLowerCase() === key)
-  if (button) {
-    event.preventDefault()
-    button.click()
+  if (!row) {
+    return
   }
+
+  event.preventDefault()
+  const commitButton = row.querySelector<HTMLButtonElement>('button.choice-button')
+  if (commitButton && !commitButton.disabled) {
+    commitButton.click()
+    return
+  }
+  row
+    .querySelector<HTMLElement>(
+      'input:not(:disabled), select:not(:disabled), textarea:not(:disabled), ' +
+        '[contenteditable]:not([contenteditable="false"]), [role="option"][tabindex="0"]',
+    )
+    ?.focus()
 }
 
 onMounted(() => window.addEventListener('keydown', handleChoiceKey))
@@ -121,7 +135,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleChoiceKey))
               v-for="(choice, index) in choices"
               :key="choice.uid"
               :choice="choice"
-              :position="index + 1"
+              :hotkey="choiceHotkeys[index]"
               :fragments="fragments"
               :disabled="disabled"
               @doAction="handleAction"

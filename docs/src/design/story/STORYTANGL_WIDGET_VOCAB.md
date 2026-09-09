@@ -784,7 +784,7 @@ into the same player-facing shape at the story journal boundary.
 | **Optional** | `available` (default `true`); `unavailable_reason`; `blockers[]`; `accepts`; `ui_hints`; `activation_payload` |
 | **Container rule** | Always emitted within the active `scene` group. Order is presented order; positional hotkey numbering follows order. |
 | **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, place, compose}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
-| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices. Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. Up/down cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target at least 44x44 on touch. Locked choices remain focusable for screen reader stability. |
+| **A11y** | Group is `role="group" aria-label="choices"`. **The position of a choice in the open-choice list is its default hotkey** (`1`–`9`, then `a`–`z`). `ui_hints.hotkey` overrides the default for specific choices. Duplicate resolved hotkeys are invalid and clients raise. Hotkeys are suppressed when a text input has focus; Esc returns to choice-selection mode. Up/down cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target at least 44x44 on touch. Locked choices remain focusable for screen reader stability. |
 | **Fallback** | Unknown `accepts.kind` → plain button posting empty payload, with warning. Unknown `ui_hints.widget` → default widget for `accepts.kind`. |
 
 **Port sketches.** Web: button list; freeform → `<input>` + submit. CLI: `1. Pay the forty silver.` … `> ` prompt; `x)` in place of the number for unavailable. tkinter: `Button` stack; `Entry` for freeform; `state="disabled"` for locked. Ren'Py: custom choice screen with insensitive locked rows; `renpy.input` for freeform. Godot: `VBoxContainer` of `Button`; `disabled=true` for locked; `LineEdit` for freeform.
@@ -1343,7 +1343,7 @@ Concrete `place` (edge variant) — "lay track on the Toledo-Chicago connection"
 
 ```python
 class UIHints(BaseModel, extra="allow"):
-    hotkey: str | None = None             # "1"-"9", "a"-"z", or symbolic
+    hotkey: str | None = None             # explicit per-choice override
     icon: str | None = None
     emphasis: Literal["primary", "subtle", "warning", "danger"] | None = None
     widget: str | None = None             # variant override id from bundle.widgets
@@ -1353,6 +1353,15 @@ class UIHints(BaseModel, extra="allow"):
 `UIHints` is deliberately open (`extra="allow"`) — it's a hint surface,
 not a contract surface. Authors may add hints freely; ports ignore
 unknowns. The named fields are documented hints with defined semantics.
+
+`hotkey` overrides the positional default for one choice; it is not a
+numbering template. Do not use `\d` unless the author explicitly enumerates
+every choice in the list. In most cases, put choices in the desired order and
+rely on positional defaults. After applying authored overrides and excluding
+locked or unkeyed rows, a client normalizes resolved keys exactly as its
+keyboard matching does. Duplicate resolved hotkeys are invalid: the client
+raises an error identifying the duplicate key and the implicated choices or
+positions.
 
 #### 6.2.1 Genre-specific UIHints sub-shapes (Tier P3)
 
