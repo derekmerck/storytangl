@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
+from tangl.loaders import DecodeResult, EncodeResult
 from tangl.loaders.compiler import WorldCompiler
 from tangl.service.service_manager import ServiceManager
 from tangl.service.world_registry import (
@@ -191,3 +192,79 @@ def test_world_compiler_encodes_with_bundle_local_codec(tmp_path: Path) -> None:
     world = compiler.compile(bundle)
 
     assert compiler.encode(bundle, world.bundle).artifacts == {"local.story": "local_encode"}
+
+
+class _ApplicationCodec:
+    """An application-supplied codec claiming the same id as a bundle's."""
+
+    codec_id = "local_codec"
+
+    def decode(self, *, bundle, script_paths, story_key):
+        _ = script_paths, story_key
+        return DecodeResult(
+            story_data={
+                "label": bundle.manifest.label,
+                "metadata": {"title": "application", "start_at": "intro.start"},
+                "scenes": {"intro": {"blocks": {"start": {"content": "application"}}}},
+            },
+            codec_state={"codec_id": self.codec_id, "variant": "application"},
+        )
+
+    def encode(self, *, bundle, runtime_data, story_key, codec_state=None):
+        _ = bundle, story_key, codec_state
+        return EncodeResult(artifacts={"local.story": runtime_data["label"]})
+
+
+def test_bundle_contribution_outranks_a_same_id_application_codec(
+    tmp_path: Path,
+) -> None:
+    """Specificity decides, not who registered first.
+
+    A contribution from a world's own domain module is scoped to that world, so
+    it outranks a generic registration for the codec type. This is the rule an
+    application relies on when a world ships a better reader for its own source
+    than the one core provides, and it is documented in STORY_DESIGN.md as
+    intended rather than incidental - so it is pinned here.
+    """
+    _write_codec_bundle(tmp_path, label="local_precedence", variant="bundle")
+
+    compiler = WorldCompiler()
+    compiler.codec_registry.register("local_codec", _ApplicationCodec())
+
+    World.clear_instances()
+    try:
+        bundle = WorldRegistry([tmp_path]).bundles["local_precedence"]
+        world = compiler.compile(bundle)
+    finally:
+        World.clear_instances()
+
+    assert world.metadata["title"] == "bundle"
+    assert world.bundle.codec_state["variant"] == "bundle"
+
+
+def test_application_codec_is_used_when_the_bundle_contributes_none(
+    tmp_path: Path,
+) -> None:
+    """The application registry is the fallback, not dead weight.
+
+    Without this the previous test would pass even if bundle contributions were
+    the only path that ever worked.
+    """
+    _write_codec_bundle(tmp_path, label="local_fallback", variant="bundle")
+    module_name = "local_fallback_domain"
+    # Strip the contribution hook, keeping the module importable.
+    (tmp_path / "local_fallback" / f"{module_name}.py").write_text(
+        "from __future__ import annotations\n", encoding="utf-8"
+    )
+
+    compiler = WorldCompiler()
+    compiler.codec_registry.register("local_codec", _ApplicationCodec())
+
+    World.clear_instances()
+    try:
+        bundle = WorldRegistry([tmp_path]).bundles["local_fallback"]
+        world = compiler.compile(bundle)
+    finally:
+        World.clear_instances()
+
+    assert world.metadata["title"] == "application"

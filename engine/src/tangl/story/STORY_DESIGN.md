@@ -124,38 +124,34 @@ contributions overlay the application's built-in registry without changing it,
 then lower their private source representation directly to cardinal story data.
 The same loaded domain adjuncts are reused for `WorldBuilder` assembly.
 
-**Today a bundle contribution always wins.** `_resolve_story_codec()` consults
-the bundle's contributions before the application registry and takes the first
-hit, with no way for an application to keep a codec it configured deliberately.
-That is a real limitation, not a settled design: an application that constructs
-a codec with particular options and hands it to `WorldCompiler` will find it
-silently replaced by the bundle's own, differently configured instance.
+**A bundle contribution wins, and that is the intended rule.**
+`_resolve_story_codec()` consults the bundle's contributions before the
+application registry. Resolution is ordered by specificity, not by who
+registered it: a contribution from a world's own domain module is inherently
+scoped to that world, so it outranks a generic registration for the codec type.
+If an application ships a weak `passages` codec, a world that ships its own gets
+its own.
 
-The intended shape is resolution ordered by **specificity** rather than by who
-registered it — an application registration bound to a specific world's
-singleton label, then a bundle contribution, then a generic registration for the
-codec type. A bundle contribution is inherently world-scoped, so it would still
-outrank a generic type registration, while an application could reclaim
-precedence by binding to a world's label and so repair a bad bundle codec
-without editing that bundle. **That world-label tier does not exist.** There is
-no API for it, and nothing below the top of this paragraph should be read as an
-available escape hatch.
-
-Codec construction parameters are likewise unsolved. `get_story_codecs()`
+There is no parameterization seam, and none is planned. `get_story_codecs()`
 returns constructed instances, so a contribution carries exactly one
-configuration and the hook cannot express a second.
+configuration.
 
-That gap is narrower than it first looks, because much of what tempts an author
-to parameterize a codec does not belong there. Graph initialization depth is
-already a runtime per-story toggle — `InitMode.LAZY` / `InitMode.EAGER` on
-`World.create_story()`, surfaced per request by the service manager — and
-governs the initial shape of a new graph. Which media a template prefers when it
-emits an instance onto a graph is a property of the template, not of the source
-format's reader. A codec decodes source into cardinal data; policy that decides
-what a graph looks like at birth, or what a template emits when it instantiates,
-belongs to the runtime toggle or the template respectively. Before adding a
-construction parameter here, check that the option is really about *reading the
-source* and not about one of those.
+That is a smaller constraint than it first appears, because most of what tempts
+an author to parameterize a codec does not belong to a codec at all. Graph
+initialization depth is already a runtime per-story toggle — `InitMode.LAZY` /
+`InitMode.EAGER` on `World.create_story()`, surfaced per request by the service
+manager — and governs the initial shape of a new graph. Which media a template
+prefers when it emits an instance onto a graph is a property of the template. A
+codec reads source into cardinal data and nothing more. Policy about what a
+graph looks like at birth belongs to the runtime toggle; policy about what a
+template emits belongs to the template. Before reaching for a construction
+parameter, check the option is really about *reading the source*; the first
+candidate to be examined this way, CarWars' flavor-media mode, turned out to be
+template-emission policy wearing a codec argument.
+
+A finer binding — an application registration scoped to one world's singleton
+label, outranking even that world's own contribution — is a natural extension if
+a real conflict ever calls for it. Nothing needs it today, and it is not built.
 
 Domain modules contribute through a small set of parallel hooks:
 `get_authorities()`, `get_story_codecs()`, and `get_media_index_handlers()`, plus
