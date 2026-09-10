@@ -1,0 +1,5 @@
+create_story adventure_sandbox_slice
+do 1
+do 2
+do 3
+do 5

@@ -8,3 +8,4 @@ assets:
 metadata:
   title: "Credential Gate"
   description: "A checkpoint shift: inspect a roster of travelers and rule on each disposition."
+  proof_class: finite

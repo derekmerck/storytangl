@@ -22,6 +22,11 @@ from tangl.mechanics.sandbox import (
     SandboxVisibilityRule,
     SwitchableFacet,
 )
+
+# Load-bearing composition import: the sandbox package does not register its
+# story-info adapter implicitly. This world uses the ordinary Watch, Here,
+# Carrying, Map, and surrounding-state affordances.
+import tangl.mechanics.sandbox.story_info  # noqa: F401
 from tangl.mechanics.sandbox.handlers import sandbox_player_assets
 from tangl.story import Action, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager

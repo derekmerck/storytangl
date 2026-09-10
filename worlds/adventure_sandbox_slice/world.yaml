@@ -6,3 +6,4 @@ metadata:
   title: "Adventure Sandbox Slice"
   description: "A feel-preserving Colossal Cave-style sandbox mechanics demo."
   start_at: adventure.entrance
+  proof_class: open-ended
