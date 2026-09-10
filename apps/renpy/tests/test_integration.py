@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
 import pytest
 
+from tangl.loaders import WorldBundle
 from tangl.persistence import PersistenceManagerFactory
 from tangl.renpy import RenPyChoice, RenPySessionBridge
 from tangl.service import build_service_manager
 from tangl.service.world_registry import clear_discovered_world_registries
 from tangl.story.fabula.world import World
+
+
+REN_PY_DEMO_ROOT = Path(__file__).resolve().parents[3] / "worlds" / "renpy_demo"
 
 
 @pytest.fixture(autouse=True)
@@ -32,11 +37,13 @@ def _choice_by_text(choices: list[RenPyChoice], text: str) -> UUID:
 
 
 def test_renpy_demo_start_turn_has_background_and_intro_choice() -> None:
+    bundle = WorldBundle.load(REN_PY_DEMO_ROOT)
     bridge = RenPySessionBridge(service_manager=_service_manager())
 
     envelope = bridge.start("renpy_demo")
     turns = bridge.build_turns(envelope.fragments)
 
+    assert bundle.manifest.metadata["proof_class"] == "adapter"
     assert len(turns) == 1
     turn = turns[0]
     assert any(op.role == "narrative_im" for op in turn.media_ops)

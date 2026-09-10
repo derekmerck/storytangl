@@ -1,0 +1,8 @@
+create_story credential_gate
+do 1
+do 1 0:passport
+do 1
+do 1 1:passport
+do 4
+do 1 2:passport
+do 5
