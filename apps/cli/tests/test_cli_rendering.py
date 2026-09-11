@@ -72,11 +72,7 @@ def test_rich_renderer_exports_envelope_text() -> None:
             ),
         ],
         metadata={
-            "info_affordances": [
-                {"kind": "map", "label": "Map", "shortcuts": ["m"]},
-                {"kind": "inventory", "label": "Inventory", "shortcuts": ["i"]},
-            ],
-            "info_state": {"available_kinds": ["map"]},
+            "info_state": {"available_kinds": ["ui-map"]},
         },
     )
     renderer.emit(cmd, renderables)
@@ -96,8 +92,7 @@ def test_rich_renderer_exports_envelope_text() -> None:
     assert "Permit expired" in transcript
     assert "cost: time -1 minute" in transcript
     assert "The permit expired yesterday." in " ".join(transcript.split())
-    assert "/m Map" in transcript
-    assert "Inventory" not in transcript
+    assert "/m Map" not in transcript
 
 
 def test_rich_renderer_exports_diagnostic_transcript() -> None:
@@ -116,7 +111,6 @@ def test_rich_renderer_exports_diagnostic_transcript() -> None:
     assert "Unknown fragments remain visible" in transcript
     assert "Projected State" in transcript
     assert "Candidates" in transcript
-    assert "/r Registry" in transcript
 
 
 def test_rich_projected_state_renders_native_tables() -> None:

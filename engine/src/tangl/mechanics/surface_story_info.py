@@ -50,9 +50,8 @@ from tangl.presentation.surface import HasSurface, Surface
 from tangl.presentation.values import KvRow
 from tangl.vm.runtime.frame import PhaseCtx
 
-SURFACE_PLATE_KIND = "surface_plate"
+SURFACE_PLATE_KIND = "ui-surface"
 SURFACE_SLOTS_KIND = "surface_slots"
-SURFACE_KINDS = frozenset({SURFACE_PLATE_KIND, SURFACE_SLOTS_KIND})
 
 SURFACE_PLATE_SECTION = "surface_plate"
 SURFACE_SLOTS_SECTION = "surface_slots"
@@ -87,9 +86,8 @@ def advertise_surface_info_channels(
     # offer the player a table of coordinates.
     return [
         InfoAffordance(
-            kind=SURFACE_PLATE_KIND,
+            channel_id=SURFACE_PLATE_KIND,
             label="Surface",
-            query={"kinds": [SURFACE_PLATE_KIND, SURFACE_SLOTS_KIND]},
         )
     ]
 
@@ -107,16 +105,11 @@ def project_surface_info(
     surface = _surface(caller)
     if surface is None:
         return None
-    kinds = request.requested_kinds()
-    if SURFACE_KINDS.isdisjoint(kinds):
+    kinds = request.requested_channels()
+    if SURFACE_PLATE_KIND not in kinds:
         return None
 
-    sections: list[ProjectedSection] = []
-    if SURFACE_PLATE_KIND in kinds:
-        sections.append(_plate_section(surface))
-    if SURFACE_SLOTS_KIND in kinds:
-        sections.append(_slots_section(surface))
-    return sections or None
+    return [_plate_section(surface), _slots_section(surface)]
 
 
 def _plate_section(surface: Surface) -> ProjectedSection:

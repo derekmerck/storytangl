@@ -62,6 +62,7 @@ describe('WorldInfo', () => {
 
   it('displays world title from store', async () => {
     const store = useStore()
+    store.current_world_uid = 'tangl_world'
     await store.getCurrentWorldInfo()
 
     const wrapper = mountDialog()
@@ -71,16 +72,17 @@ describe('WorldInfo', () => {
     expect(dialog.text()).toContain('My world!')
   })
 
-  it('displays world summary and version', async () => {
+  it('displays the advisory logo media reference', async () => {
     const store = useStore()
+    store.current_world_uid = 'tangl_world'
     await store.getCurrentWorldInfo()
 
     const wrapper = mountDialog()
     await flushPromises()
 
     const dialog = wrapper.findComponent(WorldInfo)
-    expect(dialog.text()).toContain('2.7.9')
-    expect(dialog.text()).toContain('A cozy corner of the Tangl multiverse')
+    expect(dialog.text()).toContain('Logo media: cover_im')
+    expect(dialog.text()).toContain('Advisory branding for this world')
   })
 
   it('emits close when dialog is dismissed', async () => {

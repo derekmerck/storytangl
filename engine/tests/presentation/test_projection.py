@@ -122,31 +122,29 @@ def test_table_value_rejects_rows_with_wrong_width() -> None:
 
 def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
     affordance = InfoAffordance(
-        kind="map",
+        channel_id="ui-map",
         label="Map",
         shortcuts=["m"],
-        query={"type": "map", "scope": "known"},
     )
-    state = InfoState(version=7, dirty_kinds=["map"], available_kinds=["map", "inventory"])
+    state = InfoState(
+        version=7,
+        dirty_kinds=["ui-map"],
+        available_kinds=["ui-map", "ui-inventory"],
+    )
 
     assert affordance.model_dump(mode="python") == {
-        "kind": "map",
+        "channel_id": "ui-map",
         "label": "Map",
         "shortcuts": ["m"],
-        "query": {"type": "map", "scope": "known"},
     }
     assert state.model_dump(mode="python") == {
         "version": 7,
-        "dirty_kinds": ["map"],
-        "available_kinds": ["map", "inventory"],
+        "dirty_kinds": ["ui-map"],
+        "available_kinds": ["ui-map", "ui-inventory"],
     }
 
 
-def test_projection_request_gathers_explicit_and_opaque_query_kinds() -> None:
-    request = ProjectionRequest(
-        kind="status",
-        kinds=["inventory"],
-        query={"kinds": ["location", "presence"], "type": "map"},
-    )
+def test_projection_request_deduplicates_exact_channels_in_request_order() -> None:
+    request = ProjectionRequest(channels=["ui-map", "ui-sidebar", "ui-map"])
 
-    assert request.requested_kinds() == ["status", "inventory", "location", "presence"]
+    assert request.requested_channels() == ["ui-map", "ui-sidebar"]

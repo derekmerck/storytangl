@@ -22,6 +22,7 @@ from .dispatch import (
 )
 from .projection import (
     BadgeListValue,
+    BrandingValue,
     InfoAffordance,
     InfoState,
     ItemListValue,
@@ -33,11 +34,13 @@ from .projection import (
     SectionValue,
     ProjectionRequest,
     TableValue,
+    ThemeTokens,
 )
 
 __all__ = [
     "Accepts",
     "BadgeListValue",
+    "BrandingValue",
     "Blocker",
     "CostPreview",
     "GrammarHint",
@@ -62,6 +65,7 @@ __all__ = [
     "Surface",
     "SurfaceSlot",
     "TableValue",
+    "ThemeTokens",
     "UIHints",
     "UxEvent",
     "on_advertise_info_channels",

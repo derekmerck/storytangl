@@ -11,7 +11,7 @@ from uuid import UUID
 
 import yaml
 
-from tangl.core import BaseFragment
+from tangl.core import BaseFragment, Ctx
 from tangl.journal.fragments import ChoiceFragment, PieceFragment
 from tangl.persistence import PersistenceManager
 from tangl.presentation.events import GrammarHint, GrammarNoun, GrammarVerb, UxEvent
@@ -34,13 +34,12 @@ from .auth import user_id_by_key
 from .exceptions import AuthMismatchError, InvalidOperationError
 from ._user_support import parse_bool_flag, parse_datetime_field
 from .diagnostics import diagnostics_from_codec_state, diagnostics_from_compile_issues
-from .dispatch import do_advertise_info_channels, do_get_story_info
+from .dispatch import do_advertise_info_channels, do_get_story_info, do_get_world_info
 from .media import resolve_world_media
 from .response import (
     DirectEdgeRequest,
     EdgeResolutionRequest,
     FindEdgeRequest,
-    JsonValue,
     PreflightReport,
     RuntimeEnvelope,
     RuntimeInfo,
@@ -318,28 +317,26 @@ class ServiceManager:
     @staticmethod
     def _story_info_metadata(ledger: Ledger) -> dict[str, Any]:
         ctx = ServiceManager._make_story_info_ctx(ledger)
-        affordances = do_advertise_info_channels(ledger.cursor, ctx=ctx)
-        if not affordances:
-            return {}
-
-        available_kinds = _unique_info_kinds(affordances)
+        affordances = ServiceManager._story_info_channels(ledger, ctx=ctx)
+        available_channels = _unique_info_channels(affordances)
         info_state = InfoState(
             version=ledger.step,
-            dirty_kinds=list(available_kinds),
-            available_kinds=list(available_kinds),
+            dirty_kinds=list(available_channels),
+            available_kinds=list(available_channels),
         )
-        return {
-            "info_affordances": [
-                affordance.model_dump(mode="python") for affordance in affordances
-            ],
-            "info_state": info_state.model_dump(mode="python"),
-        }
+        return {"info_state": info_state.model_dump(mode="python")}
+
+    @staticmethod
+    def _story_info_channels(ledger: Ledger, *, ctx: "PhaseCtx") -> list[InfoAffordance]:
+        return [
+            InfoAffordance(channel_id="ui-sidebar", label="Status"),
+            *do_advertise_info_channels(ledger.cursor, ctx=ctx),
+        ]
 
     @staticmethod
     def _default_story_info(ledger: Ledger, request: ProjectionRequest) -> ProjectedState:
         """Return the small Service-owned session fallback when no provider owns it."""
-        requested = request.requested_kinds()
-        if requested and not {"session", "stats"}.intersection(requested):
+        if "ui-sidebar" not in request.requested_channels():
             return ProjectedState()
 
         items: list[KvRow] = []
@@ -599,11 +596,9 @@ class ServiceManager:
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: "UserAuthInfo | None" = None,
-        kind: str | None = None,
-        kinds: list[str] | None = None,
-        query: dict[str, JsonValue] | None = None,
+        channels: list[str] | None = None,
     ) -> ProjectedState:
-        """Return projected current-state sections for the active story."""
+        """Discover or retrieve current-story projected-state channels."""
 
         with self.open_session(
             user_id=user_id,
@@ -611,16 +606,28 @@ class ServiceManager:
             write_back=False,
             user_auth=user_auth,
         ) as session:
-            request = ProjectionRequest(
-                kind=kind,
-                kinds=list(kinds or []),
-                query=query,
-            )
             ctx = self._make_story_info_ctx(session.ledger)
-            state = do_get_story_info(session.ledger.cursor, ctx=ctx, request=request)
-            if state.sections:
-                return state
-            return self._default_story_info(session.ledger, request)
+            affordances = self._story_info_channels(session.ledger, ctx=ctx)
+            available = _unique_info_channels(affordances)
+            request = ProjectionRequest(channels=list(channels or []))
+            requested = request.requested_channels()
+            if not requested:
+                return ProjectedState(channels=affordances)
+            _validate_info_channels(requested, available)
+
+            sections: list[ProjectedSection] = []
+            for channel in requested:
+                selected = ProjectionRequest(channels=[channel])
+                if channel == "ui-sidebar":
+                    sections.extend(self._default_story_info(session.ledger, selected).sections)
+                sections.extend(
+                    do_get_story_info(
+                        session.ledger.cursor,
+                        ctx=ctx,
+                        request=selected,
+                    ).sections
+                )
+            return ProjectedState(sections=sections)
 
     @service_method(
         access=ServiceAccess.CLIENT,
@@ -842,15 +849,31 @@ class ServiceManager:
         writeback=ServiceWriteback.NONE,
         operation_id="world.info",
     )
-    def get_world_info(self, *, world_id: str) -> WorldInfo:
-        """Return metadata for one resolved world."""
+    def get_world_info(
+        self, *, world_id: str, channels: list[str] | None = None
+    ) -> ProjectedState:
+        """Discover or retrieve cacheable public world-info channels."""
 
         world = self.open_world(world_id)
-        metadata = dict(world.metadata or {})
-        metadata.pop("label", None)
-        metadata.setdefault("title", world.label)
-        metadata.setdefault("author", "Unknown")
-        return WorldInfo(label=world.label, **metadata)
+        ctx = Ctx(registries=tuple(world.get_authorities()))
+        affordances = do_advertise_info_channels(world, ctx=ctx)
+        available = _unique_info_channels(affordances)
+        request = ProjectionRequest(channels=list(channels or []))
+        requested = request.requested_channels()
+        if not requested:
+            return ProjectedState(channels=affordances)
+        _validate_info_channels(requested, available)
+
+        sections: list[ProjectedSection] = []
+        for channel in requested:
+            sections.extend(
+                do_get_world_info(
+                    world,
+                    ctx=ctx,
+                    request=ProjectionRequest(channels=[channel]),
+                ).sections
+            )
+        return ProjectedState(sections=sections)
 
     @service_method(
         access=ServiceAccess.PUBLIC,
@@ -983,8 +1006,17 @@ class ServiceManager:
         return reset_system(hard=hard)
 
 
-def _unique_info_kinds(affordances: list[InfoAffordance]) -> list[str]:
-    return list(dict.fromkeys(affordance.kind for affordance in affordances))
+def _unique_info_channels(affordances: list[InfoAffordance]) -> list[str]:
+    channels = [affordance.channel_id for affordance in affordances]
+    if len(channels) != len(set(channels)):
+        raise ValueError("Info channel ids must be unique in their current scope")
+    return channels
+
+
+def _validate_info_channels(requested: list[str], available: list[str]) -> None:
+    unknown = [channel for channel in requested if channel not in available]
+    if unknown:
+        raise ValueError(f"Unknown info channel(s): {', '.join(unknown)}")
 
 
 __all__ = [

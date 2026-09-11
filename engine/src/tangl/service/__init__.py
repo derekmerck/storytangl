@@ -29,6 +29,7 @@ from .exceptions import (
 from .dispatch import (
     do_advertise_info_channels,
     do_get_story_info,
+    do_get_world_info,
     service_dispatch,
 )
 from .response import (
@@ -110,6 +111,7 @@ __all__ = [
     "coerce_runtime_info",
     "do_advertise_info_channels",
     "do_get_story_info",
+    "do_get_world_info",
     "get_service_method_spec",
     "service_dispatch",
     "service_method",

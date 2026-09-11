@@ -151,33 +151,37 @@ and similar wire concerns belong in CLI/server adapters.
 translate journal content into a second shape or maintain a second fragment
 representation.
 
-## Story-Info Channels
+## Info Channels
 
 `get_story_info` is the generic side-channel for supplementary projected state.
-It returns presentation-owned `ProjectedState`, the same portable section model used by status
-rails, command-line inspection, and future rich panels. The endpoint accepts an
-optional `kind`, comma-separated `kinds`, and opaque JSON `query` descriptor.
-Clients pass query descriptors back without interpreting them.
+It returns presentation-owned `ProjectedState`, the same portable section model
+used by status rails, command-line inspection, and future rich panels. With no
+`channels` query it returns the exact channels valid for the authenticated
+story. `channels=a,b` selects only those channels, deduplicated in request order;
+an unknown id is a bad request.
 
-Service exposes two story-info entry points and folds the presentation registry
-with story, world, and runtime-local authorities:
+`get_world_info` uses the same protocol for public, fixed, cacheable world
+projections. It is available without a story session and currently advertises
+common HTML class meanings plus advisory branding, light/dark tokens, and a
+logo media reference. These are suggestions a client may ignore or adjust.
 
-- `advertise_info_channels` gathers presentation `InfoAffordance` values for the next
-  `RuntimeEnvelope.metadata.info_affordances` list.
-- `get_story_info` gathers presentation `ProjectedSection` values for a concrete
-  presentation `ProjectionRequest`.
+Service folds the presentation registry with story, world, and runtime-local
+authorities:
 
-If no contributor returns a section, Service supplies its private minimal session
-projection. It is fallback behavior, not a pluggable provider seam.
+- `advertise_info_channels` gathers exact `InfoAffordance` channel ids for
+  endpoint discovery.
+- `get_story_info` and `get_world_info` gather `ProjectedSection` values for a
+  concrete `ProjectionRequest`.
 
-The fulfillment task is additive: several handlers may contribute sections for
-a multi-kind request. V1 does not deduplicate `section_id` values or apply
-priority-based override semantics, so providers should use non-overlapping
-section ids unless they intentionally want repeated sections. Handlers should
-treat projected state as disclosed state, not authority state. A sandbox map may
-show known rooms and visible exits; a credentials loop may show presented
-documents and public rules. Neither should expose hidden truth, future
-schedules, or backend-only decision state.
+Service owns the exact `ui-sidebar` story channel and its minimal session
+projection. Runtime envelopes carry only `InfoState` version, dirty, and
+availability hints; the full catalog is discovered through the info endpoint.
+
+One exact channel may contribute several sections. Service dispatches selected
+channels one at a time to preserve request order. There is no glob expansion,
+folder hierarchy, provider recruitment, or specificity ranking. Handlers treat
+projected state as disclosed state, not authority state: a sandbox map may show
+known rooms and visible exits, but not hidden truth or future schedules.
 
 Any hotspot, edge reference, or action hint carried in a projected section is
 advisory. Committing a move still goes through ordinary action selection.

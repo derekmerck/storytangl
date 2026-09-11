@@ -33,7 +33,6 @@ from .exceptions import (
 )
 from .response import (
     EdgeResolutionRequest,
-    JsonValue,
     RuntimeEnvelope,
     RuntimeInfo,
     SystemInfo,
@@ -42,7 +41,13 @@ from .response import (
     WorldInfo,
 )
 from .service_manager import ServiceManager, ServiceSession
-from .service_method import BlockingMode, ServiceAccess, ServiceContext, ServiceWriteback, service_method
+from .service_method import (
+    BlockingMode,
+    ServiceAccess,
+    ServiceContext,
+    ServiceWriteback,
+    service_method,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -459,20 +464,14 @@ class RemoteServiceManager(ServiceManager):
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
         user_auth: UserAuthInfo | None = None,
-        kind: str | None = None,
-        kinds: list[str] | None = None,
-        query: dict[str, JsonValue] | None = None,
+        channels: list[str] | None = None,
     ) -> ProjectedState:
         self._validate_user_auth(user_id=user_id, user_auth=user_auth)
         self._check_bound_user(user_id)
         _ = ledger_id
         params: dict[str, object] = {}
-        if kind is not None:
-            params["kind"] = kind
-        if kinds:
-            params["kinds"] = ",".join(kinds)
-        if query is not None:
-            params["query"] = json.dumps(query)
+        if channels:
+            params["channels"] = ",".join(channels)
         payload = self._request(
             "GET",
             "/story/info",
@@ -651,13 +650,17 @@ class RemoteServiceManager(ServiceManager):
         writeback=ServiceWriteback.NONE,
         operation_id="world.info",
     )
-    def get_world_info(self, *, world_id: str) -> WorldInfo:
+    def get_world_info(
+        self, *, world_id: str, channels: list[str] | None = None
+    ) -> ProjectedState:
+        params = {"channels": ",".join(channels)} if channels else None
         payload = self._request(
             "GET",
             f"/world/{world_id}/info",
             auth_required=False,
+            params=params,
         )
-        return self._decode_model(WorldInfo, payload, label="world info")
+        return self._decode_model(ProjectedState, payload, label="projected state")
 
     @service_method(
         access=ServiceAccess.PUBLIC,

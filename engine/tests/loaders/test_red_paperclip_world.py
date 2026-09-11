@@ -293,7 +293,7 @@ class TestRedPaperclipWorld:
         projected = do_get_story_info(
             ledger.cursor,
             ctx=_ctx(ledger),
-            request=ProjectionRequest(kinds=["map_plate", "map_regions", "location"]),
+            request=ProjectionRequest(channels=["ui-map-plate", "ui-location"]),
         )
         section_ids = {section.section_id for section in projected.sections}
 
@@ -377,7 +377,7 @@ class TestRedPaperclipWorld:
         projected = do_get_story_info(
             ledger.cursor,
             ctx=_ctx(ledger),
-            request=ProjectionRequest(kind="status"),
+            request=ProjectionRequest(channels=["ui-trade-status"]),
         )
         holding = next(
             section

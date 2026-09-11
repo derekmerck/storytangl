@@ -78,11 +78,14 @@ describe('StoryStatus', () => {
   })
 
   it('renders optional info affordances without requiring bespoke client support', async () => {
-    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState)),
+    )
+    const wrapper = mountStatus()
     await flushPromises()
 
     expect(wrapper.find('[data-testid="info-affordance-bar"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Status')
+    expect(wrapper.text()).toContain('Watch')
     expect(wrapper.text()).toContain('Map')
     expect(wrapper.text()).toContain('Carrying')
     expect(wrapper.text()).toContain('Help')
@@ -91,21 +94,25 @@ describe('StoryStatus', () => {
     expect(shortcuts).toContain('i')
   })
 
-  it('treats info_state available kinds as advisory affordance visibility', async () => {
+  it('treats info_state available channels as advisory affordance visibility', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState)),
+    )
     const wrapper = mountStatus({
-      infoAffordances: sandboxInfoAffordances,
-      infoState: { ...sandboxInfoState, available_kinds: ['map', 'help'] },
+      infoState: { ...sandboxInfoState, available_kinds: ['ui-map', 'ui-help'] },
     })
     await flushPromises()
 
-    expect(wrapper.find('[data-info-kind="map"]').exists()).toBe(true)
-    expect(wrapper.find('[data-info-kind="help"]').exists()).toBe(true)
-    expect(wrapper.find('[data-info-kind="inventory"]').exists()).toBe(false)
+    expect(wrapper.find('[data-info-channel="ui-map"]').exists()).toBe(true)
+    expect(wrapper.find('[data-info-channel="ui-help"]').exists()).toBe(true)
+    expect(wrapper.find('[data-info-channel="ui-inventory"]').exists()).toBe(false)
   })
 
-  it('hides all optional affordances when info_state marks none available', async () => {
+  it('hides all affordances when info_state marks none available', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState)),
+    )
     const wrapper = mountStatus({
-      infoAffordances: sandboxInfoAffordances,
       infoState: { ...sandboxInfoState, available_kinds: [] },
     })
     await flushPromises()
@@ -113,7 +120,7 @@ describe('StoryStatus', () => {
     expect(wrapper.find('[data-testid="info-affordance-bar"]').exists()).toBe(false)
   })
 
-  it('loads the selected info affordance through an opaque story-info query descriptor', async () => {
+  it('loads the selected exact story-info channel', async () => {
     const seenParams: URLSearchParams[] = []
     server.use(
       http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
@@ -122,41 +129,43 @@ describe('StoryStatus', () => {
       }),
     )
 
-    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    const wrapper = mountStatus()
     await flushPromises()
 
-    const mapButton = wrapper.find('[data-info-kind="map"]')
+    const mapButton = wrapper.find('[data-info-channel="ui-map"]')
     expect(mapButton.exists()).toBe(true)
     await mapButton.trigger('click')
     await flushPromises()
 
     expect(seenParams.at(0)?.toString()).toBe('')
-    const mapParams = seenParams.find((params) => params.get('kind') === 'map')
+    const mapParams = seenParams.find((params) => params.get('channels') === 'ui-map')
     expect(mapParams).toBeDefined()
-    expect(mapParams?.get('type')).toBeNull()
-    expect(mapParams?.get('format')).toBeNull()
-    expect(JSON.parse(mapParams?.get('query') ?? '{}')).toEqual({ type: 'map', format: 'graph' })
+    expect(mapParams?.has('kind')).toBe(false)
+    expect(mapParams?.has('query')).toBe(false)
   })
 
   it('ignores stale story-info responses when affordance requests overlap', async () => {
-    type StoryInfoResponse = { sections: Array<Record<string, unknown>> }
+    type StoryInfoResponse = { channels?: typeof sandboxInfoAffordances; sections: Array<Record<string, unknown>> }
     const pending = new Map<string, unknown>()
     server.use(
       http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
-        const kind = new URL(request.url).searchParams.get('kind') ?? 'status'
+        const channel = new URL(request.url).searchParams.get('channels')
+        if (channel === null) {
+          return HttpResponse.json({ channels: sandboxInfoAffordances, sections: [] })
+        }
         return new Promise((resolve) => {
-          pending.set(kind, (payload: StoryInfoResponse) => resolve(HttpResponse.json(payload)))
+          pending.set(channel, (payload: StoryInfoResponse) => resolve(HttpResponse.json(payload)))
         })
       }),
     )
 
-    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    const wrapper = mountStatus()
     await flushPromises()
 
-    await wrapper.find('[data-info-kind="map"]').trigger('click')
+    await wrapper.find('[data-info-channel="ui-map"]').trigger('click')
     await flushPromises()
 
-    const resolveMap = pending.get('map')
+    const resolveMap = pending.get('ui-map')
     if (typeof resolveMap === 'function') {
       resolveMap({
         sections: [
@@ -170,7 +179,7 @@ describe('StoryStatus', () => {
     }
     await flushPromises()
 
-    const resolveStatus = pending.get('status')
+    const resolveStatus = pending.get('ui-world-time')
     if (typeof resolveStatus === 'function') {
       resolveStatus({
         sections: [
@@ -188,7 +197,7 @@ describe('StoryStatus', () => {
     expect(wrapper.text()).not.toContain('stale status')
   })
 
-  it('sends null-query affordances by kind only', async () => {
+  it('sends one exact channel without legacy query parameters', async () => {
     const seenParams: URLSearchParams[] = []
     server.use(
       http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
@@ -197,20 +206,26 @@ describe('StoryStatus', () => {
       }),
     )
 
-    const wrapper = mountStatus({ infoAffordances: sandboxInfoAffordances })
+    const wrapper = mountStatus()
     await flushPromises()
 
-    await wrapper.find('[data-info-kind="help"]').trigger('click')
+    await wrapper.find('[data-info-channel="ui-help"]').trigger('click')
     await flushPromises()
 
-    const helpParams = seenParams.find((params) => params.get('kind') === 'help')
+    const helpParams = seenParams.find((params) => params.get('channels') === 'ui-help')
     expect(helpParams).toBeDefined()
     expect(helpParams?.has('query')).toBe(false)
   })
 
   it('refreshes the projected status when the story update key changes', async () => {
-    const statusHandler = vi.fn(() =>
-      HttpResponse.json({
+    const statusHandler = vi.fn(({ request }) => {
+      if (!new URL(request.url).searchParams.has('channels')) {
+        return HttpResponse.json({
+          channels: [{ channel_id: 'ui-sidebar', label: 'Status' }],
+          sections: [],
+        })
+      }
+      return HttpResponse.json({
         sections: [
           {
             section_id: 'turn',
@@ -218,95 +233,36 @@ describe('StoryStatus', () => {
             value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
           },
         ],
-      }),
-    )
+      })
+    })
     server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
 
     const wrapper = mountStatus({ refreshKey: 0 })
     await flushPromises()
 
-    expect(statusHandler).toHaveBeenCalledTimes(1)
+    expect(statusHandler).toHaveBeenCalledTimes(2)
 
     await wrapper.setProps({ refreshKey: 1 })
     await flushPromises()
 
-    expect(statusHandler).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('2')
+    expect(statusHandler).toHaveBeenCalledTimes(3)
+    expect(wrapper.text()).toContain('3')
   })
 
   it('skips refreshes when info_state marks the active status kind clean', async () => {
-    const statusHandler = vi.fn(() =>
-      HttpResponse.json({
-        sections: [
-          {
-            section_id: 'turn',
-            title: 'Turn',
-            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
-          },
-        ],
-      }),
-    )
-    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
-
-    const wrapper = mountStatus({
-      refreshKey: 0,
-      infoState: { ...sandboxInfoState, dirty_kinds: [] },
-    })
-    await flushPromises()
-
-    expect(statusHandler).toHaveBeenCalledTimes(1)
-
-    await wrapper.setProps({
-      refreshKey: 1,
-      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: [] },
-    })
-    await flushPromises()
-
-    expect(statusHandler).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('1')
-  })
-
-  it('refreshes when info_state marks the active status kind dirty', async () => {
-    const statusHandler = vi.fn(() =>
-      HttpResponse.json({
-        sections: [
-          {
-            section_id: 'turn',
-            title: 'Turn',
-            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
-          },
-        ],
-      }),
-    )
-    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
-
-    const wrapper = mountStatus({
-      refreshKey: 0,
-      infoState: { ...sandboxInfoState, dirty_kinds: [] },
-    })
-    await flushPromises()
-
-    await wrapper.setProps({
-      refreshKey: 1,
-      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: ['status'] },
-    })
-    await flushPromises()
-
-    expect(statusHandler).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('2')
-  })
-
-  it('uses dirty kinds for the selected info affordance', async () => {
-    const seenKinds: string[] = []
     const statusHandler = vi.fn(({ request }) => {
-      const kind = new URL(request.url).searchParams.get('kind') ?? 'status'
-      seenKinds.push(kind)
+      if (!new URL(request.url).searchParams.has('channels')) {
+        return HttpResponse.json({
+          channels: [{ channel_id: 'ui-sidebar', label: 'Status' }],
+          sections: [],
+        })
+      }
       return HttpResponse.json({
         sections: [
           {
-            section_id: kind,
-            title: kind,
-            value: { value_type: 'scalar', value: `${kind}-${seenKinds.length}` },
+            section_id: 'turn',
+            title: 'Turn',
+            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
           },
         ],
       })
@@ -315,33 +271,106 @@ describe('StoryStatus', () => {
 
     const wrapper = mountStatus({
       refreshKey: 0,
-      infoAffordances: sandboxInfoAffordances,
       infoState: { ...sandboxInfoState, dirty_kinds: [] },
     })
     await flushPromises()
 
-    await wrapper.find('[data-info-kind="map"]').trigger('click')
-    await flushPromises()
+    expect(statusHandler).toHaveBeenCalledTimes(2)
 
     await wrapper.setProps({
       refreshKey: 1,
-      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: ['inventory'] },
+      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: [] },
     })
     await flushPromises()
 
     expect(statusHandler).toHaveBeenCalledTimes(2)
-    expect(seenKinds).toEqual(['status', 'map'])
-    expect(wrapper.text()).toContain('map-2')
+    expect(wrapper.text()).toContain('2')
+  })
+
+  it('refreshes when info_state marks the active status kind dirty', async () => {
+    const statusHandler = vi.fn(({ request }) => {
+      if (!new URL(request.url).searchParams.has('channels')) {
+        return HttpResponse.json({
+          channels: [{ channel_id: 'ui-sidebar', label: 'Status' }],
+          sections: [],
+        })
+      }
+      return HttpResponse.json({
+        sections: [
+          {
+            section_id: 'turn',
+            title: 'Turn',
+            value: { value_type: 'scalar', value: statusHandler.mock.calls.length },
+          },
+        ],
+      })
+    })
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
+
+    const wrapper = mountStatus({
+      refreshKey: 0,
+      infoState: { ...sandboxInfoState, dirty_kinds: [] },
+    })
+    await flushPromises()
 
     await wrapper.setProps({
-      refreshKey: 2,
-      infoState: { ...sandboxInfoState, version: 19, dirty_kinds: ['map'] },
+      refreshKey: 1,
+      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: ['ui-sidebar'] },
     })
     await flushPromises()
 
     expect(statusHandler).toHaveBeenCalledTimes(3)
-    expect(seenKinds).toEqual(['status', 'map', 'map'])
-    expect(wrapper.text()).toContain('map-3')
+    expect(wrapper.text()).toContain('3')
+  })
+
+  it('uses dirty channels for the selected info affordance', async () => {
+    const seenChannels: string[] = []
+    const statusHandler = vi.fn(({ request }) => {
+      const channel = new URL(request.url).searchParams.get('channels')
+      if (channel === null) {
+        return HttpResponse.json({ channels: sandboxInfoAffordances, sections: [] })
+      }
+      seenChannels.push(channel)
+      return HttpResponse.json({
+        sections: [
+          {
+            section_id: channel,
+            title: channel,
+            value: { value_type: 'scalar', value: `${channel}-${seenChannels.length}` },
+          },
+        ],
+      })
+    })
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, statusHandler))
+
+    const wrapper = mountStatus({
+      refreshKey: 0,
+      infoState: { ...sandboxInfoState, dirty_kinds: [] },
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-info-channel="ui-map"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.setProps({
+      refreshKey: 1,
+      infoState: { ...sandboxInfoState, version: 18, dirty_kinds: ['ui-inventory'] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(3)
+    expect(seenChannels).toEqual(['ui-world-time', 'ui-map'])
+    expect(wrapper.text()).toContain('ui-map-2')
+
+    await wrapper.setProps({
+      refreshKey: 2,
+      infoState: { ...sandboxInfoState, version: 19, dirty_kinds: ['ui-map'] },
+    })
+    await flushPromises()
+
+    expect(statusHandler).toHaveBeenCalledTimes(4)
+    expect(seenChannels).toEqual(['ui-world-time', 'ui-map', 'ui-map'])
+    expect(wrapper.text()).toContain('ui-map-3')
   })
 
   it('handles empty status payload', async () => {

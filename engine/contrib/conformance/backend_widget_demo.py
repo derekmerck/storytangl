@@ -20,6 +20,7 @@ from tangl.presentation.projection import (
     ItemListValue,
     KvListValue,
     ProjectedItem,
+    ProjectionRequest,
     ProjectedSection,
     ProjectedState,
     ScalarValue,
@@ -110,9 +111,12 @@ def _project_widget_demo(
     *,
     caller: object,
     ctx: PhaseCtx,
+    request: ProjectionRequest,
     **_kw: object,
-) -> ProjectedState:
+) -> ProjectedState | None:
     """Contribute the diagnostic projection through the world's authority."""
+    if "ui-widget-demo" not in request.requested_channels():
+        return None
     return _WidgetDemoSections().build(cursor_label=caller.label, step=ctx.step)
 
 
@@ -191,16 +195,9 @@ def _advertise_info_channels(
     _ = (caller, ctx)
     return [
         InfoAffordance(
-            kind="inventory",
-            label="Inventory",
+            channel_id="ui-widget-demo",
+            label="Widget demo",
             shortcuts=["i", "inv"],
-            query={"kinds": ["inventory"]},
-        ),
-        InfoAffordance(
-            kind="map",
-            label="Map",
-            shortcuts=["m"],
-            query={"kinds": ["map"], "format": "text"},
         ),
     ]
 
@@ -229,7 +226,10 @@ def build_demo_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
             init_mode=InitMode.EAGER.value,
             story_label="widget_contract_story",
         )
-        projected = manager.get_story_info(user_id=user.uid)
+        projected = manager.get_story_info(
+            user_id=user.uid,
+            channels=["ui-widget-demo"],
+        )
 
         runtime_payload = envelope.to_dto()
         projected_payload = projected.to_dto()

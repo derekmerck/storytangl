@@ -480,41 +480,39 @@ cheap.
 > client UI**.
 
 **Status (vocabulary):** promoted Tier S contract. **Status (reference client):** webapp
-implements `info_affordances` with `query` descriptors against `/story/info`,
-and the CLI reference floor exposes the same affordances through `?` /
-slash-command output. **Status (engine):** defines typed `InfoAffordance`,
-`InfoState`, and `ProjectionRequest` models, advertises available channels on
-runtime envelopes, and routes `/story/info` through the service-info dispatch
-surface. Fine-grained dirty-kind tracking remains conservative in v1.
+discovers exact channels from `/story/info` and selects them with the public
+`channels=a,b` query. The CLI reference floor exposes the same discovered
+affordances through `?` / slash-command output. **Status (engine):** defines
+typed `InfoAffordance`, `InfoState`, and `ProjectionRequest` models and routes
+both public world-static and authenticated story-dynamic projections through
+the service-info dispatch surface. Runtime envelopes retain only freshness
+hints. Fine-grained dirty-kind tracking remains conservative in v1.
 
 A bundle MAY expose **info channels** — typed sub-surfaces of world
 state the player can pull on demand: a map, an inventory, a watch
 showing world time, a character sheet, a help screen, a list of active
 objectives.
 
-The runtime advertises these channels through two optional metadata
-keys on `RuntimeEnvelope`:
+The corresponding info endpoint advertises channels in `ProjectedState`:
 
 ```python
 class InfoAffordance(BaseModel):
-    kind: str               # stable info-channel identifier
-    label: str | None = None # short, player-facing; clients fall back to kind
+    channel_id: str          # exact flat info-channel identifier
+    label: str | None = None # clients fall back to channel_id
     shortcuts: list[str]    # CLI/keyboard aliases
-    query: dict[str, Any] | None = None
-    # Opaque query descriptor the backend interprets.
-    # Hand-it-back semantic: clients pass it to the info endpoint without
-    # inspecting its contents. Bundles decide what query keys mean.
-    # Examples: { "type": "map", "format": "tiles" },
-    #           { "kinds": ["party", "followers"] },
-    #           None  (no descriptor; default info kind is the channel itself)
+
+class ProjectionRequest(BaseModel):
+    channels: list[str] = [] # exact ids, deduplicated in request order
 
 class InfoState(BaseModel):
     version: int                          # monotonic per cursor
     dirty_kinds: list[str] = []           # changed since prior turn
     available_kinds: list[str] = []       # what's queryable this turn
 
-# RuntimeEnvelope.metadata reserved sub-keys:
-#   metadata.info_affordances: list[InfoAffordance]
+# ProjectedState discovery response:
+#   channels: list[InfoAffordance]
+#   sections: []
+# RuntimeEnvelope.metadata reserved sub-key:
 #   metadata.info_state: InfoState
 ```
 
@@ -534,10 +532,10 @@ unexplored]`, on Godot as a 3D minimap. The *data* is canonical; the
 choose visual treatments via `hints.style_tags`, bundle widget
 variants (§4.2), or port-specific profiles (§4.3).
 
-**Every info channel has a `ProjectedState` fallback.** Any `kind`
+**Every info channel has a `ProjectedState` fallback.** Any `channel_id`
 exposed as an info affordance MUST also be expressible as one of the
-five canonical `value_type`s (`scalar`, `kv_list`, `item_list`,
-`table`, `badges`) — either directly in `ProjectedState.sections` or
+six canonical `value_type`s (`scalar`, `kv_list`, `item_list`,
+`table`, `badges`, `branding`) — either directly in `ProjectedState.sections` or
 via an info-channel query (§6.7). The fallback exists so a port
 that doesn't implement the rich rendering still has *something* to
 show. The fallback is the contract surface; the rich rendering is
@@ -2030,7 +2028,7 @@ These serve as both regression baselines and authoring references.
 | Cursor | One participant's traversal through a story. Each cursor has its own journal channel; envelopes are per-cursor. |
 | Channel | The envelope stream for one cursor. Multi-cursor sessions have multiple channels coordinated by bundle logic. |
 | Participant / Owner | The account or identity behind a cursor. Used for `owner_only` visibility and `visibility=[participant_ids]` audience routing. |
-| Info channel | An advisory side-projection of world state queryable via the info endpoint (§6.7) with an opaque `query` descriptor (§1.6) and advertised in `metadata.info_affordances`. |
+| Info channel | An advisory side-projection discovered through an info endpoint and selected by exact `channels=a,b` ids (§1.6). |
 | Piece (Tier P2) | Identified, state-bearing surface element (card, tile, die, etc.). UI concept; distinct from `tangl.core.token.Token`. May be realized (has backend UID) or unrealized (an offer). |
 | Offer (Tier P2) | A `PieceFragment` with `realized=False`. Becomes a real piece on commit. |
 | Zone (Tier P2) | A `group_type="zone"` group containing pieces. May carry `constraints` (semantic), `layout_hints` (visual), and `layout_hints.graph.edges` (addressable adjacencies). |

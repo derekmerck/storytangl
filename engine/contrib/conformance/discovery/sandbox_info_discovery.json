@@ -1,0 +1,7 @@
+{
+  "channels": [
+    {"channel_id": "ui-map", "label": "Map", "shortcuts": ["m", "map"]},
+    {"channel_id": "ui-inventory", "label": "Carrying", "shortcuts": ["i", "inv"]}
+  ],
+  "sections": []
+}

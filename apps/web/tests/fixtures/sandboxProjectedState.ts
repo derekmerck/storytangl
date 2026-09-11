@@ -2,65 +2,59 @@ import type { InfoAffordance, InfoState, ProjectedState } from '@/types'
 
 export const sandboxInfoAffordances: InfoAffordance[] = [
   {
-    kind: 'world_time',
+    channel_id: 'ui-world-time',
     label: 'Watch',
     shortcuts: ['t', 'time'],
-    query: { kinds: ['world_time'] },
   },
   {
-    kind: 'presence',
+    channel_id: 'ui-location',
     label: 'Here',
     shortcuts: ['h', 'look'],
-    query: { kinds: ['location', 'presence'] },
   },
   {
-    kind: 'inventory',
+    channel_id: 'ui-inventory',
     label: 'Carrying',
     shortcuts: ['i', 'inv'],
-    query: { kinds: ['inventory'] },
   },
   {
-    kind: 'map',
+    channel_id: 'ui-map',
     label: 'Map',
     shortcuts: ['m', 'map'],
-    query: { type: 'map', format: 'graph' },
   },
   {
-    kind: 'agenda',
+    channel_id: 'ui-agenda',
     label: 'Schedule',
     shortcuts: ['a'],
-    query: { kinds: ['agenda'] },
   },
   {
-    kind: 'objectives',
+    channel_id: 'ui-objectives',
     label: 'Objectives',
     shortcuts: ['o'],
-    query: { kinds: ['objectives'] },
   },
   {
-    kind: 'help',
+    channel_id: 'ui-help',
     label: 'Help',
     shortcuts: ['?'],
-    query: null,
   },
 ]
 
 export const sandboxInfoState: InfoState = {
   version: 17,
-  dirty_kinds: ['location', 'inventory', 'agenda'],
+  dirty_kinds: ['ui-location', 'ui-inventory', 'ui-agenda'],
   available_kinds: [
-    'status',
-    'inventory',
-    'map',
-    'world_time',
-    'agenda',
-    'presence',
-    'objectives',
-    'help',
+    'ui-sidebar',
+    'ui-inventory',
+    'ui-map',
+    'ui-world-time',
+    'ui-agenda',
+    'ui-location',
+    'ui-objectives',
+    'ui-help',
   ],
 }
 
 export const sandboxProjectedState: ProjectedState = {
+  channels: sandboxInfoAffordances,
   sections: [
     {
       section_id: 'world_time',

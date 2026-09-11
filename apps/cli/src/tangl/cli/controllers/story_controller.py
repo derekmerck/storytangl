@@ -408,9 +408,22 @@ class StoryController(CommandSet):
         if persistence_deleted is not None:
             self._cmd.poutput(f"Persistence deleted: {bool(persistence_deleted)}")
 
-    def do_status(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
+    def do_status(self, arg: str | None = None) -> None:
         if not self._require_story_context():
             return
 
-        info = cast(ProjectedState, self._call_service("get_story_info"))
+        catalog = cast(ProjectedState, self._call_service("get_story_info"))
+        requested = (arg or "").strip() or "ui-sidebar"
+        for affordance in catalog.channels:
+            if requested in affordance.shortcuts:
+                requested = affordance.channel_id
+                break
+        try:
+            info = cast(
+                ProjectedState,
+                self._call_service("get_story_info", channels=[requested]),
+            )
+        except ValueError as exc:
+            self._cmd.poutput(str(exc))
+            return
         self._cmd.emit_terminal(self._cmd.terminal_renderer.projected_state(info.to_dto()))

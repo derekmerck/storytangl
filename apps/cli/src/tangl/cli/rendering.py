@@ -48,7 +48,6 @@ class PlainTerminalRenderer:
 
         lines.extend(_plain_ux_event_lines(ux_events or []))
         lines.extend(self._choice_lines(choices))
-        lines.extend(_plain_info_affordance_lines(metadata))
         return lines
 
     def story_created(
@@ -77,7 +76,6 @@ class PlainTerminalRenderer:
         else:
             lines.append("(No choices available)")
 
-        lines.extend(_plain_info_affordance_lines(metadata))
         lines.append("\nUse 'do <number>' to make a choice.")
         return lines
 
@@ -195,7 +193,6 @@ class RichTerminalRenderer(PlainTerminalRenderer):
 
         renderables.extend(_rich_ux_events(ux_events or []))
         renderables.append(_rich_choices(choices))
-        renderables.extend(_rich_info_affordances(metadata))
         return renderables
 
     def story_created(
@@ -217,7 +214,6 @@ class RichTerminalRenderer(PlainTerminalRenderer):
                 renderables.extend(_rich_fragment_renderables(fragment))
         renderables.extend(_rich_ux_events(ux_events or []))
         renderables.append(_rich_choices(choices, no_choices_text="(No choices available)"))
-        renderables.extend(_rich_info_affordances(metadata))
         renderables.append(_rich_text("Use 'do <number>' to make a choice.", style="dim"))
         return renderables
 
@@ -404,13 +400,6 @@ def _rich_projected_table(title: str, value: JsonMapping) -> Any | None:
     return table
 
 
-def _rich_info_affordances(metadata: JsonMapping | None) -> list[Any]:
-    lines = _plain_info_affordance_lines(metadata)
-    if not lines:
-        return []
-    return [_rich_text(" · ".join(lines), style="dim")]
-
-
 def _rich_text(text: str, *, style: str | None = None) -> Any:
     from rich.text import Text
 
@@ -421,37 +410,6 @@ def _rich_rule(title: str) -> Any:
     from rich.rule import Rule
 
     return Rule(title)
-
-
-def _plain_info_affordance_lines(metadata: JsonMapping | None) -> list[str]:
-    if not metadata:
-        return []
-    affordances = metadata.get("info_affordances")
-    if not isinstance(affordances, list) or not affordances:
-        return []
-
-    info_state = metadata.get("info_state")
-    available = None
-    if isinstance(info_state, Mapping) and isinstance(info_state.get("available_kinds"), list):
-        available = {str(kind) for kind in info_state["available_kinds"]}
-
-    labels: list[str] = []
-    for affordance in affordances:
-        if not isinstance(affordance, Mapping):
-            continue
-        kind = str(affordance.get("kind") or "info")
-        if available is not None and kind not in available:
-            continue
-        label = str(affordance.get("label") or kind)
-        shortcuts = affordance.get("shortcuts")
-        shortcut = ""
-        if isinstance(shortcuts, list) and shortcuts:
-            shortcut = f"/{shortcuts[0]} "
-        labels.append(f"{shortcut}{label}")
-
-    if not labels:
-        return []
-    return ["Info: " + " · ".join(labels)]
 
 
 def _plain_ux_event_lines(events: list[Any]) -> list[str]:
@@ -563,12 +521,9 @@ def _diagnostic_metadata() -> JsonMapping:
         "world": "diagnostic",
         "story": "renderer",
         "cursor": "credential_gate",
-        "info_affordances": [
-            {"kind": "map", "label": "Map", "shortcuts": ["m"]},
-            {"kind": "inventory", "label": "Inventory", "shortcuts": ["i"]},
-            {"kind": "registry", "label": "Registry", "shortcuts": ["r"]},
-        ],
-        "info_state": {"available_kinds": ["map", "inventory", "registry"]},
+        "info_state": {
+            "available_kinds": ["ui-map", "ui-inventory", "ui-registry"]
+        },
     }
 
 

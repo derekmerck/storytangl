@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+
 from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Selector
 from tangl.presentation.dispatch import presentation_dispatch
 from tangl.presentation.projection import (
+    BrandingValue,
     InfoAffordance,
     ProjectionRequest,
     ProjectedSection,
     ProjectedState,
+    TableValue,
 )
+from tangl.story import World
+
+WORLD_STYLE_CHANNEL = "ui-style-hints-html"
+WORLD_BRANDING_CHANNEL = "ui-branding"
 
 service_dispatch = BehaviorRegistry(
     label="service_dispatch",
@@ -49,6 +56,84 @@ def do_get_story_info(
     for value in _execute("get_story_info", caller=caller, ctx=ctx, request=request):
         sections.extend(_coerce_sections(value))
     return ProjectedState(sections=sections)
+
+
+def do_get_world_info(
+    caller: World,
+    *,
+    ctx: object,
+    request: ProjectionRequest,
+) -> ProjectedState:
+    """Gather public world-static sections for ``request``."""
+
+    sections: list[ProjectedSection] = []
+    for value in _execute("get_world_info", caller=caller, ctx=ctx, request=request):
+        sections.extend(_coerce_sections(value))
+    return ProjectedState(sections=sections)
+
+
+def advertise_world_info_channels(
+    *, caller: World, **_kw: object
+) -> list[InfoAffordance]:
+    """Advertise the fixed public presentation channels shared by worlds."""
+
+    return [
+        InfoAffordance(channel_id=WORLD_STYLE_CHANNEL, label="HTML style hints"),
+        InfoAffordance(channel_id=WORLD_BRANDING_CHANNEL, label="Branding"),
+    ]
+
+
+def project_world_info(
+    *, caller: World, request: ProjectionRequest, **_kw: object
+) -> list[ProjectedSection]:
+    """Project cacheable advisory presentation metadata for one world."""
+
+    channels = request.requested_channels()
+    sections: list[ProjectedSection] = []
+    if WORLD_STYLE_CHANNEL in channels:
+        sections.append(
+            ProjectedSection(
+                section_id=WORLD_STYLE_CHANNEL,
+                title="HTML style hints",
+                kind="style_hints",
+                value=TableValue(
+                    columns=["class", "meaning"],
+                    rows=[
+                        ["st-emphasis", "emphasized content"],
+                        ["st-emphasis--warn", "warning prominence"],
+                        ["st-unavailable", "unavailable action"],
+                    ],
+                ),
+            )
+        )
+    if WORLD_BRANDING_CHANNEL in channels:
+        branding = {
+            "name": str(caller.metadata.get("title", caller.label)),
+            **dict(caller.metadata.get("branding") or {}),
+        }
+        sections.append(
+            ProjectedSection(
+                section_id=WORLD_BRANDING_CHANNEL,
+                title="Branding",
+                kind="branding",
+                value=BrandingValue.model_validate(branding),
+            )
+        )
+    return sections
+
+
+service_dispatch.register(
+    advertise_world_info_channels,
+    task="advertise_info_channels",
+    wants_caller_kind=World,
+    wants_exact_kind=False,
+)
+service_dispatch.register(
+    project_world_info,
+    task="get_world_info",
+    wants_caller_kind=World,
+    wants_exact_kind=False,
+)
 
 
 def _coerce_affordances(value: object) -> list[InfoAffordance]:
@@ -97,5 +182,8 @@ def _coerce_sections(value: object) -> list[ProjectedSection]:
 __all__ = [
     "do_advertise_info_channels",
     "do_get_story_info",
+    "do_get_world_info",
+    "WORLD_BRANDING_CHANNEL",
+    "WORLD_STYLE_CHANNEL",
     "service_dispatch",
 ]

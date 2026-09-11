@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Self, TypeAlias
 
-from pydantic import BaseModel, Field, JsonValue, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .hints import PresentationHints
 from .values import KvRow, PrimitiveValue
@@ -13,10 +13,9 @@ from .values import KvRow, PrimitiveValue
 class InfoAffordance(BaseModel):
     """Advisory projected-state channel advertised to clients."""
 
-    kind: str
+    channel_id: str
     label: str | None = None
     shortcuts: list[str] = Field(default_factory=list)
-    query: dict[str, JsonValue] | None = None
 
 
 class InfoState(BaseModel):
@@ -28,35 +27,13 @@ class InfoState(BaseModel):
 
 
 class ProjectionRequest(BaseModel):
-    """Opaque projected-state request descriptor from a client."""
+    """Exact projected-state channels selected by a client."""
 
-    kind: str | None = None
-    kinds: list[str] = Field(default_factory=list)
-    query: dict[str, JsonValue] | None = None
+    channels: list[str] = Field(default_factory=list)
 
-    def requested_kinds(self) -> list[str]:
-        """Return requested info kinds in stable first-seen order."""
-        requested: list[str] = []
-
-        def append(value: object) -> None:
-            if not isinstance(value, str) or not value:
-                return
-            if value not in requested:
-                requested.append(value)
-
-        append(self.kind)
-        for kind in self.kinds:
-            append(kind)
-
-        query = self.query or {}
-        query_kinds = query.get("kinds")
-        if isinstance(query_kinds, list):
-            for kind in query_kinds:
-                append(kind)
-
-        query_kind = query.get("kind")
-        append(query_kind)
-        return requested
+    def requested_channels(self) -> list[str]:
+        """Return non-empty channel ids in stable first-seen order."""
+        return list(dict.fromkeys(channel for channel in self.channels if channel))
 
 
 class ScalarValue(BaseModel):
@@ -115,8 +92,33 @@ class BadgeListValue(BaseModel):
     items: list[str]
 
 
+class ThemeTokens(BaseModel):
+    """Advisory client theme tokens for one color mode."""
+
+    primary: str
+    accent: str | None = None
+    background: str | None = None
+
+
+class BrandingValue(BaseModel):
+    """Cacheable world branding suggestions; clients remain authoritative."""
+
+    value_type: Literal["branding"] = "branding"
+    name: str
+    logo_media: str | None = None
+    light: ThemeTokens | None = None
+    dark: ThemeTokens | None = None
+
+
 SectionValue: TypeAlias = Annotated[
-    ScalarValue | KvListValue | ItemListValue | TableValue | BadgeListValue,
+    (
+        ScalarValue
+        | KvListValue
+        | ItemListValue
+        | TableValue
+        | BadgeListValue
+        | BrandingValue
+    ),
     Field(discriminator="value_type"),
 ]
 
@@ -134,6 +136,7 @@ class ProjectedSection(BaseModel):
 class ProjectedState(BaseModel):
     """Canonical ordered projected-state payload for runtime surfaces."""
 
+    channels: list[InfoAffordance] = Field(default_factory=list)
     sections: list[ProjectedSection] = Field(default_factory=list)
 
     def to_dto(self) -> dict[str, Any]:
@@ -144,6 +147,7 @@ class ProjectedState(BaseModel):
 
 __all__ = [
     "BadgeListValue",
+    "BrandingValue",
     "InfoAffordance",
     "InfoState",
     "ItemListValue",
@@ -155,4 +159,5 @@ __all__ = [
     "SectionValue",
     "ProjectionRequest",
     "TableValue",
+    "ThemeTokens",
 ]

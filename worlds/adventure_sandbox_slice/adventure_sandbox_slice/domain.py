@@ -5,7 +5,12 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from tangl.core import BehaviorRegistry, Graph, Priority, Selector, Token
-from tangl.presentation.projection import KvListValue, ProjectionRequest, ProjectedSection
+from tangl.presentation.projection import (
+    InfoAffordance,
+    KvListValue,
+    ProjectionRequest,
+    ProjectedSection,
+)
 from tangl.presentation.values import KvRow
 from tangl.mechanics.sandbox import (
     ChargeFacet,
@@ -269,7 +274,7 @@ def project_adventure_score(
     **_kw: object,
 ) -> ProjectedSection | None:
     """Contribute the Adventure score when a client requests it."""
-    if "score" not in request.requested_kinds():
+    if "ui-score" not in request.requested_channels():
         return None
     return ProjectedSection(
         section_id="adventure_score",
@@ -286,6 +291,22 @@ def project_adventure_score(
             ]
         ),
     )
+
+
+def advertise_adventure_score(
+    *, caller: AdventureSandboxLocation, **_kw: object
+) -> InfoAffordance:
+    """Advertise the exact score channel owned by this world."""
+
+    return InfoAffordance(channel_id="ui-score", label="Score")
+
+
+adventure_dispatch.register(
+    advertise_adventure_score,
+    task="advertise_info_channels",
+    wants_caller_kind=AdventureSandboxLocation,
+    wants_exact_kind=False,
+)
 
 
 adventure_dispatch.register(

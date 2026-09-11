@@ -41,6 +41,7 @@ from tangl.mechanics.sandbox import SandboxLocation, SandboxMob, SandboxScope
 import tangl.mechanics.sandbox.story_info  # noqa: F401
 from tangl.presentation.intent import Blocker
 from tangl.presentation.projection import (
+    InfoAffordance,
     ItemListValue,
     KvListValue,
     ProjectedItem,
@@ -419,6 +420,26 @@ def compose_spent_trader_lines(
 
 # ---------------------------------------------------------- story info
 
+
+def advertise_red_paperclip_info(
+    *, caller: RedPaperclipHub, **_kw: object
+) -> list[InfoAffordance]:
+    """Advertise the world's two exact trade-state channels."""
+
+    return [
+        InfoAffordance(channel_id="ui-trade-status", label="Holding"),
+        InfoAffordance(channel_id="ui-trade-history", label="Trade history"),
+    ]
+
+
+red_paperclip_dispatch.register(
+    advertise_red_paperclip_info,
+    task="advertise_info_channels",
+    wants_caller_kind=RedPaperclipHub,
+    wants_exact_kind=False,
+)
+
+
 def project_red_paperclip_holding(
     *,
     caller: RedPaperclipHub,
@@ -433,13 +454,13 @@ def project_red_paperclip_holding(
     of a surface it does not own.
     """
 
-    requested = set(request.requested_kinds())
-    if not requested or requested.isdisjoint({"status", "history"}):
+    requested = request.requested_channels()
+    if not requested or requested.isdisjoint({"ui-trade-status", "ui-trade-history"}):
         return None
 
     holding = _holding(caller)
     sections: list[ProjectedSection] = []
-    if "status" in requested:
+    if "ui-trade-status" in requested:
         sections.append(
             ProjectedSection(
                 section_id="red_paperclip_holding",
@@ -457,7 +478,7 @@ def project_red_paperclip_holding(
                 ),
             )
         )
-    if "history" in requested:
+    if "ui-trade-history" in requested:
         sections.append(
             ProjectedSection(
                 section_id="red_paperclip_chain",

@@ -53,10 +53,22 @@ export const handlers = [
     return HttpResponse.json(crossroadsProjectedState)
   }),
 
-  http.get(`${apiBase}/world/:worldId/info`, ({ params }) => {
+  http.get(`${apiBase}/world/:worldId/info`, ({ request }) => {
+    const worldId = new URL(request.url).pathname.split('/').at(-2) ?? 'world'
     return HttpResponse.json({
-      ...mockWorldInfo,
-      world_id: params.worldId as string,
+      channels: [],
+      sections: [
+        {
+          section_id: 'ui-branding',
+          title: 'Branding',
+          kind: 'branding',
+          value: {
+            value_type: 'branding',
+            name: worldId === 'tangl_world' ? mockWorldInfo.title : worldId,
+            logo_media: 'cover_im',
+          },
+        },
+      ],
     })
   }),
 

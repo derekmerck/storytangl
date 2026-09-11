@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useGlobal } from '@/composables/globals'
 import type {
   BadgeListValue,
+  BrandingValue,
   ItemListValue,
   KvListValue,
   InfoAffordance,
@@ -30,14 +31,14 @@ const { $http } = useGlobal()
 
 const props = defineProps<{
   refreshKey?: string | number
-  infoAffordances?: InfoAffordance[]
   infoState?: InfoState | null
 }>()
 
 const statusSections = ref<StatusSection[]>([])
+const infoAffordances = ref<InfoAffordance[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const activeAffordanceKind = ref<string | null>(null)
+const activeChannel = ref<string | null>(null)
 const statusRequestId = ref(0)
 
 const formatPrimitive = (value: PrimitiveValue): string => {
@@ -73,6 +74,11 @@ const normalizeTable = (value: TableValue): StatusItem[] =>
 const normalizeBadges = (value: BadgeListValue): StatusItem[] =>
   value.items.length ? [{ key: 'Values', value: value.items.join(', ') }] : []
 
+const normalizeBranding = (value: BrandingValue): StatusItem[] => [
+  { key: 'Name', value: value.name },
+  ...(value.logo_media ? [{ key: 'Logo', value: value.logo_media }] : []),
+]
+
 const normalizeSection = (section: ProjectedSection): StatusSection => {
   const value = section.value
   const base = { sectionId: section.section_id, title: section.title, kind: section.kind }
@@ -88,6 +94,9 @@ const normalizeSection = (section: ProjectedSection): StatusSection => {
   }
   if (value.value_type === 'badges') {
     return { ...base, items: normalizeBadges(value) }
+  }
+  if (value.value_type === 'branding') {
+    return { ...base, items: normalizeBranding(value) }
   }
 
   return {
@@ -106,23 +115,20 @@ const normalizeStatusPayload = (payload: StoryStatusPayload | null | undefined):
 type QueryParams = Record<string, string>
 
 const affordanceLabel = (affordance: InfoAffordance): string =>
-  affordance.label ?? affordance.kind.replace(/_/g, ' ')
+  affordance.label ?? affordance.channel_id.replace(/-/g, ' ')
 
 const visibleAffordances = computed(() => {
-  const affordances = props.infoAffordances ?? []
-  const availableKinds = props.infoState?.available_kinds
-  if (availableKinds === undefined) {
-    return affordances
+  const availableChannels = props.infoState?.available_kinds
+  if (availableChannels === undefined) {
+    return infoAffordances.value
   }
-  const available = new Set(availableKinds)
-  return affordances.filter((affordance) => available.has(affordance.kind))
+  const available = new Set(availableChannels)
+  return infoAffordances.value.filter((affordance) => available.has(affordance.channel_id))
 })
 
 const activeAffordance = computed(() =>
-  visibleAffordances.value.find((affordance) => affordance.kind === activeAffordanceKind.value),
+  visibleAffordances.value.find((affordance) => affordance.channel_id === activeChannel.value),
 )
-
-const activeInfoKind = computed(() => activeAffordanceKind.value ?? 'status')
 
 const shouldRefreshForInfoState = (): boolean => {
   const infoState = props.infoState
@@ -131,28 +137,25 @@ const shouldRefreshForInfoState = (): boolean => {
   }
   return (
     infoState.dirty_kinds.includes('*') ||
-    infoState.dirty_kinds.includes(activeInfoKind.value)
+    (activeChannel.value !== null && infoState.dirty_kinds.includes(activeChannel.value))
   )
 }
 
-const infoQueryParams = (affordance: InfoAffordance | undefined): QueryParams | undefined => {
-  if (!affordance) {
-    return undefined
-  }
-  const params: QueryParams = { kind: affordance.kind }
-  if (affordance.query) {
-    params.query = JSON.stringify(affordance.query)
-  }
-  return params
-}
+const infoQueryParams = (affordance: InfoAffordance): QueryParams => ({
+  channels: affordance.channel_id,
+})
 
-const loadStatus = async (affordance: InfoAffordance | undefined = activeAffordance.value) => {
+const loadStatus = async (affordance?: InfoAffordance) => {
+  const selected = affordance ?? activeAffordance.value
+  if (!selected) {
+    return
+  }
   const requestId = ++statusRequestId.value
   try {
     loading.value = true
     error.value = null
     const response = await $http.value.get<StoryStatusPayload>('/story/info', {
-      params: infoQueryParams(affordance),
+      params: infoQueryParams(selected),
     })
     if (requestId !== statusRequestId.value) {
       return
@@ -175,6 +178,30 @@ const loadStatus = async (affordance: InfoAffordance | undefined = activeAfforda
 const hasSections = computed(() => statusSections.value.length > 0)
 const hasAffordances = computed(() => visibleAffordances.value.length > 0)
 
+const discoverChannels = async () => {
+  try {
+    loading.value = true
+    error.value = null
+    const response = await $http.value.get<StoryStatusPayload>('/story/info')
+    infoAffordances.value = response.data.channels ?? []
+    const selected =
+      visibleAffordances.value.find((item) => item.channel_id === activeChannel.value) ??
+      visibleAffordances.value.find((item) => item.channel_id === 'ui-sidebar') ??
+      visibleAffordances.value[0]
+    if (selected) {
+      activeChannel.value = selected.channel_id
+      await loadStatus(selected)
+    } else {
+      statusSections.value = []
+      loading.value = false
+    }
+  } catch (err) {
+    console.error('Failed to discover story info:', err)
+    error.value = 'Unable to load story status. Please try again later.'
+    loading.value = false
+  }
+}
+
 const sectionClass = (section: StatusSection): Record<string, boolean> => {
   const kind = section.kind ?? section.sectionId
   return {
@@ -184,7 +211,7 @@ const sectionClass = (section: StatusSection): Record<string, boolean> => {
   }
 }
 
-onMounted(loadStatus)
+onMounted(discoverChannels)
 
 watch(
   () => props.refreshKey,
@@ -199,17 +226,24 @@ watch(
   visibleAffordances,
   (affordances) => {
     if (
-      activeAffordanceKind.value &&
-      !affordances.some((affordance) => affordance.kind === activeAffordanceKind.value)
+      activeChannel.value &&
+      !affordances.some((affordance) => affordance.channel_id === activeChannel.value)
     ) {
-      activeAffordanceKind.value = null
-      void loadStatus(undefined)
+      const replacement = affordances[0]
+      activeChannel.value = replacement?.channel_id ?? null
+      if (replacement) {
+        void loadStatus(replacement)
+      } else {
+        statusRequestId.value += 1
+        statusSections.value = []
+        loading.value = false
+      }
     }
   },
 )
 
-const selectAffordance = (affordance: InfoAffordance | undefined) => {
-  activeAffordanceKind.value = affordance?.kind ?? null
+const selectAffordance = (affordance: InfoAffordance) => {
+  activeChannel.value = affordance.channel_id
   void loadStatus(affordance)
 }
 </script>
@@ -223,24 +257,14 @@ const selectAffordance = (affordance: InfoAffordance | undefined) => {
       aria-label="story info"
     >
       <v-btn
-        class="info-affordance"
-        size="x-small"
-        variant="text"
-        :color="activeAffordanceKind === null ? 'primary' : undefined"
-        :aria-pressed="activeAffordanceKind === null"
-        @click="selectAffordance(undefined)"
-      >
-        Status
-      </v-btn>
-      <v-btn
         v-for="affordance in visibleAffordances"
-        :key="affordance.kind"
+        :key="affordance.channel_id"
         class="info-affordance"
         size="x-small"
         variant="text"
-        :color="activeAffordanceKind === affordance.kind ? 'primary' : undefined"
-        :aria-pressed="activeAffordanceKind === affordance.kind"
-        :data-info-kind="affordance.kind"
+        :color="activeChannel === affordance.channel_id ? 'primary' : undefined"
+        :aria-pressed="activeChannel === affordance.channel_id"
+        :data-info-channel="affordance.channel_id"
         @click="selectAffordance(affordance)"
       >
         {{ affordanceLabel(affordance) }}

@@ -474,3 +474,23 @@ def test_status_uses_projected_state_dto(
     output = "\n".join(cli.outputs)
     assert "Session:" in output
     assert "Step: 4" in output
+
+
+def test_status_reports_unknown_channel(
+    story_controller: StoryController,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cli = story_controller._cmd
+
+    def get_story_info(*_args: object, **kwargs: object) -> ProjectedState:
+        if kwargs.get("channels"):
+            assert kwargs["channels"] == ["missing"]
+            raise ValueError("Unknown info channel(s): missing")
+        return ProjectedState()
+
+    monkeypatch.setattr(cli, "call_service", get_story_info)
+    cli.outputs.clear()
+
+    story_controller.do_status("missing")
+
+    assert cli.outputs == ["Unknown info channel(s): missing"]
