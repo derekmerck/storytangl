@@ -11,6 +11,44 @@ from tangl.type_hints import StringMap
 logger = logging.getLogger(__name__)
 
 
+# Per-class answers to "which fields/methods carry this marker?". Keyed on the
+# class, what was asked, and the identity of the class's field dict, so a
+# pydantic ``model_rebuild()`` - which replaces that dict - invalidates the entry
+# instead of serving stale names. Criteria are marker flags (``exclude=True``,
+# ``dto=True``, ...); anything unhashable falls back to an uncached scan.
+#
+# Keep ``cls`` in the key even though ``id(fields)`` already tells live classes
+# apart. The key holds the class strongly, which keeps its field dict alive,
+# which is what makes the ``id()`` safe: without it, a collected class's id can
+# be reused by a new class and served the old answer. That failure is
+# nondeterministic, so no test can pin it - this comment is the guard. The cost
+# is that dynamically created classes (test fixtures, mostly) are never freed.
+_MATCH_CACHE: dict[tuple, tuple[str, ...]] = {}
+
+
+def _cached_match(
+    cls: type,
+    kind: str,
+    criteria: dict[str, Any],
+    scan: Callable[[dict[str, Any]], tuple[str, ...]],
+) -> tuple[str, ...]:
+    try:
+        key = (
+            cls,
+            kind,
+            id(getattr(cls, "__pydantic_fields__", None)),
+            tuple(sorted(criteria.items())),
+        )
+        hash(key)
+    except TypeError:
+        return scan(criteria)
+    found = _MATCH_CACHE.get(key)
+    if found is None:
+        found = scan(criteria)
+        _MATCH_CACHE[key] = found
+    return found
+
+
 class BaseModelPlus(BaseModel):
     """Pydantic base model with schema introspection and escape hatches.
 
@@ -62,14 +100,24 @@ class BaseModelPlus(BaseModel):
 
     @classmethod
     def _match_methods(cls, **criteria) -> Iterator[str]:
-        """Yield method names whose attributes satisfy `criteria`."""
+        """Yield method names whose attributes satisfy `criteria`.
 
+        Which methods carry a marker is class metadata: it depends on the MRO,
+        never on an instance. The answer is cached per class and criteria, since
+        this sits under ``get_identifiers`` and runs for every entity compared
+        or indexed.
+        """
+        return iter(_cached_match(cls, "methods", criteria, cls._scan_methods))
+
+    @classmethod
+    def _scan_methods(cls, criteria: dict[str, Any]) -> tuple[str, ...]:
         def _method_matches(method: Callable):
             for k, v in criteria.items():
                 if getattr(method, k, None) != v:
                     return False
             return True
 
+        found: list[str] = []
         seen_names: set[str] = set()
         for cls_ in cls.__mro__:
             for name, attrib in cls_.__dict__.items():
@@ -77,12 +125,22 @@ class BaseModelPlus(BaseModel):
                     continue
                 seen_names.add(name)
                 if callable(attrib) and _method_matches(attrib):
-                    yield name
+                    found.append(name)
+        return tuple(found)
 
     @classmethod
     def _match_fields(cls, **criteria) -> Iterator[str]:
-        """Yield field names whose FieldInfo (or json_schema_extra) satisfy `criteria`."""
+        """Yield field names whose FieldInfo (or json_schema_extra) satisfy `criteria`.
 
+        Field markers are class metadata, so the answer is cached per class and
+        criteria. ``unstructure`` asks this three times per call, and it is
+        called for every entity on every snapshot; recomputing it was most of
+        the cost of materializing and stepping a story.
+        """
+        return iter(_cached_match(cls, "fields", criteria, cls._scan_fields))
+
+    @classmethod
+    def _scan_fields(cls, criteria: dict[str, Any]) -> tuple[str, ...]:
         def _field_matches(field_info: FieldInfo) -> bool:
             for k, v in criteria.items():
                 extra = field_info.json_schema_extra or {}
@@ -90,9 +148,7 @@ class BaseModelPlus(BaseModel):
                     return False
             return True
 
-        for name, info in cls.model_fields.items():
-            if _field_matches(info):
-                yield name
+        return tuple(name for name, info in cls.model_fields.items() if _field_matches(info))
 
     def _schema_matches(self, **criteria) -> StringMap:
         """Return a mapping of matching field/method schema annotations to values."""
