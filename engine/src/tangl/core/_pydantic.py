@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Callable, ClassVar, Iterator, Optional, Self, Type
+from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic.fields import FieldInfo
@@ -11,19 +12,18 @@ from tangl.type_hints import StringMap
 logger = logging.getLogger(__name__)
 
 
-# Per-class answers to "which fields/methods carry this marker?". Keyed on the
-# class, what was asked, and the identity of the class's field dict, so a
-# pydantic ``model_rebuild()`` - which replaces that dict - invalidates the entry
-# instead of serving stale names. Criteria are marker flags (``exclude=True``,
-# ``dto=True``, ...); anything unhashable falls back to an uncached scan.
+# Per-class answers to "which fields/methods carry this marker?", keyed on what
+# was asked. Criteria are marker flags (``exclude=True``, ``dto=True``, ...);
+# anything unhashable falls back to an uncached scan.
 #
-# Keep ``cls`` in the key even though ``id(fields)`` already tells live classes
-# apart. The key holds the class strongly, which keeps its field dict alive,
-# which is what makes the ``id()`` safe: without it, a collected class's id can
-# be reused by a new class and served the old answer. That failure is
-# nondeterministic, so no test can pin it - this comment is the guard. The cost
-# is that dynamically created classes (test fixtures, mostly) are never freed.
-_MATCH_CACHE: dict[tuple, tuple[str, ...]] = {}
+# Marker metadata is treated as fixed once a class is complete. The one case
+# where it is not is an incomplete model: a marker inside ``Annotated`` on an
+# unresolved forward ref is invisible until ``model_rebuild()`` resolves it. So
+# incomplete classes are scanned but never cached.
+#
+# Weakly keyed, so the cache never keeps a class alive; its entries go when the
+# class does. The values are tuples of names and hold no reference back.
+_MATCH_CACHE: WeakKeyDictionary[type, dict[tuple, tuple[str, ...]]] = WeakKeyDictionary()
 
 
 def _cached_match(
@@ -32,20 +32,19 @@ def _cached_match(
     criteria: dict[str, Any],
     scan: Callable[[dict[str, Any]], tuple[str, ...]],
 ) -> tuple[str, ...]:
+    if not getattr(cls, "__pydantic_complete__", False):
+        return scan(criteria)
     try:
-        key = (
-            cls,
-            kind,
-            id(getattr(cls, "__pydantic_fields__", None)),
-            tuple(sorted(criteria.items())),
-        )
+        key = (kind, tuple(sorted(criteria.items())))
         hash(key)
     except TypeError:
         return scan(criteria)
-    found = _MATCH_CACHE.get(key)
+    answers = _MATCH_CACHE.get(cls)
+    if answers is None:
+        answers = _MATCH_CACHE[cls] = {}
+    found = answers.get(key)
     if found is None:
-        found = scan(criteria)
-        _MATCH_CACHE[key] = found
+        found = answers[key] = scan(criteria)
     return found
 
 
