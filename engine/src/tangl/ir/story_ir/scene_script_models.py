@@ -207,6 +207,17 @@ class ActionScript(BaseScriptItem):
     )
 
 
+def _apply_default_trigger(data, field_name: str):
+    """Give a block's edge list the trigger its field name already implies."""
+    # Imported here, as the story layer imports this module.
+    from tangl.story.episode.action import DEFAULT_ACTIVATION_BY_FIELD
+
+    default = DEFAULT_ACTIVATION_BY_FIELD[field_name]
+    for entry in data:
+        entry.setdefault('trigger', default)
+    return data
+
+
 class BlockScript(BaseScriptItem):
 
     @classmethod
@@ -232,20 +243,12 @@ class BlockScript(BaseScriptItem):
     @pydantic.field_validator('redirects', mode='before')
     @classmethod
     def _set_enter_trigger(cls, data):
-        for d in data:
-            d.setdefault('trigger', 'first')
-        return data
+        return _apply_default_trigger(data, 'redirects')
 
     @pydantic.field_validator('continues', mode='before')
     @classmethod
     def _set_exit_trigger(cls, data):
-        for d in data:
-            try:
-                d.setdefault('trigger', 'last')
-            except AttributeError:
-                print( d )
-                raise
-        return data
+        return _apply_default_trigger(data, 'continues')
 
     @pydantic.field_validator('roles', mode='before')
     @classmethod

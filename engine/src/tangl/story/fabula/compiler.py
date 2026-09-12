@@ -17,6 +17,7 @@ from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
 from ..episode import Action, Block, MenuBlock, Scene
+from ..episode.action import DEFAULT_ACTIVATION_BY_FIELD
 from .types import AuthoredRef, CompileIssue, CompileSeverity, JsonValue
 
 
@@ -872,16 +873,19 @@ class StoryCompiler:
                     self._normalize_list(block_data.get("actions")),
                     scene_label=scene_label,
                     root_scene_labels=root_scene_labels,
+                    default_activation=DEFAULT_ACTIVATION_BY_FIELD["actions"],
                 )
                 continues = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("continues")),
                     scene_label=scene_label,
                     root_scene_labels=root_scene_labels,
+                    default_activation=DEFAULT_ACTIVATION_BY_FIELD["continues"],
                 )
                 redirects = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("redirects")),
                     scene_label=scene_label,
                     root_scene_labels=root_scene_labels,
+                    default_activation=DEFAULT_ACTIVATION_BY_FIELD["redirects"],
                 )
                 next_qualified = self._next_block_label(blocks, block_index, scene_label)
                 for spec_list in (actions, continues, redirects):
@@ -1199,15 +1203,24 @@ class StoryCompiler:
         *,
         scene_label: str,
         root_scene_labels: set[str],
+        default_activation: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return canonical action specs for one scene.
 
         Part A policy: when a bare successor token collides with a root scene
         label, it is treated as an absolute scene destination by design.
+
+        default_activation is what the block's field name already says -
+        a continue follows on its own, a redirect fires first - applied when
+        the entry does not name its own trigger.
         """
         normalized: list[dict[str, Any]] = []
         for spec in specs:
             payload = dict(spec)
+            if default_activation is not None and not (
+                payload.get("trigger") or payload.get("activation")
+            ):
+                payload["trigger"] = default_activation
             inferred = payload.get("successor_is_inferred") is True
             authored = None if inferred else payload.get("authored_successor_ref")
             if inferred:

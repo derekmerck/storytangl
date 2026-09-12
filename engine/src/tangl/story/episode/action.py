@@ -8,6 +8,18 @@ from tangl.presentation.intent import Accepts, Blocker, UIHints
 from tangl.vm import ResolutionPhase, TraversableEdge
 
 
+# What a block's edge lists mean when the author does not say. A block's
+# ``continues`` follow on their own after its content, its ``redirects`` before
+# it, and its ``actions`` wait for the reader. The field name *is* the
+# declaration, so authors need not restate it on every entry; an entry that
+# names its own ``trigger`` keeps it.
+DEFAULT_ACTIVATION_BY_FIELD: dict[str, str | None] = {
+    "actions": None,
+    "continues": "last",
+    "redirects": "first",
+}
+
+
 class Action(TraversableEdge):
     """Action()
 
