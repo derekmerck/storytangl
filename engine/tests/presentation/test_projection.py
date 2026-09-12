@@ -128,8 +128,8 @@ def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
     )
     state = InfoState(
         version=7,
-        dirty_kinds=["ui-map"],
-        available_kinds=["ui-map", "ui-inventory"],
+        dirty_channels=["ui-map"],
+        available_channels=["ui-map", "ui-inventory"],
     )
 
     assert affordance.model_dump(mode="python") == {
@@ -139,8 +139,8 @@ def test_info_affordance_and_state_are_json_ready_contract_models() -> None:
     }
     assert state.model_dump(mode="python") == {
         "version": 7,
-        "dirty_kinds": ["ui-map"],
-        "available_kinds": ["ui-map", "ui-inventory"],
+        "dirty_channels": ["ui-map"],
+        "available_channels": ["ui-map", "ui-inventory"],
     }
 
 

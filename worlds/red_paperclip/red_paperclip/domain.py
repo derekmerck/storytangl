@@ -455,43 +455,46 @@ def project_red_paperclip_holding(
     """
 
     requested = request.requested_channels()
-    if not requested or requested.isdisjoint({"ui-trade-status", "ui-trade-history"}):
+    if not requested or not any(
+        channel in {"ui-trade-status", "ui-trade-history"} for channel in requested
+    ):
         return None
 
     holding = _holding(caller)
     sections: list[ProjectedSection] = []
-    if "ui-trade-status" in requested:
-        sections.append(
-            ProjectedSection(
-                section_id="red_paperclip_holding",
-                title="Holding",
-                kind="status",
-                value=KvListValue(
-                    items=[
-                        KvRow(key="Holding", value=TRADES.items[holding].name),
-                        KvRow(key="Trades", value=len(_chain(caller)) - 1),
-                        KvRow(
-                            key="Journeys",
-                            value=int(_state(caller)["world_turn"]),
-                        ),
-                    ]
-                ),
+    for channel in requested:
+        if channel == "ui-trade-status":
+            sections.append(
+                ProjectedSection(
+                    section_id="red_paperclip_holding",
+                    title="Holding",
+                    kind="status",
+                    value=KvListValue(
+                        items=[
+                            KvRow(key="Holding", value=TRADES.items[holding].name),
+                            KvRow(key="Trades", value=len(_chain(caller)) - 1),
+                            KvRow(
+                                key="Journeys",
+                                value=int(_state(caller)["world_turn"]),
+                            ),
+                        ]
+                    ),
+                )
             )
-        )
-    if "ui-trade-history" in requested:
-        sections.append(
-            ProjectedSection(
-                section_id="red_paperclip_chain",
-                title="Chain",
-                kind="history",
-                value=ItemListValue(
-                    items=[
-                        ProjectedItem(label=TRADES.items[label].name)
-                        for label in _chain(caller)
-                    ]
-                ),
+        elif channel == "ui-trade-history":
+            sections.append(
+                ProjectedSection(
+                    section_id="red_paperclip_chain",
+                    title="Chain",
+                    kind="history",
+                    value=ItemListValue(
+                        items=[
+                            ProjectedItem(label=TRADES.items[label].name)
+                            for label in _chain(caller)
+                        ]
+                    ),
+                )
             )
-        )
     return sections or None
 
 

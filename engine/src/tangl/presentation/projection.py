@@ -22,8 +22,8 @@ class InfoState(BaseModel):
     """Lightweight projected-state availability marker for one envelope."""
 
     version: int
-    dirty_kinds: list[str] = Field(default_factory=list)
-    available_kinds: list[str] = Field(default_factory=list)
+    dirty_channels: list[str] = Field(default_factory=list)
+    available_channels: list[str] = Field(default_factory=list)
 
 
 class ProjectionRequest(BaseModel):

@@ -708,4 +708,20 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
 
     discovery = _load_fixture(DISCOVERY_DIR / "credentials_info_discovery.json")
     advertised = {channel["channel_id"] for channel in discovery["channels"]}
-    assert advertised == {"ui-rules", "ui-roster-progress", "ui-case-summary"}
+    assert advertised == {
+        "ui-sidebar",
+        "ui-rules",
+        "ui-roster-progress",
+        "ui-case-summary",
+    }
+    assert advertised == set(payload["metadata"]["info_state"]["available_channels"])
+
+
+def test_sandbox_discovery_matches_runtime_channel_availability() -> None:
+    runtime = _load_fixture(FIXTURE_DIR / "sandbox_info_channels.json")
+    discovery = _load_fixture(DISCOVERY_DIR / "sandbox_info_discovery.json")
+
+    advertised = {channel["channel_id"] for channel in discovery["channels"]}
+    available = set(runtime["metadata"]["info_state"]["available_channels"])
+
+    assert advertised == available

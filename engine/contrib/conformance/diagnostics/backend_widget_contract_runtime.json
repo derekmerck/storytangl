@@ -67,11 +67,11 @@
   "metadata": {
     "info_state": {
       "version": 1,
-      "dirty_kinds": [
+      "dirty_channels": [
         "ui-sidebar",
         "ui-widget-demo"
       ],
-      "available_kinds": [
+      "available_channels": [
         "ui-sidebar",
         "ui-widget-demo"
       ]

@@ -321,8 +321,8 @@ class ServiceManager:
         available_channels = _unique_info_channels(affordances)
         info_state = InfoState(
             version=ledger.step,
-            dirty_kinds=list(available_channels),
-            available_kinds=list(available_channels),
+            dirty_channels=list(available_channels),
+            available_channels=list(available_channels),
         )
         return {"info_state": info_state.model_dump(mode="python")}
 

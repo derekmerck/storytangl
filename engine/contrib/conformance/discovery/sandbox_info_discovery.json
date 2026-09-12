@@ -1,7 +1,12 @@
 {
   "channels": [
+    {"channel_id": "ui-sidebar", "label": "Status", "shortcuts": []},
+    {"channel_id": "ui-world-time", "label": "Watch", "shortcuts": ["t", "time"]},
+    {"channel_id": "ui-location", "label": "Here", "shortcuts": ["h", "look"]},
+    {"channel_id": "ui-inventory", "label": "Carrying", "shortcuts": ["i", "inv"]},
     {"channel_id": "ui-map", "label": "Map", "shortcuts": ["m", "map"]},
-    {"channel_id": "ui-inventory", "label": "Carrying", "shortcuts": ["i", "inv"]}
+    {"channel_id": "ui-presence", "label": "Present", "shortcuts": ["p"]},
+    {"channel_id": "ui-exits", "label": "Exits", "shortcuts": ["x"]}
   ],
   "sections": []
 }

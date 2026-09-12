@@ -252,13 +252,13 @@ export interface ProjectedState {
 export interface InfoAffordance {
   channel_id: string
   label?: string | null
-  shortcuts?: string[]
+  shortcuts: string[]
 }
 
 export interface InfoState {
   version?: number | null
-  dirty_kinds?: string[]
-  available_kinds?: string[]
+  dirty_channels?: string[]
+  available_channels?: string[]
 }
 
 export type StoryStatus = ProjectedState

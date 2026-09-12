@@ -522,7 +522,7 @@ def _diagnostic_metadata() -> JsonMapping:
         "story": "renderer",
         "cursor": "credential_gate",
         "info_state": {
-            "available_kinds": ["ui-map", "ui-inventory", "ui-registry"]
+            "available_channels": ["ui-map", "ui-inventory", "ui-registry"]
         },
     }
 

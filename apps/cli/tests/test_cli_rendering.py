@@ -72,7 +72,7 @@ def test_rich_renderer_exports_envelope_text() -> None:
             ),
         ],
         metadata={
-            "info_state": {"available_kinds": ["ui-map"]},
+            "info_state": {"available_channels": ["ui-map"]},
         },
     )
     renderer.emit(cmd, renderables)

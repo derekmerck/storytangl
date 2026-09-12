@@ -2,6 +2,11 @@ import type { InfoAffordance, InfoState, ProjectedState } from '@/types'
 
 export const sandboxInfoAffordances: InfoAffordance[] = [
   {
+    channel_id: 'ui-sidebar',
+    label: 'Status',
+    shortcuts: [],
+  },
+  {
     channel_id: 'ui-world-time',
     label: 'Watch',
     shortcuts: ['t', 'time'],
@@ -40,8 +45,8 @@ export const sandboxInfoAffordances: InfoAffordance[] = [
 
 export const sandboxInfoState: InfoState = {
   version: 17,
-  dirty_kinds: ['ui-location', 'ui-inventory', 'ui-agenda'],
-  available_kinds: [
+  dirty_channels: ['ui-location', 'ui-inventory', 'ui-agenda'],
+  available_channels: [
     'ui-sidebar',
     'ui-inventory',
     'ui-map',

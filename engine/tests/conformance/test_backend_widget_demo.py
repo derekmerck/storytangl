@@ -114,7 +114,7 @@ def test_backend_widget_diagnostics_validate_as_service_contracts() -> None:
             "frames": ["Name the mule."],
         },
     ]
-    assert runtime_payload["metadata"]["info_state"]["available_kinds"] == [
+    assert runtime_payload["metadata"]["info_state"]["available_channels"] == [
         "ui-sidebar",
         "ui-widget-demo",
     ]

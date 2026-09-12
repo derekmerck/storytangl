@@ -89,16 +89,16 @@ const normalizeInfoState = (value: unknown): InfoState | null => {
   if (!isRecord(value)) {
     return null
   }
-  const dirtyKinds = Array.isArray(value.dirty_kinds)
-    ? value.dirty_kinds.filter((channel): channel is string => typeof channel === 'string')
+  const dirtyChannels = Array.isArray(value.dirty_channels)
+    ? value.dirty_channels.filter((channel): channel is string => typeof channel === 'string')
     : undefined
-  const availableKinds = Array.isArray(value.available_kinds)
-    ? value.available_kinds.filter((channel): channel is string => typeof channel === 'string')
+  const availableChannels = Array.isArray(value.available_channels)
+    ? value.available_channels.filter((channel): channel is string => typeof channel === 'string')
     : undefined
   return {
     version: typeof value.version === 'number' ? value.version : undefined,
-    dirty_kinds: dirtyKinds,
-    available_kinds: availableKinds,
+    dirty_channels: dirtyChannels,
+    available_channels: availableChannels,
   }
 }
 

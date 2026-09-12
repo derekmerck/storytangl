@@ -36,6 +36,7 @@ const props = defineProps<{
 
 const statusSections = ref<StatusSection[]>([])
 const infoAffordances = ref<InfoAffordance[]>([])
+const catalogLoaded = ref(false)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const activeChannel = ref<string | null>(null)
@@ -118,7 +119,7 @@ const affordanceLabel = (affordance: InfoAffordance): string =>
   affordance.label ?? affordance.channel_id.replace(/-/g, ' ')
 
 const visibleAffordances = computed(() => {
-  const availableChannels = props.infoState?.available_kinds
+  const availableChannels = props.infoState?.available_channels
   if (availableChannels === undefined) {
     return infoAffordances.value
   }
@@ -132,13 +133,23 @@ const activeAffordance = computed(() =>
 
 const shouldRefreshForInfoState = (): boolean => {
   const infoState = props.infoState
-  if (!infoState?.dirty_kinds) {
+  if (!infoState?.dirty_channels) {
     return true
   }
   return (
-    infoState.dirty_kinds.includes('*') ||
-    (activeChannel.value !== null && infoState.dirty_kinds.includes(activeChannel.value))
+    infoState.dirty_channels.includes('*') ||
+    (activeChannel.value !== null && infoState.dirty_channels.includes(activeChannel.value))
   )
+}
+
+const catalogMatchesAvailability = (): boolean => {
+  const availableChannels = props.infoState?.available_channels
+  if (availableChannels === undefined) {
+    return true
+  }
+  const available = new Set(availableChannels)
+  const catalog = new Set(infoAffordances.value.map((affordance) => affordance.channel_id))
+  return available.size === catalog.size && [...available].every((channel) => catalog.has(channel))
 }
 
 const infoQueryParams = (affordance: InfoAffordance): QueryParams => ({
@@ -179,11 +190,16 @@ const hasSections = computed(() => statusSections.value.length > 0)
 const hasAffordances = computed(() => visibleAffordances.value.length > 0)
 
 const discoverChannels = async () => {
+  const requestId = ++statusRequestId.value
   try {
     loading.value = true
     error.value = null
     const response = await $http.value.get<StoryStatusPayload>('/story/info')
+    if (requestId !== statusRequestId.value) {
+      return
+    }
     infoAffordances.value = response.data.channels ?? []
+    catalogLoaded.value = true
     const selected =
       visibleAffordances.value.find((item) => item.channel_id === activeChannel.value) ??
       visibleAffordances.value.find((item) => item.channel_id === 'ui-sidebar') ??
@@ -196,6 +212,9 @@ const discoverChannels = async () => {
       loading.value = false
     }
   } catch (err) {
+    if (requestId !== statusRequestId.value) {
+      return
+    }
     console.error('Failed to discover story info:', err)
     error.value = 'Unable to load story status. Please try again later.'
     loading.value = false
@@ -214,32 +233,34 @@ const sectionClass = (section: StatusSection): Record<string, boolean> => {
 onMounted(discoverChannels)
 
 watch(
-  () => props.refreshKey,
-  () => {
-    if (shouldRefreshForInfoState()) {
-      void loadStatus()
+  [() => props.refreshKey, () => props.infoState?.available_channels],
+  ([refreshKey], [previousRefreshKey]) => {
+    if (!catalogLoaded.value) {
+      return
     }
-  },
-)
+    if (!catalogMatchesAvailability()) {
+      void discoverChannels()
+      return
+    }
 
-watch(
-  visibleAffordances,
-  (affordances) => {
-    if (
-      activeChannel.value &&
-      !affordances.some((affordance) => affordance.channel_id === activeChannel.value)
-    ) {
-      const replacement = affordances[0]
-      activeChannel.value = replacement?.channel_id ?? null
-      if (replacement) {
-        void loadStatus(replacement)
-      } else {
-        statusRequestId.value += 1
-        statusSections.value = []
-        loading.value = false
-      }
+    const replacement = activeAffordance.value ?? visibleAffordances.value[0]
+    if (!replacement) {
+      activeChannel.value = null
+      statusRequestId.value += 1
+      statusSections.value = []
+      loading.value = false
+      return
+    }
+    if (activeChannel.value !== replacement.channel_id) {
+      activeChannel.value = replacement.channel_id
+      void loadStatus(replacement)
+      return
+    }
+    if (refreshKey !== previousRefreshKey && shouldRefreshForInfoState()) {
+      void loadStatus(replacement)
     }
   },
+  { deep: true },
 )
 
 const selectAffordance = (affordance: InfoAffordance) => {
