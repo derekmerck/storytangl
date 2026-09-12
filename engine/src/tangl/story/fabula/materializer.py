@@ -40,6 +40,10 @@ from .types import (
 )
 
 
+# What to call an edge the author did not name, by the list it came from.
+_EDGE_LABEL_STEM = {"actions": "action", "continues": "continue", "redirects": "redirect"}
+
+
 @dataclass(slots=True)
 class _MaterializationState:
     graph: StoryGraph
@@ -714,9 +718,15 @@ class StoryMaterializer:
     ) -> None:
         for node in nodes:
             if isinstance(node, Block):
-                self._wire_actions_for_block(node=node, specs=node.redirects, state=state)
-                self._wire_actions_for_block(node=node, specs=node.continues, state=state)
-                self._wire_actions_for_block(node=node, specs=node.actions, state=state)
+                self._wire_actions_for_block(
+                    node=node, specs=node.redirects, state=state, field="redirects"
+                )
+                self._wire_actions_for_block(
+                    node=node, specs=node.continues, state=state, field="continues"
+                )
+                self._wire_actions_for_block(
+                    node=node, specs=node.actions, state=state, field="actions"
+                )
 
     def _wire_media_dependencies(
         self,
@@ -839,6 +849,7 @@ class StoryMaterializer:
         node: Block,
         specs: list[dict[str, Any]],
         state: _MaterializationState,
+        field: str = "actions",
     ) -> None:
         for index, spec in enumerate(specs):
             authored_successor_ref = self._coerce_str(spec.get("authored_successor_ref"))
@@ -877,7 +888,9 @@ class StoryMaterializer:
 
             action = Action(
                 registry=state.graph,
-                label=spec.get("label") or f"action_{node.label}_{index}",
+                # Named for the list it came from: a block's first continue and
+                # its first action would otherwise both be action_<block>_0.
+                label=spec.get("label") or f"{_EDGE_LABEL_STEM[field]}_{node.label}_{index}",
                 predecessor_id=node.uid,
                 text=self._coerce_str(spec.get("text") or spec.get("content") or spec.get("label"))
                 or "",

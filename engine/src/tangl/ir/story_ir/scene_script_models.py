@@ -207,6 +207,27 @@ class ActionScript(BaseScriptItem):
     )
 
 
+# What a block's edge lists mean when the author does not say. A block's
+# ``continues`` follow on their own after its content, its ``redirects`` before
+# it, and its ``actions`` wait for the reader. The field name *is* the
+# declaration, so authors need not restate it on every entry; an entry that
+# names its own ``trigger`` keeps it. This is script vocabulary, so it lives
+# with the script models, and the story compiler reads it from here.
+DEFAULT_ACTIVATION_BY_FIELD: dict[str, str | None] = {
+    "actions": None,
+    "continues": "last",
+    "redirects": "first",
+}
+
+
+def _apply_default_trigger(data, field_name: str):
+    """Give a block's edge list the trigger its field name already implies."""
+    default = DEFAULT_ACTIVATION_BY_FIELD[field_name]
+    for entry in data:
+        entry.setdefault('trigger', default)
+    return data
+
+
 class BlockScript(BaseScriptItem):
 
     @classmethod
@@ -232,20 +253,12 @@ class BlockScript(BaseScriptItem):
     @pydantic.field_validator('redirects', mode='before')
     @classmethod
     def _set_enter_trigger(cls, data):
-        for d in data:
-            d.setdefault('trigger', 'first')
-        return data
+        return _apply_default_trigger(data, 'redirects')
 
     @pydantic.field_validator('continues', mode='before')
     @classmethod
     def _set_exit_trigger(cls, data):
-        for d in data:
-            try:
-                d.setdefault('trigger', 'last')
-            except AttributeError:
-                print( d )
-                raise
-        return data
+        return _apply_default_trigger(data, 'continues')
 
     @pydantic.field_validator('roles', mode='before')
     @classmethod
