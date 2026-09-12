@@ -35,6 +35,7 @@ from tangl.presentation.projection import (
     TableValue,
 )
 from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.service_manager import ServiceManager
 from tangl.story.concepts.asset import AssetType
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -379,6 +380,35 @@ def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
         ["End of Road", "down", "Below the Grate", "locked, closed"],
         ["End of Road", "east", "Inside Building", "open"],
     ]
+
+
+def test_a_location_the_reader_has_left_stays_on_the_service_map() -> None:
+    """The map shows where the reader has been, not only what is adjacent.
+
+    "Where the reader has been" is the ledger's cursor history. The service
+    builds its own context for story info, and that context must carry the
+    history the ledger gives every phase context - or the map forgets every
+    location the reader has walked away from.
+    """
+    graph = Graph(label="tiny_cave")
+    road = SandboxLocation(label="road", location_name="End of Road", links={"east": "building"})
+    building = SandboxLocation(
+        label="building",
+        location_name="Inside Building",
+        links={"west": "road", "down": "cellar"},
+    )
+    cellar = SandboxLocation(label="cellar", location_name="Cellar", links={"up": "building"})
+    for item in (road, building, cellar):
+        graph.add(item)
+    ledger = Ledger.from_graph(graph, entry_id=cellar.uid)
+    ledger.cursor_history = [road.uid, building.uid, cellar.uid]
+
+    ctx = ServiceManager._make_story_info_ctx(ledger)
+    sections = _section_by_id(_project_sandbox_info(cellar, ctx, ProjectionRequest(kind="map")))
+
+    assert ctx.get_meta()["cursor_history"] == ledger.cursor_history
+    # The road is two rooms away, so only having been there puts it on the map.
+    assert "End of Road" in _item_labels(sections["sandbox_map_nodes"])
 
 
 def test_sandbox_map_honors_visibility_suppression() -> None:
