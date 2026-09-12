@@ -13,11 +13,11 @@ from uuid import UUID
 from tangl.core import Entity, EntityTemplate, Selector, TemplateRegistry
 from tangl.core.template import TemplateGroup
 from tangl.ir.story_ir import StoryScript
+from tangl.ir.story_ir.scene_script_models import DEFAULT_ACTIVATION_BY_FIELD
 from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
 from ..episode import Action, Block, MenuBlock, Scene
-from ..episode.action import DEFAULT_ACTIVATION_BY_FIELD
 from .types import AuthoredRef, CompileIssue, CompileSeverity, JsonValue
 
 

@@ -207,11 +207,21 @@ class ActionScript(BaseScriptItem):
     )
 
 
+# What a block's edge lists mean when the author does not say. A block's
+# ``continues`` follow on their own after its content, its ``redirects`` before
+# it, and its ``actions`` wait for the reader. The field name *is* the
+# declaration, so authors need not restate it on every entry; an entry that
+# names its own ``trigger`` keeps it. This is script vocabulary, so it lives
+# with the script models, and the story compiler reads it from here.
+DEFAULT_ACTIVATION_BY_FIELD: dict[str, str | None] = {
+    "actions": None,
+    "continues": "last",
+    "redirects": "first",
+}
+
+
 def _apply_default_trigger(data, field_name: str):
     """Give a block's edge list the trigger its field name already implies."""
-    # Imported here, as the story layer imports this module.
-    from tangl.story.episode.action import DEFAULT_ACTIVATION_BY_FIELD
-
     default = DEFAULT_ACTIVATION_BY_FIELD[field_name]
     for entry in data:
         entry.setdefault('trigger', default)
