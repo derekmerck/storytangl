@@ -44,8 +44,9 @@ from tangl.core import Edge, Graph, HierarchicalNode, Node, Selector
 from tangl.core.bases import BaseModelPlus, HasState
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.type_hints import StringMap
-from .ctx import VmPhaseCtx
+from .ctx import VmPhaseCtx, cursor_history_from
 from .resolution_phase import ResolutionPhase
+from .traversal import get_visit_count
 
 
 __all__ = [
@@ -58,6 +59,7 @@ __all__ = [
     "TraversableEdge",
     "AnonymousEdge",
     "AnyTraversableEdge",
+    "has_visited",
     "validate_traversal_contracts",
     "assert_traversal_contracts",
     "lca",
@@ -310,6 +312,19 @@ class HasContainerEntryProjection(BaseModelPlus):
 # ---------------------------------------------------------------------------
 # LCA utilities
 # ---------------------------------------------------------------------------
+
+def has_visited(node: Any, *, ctx: Any = None) -> bool:
+    """True when the reader has been to ``node``.
+
+    Reads the ledger's cursor history through ``ctx``. A node carries no
+    visited flag of its own: the ledger is where "where the reader has been"
+    lives, and a replayed or restored ledger therefore answers the same way.
+    """
+    uid = getattr(node, "uid", node)
+    if uid is None:
+        return False
+    return get_visit_count(uid, cursor_history_from(ctx)) > 0
+
 
 def lca(a: HierarchicalNode, b: HierarchicalNode) -> Optional[HierarchicalNode]:
     """Lowest common ancestor of two nodes in the same hierarchy.
@@ -826,6 +841,15 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
     stack and, on completion, follows ``get_return_edge()`` back to
     ``predecessor`` starting at this phase."""
 
+    once: bool = False
+    """Offer this edge only until its destination has been visited.
+
+    "Visited" is the reader's history, held by the ledger - not a flag on the
+    node - so every route into the destination counts.  That is what makes a
+    hub reachable from many places usable exactly once.  Sandbox interactions
+    have spelled this ``once`` since they were written.
+    """
+
     predicate: str | None = None
     """Legacy compatibility guard key for namespace-driven edge gating.
 
@@ -865,6 +889,8 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
         """
         successor = self.successor
         if successor is None:
+            return False
+        if self.once and has_visited(successor, ctx=ctx):
             return False
         rand = _resolve_rand(rand=None, ctx=ctx)
         predecessor = self.predecessor

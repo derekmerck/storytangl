@@ -439,8 +439,46 @@ def test_once_mob_interaction_is_suppressed_after_target_visit() -> None:
     pirate_chat = Block(
         label="pirate_chat",
         content="The pirate tells you about the cave.",
-        locals={"_visited": True},
     )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(pirate_chat)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(pirate)
+
+    # ``once`` reads where the reader has been, which the ledger holds and the
+    # frame carries on meta - not a flag annotated onto the target.
+    do_provision(
+        road,
+        ctx=PhaseCtx(
+            graph=graph,
+            cursor_id=road.uid,
+            meta={"cursor_history": [pirate_chat.uid]},
+        ),
+    )
+
+    assert _dynamic_sandbox_actions_with_tag(road, "interaction") == []
+
+
+def test_a_once_interaction_still_shows_before_its_target_is_visited() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        interactions=[
+            SandboxInteraction(
+                label="talk",
+                text="Talk to the pirate",
+                target="pirate_chat",
+                once=True,
+            )
+        ],
+    )
+    scope = SandboxScope(label="tiny_cave_scope", mobs=[pirate])
+    road = SandboxLocation(label="road", location_name="Road")
+    pirate_chat = Block(label="pirate_chat", content="The pirate talks.")
     graph.add(scope)
     graph.add(road)
     graph.add(pirate_chat)
@@ -450,7 +488,9 @@ def test_once_mob_interaction_is_suppressed_after_target_visit() -> None:
 
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
-    assert _dynamic_sandbox_actions_with_tag(road, "interaction") == []
+    assert [a.text for a in _dynamic_sandbox_actions_with_tag(road, "interaction")] == [
+        "Talk to the pirate"
+    ]
 
 
 def test_location_interaction_can_be_trivial_self_loop_action() -> None:
@@ -1944,10 +1984,14 @@ def test_scope_once_event_triggers_on_entry_returns_and_suppresses_after_target_
     assert orientation.locals["_visited"] is True
     assert road.locals["_visited"] is True
 
-    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    # The reader really went to ``orientation``, so the ledger's history says so.
+    history = {"cursor_history": list(ledger.cursor_history)}
+    assert orientation.uid in ledger.cursor_history
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid, meta=history))
     assert _dynamic_sandbox_actions_with_tag(road, "event") == []
 
-    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid, meta=history))
     assert _dynamic_sandbox_actions_with_tag(building, "event") == []
 
 

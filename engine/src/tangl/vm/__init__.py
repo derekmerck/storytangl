@@ -70,6 +70,7 @@ from .provision import (
 # Provides:
 # - cursor traversal rules
 from .traversable import (
+    has_visited,
     ContainerEntryRule,
     HasContainerEntryProjection,
     TraversableEdge,
@@ -147,6 +148,7 @@ __all__ = [
     "ContainerEntryRule",
     "HasContainerEntryProjection",
     "TraversableEdge",
+    "has_visited",
     "TraversableGraph",
     "TraversableGraphFactory",
     "TraversableNode",
