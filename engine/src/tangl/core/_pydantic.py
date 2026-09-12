@@ -78,7 +78,7 @@ class BaseModelPlus(BaseModel):
         ...         return 1
         ...     def yes(self):
         ...         return 2
-        >>> setattr(M.yes, "foo", True)
+        >>> setattr(M.yes, "foo", True)  # before the first query, or it is not seen
         >>> list(M._match_methods(foo=True))
         ['yes']
 
@@ -105,6 +105,10 @@ class BaseModelPlus(BaseModel):
         never on an instance. The answer is cached per class and criteria, since
         this sits under ``get_identifiers`` and runs for every entity compared
         or indexed.
+
+        Markers must be in place before the class is first queried; setting one
+        on a method afterwards is not seen. Decorators such as ``is_identifier``
+        run in the class body, so they always are.
         """
         return iter(_cached_match(cls, "methods", criteria, cls._scan_methods))
 
@@ -135,6 +139,9 @@ class BaseModelPlus(BaseModel):
         criteria. ``unstructure`` asks this three times per call, and it is
         called for every entity on every snapshot; recomputing it was most of
         the cost of materializing and stepping a story.
+
+        Markers must be in place before the class is first queried; mutating a
+        field's ``json_schema_extra`` afterwards is not seen.
         """
         return iter(_cached_match(cls, "fields", criteria, cls._scan_fields))
 
