@@ -301,16 +301,11 @@ class ServiceManager:
     def _make_story_info_ctx(ledger: Ledger) -> "PhaseCtx":
         from tangl.vm.runtime.frame import PhaseCtx
 
-        meta: dict[str, Any] = {"causality_mode": ledger.causality_mode.value}
-        if ledger.user is not None:
-            meta["user"] = ledger.user
-        if ledger.user_id is not None:
-            meta["user_id"] = ledger.user_id
         return PhaseCtx(
             graph=ledger.graph,
             cursor_id=ledger.cursor_id,
             step=ledger.step,
-            meta=meta,
+            meta=ledger.frame_meta(),
             causality_mode=ledger.causality_mode,
             local_authorities=[ledger.local_behaviors],
         )
