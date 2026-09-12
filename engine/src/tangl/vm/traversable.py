@@ -313,17 +313,14 @@ class HasContainerEntryProjection(BaseModelPlus):
 # LCA utilities
 # ---------------------------------------------------------------------------
 
-def has_visited(node: Any, *, ctx: Any = None) -> bool:
+def has_visited(node: TraversableNode, *, ctx: VmPhaseCtx | None) -> bool:
     """True when the reader has been to ``node``.
 
     Reads the ledger's cursor history through ``ctx``. A node carries no
     visited flag of its own: the ledger is where "where the reader has been"
     lives, and a replayed or restored ledger therefore answers the same way.
     """
-    uid = getattr(node, "uid", node)
-    if uid is None:
-        return False
-    return get_visit_count(uid, cursor_history_from(ctx)) > 0
+    return get_visit_count(node.uid, cursor_history_from(ctx)) > 0
 
 
 def lca(a: HierarchicalNode, b: HierarchicalNode) -> Optional[HierarchicalNode]:

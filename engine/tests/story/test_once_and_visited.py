@@ -37,7 +37,10 @@ def _script() -> dict:
                     "detour": {
                         "label": "detour",
                         "content": "A detour.",
-                        "actions": [{"text": "On to the hub", "successor": "hub"}],
+                        "actions": [
+                            {"text": "On to the hub", "successor": "hub"},
+                            {"text": "Turn back", "successor": "start"},
+                        ],
                     },
                     "hub": {
                         "label": "hub",
@@ -86,9 +89,13 @@ def test_a_once_edge_is_open_until_its_destination_is_visited() -> None:
     graph = _graph("once_open")
     ledger = Ledger.from_graph(graph=graph, entry_id=_node(graph, "start").uid)
     ledger.resolve_choice(_edge(graph, "start", "The long way").uid)
+    ledger.resolve_choice(_edge(graph, "detour", "Turn back").uid)
 
-    # At the detour, the hub has not been reached yet.
-    assert _offered(ledger) == {"On to the hub": True}
+    # Back at the start, having seen the detour but never the hub. Without this
+    # positive case, a ``once`` that closed every edge would pass the next test.
+    offered = _offered(ledger)
+    assert offered["Straight to the hub"] is True
+    assert offered["The long way"] is True
 
 
 def test_a_once_edge_closes_after_any_route_reaches_its_destination() -> None:
@@ -111,6 +118,7 @@ def test_visited_answers_for_any_node_by_label_or_by_node() -> None:
 
     visited = _ns_at(ledger, "start")["visited"]
     assert visited("hub") is False
+    assert visited("s.hub") is False
     assert visited(hub) is False
     assert visited(hub.uid) is False
 
@@ -119,6 +127,7 @@ def test_visited_answers_for_any_node_by_label_or_by_node() -> None:
 
     visited = _ns_at(ledger, "hub")["visited"]
     assert visited("hub") is True
+    assert visited("s.hub") is True  # a qualified path resolves as materialization does
     assert visited(hub) is True
     assert visited(hub.uid) is True
     assert visited("detour") is True

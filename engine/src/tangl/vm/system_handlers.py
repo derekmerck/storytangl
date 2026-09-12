@@ -84,7 +84,7 @@ from .dispatch import (
 from .resolution_phase import ResolutionPhase
 from .traversal import get_visit_count, is_first_visit, steps_since_last_visit
 from .runtime.causality import CausalityMode
-from .ctx import cursor_history_from
+from .ctx import VmPhaseCtx, cursor_history_from
 from .traversable import (
     AnonymousEdge,
     HasEffects,
@@ -99,22 +99,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _visited_query(ctx: "PhaseCtx | None"):
+def _visited_query(ctx: VmPhaseCtx):
     """Build the ``visited(ref)`` an author calls from a condition."""
-    graph = getattr(ctx, "graph", None)
 
-    def visited(ref: Any) -> bool:
-        """True when the reader has been to ``ref``: a node, label, or uid."""
-        node = ref
-        if not hasattr(node, "uid"):
-            if graph is None:
-                return False
-            node = (
-                graph.get(ref)
-                if isinstance(ref, UUID)
-                else graph.find_one(Selector(has_identifier=str(ref)))
-            )
-        return node is not None and has_visited(node, ctx=ctx)
+    def visited(ref: TraversableNode | UUID | str) -> bool:
+        """True when the reader has been to ``ref``: a node, a uid, or a path.
+
+        A path resolves as materialization resolves one - a qualified path such
+        as ``"scene.block"`` first, then a plain identifier or label.
+        """
+        if isinstance(ref, TraversableNode):
+            node = ref
+        elif isinstance(ref, UUID):
+            node = ctx.graph.get(ref)
+        else:
+            node = ctx.graph.find_one(
+                Selector(has_kind=TraversableNode, has_path=ref)
+            ) or ctx.graph.find_one(Selector(has_kind=TraversableNode, has_identifier=ref))
+        return isinstance(node, TraversableNode) and has_visited(node, ctx=ctx)
 
     return visited
 
@@ -304,7 +306,7 @@ def contribute_visit_stats(*, caller, ctx, **kw):
         "node_completed": visited,
         "is_first_visit": is_first_visit(caller.uid, history),
         # Ask about any other node, which is what an authored condition needs:
-        # ``visited(gutter)``, ``not visited("cw1.80")``.
+        # ``visited(gutter)``, ``not visited("garage.front_desk")``.
         "visited": _visited_query(ctx),
     }
 

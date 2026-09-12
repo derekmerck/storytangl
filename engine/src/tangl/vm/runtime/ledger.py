@@ -236,13 +236,19 @@ class Ledger(Entity):
             self._call_stack(),
             ledger_local_behaviors=self.local_behaviors,
             step_base=self.cursor_steps,
-            meta=self._frame_meta(),
+            meta=self.frame_meta(),
             causality_mode=self.causality_mode,
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
         )
 
-    def _frame_meta(self) -> dict[str, Any]:
+    def frame_meta(self) -> dict[str, Any]:
+        """What every phase context built from this ledger carries on ``meta``.
+
+        The cursor history in particular: it is how anything asks whether the
+        reader has been somewhere, so a context built without it silently
+        answers "never".
+        """
         meta: dict[str, Any] = {"causality_mode": self.causality_mode.value}
         meta["cursor_history"] = list(self.cursor_history)
         if self.user is not None:
@@ -415,6 +421,7 @@ class Ledger(Entity):
             graph=self.graph,
             cursor_id=self.cursor_id,
             step=max(self.cursor_steps, 0),
+            meta=self.frame_meta(),
             causality_mode=self.causality_mode,
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
