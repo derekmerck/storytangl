@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Callable, ClassVar, Iterator, Optional, Self, Type
+from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic.fields import FieldInfo
@@ -9,6 +10,42 @@ from pydantic.fields import FieldInfo
 from tangl.type_hints import StringMap
 
 logger = logging.getLogger(__name__)
+
+
+# Per-class answers to "which fields/methods carry this marker?", keyed on what
+# was asked. Criteria are marker flags (``exclude=True``, ``dto=True``, ...);
+# anything unhashable falls back to an uncached scan.
+#
+# Marker metadata is treated as fixed once a class is complete. The one case
+# where it is not is an incomplete model: a marker inside ``Annotated`` on an
+# unresolved forward ref is invisible until ``model_rebuild()`` resolves it. So
+# incomplete classes are scanned but never cached.
+#
+# Weakly keyed, so the cache never keeps a class alive; its entries go when the
+# class does. The values are tuples of names and hold no reference back.
+_MATCH_CACHE: WeakKeyDictionary[type, dict[tuple, tuple[str, ...]]] = WeakKeyDictionary()
+
+
+def _cached_match(
+    cls: type,
+    kind: str,
+    criteria: dict[str, Any],
+    scan: Callable[[dict[str, Any]], tuple[str, ...]],
+) -> tuple[str, ...]:
+    if not getattr(cls, "__pydantic_complete__", False):
+        return scan(criteria)
+    try:
+        key = (kind, tuple(sorted(criteria.items())))
+        hash(key)
+    except TypeError:
+        return scan(criteria)
+    answers = _MATCH_CACHE.get(cls)
+    if answers is None:
+        answers = _MATCH_CACHE[cls] = {}
+    found = answers.get(key)
+    if found is None:
+        found = answers[key] = scan(criteria)
+    return found
 
 
 class BaseModelPlus(BaseModel):
@@ -41,7 +78,7 @@ class BaseModelPlus(BaseModel):
         ...         return 1
         ...     def yes(self):
         ...         return 2
-        >>> setattr(M.yes, "foo", True)
+        >>> setattr(M.yes, "foo", True)  # before the first query, or it is not seen
         >>> list(M._match_methods(foo=True))
         ['yes']
 
@@ -62,14 +99,28 @@ class BaseModelPlus(BaseModel):
 
     @classmethod
     def _match_methods(cls, **criteria) -> Iterator[str]:
-        """Yield method names whose attributes satisfy `criteria`."""
+        """Yield method names whose attributes satisfy `criteria`.
 
+        Which methods carry a marker is class metadata: it depends on the MRO,
+        never on an instance. The answer is cached per class and criteria, since
+        this sits under ``get_identifiers`` and runs for every entity compared
+        or indexed.
+
+        Markers must be in place before the class is first queried; setting one
+        on a method afterwards is not seen. Decorators such as ``is_identifier``
+        run in the class body, so they always are.
+        """
+        return iter(_cached_match(cls, "methods", criteria, cls._scan_methods))
+
+    @classmethod
+    def _scan_methods(cls, criteria: dict[str, Any]) -> tuple[str, ...]:
         def _method_matches(method: Callable):
             for k, v in criteria.items():
                 if getattr(method, k, None) != v:
                     return False
             return True
 
+        found: list[str] = []
         seen_names: set[str] = set()
         for cls_ in cls.__mro__:
             for name, attrib in cls_.__dict__.items():
@@ -77,12 +128,25 @@ class BaseModelPlus(BaseModel):
                     continue
                 seen_names.add(name)
                 if callable(attrib) and _method_matches(attrib):
-                    yield name
+                    found.append(name)
+        return tuple(found)
 
     @classmethod
     def _match_fields(cls, **criteria) -> Iterator[str]:
-        """Yield field names whose FieldInfo (or json_schema_extra) satisfy `criteria`."""
+        """Yield field names whose FieldInfo (or json_schema_extra) satisfy `criteria`.
 
+        Field markers are class metadata, so the answer is cached per class and
+        criteria. ``unstructure`` asks this three times per call, and it is
+        called for every entity on every snapshot; recomputing it was most of
+        the cost of materializing and stepping a story.
+
+        Markers must be in place before the class is first queried; mutating a
+        field's ``json_schema_extra`` afterwards is not seen.
+        """
+        return iter(_cached_match(cls, "fields", criteria, cls._scan_fields))
+
+    @classmethod
+    def _scan_fields(cls, criteria: dict[str, Any]) -> tuple[str, ...]:
         def _field_matches(field_info: FieldInfo) -> bool:
             for k, v in criteria.items():
                 extra = field_info.json_schema_extra or {}
@@ -90,9 +154,7 @@ class BaseModelPlus(BaseModel):
                     return False
             return True
 
-        for name, info in cls.model_fields.items():
-            if _field_matches(info):
-                yield name
+        return tuple(name for name, info in cls.model_fields.items() if _field_matches(info))
 
     def _schema_matches(self, **criteria) -> StringMap:
         """Return a mapping of matching field/method schema annotations to values."""

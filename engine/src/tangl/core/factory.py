@@ -42,6 +42,11 @@ class _TemplateIndex:
         self.hash_by_uid: dict[UUID, Hash] = {}
         self.parent_by_child_uid: dict[UUID, TemplateGroup] = {}
         self.materialized_by_hash: dict[Hash, list[GraphItem]] = defaultdict(list)
+        # Membership keys per identifier, so indexing is O(1) per insert. Many
+        # templates share an identifier (a scene label, say), so the old linear
+        # ``templ not in matches`` scan was quadratic, and each comparison ran
+        # two full content hashes through ``eq_by_content``.
+        self._index_keys: dict[Identifier, set[tuple[type, Hash]]] = defaultdict(set)
 
         for templ in self.templates:
             templ_hash = templ.content_hash()
@@ -56,9 +61,17 @@ class _TemplateIndex:
                     self.parent_by_child_uid.setdefault(member_id, templ)
 
     def _index_identifier(self, identifier: Identifier, templ: EntityTemplate) -> None:
-        matches = self.by_identifier[identifier]
-        if templ not in matches:
-            matches.append(templ)
+        # ``(class, content hash)`` is exactly what template equality compares
+        # (``eq_by_content``: same class and same content hash), so this keeps
+        # the old dedup semantics without re-hashing on every comparison.
+        templ_hash = self.hash_by_uid.get(templ.uid)
+        if templ_hash is None:
+            templ_hash = templ.content_hash()
+        key = (type(templ), templ_hash)
+        seen = self._index_keys[identifier]
+        if key not in seen:
+            seen.add(key)
+            self.by_identifier[identifier].append(templ)
 
     def template_hash(self, templ: EntityTemplate) -> Hash:
         templ_hash = self.hash_by_uid.get(templ.uid)
