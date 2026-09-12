@@ -899,6 +899,7 @@ class StoryMaterializer:
                     or spec.get("presentation_hints")
                 ),
                 trigger_phase=trigger_phase,
+                once=bool(spec.get("once", False)),
             )
 
             target = self._find_runtime_entity(
