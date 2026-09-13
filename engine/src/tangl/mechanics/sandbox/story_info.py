@@ -18,6 +18,7 @@ from tangl.presentation.projection import (
 )
 from tangl.presentation.values import KvRow
 from tangl.story.concepts.asset import HasAssets
+from tangl.vm import has_visited
 from tangl.vm.runtime.frame import PhaseCtx
 
 from .handlers import (
@@ -415,7 +416,7 @@ def _map_sections(location: SandboxLocation, ctx: PhaseCtx) -> list[ProjectedSec
             title="Known Places",
             kind="map_nodes",
             value=ItemListValue(
-                items=[_map_node_item(node, current=location) for node in nodes]
+                items=[_map_node_item(node, current=location, ctx=ctx) for node in nodes]
             ),
         ),
         ProjectedSection(
@@ -439,7 +440,7 @@ def _known_map_locations(
     for candidate in location.graph.find_all(Selector(has_kind=SandboxLocation)):
         if not isinstance(candidate, SandboxLocation):
             continue
-        if candidate.locals.get("_visited"):
+        if has_visited(candidate, ctx=ctx):
             known_by_label[candidate.get_label()] = candidate
     if not projection.suppress_location_description:
         for exit_value in location.links.values():
@@ -459,7 +460,7 @@ def _map_edge_rows(
     projection = sandbox_projection_state(location, ctx)
     rows: list[list[str]] = []
     for source in known_locations:
-        source_is_disclosed = source.locals.get("_visited") or (
+        source_is_disclosed = has_visited(source, ctx=ctx) or (
             source is location and not projection.suppress_location_description
         )
         if not source_is_disclosed:
@@ -480,13 +481,14 @@ def _map_node_item(
     location: SandboxLocation,
     *,
     current: SandboxLocation,
+    ctx: PhaseCtx,
 ) -> ProjectedItem:
     tags = ["location"]
     detail: str | None = None
     if location is current:
         tags.append("current")
         detail = "current"
-    elif location.locals.get("_visited"):
+    elif has_visited(location, ctx=ctx):
         tags.append("visited")
         detail = "visited"
     else:

@@ -79,6 +79,7 @@ def register_system_handlers(clean_vm_dispatch):
 def ctx() -> SimpleNamespace:
     return SimpleNamespace(
         selected_edge=None,
+        get_meta=lambda: {},
         get_authorities=lambda: [vm_dispatch],
         get_inline_behaviors=lambda: [],
     )
@@ -121,7 +122,8 @@ class TestContributeRuntimeBaseline:
             graph=g,
             cursor=node,
             selected_edge=None,
-            get_authorities=lambda: [vm_dispatch],
+            get_meta=lambda: {},
+        get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
         )
         ns = do_gather_ns(node, ctx=baseline_ctx)

@@ -66,6 +66,7 @@ See Also
 from __future__ import annotations
 
 import logging
+from uuid import UUID
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
@@ -83,7 +84,14 @@ from .dispatch import (
 from .resolution_phase import ResolutionPhase
 from .traversal import get_visit_count, is_first_visit, steps_since_last_visit
 from .runtime.causality import CausalityMode
-from .traversable import HasEffects, TraversableNode, TraversableEdge, AnonymousEdge
+from .ctx import VmPhaseCtx, cursor_history_from
+from .traversable import (
+    AnonymousEdge,
+    HasEffects,
+    TraversableEdge,
+    TraversableNode,
+    has_visited,
+)
 
 if TYPE_CHECKING:
     from .runtime.frame import PhaseCtx
@@ -91,14 +99,26 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _ctx_cursor_history(ctx: "PhaseCtx | None") -> list[object]:
-    if ctx is None:
-        return []
-    meta = ctx.get_meta() if hasattr(ctx, "get_meta") else {}
-    if not isinstance(meta, Mapping):
-        return []
-    history = meta.get("cursor_history")
-    return list(history) if isinstance(history, list) else []
+def _visited_query(ctx: VmPhaseCtx):
+    """Build the ``visited(ref)`` an author calls from a condition."""
+
+    def visited(ref: TraversableNode | UUID | str) -> bool:
+        """True when the reader has been to ``ref``: a node, a uid, or a path.
+
+        A path resolves as materialization resolves one - a qualified path such
+        as ``"scene.block"`` first, then a plain identifier or label.
+        """
+        if isinstance(ref, TraversableNode):
+            node = ref
+        elif isinstance(ref, UUID):
+            node = ctx.graph.get(ref)
+        else:
+            node = ctx.graph.find_one(
+                Selector(has_kind=TraversableNode, has_path=ref)
+            ) or ctx.graph.find_one(Selector(has_kind=TraversableNode, has_identifier=ref))
+        return isinstance(node, TraversableNode) and has_visited(node, ctx=ctx)
+
+    return visited
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +145,7 @@ def contribute_runtime_baseline(*, caller, ctx, **kw):
 def _history_predecessor(*, caller, ctx) -> object | None:
     """Resolve the prior cursor from context history when edge data is absent."""
     graph = getattr(ctx, "graph", None)
-    history = _ctx_cursor_history(ctx)
+    history = cursor_history_from(ctx)
     if graph is None or not history:
         return None
     caller_uid = getattr(caller, "uid", None)
@@ -276,7 +296,7 @@ def contribute_visit_stats(*, caller, ctx, **kw):
     VM surface. Richer completion semantics remain a story/mechanics concern.
     """
     _ = kw
-    history = _ctx_cursor_history(ctx)
+    history = cursor_history_from(ctx)
     visit_count = get_visit_count(caller.uid, history)
     visited = visit_count > 0
     return {
@@ -285,6 +305,9 @@ def contribute_visit_stats(*, caller, ctx, **kw):
         "node_steps_since": steps_since_last_visit(caller.uid, history),
         "node_completed": visited,
         "is_first_visit": is_first_visit(caller.uid, history),
+        # Ask about any other node, which is what an authored condition needs:
+        # ``visited(gutter)``, ``not visited("garage.front_desk")``.
+        "visited": _visited_query(ctx),
     }
 
 
@@ -407,9 +430,12 @@ def mark_visited(*, caller, ctx, **kw):
     """Mark the cursor node as visited and increment visit count.
 
     Sets ``caller.locals['_visited'] = True`` and increments
-    ``caller.locals['_visit_count']``.  These are available in the namespace
-    for condition evaluation (e.g., ``visited(gutter)`` checks this flag,
-    ``visit_count > 3`` triggers different content on repeat visits).
+    ``caller.locals['_visit_count']``.
+
+    These annotations are a per-node convenience for authors reading a node's
+    own state.  They are not what answers "has the reader been here?" -
+    ``visited(ref)`` and ``once`` read the ledger's cursor history, so they
+    answer the same way for a replayed or restored ledger.
 
     Only fires on nodes that have a ``locals`` attribute (which includes
     any ``HierarchicalNode`` or story-layer block).
