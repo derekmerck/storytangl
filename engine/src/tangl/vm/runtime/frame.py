@@ -595,6 +595,9 @@ class Frame:
             combined_history.extend(self.cursor_trace)
         if combined_history:
             meta["cursor_history"] = combined_history
+        # The calls this traversal is inside. While any is open, the loop in
+        # ``resolve_choice`` cannot hand control back to the reader.
+        meta["call_stack_ids"] = [call.uid for call in self.return_stack]
         return PhaseCtx(
             graph=self.graph,
             cursor_id=self.cursor.uid,
@@ -909,12 +912,15 @@ class Frame:
         is_choice_edge: bool,
         choice_payload: Any = None,
     ) -> AnyTraversableEdge | None:
+        # Push a call before following it, so the call is on the stack for its
+        # whole traversal - the callee and anywhere it redirects - and every
+        # handler along the way can see it is inside one.
+        self._push_call_edge_if_needed(edge)
         redirect = self.follow_edge(
             edge,
             was_choice=is_choice_edge,
             selected_payload_override=choice_payload if is_choice_edge else None,
         )
-        self._push_call_edge_if_needed(edge)
         next_edge = self._next_resolve_edge(redirect=redirect)
         self._emit_step_trace()
         return next_edge

@@ -931,9 +931,10 @@ class StoryMaterializer:
                 once=_authored_flag(spec, "once"),
                 # ``return: true`` makes this a call: the reader goes there,
                 # and comes back here. Same meaning as a sandbox interaction's
-                # ``return_to_location``, and the same phase.
+                # ``return_to_location``, and the same phase. Parsed as a bool,
+                # like ``once``, so ``return: "false"`` is not a call.
                 return_phase=(
-                    ResolutionPhase.PLANNING if spec.get("return") else None
+                    ResolutionPhase.PLANNING if _authored_flag(spec, "return") else None
                 ),
             )
 

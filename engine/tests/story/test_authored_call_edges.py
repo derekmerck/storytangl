@@ -6,15 +6,20 @@ authored script, so a gamebook's "return to the paragraph from which you came"
 could only be compiled as a dead end.
 
 The call is one-shot: the destination's content and effects land, and the reader
-is returned to the caller in the same step. So a destination with choices of its
-own cannot stop there and offer them, and it does not journal them either - they
-could never be taken from where the reader ends up. A call that waits for the
+is returned to the caller in the same step. So nothing inside the call can stop and
+offer choices - not the destination, and not anywhere it redirects or continues -
+and none of it journals them either, since they could never be taken from where
+the reader ends up. A call that waits for the
 reader needs the ledger's call stack to survive the step.
 """
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from tangl.core import Selector
+from tangl.ir.story_ir import ActionScript
 from tangl.journal.fragments import ChoiceFragment
 from tangl.story import InitMode
 from tangl.story.episode import Action
@@ -39,6 +44,11 @@ def _script(clinic: dict, call: dict) -> dict:
                         ],
                     },
                     "clinic": {"label": "clinic", "content": "The doctor patches you up.", **clinic},
+                    "exam": {
+                        "label": "exam",
+                        "content": "The exam room.",
+                        "actions": [{"text": "Stale", "successor": "town"}],
+                    },
                     "town": {"label": "town", "content": "Town."},
                 }
             }
@@ -168,3 +178,52 @@ def test_the_same_block_reached_without_a_call_still_offers_its_choices() -> Non
 
     assert ledger.cursor.get_label() == "clinic"
     assert offered == {"Ask about the scar"}
+
+
+def _offered_now(ledger) -> set[str]:
+    return {
+        fragment.text
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ChoiceFragment)
+        and fragment.step >= ledger.current_update_start_step
+    }
+
+
+def test_choices_are_withheld_for_the_whole_call_not_only_its_destination() -> None:
+    """road --call--> clinic --continue--> exam, and exam offers "Stale".
+
+    The call is open while the clinic continues into the exam room, and the
+    reader is returned past both in the same step. Checking only the edge the
+    destination was entered by would miss the exam room.
+    """
+    graph = _graph(
+        "call_continues",
+        clinic={"continues": [{"successor": "exam", "trigger": "last"}]},
+    )
+    ledger = _visit(graph)
+
+    assert [ledger.graph.get(uid).get_label() for uid in ledger.cursor_history] == [
+        "road",
+        "clinic",
+        "exam",
+        "road",
+    ]
+    assert _offered_now(ledger) == {"Get medical help", "Drive on"}
+
+
+def test_return_is_declared_script_vocabulary() -> None:
+    action = ActionScript(text="Get medical help", successor="clinic", **{"return": "false"})
+
+    assert action.return_ is False
+    assert "return" in ActionScript.model_json_schema()["properties"]
+
+
+def test_an_authored_return_is_parsed_as_a_bool_not_by_truthiness() -> None:
+    graph = _graph("return_false_string", call={"return": "false"})
+
+    assert _edge(graph, "road", "Get medical help").return_phase is None
+
+
+def test_an_authored_return_that_is_not_a_bool_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        _graph("return_nonsense", call={"return": "sometimes"})
