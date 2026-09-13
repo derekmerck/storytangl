@@ -412,7 +412,9 @@ def test_a_location_the_reader_has_left_stays_on_the_service_map() -> None:
     ledger.cursor_history = [road.uid, building.uid, cellar.uid]
 
     ctx = ServiceManager._make_story_info_ctx(ledger)
-    sections = _section_by_id(_project_sandbox_info(cellar, ctx, ProjectionRequest(kind="map")))
+    sections = _section_by_id(
+        _project_sandbox_info(cellar, ctx, ProjectionRequest(channels=["ui-map"]))
+    )
 
     assert ctx.get_meta()["cursor_history"] == ledger.cursor_history
     # The road is two rooms away, so only having been there puts it on the map.
