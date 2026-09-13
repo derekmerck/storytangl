@@ -11,7 +11,11 @@ been visited, and a restored ledger still knows where its reader has been.
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from tangl.core import Selector
+from tangl.ir.story_ir import ActionScript
 from tangl.journal.fragments import ChoiceFragment
 from tangl.story import InitMode
 from tangl.story.episode import Action
@@ -53,8 +57,10 @@ def _script() -> dict:
     }
 
 
-def _graph(label: str):
-    world = World.from_script_data(script_data=_script())
+def _graph(label: str, *, once: object = True):
+    script = _script()
+    script["scenes"]["s"]["blocks"]["start"]["actions"][0]["once"] = once
+    world = World.from_script_data(script_data=script)
     return world.create_story(label, init_mode=InitMode.EAGER).graph
 
 
@@ -132,3 +138,22 @@ def test_visited_answers_for_any_node_by_label_or_by_node() -> None:
     assert visited(hub.uid) is True
     assert visited("detour") is True
     assert visited("nowhere_in_particular") is False
+
+
+def test_once_is_declared_script_vocabulary() -> None:
+    action = ActionScript(text="Straight to the hub", successor="hub", once="false")
+
+    assert action.once is False
+    assert "once" in ActionScript.model_json_schema()["properties"]
+
+
+def test_an_authored_once_is_parsed_as_a_bool_not_by_truthiness() -> None:
+    # Compiled specs are plain mappings, so "false" can arrive as a string.
+    graph = _graph("once_false_string", once="false")
+
+    assert _edge(graph, "start", "Straight to the hub").once is False
+
+
+def test_an_authored_once_that_is_not_a_bool_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        _graph("once_nonsense", once="sometimes")

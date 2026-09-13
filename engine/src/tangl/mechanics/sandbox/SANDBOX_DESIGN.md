@@ -685,7 +685,10 @@ journals. `return_to_location` is orthogonal to activation; it is projected as a
 normal `Action` with `return_phase=PLANNING`, so when the target scene finishes,
 the frame returns to the originating location and reprojects dynamic choices
 before journaling that location. A `once` event is not projected after its
-target has generic VM `_visited` state. This covers scope-level "first time in
+target appears in the ledger's cursor history (`has_visited`), which is the
+authority on where the reader has been; a node's `_visited` locals are not. The
+same history answers an authored `once` edge and `visited(ref)` in a condition,
+and it survives a restored or replayed ledger. This covers scope-level "first time in
 this sandbox" beats without a sandbox ledger or custom flag system: donate the
 same once-only event to every child location, target a shared orientation block,
 trigger it on entry, and let target visit history suppress future projections.
