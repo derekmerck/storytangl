@@ -21,7 +21,10 @@ dependency on Service.
 """
 from __future__ import annotations
 
-from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.dispatch import (
+    on_advertise_story_info_channels,
+    on_get_story_info,
+)
 from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
@@ -36,9 +39,9 @@ from tangl.vm.runtime.frame import PhaseCtx
 from .credentials_game import CredentialsGame
 from .has_game import HasGame
 
-RULES_KIND = "rules"
-PROGRESS_KIND = "roster_progress"
-CASE_SUMMARY_KIND = "case_summary"
+RULES_KIND = "ui-rules"
+PROGRESS_KIND = "ui-roster-progress"
+CASE_SUMMARY_KIND = "ui-case-summary"
 
 
 def _credentials_game(caller: HasGame) -> CredentialsGame | None:
@@ -53,7 +56,7 @@ def _credentials_game(caller: HasGame) -> CredentialsGame | None:
     return game if isinstance(game, CredentialsGame) else None
 
 
-@on_advertise_info_channels(wants_caller_kind=HasGame, wants_exact_kind=False)
+@on_advertise_story_info_channels(wants_caller_kind=HasGame, wants_exact_kind=False)
 def advertise_credentials_info_channels(
     *,
     caller: HasGame,
@@ -66,22 +69,19 @@ def advertise_credentials_info_channels(
         return []
     return [
         InfoAffordance(
-            kind=RULES_KIND,
+            channel_id=RULES_KIND,
             label="Today's rules",
             shortcuts=["r", "rules"],
-            query={"kinds": [RULES_KIND]},
         ),
         InfoAffordance(
-            kind=PROGRESS_KIND,
+            channel_id=PROGRESS_KIND,
             label="Shift progress",
             shortcuts=["p", "shift"],
-            query={"kinds": [PROGRESS_KIND]},
         ),
         InfoAffordance(
-            kind=CASE_SUMMARY_KIND,
+            channel_id=CASE_SUMMARY_KIND,
             label="Findings",
             shortcuts=["c", "findings"],
-            query={"kinds": [CASE_SUMMARY_KIND]},
         ),
     ]
 
@@ -100,7 +100,7 @@ def project_credentials_info(
     if game is None:
         return None
 
-    kinds = request.requested_kinds()
+    kinds = request.requested_channels()
     sections: list[ProjectedSection] = []
     if RULES_KIND in kinds:
         sections.append(_rules_section(game))

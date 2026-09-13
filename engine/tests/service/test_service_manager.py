@@ -13,7 +13,7 @@ import pytest
 from tangl.core import BaseFragment, Selector
 from tangl.journal.fragments import BlockFragment, ChoiceFragment, ContentFragment
 from tangl.persistence import PersistenceManagerFactory
-from tangl.presentation.projection import ProjectedState
+from tangl.presentation.projection import BrandingValue, ProjectedState, TableValue
 from tangl.service.response import (
     CommandEdgeQuery,
     DirectEdgeRequest,
@@ -422,8 +422,24 @@ def test_user_world_and_system_methods_return_typed_models(
     assert all(isinstance(world, WorldInfo) for world in worlds)
 
     world_info = manager.get_world_info(world_id=loaded_world_label)
-    assert isinstance(world_info, WorldInfo)
-    assert world_info.label == loaded_world_label
+    assert isinstance(world_info, ProjectedState)
+    assert [channel.channel_id for channel in world_info.channels] == [
+        "ui-style-hints-html",
+        "ui-branding",
+    ]
+    selected = manager.get_world_info(
+        world_id=loaded_world_label,
+        channels=["ui-branding", "ui-style-hints-html", "ui-branding"],
+    )
+    assert [section.section_id for section in selected.sections] == [
+        "ui-branding",
+        "ui-style-hints-html",
+    ]
+    assert isinstance(selected.sections[0].value, BrandingValue)
+    assert isinstance(selected.sections[1].value, TableValue)
+
+    with pytest.raises(ValueError, match="Unknown info channel"):
+        manager.get_world_info(world_id=loaded_world_label, channels=["ui-unknown"])
 
     system_info = manager.get_system_info()
     assert system_info.engine

@@ -27,8 +27,10 @@ from .exceptions import (
     ValidationError,
 )
 from .dispatch import (
-    do_advertise_info_channels,
+    do_advertise_story_info_channels,
+    do_advertise_world_info_channels,
     do_get_story_info,
+    do_get_world_info,
     service_dispatch,
 )
 from .response import (
@@ -108,8 +110,10 @@ __all__ = [
     "WorldRegistry",
     "build_service_manager",
     "coerce_runtime_info",
-    "do_advertise_info_channels",
+    "do_advertise_story_info_channels",
+    "do_advertise_world_info_channels",
     "do_get_story_info",
+    "do_get_world_info",
     "get_service_method_spec",
     "service_dispatch",
     "service_method",

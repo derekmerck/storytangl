@@ -36,12 +36,13 @@ describe('Store', () => {
     expect(store.user_secret).toBe('dev-secret-123')
   })
 
-  it('fetches world info and transforms media', async () => {
+  it('fetches the world branding projection', async () => {
     const store = useStore()
     await store.getCurrentWorldInfo()
 
     expect(store.current_world_info).toBeDefined()
-    expect(store.current_world_info?.media_dict?.cover_im?.url).toBeDefined()
+    expect(store.current_world_info?.name).toBe('My world!')
+    expect(store.current_world_info?.logo_media).toBe('cover_im')
   })
 
   it('changes world and fetches new info', async () => {
@@ -49,7 +50,7 @@ describe('Store', () => {
     await store.setCurrentWorld('new_world')
 
     expect(store.current_world_uid).toBe('new_world')
-    expect(store.current_world_info?.world_id).toBe('new_world')
+    expect(store.current_world_info?.name).toBe('new_world')
   })
 
   it('authenticates a persisted user from a user secret', async () => {

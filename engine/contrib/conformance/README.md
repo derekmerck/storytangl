@@ -52,7 +52,7 @@ importing engine models or calling the service layer. `cli_reference_port.py`
 then formats that document as plain terminal text, including choice blockers,
 cost previews, typed accepts prompts, command-bar hints, envelope UX events,
 and unknown-fragment fallbacks, plus info-channel `?` / slash-command
-fallbacks from `metadata.info_affordances`.
+fallbacks from `ProjectedState.channels` discovery fixtures.
 
 `tk_reference_port.py` is a tiny desktop-toolkit proof over the same view model.
 Its `--inspect` mode prints the planned widgets and sample submission payloads

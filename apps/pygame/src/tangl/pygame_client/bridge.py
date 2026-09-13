@@ -313,7 +313,7 @@ class PygameSessionBridge:
         cannot draw maps never pays for it.
         """
 
-        sections = self._info_sections(["map_plate", "map_regions"])
+        sections = self._info_sections(["ui-map-plate"])
         summary = sections.get("sandbox_map_plate")
         if summary is None:
             return None
@@ -330,8 +330,8 @@ class PygameSessionBridge:
             regions=self._regions(sections.get("sandbox_map_regions")),
         )
 
-    def _info_sections(self, kinds: list[str]) -> dict[Any, dict[str, Any]]:
-        """Fetch story-info sections by kind, keyed by section id.
+    def _info_sections(self, channels: list[str]) -> dict[Any, dict[str, Any]]:
+        """Fetch story-info sections by channel, keyed by section id.
 
         Shared by every disclosure read so the request and the lookup cannot
         drift apart: a channel asked for under one name and read back under
@@ -340,10 +340,17 @@ class PygameSessionBridge:
 
         if self.user_id is None or self.ledger_id is None:
             return {}
+        catalog = self.service_manager.get_story_info(
+            user_id=self.user_id,
+            ledger_id=self.ledger_id,
+        )
+        available = {channel.channel_id for channel in catalog.channels}
+        if any(channel not in available for channel in channels):
+            return {}
         state = self.service_manager.get_story_info(
             user_id=self.user_id,
             ledger_id=self.ledger_id,
-            kinds=kinds,
+            channels=channels,
         )
         return {
             section.get("section_id"): section
@@ -358,7 +365,7 @@ class PygameSessionBridge:
         cannot draw.
         """
 
-        sections = self._info_sections(["surface_plate", "surface_slots"])
+        sections = self._info_sections(["ui-surface"])
         summary = sections.get("surface_plate")
         if summary is None:
             return None

@@ -77,7 +77,8 @@ def test_service_no_longer_exports_presentation_registration_or_projectors() -> 
         for name in (
             "DefaultStoryInfoProjector",
             "StoryInfoProjector",
-            "on_advertise_info_channels",
+            "on_advertise_story_info_channels",
+            "on_advertise_world_info_channels",
             "on_get_story_info",
         )
     )

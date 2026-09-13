@@ -34,7 +34,7 @@ from tangl.presentation.projection import (
     ProjectionRequest,
     TableValue,
 )
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.dispatch import do_advertise_story_info_channels, do_get_story_info
 from tangl.story.concepts.asset import AssetType
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -208,22 +208,22 @@ def test_service_dispatch_fold_advertises_sandbox_map_info_channel() -> None:
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 
-    affordances = do_advertise_info_channels(road, ctx=ctx)
+    affordances = do_advertise_story_info_channels(road, ctx=ctx)
 
-    assert [affordance.kind for affordance in affordances] == [
-        "world_time",
-        "location",
-        "inventory",
-        "map",
-        "local_assets",
-        "fixtures",
-        "presence",
-        "exits",
+    assert [affordance.channel_id for affordance in affordances] == [
+        "ui-world-time",
+        "ui-location",
+        "ui-inventory",
+        "ui-map",
+        "ui-local-assets",
+        "ui-fixtures",
+        "ui-presence",
+        "ui-exits",
     ]
     map_affordance = next(
-        affordance for affordance in affordances if affordance.kind == "map"
+        affordance for affordance in affordances if affordance.channel_id == "ui-map"
     )
-    assert map_affordance.query == {"kinds": ["map"], "scope": "known"}
+    assert map_affordance.shortcuts == ["m", "map"]
 
 
 def test_sandbox_dispatch_projects_requested_status_channels() -> None:
@@ -252,7 +252,13 @@ def test_sandbox_dispatch_projects_requested_status_channels() -> None:
         road,
         ctx=ctx,
         request=ProjectionRequest(
-            kinds=["location", "world_time", "inventory", "presence", "exits"]
+            channels=[
+                "ui-location",
+                "ui-world-time",
+                "ui-inventory",
+                "ui-presence",
+                "ui-exits",
+            ]
         ),
     )
     sections = _section_by_id(projected.sections)
@@ -285,7 +291,7 @@ def test_sandbox_provider_filters_requested_status_channels() -> None:
     projected = _project_sandbox_info(
         road,
         ctx,
-        ProjectionRequest(kind="location"),
+        ProjectionRequest(channels=["ui-location"]),
     )
     assert [section.section_id for section in projected] == [
         "sandbox_location"
@@ -294,10 +300,12 @@ def test_sandbox_provider_filters_requested_status_channels() -> None:
     map_nodes = _project_sandbox_info(
         road,
         ctx,
-        ProjectionRequest(kind="map_nodes"),
+        ProjectionRequest(channels=["ui-map"]),
     )
     assert [section.section_id for section in map_nodes] == [
-        "sandbox_map_nodes"
+        "sandbox_map_summary",
+        "sandbox_map_nodes",
+        "sandbox_map_edges",
     ]
 
 
@@ -351,7 +359,7 @@ def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
     projected = _project_sandbox_info(
         road,
         ctx,
-        ProjectionRequest(kind="map"),
+        ProjectionRequest(channels=["ui-map"]),
     )
     sections = _section_by_id(projected)
 
@@ -405,7 +413,7 @@ def test_sandbox_map_honors_visibility_suppression() -> None:
     projected = _project_sandbox_info(
         cave,
         ctx,
-        ProjectionRequest(kind="map"),
+        ProjectionRequest(channels=["ui-map"]),
     )
     sections = _section_by_id(projected)
 
@@ -444,7 +452,7 @@ def test_sandbox_plate_geometry_projects_when_asked_for_by_name() -> None:
     projected = _project_sandbox_info(
         hub,
         ctx,
-        ProjectionRequest(kinds=["map_plate", "map_regions"]),
+        ProjectionRequest(channels=["ui-map-plate"]),
     )
 
     sections = _section_by_id(projected)
@@ -472,7 +480,7 @@ def test_sandbox_map_channel_stays_reader_facing() -> None:
     ledger = Ledger.from_graph(graph, entry_id=hub.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, step=ledger.step)
 
-    projected = _project_sandbox_info(hub, ctx, ProjectionRequest(kind="map"))
+    projected = _project_sandbox_info(hub, ctx, ProjectionRequest(channels=["ui-map"]))
 
     assert "sandbox_map_nodes" in _section_by_id(projected)
     assert "sandbox_map_plate" not in _section_by_id(projected)
@@ -488,11 +496,11 @@ def test_sandbox_plate_channel_is_advertised_only_by_the_plate_owner() -> None:
     mill_ctx = PhaseCtx(graph=graph, cursor_id=mill.uid, step=ledger.step)
 
     hub_kinds = {
-        a.kind for a in advertise_sandbox_info_channels(caller=hub, ctx=hub_ctx)
+        a.channel_id for a in advertise_sandbox_info_channels(caller=hub, ctx=hub_ctx)
     }
     mill_kinds = {
-        a.kind for a in advertise_sandbox_info_channels(caller=mill, ctx=mill_ctx)
+        a.channel_id for a in advertise_sandbox_info_channels(caller=mill, ctx=mill_ctx)
     }
 
-    assert "map_plate" in hub_kinds
-    assert "map_plate" not in mill_kinds
+    assert "ui-map-plate" in hub_kinds
+    assert "ui-map-plate" not in mill_kinds

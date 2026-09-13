@@ -214,7 +214,27 @@ export interface BadgeListValue {
   items: string[]
 }
 
-export type SectionValue = ScalarValue | KvListValue | ItemListValue | TableValue | BadgeListValue
+export interface ThemeTokens {
+  primary: string
+  accent?: string | null
+  background?: string | null
+}
+
+export interface BrandingValue {
+  value_type: 'branding'
+  name: string
+  logo_media?: string | null
+  light?: ThemeTokens | null
+  dark?: ThemeTokens | null
+}
+
+export type SectionValue =
+  | ScalarValue
+  | KvListValue
+  | ItemListValue
+  | TableValue
+  | BadgeListValue
+  | BrandingValue
 
 export interface ProjectedSection {
   section_id: string
@@ -225,20 +245,20 @@ export interface ProjectedSection {
 }
 
 export interface ProjectedState {
+  channels: InfoAffordance[]
   sections: ProjectedSection[]
 }
 
 export interface InfoAffordance {
-  kind: string
+  channel_id: string
   label?: string | null
-  shortcuts?: string[]
-  query?: Record<string, unknown> | null
+  shortcuts: string[]
 }
 
 export interface InfoState {
   version?: number | null
-  dirty_kinds?: string[]
-  available_kinds?: string[]
+  dirty_channels?: string[]
+  available_channels?: string[]
 }
 
 export type StoryStatus = ProjectedState

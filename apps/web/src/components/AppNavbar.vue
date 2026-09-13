@@ -22,7 +22,7 @@ const showWorldInfo = ref(false)
 const showSystemInfo = ref(false)
 const showSecretDialog = ref(false)
 
-const guideUrl = computed((): string => store.current_world_info?.guide_url ?? '/guide')
+const guideUrl = computed((): string => '/guide')
 
 onMounted(async () => {
   try {

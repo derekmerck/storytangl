@@ -87,4 +87,4 @@ def test_adventure_sandbox_cli_witness_remains_open_and_coherent() -> None:
     final_road = transcript.rsplit("You are standing at the end of a road", 1)[1]
     assert "Choices:" in final_road
     assert "5. Wait" in final_road
-    assert "Info: /t Watch" in final_road
+    assert "Time:" in final_road

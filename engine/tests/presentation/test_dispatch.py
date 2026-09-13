@@ -8,7 +8,8 @@ import pytest
 
 from tangl.core import Selector
 from tangl.presentation.dispatch import (
-    on_advertise_info_channels,
+    on_advertise_story_info_channels,
+    on_advertise_world_info_channels,
     on_get_story_info,
     presentation_dispatch,
 )
@@ -17,7 +18,8 @@ from tangl.presentation.dispatch import (
 @pytest.mark.parametrize(
     ("decorator", "task"),
     (
-        (on_advertise_info_channels, "advertise_info_channels"),
+        (on_advertise_story_info_channels, "advertise_story_info_channels"),
+        (on_advertise_world_info_channels, "advertise_world_info_channels"),
         (on_get_story_info, "get_story_info"),
     ),
 )

@@ -10,6 +10,7 @@ from markdown_it import MarkdownIt
 
 from tangl.config import get_story_media_dir, get_sys_media_dir
 from tangl.journal.fragments import MediaFragment, fragment_to_dto
+from tangl.presentation.projection import ProjectedState
 from tangl.rest.dependencies_gateway import (
     get_service_manager,
     get_user_locks,
@@ -74,30 +75,10 @@ def _profile_has(render_profile: str | Iterable[str] | None, token: str) -> bool
     return token.lower() in _normalize_profile_tokens(render_profile)
 
 
-def _parse_kinds(value: str | None) -> list[str]:
+def _parse_channels(value: str | None) -> list[str]:
     if value is None:
         return []
     return [part.strip() for part in value.split(",") if part.strip()]
-
-
-def _parse_info_query(value: str | None) -> dict[str, JsonValue] | None:
-    if value is None or not value.strip():
-        return None
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=_bad_request_detail(exc),
-        ) from exc
-    if parsed is None:
-        return None
-    if not isinstance(parsed, dict):
-        raise HTTPException(
-            status_code=400,
-            detail="story-info query must be a JSON object",
-        )
-    return dict(parsed)
 
 
 def _media_render_profile(render_profile: str | Iterable[str] | None) -> MediaRenderProfile:
@@ -405,27 +386,21 @@ async def do_story_action(
     return _serialize_runtime_envelope(result, render_profile=render_profile)
 
 
-@router.get("/info")
+@router.get("/info", response_model=ProjectedState)
 async def get_story_info(
     service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", examples=["example-api-key"]
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-    kind: str | None = Query(default=None, description="Projected-state channel kind."),
-    kinds: str | None = Query(
+    channels: str | None = Query(
         default=None,
-        description="Comma-separated projected-state channel kinds.",
-    ),
-    query: str | None = Query(
-        default=None,
-        description="JSON-encoded opaque projected-state query descriptor.",
+        description="Comma-separated exact projected-state channel ids.",
     ),
 ):
-    """Return runtime status details for the active story."""
+    """Discover or retrieve projected state for the active story."""
 
     user_auth = resolve_user_auth(api_key, service_manager=service_manager)
-    parsed_query = _parse_info_query(query)
     try:
         result = _call_service_method(
             service_manager,
@@ -433,9 +408,7 @@ async def get_story_info(
             auth_context=user_auth,
             user_id=user_auth.user_id,
             user_auth=user_auth,
-            kind=kind,
-            kinds=_parse_kinds(kinds),
-            query=parsed_query,
+            channels=_parse_channels(channels),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_bad_request_detail(exc)) from exc

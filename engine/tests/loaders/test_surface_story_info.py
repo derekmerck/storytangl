@@ -31,7 +31,7 @@ from tangl.mechanics.surface_story_info import (
     advertise_surface_info_channels,
     project_surface_info,
 )
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.dispatch import do_advertise_story_info_channels, do_get_story_info
 from tangl.presentation.projection import ProjectionRequest
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -70,7 +70,7 @@ def _slots(ledger: Ledger, ctx: PhaseCtx) -> dict[str, list]:
     state = do_get_story_info(
         ledger.cursor,
         ctx=ctx,
-        request=ProjectionRequest(kinds=["surface_plate", "surface_slots"]),
+        request=ProjectionRequest(channels=["ui-surface"]),
     )
     sections = {section.section_id: section for section in state.sections}
     table = sections["surface_slots"]
@@ -81,8 +81,11 @@ def _slots(ledger: Ledger, ctx: PhaseCtx) -> dict[str, list]:
 def test_a_block_with_a_surface_advertises_and_serves_it() -> None:
     ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
 
-    advertised = {a.kind for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)}
-    assert "surface_plate" in advertised
+    advertised = {
+        a.channel_id
+        for a in do_advertise_story_info_channels(ledger.cursor, ctx=ctx)
+    }
+    assert "ui-surface" in advertised
 
     slots = _slots(ledger, ctx)
     assert slots["papers"][1] == "id_card"
@@ -94,7 +97,7 @@ def test_the_band_travels_as_numbers_not_as_prose() -> None:
 
     ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
     state = do_get_story_info(
-        ledger.cursor, ctx=ctx, request=ProjectionRequest(kinds=["surface_plate"])
+        ledger.cursor, ctx=ctx, request=ProjectionRequest(channels=["ui-surface"])
     )
     rows = {row.key: row.value for row in state.sections[0].value.items}
 
@@ -115,9 +118,10 @@ def test_slots_arrive_in_the_order_the_world_declared_them() -> None:
 
     ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
     state = do_get_story_info(
-        ledger.cursor, ctx=ctx, request=ProjectionRequest(kinds=["surface_slots"])
+        ledger.cursor, ctx=ctx, request=ProjectionRequest(channels=["ui-surface"])
     )
-    names = [row[0] for row in state.sections[0].value.rows]
+    slots = next(section for section in state.sections if section.section_id == "surface_slots")
+    names = [row[0] for row in slots.value.rows]
 
     assert names == ["traveler", "papers", "permit", "ticket", "loose_page"]
     assert names != sorted(names), "world chosen as a witness no longer discriminates"
@@ -155,7 +159,7 @@ def test_a_block_that_could_have_a_surface_but_declares_none_publishes_nothing()
         project_surface_info(
             caller=Counter(),
             ctx=None,
-            request=ProjectionRequest(kinds=["surface_plate", "surface_slots"]),
+            request=ProjectionRequest(channels=["ui-surface"]),
         )
         is None
     )
@@ -170,13 +174,16 @@ def test_a_block_with_no_surface_publishes_nothing() -> None:
     ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
     ctx = PhaseCtx(graph=result.graph, cursor_id=ledger.cursor.uid, step=ledger.step)
 
-    advertised = {a.kind for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)}
-    assert "surface_plate" not in advertised
+    advertised = {
+        a.channel_id
+        for a in do_advertise_story_info_channels(ledger.cursor, ctx=ctx)
+    }
+    assert "ui-surface" not in advertised
 
     state = do_get_story_info(
         ledger.cursor,
         ctx=ctx,
-        request=ProjectionRequest(kinds=["surface_plate", "surface_slots"]),
+        request=ProjectionRequest(channels=["ui-surface"]),
     )
     assert [s for s in state.sections if s.kind.startswith("surface")] == []
 
@@ -202,5 +209,3 @@ def test_the_map_plate_still_enforces_the_rule_it_now_shares() -> None:
         0.25,
         0.30,
     ]
-
-

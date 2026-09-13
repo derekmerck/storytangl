@@ -114,9 +114,9 @@ def test_backend_widget_diagnostics_validate_as_service_contracts() -> None:
             "frames": ["Name the mule."],
         },
     ]
-    assert runtime_payload["metadata"]["info_state"]["available_kinds"] == [
-        "inventory",
-        "map",
+    assert runtime_payload["metadata"]["info_state"]["available_channels"] == [
+        "ui-sidebar",
+        "ui-widget-demo",
     ]
 
 
@@ -138,6 +138,5 @@ def test_backend_widget_diagnostics_render_in_reference_port() -> None:
         "[cost: coin -2 silver; supplies +1 ration]"
     ) in runtime_output
     assert "n) Name the mule. <text: Buttercup>" in runtime_output
-    assert "? Inventory: /info inventory (shortcuts: /i, /inv)" in runtime_output
     assert "Supplies:\n  Rations: 2" in projected_output
     assert "Mira | Scout" in projected_output

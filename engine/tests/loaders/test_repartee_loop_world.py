@@ -9,7 +9,7 @@ from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragme
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.games import CallResponseExchange, GameResult
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.dispatch import do_advertise_story_info_channels, do_get_story_info
 from tangl.presentation.projection import ProjectionRequest
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
@@ -252,13 +252,16 @@ class TestReparteeLoopWorld:
             cursor_id=ledger.cursor.uid,
             step=ledger.step,
         )
-        advertised = {a.kind for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)}
-        assert {"map", "map_plate"} <= advertised
+        advertised = {
+            a.channel_id
+            for a in do_advertise_story_info_channels(ledger.cursor, ctx=ctx)
+        }
+        assert {"ui-map", "ui-map-plate"} <= advertised
 
         state = do_get_story_info(
             ledger.cursor,
             ctx=ctx,
-            request=ProjectionRequest(kinds=["map_plate", "map_regions"]),
+            request=ProjectionRequest(channels=["ui-map-plate"]),
         )
         sections = {section.section_id: section for section in state.sections}
         regions = sections["sandbox_map_regions"]
@@ -273,7 +276,7 @@ class TestReparteeLoopWorld:
         gazetteer = do_get_story_info(
             ledger.cursor,
             ctx=ctx,
-            request=ProjectionRequest(kind="map"),
+            request=ProjectionRequest(channels=["ui-map"]),
         )
         assert not any(
             section.section_id.startswith("sandbox_map_region")

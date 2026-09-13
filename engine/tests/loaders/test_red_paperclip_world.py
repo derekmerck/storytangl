@@ -293,13 +293,31 @@ class TestRedPaperclipWorld:
         projected = do_get_story_info(
             ledger.cursor,
             ctx=_ctx(ledger),
-            request=ProjectionRequest(kinds=["map_plate", "map_regions", "location"]),
+            request=ProjectionRequest(channels=["ui-map-plate", "ui-location"]),
         )
         section_ids = {section.section_id for section in projected.sections}
 
         assert "sandbox_map_plate" in section_ids
         assert "sandbox_map_regions" in section_ids
         assert "sandbox_location" in section_ids
+
+    def test_trade_info_preserves_exact_channel_order(self) -> None:
+        ledger = _start()
+
+        projected = do_get_story_info(
+            ledger.cursor,
+            ctx=_ctx(ledger),
+            request=ProjectionRequest(
+                channels=["ui-trade-history", "ui-trade-status"]
+            ),
+        )
+
+        trade_sections = [
+            section.section_id
+            for section in projected.sections
+            if section.section_id.startswith("red_paperclip_")
+        ]
+        assert trade_sections == ["red_paperclip_chain", "red_paperclip_holding"]
 
     def test_the_road_offers_travel_to_every_hub(self) -> None:
         ledger = _start()
@@ -377,7 +395,7 @@ class TestRedPaperclipWorld:
         projected = do_get_story_info(
             ledger.cursor,
             ctx=_ctx(ledger),
-            request=ProjectionRequest(kind="status"),
+            request=ProjectionRequest(channels=["ui-trade-status"]),
         )
         holding = next(
             section

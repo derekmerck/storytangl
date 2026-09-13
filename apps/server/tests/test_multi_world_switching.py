@@ -134,7 +134,14 @@ def test_story_info_returns_projected_state(
     )
     assert create_resp.status_code == 200
 
-    response = client.get("story/info", headers=headers)
+    discovery = client.get("story/info", headers=headers)
+    assert discovery.status_code == 200
+    assert discovery.json()["channels"][0]["channel_id"] == "ui-sidebar"
+    response = client.get(
+        "story/info",
+        params={"channels": "ui-sidebar"},
+        headers=headers,
+    )
     assert response.status_code == 200
     payload = response.json()
     assert payload.get("sections")
@@ -268,7 +275,9 @@ def test_multi_world_switching_flow(
     choices_one = extract_choices_from_fragments(fragments_one)
     assert len(choices_one) >= 2
 
-    status_before = client.get("story/info", headers=headers)
+    status_before = client.get(
+        "story/info", params={"channels": "ui-sidebar"}, headers=headers
+    )
     assert status_before.status_code == 200
     step_before = _session_value(status_before.json(), "Step")
     assert isinstance(step_before, int)
@@ -280,7 +289,9 @@ def test_multi_world_switching_flow(
     assert choose_resp.status_code == 200
     choice_step = choose_resp.json()["step"]
 
-    status_after = client.get("story/info", headers=headers)
+    status_after = client.get(
+        "story/info", params={"channels": "ui-sidebar"}, headers=headers
+    )
     assert status_after.status_code == 200
     step_after = _session_value(status_after.json(), "Step")
     assert isinstance(step_after, int)

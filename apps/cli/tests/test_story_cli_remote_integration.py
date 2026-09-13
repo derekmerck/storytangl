@@ -147,6 +147,10 @@ def test_remote_cli_walkthrough_against_live_server(
     assert "You begin your journey at dawn." in first_update
     assert "1. Continue" in first_update
 
+    app.onecmd("status missing")
+    unknown_status = _capture_output(app)
+    assert unknown_status.strip() == "Unknown info channel(s): missing"
+
     app.onecmd("do 1")
     second_step = _capture_output(app)
     assert "The path winds through ancient woods." in second_step

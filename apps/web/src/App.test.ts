@@ -8,7 +8,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import App from '@/App.vue'
 import { useStore } from '@/store'
 import { HttpResponse, http, server } from '@tests/setup'
-import { crossroadsRuntimeEnvelope, sandboxInfoAffordances, sandboxInfoState } from '@tests/fixtures'
+import { crossroadsRuntimeEnvelope, sandboxInfoState, sandboxProjectedState } from '@tests/fixtures'
 
 const vuetify = createVuetify({ components, directives })
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
@@ -165,18 +165,18 @@ describe('App.vue', () => {
     expect(drawer.text()).toContain('Sound')
   })
 
-  it('surfaces advertised story-info affordances from the latest envelope', async () => {
+  it('discovers story-info affordances independently of runtime envelopes', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
         HttpResponse.json({
           ...crossroadsRuntimeEnvelope,
           metadata: {
             ...crossroadsRuntimeEnvelope.metadata,
-            info_affordances: sandboxInfoAffordances,
             info_state: sandboxInfoState,
           },
         }),
       ),
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState)),
     )
 
     const wrapper = mountApp()

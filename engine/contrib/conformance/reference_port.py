@@ -169,7 +169,6 @@ def _render_runtime_document(envelope: JsonObject, registry: FragmentRegistry) -
     ]
 
     items = [_item("title", _runtime_title(envelope))]
-    items.extend(_render_info_affordances(envelope))
     items.extend(_render_command_affordance(envelope))
     visited: set[str] = set()
     if not scenes:
@@ -200,6 +199,10 @@ def render_projected_state_document(state: JsonObject) -> RenderDocument:
     """Render a ProjectedState-like JSON object to a generic view model."""
 
     items = [_item("title", "Projected State")]
+    channels = _object_list(state.get("channels"))
+    if channels:
+        items.append(_item("info_label", "Story info:"))
+        items.extend(_info_affordance_item(channel) for channel in channels)
     for section in _object_list(state.get("sections")):
         section_id = _text(section, "section_id")
         title = _text(section, "title", "section_id") or "Untitled"
@@ -225,27 +228,6 @@ def _runtime_title(envelope: JsonObject) -> str:
     if isinstance(step, int):
         bits.append(f"step={step}")
     return " | ".join(bits)
-
-
-def _render_info_affordances(envelope: JsonObject) -> list[RenderItem]:
-    metadata = _object(envelope.get("metadata"))
-    affordances = _object_list(metadata.get("info_affordances")) if metadata else []
-    if not affordances:
-        return []
-
-    available_kinds = _available_info_kinds(metadata)
-    visible_affordances = [
-        affordance
-        for affordance in affordances
-        if available_kinds is None or (_text(affordance, "kind") or "info") in available_kinds
-    ]
-    if not visible_affordances:
-        return []
-
-    items = [_item("info_label", "Story info:")]
-    for affordance in visible_affordances:
-        items.append(_info_affordance_item(affordance))
-    return items
 
 
 def _render_command_affordance(envelope: JsonObject) -> list[RenderItem]:
@@ -283,31 +265,21 @@ def _render_ux_events(envelope: JsonObject) -> list[RenderItem]:
     return items
 
 
-def _available_info_kinds(metadata: JsonObject) -> set[str] | None:
-    info_state = _object(metadata.get("info_state"))
-    if info_state is None or "available_kinds" not in info_state:
-        return None
-    return set(_string_list(info_state.get("available_kinds")))
-
-
 def _info_affordance_item(affordance: JsonObject) -> RenderItem:
-    kind = _text(affordance, "kind") or "info"
-    label = _text(affordance, "label") or kind
+    channel_id = _text(affordance, "channel_id") or "info"
+    label = _text(affordance, "label") or channel_id
     shortcuts = _string_list(affordance.get("shortcuts"))
-    query = _object(affordance.get("query"))
-    command = f"/info {kind}"
+    command = f"/info {channel_id}"
     shortcut_text = f" (shortcuts: {_slash_shortcuts(shortcuts)})" if shortcuts else ""
-    query_text = f" query={json.dumps(query, sort_keys=True)}" if query is not None else ""
     return _item(
         "info_affordance",
-        f"? {label}: {command}{shortcut_text}{query_text}",
+        f"? {label}: {command}{shortcut_text}",
         indent=1,
-        ref_id=kind,
+        ref_id=channel_id,
         data={
-            "kind": kind,
+            "channel_id": channel_id,
             "label": label,
             "shortcuts": shortcuts,
-            "query": query,
             "commands": [command, *[f"/{shortcut}" for shortcut in shortcuts]],
         },
     )

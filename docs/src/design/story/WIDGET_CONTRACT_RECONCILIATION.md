@@ -63,11 +63,11 @@ the negotiation is mostly about typed-shape graduations.
 | `ControlFragment` (`update` / `delete`) | S | done | done | — |
 | `RuntimeEnvelope.ux_events: list[UxEvent]` | S | done (web + CLI + Tk planning floor) | done | — |
 | Typed direct `edge_id` / exploratory `find_edge` requests | S | done (web + CLI) | done (service + REST + remote client) | add more query discriminators only when story policy needs them |
-| `ProjectedState.sections` with five `value_type`s | S | done | done | — |
-| `metadata.info_affordances: list[InfoAffordance]` | S | done (web + CLI `?`/slash floor) | done (typed; gathered through service-info dispatch) | sandbox and credentials fixtures cover advertised channels |
-| `InfoAffordance.query` optional dict (opaque descriptor) | S | done | done | bundles choose descriptor contents; clients hand it back |
-| `metadata.info_state: InfoState` typed | S | done (nested type + dirty-kind cache hints) | partial (typed; v1 conservatively marks advertised kinds dirty) | add finer dirty tracking only when a client needs caching |
-| `/story/info` accepts `kind`/`kinds` + `query` params | S | done client-side | done (same endpoint; singular/plural kind filters + query descriptor routing) | add bundle-specific providers as worlds need them |
+| `ProjectedState.channels` discovery + `sections` with six `value_type`s | S | done | done | — |
+| Discovery `channels: list[InfoAffordance]` | S | done (web + CLI `?`/slash floor) | done (typed; gathered through service-info dispatch) | sandbox and credentials fixtures cover advertised channels |
+| Exact `InfoAffordance.channel_id` selection | S | done | done | parameterized channels require a separate typed contract |
+| `metadata.info_state: InfoState` typed | S | done (nested type + dirty-channel cache hints) | partial (typed; v1 conservatively marks advertised channels dirty) | add finer dirty tracking only when a client needs caching |
+| `/story/info` accepts exact `channels` | S | done client-side | done (omission discovers; selection rejects unknown ids) | add bundle-specific providers as worlds need them |
 | §1.6 Info channels | S | done (info pills + CLI floor) | done | keep rich renderers optional; `ProjectedState` fallback remains required |
 | `PresentationHints` (style_name, style_tags, style_dict, icon) | S | partial (basic style/icon fields) | done | audit aliases and long-tail hints before treating complete |
 | `ui:`-namespaced fragment `tags` (client-visible subset) | P2 | partial (pygame map hotspots bind on `ui:plate:`) | done (`client_visible_tags`, promoted at choice rendering) | name each `ui:` sub-namespace here as a bundle claims one |
@@ -163,7 +163,7 @@ implements.
 |---|---|---|---|---|
 | `/story/do` | POST | accepts `EdgeResolutionRequest` direct/find union; returns `RuntimeEnvelope` | done | — |
 | `/story/update` | GET | returns `RuntimeEnvelope` typed | partial | type response |
-| `/story/info` | GET | accepts `kind?`, `kinds?`, and `query?` params (JSON-encoded descriptor); returns `ProjectedState` | done | add bundle-specific providers |
+| `/story/info` | GET | omitting `channels` discovers; exact `channels?` selection returns `ProjectedState` | done | add bundle-specific providers |
 | `/system/info` | GET | public; rate-limited | done | — |
 | `/auth/whoami` | GET | returns current `Principal` | not_started | see auth thread |
 | `/auth/keys` (CRUD) | various | API key lifecycle | not_started | see auth thread |
@@ -234,9 +234,9 @@ others.
   `ServiceManager`, REST JSON, and remote Python-client hydration.
   **Impact:** generic clients can depend on typed payload contracts without
   REST inventing a second fragment model.
-- Pinned `ProjectedState` remote hydration for `kind`, `kinds`, and opaque
-  `query` routing. **Impact:** info-channel sections remain typed for Python
-  clients while REST stays a transcription boundary.
+- Pinned `ProjectedState` remote hydration for discovery and exact `channels`
+  routing. **Impact:** info-channel sections remain typed for Python clients
+  while REST stays a transcription boundary.
 - Added backend-emitted diagnostics under
   `engine/contrib/conformance/diagnostics/`. **Impact:** the current backend
   can now generate a real widget-shaped `RuntimeEnvelope` plus
@@ -282,9 +282,9 @@ others.
 - Demoted §1.5 cursors and §1.6 info channels to Tier P1. **Impact:**
   none on transport or engine directly; clarifies that current single-cursor behavior
   is settled, multi-cursor is target.
-- Replaced `GET /story/info/{kind}` with query-descriptor model.
-  **Impact:** transport evolves the `/story/info` endpoint; no vocabulary break since
-  the v1.2 URL form was never shipped.
+- Replaced the draft `GET /story/info/{kind}` shape with discovery plus exact
+  `channels` selection on `/story/info`. **Impact:** clients discover the
+  current catalog before selecting flat channel ids.
 - Added §0.7 presentation-contract views. **Impact:** this document
   exists.
 - EXTENSIONS.md swept `tokens → pieces`. **Impact:** carwars Tier P3
@@ -294,11 +294,11 @@ others.
 
 - Reference webapp uses `accepts.kind="pieces"` throughout (15+ call
   sites).
-- Reference webapp implements `InfoAffordance.query` as an opaque JSON
-  descriptor on `/story/info?kind=...&query=...`.
+- Reference webapp's earlier opaque story-info descriptor experiment was
+  superseded by endpoint discovery plus exact channel selection.
 - Reference webapp accepts nested `metadata.info_state`. This row is
-  superseded by the v1.5 update, where `dirty_kinds` became an implemented
-  cache hint in the reference client.
+  superseded by the v1.5 update, where dirty-channel state became an
+  implemented cache hint in the reference client.
 - Reference webapp ships `place` accepts kind without `edge_ref`
   (proposal fixture not yet exercised).
 
@@ -311,11 +311,11 @@ others.
   expose more of the decision-legibility contract in the current shell.
 - Reference webapp posts `edge_id` to `/story/do`. **Impact:** client and
   endpoint server now use the same choice-edge identifier name.
-- Reference webapp treats `metadata.info_state.dirty_kinds` as cache hints for
+- Reference webapp treats `metadata.info_state.dirty_channels` as cache hints for
   `/story/info`. **Impact:** the sidebar keeps old refresh behavior when no
   hint is provided, but skips clean side-channel refreshes when the backend
-  sends explicit dirty-kind metadata. The tests cover both default status and
-  selected affordance kinds.
+  sends explicit dirty-channel metadata. The tests cover both default status
+  and selected channels.
 - Reference CLI/Tk ports render or inspect blockers, cost previews, typed
   accepts prompts, and v1.6 UX events. **Impact:** new client ports can compare
   against portable JSON fixtures and proposal fixtures instead of copying the
@@ -392,10 +392,10 @@ references; webapp behavior aligns to v1.6.
   1. ✅ `compose` accepts rendering as nested ChoiceInputView.
   2. ✅ Command bar submits typed `find_edge` requests and renders inline
      `UxEvent` feedback.
-  3. ✅ `metadata.info_state` behavior pass: use nested `dirty_kinds` /
-     `available_kinds` as cache hints once the backend emits them.
-  4. Keep `info_affordances` opaque; clients pass `query` descriptors through
-     rather than parsing bundle-specific fields.
+  3. ✅ `metadata.info_state` behavior pass: use nested `dirty_channels` /
+     `available_channels` as cache hints once the backend emits them.
+  4. ✅ Discover `InfoAffordance` catalogs from `/story/info`; clients select
+     exact `channel_id` values rather than interpreting bundle-specific state.
 
 **Phase 3 — Engine + API catch up.** Backend declares capabilities,
 API maps them.

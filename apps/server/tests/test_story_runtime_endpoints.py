@@ -110,13 +110,18 @@ def _write_story_bundle(
             "\n".join(
                 [
                     "from tangl.core import BehaviorRegistry",
-                    "from tangl.presentation.projection import KvListValue, ProjectedSection",
+                    "from tangl.presentation.projection import (",
+                    "    InfoAffordance, KvListValue, ProjectedSection,",
+                    ")",
                     "from tangl.presentation.values import KvRow",
                     "",
                     "world_dispatch = BehaviorRegistry(label='story_demo.presentation')",
                     "",
+                    "def advertise_world_state(**_kw):",
+                    "    return InfoAffordance(channel_id='ui-mystery', label='Mystery')",
+                    "",
                     "def project_world_state(*, ctx, request, **_kw):",
-                    "    if request.requested_kinds() and 'mystery' not in request.requested_kinds():",
+                    "    if 'ui-mystery' not in request.requested_channels():",
                     "        return None",
                     "    return ProjectedSection(",
                     '        section_id="world_state",',
@@ -130,6 +135,9 @@ def _write_story_bundle(
                     "        ),",
                     "    )",
                     "",
+                    "world_dispatch.register(",
+                    "    advertise_world_state, task='advertise_story_info_channels',",
+                    ")",
                     "world_dispatch.register(project_world_state, task='get_story_info')",
                     "",
                     "def get_authorities():",
@@ -371,7 +379,14 @@ def test_story_rest_envelope_flow(
     assert captured.get("edge_id") == choice.uid
     assert captured.get("choice_payload") == payload
 
-    status = client.get("story/info", headers=headers)
+    catalog = client.get("story/info", headers=headers)
+    assert catalog.status_code == 200
+    assert catalog.json()["channels"][0]["channel_id"] == "ui-sidebar"
+    status = client.get(
+        "story/info",
+        params={"channels": "ui-sidebar"},
+        headers=headers,
+    )
     assert status.status_code == 200
     status_payload = status.json()
     assert status_payload.get("sections")
@@ -533,6 +548,24 @@ def test_story_runtime_endpoints_publish_envelope_payload_schema() -> None:
     assert metadata_ref.endswith("/RuntimeMetadata")
 
 
+def test_info_endpoints_publish_only_the_channels_selector() -> None:
+    schema = api_app.openapi()
+
+    for path in ("/story/info", "/world/{world_id}/info"):
+        parameters = schema["paths"][path]["get"]["parameters"]
+        query_names = {
+            parameter["name"]
+            for parameter in parameters
+            if parameter["in"] == "query"
+        }
+        assert "channels" in query_names
+        assert {"kind", "kinds", "query"}.isdisjoint(query_names)
+        response_schema = schema["paths"][path]["get"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        assert response_schema["$ref"].endswith("/ProjectedState")
+
+
 def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(
     story_client: tuple[TestClient, dict[str, str], str],
 ) -> None:
@@ -569,7 +602,17 @@ def test_story_info_returns_world_authored_projected_sections(
 ) -> None:
     client, headers = projected_story_client
 
-    response = client.get("story/info", headers=headers)
+    discovery = client.get("story/info", headers=headers)
+    assert discovery.status_code == 200
+    assert [channel["channel_id"] for channel in discovery.json()["channels"]] == [
+        "ui-sidebar",
+        "ui-mystery",
+    ]
+    response = client.get(
+        "story/info",
+        params={"channels": "ui-mystery"},
+        headers=headers,
+    )
     assert response.status_code == 200
     payload = response.json()
     sections = payload.get("sections")
@@ -580,43 +623,50 @@ def test_story_info_returns_world_authored_projected_sections(
     assert sections[0]["value"]["items"][0]["value"] == "tense"
 
 
-def test_story_info_filters_sections_by_query_and_kind(
+def test_story_info_selects_exact_channels_and_rejects_unknown_ids(
     projected_story_client: tuple[TestClient, dict[str, str]],
 ) -> None:
     client, headers = projected_story_client
 
     filtered = client.get(
         "story/info",
-        params={"query": '{"kinds":["mystery"]}'},
+        params={"channels": "ui-mystery"},
         headers=headers,
     )
     assert filtered.status_code == 200
     assert filtered.json()["sections"][0]["section_id"] == "world_state"
 
-    empty = client.get("story/info", params={"kind": "map"}, headers=headers)
-    assert empty.status_code == 200
-    assert empty.json()["sections"] == []
+    unknown = client.get("story/info", params={"channels": "ui-map"}, headers=headers)
+    assert unknown.status_code == 400
+    assert "Unknown info channel" in unknown.json()["detail"]
 
 
-def test_story_info_rejects_invalid_query_json(
+def test_world_info_excludes_story_only_channel_advertisers(
     projected_story_client: tuple[TestClient, dict[str, str]],
 ) -> None:
-    client, headers = projected_story_client
+    client, _headers = projected_story_client
 
-    bad_json = client.get(
-        "story/info",
-        params={"query": "{"},
-        headers=headers,
-    )
-    assert bad_json.status_code == 400
+    discovery = client.get("world/story_demo/info")
+    assert discovery.status_code == 200
+    assert [channel["channel_id"] for channel in discovery.json()["channels"]] == [
+        "ui-style-hints-html",
+        "ui-branding",
+    ]
 
-    non_object_query = client.get(
-        "story/info",
-        params={"query": '["mystery"]'},
-        headers=headers,
+    for channel_id in ("ui-style-hints-html", "ui-branding"):
+        selected = client.get(
+            "world/story_demo/info",
+            params={"channels": channel_id},
+        )
+        assert selected.status_code == 200
+        assert selected.json()["sections"][0]["section_id"] == channel_id
+
+    story_only = client.get(
+        "world/story_demo/info",
+        params={"channels": "ui-mystery"},
     )
-    assert non_object_query.status_code == 400
-    assert "JSON object" in non_object_query.json()["detail"]
+    assert story_only.status_code == 400
+    assert "Unknown info channel" in story_only.json()["detail"]
 
 
 @pytest.fixture()

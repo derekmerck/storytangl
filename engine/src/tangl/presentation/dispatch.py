@@ -26,12 +26,14 @@ def _make_on_hook(task: str) -> Callable:
     return on_hook
 
 
-on_advertise_info_channels = _make_on_hook("advertise_info_channels")
+on_advertise_story_info_channels = _make_on_hook("advertise_story_info_channels")
+on_advertise_world_info_channels = _make_on_hook("advertise_world_info_channels")
 on_get_story_info = _make_on_hook("get_story_info")
 
 
 __all__ = [
-    "on_advertise_info_channels",
+    "on_advertise_story_info_channels",
+    "on_advertise_world_info_channels",
     "on_get_story_info",
     "presentation_dispatch",
 ]
