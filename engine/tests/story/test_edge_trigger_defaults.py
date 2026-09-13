@@ -12,6 +12,7 @@ automatic. Every ``continues`` entry in this repo's worlds writes
 from __future__ import annotations
 
 from tangl.core import Selector
+from tangl.ir.story_ir import ActionScript, BlockScript
 from tangl.story import InitMode
 from tangl.story.episode import Action
 from tangl.story.fabula.world import World
@@ -115,3 +116,31 @@ def test_edges_are_named_for_the_list_they_came_from() -> None:
     labels = {edge.get_label() for edge in hub.edges_out(Selector(has_kind=Action))}
 
     assert labels == {"continue_hub_0", "action_hub_0"}
+
+
+def test_an_explicit_null_trigger_keeps_a_continue_waiting_for_the_reader() -> None:
+    # "Names its own trigger" is key presence, not truthiness. ``trigger: null``
+    # is how an author makes a continue reader-driven, so the list default must
+    # not overwrite it.
+    graph = _graph(
+        {"continues": [{"text": "Continue", "successor": "end", "trigger": None}]},
+        "null_trigger_story",
+    )
+
+    assert _edge_to(graph, "hub", "end").trigger_phase is None
+    assert _walk_into_hub(graph).cursor.get_label() == "hub"
+
+
+def test_the_script_models_apply_the_same_rule_to_typed_entries() -> None:
+    # A block's lists hold validated ActionScripts as well as mappings.
+    block = BlockScript(
+        label="hub",
+        continues=[
+            ActionScript(text="Continue", successor="end"),
+            ActionScript(text="Wait", successor="end", trigger=None),
+        ],
+        redirects=[{"successor": "elsewhere"}],
+    )
+
+    assert [entry.activation for entry in block.continues] == ["last", None]
+    assert block.redirects[0].activation == "first"

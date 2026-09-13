@@ -13,7 +13,10 @@ from uuid import UUID
 from tangl.core import Entity, EntityTemplate, Selector, TemplateRegistry
 from tangl.core.template import TemplateGroup
 from tangl.ir.story_ir import StoryScript
-from tangl.ir.story_ir.scene_script_models import DEFAULT_ACTIVATION_BY_FIELD
+from tangl.ir.story_ir.scene_script_models import (
+    DEFAULT_ACTIVATION_BY_FIELD,
+    with_default_activation,
+)
 from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
@@ -1210,17 +1213,14 @@ class StoryCompiler:
         Part A policy: when a bare successor token collides with a root scene
         label, it is treated as an absolute scene destination by design.
 
-        default_activation is what the block's field name already says -
+        ``default_activation`` is what the block's field name already says -
         a continue follows on its own, a redirect fires first - applied when
-        the entry does not name its own trigger.
+        the entry does not name its own trigger, by the same rule the script
+        models use.
         """
         normalized: list[dict[str, Any]] = []
         for spec in specs:
-            payload = dict(spec)
-            if default_activation is not None and not (
-                payload.get("trigger") or payload.get("activation")
-            ):
-                payload["trigger"] = default_activation
+            payload = with_default_activation(dict(spec), default_activation)
             inferred = payload.get("successor_is_inferred") is True
             authored = None if inferred else payload.get("authored_successor_ref")
             if inferred:

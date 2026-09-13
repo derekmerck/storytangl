@@ -889,7 +889,7 @@ class StoryMaterializer:
             action = Action(
                 registry=state.graph,
                 # Named for the list it came from: a block's first continue and
-                # its first action would otherwise both be action_<block>_0.
+                # its first action would otherwise both be ``action_<block>_0``.
                 label=spec.get("label") or f"{_EDGE_LABEL_STEM[field]}_{node.label}_{index}",
                 predecessor_id=node.uid,
                 text=self._coerce_str(spec.get("text") or spec.get("content") or spec.get("label"))
