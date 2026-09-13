@@ -8,7 +8,7 @@ from tangl.core import Ctx
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.presentation.projection import BrandingValue, ProjectionRequest, TableValue
-from tangl.service.dispatch import do_advertise_info_channels, do_get_world_info
+from tangl.service.dispatch import do_advertise_world_info_channels, do_get_world_info
 
 
 def test_renpy_demo_publishes_cacheable_style_and_branding_channels() -> None:
@@ -16,7 +16,7 @@ def test_renpy_demo_publishes_cacheable_style_and_branding_channels() -> None:
     world = WorldCompiler().compile(WorldBundle.load(root))
     ctx = Ctx(registries=tuple(world.get_authorities()))
 
-    channels = do_advertise_info_channels(world, ctx=ctx)
+    channels = do_advertise_world_info_channels(world, ctx=ctx)
     assert [channel.channel_id for channel in channels] == [
         "ui-style-hints-html",
         "ui-branding",

@@ -31,7 +31,7 @@ from tangl.mechanics.surface_story_info import (
     advertise_surface_info_channels,
     project_surface_info,
 )
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.dispatch import do_advertise_story_info_channels, do_get_story_info
 from tangl.presentation.projection import ProjectionRequest
 from tangl.story import Action, InitMode
 from tangl.vm import Ledger
@@ -82,7 +82,8 @@ def test_a_block_with_a_surface_advertises_and_serves_it() -> None:
     ledger, ctx = _at_the_shift("credential_gate", "Work the scheduled shift")
 
     advertised = {
-        a.channel_id for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)
+        a.channel_id
+        for a in do_advertise_story_info_channels(ledger.cursor, ctx=ctx)
     }
     assert "ui-surface" in advertised
 
@@ -174,7 +175,8 @@ def test_a_block_with_no_surface_publishes_nothing() -> None:
     ctx = PhaseCtx(graph=result.graph, cursor_id=ledger.cursor.uid, step=ledger.step)
 
     advertised = {
-        a.channel_id for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)
+        a.channel_id
+        for a in do_advertise_story_info_channels(ledger.cursor, ctx=ctx)
     }
     assert "ui-surface" not in advertised
 

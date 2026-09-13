@@ -34,7 +34,12 @@ from .auth import user_id_by_key
 from .exceptions import AuthMismatchError, InvalidOperationError
 from ._user_support import parse_bool_flag, parse_datetime_field
 from .diagnostics import diagnostics_from_codec_state, diagnostics_from_compile_issues
-from .dispatch import do_advertise_info_channels, do_get_story_info, do_get_world_info
+from .dispatch import (
+    do_advertise_story_info_channels,
+    do_advertise_world_info_channels,
+    do_get_story_info,
+    do_get_world_info,
+)
 from .media import resolve_world_media
 from .response import (
     DirectEdgeRequest,
@@ -330,7 +335,7 @@ class ServiceManager:
     def _story_info_channels(ledger: Ledger, *, ctx: "PhaseCtx") -> list[InfoAffordance]:
         return [
             InfoAffordance(channel_id="ui-sidebar", label="Status"),
-            *do_advertise_info_channels(ledger.cursor, ctx=ctx),
+            *do_advertise_story_info_channels(ledger.cursor, ctx=ctx),
         ]
 
     @staticmethod
@@ -856,7 +861,7 @@ class ServiceManager:
 
         world = self.open_world(world_id)
         ctx = Ctx(registries=tuple(world.get_authorities()))
-        affordances = do_advertise_info_channels(world, ctx=ctx)
+        affordances = do_advertise_world_info_channels(world, ctx=ctx)
         available = _unique_info_channels(affordances)
         request = ProjectionRequest(channels=list(channels or []))
         requested = request.requested_channels()

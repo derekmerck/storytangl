@@ -21,7 +21,10 @@ dependency on Service.
 """
 from __future__ import annotations
 
-from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.dispatch import (
+    on_advertise_story_info_channels,
+    on_get_story_info,
+)
 from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
@@ -53,7 +56,7 @@ def _credentials_game(caller: HasGame) -> CredentialsGame | None:
     return game if isinstance(game, CredentialsGame) else None
 
 
-@on_advertise_info_channels(wants_caller_kind=HasGame, wants_exact_kind=False)
+@on_advertise_story_info_channels(wants_caller_kind=HasGame, wants_exact_kind=False)
 def advertise_credentials_info_channels(
     *,
     caller: HasGame,

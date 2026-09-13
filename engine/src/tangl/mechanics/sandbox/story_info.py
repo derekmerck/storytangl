@@ -6,7 +6,10 @@ from collections.abc import Sequence
 from typing import Protocol, cast
 
 from tangl.core import Selector, Token
-from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.dispatch import (
+    on_advertise_story_info_channels,
+    on_get_story_info,
+)
 from tangl.presentation.projection import (
     InfoAffordance,
     ItemListValue,
@@ -212,7 +215,7 @@ def sandbox_status_sections(
     return _SandboxInfoSections().sections_for(location, ctx=ctx)
 
 
-@on_advertise_info_channels(
+@on_advertise_story_info_channels(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
 )

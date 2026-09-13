@@ -434,7 +434,7 @@ def advertise_red_paperclip_info(
 
 red_paperclip_dispatch.register(
     advertise_red_paperclip_info,
-    task="advertise_info_channels",
+    task="advertise_story_info_channels",
     wants_caller_kind=RedPaperclipHub,
     wants_exact_kind=False,
 )

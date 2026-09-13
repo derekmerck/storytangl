@@ -303,7 +303,7 @@ def advertise_adventure_score(
 
 adventure_dispatch.register(
     advertise_adventure_score,
-    task="advertise_info_channels",
+    task="advertise_story_info_channels",
     wants_caller_kind=AdventureSandboxLocation,
     wants_exact_kind=False,
 )

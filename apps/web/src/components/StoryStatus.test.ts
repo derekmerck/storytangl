@@ -494,4 +494,46 @@ describe('StoryStatus', () => {
     expect(wrapper.text()).toContain('Unable to load story status')
     consoleSpy.mockRestore()
   })
+
+  it('retries discovery on refresh after an initial failure', async () => {
+    let discoveryAttempts = 0
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/info`, ({ request }) => {
+        const channel = new URL(request.url).searchParams.get('channels')
+        if (channel !== null) {
+          return HttpResponse.json({
+            channels: [],
+            sections: [
+              {
+                section_id: channel,
+                title: 'Recovered',
+                value: { value_type: 'scalar', value: 'available again' },
+              },
+            ],
+          })
+        }
+        discoveryAttempts += 1
+        if (discoveryAttempts === 1) {
+          return HttpResponse.error()
+        }
+        return HttpResponse.json({
+          channels: [{ channel_id: 'ui-sidebar', label: 'Status', shortcuts: [] }],
+          sections: [],
+        })
+      }),
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mountStatus({ refreshKey: 0 })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to load story status')
+
+    await wrapper.setProps({ refreshKey: 1 })
+    await flushPromises()
+
+    expect(discoveryAttempts).toBe(2)
+    expect(wrapper.text()).toContain('Recovered')
+    expect(wrapper.text()).toContain('available again')
+    consoleSpy.mockRestore()
+  })
 })

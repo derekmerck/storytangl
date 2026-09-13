@@ -168,8 +168,8 @@ logo media reference. These are suggestions a client may ignore or adjust.
 Service folds the presentation registry with story, world, and runtime-local
 authorities:
 
-- `advertise_info_channels` gathers exact `InfoAffordance` channel ids for
-  endpoint discovery.
+- `advertise_story_info_channels` gathers exact story channel ids, while
+  `advertise_world_info_channels` gathers only public world-static channel ids.
 - `get_story_info` and `get_world_info` gather `ProjectedSection` values for a
   concrete `ProjectionRequest`.
 

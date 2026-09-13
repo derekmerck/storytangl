@@ -187,7 +187,7 @@ def _script_data() -> dict[str, object]:
     }
 
 
-def _advertise_info_channels(
+def _advertise_story_info_channels(
     caller: object,
     *,
     ctx: PhaseCtx,
@@ -214,8 +214,8 @@ def build_demo_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
 
         world = World.from_script_data(script_data=_script_data())
         world.dispatch.register(
-            _advertise_info_channels,
-            task="advertise_info_channels",
+            _advertise_story_info_channels,
+            task="advertise_story_info_channels",
         )
         world.dispatch.register(_project_widget_demo, task="get_story_info")
 

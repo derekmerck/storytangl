@@ -37,6 +37,7 @@ const props = defineProps<{
 const statusSections = ref<StatusSection[]>([])
 const infoAffordances = ref<InfoAffordance[]>([])
 const catalogLoaded = ref(false)
+const catalogLoading = ref(false)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const activeChannel = ref<string | null>(null)
@@ -190,6 +191,10 @@ const hasSections = computed(() => statusSections.value.length > 0)
 const hasAffordances = computed(() => visibleAffordances.value.length > 0)
 
 const discoverChannels = async () => {
+  if (catalogLoading.value) {
+    return
+  }
+  catalogLoading.value = true
   const requestId = ++statusRequestId.value
   try {
     loading.value = true
@@ -218,6 +223,8 @@ const discoverChannels = async () => {
     console.error('Failed to discover story info:', err)
     error.value = 'Unable to load story status. Please try again later.'
     loading.value = false
+  } finally {
+    catalogLoading.value = false
   }
 }
 
@@ -236,6 +243,7 @@ watch(
   [() => props.refreshKey, () => props.infoState?.available_channels],
   ([refreshKey], [previousRefreshKey]) => {
     if (!catalogLoaded.value) {
+      void discoverChannels()
       return
     }
     if (!catalogMatchesAvailability()) {

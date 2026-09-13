@@ -16,7 +16,8 @@ from .intent import (
 from .surface import HasSurface, Surface, SurfaceSlot
 from .values import KvRow, PrimitiveValue
 from .dispatch import (
-    on_advertise_info_channels,
+    on_advertise_story_info_channels,
+    on_advertise_world_info_channels,
     on_get_story_info,
     presentation_dispatch,
 )
@@ -68,7 +69,8 @@ __all__ = [
     "ThemeTokens",
     "UIHints",
     "UxEvent",
-    "on_advertise_info_channels",
+    "on_advertise_story_info_channels",
+    "on_advertise_world_info_channels",
     "on_get_story_info",
     "presentation_dispatch",
 ]

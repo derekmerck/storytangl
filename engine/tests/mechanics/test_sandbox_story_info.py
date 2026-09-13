@@ -34,7 +34,7 @@ from tangl.presentation.projection import (
     ProjectionRequest,
     TableValue,
 )
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.dispatch import do_advertise_story_info_channels, do_get_story_info
 from tangl.story.concepts.asset import AssetType
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -208,7 +208,7 @@ def test_service_dispatch_fold_advertises_sandbox_map_info_channel() -> None:
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 
-    affordances = do_advertise_info_channels(road, ctx=ctx)
+    affordances = do_advertise_story_info_channels(road, ctx=ctx)
 
     assert [affordance.channel_id for affordance in affordances] == [
         "ui-world-time",

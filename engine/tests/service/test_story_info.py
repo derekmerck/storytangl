@@ -94,7 +94,10 @@ def test_service_dispatch_composes_service_presentation_world_and_runtime_contri
         def runtime_provider(*, caller: object, **_kw: object) -> ProjectedSection:
             return _section("runtime")
 
-        world.dispatch.register(advertise_rules, task="advertise_info_channels")
+        world.dispatch.register(
+            advertise_rules,
+            task="advertise_story_info_channels",
+        )
         service_dispatch.register(service_provider, task="get_story_info")
         presentation_dispatch.register(presentation_provider, task="get_story_info")
         world.dispatch.register(

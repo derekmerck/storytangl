@@ -37,10 +37,22 @@ def _execute(task: str, *, caller: object, ctx: object, **kwargs: object) -> lis
     return CallReceipt.gather_results(*receipts)
 
 
-def do_advertise_info_channels(caller: object, *, ctx: object) -> list[InfoAffordance]:
+def do_advertise_story_info_channels(
+    caller: object, *, ctx: object
+) -> list[InfoAffordance]:
     """Gather queryable story-info channels for the current envelope."""
     affordances: list[InfoAffordance] = []
-    for value in _execute("advertise_info_channels", caller=caller, ctx=ctx):
+    for value in _execute("advertise_story_info_channels", caller=caller, ctx=ctx):
+        affordances.extend(_coerce_affordances(value))
+    return affordances
+
+
+def do_advertise_world_info_channels(
+    caller: World, *, ctx: object
+) -> list[InfoAffordance]:
+    """Gather public world-info channels."""
+    affordances: list[InfoAffordance] = []
+    for value in _execute("advertise_world_info_channels", caller=caller, ctx=ctx):
         affordances.extend(_coerce_affordances(value))
     return affordances
 
@@ -124,7 +136,7 @@ def project_world_info(
 
 service_dispatch.register(
     advertise_world_info_channels,
-    task="advertise_info_channels",
+    task="advertise_world_info_channels",
     wants_caller_kind=World,
     wants_exact_kind=False,
 )
@@ -146,13 +158,13 @@ def _coerce_affordances(value: object) -> list[InfoAffordance]:
         for item in value:
             if not isinstance(item, InfoAffordance):
                 raise TypeError(
-                    "advertise_info_channels handlers must return "
+                    "info-channel advertisement handlers must return "
                     "InfoAffordance values"
                 )
             affordances.append(item)
         return affordances
     raise TypeError(
-        "advertise_info_channels handlers must return "
+        "info-channel advertisement handlers must return "
         "InfoAffordance | Iterable[InfoAffordance] | None"
     )
 
@@ -180,7 +192,8 @@ def _coerce_sections(value: object) -> list[ProjectedSection]:
 
 
 __all__ = [
-    "do_advertise_info_channels",
+    "do_advertise_story_info_channels",
+    "do_advertise_world_info_channels",
     "do_get_story_info",
     "do_get_world_info",
     "WORLD_BRANDING_CHANNEL",

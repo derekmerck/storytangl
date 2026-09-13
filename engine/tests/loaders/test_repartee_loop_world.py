@@ -9,7 +9,7 @@ from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragme
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.games import CallResponseExchange, GameResult
-from tangl.service.dispatch import do_advertise_info_channels, do_get_story_info
+from tangl.service.dispatch import do_advertise_story_info_channels, do_get_story_info
 from tangl.presentation.projection import ProjectionRequest
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Action, InitMode
@@ -253,7 +253,8 @@ class TestReparteeLoopWorld:
             step=ledger.step,
         )
         advertised = {
-            a.channel_id for a in do_advertise_info_channels(ledger.cursor, ctx=ctx)
+            a.channel_id
+            for a in do_advertise_story_info_channels(ledger.cursor, ctx=ctx)
         }
         assert {"ui-map", "ui-map-plate"} <= advertised
 

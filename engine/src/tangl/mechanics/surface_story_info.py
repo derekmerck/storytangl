@@ -38,7 +38,10 @@ Nothing here knows an envelope exists, or a client, or a DTO.
 
 from __future__ import annotations
 
-from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.dispatch import (
+    on_advertise_story_info_channels,
+    on_get_story_info,
+)
 from tangl.presentation.projection import (
     InfoAffordance,
     KvListValue,
@@ -69,7 +72,7 @@ def _surface(caller: HasSurface) -> Surface | None:
     return caller.surface
 
 
-@on_advertise_info_channels(wants_caller_kind=HasSurface, wants_exact_kind=False)
+@on_advertise_story_info_channels(wants_caller_kind=HasSurface, wants_exact_kind=False)
 def advertise_surface_info_channels(
     *,
     caller: HasSurface,

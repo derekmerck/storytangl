@@ -31,7 +31,7 @@ from tangl.presentation.projection import (
     ScalarValue,
     TableValue,
 )
-from tangl.service.dispatch import do_advertise_info_channels
+from tangl.service.dispatch import do_advertise_story_info_channels
 from tangl.story import Block
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -98,7 +98,9 @@ def _sections(
 class TestAdvertise:
     def test_service_dispatch_fold_advertises_three_channels(self) -> None:
         block, ctx = _block_and_ctx()
-        channels = {a.channel_id for a in do_advertise_info_channels(block, ctx=ctx)}
+        channels = {
+            a.channel_id for a in do_advertise_story_info_channels(block, ctx=ctx)
+        }
         assert channels == {"ui-rules", "ui-roster-progress", "ui-case-summary"}
 
     def test_non_credentials_caller_advertises_nothing(self) -> None:
@@ -106,7 +108,7 @@ class TestAdvertise:
         plain = graph.add_node(kind=Block, label="plain")
         ledger = Ledger.from_graph(graph, entry_id=plain.uid)
         ctx = PhaseCtx(graph=graph, cursor_id=plain.uid, step=ledger.step)
-        assert do_advertise_info_channels(plain, ctx=ctx) == []
+        assert do_advertise_story_info_channels(plain, ctx=ctx) == []
 
 
 class TestRulesChannel:

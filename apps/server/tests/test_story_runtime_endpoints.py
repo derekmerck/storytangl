@@ -136,7 +136,7 @@ def _write_story_bundle(
                     "    )",
                     "",
                     "world_dispatch.register(",
-                    "    advertise_world_state, task='advertise_info_channels',",
+                    "    advertise_world_state, task='advertise_story_info_channels',",
                     ")",
                     "world_dispatch.register(project_world_state, task='get_story_info')",
                     "",
@@ -639,6 +639,34 @@ def test_story_info_selects_exact_channels_and_rejects_unknown_ids(
     unknown = client.get("story/info", params={"channels": "ui-map"}, headers=headers)
     assert unknown.status_code == 400
     assert "Unknown info channel" in unknown.json()["detail"]
+
+
+def test_world_info_excludes_story_only_channel_advertisers(
+    projected_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, _headers = projected_story_client
+
+    discovery = client.get("world/story_demo/info")
+    assert discovery.status_code == 200
+    assert [channel["channel_id"] for channel in discovery.json()["channels"]] == [
+        "ui-style-hints-html",
+        "ui-branding",
+    ]
+
+    for channel_id in ("ui-style-hints-html", "ui-branding"):
+        selected = client.get(
+            "world/story_demo/info",
+            params={"channels": channel_id},
+        )
+        assert selected.status_code == 200
+        assert selected.json()["sections"][0]["section_id"] == channel_id
+
+    story_only = client.get(
+        "world/story_demo/info",
+        params={"channels": "ui-mystery"},
+    )
+    assert story_only.status_code == 400
+    assert "Unknown info channel" in story_only.json()["detail"]
 
 
 @pytest.fixture()
