@@ -207,6 +207,46 @@ class ActionScript(BaseScriptItem):
     )
 
 
+# What a block's edge lists mean when the author does not say. A block's
+# ``continues`` follow on their own after its content, its ``redirects`` before
+# it, and its ``actions`` wait for the reader. The field name *is* the
+# declaration, so authors need not restate it on every entry; an entry that
+# names its own ``trigger`` keeps it. This is script vocabulary, so it lives
+# with the script models, and the story compiler reads it from here.
+DEFAULT_ACTIVATION_BY_FIELD: dict[str, str | None] = {
+    "actions": None,
+    "continues": "last",
+    "redirects": "first",
+}
+
+
+def with_default_activation(entry: "ActionScript | dict[str, Any]", default: str | None):
+    """The entry, carrying its list's trigger unless it names its own.
+
+    "Names its own" means the key is present, not that it is truthy: an author
+    who writes ``trigger: null`` on a continue is making it wait for the reader,
+    and that has to survive. Accepts a validated ``ActionScript`` as well as a
+    mapping, since a block's lists hold either.
+    """
+    if default is None:
+        return entry
+    if isinstance(entry, ActionScript):
+        if "activation" in entry.model_fields_set:
+            return entry
+        return entry.model_copy(update={"activation": default})
+    if "trigger" in entry or "activation" in entry:
+        return entry
+    return {**entry, "trigger": default}
+
+
+def _apply_default_trigger(data, field_name: str):
+    """Give a block's edge list the trigger its field name already implies."""
+    if not data:
+        return data
+    default = DEFAULT_ACTIVATION_BY_FIELD[field_name]
+    return [with_default_activation(entry, default) for entry in data]
+
+
 class BlockScript(BaseScriptItem):
 
     @classmethod
@@ -232,20 +272,12 @@ class BlockScript(BaseScriptItem):
     @pydantic.field_validator('redirects', mode='before')
     @classmethod
     def _set_enter_trigger(cls, data):
-        for d in data:
-            d.setdefault('trigger', 'first')
-        return data
+        return _apply_default_trigger(data, 'redirects')
 
     @pydantic.field_validator('continues', mode='before')
     @classmethod
     def _set_exit_trigger(cls, data):
-        for d in data:
-            try:
-                d.setdefault('trigger', 'last')
-            except AttributeError:
-                print( d )
-                raise
-        return data
+        return _apply_default_trigger(data, 'continues')
 
     @pydantic.field_validator('roles', mode='before')
     @classmethod
