@@ -46,8 +46,9 @@ Backend/service responsibilities:
 - Preserve independent fragments and fragment `uid`s.
 - Populate action-facing `ChoiceFragment.edge_id`, `accepts`, `ui_hints`,
   availability, and blockers.
-- Populate advisory envelope metadata such as `info_affordances`,
-  `info_state`, `world_id`, `ledger_id`, and command grammar hints.
+- Populate advisory envelope metadata such as `info_state`, `world_id`,
+  `ledger_id`, and command grammar hints; expose info-channel catalogs through
+  `ProjectedState` discovery.
 - Accept the typed direct-edge / exploratory `find_edge` request union.
 - Resolve exploratory queries through Story policy before committing an edge.
 - Validate submitted choice payloads during action resolution.
@@ -175,8 +176,8 @@ backend-emitted diagnostic payloads:
 These are not canonical conformance fixtures yet. They prove that the current
 service layer can emit a real widget-shaped `RuntimeEnvelope` and
 `ProjectedState` covering content, typed choices, blockers, plural cost
-previews, `accepts`, `ui_hints`, `metadata.info_affordances`,
-`metadata.info_state`, and generic projected-state values.
+previews, `accepts`, `ui_hints`, `metadata.info_state`, endpoint-discovered
+info channels, and generic projected-state values.
 
 Diagnostic transcripts should be generated only after backend output can be
 captured as a real `RuntimeEnvelope` stream. The durable source of truth should

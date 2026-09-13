@@ -5,3 +5,13 @@ metadata:
   title: "Ren'Py Demo"
   description: "A tiny VN-shaped StoryTangl world for the Ren'Py adapter demo."
   proof_class: adapter
+  branding:
+    logo_media: guide_portrait.svg
+    light:
+      primary: "#6b4f8a"
+      accent: "#b06a82"
+      background: "#fff8f2"
+    dark:
+      primary: "#c8a9e8"
+      accent: "#ef9db7"
+      background: "#211b26"

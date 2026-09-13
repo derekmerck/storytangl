@@ -12,6 +12,7 @@ from tangl.presentation.intent import Blocker, CostPreview, UIHints
 from tangl.presentation.events import UxEvent
 from tangl.presentation.projection import (
     BadgeListValue,
+    InfoAffordance,
     KvListValue,
     ProjectedSection,
     ProjectedState,
@@ -67,6 +68,10 @@ class RecordingCLI(cmd2.Cmd):
                 fragments=[ContentFragment(content="moved")],
             )
         if method_name == "get_story_info":
+            if not params.get("channels"):
+                return ProjectedState(
+                    channels=[InfoAffordance(channel_id="ui-sidebar", label="Status")]
+                )
             return ProjectedState(
                 sections=[
                     ProjectedSection(
@@ -466,7 +471,17 @@ def test_status_uses_projected_state_dto(
             )
         ]
     )
-    monkeypatch.setattr(cli, "call_service", lambda *_args, **_kwargs: state)
+    monkeypatch.setattr(
+        cli,
+        "call_service",
+        lambda *_args, **kwargs: (
+            state
+            if kwargs.get("channels")
+            else ProjectedState(
+                channels=[InfoAffordance(channel_id="ui-sidebar", label="Status")]
+            )
+        ),
+    )
     cli.outputs.clear()
 
     story_controller.do_status()
@@ -474,3 +489,28 @@ def test_status_uses_projected_state_dto(
     output = "\n".join(cli.outputs)
     assert "Session:" in output
     assert "Step: 4" in output
+
+
+def test_status_reports_unknown_channel_before_backend_selection(
+    story_controller: StoryController,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cli = story_controller._cmd
+    selected_requests: list[list[str]] = []
+
+    def get_story_info(*_args: object, **kwargs: object) -> ProjectedState:
+        channels = kwargs.get("channels")
+        if isinstance(channels, list):
+            selected_requests.append(channels)
+            raise AssertionError("unknown channels must not reach the backend")
+        return ProjectedState(
+            channels=[InfoAffordance(channel_id="ui-sidebar", label="Status")]
+        )
+
+    monkeypatch.setattr(cli, "call_service", get_story_info)
+    cli.outputs.clear()
+
+    story_controller.do_status("missing")
+
+    assert cli.outputs == ["Unknown info channel(s): missing"]
+    assert selected_requests == []

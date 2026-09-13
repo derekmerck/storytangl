@@ -31,7 +31,7 @@ from tangl.presentation.projection import (
     ScalarValue,
     TableValue,
 )
-from tangl.service.dispatch import do_advertise_info_channels
+from tangl.service.dispatch import do_advertise_story_info_channels
 from tangl.story import Block
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
@@ -98,21 +98,23 @@ def _sections(
 class TestAdvertise:
     def test_service_dispatch_fold_advertises_three_channels(self) -> None:
         block, ctx = _block_and_ctx()
-        kinds = {a.kind for a in do_advertise_info_channels(block, ctx=ctx)}
-        assert kinds == {"rules", "roster_progress", "case_summary"}
+        channels = {
+            a.channel_id for a in do_advertise_story_info_channels(block, ctx=ctx)
+        }
+        assert channels == {"ui-rules", "ui-roster-progress", "ui-case-summary"}
 
     def test_non_credentials_caller_advertises_nothing(self) -> None:
         graph = Graph(label="plain")
         plain = graph.add_node(kind=Block, label="plain")
         ledger = Ledger.from_graph(graph, entry_id=plain.uid)
         ctx = PhaseCtx(graph=graph, cursor_id=plain.uid, step=ledger.step)
-        assert do_advertise_info_channels(plain, ctx=ctx) == []
+        assert do_advertise_story_info_channels(plain, ctx=ctx) == []
 
 
 class TestRulesChannel:
     def test_rules_project_the_restriction_map(self) -> None:
         block, ctx = _block_and_ctx()
-        sections = _sections(block, ctx, kind="rules")
+        sections = _sections(block, ctx, channels=["ui-rules"])
         value = sections["credential_rules"].value
         assert isinstance(value, KvListValue)
         pairs = {(row.key, row.value) for row in value.items}
@@ -123,7 +125,7 @@ class TestRulesChannel:
 class TestProgressChannel:
     def test_progress_scalar_before_any_ruling(self) -> None:
         block, ctx = _block_and_ctx()
-        sections = _sections(block, ctx, kind="roster_progress")
+        sections = _sections(block, ctx, channels=["ui-roster-progress"])
         assert isinstance(sections["credential_progress"].value, ScalarValue)
         assert sections["credential_progress"].value.value == "Candidate 1 of 2"
         # No rulings table yet.
@@ -137,7 +139,7 @@ class TestProgressChannel:
             handler.receive_move(block.game, ("decide", "pass"))
         assert block.game.shift_complete
 
-        sections = _sections(block, ctx, kind="roster_progress")
+        sections = _sections(block, ctx, channels=["ui-roster-progress"])
         assert sections["credential_progress"].value.value == "Shift complete"
 
     def test_progress_shows_rulings_without_correctness(self) -> None:
@@ -146,7 +148,7 @@ class TestProgressChannel:
         handler.receive_move(block.game, ("inspect", "passport"))
         handler.receive_move(block.game, ("decide", "pass"))  # wrong (should be deny)
 
-        sections = _sections(block, ctx, kind="roster_progress")
+        sections = _sections(block, ctx, channels=["ui-roster-progress"])
         rulings = sections["credential_rulings"].value
         assert isinstance(rulings, TableValue)
         # The ruling is disclosed; correctness is not.
@@ -159,14 +161,14 @@ class TestProgressChannel:
 class TestCaseSummaryChannel:
     def test_empty_before_inspection(self) -> None:
         block, ctx = _block_and_ctx()
-        sections = _sections(block, ctx, kind="case_summary")
+        sections = _sections(block, ctx, channels=["ui-case-summary"])
         assert "credential_case_summary" not in sections
 
     def test_discloses_only_revealed_findings(self) -> None:
         block, ctx = _block_and_ctx()
         block.game_handler.receive_move(block.game, ("inspect", "passport"))
 
-        sections = _sections(block, ctx, kind="case_summary")
+        sections = _sections(block, ctx, channels=["ui-case-summary"])
         value = sections["credential_case_summary"].value
         assert isinstance(value, KvListValue)
         keys = {row.key for row in value.items}
@@ -202,7 +204,7 @@ class TestCaseSummaryChannel:
         block.game_handler.receive_move(block.game, ("inspect", "passport"))
         block.game_handler.receive_move(block.game, ("request_document", IND.WORK.value))
 
-        sections = _sections(block, ctx, kind="case_summary")
+        sections = _sections(block, ctx, channels=["ui-case-summary"])
         value = sections["credential_case_summary"].value
         cleared = [row for row in value.items if row.value == "cleared"]
         assert cleared and cleared[0].key == IND.WORK.value  # no "(cleared)" suffix

@@ -301,8 +301,8 @@ Each runtime turn produces one envelope **for one cursor** (§1.5). Fields:
   ledger's most recent and historical redirects. Author/debug surface
   only; reader clients ignore.
 - **`metadata`** — open dict for cross-cutting hints. Reserved sub-keys:
-  `metadata.grammar` (§6.6), `metadata.info_affordances` and
-  `metadata.info_state` (§1.6).
+  `metadata.grammar` (§6.6) and `metadata.info_state` (§1.6). Info-channel
+  catalogs are discovered from `/story/info`, not copied into envelopes.
 
 ### 1.2 Fragment registry and UID stability
 
@@ -326,6 +326,7 @@ resolvable by future control fragments.
 ```python
 # tangl/presentation/projection.py — current shape (Tier S)
 class ProjectedState(InfoModel):
+    channels: list[InfoAffordance] = Field(default_factory=list)
     sections: list[ProjectedSection] = Field(default_factory=list)
 
 class ProjectedSection(BaseModel):
@@ -480,41 +481,39 @@ cheap.
 > client UI**.
 
 **Status (vocabulary):** promoted Tier S contract. **Status (reference client):** webapp
-implements `info_affordances` with `query` descriptors against `/story/info`,
-and the CLI reference floor exposes the same affordances through `?` /
-slash-command output. **Status (engine):** defines typed `InfoAffordance`,
-`InfoState`, and `ProjectionRequest` models, advertises available channels on
-runtime envelopes, and routes `/story/info` through the service-info dispatch
-surface. Fine-grained dirty-kind tracking remains conservative in v1.
+discovers exact channels from `/story/info` and selects them with the public
+`channels=a,b` query. The CLI reference floor exposes the same discovered
+affordances through `?` / slash-command output. **Status (engine):** defines
+typed `InfoAffordance`, `InfoState`, and `ProjectionRequest` models and routes
+both public world-static and authenticated story-dynamic projections through
+the service-info dispatch surface. Runtime envelopes retain only freshness
+hints. Fine-grained dirty-channel tracking remains conservative in v1.
 
 A bundle MAY expose **info channels** — typed sub-surfaces of world
 state the player can pull on demand: a map, an inventory, a watch
 showing world time, a character sheet, a help screen, a list of active
 objectives.
 
-The runtime advertises these channels through two optional metadata
-keys on `RuntimeEnvelope`:
+The corresponding info endpoint advertises channels in `ProjectedState`:
 
 ```python
 class InfoAffordance(BaseModel):
-    kind: str               # stable info-channel identifier
-    label: str | None = None # short, player-facing; clients fall back to kind
+    channel_id: str          # exact flat info-channel identifier
+    label: str | None = None # clients fall back to channel_id
     shortcuts: list[str]    # CLI/keyboard aliases
-    query: dict[str, Any] | None = None
-    # Opaque query descriptor the backend interprets.
-    # Hand-it-back semantic: clients pass it to the info endpoint without
-    # inspecting its contents. Bundles decide what query keys mean.
-    # Examples: { "type": "map", "format": "tiles" },
-    #           { "kinds": ["party", "followers"] },
-    #           None  (no descriptor; default info kind is the channel itself)
+
+class ProjectionRequest(BaseModel):
+    channels: list[str] = [] # exact ids, deduplicated in request order
 
 class InfoState(BaseModel):
     version: int                          # monotonic per cursor
-    dirty_kinds: list[str] = []           # changed since prior turn
-    available_kinds: list[str] = []       # what's queryable this turn
+    dirty_channels: list[str] = []        # changed since prior turn
+    available_channels: list[str] = []    # what's queryable this turn
 
-# RuntimeEnvelope.metadata reserved sub-keys:
-#   metadata.info_affordances: list[InfoAffordance]
+# ProjectedState discovery response:
+#   channels: list[InfoAffordance]
+#   sections: []
+# RuntimeEnvelope.metadata reserved sub-key:
 #   metadata.info_state: InfoState
 ```
 
@@ -534,11 +533,11 @@ unexplored]`, on Godot as a 3D minimap. The *data* is canonical; the
 choose visual treatments via `hints.style_tags`, bundle widget
 variants (§4.2), or port-specific profiles (§4.3).
 
-**Every info channel has a `ProjectedState` fallback.** Any `kind`
+**Every info channel has a `ProjectedState` fallback.** Any `channel_id`
 exposed as an info affordance MUST also be expressible as one of the
-five canonical `value_type`s (`scalar`, `kv_list`, `item_list`,
-`table`, `badges`) — either directly in `ProjectedState.sections` or
-via an info-channel query (§6.7). The fallback exists so a port
+six canonical `value_type`s (`scalar`, `kv_list`, `item_list`,
+`table`, `badges`, `branding`) — directly in `ProjectedState.sections`
+after exact channel selection (§6.7). The fallback exists so a port
 that doesn't implement the rich rendering still has *something* to
 show. The fallback is the contract surface; the rich rendering is
 ornament.
@@ -551,7 +550,7 @@ render with a clock icon by default; `kind="map"` might earn a fold-
 out treatment. None of this is contract; it's recommended convention.
 
 **Cache invalidation.** `info_state.version` is monotonic per cursor.
-`info_state.dirty_kinds` tells the client which channels' cached
+`info_state.dirty_channels` tells the client which channels' cached
 projections went stale since the prior turn. A client that does not
 cache info channels can ignore `info_state` entirely.
 
@@ -907,15 +906,15 @@ should survive replay.
 
 ```python
 SectionValue = Annotated[
-    ScalarValue | KvListValue | ItemListValue | TableValue | BadgeListValue,
+    ScalarValue | KvListValue | ItemListValue | TableValue | BadgeListValue | BrandingValue,
     Field(discriminator="value_type"),
 ]
 ```
 
-Five canonical value types. Each has a stable shape, port-independent
-semantics, and a sensible CLI rendering. **No additional `value_type`s
-are proposed.** Subtypes that look like new value types are populated
-`kv_list`s (see §2.5.1).
+Six canonical value types. Each has a stable shape, port-independent
+semantics, and a sensible CLI rendering. Further additions require an explicit
+contract revision. Subtypes that do not need a distinct wire shape remain
+populated `kv_list`s (see §2.5.1).
 
 ### 3.2 Shapes and renderings
 
@@ -926,6 +925,7 @@ are proposed.** Subtypes that look like new value types are populated
 | `item_list` | `items: list[{label, detail?, tags?}]` | roster | `- label (detail) [tags]` | listbox + detail |
 | `table` | `columns: list[str]`, `rows: list[list[PrimitiveValue]]` | `<table>` | aligned columns | `ttk.Treeview` |
 | `badges` | `items: list[str]` | chips | `[tag1][tag2]` | small labels |
+| `branding` | `name`, optional `logo_media`, `light`, `dark` theme tokens | world identity / theme | labeled fields | labels + theme hints |
 
 `kv_list` is the workhorse: it absorbs ledger-like data, capacity bars,
 deltas, and styled rows via the field-population mechanics in §2.5.1.
@@ -1148,7 +1148,7 @@ paths with no slash-command or `?` menu fallback, is non-conforming.
 - An info-affordance bar (§1.6) is one way to expose info channels.
   Ports without room for it (CLI, narrow viewports, accessibility mode)
   MUST expose the same info channels through some CLI-floor mode —
-  typically slash commands derived from `info_affordances[].shortcuts`,
+  typically slash commands derived from discovered `channels[].shortcuts`,
   or a single `?` menu.
 
 ---
@@ -1543,8 +1543,7 @@ def get_story_update(...) -> RuntimeEnvelope: ...
 
 @router.get("/story/info", response_model=ProjectedState)
 def get_story_info(
-    kind: str | None = None,
-    query: str | None = None,   # JSON-encoded InfoAffordance.query descriptor
+    channels: str | None = None,  # comma-separated exact channel ids
     ...,
 ) -> ProjectedState: ...
 ```
@@ -1562,18 +1561,12 @@ Four contract points:
    posted payload against the matching `*Payload` shape (§6.1.1).
    Failures that are useful client guidance are surfaced as inline,
    non-replayed `UxEvent` values.
-4. **`/story/info` accepts an opaque query descriptor.** The
-   `InfoAffordance.query` payload (§1.6) is JSON-encoded and passed as
-   the `query` parameter; `kind` filters the response to a single info
-   channel. Both parameters are optional. The backend interprets the
-   descriptor however it wants; clients pass it back without inspecting
-   contents. **The contract surface is the `InfoAffordance.query` shape
-   in §1.6, not the URL routing here** — the transport may evolve (POST
-   body, separate endpoint per kind, etc.) without breaking the vocabulary
-   vocabulary clients, as long as the query descriptor is honored. The
-   v1.2 draft proposal of `GET /story/info/{kind}` was rejected in
-   v1.2.1 review because the URL-path approach baked `kind` into the
-   transport and didn't accommodate richer query payloads.
+4. **`/story/info` is discovery-first and exact.** Omitting `channels`
+   returns a `ProjectedState` catalog in `channels` with no projected
+   sections. Supplying comma-separated exact channel ids returns their
+   sections in request order; unknown ids fail with HTTP 400. Clients inspect
+   only the catalog fields and send selected `channel_id` values back without
+   interpreting provider-specific state.
 
 ---
 
@@ -1895,7 +1888,7 @@ through the CLI Floor Rule.
 | projected item_list | roster | `- label (detail)` | `Listbox` + detail | `ItemList` |
 | projected table | `<table>` | aligned columns | `ttk.Treeview` | grid / `Tree` |
 | projected badges | chips | `[tag1][tag2]` | small labels | chips |
-| info_affordances bar | pill bar | slash commands / `?` menu | menu bar | menu screen |
+| info-channel catalog | pill bar | slash commands / `?` menu | menu bar | menu screen |
 
 **Tier P2 widgets (piece, zone, roll)** are not in this table until
 their CLI renderings ship in `cli_reference_port.py`.
@@ -1971,8 +1964,8 @@ the fixtures and asserts observable output:
   reachable on the web port via tap/click of a visible button.
 - Every drag-and-drop interaction on the web port has a click-pick
   fallback observable in the same fixture.
-- Every `metadata.info_affordances` entry is reachable through some
-  CLI-floor mode (`info_affordances[].shortcuts` keystrokes or a
+- Every `/story/info` discovery `channels` entry is reachable through some
+  CLI-floor mode (`channels[].shortcuts` keystrokes or a
   documented slash/menu command).
 
 Failure prints the offending fixture, choice/fragment UID, and rule
@@ -2030,7 +2023,7 @@ These serve as both regression baselines and authoring references.
 | Cursor | One participant's traversal through a story. Each cursor has its own journal channel; envelopes are per-cursor. |
 | Channel | The envelope stream for one cursor. Multi-cursor sessions have multiple channels coordinated by bundle logic. |
 | Participant / Owner | The account or identity behind a cursor. Used for `owner_only` visibility and `visibility=[participant_ids]` audience routing. |
-| Info channel | An advisory side-projection of world state queryable via the info endpoint (§6.7) with an opaque `query` descriptor (§1.6) and advertised in `metadata.info_affordances`. |
+| Info channel | An advisory side-projection discovered through an info endpoint and selected by exact `channels=a,b` ids (§1.6). |
 | Piece (Tier P2) | Identified, state-bearing surface element (card, tile, die, etc.). UI concept; distinct from `tangl.core.token.Token`. May be realized (has backend UID) or unrealized (an offer). |
 | Offer (Tier P2) | A `PieceFragment` with `realized=False`. Becomes a real piece on commit. |
 | Zone (Tier P2) | A `group_type="zone"` group containing pieces. May carry `constraints` (semantic), `layout_hints` (visual), and `layout_hints.graph.edges` (addressable adjacencies). |
@@ -2075,12 +2068,11 @@ These serve as both regression baselines and authoring references.
    for "wait for all cursors to commit" or "rotate active cursor."
    Worth a sketch document at some point but explicitly out of scope
    for v1.x.
-10. **Info-channel compound queries.** v1.5 keeps the v1.3 sub-
-    addressing question via `InfoAffordance.query: dict[str, Any] |
-    None` — bundles encode whatever compound parameters they need in
-    the descriptor (e.g., `query={"type":"map","region":"hall"}`).
-    Whether the engine team standardizes a sub-set of well-known query
-    keys (`region`, `filter`, `format`) is a future question.
+10. **Info-channel parameters.** The current contract deliberately selects
+    exact flat channel ids and has no opaque sub-addressing descriptor. A
+    bundle needing parameterized projection should first expose a distinct
+    exact channel; any shared typed parameter shape requires a separate
+    contract checkpoint.
 
 ## Appendix C — Cross-references to genre extensions
 

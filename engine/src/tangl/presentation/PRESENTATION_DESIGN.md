@@ -15,7 +15,10 @@ them. Backend state remains authoritative for every action.
 
 Current — Slice 2 also owns `UxEvent`, advisory grammar, `ProjectedState`,
 `ProjectedSection`, section value variants, info affordances/state, and the
-opaque `ProjectionRequest` descriptor that lower-layer providers consume.
+exact-channel `ProjectionRequest` that lower-layer providers consume. An empty
+request discovers `ProjectedState.channels`; a non-empty request selects only
+those exact ids and returns ordinary typed sections. World-static and
+story-dynamic scopes share this model without sharing authority or freshness.
 `presentation_dispatch` is the application-level contributor registry for
 presentation tasks; its decorators are the registration vocabulary for generic
 mechanics. Service retains operations, outer dispatch, response

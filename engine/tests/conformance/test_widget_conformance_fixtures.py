@@ -23,6 +23,7 @@ from tangl.service.response import RuntimeEnvelope
 
 FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"
 PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposals"
+DISCOVERY_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "discovery"
 LEGIBILITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "legibility.py"
 PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "parity.py"
 TIME_PARITY_PATH = Path(__file__).parents[2] / "contrib" / "conformance" / "time_parity.py"
@@ -705,5 +706,22 @@ def test_credentials_shift_fixture_round_trips_through_typed_models() -> None:
     dispositions = [c for c in choices if c.text.startswith("Choose ")]
     assert dispositions and all(c.available is not False for c in dispositions)
 
-    advertised = {a["kind"] for a in payload["metadata"]["info_affordances"]}
-    assert advertised == {"rules", "roster_progress", "case_summary"}
+    discovery = _load_fixture(DISCOVERY_DIR / "credentials_info_discovery.json")
+    advertised = {channel["channel_id"] for channel in discovery["channels"]}
+    assert advertised == {
+        "ui-sidebar",
+        "ui-rules",
+        "ui-roster-progress",
+        "ui-case-summary",
+    }
+    assert advertised == set(payload["metadata"]["info_state"]["available_channels"])
+
+
+def test_sandbox_discovery_matches_runtime_channel_availability() -> None:
+    runtime = _load_fixture(FIXTURE_DIR / "sandbox_info_channels.json")
+    discovery = _load_fixture(DISCOVERY_DIR / "sandbox_info_discovery.json")
+
+    advertised = {channel["channel_id"] for channel in discovery["channels"]}
+    available = set(runtime["metadata"]["info_state"]["available_channels"])
+
+    assert advertised == available

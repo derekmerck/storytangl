@@ -1,18 +1,18 @@
 import { defineStore } from 'pinia'
 
-import type { UserInfo, UserSecretResponse, WorldInfo } from '@/types'
+import type { BrandingValue, ProjectedState, UserInfo, UserSecretResponse } from '@/types'
 import { useGlobal } from '@/composables/globals'
 import { savePlayerSecret } from '@/playerSession'
 
 interface StoreState {
   current_world_uid: string
-  current_world_info?: WorldInfo
+  current_world_info?: BrandingValue
   current_user?: UserInfo
   user_secret: string
   user_api_key?: string
 }
 
-const { $http, makeMediaDict } = useGlobal()
+const { $http } = useGlobal()
 
 export const useStore = defineStore('main', {
   state: (): StoreState => ({
@@ -36,14 +36,14 @@ export const useStore = defineStore('main', {
     },
 
     async getCurrentWorldInfo() {
-      const response = await $http.value.get<WorldInfo>(`/world/${this.current_world_uid}/info`)
-      const world = response.data
-
-      if (world?.media) {
-        world.media_dict = makeMediaDict(world)
-      }
-
-      this.current_world_info = world
+      const response = await $http.value.get<ProjectedState>(
+        `/world/${this.current_world_uid}/info`,
+        { params: { channels: 'ui-branding' } },
+      )
+      const value = response.data.sections.find(
+        (section) => section.value.value_type === 'branding',
+      )?.value
+      this.current_world_info = value?.value_type === 'branding' ? value : undefined
     },
 
     async authenticateWithSecret(secret: string) {

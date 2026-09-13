@@ -541,9 +541,7 @@ class TestRemoteResponseHydration:
 
         state = manager.get_story_info(
             user_id=user_id,
-            kind="status",
-            kinds=["map", "inventory"],
-            query={"kinds": ["map"], "format": "table"},
+            channels=["ui-sidebar", "ui-map", "ui-inventory"],
         )
 
         assert isinstance(state, ProjectedState)
@@ -554,9 +552,7 @@ class TestRemoteResponseHydration:
         assert state.sections[1].value.rows == [["Hall", True]]
         assert session.calls[0]["url"] == "https://example.test/api/v2/story/info"
         assert session.calls[0]["params"] == {
-            "kind": "status",
-            "kinds": "map,inventory",
-            "query": '{"kinds": ["map"], "format": "table"}',
+            "channels": "ui-sidebar,ui-map,ui-inventory",
             "render_profile": "raw",
         }
 

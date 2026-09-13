@@ -16,7 +16,8 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 const worldInfo = computed(() => store.current_world_info)
-const coverImage = computed(() => worldInfo.value?.media_dict?.cover_im?.url)
+const worldTitle = computed(() => worldInfo.value?.name ?? 'World Info')
+const logoMedia = computed(() => worldInfo.value?.logo_media)
 
 const ensureWorldInfo = async () => {
   if (worldInfo.value || loading.value) {
@@ -53,25 +54,19 @@ const close = () => {
 <template>
   <v-dialog :model-value="modelValue" max-width="640">
     <v-card>
-      <v-img v-if="coverImage" :src="coverImage" height="200" cover />
-
       <v-card-title>
-        {{ worldInfo?.title ?? 'World Info' }}
+        {{ worldTitle }}
       </v-card-title>
 
-      <v-card-subtitle v-if="worldInfo?.version">
-        Version {{ worldInfo.version }}
+      <v-card-subtitle v-if="logoMedia">
+        Logo media: {{ logoMedia }}
       </v-card-subtitle>
 
       <v-card-text>
         <div v-if="error" class="text-error">{{ error }}</div>
         <div v-else-if="loading">Loading world information...</div>
-        <div v-else-if="worldInfo?.summary">{{ worldInfo.summary }}</div>
-        <div v-else>World details are not available.</div>
-      </v-card-text>
-
-      <v-card-text v-if="worldInfo?.comments">
-        {{ worldInfo.comments }}
+        <div v-else-if="worldInfo">Advisory branding for this world.</div>
+        <div v-else>World branding is not available.</div>
       </v-card-text>
 
       <v-card-actions>

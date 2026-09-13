@@ -16,12 +16,14 @@ from .intent import (
 from .surface import HasSurface, Surface, SurfaceSlot
 from .values import KvRow, PrimitiveValue
 from .dispatch import (
-    on_advertise_info_channels,
+    on_advertise_story_info_channels,
+    on_advertise_world_info_channels,
     on_get_story_info,
     presentation_dispatch,
 )
 from .projection import (
     BadgeListValue,
+    BrandingValue,
     InfoAffordance,
     InfoState,
     ItemListValue,
@@ -33,11 +35,13 @@ from .projection import (
     SectionValue,
     ProjectionRequest,
     TableValue,
+    ThemeTokens,
 )
 
 __all__ = [
     "Accepts",
     "BadgeListValue",
+    "BrandingValue",
     "Blocker",
     "CostPreview",
     "GrammarHint",
@@ -62,9 +66,11 @@ __all__ = [
     "Surface",
     "SurfaceSlot",
     "TableValue",
+    "ThemeTokens",
     "UIHints",
     "UxEvent",
-    "on_advertise_info_channels",
+    "on_advertise_story_info_channels",
+    "on_advertise_world_info_channels",
     "on_get_story_info",
     "presentation_dispatch",
 ]

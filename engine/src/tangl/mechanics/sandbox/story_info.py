@@ -6,7 +6,10 @@ from collections.abc import Sequence
 from typing import Protocol, cast
 
 from tangl.core import Selector, Token
-from tangl.presentation.dispatch import on_advertise_info_channels, on_get_story_info
+from tangl.presentation.dispatch import (
+    on_advertise_story_info_channels,
+    on_get_story_info,
+)
 from tangl.presentation.projection import (
     InfoAffordance,
     ItemListValue,
@@ -54,6 +57,18 @@ SANDBOX_INFO_KINDS = {
     MAP_REGIONS_KIND,
     "presence",
     "world_time",
+}
+
+SANDBOX_CHANNELS = {
+    "ui-world-time": {"world_time"},
+    "ui-location": {"location", "presence"},
+    "ui-inventory": {"inventory"},
+    "ui-map": {MAP_KIND, "map_nodes", "map_edges"},
+    "ui-map-plate": {MAP_PLATE_KIND, MAP_REGIONS_KIND},
+    "ui-local-assets": {"local_assets"},
+    "ui-fixtures": {"fixtures"},
+    "ui-presence": {"presence"},
+    "ui-exits": {"exits"},
 }
 
 
@@ -200,7 +215,7 @@ def sandbox_status_sections(
     return _SandboxInfoSections().sections_for(location, ctx=ctx)
 
 
-@on_advertise_info_channels(
+@on_advertise_story_info_channels(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
 )
@@ -214,36 +229,31 @@ def advertise_sandbox_info_channels(
     projection = sandbox_projection_state(caller, ctx)
     affordances = [
         InfoAffordance(
-            kind="world_time",
+            channel_id="ui-world-time",
             label="Watch",
             shortcuts=["t", "time"],
-            query={"kinds": ["world_time"]},
         ),
         InfoAffordance(
-            kind="location",
+            channel_id="ui-location",
             label="Here",
             shortcuts=["h", "look"],
-            query={"kinds": ["location", "presence"]},
         ),
         InfoAffordance(
-            kind="inventory",
+            channel_id="ui-inventory",
             label="Carrying",
             shortcuts=["i", "inv"],
-            query={"kinds": ["inventory"]},
         ),
         InfoAffordance(
-            kind=MAP_KIND,
+            channel_id="ui-map",
             label="Map",
             shortcuts=["m", MAP_KIND],
-            query={"kinds": [MAP_KIND], "scope": "known"},
         ),
     ]
     if caller.map is not None:
         affordances.append(
             InfoAffordance(
-                kind=MAP_PLATE_KIND,
+                channel_id="ui-map-plate",
                 label="Map Plate",
-                query={"kinds": [MAP_PLATE_KIND, MAP_REGIONS_KIND]},
             )
         )
     if projection.suppress_location_description:
@@ -251,35 +261,31 @@ def advertise_sandbox_info_channels(
     if not projection.suppress_asset_affordances:
         affordances.append(
             InfoAffordance(
-                kind="local_assets",
+                channel_id="ui-local-assets",
                 label="Here",
                 shortcuts=["a", "assets"],
-                query={"kinds": ["local_assets"]},
             )
         )
     if not projection.suppress_fixture_affordances:
         affordances.append(
             InfoAffordance(
-                kind="fixtures",
+                channel_id="ui-fixtures",
                 label="Fixtures",
                 shortcuts=["f"],
-                query={"kinds": ["fixtures"]},
             )
         )
     affordances.append(
         InfoAffordance(
-            kind="presence",
+            channel_id="ui-presence",
             label="Present",
             shortcuts=["p"],
-            query={"kinds": ["presence"]},
         )
     )
     affordances.append(
         InfoAffordance(
-            kind="exits",
+            channel_id="ui-exits",
             label="Exits",
             shortcuts=["x"],
-            query={"kinds": ["exits"]},
         )
     )
     return affordances
@@ -297,9 +303,10 @@ def project_sandbox_map_info(
     **_kw: object,
 ) -> list[ProjectedSection] | None:
     """Project requested disclosed sandbox channels for side-panel clients."""
-    requested = set(request.requested_kinds())
-    if not requested:
+    channels = request.requested_channels()
+    if not channels:
         return None
+    requested = set().union(*(SANDBOX_CHANNELS.get(channel, set()) for channel in channels))
     if requested.isdisjoint(SANDBOX_INFO_KINDS):
         return None
 

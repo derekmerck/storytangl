@@ -11,6 +11,7 @@ from typing import Any
 
 ROOT = Path(__file__).parents[3]
 FIXTURE_DIR = ROOT / "engine" / "contrib" / "conformance" / "fixtures"
+DISCOVERY_DIR = ROOT / "engine" / "contrib" / "conformance" / "discovery"
 PROPOSAL_DIR = ROOT / "engine" / "contrib" / "conformance" / "proposals"
 REFERENCE_PATH = ROOT / "engine" / "contrib" / "conformance" / "reference_port.py"
 CLI_PATH = ROOT / "engine" / "contrib" / "conformance" / "cli_reference_port.py"
@@ -39,22 +40,15 @@ def _render_proposal(name: str) -> str:
     return "\n".join(PORT.render_fixture(payload))
 
 
-def _available_info_affordances(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    metadata = payload.get("metadata")
-    assert isinstance(metadata, dict)
-    affordances = metadata.get("info_affordances")
-    assert isinstance(affordances, list)
-    info_state = metadata.get("info_state")
-    if not isinstance(info_state, dict) or "available_kinds" not in info_state:
-        return [item for item in affordances if isinstance(item, dict)]
+def _render_discovery(name: str) -> str:
+    payload = PORT.load_fixture(DISCOVERY_DIR / name)
+    return "\n".join(PORT.render_fixture(payload))
 
-    available_kinds = info_state.get("available_kinds")
-    assert isinstance(available_kinds, list)
-    return [
-        item
-        for item in affordances
-        if isinstance(item, dict) and (item.get("kind") or "info") in available_kinds
-    ]
+
+def _available_info_affordances(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    channels = payload.get("channels")
+    assert isinstance(channels, list)
+    return [item for item in channels if isinstance(item, dict)]
 
 
 def test_cli_reference_port_stays_json_only() -> None:
@@ -129,74 +123,56 @@ def test_cli_reference_renders_command_hints_as_advisory_prompt() -> None:
 
 
 def test_cli_reference_renders_info_affordances_as_queryable_commands() -> None:
-    sandbox_output = _render("sandbox_info_channels.json")
-    credentials_output = _render("credentials_shift.json")
+    sandbox_output = _render_discovery("sandbox_info_discovery.json")
+    credentials_output = _render_discovery("credentials_info_discovery.json")
 
     assert "Story info:" in sandbox_output
-    assert "? Map: /info map (shortcuts: /m, /map) query=" in sandbox_output
-    assert '"scope": "known"' in sandbox_output
-    assert "? Today's rules: /info rules (shortcuts: /r, /rules)" in credentials_output
-    assert "? Shift progress: /info roster_progress (shortcuts: /p, /shift)" in credentials_output
-    assert "? Findings: /info case_summary (shortcuts: /c, /findings)" in credentials_output
+    assert "? Map: /info ui-map (shortcuts: /m, /map)" in sandbox_output
+    assert "? Today's rules: /info ui-rules (shortcuts: /r, /rules)" in credentials_output
+    assert (
+        "? Shift progress: /info ui-roster-progress (shortcuts: /p, /shift)"
+        in credentials_output
+    )
+    assert "? Findings: /info ui-case-summary (shortcuts: /c, /findings)" in credentials_output
 
 
 def test_cli_reference_makes_every_available_info_affordance_reachable() -> None:
-    for name in ("sandbox_info_channels.json", "credentials_shift.json"):
-        payload = PORT.load_fixture(FIXTURE_DIR / name)
+    for name in ("sandbox_info_discovery.json", "credentials_info_discovery.json"):
+        payload = PORT.load_fixture(DISCOVERY_DIR / name)
         document = PORT.render_fixture_document(payload)
         floor_items = {
-            item.data["kind"]: item
+            item.data["channel_id"]: item
             for item in document.items
             if item.role == "info_affordance" and item.data is not None
         }
         advertised = _available_info_affordances(payload)
 
-        assert set(floor_items) == {str(item["kind"]) for item in advertised}
+        assert set(floor_items) == {str(item["channel_id"]) for item in advertised}
         for affordance in advertised:
-            kind = str(affordance["kind"])
-            item = floor_items[kind]
+            channel_id = str(affordance["channel_id"])
+            item = floor_items[channel_id]
             commands = item.data["commands"]
-            assert f"/info {kind}" in commands
-            assert f"/info {kind}" in item.text
-            assert item.data["query"] == affordance.get("query")
+            assert f"/info {channel_id}" in commands
+            assert f"/info {channel_id}" in item.text
             for shortcut in affordance.get("shortcuts", []):
                 assert f"/{shortcut}" in commands
                 assert f"/{shortcut}" in item.text
 
 
-def test_cli_reference_hides_unavailable_info_affordances() -> None:
+def test_cli_reference_renders_only_discovered_info_channels() -> None:
     payload = {
-        "cursor_id": "fixture",
-        "step": 1,
-        "fragments": [
-            {
-                "uid": "scene",
-                "fragment_type": "group",
-                "group_type": "scene",
-                "member_ids": [],
-            }
-        ],
-        "metadata": {
-            "info_affordances": [
-                {"kind": "map", "label": "Map", "shortcuts": ["m"]},
-                {"kind": "inventory", "label": "Carrying", "shortcuts": ["i"]},
-            ],
-            "info_state": {
-                "version": 1,
-                "dirty_kinds": ["map"],
-                "available_kinds": ["map"],
-            },
-        },
+        "channels": [{"channel_id": "ui-map", "label": "Map", "shortcuts": ["m"]}],
+        "sections": [],
     }
 
     document = PORT.render_fixture_document(payload)
-    visible_kinds = [
-        item.data["kind"]
+    visible_channels = [
+        item.data["channel_id"]
         for item in document.items
         if item.role == "info_affordance" and item.data is not None
     ]
 
-    assert visible_kinds == ["map"]
+    assert visible_channels == ["ui-map"]
 
 
 def test_cli_reference_renders_projected_state_value_types() -> None:

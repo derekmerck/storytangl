@@ -51,8 +51,10 @@ def test_service_story_info_uses_private_session_fallback() -> None:
             story_label="story-info-fallback-story",
         )
 
-        state = manager.get_story_info(user_id=user.uid)
+        catalog = manager.get_story_info(user_id=user.uid)
+        state = manager.get_story_info(user_id=user.uid, channels=["ui-sidebar"])
 
+        assert [channel.channel_id for channel in catalog.channels] == ["ui-sidebar"]
         assert [section.section_id for section in state.sections] == ["session"]
         assert [item.key for item in state.sections[0].value.items] == [
             "Cursor",
@@ -78,7 +80,7 @@ def test_service_dispatch_composes_service_presentation_world_and_runtime_contri
         )
 
         def advertise_rules(*, caller: object, **_kw: object) -> InfoAffordance:
-            return InfoAffordance(kind="proof", label="Proof", query={"kinds": ["proof"]})
+            return InfoAffordance(channel_id="ui-proof", label="Proof")
 
         def service_provider(*, caller: object, **_kw: object) -> ProjectedSection:
             return _section("service")
@@ -92,7 +94,10 @@ def test_service_dispatch_composes_service_presentation_world_and_runtime_contri
         def runtime_provider(*, caller: object, **_kw: object) -> ProjectedSection:
             return _section("runtime")
 
-        world.dispatch.register(advertise_rules, task="advertise_info_channels")
+        world.dispatch.register(
+            advertise_rules,
+            task="advertise_story_info_channels",
+        )
         service_dispatch.register(service_provider, task="get_story_info")
         presentation_dispatch.register(presentation_provider, task="get_story_info")
         world.dispatch.register(
@@ -117,7 +122,7 @@ def test_service_dispatch_composes_service_presentation_world_and_runtime_contri
             state = do_get_story_info(
                 session.ledger.cursor,
                 ctx=manager._make_story_info_ctx(session.ledger),
-                request=ProjectionRequest(kind="proof"),
+                request=ProjectionRequest(channels=["ui-proof"]),
             )
 
         assert [section.section_id for section in state.sections] == [

@@ -104,7 +104,7 @@ class TestAdventureSandboxWorld:
         projected = do_get_story_info(
             ledger.cursor,
             ctx=PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor.uid),
-            request=ProjectionRequest(kind="score"),
+            request=ProjectionRequest(channels=["ui-score"]),
         )
         score_section = next(
             section

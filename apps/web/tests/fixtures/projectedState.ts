@@ -1,6 +1,7 @@
 import type { ProjectedState } from '@/types'
 
 export const crossroadsProjectedState: ProjectedState = {
+  channels: [{ channel_id: 'ui-sidebar', label: 'Status', shortcuts: [] }],
   sections: [
     {
       section_id: 'health',

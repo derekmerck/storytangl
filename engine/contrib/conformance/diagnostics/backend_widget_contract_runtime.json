@@ -65,43 +65,15 @@
   "ux_events": [],
   "redirect_trace": [],
   "metadata": {
-    "info_affordances": [
-      {
-        "kind": "inventory",
-        "label": "Inventory",
-        "shortcuts": [
-          "i",
-          "inv"
-        ],
-        "query": {
-          "kinds": [
-            "inventory"
-          ]
-        }
-      },
-      {
-        "kind": "map",
-        "label": "Map",
-        "shortcuts": [
-          "m"
-        ],
-        "query": {
-          "kinds": [
-            "map"
-          ],
-          "format": "text"
-        }
-      }
-    ],
     "info_state": {
       "version": 1,
-      "dirty_kinds": [
-        "inventory",
-        "map"
+      "dirty_channels": [
+        "ui-sidebar",
+        "ui-widget-demo"
       ],
-      "available_kinds": [
-        "inventory",
-        "map"
+      "available_channels": [
+        "ui-sidebar",
+        "ui-widget-demo"
       ]
     },
     "grammar": {
