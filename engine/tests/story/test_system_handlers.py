@@ -42,7 +42,7 @@ def reset_wearable_types():
 
 
 def _ctx_with_ns(ns: dict[str, object] | None = None) -> SimpleNamespace:
-    return SimpleNamespace(get_ns=lambda _caller: dict(ns or {}))
+    return SimpleNamespace(incoming_edge=None, get_ns=lambda _caller: dict(ns or {}))
 
 
 class DemoGuide(Actor, HasLook):
@@ -175,6 +175,7 @@ def test_render_block_emits_selected_action_journal_text_before_block_content() 
     graph.add(action)
     ctx = SimpleNamespace(
         selected_edge=action,
+        incoming_edge=action,
         get_ns=lambda _caller: {},
     )
 

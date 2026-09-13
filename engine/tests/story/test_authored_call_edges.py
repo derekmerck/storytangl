@@ -7,9 +7,9 @@ could only be compiled as a dead end.
 
 The call is one-shot: the destination's content and effects land, and the reader
 is returned to the caller in the same step. So a destination with choices of its
-own cannot stop there and offer them - it journals them anyway, stale, in the
-same update. Call into leaf blocks, which is what a gamebook's service hub is. A
-call that waits for the reader needs the ledger's call stack to survive the step.
+own cannot stop there and offer them, and it does not journal them either - they
+could never be taken from where the reader ends up. A call that waits for the
+reader needs the ledger's call stack to survive the step.
 """
 
 from __future__ import annotations
@@ -120,14 +120,13 @@ def test_the_call_is_marked_on_the_edge() -> None:
     assert _edge(graph, "road", "Drive on").return_phase is None
 
 
-def test_a_called_destination_journals_choices_the_reader_has_moved_past() -> None:
-    """The wrinkle to know about before calling into a block with choices.
+def test_a_called_destination_does_not_offer_choices_the_reader_cannot_take() -> None:
+    """The reader returns in the same step, so the destination's choices are moot.
 
-    The call returns in the same step, so the reader ends up at the caller -
-    but the destination journalled its choices on the way through, and they
-    arrive in the same update. Nothing filters a choice by whether its owner is
-    still the cursor, so a client would render all three. Call into leaf blocks
-    until that is settled; a gamebook's service hub is one.
+    Journalled, they would reach the client as live buttons beside the caller's
+    - and a choice id is accepted without checking that its edge starts at the
+    cursor, so taking one would jump from the caller along the callee's edge.
+    The destination's content still lands; only its choices are withheld.
     """
     graph = _graph(
         "call_nested",
@@ -142,4 +141,30 @@ def test_a_called_destination_journals_choices_the_reader_has_moved_past() -> No
     }
 
     assert ledger.cursor.get_label() == "road"
-    assert "Ask about the scar" in offered  # documents today's behaviour
+    assert offered == {"Get medical help", "Drive on"}
+    assert "Ask about the scar" not in offered
+    content = [
+        getattr(fragment, "content", None)
+        for fragment in ledger.get_journal()
+        if getattr(fragment, "step", -1) >= ledger.current_update_start_step
+    ]
+    assert "The doctor patches you up." in content
+
+
+def test_the_same_block_reached_without_a_call_still_offers_its_choices() -> None:
+    # The withholding is about how the reader arrived, not about the block.
+    graph = _graph(
+        "plain_nested",
+        clinic={"actions": [{"text": "Ask about the scar", "successor": "town"}]},
+        call={},
+    )
+    ledger = _visit(graph)
+    offered = {
+        fragment.text
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ChoiceFragment)
+        and fragment.step >= ledger.current_update_start_step
+    }
+
+    assert ledger.cursor.get_label() == "clinic"
+    assert offered == {"Ask about the scar"}

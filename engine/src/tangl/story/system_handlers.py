@@ -25,6 +25,7 @@ from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    TraversableEdge,
     TraversableNode,
     ViabilityResult,
     do_compose_journal,
@@ -731,8 +732,18 @@ def render_block_media(*, caller, ctx, **_kw):
 
 @on_journal(priority=Priority.LATE)
 def render_block_choices(*, caller, ctx, **_kw):
-    """Render block outbound actions into choice fragments."""
+    """Render block outbound actions into choice fragments.
+
+    A block entered by a call (an edge with ``return_phase``) renders none: the
+    reader is returned to the caller in this same step, so its choices could
+    never be taken from where the reader ends up. Journalled anyway, they would
+    reach the client as live buttons, and a choice id is accepted without
+    checking that its edge starts at the cursor.
+    """
     if not isinstance(caller, Block):
+        return None
+    incoming = ctx.incoming_edge
+    if isinstance(incoming, TraversableEdge) and incoming.return_phase is not None:
         return None
 
     fragments: list[ChoiceFragment] = []
