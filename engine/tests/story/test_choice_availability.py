@@ -45,7 +45,7 @@ import tangl.story  # noqa: F401 – register story handlers
 def _simple_ctx(ns: dict | None = None):
     """Minimal ctx stub sufficient for availability checks."""
     from types import SimpleNamespace
-    return SimpleNamespace(get_ns=lambda _caller: dict(ns or {}))
+    return SimpleNamespace(incoming_edge=None, get_ns=lambda _caller: dict(ns or {}))
 
 
 def _full_ctx(graph: StoryGraph, cursor: Block, ns: dict | None = None):

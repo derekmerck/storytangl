@@ -23,6 +23,7 @@ from tangl.vm import (
     TraversableNode,
     assert_traversal_contracts,
 )
+from tangl.vm import ResolutionPhase
 from tangl.vm.provision import MaterializeRole, attach_child, materialize_template_entity
 from tangl.vm.provision.provisioner import _next_provision_uid
 
@@ -900,6 +901,12 @@ class StoryMaterializer:
                 ),
                 trigger_phase=trigger_phase,
                 once=bool(spec.get("once", False)),
+                # ``return: true`` makes this a call: the reader goes there,
+                # and comes back here. Same meaning as a sandbox interaction's
+                # ``return_to_location``, and the same phase.
+                return_phase=(
+                    ResolutionPhase.PLANNING if spec.get("return") else None
+                ),
             )
 
             target = self._find_runtime_entity(
