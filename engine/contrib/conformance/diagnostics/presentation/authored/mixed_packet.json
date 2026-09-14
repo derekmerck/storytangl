@@ -1,0 +1,97 @@
+{
+  "bundle_id": "mixed-packet",
+  "context": {
+    "gate_open": false,
+    "weather": "hard rain"
+  },
+  "fragments": [
+    {
+      "fragment_type": "content",
+      "uid": "20000000-0000-0000-0000-000000000001",
+      "origin_id": "20000000-0000-0000-0000-000000000101",
+      "source_id": "20000000-0000-0000-0000-000000000201",
+      "hints": {
+        "style_tags": [
+          "fragment:status"
+        ]
+      },
+      "authored_template": "Bridge watch: {{ weather }}",
+      "debug_payload": {
+        "text": "**not eligible** <unsafe>",
+        "nested": {
+          "content": "{{ untouched }}"
+        }
+      }
+    },
+    {
+      "fragment_type": "kv",
+      "uid": "20000000-0000-0000-0000-000000000002",
+      "origin_id": "20000000-0000-0000-0000-000000000102",
+      "authored_rows": [
+        {
+          "key": "Gate",
+          "value_template": "{% if gate_open %}open{% else %}closed{% endif %}"
+        },
+        {
+          "key": "Weather",
+          "value_template": "{{ weather }}"
+        }
+      ]
+    },
+    {
+      "fragment_type": "choice",
+      "uid": "20000000-0000-0000-0000-000000000003",
+      "origin_id": "20000000-0000-0000-0000-000000000103",
+      "edge_id": "20000000-0000-0000-0000-000000000303",
+      "available": false,
+      "unavailable_reason": "Gate closed",
+      "hints": {
+        "style_tags": [
+          "state:locked"
+        ]
+      },
+      "authored_template": "Cross the bridge"
+    },
+    {
+      "fragment_type": "media",
+      "uid": "20000000-0000-0000-0000-000000000004",
+      "origin_id": "20000000-0000-0000-0000-000000000104",
+      "source_id": "20000000-0000-0000-0000-000000000204",
+      "content": "bridge-storm.webp",
+      "content_format": "url",
+      "media_role": "narrative_im",
+      "fallback_template": "The bridge disappears into {{ weather }}."
+    },
+    {
+      "fragment_type": "group",
+      "uid": "20000000-0000-0000-0000-000000000005",
+      "origin_id": "20000000-0000-0000-0000-000000000105",
+      "group_type": "status_sidecar",
+      "zone_role": "packet",
+      "hints": {
+        "style_tags": [
+          "group:status_packet"
+        ]
+      },
+      "member_ids": [
+        "20000000-0000-0000-0000-000000000001",
+        "20000000-0000-0000-0000-000000000002",
+        "20000000-0000-0000-0000-000000000003",
+        "20000000-0000-0000-0000-000000000004"
+      ]
+    }
+  ],
+  "ux_events": [
+    {
+      "event_id": "20000000-0000-0000-0000-000000000401",
+      "event_type": "gate_refused",
+      "message_template": "The watch refuses passage in {{ weather }}.",
+      "presentation": "inline",
+      "replay": false,
+      "severity": "warning",
+      "details": {
+        "choice_id": "20000000-0000-0000-0000-000000000303"
+      }
+    }
+  ]
+}
