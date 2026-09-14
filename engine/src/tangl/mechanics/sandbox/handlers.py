@@ -18,6 +18,7 @@ from tangl.vm import (
     ResolutionPhase,
     TraversableNode,
     VmPhaseCtx,
+    has_visited,
     on_journal,
     on_provision,
     on_update,
@@ -610,6 +611,7 @@ def _project_sandbox_interaction(
     location: SandboxLocation,
     *,
     graph: Graph,
+    ctx: VmPhaseCtx,
     interaction: SandboxInteraction,
     source: str,
     sponsor_label: str,
@@ -624,7 +626,7 @@ def _project_sandbox_interaction(
     target = _interaction_target(location, interaction)
     if target is None:
         return None
-    if interaction.once and _target_visited(target):
+    if interaction.once and has_visited(target, ctx=ctx):
         return None
     return Action(
         registry=graph,
@@ -880,10 +882,6 @@ def sandbox_projection_state(
 ) -> SandboxProjectionState:
     """Return the disclosed projection state for ``location`` in ``ctx``."""
     return _projection_state(location, ctx)
-
-
-def _target_visited(target: TraversableNode) -> bool:
-    return bool(target.locals.get("_visited", False))
 
 
 def _concept_providers(location: SandboxLocation, ctx: VmPhaseCtx) -> list[Any]:
@@ -1474,12 +1472,14 @@ def _project_location_asset_actions(
     location: SandboxLocation,
     *,
     graph: Graph,
+    ctx: VmPhaseCtx,
 ) -> None:
     for asset_label, asset in sorted(location.assets.items()):
         asset_name = _asset_name(asset)
         _project_asset_interactions(
             location,
             graph=graph,
+            ctx=ctx,
             asset=asset,
             asset_label=asset_label,
             possession="location",
@@ -1530,6 +1530,7 @@ def _project_carried_asset_actions(
     location: SandboxLocation,
     *,
     graph: Graph,
+    ctx: VmPhaseCtx,
     player_assets: HasAssets,
     projection_state: SandboxProjectionState,
 ) -> None:
@@ -1606,6 +1607,7 @@ def _project_carried_asset_actions(
         _project_asset_interactions(
             location,
             graph=graph,
+            ctx=ctx,
             asset=asset,
             asset_label=asset_label,
             possession="carried",
@@ -1655,6 +1657,7 @@ def _project_asset_interactions(
     location: SandboxLocation,
     *,
     graph: Graph,
+    ctx: VmPhaseCtx,
     asset: SandboxAssetSurface,
     asset_label: str,
     possession: str,
@@ -1663,6 +1666,7 @@ def _project_asset_interactions(
         _project_sandbox_interaction(
             location,
             graph=graph,
+            ctx=ctx,
             interaction=interaction,
             source="sandbox_asset",
             sponsor_label=asset_label,
@@ -1677,12 +1681,14 @@ def _project_fixture_interactions(
     location: SandboxLocation,
     *,
     graph: Graph,
+    ctx: VmPhaseCtx,
     fixture: SandboxFixture,
 ) -> None:
     for interaction in fixture.interactions:
         _project_sandbox_interaction(
             location,
             graph=graph,
+            ctx=ctx,
             interaction=interaction,
             source="sandbox_fixture",
             sponsor_label=fixture.label,
@@ -1968,7 +1974,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
     projection_state = _projection_state(caller, ctx)
 
     if not projection_state.suppress_asset_affordances:
-        _project_location_asset_actions(caller, graph=graph)
+        _project_location_asset_actions(caller, graph=graph, ctx=ctx)
 
     player_assets = _player_asset_holder(caller)
     if player_assets is None:
@@ -1976,6 +1982,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
     _project_carried_asset_actions(
         caller,
         graph=graph,
+        ctx=ctx,
         player_assets=player_assets,
         projection_state=projection_state,
     )
@@ -2077,7 +2084,7 @@ def project_sandbox_fixture_actions(*, caller, ctx, **_kw):
         return None
 
     for fixture in caller.fixtures:
-        _project_fixture_interactions(caller, graph=graph, fixture=fixture)
+        _project_fixture_interactions(caller, graph=graph, ctx=ctx, fixture=fixture)
         if fixture.openable is None:
             continue
         if fixture.open:
@@ -2192,6 +2199,7 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
             _project_sandbox_interaction(
                 caller,
                 graph=graph,
+                ctx=ctx,
                 interaction=interaction,
                 source="sandbox_mob",
                 sponsor_label=mob_label,
@@ -2221,6 +2229,7 @@ def project_sandbox_location_interactions(*, caller, ctx, **_kw):
         _project_sandbox_interaction(
             caller,
             graph=graph,
+            ctx=ctx,
             interaction=interaction,
             source="sandbox_location",
             sponsor_label=caller.get_label(),
@@ -2302,6 +2311,7 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
         _project_sandbox_interaction(
             caller,
             graph=graph,
+            ctx=ctx,
             interaction=event.as_interaction(event_label),
             source=contribution.source,
             sponsor_label=contribution.source_label,

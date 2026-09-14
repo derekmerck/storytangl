@@ -58,4 +58,16 @@ class VmPhaseCtx(DispatchCtx, Protocol):
     ) -> "PhaseCtx": ...
 
 
-__all__ = ["VmPhaseCtx"]
+def cursor_history_from(ctx: "VmPhaseCtx | None") -> list[Any]:
+    """The reader's cursor history, as the ledger records it.
+
+    The ledger owns where the reader has been; the frame carries it on meta.
+    Everything that asks "has this been visited?" reads it from here, rather
+    than from a flag annotated onto a node.
+    """
+    if ctx is None:
+        return []
+    return list(ctx.get_meta().get("cursor_history") or ())
+
+
+__all__ = ["VmPhaseCtx", "cursor_history_from"]

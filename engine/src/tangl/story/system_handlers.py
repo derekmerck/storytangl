@@ -28,6 +28,7 @@ from tangl.vm import (
     TraversableNode,
     ViabilityResult,
     do_compose_journal,
+    in_subroutine,
     on_provision,
 )
 
@@ -731,8 +732,18 @@ def render_block_media(*, caller, ctx, **_kw):
 
 @on_journal(priority=Priority.LATE)
 def render_block_choices(*, caller, ctx, **_kw):
-    """Render block outbound actions into choice fragments."""
+    """Render block outbound actions into choice fragments.
+
+    A block journalled inside a call renders none - the callee, and anywhere it
+    redirects or continues. The step cannot end while a call is open, so the
+    reader is returned past every such block before getting control back, and
+    its choices could never be taken from where the reader ends up. Journalled
+    anyway, they would reach the client as live buttons, and a choice id is
+    accepted without checking that its edge starts at the cursor.
+    """
     if not isinstance(caller, Block):
+        return None
+    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())):
         return None
 
     fragments: list[ChoiceFragment] = []

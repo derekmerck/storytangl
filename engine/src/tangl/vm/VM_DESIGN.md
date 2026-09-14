@@ -266,8 +266,13 @@ Wraps core's `Edge` with phase-control fields:
 - `entry_phase` — which pipeline phase to start at when arriving via this edge. Return
   edges set `entry_phase=UPDATE` to skip VALIDATE/PLANNING on already-processed nodes.
 - `return_phase` — marks this edge as a *call*. The frame pushes it onto the return
-  stack before following. When the callee pipeline reaches a terminal, the frame pops
-  the stack and follows `get_return_edge()` back to the predecessor at `return_phase`.
+  stack before following, so the call is open for its whole traversal, and each phase
+  context carries the open calls as `meta["call_stack_ids"]`. When the callee pipeline
+  reaches a terminal, the frame pops the stack and follows `get_return_edge()` back to
+  the predecessor at `return_phase`.
+- `once` — offer this edge only until its successor has been visited, by any route.
+  "Visited" is the ledger's cursor history, read through the phase context by
+  `has_visited(node, ctx=ctx)`; a node's `_visited` locals are not consulted.
 - `availability` — edge-local activation guards evaluated against the
   predecessor scope before successor entry availability is checked.
 - `effects` — edge-local runtime effects applied to the successor/arrival
@@ -777,7 +782,7 @@ Every vm-layer concept wraps a core primitive rather than modifying it:
 
 ```
 core.Edge           topology endpoints
-  vm.TraversableEdge    + entry_phase, return_phase
+  vm.TraversableEdge    + entry_phase, return_phase, once
     story.Choice          + narrative metadata, label, availability label
 
 core.Effect         serializable expression

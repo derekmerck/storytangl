@@ -173,6 +173,21 @@ class ActionScript(BaseScriptItem):
             "Optional typed advisory metadata for client choice presentation."
         ),
     )
+    once: bool = Field(
+        False,
+        description=(
+            "Offer this action only until its successor has been visited, by any "
+            "route, as the ledger's cursor history records it."
+        ),
+    )
+    return_: bool = Field(
+        False,
+        alias="return",
+        description=(
+            "Make this action a call: the reader goes to the successor, and is "
+            "returned here in the same step."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod

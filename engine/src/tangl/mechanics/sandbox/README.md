@@ -165,8 +165,10 @@ schedule fields decide whether the affordance is primed at the current
 `WorldTime`, location, and actor-presence set. After that, `target`,
 `activation`, `return_to_location`, `availability`, `effects`, and
 `journal_text` follow the same `SandboxInteraction` path as any other sponsored
-choice. A `once` event is suppressed after its target has been marked visited by
-the generic VM `mark_visited` handler.
+choice. A `once` event is suppressed after its target has been visited, as the
+ledger's cursor history records it (`has_visited`). The `_visited` locals that
+the VM's `mark_visited` handler annotates onto a node are a convenience for a
+node reading its own state, not what `once` reads.
 
 Asset projection is deliberately modest. Locations are `HasAssets` holders, and
 the nearest `SandboxScope.player_assets` holder stands in for ready-at-hand

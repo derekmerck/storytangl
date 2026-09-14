@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 from uuid import UUID
 
+from pydantic import TypeAdapter
+
 from tangl.core import EntityTemplate, GraphFactory, GraphItem, Selector, TemplateRegistry
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
@@ -23,6 +25,7 @@ from tangl.vm import (
     TraversableNode,
     assert_traversal_contracts,
 )
+from tangl.vm import ResolutionPhase
 from tangl.vm.provision import MaterializeRole, attach_child, materialize_template_entity
 from tangl.vm.provision.provisioner import _next_provision_uid
 
@@ -42,6 +45,19 @@ from .types import (
 
 # What to call an edge the author did not name, by the list it came from.
 _EDGE_LABEL_STEM = {"actions": "action", "continues": "continue", "redirects": "redirect"}
+
+_AUTHORED_FLAG = TypeAdapter(bool)
+
+
+def _authored_flag(spec: Mapping[str, Any], key: str) -> bool:
+    """An authored boolean, parsed as its typed ``ActionScript`` field parses it.
+
+    Specs reach the materializer as plain mappings - compiling does not force
+    them through the script models - so ``once: "false"`` can arrive as a
+    string, and truthiness would read it as true. This applies the same bool
+    parsing the script model does, and rejects what it would reject.
+    """
+    return _AUTHORED_FLAG.validate_python(spec.get(key, False))
 
 
 @dataclass(slots=True)
@@ -912,6 +928,14 @@ class StoryMaterializer:
                     or spec.get("presentation_hints")
                 ),
                 trigger_phase=trigger_phase,
+                once=_authored_flag(spec, "once"),
+                # ``return: true`` makes this a call: the reader goes there,
+                # and comes back here. Same meaning as a sandbox interaction's
+                # ``return_to_location``, and the same phase. Parsed as a bool,
+                # like ``once``, so ``return: "false"`` is not a call.
+                return_phase=(
+                    ResolutionPhase.PLANNING if _authored_flag(spec, "return") else None
+                ),
             )
 
             target = self._find_runtime_entity(
