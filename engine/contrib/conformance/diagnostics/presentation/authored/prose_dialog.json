@@ -1,0 +1,42 @@
+{
+  "bundle_id": "prose-dialog",
+  "context": {
+    "reader": "Mira",
+    "storm": true
+  },
+  "fragments": [
+    {
+      "fragment_type": "content",
+      "uid": "10000000-0000-0000-0000-000000000001",
+      "origin_id": "10000000-0000-0000-0000-000000000101",
+      "source_id": "10000000-0000-0000-0000-000000000201",
+      "authored_markup": "::: {.block:admonition .tone:warning}\nWelcome, {{ reader }} 🌩. [{% if storm %}The storm is close. {% else %}The road is clear. {% endif %}]{.inline:emphasis}[Keep your <lantern> lit.]{.unknown:glimmer}\n:::"
+    },
+    {
+      "fragment_type": "attributed",
+      "uid": "10000000-0000-0000-0000-000000000002",
+      "origin_id": "10000000-0000-0000-0000-000000000102",
+      "source_id": "10000000-0000-0000-0000-000000000202",
+      "who": "Guide",
+      "how": "quietly",
+      "media": "",
+      "hints": {
+        "style_tags": [
+          "fragment:dialog",
+          "speaker:guide"
+        ]
+      },
+      "authored_template": "{% if storm %}Meet me beneath the west arch, {{ reader }}.{% endif %}"
+    },
+    {
+      "fragment_type": "group",
+      "uid": "10000000-0000-0000-0000-000000000003",
+      "origin_id": "10000000-0000-0000-0000-000000000103",
+      "group_type": "dialog",
+      "member_ids": [
+        "10000000-0000-0000-0000-000000000002"
+      ]
+    }
+  ],
+  "ux_events": []
+}

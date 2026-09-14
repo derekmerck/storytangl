@@ -34,6 +34,12 @@ that the current backend can emit widget-shaped `RuntimeEnvelope` and
 Regenerate them with
 `poetry run python engine/contrib/conformance/backend_widget_demo.py`.
 
+`diagnostics/presentation/` is a separate experimental comparison for issues
+#457 and #454. Its two authored bundles and generated report make template
+evaluation, neutral annotation, safe structural HTML, Rich spans, and plain
+fallback inspectable without promoting a new attributed-text or persistence
+contract.
+
 `legibility.py` contains the first promoted conformance harness. It is a
 JSON-only decision-legibility check: after applying update/delete controls, each
 available choice must be renderable in the current scene shell and any
