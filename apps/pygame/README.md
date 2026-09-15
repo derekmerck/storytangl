@@ -37,6 +37,17 @@ rather than merely intended — see the map view below.
 **Unavailable choices render dimmed with their `unavailable_reason`** rather
 than being hidden (§5.1, Decision Legibility).
 
+**A sprite plays a clip only when its staging asks for one.** When a portrait's
+payload carries `sprite_sheets` and its `staging_hints` name a `media_clip`, the
+stage draws that clip's current frame over the still's box, offset by the sheet's
+pivot so the still's own pixels land exactly where the still would -- starting or
+switching a clip never moves the character. The frame comes from the manifest's
+own `frame_index_at`, on an injectable clock. Frames are cut from the sheet before
+mirroring. A clip restarts when it changes and carries on when a turn restates it.
+With no clip, no sheet that has it, or a sheet this port cannot load, the still is
+drawn. The event loop sleeps until input, and ticks at about thirty frames a
+second only while a clip is actually playing.
+
 ## Typed Choices
 
 Most choices are answered by their `edge_id` alone. Some want a value first, and
@@ -213,7 +224,10 @@ PYTHONPATH=engine/src:apps/pygame/src:worlds/repartee_loop \
 ```
 
 `--assets DIR` resolves relative media sources. `--screenshot PATH` renders one
-frame and exits, which works headless under `SDL_VIDEODRIVER=dummy`.
+frame and exits, which works headless under `SDL_VIDEODRIVER=dummy`; a clip in
+that frame shows its first frame, so captures are reproducible.
+`--reduced-motion` holds every clip on its first frame. The pose still shows --
+it is story state -- only the motion stops.
 
 ```bash
 PYTHONPATH=engine/src:apps/pygame/src poetry run pytest apps/pygame/tests

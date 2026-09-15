@@ -36,3 +36,12 @@ Geometry arrived here from two places that were only ever its first consumers:
 the rectangle sat in `journal` because a fragment carried it, and the surface
 types sat in `mechanics` because a game block declared one. Neither owned the
 vocabulary, which is the same accident this whole extraction undoes.
+
+`sprite_sheet` describes an optional animated alternative to a staged still, as
+a typed subset of Aseprite's JSON export: frame rects and durations, tags with a
+direction and repeat, and a pivot slice. It describes the bytes only.
+`StagingHints.media_clip` selects a tag per use, and looping stays with
+`media_timing`, because Aseprite's format cannot express "forever". A filename
+(`<still>[-<clip>]-<cols>x<rows>[-<total>]`) and a compact broadcasting form
+both expand into the same manifest. `frame_index_at` is the one timing function
+every client and test shares.

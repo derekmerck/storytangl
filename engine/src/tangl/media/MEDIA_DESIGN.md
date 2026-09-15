@@ -291,6 +291,17 @@ Two factory functions create scoped managers:
 World-scoped managers are created by loader/compiler infrastructure during world
 loading and attached to world facets.
 
+**Sprite sheets ride on their still.** After every indexing pass,
+`link_sprite_sheets` finds images named as sheets (`master_sprite-4x1.png`),
+attaches each one's typed manifest -- read from its sidecar export or expanded
+from its name -- and adds a `SpriteSheetRef` to the still it names. Two
+constraints fix that design. Linking must run across files, since a sheet always
+sorts before its still. And the reference must travel *with* the still: a story
+copies the still's record into its own graph, where the world's inventory is no
+longer reachable, so a sheet looked up at payload time would be found in a quick
+test and missing in every live session. The ref is plain data, so a saved graph
+carries no class path for it.
+
 
 ### MediaFragment and StagingHints
 
@@ -323,6 +334,12 @@ how to interpret them based on its capabilities.
 inline data, passthrough paths, poll directives, or fallback content. This is
 the one place where media indirection is resolved; story code never constructs
 client-facing media payloads.
+
+Every payload carries the fragment's `staging_hints`, and a still with sprite
+sheets carries `sprite_sheets`: each sheet resolved through the same function as
+the still, so URL sits beside URL and bytes beside bytes, with its manifest.
+Earlier the payload dropped staging hints entirely, which an in-process client
+never noticed and a remote client could not work around.
 
 
 ### Creator Pipeline (`media_creators/`)

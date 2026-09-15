@@ -84,6 +84,22 @@ Nothing else changes — not the script, not the staging hints, not any client.
 night spaceport, with the clerk as a service robot and the dockhand as an
 alien stevedore.
 
+### Sprite sheets
+
+The spaceport pack animates its three characters. Each still has a sheet beside
+it with three clips: `idle` (a blink, or the clerk's visor dimming), `call` and
+`response`. Locations loop `idle`; each contest poses its opponent from game
+state -- attacking while it holds the initiative, on guard while it waits for
+your line -- and the aftermaths hold their outcome. Select the pack to see it:
+
+```yaml
+media_dir: media_spaceport
+```
+
+The quayside pack stages the same clips and draws its stills, because it has no
+sheets yet; a pack without sheets is still a complete reskin. See `AGENTS.md`
+for why, and for how the frames were made.
+
 ### Capturing a pack
 
 [`scripts/capture_world_frames.py`](../../scripts/capture_world_frames.py)
