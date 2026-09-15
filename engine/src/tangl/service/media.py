@@ -269,6 +269,15 @@ def _base_payload(
     }
     if rit_id is not None:
         payload["rit_id"] = str(rit_id)
+    # Per-use staging travels with the media it stages. Before this, every media
+    # payload dropped it: an in-process client read hints off the fragment and
+    # never noticed, while a remote client had no way to place, flip or animate
+    # anything at all -- and tests that built fixtures with hints hid the gap.
+    hints = getattr(fragment, "staging_hints", None)
+    if hints is not None:
+        dumped = hints.model_dump(exclude_none=True) if hasattr(hints, "model_dump") else dict(hints)
+        if dumped:
+            payload["staging_hints"] = dumped
     return payload
 
 
@@ -447,6 +456,58 @@ def _resolved_rit_payload(
     )
 
 
+_TRANSPORT_KEYS = ("content_format", "media_type", "url", "path", "data", "rit_id")
+
+
+def _sprite_sheet_payloads(
+    rit: MediaRIT,
+    *,
+    fragment: MediaFragment,
+    scope: str,
+    profile: MediaRenderProfile,
+    world_id: str | None = None,
+    story_id: str | None = None,
+    world_media_root: Path | None = None,
+    story_media_root: Path | None = None,
+    system_media_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Each of the still's sheets, transported exactly as the still itself is.
+
+    A sheet goes through the same resolution as its still, so a client asking for
+    URLs gets URLs for both, one asking for paths gets paths, and inline data is
+    inline for both. Only the transport fields are kept -- role, text and uid
+    belong to the staged still, not to its alternative. A sheet that cannot be
+    resolved is left out: the still is already the floor.
+    """
+
+    sheets: list[dict[str, Any]] = []
+    for ref in getattr(rit, "sprite_sheets", None) or ():
+        sheet_rit = MediaRIT(uid=ref.rit_id, path=ref.path, content_hash=bytes.fromhex(ref.content_hash))
+        result = _resolve_media_data(sheet_rit)
+        if not isinstance(result, ResolvedMediaResult):
+            continue
+        resolved = _resolved_rit_payload(
+            sheet_rit,
+            fragment=fragment,
+            scope=scope,
+            result=result,
+            profile=profile,
+            world_id=world_id,
+            story_id=story_id,
+            world_media_root=world_media_root,
+            story_media_root=story_media_root,
+            system_media_root=system_media_root,
+        )
+        if resolved.get("content_format") is None:
+            continue
+        sheets.append({
+            **{key: resolved[key] for key in _TRANSPORT_KEYS if key in resolved},
+            "content_hash": ref.content_hash,
+            "manifest": ref.manifest.model_dump(),
+        })
+    return sheets
+
+
 def _pending_or_failed_payload(
     *,
     fragment: MediaFragment,
@@ -521,18 +582,22 @@ def media_fragment_to_payload(
 
             result = _resolve_media_data(rit)
             if isinstance(result, ResolvedMediaResult):
-                return _resolved_rit_payload(
-                    rit,
-                    fragment=fragment,
-                    scope=scope,
-                    result=result,
-                    profile=payload_profile,
+                roots = dict(
                     world_id=world_id,
                     story_id=story_id,
                     world_media_root=world_media_root,
                     story_media_root=story_media_root,
                     system_media_root=system_media_root,
                 )
+                payload = _resolved_rit_payload(
+                    rit, fragment=fragment, scope=scope, result=result, profile=payload_profile, **roots
+                )
+                sheets = _sprite_sheet_payloads(
+                    rit, fragment=fragment, scope=scope, profile=payload_profile, **roots
+                )
+                if sheets and payload.get("content_format") is not None:
+                    payload["sprite_sheets"] = sheets
+                return payload
             return _pending_or_failed_payload(
                 fragment=fragment,
                 rit=rit,
