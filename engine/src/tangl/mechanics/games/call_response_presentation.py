@@ -19,6 +19,10 @@ script.
 The clip names are the kernel's own :data:`PhraseRole` vocabulary, not art
 vocabulary, which is what lets interchangeable art packs keep supplying the same
 names. A client without sprite sheets ignores the hint and draws the still.
+
+It registers on ``presentation_dispatch``, not the VM's registry. The VM runs the
+``compose_journal`` fold; this contribution is presentation syntax a generic
+mechanic adds to it, and owning a hook in the lifecycle is not its business.
 """
 
 from __future__ import annotations
@@ -26,8 +30,8 @@ from __future__ import annotations
 from typing import Any
 
 from tangl.journal.fragments import MediaFragment
+from tangl.presentation.dispatch import on_compose_journal
 from tangl.presentation.hints import StagingHints
-from tangl.vm import on_compose_journal
 
 from .call_response_game import CallResponseGame
 from .has_game import HasGame
@@ -51,7 +55,7 @@ def stage_call_response_posture(*, caller: HasGame, fragments: list[Any], **_kw:
     because an author who asked for one meant it.
     """
 
-    game = getattr(caller, "game", None)
+    game = caller.game
     if not isinstance(game, CallResponseGame):
         return None
 

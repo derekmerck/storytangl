@@ -85,7 +85,7 @@ class Walk:
 
 def _staged(payload: dict) -> tuple[str, str | None, str | None, list[str]]:
     hints = payload.get("staging_hints") or {}
-    sheets = [sheet["manifest"]["meta"]["image"] for sheet in payload.get("sprite_sheets", [])]
+    sheets = [sheet["manifest"]["image"] for sheet in payload.get("sprite_sheets", [])]
     return payload["url"].rsplit("/", 1)[-1], hints.get("media_clip"), hints.get("media_timing"), sheets
 
 
@@ -125,11 +125,13 @@ def test_the_sheet_travels_as_a_servable_url_beside_the_still(spaceport_service)
 
     assert payload["content_format"] == sheet["content_format"] == "url"
     assert sheet["url"].endswith("/images/clerk_sprite-4x1.png")
-    assert sheet["manifest"]["meta"]["frameTags"] == [
-        {"name": "idle", "from": 0, "to": 1, "direction": "forward"},
-        {"name": "call", "from": 2, "to": 2, "direction": "forward"},
-        {"name": "response", "from": 3, "to": 3, "direction": "forward"},
+    assert sheet["manifest"]["clips"] == [
+        {"name": "idle", "first": 0, "last": 1, "direction": "forward"},
+        {"name": "call", "first": 2, "last": 2, "direction": "forward"},
+        {"name": "response", "first": 3, "last": 3, "direction": "forward"},
     ]
+    # Every frame carries its own anchor: the export's one pivot key, resolved.
+    assert {(f["pivot"]["x"], f["pivot"]["y"]) for f in sheet["manifest"]["frames"]} == {(51, 111)}
 
 
 def test_the_default_quayside_pack_stages_the_same_clips_and_no_sheets() -> None:

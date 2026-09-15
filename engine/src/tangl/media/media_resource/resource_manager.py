@@ -9,7 +9,7 @@ import logging
 from tangl.core import Behavior, Selector
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
-from tangl.media.media_resource.sprite_sheet_index import link_sprite_sheets
+from tangl.media.sprite_sheets.index import link_sprite_sheets
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)

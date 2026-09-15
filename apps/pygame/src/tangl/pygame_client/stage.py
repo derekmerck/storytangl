@@ -10,6 +10,7 @@ colour plus text.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
@@ -206,6 +207,23 @@ MAP_FOOTER_ROWS = 8
 footer that grows without limit is a map nobody can see."""
 
 
+_ClipKey = tuple[str, str, str, int]
+"""A staged occurrence: role, source, resolved slot, and its count among equals."""
+
+
+@dataclass(slots=True)
+class _ClipPlay:
+    """Where one staged occurrence is in its clip."""
+
+    clip: str
+    started_ms: float
+    held_ms: float | None = None
+    """Elapsed time frozen by ``pause`` or ``stop``; ``None`` while playing."""
+
+    def elapsed(self, now: float) -> float:
+        return self.held_ms if self.held_ms is not None else now - self.started_ms
+
+
 class Stage:
     """Own the display surface, fonts, and per-frame hit regions."""
 
@@ -247,7 +265,9 @@ class Stage:
         """False under reduced motion: each clip holds its first frame, still posed."""
         self.animating = False
         """True when the last draw showed a clip that has more frames to play."""
-        self._clips: dict[tuple[str, str, str], tuple[str, float]] = {}
+        self._clips: dict[_ClipKey, _ClipPlay] = {}
+        self._staged_turn: Turn | None = None
+        """The turn whose portraits were last drawn: a different one is a new statement."""
         self._drawn_at = self._now()
         self._frames: dict[tuple[str, int], pygame.Surface] = {}
 
@@ -351,7 +371,7 @@ class Stage:
             else len(turn.choices)
         )
         choices_top = LOGICAL_SIZE[1] - 4 - below * 11
-        self._draw_portraits(loaded, floor=choices_top)
+        self._draw_portraits(turn, loaded, floor=choices_top)
         panelled = self._has_state(turn, placed=placed)
         width = LOGICAL_SIZE[0] - (PANEL_W if panelled else 0)
         stage_rect = pygame.Rect(0, PROSE_TOP, width, choices_top - PROSE_TOP)
@@ -747,18 +767,21 @@ class Stage:
             self.surface.fill(TEAL)
 
     def _draw_portraits(
-        self, loaded: list[tuple[StageImage, pygame.Surface]], *, floor: int
+        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]], *, floor: int
     ) -> None:
-        """Place up to two sprites on a shared baseline, preserving aspect.
+        """Place up to three sprites on a shared baseline, preserving aspect.
 
         The still decides where a sprite stands and how big it is. When a clip is
-        playing, its frame is drawn over the same box, offset so the still's own
-        pixels would land exactly where the still does -- so starting, stopping or
-        switching a clip never moves the character.
+        playing, its frame is drawn over the same box where the manifest's
+        placement puts it, so starting, stopping or switching a clip never moves
+        the character.
         """
 
+        fresh = turn is not self._staged_turn
+        self._staged_turn = turn
         staged = self._pick(loaded, PORTRAIT_ROLES)[:3]
-        seen: set[tuple[str, str, str]] = set()
+        seen: set[_ClipKey] = set()
+        occurrences: Counter[tuple[str, str, str]] = Counter()
         for index, (image, portrait) in enumerate(staged):
             height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
             factor = height / portrait.get_height()
@@ -766,77 +789,94 @@ class Stage:
             slot = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
             box_x, box_y = self._slot_x(slot, width), floor - height
 
-            drawn, (off_x, off_y) = self._clip_frame(image, portrait.get_size(), seen)
+            # One timer per staged occurrence: the same sprite used twice gets two,
+            # whether it was placed explicitly or given a default slot by arrival.
+            placed = (image.role, image.source, slot)
+            key = (*placed, occurrences[placed])
+            occurrences[placed] += 1
+
+            drawn, (at_x, at_y) = self._clip_frame(image, portrait.get_size(), key, fresh=fresh)
             if drawn is None:
-                drawn, off_x, off_y = portrait, 0, 0
+                drawn, at_x, at_y = portrait, 0, 0
+            else:
+                seen.add(key)
             scaled = pygame.transform.scale(
                 drawn,
                 (max(1, round(drawn.get_width() * factor)), max(1, round(drawn.get_height() * factor))),
             )
-            self.surface.blit(scaled, (box_x - round(off_x * factor), box_y - round(off_y * factor)))
+            self.surface.blit(scaled, (box_x + round(at_x * factor), box_y + round(at_y * factor)))
         # A sprite that left the stage starts its clip afresh when it comes back;
         # one merely restated by the next turn carries on where it was.
-        self._clips = {key: value for key, value in self._clips.items() if key in seen}
+        self._clips = {key: play for key, play in self._clips.items() if key in seen}
 
     def _clip_frame(
         self,
         image: StageImage,
         still_size: tuple[int, int],
-        seen: set[tuple[str, str, str]],
+        key: _ClipKey,
+        *,
+        fresh: bool,
     ) -> tuple[pygame.Surface | None, tuple[int, int]]:
-        """The frame this image's clip shows now, and its offset from the still's box.
+        """The frame this image's clip shows now, and where it goes relative to the still.
 
         ``None`` means draw the still: no clip asked for, no sheet that has it, or a
         sheet this port cannot use. The still is the floor at every one of those.
         """
 
-        if image.clip is None or not image.sheets:
+        if image.clip is None:
             return None, (0, 0)
-        sheet = next((s for s in image.sheets if image.clip in s.manifest.clip_names()), None) or next(
-            (s for s in image.sheets if not s.manifest.clip_names()), None
-        )
+        sheet = next((s for s in image.sheets if s.manifest.has_clip(image.clip)), None)
         if sheet is None:
             return None, (0, 0)
         manifest = sheet.manifest
         atlas = self._load(sheet.source)
-        if atlas is None or atlas.get_size() != (manifest.meta.size.w, manifest.meta.size.h):
+        if atlas is None or atlas.get_size() != (manifest.size.w, manifest.size.h):
             return None, (0, 0)
 
-        identity = (image.role, image.source, image.x_slot or "")
-        seen.add(identity)
-        now = self._now()
-        started = self._clips.get(identity)
-        if started is None or started[0] != image.clip:
-            started = (image.clip, now)
-            self._clips[identity] = started
-        elapsed = now - started[1] if self.animate else 0
-        frame_index = manifest.frame_index_at(image.clip, elapsed, loop=image.loop)
+        play = self._play(key, image, fresh=fresh)
+        elapsed = play.elapsed(self._now()) if self.animate else 0
+        loop = image.timing == "loop"
+        index = manifest.frame_index_at(image.clip, elapsed, loop=loop)
 
-        frame = self._frames.get((sheet.source, frame_index))
+        frame = self._frames.get((sheet.source, index))
         if frame is None:
-            r = manifest.frames[frame_index].frame
+            r = manifest.frames[index].rect
             frame = atlas.subsurface(pygame.Rect(r.x, r.y, r.w, r.h)).copy()
-            self._frames[(sheet.source, frame_index)] = frame
-
-        still_w, still_h = still_size
-        pivot = manifest.pivot()
-        if pivot is not None:
-            # The pivot is the still's own bottom-centre inside the cell.
-            off_x, off_y = pivot.x - still_w // 2, pivot.y - (still_h - 1)
-        else:
-            off_x, off_y = (frame.get_width() - still_w) // 2, frame.get_height() - still_h
+            self._frames[(sheet.source, index)] = frame
         if image.flip_h:
             # Cut the frame out first, then mirror it. Mirroring the whole sheet
             # would reverse the frame order along with the pixels.
             frame = pygame.transform.flip(frame, True, False)
-            off_x = frame.get_width() - off_x - still_w
+        at = manifest.placement(index, still_size, flip_h=image.flip_h)
 
-        order = manifest.sequence(image.clip)
-        if self.animate and len(order) > 1:
-            cycle = sum(manifest.frames[i].duration for i in order)
-            if image.loop or elapsed < cycle * (manifest.tag(image.clip).repeat or 1):
+        if self.animate and play.held_ms is None:
+            settles = manifest.settles_at_ms(image.clip, loop=loop)
+            if settles is None or elapsed < settles:
                 self.animating = True
-        return frame, (off_x, off_y)
+        return frame, (at.x, at.y)
+
+    def _play(self, key: _ClipKey, image: StageImage, *, fresh: bool) -> "_ClipPlay":
+        """This occurrence's playback state, after applying the use's ``media_timing``.
+
+        ``None``, ``start`` and ``loop`` play (from wherever a pause left off);
+        ``restart`` plays from the top each time a new turn states it; ``pause``
+        holds the frame showing; ``stop`` holds the first frame, and the next play
+        starts from there. Whether a clip loops is read separately, at timing.
+        """
+
+        now = self._now()
+        play = self._clips.get(key)
+        if play is None or play.clip != image.clip or (fresh and image.timing == "restart"):
+            play = _ClipPlay(clip=image.clip, started_ms=now)
+            self._clips[key] = play
+        if image.timing == "stop":
+            play.started_ms, play.held_ms = now, 0.0
+        elif image.timing == "pause":
+            if play.held_ms is None:
+                play.held_ms = now - play.started_ms
+        elif play.held_ms is not None:
+            play.started_ms, play.held_ms = now - play.held_ms, None
+        return play
 
     @staticmethod
     def _slot_x(slot: str, width: int) -> int:

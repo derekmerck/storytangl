@@ -508,6 +508,40 @@ def _sprite_sheet_payloads(
     return sheets
 
 
+def _still_payload(
+    rit: MediaRIT,
+    *,
+    fragment: MediaFragment,
+    scope: str,
+    result: ResolvedMediaResult,
+    profile: MediaRenderProfile,
+    world_id: str | None = None,
+    story_id: str | None = None,
+    world_media_root: Path | None = None,
+    story_media_root: Path | None = None,
+    system_media_root: Path | None = None,
+) -> dict[str, Any]:
+    """A resolved still, with its sprite sheets beside it.
+
+    The one way a still reaches a client, whether it is the fragment's own resource
+    or a static fallback standing in for one still pending: a fallback is a still
+    like any other, and its sheets come with it.
+    """
+
+    roots = dict(
+        world_id=world_id,
+        story_id=story_id,
+        world_media_root=world_media_root,
+        story_media_root=story_media_root,
+        system_media_root=system_media_root,
+    )
+    payload = _resolved_rit_payload(rit, fragment=fragment, scope=scope, result=result, profile=profile, **roots)
+    sheets = _sprite_sheet_payloads(rit, fragment=fragment, scope=scope, profile=profile, **roots)
+    if sheets and payload.get("content_format") is not None:
+        payload["sprite_sheets"] = sheets
+    return payload
+
+
 def _pending_or_failed_payload(
     *,
     fragment: MediaFragment,
@@ -540,7 +574,7 @@ def _pending_or_failed_payload(
         fallback_rit, fallback_scope = fallback
         fallback_result = _resolve_media_data(fallback_rit)
         if isinstance(fallback_result, ResolvedMediaResult):
-            return _resolved_rit_payload(
+            return _still_payload(
                 fallback_rit,
                 fragment=fragment,
                 scope=fallback_scope,
@@ -589,15 +623,9 @@ def media_fragment_to_payload(
                     story_media_root=story_media_root,
                     system_media_root=system_media_root,
                 )
-                payload = _resolved_rit_payload(
+                return _still_payload(
                     rit, fragment=fragment, scope=scope, result=result, profile=payload_profile, **roots
                 )
-                sheets = _sprite_sheet_payloads(
-                    rit, fragment=fragment, scope=scope, profile=payload_profile, **roots
-                )
-                if sheets and payload.get("content_format") is not None:
-                    payload["sprite_sheets"] = sheets
-                return payload
             return _pending_or_failed_payload(
                 fragment=fragment,
                 rit=rit,

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, get_args
 from uuid import UUID
 
 from tangl.core import BaseFragment
@@ -23,6 +23,7 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.persistence import PersistenceManagerFactory
+from tangl.presentation.hints import TimingName
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.media import (
     MediaContentProfile,
@@ -61,6 +62,15 @@ def _text(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
     return value.strip() or None
+
+
+def _timing(value: Any) -> TimingName | None:
+    """A ``media_timing`` this port knows, kept as stated; anything else is dropped aloud."""
+
+    if value is None or value in get_args(TimingName):
+        return value
+    logger.warning("Ignoring unknown media_timing %r; the clip plays as its sheet times it", value)
+    return None
 
 
 # ``content_format`` names the key its source lives under. This used to be a
@@ -668,7 +678,7 @@ class PygameSessionBridge:
                 x_slot=_text(hints.get("media_x")),
                 flip_h=bool(hints.get("media_flip_h")),
                 clip=_text(hints.get("media_clip")),
-                loop=hints.get("media_timing") == "loop",
+                timing=_timing(hints.get("media_timing")),
                 sheets=self._sheets(payload),
             )
         )

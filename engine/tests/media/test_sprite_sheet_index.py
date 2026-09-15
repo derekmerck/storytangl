@@ -17,7 +17,7 @@ from PIL import Image
 from tangl.core import Graph
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.resource_manager import ResourceManager
-from tangl.media.media_resource.sprite_sheet_index import SpriteSheetError
+from tangl.media.sprite_sheets.index import SpriteSheetError
 
 
 def _png(path: Path, size: tuple[int, int], shade: int) -> Path:
@@ -56,7 +56,7 @@ def test_a_named_sheet_attaches_to_its_still_with_the_manifest_its_name_implies(
 
     assert ref.path.name == "hero-idle-4x1-800ms.png"
     assert ref.manifest.clip_names() == ["idle"]
-    assert [f.duration for f in ref.manifest.frames] == [200, 200, 200, 200]
+    assert [f.duration_ms for f in ref.manifest.frames] == [200, 200, 200, 200]
 
 
 def test_the_still_is_otherwise_untouched(pack: Path) -> None:
@@ -102,7 +102,7 @@ def test_a_sidecar_export_is_authoritative(pack: Path) -> None:
     manager.index_directory("images")
 
     [ref] = _still(manager).sprite_sheets
-    assert [f.duration for f in ref.manifest.frames] == [1800, 200]
+    assert [f.duration_ms for f in ref.manifest.frames] == [1800, 200]
 
 
 @pytest.mark.parametrize(
@@ -138,6 +138,30 @@ def test_two_sheets_defining_one_clip_for_one_still_are_refused(pack: Path) -> N
 
     with pytest.raises(SpriteSheetError, match="both define clip"):
         ResourceManager(pack).index_directory("images")
+
+
+@pytest.mark.parametrize(
+    "other",
+    ["hero-2x1.png", "hero-call-1x1.png"],
+    ids=["beside-another-untagged-sheet", "beside-a-tagged-sheet"],
+)
+def test_a_sheet_without_clips_must_be_its_stills_only_sheet(pack: Path, other: str) -> None:
+    """It answers to every clip name, so beside any other sheet the choice is filename order."""
+
+    _png(pack / "images" / "hero-4x1.png", (40, 12), 20)
+    _png(pack / "images" / other, (20, 12) if other == "hero-2x1.png" else (10, 12), 30)
+
+    with pytest.raises(SpriteSheetError, match="answers to every clip name"):
+        ResourceManager(pack).index_directory("images")
+
+
+def test_a_sheet_without_clips_may_serve_its_still_alone(pack: Path) -> None:
+    _png(pack / "images" / "hero-4x1.png", (40, 12), 20)
+    manager = ResourceManager(pack)
+    manager.index_directory("images")
+
+    [ref] = _still(manager).sprite_sheets
+    assert ref.manifest.clips == [] and ref.manifest.has_clip("anything")
 
 
 def test_a_sheet_with_no_still_is_inert_rather_than_an_error(tmp_path: Path) -> None:

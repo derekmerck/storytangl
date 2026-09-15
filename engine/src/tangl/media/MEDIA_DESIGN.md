@@ -291,10 +291,17 @@ Two factory functions create scoped managers:
 World-scoped managers are created by loader/compiler infrastructure during world
 loading and attached to world facets.
 
-**Sprite sheets ride on their still.** After every indexing pass,
-`link_sprite_sheets` finds images named as sheets (`master_sprite-4x1.png`),
-attaches each one's typed manifest -- read from its sidecar export or expanded
-from its name -- and adds a `SpriteSheetRef` to the still it names. Two
+**Sprite sheets ride on their still.** `tangl.media.sprite_sheets` owns
+everything that turns an authored sheet into the client-facing
+`tangl.presentation.sprite_sheet.SpriteSheetManifest`: the Aseprite export reader
+(trim offsets, per-frame pivots from slice keys, ping-pong repeat, and a refusal
+for anything it cannot honour), the filename and compact shorthands, and
+indexing. After every indexing pass, `link_sprite_sheets` finds images named as
+sheets (`master_sprite-4x1.png`), attaches each one's manifest -- read from its
+sidecar export or expanded from its name -- and adds a `SpriteSheetRef` to the
+still it names. Every clip name must lead to one sheet, so two sheets may not
+define one clip, and a sheet with no clips, which answers to any name, must be
+its still's only sheet. Two
 constraints fix that design. Linking must run across files, since a sheet always
 sorts before its still. And the reference must travel *with* the still: a story
 copies the still's record into its own graph, where the world's inventory is no
@@ -337,7 +344,9 @@ client-facing media payloads.
 
 Every payload carries the fragment's `staging_hints`, and a still with sprite
 sheets carries `sprite_sheets`: each sheet resolved through the same function as
-the still, so URL sits beside URL and bytes beside bytes, with its manifest.
+the still, so URL sits beside URL and bytes beside bytes, with its manifest. That
+includes a static fallback standing in for pending media, which is a still like
+any other.
 Earlier the payload dropped staging hints entirely, which an in-process client
 never noticed and a remote client could not work around.
 

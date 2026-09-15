@@ -37,11 +37,21 @@ the rectangle sat in `journal` because a fragment carried it, and the surface
 types sat in `mechanics` because a game block declared one. Neither owned the
 vocabulary, which is the same accident this whole extraction undoes.
 
-`sprite_sheet` describes an optional animated alternative to a staged still, as
-a typed subset of Aseprite's JSON export: frame rects and durations, tags with a
-direction and repeat, and a pivot slice. It describes the bytes only.
-`StagingHints.media_clip` selects a tag per use, and looping stays with
-`media_timing`, because Aseprite's format cannot express "forever". A filename
-(`<still>[-<clip>]-<cols>x<rows>[-<total>]`) and a compact broadcasting form
-both expand into the same manifest. `frame_index_at` is the one timing function
-every client and test shares.
+`sprite_sheet` describes an optional animated alternative to a staged still,
+in a normalized, client-facing shape: the sheet and canvas sizes, each frame's
+rect, trim offset, duration and resolved pivot, and named clips with a direction
+and pass count. It describes the bytes only. `StagingHints.media_clip` selects a
+clip per use, and looping stays with `media_timing`, because authored sheets
+cannot express "forever".
+
+Only that vocabulary lives here. Reading an Aseprite export, the filename and
+compact shorthands, and pairing sheets with stills are authoring and indexing
+concerns, and live in `tangl.media.sprite_sheets`; presentation stays a
+vocabulary rather than a format library.
+
+The module carries two laws -- which frame shows when, and where a frame lands
+over its still -- with a Python reference implementation of each. The reference
+is not code other clients share. The portable contract is the laws plus
+`engine/contrib/conformance/sprite_sheets/playback.json`, which the reference and
+the pygame port both run, and which a web client implements against in its own
+language.

@@ -1,82 +1,61 @@
-"""Sprite sheets: frames, clips and timing for an animated alternative to a still.
+"""Sprite sheets: what a client needs to play a clip in place of a still.
 
 A sprite sheet is an optional second representation of a staged image. The still
-stays the floor every client can draw; a client that understands sheets may play
-named clips from the sheet instead. Nothing here decides *which* clip plays or
-*whether* it loops -- that is per-use staging (``StagingHints.media_clip`` and
-``media_timing``). This module describes only what the bytes are.
+stays the floor every client can draw; a client that understands sheets may play a
+named clip from the sheet instead. Which clip, and whether it loops, is per-use
+staging (``StagingHints.media_clip`` and ``media_timing``). This module says only
+what the sheet's pixels are and how a clip unfolds.
 
-The format is Aseprite's
-------------------------
-Sprite sheets are a mature, non-core problem with a format artists already export,
-so the manifest is a typed **subset of Aseprite's JSON sprite-sheet export** rather
-than anything bespoke: TexturePacker-style frame records plus ``meta.frameTags``.
-Field names and shapes follow Aseprite's own exporter (``doc_exporter.cpp``),
-including two details that are easy to get wrong:
+Normalized, not a tool's format
+-------------------------------
+Authors produce sheets with tools -- an Aseprite JSON export, or a filename
+shorthand -- and :mod:`tangl.media.sprite_sheets` imports each into this one shape.
+Nothing here knows a tool's aliases, a hash-versus-array layout, a repeat count
+written as a string, or slices. Each frame carries its own resolved anchor, a
+trimmed frame carries its own offset, and the canvas every frame is drawn on is
+stated once. A client reads fields; it never re-derives an import.
 
-- a tag's ``repeat`` is written as a *quoted string*, and only when it is finite;
-- there is no way to write "loop forever". Absent ``repeat`` means play once (the
-  export semantics), and looping is therefore a per-use hint, never a sheet fact.
+Two laws, and a reference implementation of each
+------------------------------------------------
+The Python here is the reference, not code any other client shares. The portable
+contract is these two laws and the vectors in
+``engine/contrib/conformance/sprite_sheets/``, which a client in any language can
+run against its own implementation.
 
-Accepted: frame rects and durations, trimming (``spriteSourceSize`` within
-``sourceSize``), tags with ``direction`` and ``repeat``, and slice pivots. Rotated
-frames are refused, since Aseprite never writes them. Layers, colours, user data
-and app metadata are ignored.
+**When** (:meth:`SpriteSheetManifest.frame_index_at`). A clip is a frame range
+played in *passes*. A pass runs the range once in its direction; ``reverse`` and
+``pingpong_reverse`` start at the far end. Forward and reverse passes each restart
+from the top. Ping-pong passes alternate direction, and every pass after the first
+starts one frame in from the end it turned at, so an end frame never shows twice
+in a row. A clip played, not looped, makes ``repeat`` passes -- by default one,
+or two for ping-pong (out and back) -- then holds its final frame. A looped clip
+makes passes forever. A frame shows for ``[start, start + duration)``; elapsed
+time at or below zero shows the first frame. A one-frame clip shows its frame
+once per pass. These are Aseprite's own playback rules.
 
-Shorthands compile to the same manifest
----------------------------------------
-Two lighter ways to describe a sheet exist, and both expand into
-:class:`SpriteSheetManifest` so there is one validated shape and one reader:
-
-- a **filename** such as ``master_sprite-idle-4x1-1600ms`` (see :class:`SheetName`);
-- a **compact form** (:class:`CompactSheet`) whose per-cell fields each take one
-  value or one value per cell -- a single value repeats, like array broadcasting.
-
-The filename and compact forms carry uniform or simple timing. Anything more
-particular is an Aseprite export.
+**Where** (:meth:`SpriteSheetManifest.placement`). A frame is drawn over the still
+it replaces so that the frame's anchor lands on the still's anchor. The still's
+anchor is its bottom-centre pixel, ``(w // 2, h - 1)``; a frame's is its declared
+pivot, else the canvas's bottom-centre. Mirroring flips each image about its own
+width -- the still, the canvas, and the anchors with them -- after the frame has
+been cut from the sheet.
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Direction = Literal["forward", "reverse", "pingpong", "pingpong_reverse"]
 
-DEFAULT_FRAME_MS = 100
-"""Aseprite's default frame duration, used when a shorthand states no timing."""
-
-PIVOT_SLICE = "pivot"
-"""Name of the slice whose key pivot anchors the sheet.
-
-Aseprite carries pivots on slices rather than on frames or the sheet. Reading the
-slice with this name is the one convention layered on top of the format.
-"""
-
 
 class _SheetModel(BaseModel):
-    model_config = ConfigDict(frozen=True, populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        kwargs.setdefault("by_alias", True)
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(*args, **kwargs)
-
-
-class SheetRect(_SheetModel):
-    """A pixel rectangle in sheet coordinates."""
-
-    x: int = Field(ge=0)
-    y: int = Field(ge=0)
-    w: int = Field(gt=0)
-    h: int = Field(gt=0)
-
-
-class SheetSize(_SheetModel):
-    w: int = Field(gt=0)
-    h: int = Field(gt=0)
 
 
 class SheetPoint(_SheetModel):
@@ -84,384 +63,212 @@ class SheetPoint(_SheetModel):
     y: int
 
 
+class SheetSize(_SheetModel):
+    w: int = Field(gt=0)
+    h: int = Field(gt=0)
+
+
+class SheetRect(_SheetModel):
+    """A pixel rectangle."""
+
+    x: int = Field(ge=0)
+    y: int = Field(ge=0)
+    w: int = Field(gt=0)
+    h: int = Field(gt=0)
+
+
 class SheetFrame(_SheetModel):
-    """One frame: where its pixels are, and how long it shows."""
+    """One frame: its pixels in the sheet, where they sit on the canvas, and for how long."""
 
-    filename: str | None = None
-    frame: SheetRect
-    rotated: bool = False
-    trimmed: bool = False
-    sprite_source_size: SheetRect | None = Field(default=None, alias="spriteSourceSize")
-    source_size: SheetSize | None = Field(default=None, alias="sourceSize")
-    duration: int = Field(gt=0)
+    rect: SheetRect
+    """Where the frame's pixels are in the sheet image."""
 
-    @field_validator("rotated")
-    @classmethod
-    def _refuse_rotation(cls, value: bool) -> bool:
-        if value:
-            raise ValueError(
-                "rotated frames are not supported: Aseprite never writes them, and a "
-                "packer that rotates would need every client to un-rotate"
-            )
-        return value
+    offset: SheetPoint = SheetPoint(x=0, y=0)
+    """Where ``rect``'s top-left sits on the canvas. Nonzero for a trimmed frame."""
+
+    duration_ms: int = Field(gt=0)
+
+    pivot: SheetPoint | None = None
+    """This frame's anchor on the canvas, when the sheet declares one."""
 
 
-class FrameTag(_SheetModel):
-    """A named clip: an inclusive frame range, a play direction, and a repeat count."""
+class SheetClip(_SheetModel):
+    """A named clip: an inclusive frame range, a direction, and a pass count."""
 
     name: str
-    from_frame: int = Field(alias="from", ge=0)
-    to_frame: int = Field(alias="to", ge=0)
+    first: int = Field(ge=0)
+    last: int = Field(ge=0)
     direction: Direction = "forward"
     repeat: int | None = Field(default=None, gt=0)
-    """How many times the clip plays. ``None`` means once.
-
-    Aseprite writes this as a quoted string and omits it when unset; it is read
-    from either form and written back as a string so an export round-trips.
-    """
-
-    @field_validator("repeat", mode="before")
-    @classmethod
-    def _repeat_from_string(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            if not value.isdigit():
-                raise ValueError(f"repeat must be a positive integer, got {value!r}")
-            return int(value)
-        return value
-
-    @field_serializer("repeat")
-    def _repeat_as_string(self, value: int | None) -> str | None:
-        return None if value is None else str(value)
+    """Passes when played rather than looped. ``None``: one, or two for ping-pong."""
 
     @model_validator(mode="after")
-    def _ordered(self) -> "FrameTag":
-        if self.to_frame < self.from_frame:
-            raise ValueError(f"tag {self.name!r} ends before it starts ({self.from_frame}..{self.to_frame})")
+    def _ordered(self) -> "SheetClip":
+        if self.last < self.first:
+            raise ValueError(f"clip {self.name!r} ends before it starts ({self.first}..{self.last})")
         return self
 
-
-class SliceKey(_SheetModel):
-    frame: int = Field(ge=0)
-    bounds: SheetRect
-    pivot: SheetPoint | None = None
-    center: SheetRect | None = None
-
-
-class SheetSlice(_SheetModel):
-    name: str
-    keys: list[SliceKey] = Field(default_factory=list)
-
-
-class SheetMeta(_SheetModel):
-    image: str
-    size: SheetSize
-    frame_tags: list[FrameTag] = Field(default_factory=list, alias="frameTags")
-    slices: list[SheetSlice] = Field(default_factory=list)
+    @property
+    def passes(self) -> int:
+        return self.repeat or (2 if self.direction.startswith("pingpong") else 1)
 
 
 class SpriteSheetManifest(_SheetModel):
-    """A typed subset of Aseprite's JSON sprite-sheet export.
+    """One sheet image: its frames, the canvas they share, and its clips.
 
-    Accepts both of Aseprite's layouts: the default hash, keyed by frame filename in
-    timeline order, and the array. Either way ``frames`` is held in timeline order,
-    which is the order tag ranges index.
+    A sheet with no clips has one implicit clip over every frame, which answers to
+    any name. That is why indexing lets such a sheet be the only one for its still.
     """
 
-    frames: list[SheetFrame]
-    meta: SheetMeta
+    image: str
+    """The sheet image's filename."""
 
-    @field_validator("frames", mode="before")
-    @classmethod
-    def _frames_from_hash(cls, value: Any) -> Any:
-        if isinstance(value, dict):
-            return [{"filename": name, **record} for name, record in value.items()]
-        return value
+    size: SheetSize
+    """The sheet image's pixel size."""
+
+    canvas: SheetSize
+    """The size every frame is drawn on: the sprite's own size, before trimming."""
+
+    frames: list[SheetFrame]
+    clips: list[SheetClip] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _consistent(self) -> "SpriteSheetManifest":
         if not self.frames:
             raise ValueError("a sprite sheet needs at least one frame")
-        size = self.meta.size
         for index, frame in enumerate(self.frames):
-            r = frame.frame
-            if r.x + r.w > size.w or r.y + r.h > size.h:
+            r, o = frame.rect, frame.offset
+            if r.x + r.w > self.size.w or r.y + r.h > self.size.h:
                 raise ValueError(
                     f"frame {index} rect ({r.x},{r.y},{r.w},{r.h}) lies outside the "
-                    f"{size.w}x{size.h} sheet"
+                    f"{self.size.w}x{self.size.h} sheet"
+                )
+            if o.x < 0 or o.y < 0 or o.x + r.w > self.canvas.w or o.y + r.h > self.canvas.h:
+                raise ValueError(
+                    f"frame {index} placed at ({o.x},{o.y}) does not fit the "
+                    f"{self.canvas.w}x{self.canvas.h} canvas"
                 )
         names: set[str] = set()
-        for tag in self.meta.frame_tags:
-            if tag.to_frame >= len(self.frames):
+        for clip in self.clips:
+            if clip.last >= len(self.frames):
                 raise ValueError(
-                    f"tag {tag.name!r} reaches frame {tag.to_frame}, but the sheet has "
-                    f"{len(self.frames)} frames"
+                    f"clip {clip.name!r} reaches frame {clip.last}, but the sheet has {len(self.frames)} frames"
                 )
-            if tag.name in names:
-                raise ValueError(f"tag {tag.name!r} is declared twice")
-            names.add(tag.name)
+            if clip.name in names:
+                raise ValueError(f"clip {clip.name!r} is declared twice")
+            names.add(clip.name)
         return self
 
     # ── clips ────────────────────────────────────────────────────────────
 
     def clip_names(self) -> list[str]:
-        return [tag.name for tag in self.meta.frame_tags]
+        return [clip.name for clip in self.clips]
 
-    def tag(self, clip: str | None) -> FrameTag:
-        """The tag for ``clip``; with no tags at all, one implicit clip over every frame.
+    def has_clip(self, name: str) -> bool:
+        return not self.clips or name in self.clip_names()
 
-        Asking an untagged sheet for a named clip is not an error here: it has exactly
-        one clip, and refusing a name nobody could have satisfied would only push a
-        guess onto every client. Asking a *tagged* sheet for a clip it lacks is.
-        """
+    def clip(self, name: str) -> SheetClip:
+        """The clip called ``name``; on a sheet with no clips, the implicit one."""
 
-        if not self.meta.frame_tags:
-            return FrameTag(name=clip or "", from_frame=0, to_frame=len(self.frames) - 1)
-        if clip is None:
-            return self.meta.frame_tags[0]
-        for tag in self.meta.frame_tags:
-            if tag.name == clip:
-                return tag
-        raise KeyError(f"no clip named {clip!r}; this sheet has {self.clip_names()}")
+        if not self.clips:
+            return SheetClip(name=name, first=0, last=len(self.frames) - 1)
+        for clip in self.clips:
+            if clip.name == name:
+                return clip
+        raise KeyError(f"no clip named {name!r}; this sheet has {self.clip_names()}")
 
-    def sequence(self, clip: str | None) -> list[int]:
-        """Frame indices for one pass of a clip, honouring its direction.
+    # ── when ─────────────────────────────────────────────────────────────
 
-        A ping-pong pass runs out and back without repeating either end, so
-        ``0 1 2`` plays as ``0 1 2 1`` and the next pass starts cleanly on ``0``.
-        """
+    def play_order(self, name: str, *, loop: bool = False) -> list[int]:
+        """Frame indices in the order they show: one period when looping, else the whole play."""
 
-        tag = self.tag(clip)
-        forward = list(range(tag.from_frame, tag.to_frame + 1))
-        if len(forward) == 1:
-            return forward
-        if tag.direction == "forward":
-            return forward
-        if tag.direction == "reverse":
-            return forward[::-1]
-        if tag.direction == "pingpong":
-            return forward + forward[-2:0:-1]
-        return forward[::-1] + forward[1:-1]
+        clip = self.clip(name)
+        span = list(range(clip.first, clip.last + 1))
+        if clip.direction in ("reverse", "pingpong_reverse"):
+            span.reverse()
+        pingpong = clip.direction.startswith("pingpong")
+        if len(span) == 1:
+            return span if loop else span * clip.passes
+        if loop:
+            return span + span[-2:0:-1] if pingpong else span
+        order = list(span)
+        for n in range(1, clip.passes):
+            if pingpong:
+                order += (span if n % 2 == 0 else span[::-1])[1:]
+            else:
+                order += span
+        return order
 
-    def frame_index_at(self, clip: str | None, elapsed_ms: float, *, loop: bool = False) -> int:
-        """Which frame of the sheet shows ``elapsed_ms`` into ``clip``.
+    def frame_index_at(self, name: str, elapsed_ms: float, *, loop: bool = False) -> int:
+        """Which frame of the sheet shows ``elapsed_ms`` into clip ``name``."""
 
-        The one timing function: clients call it with their clock, tests call it
-        with a number. A frame covers ``[start, start + duration)``. The clip plays
-        its tag's ``repeat`` count -- once when unset -- and then holds its final
-        frame, unless the use asks it to loop, which only staging can.
-        """
-
-        order = self.sequence(clip)
-        durations = [self.frames[i].duration for i in order]
-        cycle = sum(durations)
+        order = self.play_order(name, loop=loop)
+        durations = [self.frames[i].duration_ms for i in order]
+        total = sum(durations)
         if elapsed_ms <= 0:
             return order[0]
-        if not loop:
-            passes = self.tag(clip).repeat or 1
-            if elapsed_ms >= cycle * passes:
-                return order[-1]
-        t = elapsed_ms % cycle
+        if loop:
+            t = elapsed_ms % total
+        elif elapsed_ms >= total:
+            return order[-1]
+        else:
+            t = elapsed_ms
         for index, duration in zip(order, durations):
             if t < duration:
                 return index
             t -= duration
         return order[-1]
 
-    def pivot(self) -> SheetPoint | None:
-        """The anchor point shared by every frame, if the sheet declares one."""
+    def settles_at_ms(self, name: str, *, loop: bool = False) -> int | None:
+        """From when the frame shown stops changing, or ``None`` if it never does.
 
-        for sl in self.meta.slices:
-            if sl.name == PIVOT_SLICE and sl.keys and sl.keys[0].pivot is not None:
-                return sl.keys[0].pivot
-        return None
-
-    def check_grid(self, cols: int, rows: int) -> None:
-        """Refuse a manifest that disagrees with a grid stated elsewhere, e.g. a filename.
-
-        When a sidecar and a filename both describe a sheet, the sidecar is
-        authoritative -- but the two must still agree, or the same fact is declared
-        twice and can silently differ.
+        A client asks this to know when it can stop redrawing, so that answer comes
+        from the same order the frames are chosen from.
         """
 
-        if len(self.frames) != cols * rows:
-            raise ValueError(f"sheet declares {len(self.frames)} frames but its name says {cols}x{rows}")
-        if self.meta.size.w % cols or self.meta.size.h % rows:
-            raise ValueError(
-                f"a {self.meta.size.w}x{self.meta.size.h} sheet does not divide into {cols}x{rows} cells"
-            )
-        # Count and divisibility alone cannot tell 4x1 from 2x2: both have four cells,
-        # and a 40x12 sheet divides either way. Only the rects say which it is.
-        cw, ch = self.meta.size.w // cols, self.meta.size.h // rows
-        for index, frame in enumerate(self.frames):
-            cell = SheetRect(x=(index % cols) * cw, y=(index // cols) * ch, w=cw, h=ch)
-            if frame.frame != cell:
-                raise ValueError(
-                    f"frame {index} sits at {frame.frame.model_dump()}, not in the {cols}x{rows} "
-                    f"cell its name says {cell.model_dump()}"
-                )
+        order = self.play_order(name, loop=loop)
+        if loop:
+            return 0 if len(set(order)) == 1 else None
+        start = len(order) - 1
+        while start > 0 and order[start - 1] == order[-1]:
+            start -= 1
+        return sum(self.frames[i].duration_ms for i in order[:start])
 
+    # ── where ────────────────────────────────────────────────────────────
 
-# ── authoring shorthands ─────────────────────────────────────────────────────
+    def anchor(self, index: int) -> SheetPoint:
+        """Frame ``index``'s anchor on the canvas: its pivot, else the canvas's bottom-centre."""
 
+        pivot = self.frames[index].pivot
+        return pivot if pivot is not None else SheetPoint(x=self.canvas.w // 2, y=self.canvas.h - 1)
 
-def _distribute(total: int, weights: list[float]) -> list[int]:
-    """Integer milliseconds proportional to ``weights`` that sum to exactly ``total``."""
+    def placement(self, index: int, still_size: tuple[int, int], *, flip_h: bool = False) -> SheetPoint:
+        """Where frame ``index``'s pixels go, relative to the still's top-left, in sheet pixels.
 
-    if total < len(weights):
-        raise ValueError(f"{total} ms cannot give each of {len(weights)} frames a positive duration")
-    scale = sum(weights)
-    raw = [total * w / scale for w in weights]
-    whole = [max(1, int(value)) for value in raw]
-    shortfall = total - sum(whole)
-    by_remainder = sorted(range(len(raw)), key=lambda i: raw[i] - int(raw[i]), reverse=True)
-    for i in by_remainder[: max(shortfall, 0)]:
-        whole[i] += 1
-    return whole
+        Drawn there, the frame's anchor covers the still's anchor, so starting,
+        stopping or switching a clip never moves the character.
+        """
 
-
-def _broadcast(value: Any, cells: int, field: str) -> list[Any]:
-    if isinstance(value, list):
-        if len(value) != cells:
-            raise ValueError(f"{field} gives {len(value)} values for {cells} cells")
-        return list(value)
-    return [value] * cells
-
-
-class CompactSheet(_SheetModel):
-    """A sheet described by grid and per-cell values instead of per-frame records.
-
-    Every per-cell field takes **one value or one value per cell**: a single value
-    repeats across every cell. ``total`` is sheet-level and never broadcasts; when
-    present, ``duration`` values are weights scaled to fill it.
-    """
-
-    sheet: str
-    """Grid as ``<columns>x<rows>``, read row-major."""
-
-    role: str | list[str] | None = None
-    """Clip name per cell. Consecutive cells with one role become one tag."""
-
-    duration: float | list[float] | None = None
-    """Milliseconds per cell, or weights when ``total`` is set."""
-
-    total: int | None = Field(default=None, gt=0)
-
-    @field_validator("sheet")
-    @classmethod
-    def _grid(cls, value: str) -> str:
-        if not re.fullmatch(r"[1-9]\d*x[1-9]\d*", value):
-            raise ValueError(f"sheet must be <columns>x<rows> with at least one of each, got {value!r}")
-        return value
-
-    @property
-    def grid(self) -> tuple[int, int]:
-        cols, rows = (int(part) for part in self.sheet.split("x"))
-        return cols, rows
-
-    def durations(self) -> list[int]:
-        cols, rows = self.grid
-        cells = cols * rows
-        if self.total is not None:
-            weights = _broadcast(1.0 if self.duration is None else self.duration, cells, "duration")
-            if any(w <= 0 for w in weights):
-                raise ValueError("duration weights must be positive")
-            return _distribute(self.total, [float(w) for w in weights])
-        values = _broadcast(DEFAULT_FRAME_MS if self.duration is None else self.duration, cells, "duration")
-        if any(v <= 0 for v in values):
-            raise ValueError("durations must be positive")
-        return [max(1, round(v)) for v in values]
-
-    def tags(self) -> list[FrameTag]:
-        if self.role is None:
-            return []
-        cols, rows = self.grid
-        roles = _broadcast(self.role, cols * rows, "role")
-        tags: list[FrameTag] = []
-        start = 0
-        for index in range(1, len(roles) + 1):
-            if index == len(roles) or roles[index] != roles[start]:
-                if any(tag.name == roles[start] for tag in tags):
-                    raise ValueError(
-                        f"role {roles[start]!r} appears in two separate runs; a clip is a "
-                        "contiguous range and cannot be split"
-                    )
-                tags.append(FrameTag(name=roles[start], from_frame=start, to_frame=index - 1))
-                start = index
-        return tags
-
-    def to_manifest(self, image: str, size: tuple[int, int]) -> SpriteSheetManifest:
-        """Expand into the canonical manifest for an image of ``size`` pixels."""
-
-        cols, rows = self.grid
-        width, height = size
-        if width % cols or height % rows:
-            raise ValueError(f"a {width}x{height} image does not divide into {cols}x{rows} cells")
-        cw, ch = width // cols, height // rows
-        frames = [
-            SheetFrame(
-                filename=f"{image} {index}",
-                frame=SheetRect(x=(index % cols) * cw, y=(index // cols) * ch, w=cw, h=ch),
-                duration=duration,
-            )
-            for index, duration in enumerate(self.durations())
-        ]
-        return SpriteSheetManifest(
-            frames=frames,
-            meta=SheetMeta(image=image, size=SheetSize(w=width, h=height), frame_tags=self.tags()),
+        frame = self.frames[index]
+        anchor = self.anchor(index)
+        still_w, still_h = still_size
+        still_x, anchor_x, offset_x = still_w // 2, anchor.x, frame.offset.x
+        if flip_h:
+            still_x = still_w - 1 - still_x
+            anchor_x = self.canvas.w - 1 - anchor_x
+            offset_x = self.canvas.w - offset_x - frame.rect.w
+        return SheetPoint(
+            x=still_x - anchor_x + offset_x,
+            y=(still_h - 1) - anchor.y + frame.offset.y,
         )
 
 
-_SHEET_NAME = re.compile(
-    r"^(?P<root>[A-Za-z0-9_]+)"
-    r"(?:-(?P<clip>[a-z][a-z0-9_]*))?"
-    r"-(?P<cols>[1-9]\d*)x(?P<rows>[1-9]\d*)"
-    r"(?:-(?P<amount>[1-9]\d*)(?P<unit>ms|s))?$"
-)
-
-
-class SheetName(_SheetModel):
-    """What a sheet's filename says about it.
-
-    ``<root>[-<clip>]-<columns>x<rows>[-<total>(ms|s)]``. Underscore binds the root
-    and hyphen separates segments, so ``master_sprite-idle-4x1-1600ms`` is a
-    four-cell ``idle`` clip for the still named ``master_sprite``, lasting 1600 ms.
-    Without a clip segment the sheet's clips come from its sidecar export.
-
-    The grid segment contains an ``x``, which keeps it disjoint from #418's loose
-    frame suffix (``-01``), so both conventions can live in one pack.
-    """
-
-    root: str
-    clip: str | None = None
-    cols: int
-    rows: int
-    total_ms: int | None = None
-
-    @classmethod
-    def parse(cls, stem: str) -> "SheetName | None":
-        match = _SHEET_NAME.match(stem)
-        if match is None:
-            return None
-        amount, unit = match["amount"], match["unit"]
-        total = None if amount is None else int(amount) * (1000 if unit == "s" else 1)
-        return cls(root=match["root"], clip=match["clip"], cols=int(match["cols"]),
-                   rows=int(match["rows"]), total_ms=total)
-
-    def compact(self) -> CompactSheet:
-        """The compact form this name is shorthand for."""
-
-        return CompactSheet(sheet=f"{self.cols}x{self.rows}", role=self.clip, total=self.total_ms)
-
-
 __all__ = [
-    "DEFAULT_FRAME_MS",
-    "CompactSheet",
-    "FrameTag",
+    "Direction",
+    "SheetClip",
     "SheetFrame",
-    "SheetMeta",
-    "SheetName",
+    "SheetPoint",
     "SheetRect",
     "SheetSize",
-    "SliceKey",
     "SpriteSheetManifest",
 ]

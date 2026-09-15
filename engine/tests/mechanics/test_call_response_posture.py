@@ -3,7 +3,9 @@
 The posture is state, not a timeline: an opponent holding the initiative is
 attacking (``call``); one waiting on the player's line is on guard (``response``).
 The claims under test are that the pose follows initiative, that an author's
-explicit clip wins, and that an ambiguous stage is left alone rather than guessed.
+explicit clip wins, that an ambiguous stage is left alone rather than guessed, and
+that the contribution is presentation syntax: it registers with presentation, not
+with the VM that drives the fold.
 """
 
 from __future__ import annotations
@@ -89,3 +91,16 @@ def test_the_input_batch_is_not_mutated() -> None:
     stage_call_response_posture(caller=_contest(player_has_initiative=False), fragments=fragments)
 
     assert fragments[0].staging_hints is None
+
+
+def test_the_pose_is_contributed_to_presentation_not_to_the_vm() -> None:
+    """The VM runs ``compose_journal``; staging a clip does not make a mechanic part of it."""
+
+    from tangl.presentation.dispatch import presentation_dispatch
+    from tangl.vm.dispatch import dispatch as vm_dispatch
+
+    def composers(registry) -> list:
+        return [b.func for b in registry.values() if b.task == "compose_journal"]
+
+    assert stage_call_response_posture in composers(presentation_dispatch)
+    assert stage_call_response_posture not in composers(vm_dispatch)

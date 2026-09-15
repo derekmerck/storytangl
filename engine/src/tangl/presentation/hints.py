@@ -100,7 +100,7 @@ class StagingHints(BaseModel, extra="allow"):
     media_clip: str | None = None
     """Which named clip of the media's sprite sheet to play for this use.
 
-    A tag name from the sheet's manifest -- ``idle``, ``call``, ``response``. It
+    A clip name from the sheet's manifest -- ``idle``, ``call``, ``response``. It
     selects, it does not describe: frame timing belongs to the sheet, and whether
     the clip loops is :attr:`media_timing`, because a sheet cannot say "forever".
     A client without sheets ignores it and draws the still; one whose sheet lacks

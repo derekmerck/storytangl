@@ -13,12 +13,13 @@ from .intent import (
     CostPreview,
     UIHints,
 )
-from .sprite_sheet import CompactSheet, SheetName, SpriteSheetManifest
+from .sprite_sheet import SpriteSheetManifest
 from .surface import HasSurface, Surface, SurfaceSlot
 from .values import KvRow, PrimitiveValue
 from .dispatch import (
     on_advertise_story_info_channels,
     on_advertise_world_info_channels,
+    on_compose_journal,
     on_get_story_info,
     presentation_dispatch,
 )
@@ -44,7 +45,6 @@ __all__ = [
     "BadgeListValue",
     "Blocker",
     "BrandingValue",
-    "CompactSheet",
     "CostPreview",
     "GrammarHint",
     "GrammarNoun",
@@ -64,7 +64,6 @@ __all__ = [
     "ProjectionRequest",
     "ScalarValue",
     "SectionValue",
-    "SheetName",
     "SpriteSheetManifest",
     "StagingHints",
     "Surface",
@@ -75,6 +74,7 @@ __all__ = [
     "UxEvent",
     "on_advertise_story_info_channels",
     "on_advertise_world_info_channels",
+    "on_compose_journal",
     "on_get_story_info",
     "presentation_dispatch",
 ]

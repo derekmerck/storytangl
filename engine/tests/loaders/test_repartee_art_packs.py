@@ -79,7 +79,7 @@ def test_manifest_hash_and_size_match_the_shipped_file(
 
 
 def _is_sheet(stem: str) -> bool:
-    from tangl.presentation.sprite_sheet import SheetName
+    from tangl.media.sprite_sheets import SheetName
 
     return SheetName.parse(stem) is not None
 
@@ -116,17 +116,17 @@ def test_the_spaceport_pack_ships_a_sheet_for_every_sprite() -> None:
 def test_a_shipped_sheet_belongs_to_a_shipped_still_and_says_so_consistently(pack, name, entry) -> None:
     """The manifest, the filename and the sidecar each state the sheet's still and clips."""
 
-    from tangl.presentation.sprite_sheet import SheetName, SpriteSheetManifest
+    from tangl.media.sprite_sheets import SheetName, read_aseprite_export
 
     sheet = entry["sprite_sheet"]
     sidecar = pack / "images" / sheet["sidecar"]["file"]
     assert hashlib.sha256(sidecar.read_bytes()).hexdigest() == sheet["sidecar"]["sha256"]
-    parsed = SpriteSheetManifest.model_validate_json(sidecar.read_text())
+    parsed = read_aseprite_export(sidecar.read_text())
 
     assert sheet["of"] in ASSET_NAMES
     assert SheetName.parse(Path(entry["file"]).stem).root == sheet["of"]
     assert sheet["clips"] == parsed.clip_names()
-    assert sheet["pivot"] == parsed.pivot().model_dump()
+    assert [frame.pivot.model_dump() for frame in parsed.frames] == [sheet["pivot"]] * len(parsed.frames)
 
 
 @pytest.mark.parametrize(("pack", "name", "entry"), SHEET_CASES, ids=[f"{p.name}:{n}" for p, n, _ in SHEET_CASES])
@@ -141,25 +141,22 @@ def test_frame_zero_of_a_shipped_sheet_is_its_still(pack, name, entry) -> None:
     """The art invariant, checked on the committed bytes.
 
     A client switches from the still to a clip without the character moving only
-    if the first frame, placed by the pivot, is the still. Compared on visible
-    pixels: the still keeps whatever colour its cutout left under transparency,
-    and the sheet deliberately zeroes it.
+    if the first frame, placed by the manifest's own placement law, is the still.
+    Compared on visible pixels: the still keeps whatever colour its cutout left
+    under transparency, and the sheet deliberately zeroes it.
     """
 
-    from tangl.presentation.sprite_sheet import SpriteSheetManifest
+    from tangl.media.sprite_sheets import read_aseprite_export
 
-    sheet = SpriteSheetManifest.model_validate_json(
-        (pack / "images" / entry["sprite_sheet"]["sidecar"]["file"]).read_text()
-    )
+    sheet = read_aseprite_export((pack / "images" / entry["sprite_sheet"]["sidecar"]["file"]).read_text())
     with Image.open(pack / "images" / f"{entry['sprite_sheet']['of']}.png") as still_image:
         still = still_image.convert("RGBA")
     with Image.open(pack / "images" / entry["file"]) as sheet_image:
         atlas = sheet_image.convert("RGBA")
 
-    first = sheet.frames[sheet.sequence("idle")[0]].frame
-    pivot = sheet.pivot()
-    left = first.x + pivot.x - still.width // 2
-    top = first.y + pivot.y - (still.height - 1)
+    index = sheet.play_order("idle")[0]
+    rect, at = sheet.frames[index].rect, sheet.placement(index, still.size)
+    left, top = rect.x - at.x, rect.y - at.y
     region = atlas.crop((left, top, left + still.width, top + still.height))
 
     a, b = region.load(), still.load()

@@ -74,9 +74,9 @@ understands sheets may play a named clip from the sheet beside it instead.
 - An **authored outcome**: `dockhand_aftermath` holds `response`, because he won
   by parrying; the answered master drops back to `idle`.
 
-Format and naming are Aseprite's JSON export, filename
-`<still>-<columns>x<rows>` with the export as a sidecar; see
-`tangl.presentation.sprite_sheet` and issue #418.
+Each sheet is named `<still>-<columns>x<rows>` with an Aseprite JSON export as
+its sidecar. `tangl.media.sprite_sheets` reads the export into the client-facing
+manifest in `tangl.presentation.sprite_sheet`; see issue #418.
 
 **Spaceport only, for now.** The quayside pack has no generation-scale sources
 for its characters and its cutouts went through an unrecorded cleanup step, so

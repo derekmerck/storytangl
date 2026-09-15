@@ -58,3 +58,10 @@ fallbacks from `ProjectedState.channels` discovery fixtures.
 Its `--inspect` mode prints the planned widgets and sample submission payloads
 without importing Tkinter; running without `--inspect` opens a minimal Tkinter
 window and prints submissions instead of calling a backend.
+
+`sprite_sheets/playback.json` is a vector suite rather than a fixture: each case
+is `(manifest, clip, elapsed, loop) -> frame index`, plus when a clip settles and
+where a frame lands over its still. A client that plays sprite sheets implements
+the timing and placement laws itself, in its own language, and runs these
+vectors against that implementation. `tangl.presentation.sprite_sheet` is the
+Python reference; the pygame port is checked against the same file.

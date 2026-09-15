@@ -30,10 +30,16 @@ on_advertise_story_info_channels = _make_on_hook("advertise_story_info_channels"
 on_advertise_world_info_channels = _make_on_hook("advertise_world_info_channels")
 on_get_story_info = _make_on_hook("get_story_info")
 
+# The VM drives the ``compose_journal`` fold, and the story graph folds this
+# registry into it. A mechanic that only adds staging -- which clip, which slot --
+# registers here, contributing UI syntax without claiming a place in the lifecycle.
+on_compose_journal = _make_on_hook("compose_journal")
+
 
 __all__ = [
     "on_advertise_story_info_channels",
     "on_advertise_world_info_channels",
+    "on_compose_journal",
     "on_get_story_info",
     "presentation_dispatch",
 ]

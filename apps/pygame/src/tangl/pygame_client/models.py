@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from tangl.presentation.intent import Accepts
+from tangl.presentation.hints import TimingName
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.response import JsonValue
 
@@ -36,8 +37,13 @@ class StageImage:
     ``None`` means the still, even when sheets are available -- playing a clip is
     something a use asks for, not something a client assumes."""
 
-    loop: bool = False
-    """``staging_hints.media_timing == "loop"``. A sheet cannot say "forever"."""
+    timing: TimingName | None = None
+    """From ``staging_hints.media_timing``, kept as stated.
+
+    This port honours all of it for clips: ``loop`` repeats forever (a sheet cannot
+    say "forever"); ``restart`` starts the clip over each time a turn states it;
+    ``pause`` holds the frame showing and ``stop`` the first; ``start`` or nothing
+    plays the clip as its sheet times it and then holds the last frame."""
 
     sheets: tuple["SheetSource", ...] = ()
     """Sprite sheets delivered beside the still. The still stays the floor."""

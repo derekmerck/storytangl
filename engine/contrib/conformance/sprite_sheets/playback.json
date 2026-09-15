@@ -1,0 +1,116 @@
+{
+  "about": "Sprite-sheet playback vectors. Every sheet is a SpriteSheetManifest exactly as a media payload carries it. 'timing' cases: frames is a list of [elapsed_ms, frame_index] for one clip played (loop false) or looped (loop true); settles_at_ms is when the shown frame stops changing, or null if it never does. 'placement' cases: where frame's pixels go relative to the still's top-left, in sheet pixels, for a still of the given [w, h]. The laws are stated in engine/src/tangl/presentation/sprite_sheet.py; these expectations were worked out from those laws by hand, not generated from the Python.",
+  "sheets": {
+    "blink": {
+      "image": "blink-2x1.png",
+      "size": {"w": 20, "h": 12},
+      "canvas": {"w": 10, "h": 12},
+      "frames": [
+        {"rect": {"x": 0, "y": 0, "w": 10, "h": 12}, "duration_ms": 1800},
+        {"rect": {"x": 10, "y": 0, "w": 10, "h": 12}, "duration_ms": 200}
+      ],
+      "clips": [{"name": "idle", "first": 0, "last": 1}]
+    },
+    "strip": {
+      "image": "strip-3x1.png",
+      "size": {"w": 30, "h": 12},
+      "canvas": {"w": 10, "h": 12},
+      "frames": [
+        {"rect": {"x": 0, "y": 0, "w": 10, "h": 12}, "duration_ms": 10},
+        {"rect": {"x": 10, "y": 0, "w": 10, "h": 12}, "duration_ms": 20},
+        {"rect": {"x": 20, "y": 0, "w": 10, "h": 12}, "duration_ms": 30}
+      ],
+      "clips": [
+        {"name": "walk", "first": 0, "last": 2, "direction": "forward"},
+        {"name": "back", "first": 0, "last": 2, "direction": "reverse", "repeat": 2},
+        {"name": "bounce", "first": 0, "last": 2, "direction": "pingpong"},
+        {"name": "wave", "first": 0, "last": 2, "direction": "pingpong", "repeat": 3},
+        {"name": "sway", "first": 0, "last": 2, "direction": "pingpong_reverse"},
+        {"name": "glance", "first": 0, "last": 2, "direction": "pingpong_reverse", "repeat": 1},
+        {"name": "pose", "first": 1, "last": 1, "repeat": 3}
+      ]
+    },
+    "untagged": {
+      "image": "untagged-2x1.png",
+      "size": {"w": 20, "h": 12},
+      "canvas": {"w": 10, "h": 12},
+      "frames": [
+        {"rect": {"x": 0, "y": 0, "w": 10, "h": 12}, "duration_ms": 100},
+        {"rect": {"x": 10, "y": 0, "w": 10, "h": 12}, "duration_ms": 100}
+      ]
+    },
+    "padded": {
+      "image": "padded-2x1.png",
+      "size": {"w": 48, "h": 12},
+      "canvas": {"w": 24, "h": 12},
+      "frames": [
+        {"rect": {"x": 0, "y": 0, "w": 24, "h": 12}, "duration_ms": 100, "pivot": {"x": 13, "y": 11}},
+        {"rect": {"x": 24, "y": 0, "w": 24, "h": 12}, "duration_ms": 100, "pivot": {"x": 14, "y": 11}}
+      ]
+    },
+    "trimmed": {
+      "image": "trimmed-2x1.png",
+      "size": {"w": 32, "h": 12},
+      "canvas": {"w": 24, "h": 12},
+      "frames": [
+        {"rect": {"x": 0, "y": 0, "w": 24, "h": 12}, "duration_ms": 100, "pivot": {"x": 12, "y": 11}},
+        {"rect": {"x": 24, "y": 0, "w": 8, "h": 6}, "offset": {"x": 10, "y": 6}, "duration_ms": 100}
+      ]
+    }
+  },
+  "timing": [
+    {"sheet": "blink", "clip": "idle", "loop": true, "settles_at_ms": null,
+     "frames": [[-5, 0], [0, 0], [1799, 0], [1800, 1], [1999, 1], [2000, 0], [3800, 1]]},
+    {"sheet": "blink", "clip": "idle", "loop": false, "settles_at_ms": 1800,
+     "frames": [[1799, 0], [1800, 1], [1999, 1], [2000, 1], [10000, 1]]},
+
+    {"sheet": "strip", "clip": "walk", "loop": false, "settles_at_ms": 30,
+     "frames": [[0, 0], [9, 0], [10, 1], [29, 1], [30, 2], [59, 2], [60, 2], [1000, 2]]},
+    {"sheet": "strip", "clip": "walk", "loop": true, "settles_at_ms": null,
+     "frames": [[59, 2], [60, 0], [70, 1], [95, 2]]},
+
+    {"sheet": "strip", "clip": "back", "loop": false, "settles_at_ms": 110,
+     "frames": [[0, 2], [29, 2], [30, 1], [49, 1], [50, 0], [59, 0], [60, 2], [89, 2], [90, 1], [110, 0], [120, 0], [500, 0]]},
+    {"sheet": "strip", "clip": "back", "loop": true, "settles_at_ms": null,
+     "frames": [[60, 2], [125, 2], [170, 0]]},
+
+    {"sheet": "strip", "clip": "bounce", "loop": false, "settles_at_ms": 80,
+     "frames": [[0, 0], [10, 1], [30, 2], [59, 2], [60, 1], [79, 1], [80, 0], [89, 0], [90, 0], [200, 0]]},
+    {"sheet": "strip", "clip": "bounce", "loop": true, "settles_at_ms": null,
+     "frames": [[79, 1], [80, 0], [90, 1], [139, 2], [140, 1], [160, 0]]},
+
+    {"sheet": "strip", "clip": "wave", "loop": false, "settles_at_ms": 110,
+     "frames": [[60, 1], [80, 0], [90, 1], [109, 1], [110, 2], [139, 2], [140, 2], [1000, 2]]},
+
+    {"sheet": "strip", "clip": "sway", "loop": false, "settles_at_ms": 80,
+     "frames": [[0, 2], [30, 1], [50, 0], [60, 1], [80, 2], [109, 2], [110, 2]]},
+    {"sheet": "strip", "clip": "sway", "loop": true, "settles_at_ms": null,
+     "frames": [[59, 0], [60, 1], [80, 2]]},
+
+    {"sheet": "strip", "clip": "glance", "loop": false, "settles_at_ms": 50,
+     "frames": [[0, 2], [30, 1], [50, 0], [60, 0]]},
+
+    {"sheet": "strip", "clip": "pose", "loop": false, "settles_at_ms": 0,
+     "frames": [[0, 1], [59, 1], [60, 1], [100, 1]]},
+    {"sheet": "strip", "clip": "pose", "loop": true, "settles_at_ms": 0,
+     "frames": [[0, 1], [1000, 1]]},
+
+    {"sheet": "untagged", "clip": "any name at all", "loop": false, "settles_at_ms": 100,
+     "frames": [[0, 0], [100, 1], [250, 1]]},
+    {"sheet": "untagged", "clip": "any name at all", "loop": true, "settles_at_ms": null,
+     "frames": [[250, 0], [300, 1]]}
+  ],
+  "placement": [
+    {"sheet": "blink", "frame": 0, "still": [10, 12], "flip_h": false, "at": [0, 0]},
+    {"sheet": "blink", "frame": 0, "still": [10, 12], "flip_h": true, "at": [0, 0]},
+
+    {"sheet": "padded", "frame": 0, "still": [20, 12], "flip_h": false, "at": [-3, 0]},
+    {"sheet": "padded", "frame": 0, "still": [20, 12], "flip_h": true, "at": [-1, 0]},
+    {"sheet": "padded", "frame": 1, "still": [20, 12], "flip_h": false, "at": [-4, 0]},
+    {"sheet": "padded", "frame": 1, "still": [20, 12], "flip_h": true, "at": [0, 0]},
+
+    {"sheet": "trimmed", "frame": 0, "still": [24, 12], "flip_h": false, "at": [0, 0]},
+    {"sheet": "trimmed", "frame": 1, "still": [24, 12], "flip_h": false, "at": [10, 6]},
+    {"sheet": "trimmed", "frame": 1, "still": [24, 12], "flip_h": true, "at": [6, 6]}
+  ]
+}

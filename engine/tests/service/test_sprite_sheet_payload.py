@@ -17,7 +17,10 @@ from PIL import Image
 
 from tangl.core import Graph
 from tangl.journal.fragments import MediaFragment
+from tangl.media.media_data_type import MediaDataType
+from tangl.media.media_resource.media_inventory import MediaInventory
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+from tangl.media.media_resource.media_resource_inv_tag import MediaRITStatus
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.presentation.hints import StagingHints
 from tangl.service.media import MediaContentProfile, MediaRenderProfile, media_fragment_to_payload
@@ -79,7 +82,7 @@ def test_a_sheet_is_transported_the_way_its_still_is(world, profile, transport) 
     assert payload["content_format"] == sheet["content_format"] == transport
     assert transport in payload and transport in sheet
     assert sheet[transport] != payload[transport]
-    assert sheet["manifest"]["meta"]["frameTags"][0]["name"] == "idle"
+    assert sheet["manifest"]["clips"][0]["name"] == "idle"
     assert sheet["content_hash"] and sheet["rit_id"] != payload["rit_id"]
 
 
@@ -120,4 +123,32 @@ def test_a_still_restored_from_a_saved_graph_still_delivers_its_sheet(world) -> 
 
     payload = _payload(_fragment(restored, media_clip="idle"), root, MediaContentProfile.MEDIA_SERVER)
 
-    assert [s["manifest"]["meta"]["image"] for s in payload["sprite_sheets"]] == ["hero-idle-2x1-400ms.png"]
+    assert [s["manifest"]["image"] for s in payload["sprite_sheets"]] == ["hero-idle-2x1-400ms.png"]
+
+
+def test_a_static_fallback_standing_in_for_pending_media_brings_its_sheets(world) -> None:
+    """A pending portrait served by its fallback still is that still, sheets and all.
+
+    The fragment's own clip hint rides along either way, so a fallback without its
+    sheets would ask a capable client to play a clip it was never sent.
+    """
+
+    root, manager = world
+    pending = MediaRIT(
+        status=MediaRITStatus.PENDING,
+        adapted_spec_hash="pending-portrait",
+        derivation_spec={"fallback_ref": "hero.png"},
+        data_type=MediaDataType.IMAGE,
+    )
+    profile = MediaRenderProfile(
+        content_profile=MediaContentProfile.MEDIA_SERVER,
+        static_inventories=(MediaInventory(registry=manager.registry, scope="world"),),
+    )
+
+    payload = media_fragment_to_payload(
+        _fragment(pending, media_clip="idle"), render_profile=profile, world_id="w", world_media_root=root
+    )
+
+    assert payload["url"].endswith("/images/hero.png")
+    assert payload["staging_hints"]["media_clip"] == "idle"
+    assert [s["manifest"]["image"] for s in payload["sprite_sheets"]] == ["hero-idle-2x1-400ms.png"]
