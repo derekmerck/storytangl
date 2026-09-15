@@ -13,6 +13,7 @@ from .intent import (
     CostPreview,
     UIHints,
 )
+from .sprite_sheet import CompactSheet, SheetName, SpriteSheetManifest
 from .surface import HasSurface, Surface, SurfaceSlot
 from .values import KvRow, PrimitiveValue
 from .dispatch import (
@@ -41,8 +42,9 @@ from .projection import (
 __all__ = [
     "Accepts",
     "BadgeListValue",
-    "BrandingValue",
     "Blocker",
+    "BrandingValue",
+    "CompactSheet",
     "CostPreview",
     "GrammarHint",
     "GrammarNoun",
@@ -62,6 +64,8 @@ __all__ = [
     "ProjectionRequest",
     "ScalarValue",
     "SectionValue",
+    "SheetName",
+    "SpriteSheetManifest",
     "StagingHints",
     "Surface",
     "SurfaceSlot",
