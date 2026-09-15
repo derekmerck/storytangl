@@ -23,6 +23,7 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.persistence import PersistenceManagerFactory
+from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.media import (
     MediaContentProfile,
     MediaPendingPolicy,
@@ -45,6 +46,7 @@ from .models import (
     MapRegion,
     PendingSelection,
     Piece,
+    SheetSource,
     StageImage,
     Surface,
     SurfaceSlot,
@@ -618,6 +620,23 @@ class PygameSessionBridge:
         if text is not None:
             turn.lines.append(Line(text=text))
 
+    @staticmethod
+    def _sheets(payload: dict[str, Any]) -> tuple[SheetSource, ...]:
+        """Sheets this port can load. An unusable one is skipped; the still remains."""
+
+        sheets: list[SheetSource] = []
+        for sheet in payload.get("sprite_sheets") or ():
+            source = _payload_source(sheet)
+            if source is None:
+                continue
+            try:
+                manifest = SpriteSheetManifest.model_validate(sheet.get("manifest"))
+            except ValueError:
+                logger.debug("Unusable sprite-sheet manifest in payload: %r", sheet)
+                continue
+            sheets.append(SheetSource(source=source, manifest=manifest))
+        return tuple(sheets)
+
     def _append_media(self, turn: Turn, fragment: MediaFragment) -> None:
         payload = media_fragment_to_payload(
             fragment,
@@ -635,14 +654,21 @@ class PygameSessionBridge:
             logger.debug("Media payload without a usable source: %r", payload)
             self._append_fallback_text(turn, payload, fragment)
             return
-        hints = fragment.staging_hints
+        # Staging is read off the payload, the same contract a remote client
+        # receives, not off the in-process fragment. Reading the fragment is how
+        # the service could drop hints for every other client without this port
+        # ever noticing.
+        hints = payload.get("staging_hints") or {}
         turn.images.append(
             StageImage(
                 role=_text(payload.get("media_role")) or _text(fragment.media_role) or "media",
                 source=source,
                 alt_text=_text(payload.get("text")),
                 source_id=getattr(fragment, "rit_id", None),
-                x_slot=getattr(hints, "media_x", None),
-                flip_h=bool(getattr(hints, "media_flip_h", None)),
+                x_slot=_text(hints.get("media_x")),
+                flip_h=bool(hints.get("media_flip_h")),
+                clip=_text(hints.get("media_clip")),
+                loop=hints.get("media_timing") == "loop",
+                sheets=self._sheets(payload),
             )
         )

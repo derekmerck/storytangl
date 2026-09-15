@@ -205,11 +205,33 @@ def _commit_pending(bridge: PygameSessionBridge, pending: PendingSelection):
     return bridge.choose(pending.choice.edge_id, payload)
 
 
+FRAME_MS = 33
+"""Redraw interval while a sprite clip is playing: about thirty frames a second."""
+
+
+def _next_events(stage: Stage) -> list[pygame.event.Event]:
+    """Block for input, or for one animation tick when something is moving.
+
+    The loop used to poll ``event.get()`` with no wait at all, which spun a core
+    even on a stage where nothing could change. Now it sleeps on the event queue:
+    indefinitely for a still stage, and for one frame interval while a clip plays,
+    so animation costs time only while it is actually animating.
+    """
+
+    first = pygame.event.wait(FRAME_MS) if stage.animating else pygame.event.wait()
+    return [first, *pygame.event.get()]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--world", default="repartee_loop")
     parser.add_argument("--assets", type=Path, default=None)
     parser.add_argument("--screenshot", type=Path, help="render one frame, save it, and exit")
+    parser.add_argument(
+        "--reduced-motion",
+        action="store_true",
+        help="hold each sprite clip on its first frame instead of animating it",
+    )
     parser.add_argument(
         "--advance",
         type=int,
@@ -220,7 +242,11 @@ def main(argv: list[str] | None = None) -> int:
 
     bridge = PygameSessionBridge()
     envelope = bridge.start(args.world)
-    stage = Stage(asset_dir=args.assets, title=f"StoryTangl — {args.world}")
+    stage = Stage(
+        asset_dir=args.assets,
+        title=f"StoryTangl — {args.world}",
+        animate=not args.reduced_motion,
+    )
     frame = _frame(bridge, envelope)
 
     for step in range(args.advance):
@@ -261,7 +287,9 @@ def main(argv: list[str] | None = None) -> int:
     pending: PendingSelection | None = None
     running = True
     while running:
-        for event in pygame.event.get():
+        for event in _next_events(stage):
+            if event.type == pygame.NOEVENT:
+                continue
             action: Action | None = None
             if event.type == pygame.QUIT:
                 running = False
@@ -299,6 +327,11 @@ def main(argv: list[str] | None = None) -> int:
             pending, envelope = _apply(bridge, stage, frame, pending, action)
             if envelope is not None:
                 frame = _frame(bridge, envelope)
+            stage.draw(frame, pending)
+        # Due by the clock, not by a quiet queue: a moving mouse floods the queue
+        # with motion events, and a redraw that waited for silence would freeze
+        # every clip for as long as the pointer moved.
+        if stage.animating and stage.since_drawn_ms() >= FRAME_MS:
             stage.draw(frame, pending)
     pygame.quit()
     return 0

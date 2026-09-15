@@ -10,6 +10,7 @@ colour plus text.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
 
@@ -208,7 +209,14 @@ footer that grows without limit is a map nobody can see."""
 class Stage:
     """Own the display surface, fonts, and per-frame hit regions."""
 
-    def __init__(self, asset_dir: Path | None = None, *, title: str = "StoryTangl") -> None:
+    def __init__(
+        self,
+        asset_dir: Path | None = None,
+        *,
+        title: str = "StoryTangl",
+        clock: Callable[[], float] | None = None,
+        animate: bool = True,
+    ) -> None:
         pygame.init()
         self.window = pygame.display.set_mode(
             (LOGICAL_SIZE[0] * SCALE, LOGICAL_SIZE[1] * SCALE)
@@ -233,6 +241,20 @@ class Stage:
         self.prose_floor = LOGICAL_SIZE[1]
         self.selection_numbers: dict[str, int] = {}
         self._last_turn: Turn | None = None
+        self._now: Callable[[], float] = clock or pygame.time.get_ticks
+        """Milliseconds. Injected by tests, so no assertion depends on wall time."""
+        self.animate = animate
+        """False under reduced motion: each clip holds its first frame, still posed."""
+        self.animating = False
+        """True when the last draw showed a clip that has more frames to play."""
+        self._clips: dict[tuple[str, str, str], tuple[str, float]] = {}
+        self._drawn_at = self._now()
+        self._frames: dict[tuple[str, int], pygame.Surface] = {}
+
+    def since_drawn_ms(self) -> float:
+        """Milliseconds since the last draw, on the stage's own clock."""
+
+        return self._now() - self._drawn_at
 
     # ── assets ───────────────────────────────────────────────────────────
 
@@ -293,6 +315,8 @@ class Stage:
 
         self.hitboxes.clear()
         self.slot_boxes.clear()
+        self.animating = False
+        self._drawn_at = self._now()
         loaded, unloadable = self._resolve_images(turn)
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
@@ -725,15 +749,94 @@ class Stage:
     def _draw_portraits(
         self, loaded: list[tuple[StageImage, pygame.Surface]], *, floor: int
     ) -> None:
-        """Place up to two sprites on a shared baseline, preserving aspect."""
+        """Place up to two sprites on a shared baseline, preserving aspect.
+
+        The still decides where a sprite stands and how big it is. When a clip is
+        playing, its frame is drawn over the same box, offset so the still's own
+        pixels would land exactly where the still does -- so starting, stopping or
+        switching a clip never moves the character.
+        """
 
         staged = self._pick(loaded, PORTRAIT_ROLES)[:3]
+        seen: set[tuple[str, str, str]] = set()
         for index, (image, portrait) in enumerate(staged):
             height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
-            width = max(1, round(portrait.get_width() * height / portrait.get_height()))
-            scaled = pygame.transform.scale(portrait, (width, height))
+            factor = height / portrait.get_height()
+            width = max(1, round(portrait.get_width() * factor))
             slot = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
-            self.surface.blit(scaled, (self._slot_x(slot, width), floor - height))
+            box_x, box_y = self._slot_x(slot, width), floor - height
+
+            drawn, (off_x, off_y) = self._clip_frame(image, portrait.get_size(), seen)
+            if drawn is None:
+                drawn, off_x, off_y = portrait, 0, 0
+            scaled = pygame.transform.scale(
+                drawn,
+                (max(1, round(drawn.get_width() * factor)), max(1, round(drawn.get_height() * factor))),
+            )
+            self.surface.blit(scaled, (box_x - round(off_x * factor), box_y - round(off_y * factor)))
+        # A sprite that left the stage starts its clip afresh when it comes back;
+        # one merely restated by the next turn carries on where it was.
+        self._clips = {key: value for key, value in self._clips.items() if key in seen}
+
+    def _clip_frame(
+        self,
+        image: StageImage,
+        still_size: tuple[int, int],
+        seen: set[tuple[str, str, str]],
+    ) -> tuple[pygame.Surface | None, tuple[int, int]]:
+        """The frame this image's clip shows now, and its offset from the still's box.
+
+        ``None`` means draw the still: no clip asked for, no sheet that has it, or a
+        sheet this port cannot use. The still is the floor at every one of those.
+        """
+
+        if image.clip is None or not image.sheets:
+            return None, (0, 0)
+        sheet = next((s for s in image.sheets if image.clip in s.manifest.clip_names()), None) or next(
+            (s for s in image.sheets if not s.manifest.clip_names()), None
+        )
+        if sheet is None:
+            return None, (0, 0)
+        manifest = sheet.manifest
+        atlas = self._load(sheet.source)
+        if atlas is None or atlas.get_size() != (manifest.meta.size.w, manifest.meta.size.h):
+            return None, (0, 0)
+
+        identity = (image.role, image.source, image.x_slot or "")
+        seen.add(identity)
+        now = self._now()
+        started = self._clips.get(identity)
+        if started is None or started[0] != image.clip:
+            started = (image.clip, now)
+            self._clips[identity] = started
+        elapsed = now - started[1] if self.animate else 0
+        frame_index = manifest.frame_index_at(image.clip, elapsed, loop=image.loop)
+
+        frame = self._frames.get((sheet.source, frame_index))
+        if frame is None:
+            r = manifest.frames[frame_index].frame
+            frame = atlas.subsurface(pygame.Rect(r.x, r.y, r.w, r.h)).copy()
+            self._frames[(sheet.source, frame_index)] = frame
+
+        still_w, still_h = still_size
+        pivot = manifest.pivot()
+        if pivot is not None:
+            # The pivot is the still's own bottom-centre inside the cell.
+            off_x, off_y = pivot.x - still_w // 2, pivot.y - (still_h - 1)
+        else:
+            off_x, off_y = (frame.get_width() - still_w) // 2, frame.get_height() - still_h
+        if image.flip_h:
+            # Cut the frame out first, then mirror it. Mirroring the whole sheet
+            # would reverse the frame order along with the pixels.
+            frame = pygame.transform.flip(frame, True, False)
+            off_x = frame.get_width() - off_x - still_w
+
+        order = manifest.sequence(image.clip)
+        if self.animate and len(order) > 1:
+            cycle = sum(manifest.frames[i].duration for i in order)
+            if image.loop or elapsed < cycle * (manifest.tag(image.clip).repeat or 1):
+                self.animating = True
+        return frame, (off_x, off_y)
 
     @staticmethod
     def _slot_x(slot: str, width: int) -> int:
