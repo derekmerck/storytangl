@@ -37,6 +37,23 @@ rather than merely intended — see the map view below.
 **Unavailable choices render dimmed with their `unavailable_reason`** rather
 than being hidden (§5.1, Decision Legibility).
 
+**A sprite plays a clip only when its staging asks for one.** When a portrait's
+payload carries `sprite_sheets` and its `staging_hints` name a `media_clip`, the
+stage draws that clip's current frame over the still's box, where the manifest's
+placement law puts it -- anchor on anchor, trim offset included -- so starting or
+switching a clip never moves the character. The frame comes from the manifest's
+`frame_index_at`, on an injectable clock, and this port runs the same portable
+vectors as the Python reference (`engine/contrib/conformance/sprite_sheets/`).
+Frames are cut from the sheet before mirroring. Each staged occurrence keeps its
+own clock, so one sprite staged twice animates twice. `media_timing` is kept as
+stated and honoured: `loop` repeats; `restart` starts over each time a new turn
+states it; `pause` holds the current frame and `stop` the first; `start` or
+nothing plays as the sheet times it and holds the last frame. A clip also restarts
+when it changes, and carries on when a turn merely restates it.
+With no clip, no sheet that has it, or a sheet this port cannot load, the still is
+drawn. The event loop sleeps until input, and ticks at about thirty frames a
+second only while a clip is actually playing.
+
 ## Typed Choices
 
 Most choices are answered by their `edge_id` alone. Some want a value first, and
@@ -213,7 +230,10 @@ PYTHONPATH=engine/src:apps/pygame/src:worlds/repartee_loop \
 ```
 
 `--assets DIR` resolves relative media sources. `--screenshot PATH` renders one
-frame and exits, which works headless under `SDL_VIDEODRIVER=dummy`.
+frame and exits, which works headless under `SDL_VIDEODRIVER=dummy`; a clip in
+that frame shows its first frame, so captures are reproducible.
+`--reduced-motion` holds every clip on its first frame. The pose still shows --
+it is story state -- only the motion stops.
 
 ```bash
 PYTHONPATH=engine/src:apps/pygame/src poetry run pytest apps/pygame/tests

@@ -21,8 +21,9 @@ rule 3: CI must not need LFS to have materialized in order to pass.
 
 ## The budget
 
-Fourteen files, about 1 MB, all at target resolution: two interchangeable
-packs of seven. That is the whole binary footprint of the repository.
+Seventeen images, about 1.1 MB, all at target resolution: two interchangeable
+packs of seven, plus three sprite sheets in the spaceport pack. Each sheet's
+frames and clips live in a small JSON sidecar beside it.
 
 They are stored as **ordinary git blobs**, not LFS, via the `.gitattributes`
 beside this file. Root rule 3 forbids CI depending on LFS having materialized,
@@ -47,8 +48,46 @@ runtime.
 
 - Conform first: backgrounds and plates to 320x200, sprites trimmed to alpha
   bounds at a common height, nearest-neighbour. Then write the manifest entry.
-- Both packs or neither. `test_packs_are_interchangeable_by_name` asserts an
-  exact match on asset names, and it is right to: a pack missing an asset is a
-  reskin that half works.
+- Both packs or neither, for everything a client needs to draw the world.
+  `test_packs_are_interchangeable_by_name` asserts an exact match on those
+  names, and it is right to: a pack missing a required asset is a reskin that
+  half works.
+- Sprite sheets are the one exemption, and a deliberate one. A sheet is an
+  optional alternative to a still every client can already draw, so a pack
+  without sheets is a complete reskin that simply does not animate. The test
+  exempts only files that parse as sheets of a shipped still.
 - A new *kind* of asset — a second plate, an animation — is a design question
   first. Say what surface it exercises here before adding files.
+
+## Sprite sheets
+
+The surface they exercise: **a clip chosen per use, from three different
+places.** Each portrait's still is unchanged and remains the floor; a client that
+understands sheets may play a named clip from the sheet beside it instead.
+
+- An **authored loop**: locations stage their character with
+  `media_clip: idle` and `media_timing: loop`.
+- A **posture from game state**: contest blocks name no clip, and
+  `tangl.mechanics.games.call_response_presentation` poses the opponent each
+  turn — `call` while it holds the initiative, `response` while it waits on the
+  player's line. The clip names are the kernel's own phrase roles.
+- An **authored outcome**: `dockhand_aftermath` holds `response`, because he won
+  by parrying; the answered master drops back to `idle`.
+
+Each sheet is named `<still>-<columns>x<rows>` with an Aseprite JSON export as
+its sidecar. `tangl.media.sprite_sheets` reads the export into the client-facing
+manifest in `tangl.presentation.sprite_sheet`; see issue #418.
+
+**Spaceport only, for now.** The quayside pack has no generation-scale sources
+for its characters and its cutouts went through an unrecorded cleanup step, so
+its sheets need its stills re-conformed first. Its portraits stage the same
+clips and draw their stills.
+
+Every frame is edited at generation resolution from the still's own recovered
+source and composited back onto it inside a mask, then all frames are downscaled
+once on the still's own sampling grid — so **frame 0 of each sheet is the shipped
+still, pixel for pixel**, which `test_frame_zero_of_a_shipped_sheet_is_its_still`
+checks on the committed bytes. The full reconstruction record, with every prompt,
+seed, mask derivation and hash, is `media_spaceport/provenance/sprite-sheets.json`.
+Masks and 1024x1024 renders are intermediates and are recorded by hash, not
+committed.

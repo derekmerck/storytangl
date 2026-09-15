@@ -78,13 +78,115 @@ def test_manifest_hash_and_size_match_the_shipped_file(
         assert image.mode == entry["mode"]
 
 
+def _is_sheet(stem: str) -> bool:
+    from tangl.media.sprite_sheets import SheetName
+
+    return SheetName.parse(stem) is not None
+
+
 @pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.name)
 def test_packs_are_interchangeable_by_name(pack: Path) -> None:
-    """A swap is one manifest line, so packs must agree on asset names."""
+    """A swap is one manifest line, so packs must agree on their required assets.
+
+    Sprite sheets are the one exemption, and a deliberate one: a sheet is an
+    optional alternative to a still every client can already draw, so a pack
+    without sheets is a complete reskin that simply does not animate -- not a
+    reskin that half works. Everything else must still match exactly.
+    """
 
     manifest = json.loads((pack / "manifest.json").read_text())
-    assert set(manifest["assets"]) == ASSET_NAMES
-    assert {f.stem for f in (pack / "images").glob("*.png")} == ASSET_NAMES
+    assert {name for name in manifest["assets"] if not _is_sheet(name)} == ASSET_NAMES
+    assert {f.stem for f in (pack / "images").glob("*.png") if not _is_sheet(f.stem)} == ASSET_NAMES
+
+
+SHEET_CASES = [
+    (pack, name, entry) for pack, name, entry in CASES if "sprite_sheet" in entry
+]
+
+
+def test_the_spaceport_pack_ships_a_sheet_for_every_sprite() -> None:
+    """Guard against the sheet checks below passing because they found nothing."""
+
+    assert {entry["sprite_sheet"]["of"] for pack, _n, entry in SHEET_CASES if pack.name == "media_spaceport"} == {
+        "clerk_sprite", "master_sprite", "worker_sprite"
+    }
+
+
+@pytest.mark.parametrize(("pack", "name", "entry"), SHEET_CASES, ids=[f"{p.name}:{n}" for p, n, _ in SHEET_CASES])
+def test_a_shipped_sheet_belongs_to_a_shipped_still_and_says_so_consistently(pack, name, entry) -> None:
+    """The manifest, the filename and the sidecar each state the sheet's still and clips."""
+
+    from tangl.media.sprite_sheets import SheetName, read_aseprite_export
+
+    sheet = entry["sprite_sheet"]
+    sidecar = pack / "images" / sheet["sidecar"]["file"]
+    assert hashlib.sha256(sidecar.read_bytes()).hexdigest() == sheet["sidecar"]["sha256"]
+    parsed = read_aseprite_export(sidecar.read_text())
+
+    assert sheet["of"] in ASSET_NAMES
+    assert SheetName.parse(Path(entry["file"]).stem).root == sheet["of"]
+    assert sheet["clips"] == parsed.clip_names()
+    assert [frame.pivot.model_dump() for frame in parsed.frames] == [sheet["pivot"]] * len(parsed.frames)
+
+
+@pytest.mark.parametrize(("pack", "name", "entry"), SHEET_CASES, ids=[f"{p.name}:{n}" for p, n, _ in SHEET_CASES])
+def test_a_shipped_sheet_offers_the_contest_clips(pack, name, entry) -> None:
+    """Named with the kernel's phrase roles, so a pack supplies what the story asks for."""
+
+    assert entry["sprite_sheet"]["clips"] == ["idle", "call", "response"]
+
+
+@pytest.mark.parametrize(("pack", "name", "entry"), SHEET_CASES, ids=[f"{p.name}:{n}" for p, n, _ in SHEET_CASES])
+def test_frame_zero_of_a_shipped_sheet_is_its_still(pack, name, entry) -> None:
+    """The art invariant, checked on the committed bytes.
+
+    A client switches from the still to a clip without the character moving only
+    if the first frame, placed by the manifest's own placement law, is the still.
+    Compared on visible pixels: the still keeps whatever colour its cutout left
+    under transparency, and the sheet deliberately zeroes it.
+    """
+
+    from tangl.media.sprite_sheets import read_aseprite_export
+
+    sheet = read_aseprite_export((pack / "images" / entry["sprite_sheet"]["sidecar"]["file"]).read_text())
+    with Image.open(pack / "images" / f"{entry['sprite_sheet']['of']}.png") as still_image:
+        still = still_image.convert("RGBA")
+    with Image.open(pack / "images" / entry["file"]) as sheet_image:
+        atlas = sheet_image.convert("RGBA")
+
+    index = sheet.play_order("idle")[0]
+    rect, at = sheet.frames[index].rect, sheet.placement(index, still.size)
+    left, top = rect.x - at.x, rect.y - at.y
+    region = atlas.crop((left, top, left + still.width, top + still.height))
+
+    a, b = region.load(), still.load()
+    differing = sum(
+        1
+        for x in range(still.width)
+        for y in range(still.height)
+        if (a[x, y][3] > 0) != (b[x, y][3] > 0) or (b[x, y][3] > 0 and a[x, y] != b[x, y])
+    )
+    assert differing == 0
+
+
+@pytest.mark.parametrize("pack", MANIFEST_PACKS, ids=lambda p: p.name)
+def test_the_indexer_accepts_every_shipped_sheet_and_attaches_it(pack: Path) -> None:
+    """The real loader, not a re-reading of the JSON: what a world load would do."""
+
+    from tangl.media.media_resource.resource_manager import ResourceManager
+
+    manager = ResourceManager(pack)
+    manager.index_directory("images")
+    manifest = json.loads((pack / "manifest.json").read_text())
+    expected: dict[str, list[str]] = {}
+    for entry in manifest["assets"].values():
+        if "sprite_sheet" in entry:
+            expected.setdefault(entry["sprite_sheet"]["of"], []).append(entry["file"])
+
+    for still in ASSET_NAMES:
+        if still.endswith("_sprite"):
+            attached = [ref.path.name for ref in manager.get_rit(f"{still}.png").sprite_sheets]
+            assert attached == sorted(expected.get(still, []))
 
 
 # Full-frame assets fill the logical surface; sprites are trimmed and share a

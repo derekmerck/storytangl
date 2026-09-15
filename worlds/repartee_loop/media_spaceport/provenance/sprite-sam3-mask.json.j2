@@ -1,0 +1,10 @@
+{
+  "load":   {"class_type": "LoadImage", "inputs": {"image": {{ images.source | tojson }}}},
+  "ckpt":   {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "sam3.1_multiplex_fp16.safetensors"}},
+  "text":   {"class_type": "CLIPTextEncode", "inputs": {"clip": ["ckpt", 1], "text": {{ prompt | tojson }}}},
+  "detect": {"class_type": "SAM3_Detect", "inputs": {
+      "model": ["ckpt", 0], "image": ["load", 0], "conditioning": ["text", 0],
+      "threshold": {{ threshold }}, "refine_iterations": 2, "individual_masks": false}},
+  "as_image": {"class_type": "MaskToImage", "inputs": {"mask": ["detect", 0]}},
+  "save":   {"class_type": "SaveImage", "inputs": {"images": ["as_image", 0], "filename_prefix": {{ ("sprite_sheets/sam3/" ~ who ~ "/" ~ (prompt | replace(" ", "_"))) | tojson }}}}
+}

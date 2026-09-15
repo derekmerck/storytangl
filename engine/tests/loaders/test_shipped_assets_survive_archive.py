@@ -42,6 +42,13 @@ def _declared_assets() -> list[tuple[str, str]]:
         for name, entry in manifest["assets"].items():
             path = (pack / "images" / entry["file"]).relative_to(REPO)
             declared.append((f"{pack.parent.name}:{name}", str(path)))
+            # A sprite sheet's frames and clips live in its sidecar; an archive
+            # that kept the image but lost the sidecar would ship a sheet no
+            # loader could read.
+            sidecar = (entry.get("sprite_sheet") or {}).get("sidecar")
+            if sidecar:
+                path = (pack / "images" / sidecar["file"]).relative_to(REPO)
+                declared.append((f"{pack.parent.name}:{name}:sidecar", str(path)))
     return declared
 
 

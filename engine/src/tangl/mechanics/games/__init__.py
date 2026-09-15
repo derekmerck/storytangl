@@ -132,6 +132,8 @@ from .call_response_game import (
     CallResponsePhrase,
     DominanceMatch,
 )
+# Imported for registration: stages a call-response opponent's posture as a clip.
+from . import call_response_presentation as _call_response_presentation  # noqa: F401
 from .repertoire import (
     DominanceComposition,
     DominanceContribution,

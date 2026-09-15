@@ -266,6 +266,111 @@
         "sha256": "7a4754f299f7600a96a260090533006992dca5da44bbf21ce61ccd4773bbe269",
         "transform": "crop to alpha bounds, resize to 112px height, nearest-neighbour"
       }
+    },
+    "clerk_sprite-4x1": {
+      "file": "clerk_sprite-4x1.png",
+      "size": [
+        412,
+        112
+      ],
+      "mode": "RGBA",
+      "sha256": "d25b65aac98ef1ef5088c3c147c94764f38926ee51c5495b522b853bcd332da3",
+      "sprite_sheet": {
+        "of": "clerk_sprite",
+        "sidecar": {
+          "file": "clerk_sprite-4x1.json",
+          "sha256": "5b60b3a0e02b0020b17c5688e915315d0facd913a015f72b39e08fc85ad32d9f"
+        },
+        "clips": [
+          "idle",
+          "call",
+          "response"
+        ],
+        "grid": [
+          4,
+          1
+        ],
+        "pivot": {
+          "x": 51,
+          "y": 111
+        }
+      },
+      "conformed_from": {
+        "still_source_sha256": "764e12bcd41dedf411028584bca7efc30180a042b8afe0a490d902c19f93b7c5",
+        "transform": "every frame edited at 1024x1024 and composited onto the still's own source, then sampled once on the still's Pillow nearest-neighbour grid, extended outward by whole cells; frame 0 is the still, pixel for pixel",
+        "cell_padding_left": 0
+      },
+      "provenance": "provenance/sprite-sheets.json"
+    },
+    "master_sprite-4x1": {
+      "file": "master_sprite-4x1.png",
+      "size": [
+        364,
+        112
+      ],
+      "mode": "RGBA",
+      "sha256": "edabb7a605798195d91011c621137aabd9286e1ee0c81420e6264abbe2ebeb64",
+      "sprite_sheet": {
+        "of": "master_sprite",
+        "sidecar": {
+          "file": "master_sprite-4x1.json",
+          "sha256": "c786df4210118581a9b69b9a3f2d6398a9c33ea677192996d28217d73399d0b1"
+        },
+        "clips": [
+          "idle",
+          "call",
+          "response"
+        ],
+        "grid": [
+          4,
+          1
+        ],
+        "pivot": {
+          "x": 45,
+          "y": 111
+        }
+      },
+      "conformed_from": {
+        "still_source_sha256": "19aa5b81ae6866c57afe898cfc0212016a593a747739b80ff84bea14d877feea",
+        "transform": "every frame edited at 1024x1024 and composited onto the still's own source, then sampled once on the still's Pillow nearest-neighbour grid, extended outward by whole cells; frame 0 is the still, pixel for pixel",
+        "cell_padding_left": 0
+      },
+      "provenance": "provenance/sprite-sheets.json"
+    },
+    "worker_sprite-4x1": {
+      "file": "worker_sprite-4x1.png",
+      "size": [
+        464,
+        112
+      ],
+      "mode": "RGBA",
+      "sha256": "0d0dce35556e4dac9c2291804a838b6e172cc8491ff242c4bb8f6ff389e2723f",
+      "sprite_sheet": {
+        "of": "worker_sprite",
+        "sidecar": {
+          "file": "worker_sprite-4x1.json",
+          "sha256": "9daf48923b8eb42ca1f154c09737e1f5610f477fdb9e1cbec432abe3e60c3e30"
+        },
+        "clips": [
+          "idle",
+          "call",
+          "response"
+        ],
+        "grid": [
+          4,
+          1
+        ],
+        "pivot": {
+          "x": 60,
+          "y": 111
+        }
+      },
+      "conformed_from": {
+        "still_source_sha256": "7a4754f299f7600a96a260090533006992dca5da44bbf21ce61ccd4773bbe269",
+        "transform": "every frame edited at 1024x1024 and composited onto the still's own source, then sampled once on the still's Pillow nearest-neighbour grid, extended outward by whole cells; frame 0 is the still, pixel for pixel",
+        "cell_padding_left": 5
+      },
+      "provenance": "provenance/sprite-sheets.json"
     }
   },
   "background_removal": {

@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from tangl.presentation.intent import Accepts
+from tangl.presentation.hints import TimingName
+from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.response import JsonValue
 
 
@@ -28,6 +30,31 @@ class StageImage:
     flip_h: bool = False
     """From ``staging_hints.media_flip_h``. Other staging hints are ignored by
     this port; honouring a subset is expected of a conforming client."""
+
+    clip: str | None = None
+    """From ``staging_hints.media_clip``: which clip of a sprite sheet to play.
+
+    ``None`` means the still, even when sheets are available -- playing a clip is
+    something a use asks for, not something a client assumes."""
+
+    timing: TimingName | None = None
+    """From ``staging_hints.media_timing``, kept as stated.
+
+    This port honours all of it for clips: ``loop`` repeats forever (a sheet cannot
+    say "forever"); ``restart`` starts the clip over each time a turn states it;
+    ``pause`` holds the frame showing and ``stop`` the first; ``start`` or nothing
+    plays the clip as its sheet times it and then holds the last frame."""
+
+    sheets: tuple["SheetSource", ...] = ()
+    """Sprite sheets delivered beside the still. The still stays the floor."""
+
+
+@dataclass(slots=True, frozen=True)
+class SheetSource:
+    """One sprite sheet a staged image may play instead of its still."""
+
+    source: str
+    manifest: SpriteSheetManifest
 
 
 @dataclass(slots=True, frozen=True)

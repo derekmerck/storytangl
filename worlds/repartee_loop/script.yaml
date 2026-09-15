@@ -43,6 +43,8 @@ scenes:
               media_y: bottom
               media_transition: from_left
               media_flip_h: true
+              media_clip: idle
+              media_timing: loop
         kind: "repartee_loop.domain.ReparteeSetupBlock"
         content: "The clerk hands you one opening line and a warning not to waste it."
         actions:
@@ -103,6 +105,8 @@ scenes:
             staging_hints:
               media_x: right
               media_y: bottom
+              media_clip: idle
+              media_timing: loop
         content: "The dockhand drills newcomers between loads."
         actions:
           - text: "Challenge the dockhand"
@@ -130,6 +134,9 @@ scenes:
               media_shape: landscape
           - name: master_sprite.png
             media_role: dialog_im
+            staging_hints:
+              media_clip: idle
+              media_timing: loop
         content: "The salon master holds the terrace, waiting past the rope."
         actions:
           - text: "Challenge the salon master"
@@ -179,6 +186,7 @@ scenes:
             staging_hints:
               media_x: right
               media_y: bottom
+              media_clip: response
         kind: "repartee_loop.domain.ReparteeLossAftermathBlock"
         content: "The dockhand nods once and lets you keep the reply that beat you."
         actions:
@@ -208,6 +216,9 @@ scenes:
               media_shape: landscape
           - name: master_sprite.png
             media_role: dialog_im
+            staging_hints:
+              media_clip: idle
+              media_timing: loop
         kind: "repartee_loop.domain.ReparteePrizeAftermathBlock"
         content: "The master grants you a brass token stamped with the salon seal."
         actions:

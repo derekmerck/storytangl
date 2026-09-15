@@ -1,0 +1,249 @@
+{
+  "summary": "Sprite sheets for the spaceport pack. Every frame is edited at generation resolution from the still's own recovered source and composited back onto it inside a mask, then all frames are downscaled once on the still's sampling grid. Frame 0 of every sheet is the shipped still, pixel for pixel.",
+  "worker": "configured-worker",
+  "models": {
+    "unet": "flux-2-klein-9b-kv-fp8.safetensors",
+    "clip": "qwen_3_8b_fp8mixed.safetensors (flux2)",
+    "vae": "flux2-vae.safetensors",
+    "segmentation": "sam3.1_multiplex_fp16.safetensors",
+    "background_removal": "birefnet.safetensors"
+  },
+  "templates": {
+    "masked_edit": {
+      "file": "sprite-masked-edit.json.j2",
+      "sha256": "8ab1af7066d2617a215a4aff87d46a74d63db2ae4a081ddeb187b9ec6de0a3a2"
+    },
+    "segmentation": {
+      "file": "sprite-sam3-mask.json.j2",
+      "sha256": "01ed93f4d627c66ff5f8e45507d9e77a051e56bbf248435d7613fb85bd2ba327"
+    }
+  },
+  "sampling": {
+    "sampler": "euler",
+    "scheduler": "Flux2Scheduler",
+    "guider": "BasicGuider with ReferenceLatent(source)",
+    "noise_mask": "SetLatentNoiseMask over the encoded source"
+  },
+  "composite": "pixels inside the hard mask replace the source at 1024x1024; the latent mask alone is not enough, since VAE decoding drifts thousands of pixels outside it",
+  "downscale": "Pillow NEAREST's own accumulating sample walk over the still's recorded alpha bounds, extended by whole cells for padding; a closed-form (i+0.5)*step disagrees with Pillow at exact-integer columns",
+  "sources": {
+    "master": "conformed_from.sha256 of the still's manifest entry; recovered from the worker by its cutout receipt filename and verified against that hash",
+    "clerk": "conformed_from.sha256 of the still's manifest entry; recovered from the worker by its cutout receipt filename and verified against that hash",
+    "worker": "conformed_from.sha256 of the still's manifest entry; recovered from the worker by its cutout receipt filename and verified against that hash"
+  },
+  "characters": {
+    "master": {
+      "clips": {
+        "idle": [
+          "neutral (the still)",
+          "blink"
+        ],
+        "call": [
+          "call"
+        ],
+        "response": [
+          "response"
+        ]
+      },
+      "frames": {
+        "blink": {
+          "edit": "blink-d60",
+          "composite": "rgb inside mask; alpha from source",
+          "prompt": "Close both of his eyes completely: each upper eyelid meets its lower eyelid, and no white or pupil of either eye is visible. Keep his eyebrows, mustache, face shape, skin colour, palette and pixel-art rendering exactly the same. Change nothing else.",
+          "denoise": 0.6,
+          "seed": 442061,
+          "steps": 8,
+          "mask_grow": 16,
+          "source_sha256": "5a8b431a23bd7bcc1dd188c5af8c7ba768b85d7b4fc99e7499b3d7f16cf40f14",
+          "mask_sha256": "9b538945a56d706142c48681bc0b9d1c2c04e0be7184cbe00a0f5285e08fca12",
+          "request_sha256": "6cd2a59a20a3277051069e4efef0557c65b263629eab0bb78aea8ca083732e08",
+          "outputs": {
+            "000-blink-d60-mask_00001_.png": "1f8575da7ddd23932bd881726a2ab7d6e19dcc969739a8bbbb6f5ea80c013bf8",
+            "001-blink-d60_00001_.png": "99682ab905e0f7b956c9983fec4933d087911ad12f4556d6fb4ea6bb9f7a7a80"
+          }
+        },
+        "call": {
+          "edit": "master-call-d85-s442061",
+          "composite": "rgba inside mask",
+          "prompt": "He attacks: he thrusts his staff straight forward to the left, held level at chest height with his arm extended, the tip pointing at an opponent on the left, like a fencer's lunge. The staff is a single straight rod held in one hand. Keep his face, crest, coat, boots, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 0.85,
+          "seed": 442061,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "5a8b431a23bd7bcc1dd188c5af8c7ba768b85d7b4fc99e7499b3d7f16cf40f14",
+          "mask_sha256": "85bb3228ab739abf2246094185c0931a8b804f1a1165c09979f624a76b9852d8",
+          "request_sha256": "fb0943bbb371750839feecbb18b853a8f84d90b93583d2111e082fc82477a2b6",
+          "outputs": {
+            "000-master-call-d85-s442061-mask_00001_.png": "77d0f6cb05f51f2c259f5f6971e4406fb04cc73a78f703930923df8fa32e9bd0",
+            "001-master-call-d85-s442061_00001_.png": "386bb445470286342f3a2134d5acd445ee5c8c54b406d0c08958c55a2cb998f4",
+            "002-master-call-d85-s442061-rgba_00001_.png": "2c9b4b8312d7207a4d0dfd2db08a9ff13fb0bfe7593593a1f9607901d2ec60a6"
+          }
+        },
+        "response": {
+          "edit": "guard-d85-s7",
+          "composite": "rgba inside mask",
+          "prompt": "He raises his staff to parry a blow: he grips the staff in both hands and holds it diagonally across the front of his chest, the tip angled up and to the left, like a fencer on guard. Keep his face, crest, coat, boots, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 0.85,
+          "seed": 7,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "5a8b431a23bd7bcc1dd188c5af8c7ba768b85d7b4fc99e7499b3d7f16cf40f14",
+          "mask_sha256": "a285669515e4e08e0a8351e4ee2a4ae1cad812fef0c6a76cdea98970c9da1e6d",
+          "request_sha256": "fddc5f9d97db922caad29de635cececa7fb40341e0039f34b4139d91e39f1f85",
+          "outputs": {
+            "000-guard-d85-s7-mask_00001_.png": "c5a8ea363c341afdd0a5c7da2cea3bb2ed4046d10927e30b1ea2a71555290582",
+            "001-guard-d85-s7_00001_.png": "5523a90c2dbad9fd93ccf5c91561170dd3c127b65cafadac4a2a97558a2f0dd7",
+            "002-guard-d85-s7-rgba_00001_.png": "8819172aa3b2f0f60ea4d793c11d183380fb41ad18ccec9c7cbd73c3378e7b70"
+          }
+        }
+      },
+      "masks": {
+        "blink": "SAM 3.1 text prompt 'eyes' (threshold 0.5) on the source over RGB(224,224,224), grown 16px in-graph",
+        "pose": "polygon [(40,300),(470,300),(620,560),(620,840),(40,840)] ∪ SAM 'wooden staff' grown 24px ∪ polygon [(600,690),(820,760),(820,850),(600,850)] − SAM 'head' grown 10px; the call uses this widened mask so the old staff's lower end is inside it",
+        "response_note": "the response (guard) predates the widened mask: polygon above ∪ SAM 'wooden staff' ∪ SAM 'bandaged wrist' − SAM 'head' grown 10px"
+      }
+    },
+    "clerk": {
+      "clips": {
+        "idle": [
+          "neutral (the still)",
+          "blink"
+        ],
+        "call": [
+          "call"
+        ],
+        "response": [
+          "response"
+        ]
+      },
+      "frames": {
+        "blink": {
+          "edit": "clerk-idle-d60-s442061",
+          "composite": "rgb inside mask; alpha from source",
+          "prompt": "The glowing blue light of his visor eye switches off: the eye becomes dark unlit metal with no glow at all. Change nothing else. Keep his helmet, body, tablet, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 0.6,
+          "seed": 442061,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "027a6aef86b4d90a3edbfee9ffc0ce06abca3d84650badcba892393a13c6e9f6",
+          "mask_sha256": "6f801dd5b90ffd53d7c2fe7fca4251fc5ae02a6e8cdf440a6182c999023cb3f8",
+          "request_sha256": "3e4eb2319d3a876f7926ec52606a0799040c94b536d9ee7e101631ef3079aba4",
+          "outputs": {
+            "000-clerk-idle-d60-s442061-mask_00001_.png": "dc4460cfce9652b74f1108ef93d1d4c598180b775dc8e7556b77c7ab10711db6",
+            "001-clerk-idle-d60-s442061_00001_.png": "ee923c5a35d3753d908a150418abcabea1b6d78ab38ab87e289ceb166fe07ef0",
+            "002-clerk-idle-d60-s442061-rgba_00001_.png": "98fd5570ffd6a3c83d43736d28d497833d5ce35e0781c493e904405f2717de88"
+          }
+        },
+        "call": {
+          "edit": "clerk-call2-d100-s99",
+          "composite": "rgba inside mask",
+          "prompt": "He jabs the tablet forward at arm's length toward someone on the left, both arms fully straightened, the screen turned to face left and glowing brightly, as if demanding they read it. Keep his helmet, visor, shell pack, boots, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 1.0,
+          "seed": 99,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "027a6aef86b4d90a3edbfee9ffc0ce06abca3d84650badcba892393a13c6e9f6",
+          "mask_sha256": "66b9307d7a3eb5fdbd43cc2d734d8c83434e13093f6214d60a68fc2f79866be7",
+          "request_sha256": "9113c3cd832aa57e31e2ba75c8e82594fedcf761814e436ee760f2256efc6c19",
+          "outputs": {
+            "000-clerk-call2-d100-s99-mask_00001_.png": "90342c571b0623fb728f63fc0edc7bd73a10e82b0338101c5b68d3ad4a00ea57",
+            "001-clerk-call2-d100-s99_00001_.png": "3cf77d0039d041e53a7272f587905a150dd0d4944ba345ba73aaae19484a3c1c",
+            "002-clerk-call2-d100-s99-rgba_00001_.png": "3ee4cf414ad59a83e09ff9117fb45ce3409b5e4f21b7273f27c32cb2ce46978f"
+          }
+        },
+        "response": {
+          "edit": "clerk-response-d85-s7",
+          "composite": "rgba inside mask",
+          "prompt": "He raises the tablet up in front of his helmet like a shield, holding it with both hands to block. Keep his helmet, visor, shell pack, boots, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 0.85,
+          "seed": 7,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "027a6aef86b4d90a3edbfee9ffc0ce06abca3d84650badcba892393a13c6e9f6",
+          "mask_sha256": "66b9307d7a3eb5fdbd43cc2d734d8c83434e13093f6214d60a68fc2f79866be7",
+          "request_sha256": "38e5ce8544257f0f0ab385e15311d18a3851f070664a5f241753f065186a3bce",
+          "outputs": {
+            "000-clerk-response-d85-s7-mask_00001_.png": "9520af91fd3c5ffa5b4e8fb488810d23e59b18aaf1d359376fb20a9d7f236b92",
+            "001-clerk-response-d85-s7_00001_.png": "909cfaf234cf9e89af9945b82e1f663c5924f4700cd953c48bedad12b1cb6149",
+            "002-clerk-response-d85-s7-rgba_00001_.png": "547fd690a5c592075daea76333e1629012b2521ae682cc0a2b21d6c198061bcd"
+          }
+        }
+      },
+      "masks": {
+        "blink": "SAM 3.1 'glowing eye' (threshold 0.35) grown 10px -- the clerk has a visor, so its idle is the visor dimming",
+        "pose": "polygon [(40,290),(330,290),(480,420),(480,650),(40,650)] ∪ SAM 'tablet' grown 12px ∪ both hands (SAM 'hands holding the tablet' for the lower hand, glove colour near the tablet's upper edge for the other, each grown 6px) − SAM 'head' grown 10px"
+      }
+    },
+    "worker": {
+      "clips": {
+        "idle": [
+          "neutral (the still)",
+          "blink"
+        ],
+        "call": [
+          "call"
+        ],
+        "response": [
+          "response"
+        ]
+      },
+      "frames": {
+        "blink": {
+          "edit": "worker-idle-d60-s442061",
+          "composite": "rgb inside mask; alpha from source",
+          "prompt": "Close both of his eyes completely: each upper eyelid meets its lower eyelid, and no white or pupil of either eye is visible. Change nothing else. Keep his eyebrows, mouth, face, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 0.6,
+          "seed": 442061,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "4c4cca41724bca217b09c049a907221bb17bc7ab8688b9b7accc0b530a5ba18d",
+          "mask_sha256": "c953c49be27289e4c294533388250e981fe10854933a9842f85ea975a10e3012",
+          "request_sha256": "3f3400fdc0fb5132270739683d346e616b51a0c2384ad08f0da084122f224294",
+          "outputs": {
+            "000-worker-idle-d60-s442061-mask_00001_.png": "b00e65573c29057f5587d08c4bb0cb8627d79c8553f4a307a05cfc9dae6786aa",
+            "001-worker-idle-d60-s442061_00001_.png": "5ed6ed57672578726e7adbf6b6901340af43a2791f4adcf60c693e62ba32e776",
+            "002-worker-idle-d60-s442061-rgba_00001_.png": "9cb3846de3f56454ab704c912936b4ecd384223d085d4392bd503bf1c75fb4e1"
+          }
+        },
+        "call": {
+          "edit": "worker-call2-d100-s99",
+          "composite": "rgba inside mask",
+          "prompt": "He attacks: he lunges and thrusts his one sword straight forward to the left, the blade held level at chest height and his sword arm fully extended toward an opponent on the left. He holds exactly one sword and there is no second blade or scabbard. Keep his face, head, vest, open right hand, boots, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 1.0,
+          "seed": 99,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "4c4cca41724bca217b09c049a907221bb17bc7ab8688b9b7accc0b530a5ba18d",
+          "mask_sha256": "86e594b99719d4908c27f45ee32da8eba42a0c9492c98035addb83751124f70b",
+          "request_sha256": "a366510bb93fe972b13651571a33619659f78aa21cac4cb51e3de76df86a4d49",
+          "outputs": {
+            "000-worker-call2-d100-s99-mask_00001_.png": "0014543a1e71c3be6fcf7a2e82865b08f2dd932489ebf357c0a64e9d9dd07be8",
+            "001-worker-call2-d100-s99_00001_.png": "12fdfb2f77013326047d2b07e30098bf0bfa7d5109c9bfb69967305aa597877f",
+            "002-worker-call2-d100-s99-rgba_00001_.png": "37206c788d5da08f7a0a5d7e988597d3efa8d786c43f70412eedfe5925bad863"
+          }
+        },
+        "response": {
+          "edit": "worker-response2-d100-s99",
+          "composite": "rgba inside mask",
+          "prompt": "He parries: he holds his one sword upright in front of his body with the blade angled up and to the left, like a fencer on guard blocking a blow. He holds exactly one sword; there is no second blade, no scabbard and nothing at his left hip. Keep his face, head, vest, open right hand, boots, stance, palette and pixel-art rendering exactly the same. Plain flat light grey background, no motion lines.",
+          "denoise": 1.0,
+          "seed": 99,
+          "steps": 8,
+          "mask_grow": 0,
+          "source_sha256": "4c4cca41724bca217b09c049a907221bb17bc7ab8688b9b7accc0b530a5ba18d",
+          "mask_sha256": "86e594b99719d4908c27f45ee32da8eba42a0c9492c98035addb83751124f70b",
+          "request_sha256": "133fda4dc8af09f21a70e93e11ca1c536852b3e49752d29419efb36dafec1455",
+          "outputs": {
+            "000-worker-response2-d100-s99-mask_00001_.png": "1a4cf54f28f33e60c80df766e6973b68950823e0a11903c5d8de36e3b912dbcf",
+            "001-worker-response2-d100-s99_00001_.png": "36bf08cde6d2e9ecec3457e6e7dc5c140bf9643af133e90d42b46c39d92db0e9",
+            "002-worker-response2-d100-s99-rgba_00001_.png": "b0a0a944b07fa8dcfd47d616d322ba7392611ae7b802af6c08cf4c8232d11265"
+          }
+        }
+      },
+      "masks": {
+        "blink": "rectangles (460,230)-(525,282) ∪ (558,228)-(622,282): SAM found only one eye, so both were placed by eye on a gridded crop",
+        "pose": "polygon [(30,360),(540,360),(540,770),(30,770)] ∪ SAM 'sword' grown 16px ∪ rectangle (370,605)-(440,695) for the sword hand − head polygon [(400,30),(690,30),(700,390),(400,390)] grown 8px"
+      }
+    }
+  }
+}

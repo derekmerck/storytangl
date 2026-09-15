@@ -10,6 +10,7 @@ from tangl.core import Selector
 from tangl.presentation.dispatch import (
     on_advertise_story_info_channels,
     on_advertise_world_info_channels,
+    on_compose_journal,
     on_get_story_info,
     presentation_dispatch,
 )
@@ -21,6 +22,7 @@ from tangl.presentation.dispatch import (
         (on_advertise_story_info_channels, "advertise_story_info_channels"),
         (on_advertise_world_info_channels, "advertise_world_info_channels"),
         (on_get_story_info, "get_story_info"),
+        (on_compose_journal, "compose_journal"),
     ),
 )
 def test_presentation_decorators_register_and_execute(
