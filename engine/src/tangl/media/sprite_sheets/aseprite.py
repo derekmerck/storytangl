@@ -128,7 +128,14 @@ class AsepriteExport(_Export):
     @classmethod
     def _frames_from_hash(cls, value: Any) -> Any:
         if isinstance(value, dict):
-            return [{"filename": name, **record} for name, record in value.items()]
+            frames: list[dict[str, Any]] = []
+            for name, record in value.items():
+                if not isinstance(record, dict):
+                    # Unpacking a non-record would raise TypeError, which escapes the
+                    # loader's ValueError handling and loses the sidecar's name with it.
+                    raise ValueError(f"frame {name!r} is {type(record).__name__}, not a frame record")
+                frames.append({"filename": name, **record})
+            return frames
         return value
 
     def to_manifest(self) -> SpriteSheetManifest:

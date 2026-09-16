@@ -275,7 +275,7 @@ def _base_payload(
     # anything at all -- and tests that built fixtures with hints hid the gap.
     hints = getattr(fragment, "staging_hints", None)
     if hints is not None:
-        dumped = hints.model_dump(exclude_none=True) if hasattr(hints, "model_dump") else dict(hints)
+        dumped = hints.model_dump(exclude_none=True)
         if dumped:
             payload["staging_hints"] = dumped
     return payload

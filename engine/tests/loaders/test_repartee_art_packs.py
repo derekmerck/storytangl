@@ -97,6 +97,11 @@ def test_packs_are_interchangeable_by_name(pack: Path) -> None:
     manifest = json.loads((pack / "manifest.json").read_text())
     assert {name for name in manifest["assets"] if not _is_sheet(name)} == ASSET_NAMES
     assert {f.stem for f in (pack / "images").glob("*.png") if not _is_sheet(f.stem)} == ASSET_NAMES
+    # The exemption is from pack equality, not from being declared: an undeclared
+    # sheet would otherwise ship without its hash, size and mode ever being checked.
+    assert {f.stem for f in (pack / "images").glob("*.png") if _is_sheet(f.stem)} == {
+        Path(entry["file"]).stem for entry in manifest["assets"].values() if "sprite_sheet" in entry
+    }
 
 
 SHEET_CASES = [

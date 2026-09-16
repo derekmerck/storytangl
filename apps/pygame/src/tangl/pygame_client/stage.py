@@ -341,6 +341,10 @@ class Stage:
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
         if pending is None and self._draw_map(turn, loaded):
+            # The map replaces the stage, so every sprite has left it: drop their
+            # playback, or a clip resumes mid-cycle on the far side of the map.
+            self._clips.clear()
+            self._staged_turn = None
             pygame.transform.scale(self.surface, self.window.get_size(), self.window)
             pygame.display.flip()
             return

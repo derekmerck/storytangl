@@ -10,12 +10,18 @@ with the VM that drives the fold.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
+from tangl.core import Graph
 from tangl.journal.fragments import ContentFragment, MediaFragment
-from tangl.mechanics.games import CallResponseGame
+from tangl.mechanics.games import CallResponseGame, Game, HasGame
 from tangl.mechanics.games.call_response_presentation import posture_clip, stage_call_response_posture
 from tangl.presentation.hints import StagingHints
+from tangl.story import Block
+
+
+class Contest(HasGame, Block):
+    """A real game block, because the handler reads a block's own state field."""
+
+    _game_class = CallResponseGame
 
 
 def _portrait(role: str = "dialog_im", **hints) -> MediaFragment:
@@ -25,8 +31,14 @@ def _portrait(role: str = "dialog_im", **hints) -> MediaFragment:
     )
 
 
-def _contest(*, player_has_initiative: bool) -> SimpleNamespace:
-    return SimpleNamespace(game=CallResponseGame(player_has_initiative=player_has_initiative))
+def _block(game: Game | None) -> Contest:
+    block = Graph().add_node(kind=Contest, label="contest")
+    block.game_state = game
+    return block
+
+
+def _contest(*, player_has_initiative: bool) -> Contest:
+    return _block(CallResponseGame(player_has_initiative=player_has_initiative))
 
 
 def _clips(fragments) -> list[str | None]:
@@ -79,9 +91,7 @@ def test_two_portraits_are_left_alone_rather_than_guessed_between() -> None:
 
 
 def test_a_block_whose_game_is_not_call_response_is_untouched() -> None:
-    caller = SimpleNamespace(game=object())
-
-    assert stage_call_response_posture(caller=caller, fragments=[_portrait()]) is None
+    assert stage_call_response_posture(caller=_block(Game()), fragments=[_portrait()]) is None
 
 
 def test_the_input_batch_is_not_mutated() -> None:
@@ -91,6 +101,20 @@ def test_the_input_batch_is_not_mutated() -> None:
     stage_call_response_posture(caller=_contest(player_has_initiative=False), fragments=fragments)
 
     assert fragments[0].staging_hints is None
+
+
+def test_composing_a_journal_does_not_bring_a_game_into_being() -> None:
+    """A block's ``game`` property creates and stores one; composing is a read.
+
+    Reading it here would write a game into the block's persisted ``game_state``
+    just by rendering a turn, for every ``HasGame`` block on stage.
+    """
+
+    block = Graph().add_node(kind=Contest, label="contest")
+    assert block.game_state is None
+
+    assert stage_call_response_posture(caller=block, fragments=[_portrait()]) is None
+    assert block.game_state is None
 
 
 def test_the_pose_is_contributed_to_presentation_not_to_the_vm() -> None:

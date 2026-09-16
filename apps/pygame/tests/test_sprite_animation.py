@@ -35,7 +35,7 @@ from PIL import Image  # noqa: E402
 
 from tangl.presentation.sprite_sheet import SpriteSheetManifest  # noqa: E402
 from tangl.pygame_client.models import SheetSource, StageImage, Turn  # noqa: E402
-from tangl.pygame_client.stage import Stage  # noqa: E402
+from tangl.pygame_client.stage import LOGICAL_SIZE, Stage  # noqa: E402
 
 VECTORS = json.loads(
     (Path(__file__).parents[3] / "engine" / "contrib" / "conformance" / "sprite_sheets" / "playback.json").read_text()
@@ -49,6 +49,7 @@ LEFT, RIGHT = (200, 30, 30, 255), (90, 10, 10, 255)       # the still: two tones
 BLINK_L, BLINK_R = (30, 30, 200, 255), (240, 240, 240, 255)
 CALL_L, CALL_R = (30, 200, 30, 255), (10, 90, 10, 255)
 HOLD_L, HOLD_R = (220, 220, 30, 255), (90, 90, 10, 255)
+PLATE_INK = (12, 34, 56, 255)                             # a map plate, told apart from the stage
 
 
 def _two_tone(image: Image.Image, x0: int, left, right) -> None:
@@ -407,6 +408,37 @@ def test_stop_holds_the_first_frame_and_the_next_play_starts_there(stage, art, c
     clock.ms = 4_800
     stage.draw(played)
     assert _probe(stage, still_only, left=True) == BLINK_L
+
+
+def test_the_map_takes_the_stage_so_sprites_on_it_have_left_it(stage, art, clock, tmp_path) -> None:
+    """A map replaces the whole stage; a clip must not resume mid-cycle on the far side."""
+
+    from uuid import uuid4
+
+    from tangl.pygame_client.models import Choice, MapPlate, MapRegion
+
+    plate_image = pygame.Surface(LOGICAL_SIZE)
+    plate_image.fill(PLATE_INK)
+    pygame.image.save(plate_image, str(tmp_path / "quay_map.png"))
+    still, sheet = art
+    stage.asset_dir = tmp_path
+    stage.draw(_turn(still))
+    still_only = _pixels(stage)
+
+    stage.draw(_turn(still, sheet, clip="idle", timing="loop"))
+    plate = MapPlate(name="quay", image="quay_map.png", regions=(MapRegion(name="yard", x=0.1, y=0.1, w=0.2, h=0.2),))
+    on_the_map = Turn(
+        step=2,
+        images=[StageImage(role="map_im", source="quay_map.png")],
+        plate=plate,
+        choices=[Choice(edge_id=uuid4(), text="Go to the yard")],
+    )
+    stage.draw(on_the_map)
+    assert stage.surface.get_at((2, 2)) == pygame.Color(*PLATE_INK)   # the map really took the stage
+    clock.ms = 1850
+    stage.draw(_turn(still, sheet, clip="idle", timing="loop"))
+
+    assert _probe(stage, still_only, left=True) == LEFT
 
 
 def test_a_sprite_that_leaves_the_stage_starts_afresh_when_it_returns(stage, art, clock) -> None:

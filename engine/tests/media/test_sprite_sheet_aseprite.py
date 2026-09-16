@@ -140,6 +140,16 @@ def _trim_to_a_different_canvas(export: dict) -> None:
     export["frames"]["hero 2.aseprite"]["sourceSize"] = {"w": 11, "h": 12}
 
 
+def test_a_frames_entry_that_is_not_a_record_is_a_value_error_like_the_rest() -> None:
+    """``**record`` on a scalar would raise TypeError, which the loader does not catch."""
+
+    export = _export()
+    export["frames"]["hero 1.aseprite"] = None
+
+    with pytest.raises(ValueError, match="is NoneType, not a frame record"):
+        read_aseprite_export(export)
+
+
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [

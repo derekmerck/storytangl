@@ -55,7 +55,10 @@ def stage_call_response_posture(*, caller: HasGame, fragments: list[Any], **_kw:
     because an author who asked for one meant it.
     """
 
-    game = caller.game
+    # ``caller.game`` would *create* the game on first read and store it in the
+    # block's persisted ``game_state``. Composing a journal is a read, so it asks
+    # for the state that exists: no game yet means no posture, and the still draws.
+    game = caller.game_state
     if not isinstance(game, CallResponseGame):
         return None
 
