@@ -68,7 +68,7 @@ PROJECTION_REALIZATION_MATRIX = {
     "durable_floor": [
         "stable fragment and action identity with provenance",
         "canonical replayable semantic or procedural packet",
-        "explicit interaction consequences and current reachability",
+        "offered action identity and current reachability",
         "type-defined fallback or unsupported-type diagnostic",
     ],
     "replay_contract": [
@@ -507,8 +507,9 @@ def realize_html(dto: Mapping[str, object]) -> dict[str, object]:
     for event in cast(list[dict[str, object]], dto.get("ux_events", [])):
         text = html.escape(f"[{event['severity']}] {event['message']}")
         event_id = html.escape(str(event["event_id"]), quote=True)
+        role = "alert" if event["presentation"] == "interrupt" else "status"
         blocks.append(
-            f'<aside data-event-id="{event_id}" role="status">{text}</aside>'
+            f'<aside data-event-id="{event_id}" role="{role}">{text}</aside>'
         )
 
     markup = "\n".join(blocks)
@@ -601,7 +602,7 @@ def realize_terminal(
 
 
 def structural_manifest(dto: Mapping[str, object]) -> dict[str, object]:
-    """Expose non-visual contract fields that every adapter must preserve."""
+    """Expose the identity, structure, fallback, and event fields audited here."""
 
     fragments = cast(list[dict[str, object]], dto["fragments"])
     return {
@@ -636,6 +637,21 @@ def structural_manifest(dto: Mapping[str, object]) -> dict[str, object]:
         },
         "ux_event_order": [
             event["event_id"]
+            for event in cast(list[dict[str, object]], dto.get("ux_events", []))
+        ],
+        "ux_events": [
+            {
+                key: event[key]
+                for key in (
+                    "event_id",
+                    "event_type",
+                    "message",
+                    "presentation",
+                    "replay",
+                    "severity",
+                    "details",
+                )
+            }
             for event in cast(list[dict[str, object]], dto.get("ux_events", []))
         ],
     }

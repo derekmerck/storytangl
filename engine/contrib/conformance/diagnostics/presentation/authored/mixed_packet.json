@@ -92,6 +92,18 @@
       "details": {
         "choice_id": "20000000-0000-0000-0000-000000000303"
       }
+    },
+    {
+      "event_id": "20000000-0000-0000-0000-000000000402",
+      "event_type": "storm_interrupt",
+      "message_template": "Lightning closes the bridge in {{ weather }}.",
+      "presentation": "interrupt",
+      "replay": true,
+      "severity": "error",
+      "details": {
+        "source_id": "20000000-0000-0000-0000-000000000204",
+        "requires_acknowledgement": true
+      }
     }
   ]
 }

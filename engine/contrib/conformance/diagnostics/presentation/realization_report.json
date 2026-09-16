@@ -8,7 +8,7 @@
     "durable_floor": [
       "stable fragment and action identity with provenance",
       "canonical replayable semantic or procedural packet",
-      "explicit interaction consequences and current reachability",
+      "offered action identity and current reachability",
       "type-defined fallback or unsupported-type diagnostic"
     ],
     "replay_contract": [
@@ -286,7 +286,8 @@
           },
           "choices": [],
           "media_fallbacks": {},
-          "ux_event_order": []
+          "ux_event_order": [],
+          "ux_events": []
         }
       },
       "terminal": {
@@ -345,7 +346,8 @@
           },
           "choices": [],
           "media_fallbacks": {},
-          "ux_event_order": []
+          "ux_event_order": [],
+          "ux_events": []
         }
       },
       "plain_fallback": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.\nGUIDE (quietly): Meet me beneath the west arch, Mira.",
@@ -454,6 +456,18 @@
             "details": {
               "choice_id": "20000000-0000-0000-0000-000000000303"
             }
+          },
+          {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "event_type": "storm_interrupt",
+            "message_template": "Lightning closes the bridge in {{ weather }}.",
+            "presentation": "interrupt",
+            "replay": true,
+            "severity": "error",
+            "details": {
+              "source_id": "20000000-0000-0000-0000-000000000204",
+              "requires_acknowledgement": true
+            }
           }
         ]
       },
@@ -507,6 +521,10 @@
           {
             "event_id": "20000000-0000-0000-0000-000000000401",
             "evaluated_message": "The watch refuses passage in hard rain."
+          },
+          {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "evaluated_message": "Lightning closes the bridge in hard rain."
           }
         ],
         "offset_unit": "unicode_scalar_values",
@@ -609,6 +627,18 @@
             "details": {
               "choice_id": "20000000-0000-0000-0000-000000000303"
             }
+          },
+          {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "event_type": "storm_interrupt",
+            "message": "Lightning closes the bridge in hard rain.",
+            "presentation": "interrupt",
+            "replay": true,
+            "severity": "error",
+            "details": {
+              "source_id": "20000000-0000-0000-0000-000000000204",
+              "requires_acknowledgement": true
+            }
           }
         ],
         "redirect_trace": [],
@@ -617,8 +647,8 @@
         }
       },
       "html": {
-        "markup": "<p data-fragment-id=\"20000000-0000-0000-0000-000000000001\" data-origin-id=\"20000000-0000-0000-0000-000000000101\" data-source-id=\"20000000-0000-0000-0000-000000000201\" class=\"st-x667261676d656e743a737461747573\">Bridge watch: hard rain</p>\n<dl data-fragment-id=\"20000000-0000-0000-0000-000000000002\" data-origin-id=\"20000000-0000-0000-0000-000000000102\"><div><dt>Gate</dt><dd>: closed</dd></div>\n<div><dt>Weather</dt><dd>: hard rain</dd></div></dl>\n<p data-fragment-id=\"20000000-0000-0000-0000-000000000003\" data-origin-id=\"20000000-0000-0000-0000-000000000103\" class=\"st-x73746174653a6c6f636b6564\">x) Cross the bridge [locked: Gate closed]</p>\n<figure data-fragment-id=\"20000000-0000-0000-0000-000000000004\" data-origin-id=\"20000000-0000-0000-0000-000000000104\" data-source-id=\"20000000-0000-0000-0000-000000000204\"><figcaption>[narrative_im: The bridge disappears into hard rain.]</figcaption></figure>\n<div data-fragment-id=\"20000000-0000-0000-0000-000000000005\" data-origin-id=\"20000000-0000-0000-0000-000000000105\" class=\"st-x67726f75703a7374617475735f7061636b6574\" data-member-ids=\"20000000-0000-0000-0000-000000000001 20000000-0000-0000-0000-000000000002 20000000-0000-0000-0000-000000000003 20000000-0000-0000-0000-000000000004\" aria-hidden=\"true\"></div>\n<aside data-event-id=\"20000000-0000-0000-0000-000000000401\" role=\"status\">[warning] The watch refuses passage in hard rain.</aside>",
-        "plain_text": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.",
+        "markup": "<p data-fragment-id=\"20000000-0000-0000-0000-000000000001\" data-origin-id=\"20000000-0000-0000-0000-000000000101\" data-source-id=\"20000000-0000-0000-0000-000000000201\" class=\"st-x667261676d656e743a737461747573\">Bridge watch: hard rain</p>\n<dl data-fragment-id=\"20000000-0000-0000-0000-000000000002\" data-origin-id=\"20000000-0000-0000-0000-000000000102\"><div><dt>Gate</dt><dd>: closed</dd></div>\n<div><dt>Weather</dt><dd>: hard rain</dd></div></dl>\n<p data-fragment-id=\"20000000-0000-0000-0000-000000000003\" data-origin-id=\"20000000-0000-0000-0000-000000000103\" class=\"st-x73746174653a6c6f636b6564\">x) Cross the bridge [locked: Gate closed]</p>\n<figure data-fragment-id=\"20000000-0000-0000-0000-000000000004\" data-origin-id=\"20000000-0000-0000-0000-000000000104\" data-source-id=\"20000000-0000-0000-0000-000000000204\"><figcaption>[narrative_im: The bridge disappears into hard rain.]</figcaption></figure>\n<div data-fragment-id=\"20000000-0000-0000-0000-000000000005\" data-origin-id=\"20000000-0000-0000-0000-000000000105\" class=\"st-x67726f75703a7374617475735f7061636b6574\" data-member-ids=\"20000000-0000-0000-0000-000000000001 20000000-0000-0000-0000-000000000002 20000000-0000-0000-0000-000000000003 20000000-0000-0000-0000-000000000004\" aria-hidden=\"true\"></div>\n<aside data-event-id=\"20000000-0000-0000-0000-000000000401\" role=\"status\">[warning] The watch refuses passage in hard rain.</aside>\n<aside data-event-id=\"20000000-0000-0000-0000-000000000402\" role=\"alert\">[error] Lightning closes the bridge in hard rain.</aside>",
+        "plain_text": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
         "manifest": {
           "fragment_order": [
             "20000000-0000-0000-0000-000000000001",
@@ -666,12 +696,38 @@
             "20000000-0000-0000-0000-000000000004": "The bridge disappears into hard rain."
           },
           "ux_event_order": [
-            "20000000-0000-0000-0000-000000000401"
+            "20000000-0000-0000-0000-000000000401",
+            "20000000-0000-0000-0000-000000000402"
+          ],
+          "ux_events": [
+            {
+              "event_id": "20000000-0000-0000-0000-000000000401",
+              "event_type": "gate_refused",
+              "message": "The watch refuses passage in hard rain.",
+              "presentation": "inline",
+              "replay": false,
+              "severity": "warning",
+              "details": {
+                "choice_id": "20000000-0000-0000-0000-000000000303"
+              }
+            },
+            {
+              "event_id": "20000000-0000-0000-0000-000000000402",
+              "event_type": "storm_interrupt",
+              "message": "Lightning closes the bridge in hard rain.",
+              "presentation": "interrupt",
+              "replay": true,
+              "severity": "error",
+              "details": {
+                "source_id": "20000000-0000-0000-0000-000000000204",
+                "requires_acknowledgement": true
+              }
+            }
           ]
         }
       },
       "terminal": {
-        "rich_plain": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.",
+        "rich_plain": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
         "rich_spans": [
           {
             "start": 56,
@@ -684,7 +740,7 @@
             "style": "yellow"
           }
         ],
-        "no_color": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.",
+        "no_color": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
         "manifest": {
           "fragment_order": [
             "20000000-0000-0000-0000-000000000001",
@@ -732,11 +788,37 @@
             "20000000-0000-0000-0000-000000000004": "The bridge disappears into hard rain."
           },
           "ux_event_order": [
-            "20000000-0000-0000-0000-000000000401"
+            "20000000-0000-0000-0000-000000000401",
+            "20000000-0000-0000-0000-000000000402"
+          ],
+          "ux_events": [
+            {
+              "event_id": "20000000-0000-0000-0000-000000000401",
+              "event_type": "gate_refused",
+              "message": "The watch refuses passage in hard rain.",
+              "presentation": "inline",
+              "replay": false,
+              "severity": "warning",
+              "details": {
+                "choice_id": "20000000-0000-0000-0000-000000000303"
+              }
+            },
+            {
+              "event_id": "20000000-0000-0000-0000-000000000402",
+              "event_type": "storm_interrupt",
+              "message": "Lightning closes the bridge in hard rain.",
+              "presentation": "interrupt",
+              "replay": true,
+              "severity": "error",
+              "details": {
+                "source_id": "20000000-0000-0000-0000-000000000204",
+                "requires_acknowledgement": true
+              }
+            }
           ]
         }
       },
-      "plain_fallback": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.",
+      "plain_fallback": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
       "safe_classes": {
         "fragment:status": "st-x667261676d656e743a737461747573",
         "group:status_packet": "st-x67726f75703a7374617475735f7061636b6574",

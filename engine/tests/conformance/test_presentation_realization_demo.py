@@ -14,6 +14,7 @@ from rich.text import Text
 from engine.contrib.conformance.presentation_realization_demo import (
     DEFAULT_TERMINAL_STYLES,
     OFFSET_UNIT,
+    REPORT_PATH,
     SOURCE_PATHS,
     adapt_authored_bundle,
     build_report,
@@ -197,11 +198,12 @@ def test_canonical_dto_is_independent_of_terminal_theme(
     assert default_terminal["rich_spans"] != alternate_terminal["rich_spans"]
 
 
-def test_mixed_packet_retains_identity_provenance_and_event_placement(
+def test_mixed_packet_retains_identity_provenance_and_event_contract(
     sources: list[dict[str, object]],
 ) -> None:
     normalized = normalize_bundle(sources[1])
     manifest = structural_manifest(normalized)
+    html_stage = realize_html(normalized)
     media = normalized["fragments"][3]
     _, terminal = realize_terminal(normalized)
 
@@ -242,14 +244,47 @@ def test_mixed_packet_retains_identity_provenance_and_event_placement(
         "20000000-0000-0000-0000-000000000004",
     ]
     assert manifest["ux_event_order"] == [
-        "20000000-0000-0000-0000-000000000401"
+        "20000000-0000-0000-0000-000000000401",
+        "20000000-0000-0000-0000-000000000402",
     ]
+    assert manifest["ux_events"] == [
+        {
+            "event_id": "20000000-0000-0000-0000-000000000401",
+            "event_type": "gate_refused",
+            "message": "The watch refuses passage in hard rain.",
+            "presentation": "inline",
+            "replay": False,
+            "severity": "warning",
+            "details": {
+                "choice_id": "20000000-0000-0000-0000-000000000303",
+            },
+        },
+        {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "event_type": "storm_interrupt",
+            "message": "Lightning closes the bridge in hard rain.",
+            "presentation": "interrupt",
+            "replay": True,
+            "severity": "error",
+            "details": {
+                "source_id": "20000000-0000-0000-0000-000000000204",
+                "requires_acknowledgement": True,
+            },
+        },
+    ]
+    assert 'data-event-id="20000000-0000-0000-0000-000000000401" role="status"' in (
+        html_stage["markup"]
+    )
+    assert 'data-event-id="20000000-0000-0000-0000-000000000402" role="alert"' in (
+        html_stage["markup"]
+    )
 
 
 def test_report_keeps_all_realization_stages_inspectable() -> None:
     report = build_report()
     matrix = report["projection_realization_matrix"]
 
+    assert REPORT_PATH.read_text(encoding="utf-8") == json.dumps(report, indent=2) + "\n"
     assert report["status"] == "experimental"
     assert matrix["bundle_positions"] == {
         "prose-dialog": ["typed-neutral-fragments", "attributed-neutral-text"],

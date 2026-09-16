@@ -63,10 +63,14 @@ The generated report records these concrete points:
 
 The supported target is a range with a durable floor: stable fragment/action
 identity and provenance; a canonical replayable semantic or procedural packet;
-explicit interaction consequences and current reachability; and type-defined
-fallback or unsupported-type diagnostics. Existing fragment types retain their
-current readable fallbacks. A future typed procedural or generative fragment
-need not pretend its final generated text is journal authority.
+offered action identity and current reachability; and type-defined fallback or
+unsupported-type diagnostics. This mixed packet intentionally proves only the
+choice fields recorded in its structural manifest. The sibling
+`engine/contrib/conformance/parity.py` harness owns blockers, typed `accepts`,
+`ui_hints`, activation payload, and portable submission coverage. Existing
+fragment types retain their current readable fallbacks. A future typed
+procedural or generative fragment need not pretend its final generated text is
+journal authority.
 
 Three replay promises must remain distinct:
 
