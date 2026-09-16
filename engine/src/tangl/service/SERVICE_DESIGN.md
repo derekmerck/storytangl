@@ -135,10 +135,11 @@ account does not make a production server expose routes it declined to mount or
 enable.
 
 The authorization groups are public, user, and admin. Public operations require
-no API key and include resources such as world information, media, and the web
-client. User operations require a valid unprivileged API key. Admin operations
-require a valid API key whose user has the privilege flag. These groups
-currently map to the `PUBLIC`, `CLIENT`, and `DEV` service access markers
+no API key and include resources such as world information, media when exposed
+by the adapter, and the web client. Current v1 remote coverage does not expose
+world media. User operations require a valid unprivileged API key. Admin
+operations require a valid API key whose user has the privilege flag. These
+groups currently map to the `PUBLIC`, `CLIENT`, and `DEV` service access markers
 respectively; the marker names describe service exposure, not separate kinds of
 story player. The direct CLI should likewise make trusted debug mode explicit
 rather than infer admin privilege merely from being local. Remote parity is not
