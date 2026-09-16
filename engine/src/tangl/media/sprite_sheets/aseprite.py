@@ -19,7 +19,9 @@ get wrong:
 What the subset accepts, it honours; what it cannot honour, it refuses at load,
 because a manifest that is quietly misrendered is worse than one that fails:
 
-- a trimmed frame becomes an offset on its canvas (``spriteSourceSize`` within ``sourceSize``);
+- a trimmed frame becomes an offset on its canvas (``spriteSourceSize`` within
+  ``sourceSize``), and a frame that does not fill its canvas must state both, since
+  either one alone leaves its position on the canvas unstated;
 - the slice named ``pivot`` becomes a pivot on each frame it covers;
 - rotated frames are refused -- Aseprite never writes them;
 - frames drawn from canvases of different sizes are refused: one sheet is one sprite;
@@ -151,6 +153,19 @@ class AsepriteExport(_Export):
                     "packer that rotates would need every client to un-rotate"
                 )
             rect = record.frame
+            # Both fields are optional in the subset, because a frame that fills its
+            # canvas needs neither. A frame that does not fill it needs both, and
+            # defaulting either one would invent a canvas and a position on it.
+            missing = [
+                name
+                for name, value in (("spriteSourceSize", record.sprite_source_size), ("sourceSize", record.source_size))
+                if value is None
+            ]
+            if record.trimmed and missing:
+                raise ValueError(
+                    f"frame {index} says it is trimmed but omits {' and '.join(missing)}, "
+                    "so where its pixels sit on the canvas is unstated"
+                )
             placed = record.sprite_source_size or _Rect(x=0, y=0, w=rect.w, h=rect.h)
             if (placed.w, placed.h) != (rect.w, rect.h):
                 raise ValueError(
@@ -158,6 +173,11 @@ class AsepriteExport(_Export):
                     "on its canvas; padded or extruded frames are not supported"
                 )
             canvas = record.source_size or _Size(w=placed.x + rect.w, h=placed.y + rect.h)
+            if record.sprite_source_size is None and (canvas.w, canvas.h) != (rect.w, rect.h):
+                raise ValueError(
+                    f"frame {index} is {rect.w}x{rect.h} on a {canvas.w}x{canvas.h} canvas, but no "
+                    "spriteSourceSize says where it sits, whatever its trimmed flag claims"
+                )
             canvases.add((canvas.w, canvas.h))
             frames.append(
                 SheetFrame(

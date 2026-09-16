@@ -140,6 +140,54 @@ def _trim_to_a_different_canvas(export: dict) -> None:
     export["frames"]["hero 2.aseprite"]["sourceSize"] = {"w": 11, "h": 12}
 
 
+def _trimmed(**omit: bool) -> dict:
+    """A frame that does not fill its canvas, minus whichever field the case drops."""
+
+    record = {
+        "frame": {"x": 10, "y": 0, "w": 4, "h": 5},
+        "rotated": False,
+        "trimmed": True,
+        "spriteSourceSize": {"x": 3, "y": 7, "w": 4, "h": 5},
+        "sourceSize": {"w": 10, "h": 12},
+        "duration": 100,
+    }
+    for field in omit:
+        record.pop(field)
+    return record
+
+
+@pytest.mark.parametrize(
+    "omit", ["spriteSourceSize", "sourceSize"], ids=["without-its-place", "without-its-canvas"]
+)
+def test_a_trimmed_frame_that_cannot_be_put_back_is_refused(omit: str) -> None:
+    """Defaulting either field would invent a canvas and place the frame at its corner."""
+
+    export = _export()
+    export["frames"]["hero 1.aseprite"] = _trimmed(**{omit: True})
+
+    with pytest.raises(ValueError, match=f"trimmed but omits {omit}"):
+        read_aseprite_export(export)
+
+
+def test_a_frame_smaller_than_its_canvas_is_refused_whatever_its_trimmed_flag_says() -> None:
+    """The flag is a claim; the fields are the data, and placement needs the data."""
+
+    export = _export()
+    export["frames"]["hero 1.aseprite"] = {**_trimmed(spriteSourceSize=True), "trimmed": False}
+
+    with pytest.raises(ValueError, match="no spriteSourceSize says where it sits"):
+        read_aseprite_export(export)
+
+
+def test_a_frame_that_fills_its_canvas_needs_neither_field() -> None:
+    export = _export()
+    export["frames"]["hero 1.aseprite"] = {"frame": {"x": 10, "y": 0, "w": 10, "h": 12}, "duration": 100}
+
+    frame = read_aseprite_export(export).frames[1]
+
+    assert (frame.offset.x, frame.offset.y) == (0, 0)
+
+
 def test_a_frames_entry_that_is_not_a_record_is_a_value_error_like_the_rest() -> None:
     """``**record`` on a scalar would raise TypeError, which the loader does not catch."""
 
