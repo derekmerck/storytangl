@@ -1,0 +1,829 @@
+{
+  "status": "experimental",
+  "projection_realization_matrix": {
+    "dimensions": {
+      "projection_resolution": "sampling density from episodic spine to visible surface",
+      "realization_binding": "transport or renderer binding of the projected disclosure"
+    },
+    "durable_floor": [
+      "stable fragment and action identity with provenance",
+      "canonical replayable semantic or procedural packet",
+      "offered action identity and current reachability",
+      "type-defined fallback or unsupported-type diagnostic"
+    ],
+    "replay_contract": [
+      "graph and causal replay restores the replayable semantic story state",
+      "journal and projection replay walks the stored ordered record stream",
+      "exact rendition replay is optional archival scope and is not currently promised"
+    ],
+    "authority_chain": [
+      {
+        "stage": "graph",
+        "authority": "delta and checkpoint stack",
+        "contract": "replayable semantic story state"
+      },
+      {
+        "stage": "journal-phase",
+        "authority": "backend projection function",
+        "contract": "deterministically realizes graph, cursor, concepts, namespace, and handlers"
+      },
+      {
+        "stage": "journal-registry",
+        "authority": "ordered linearized projection",
+        "contract": "walking records recovers the fragment and event stream"
+      },
+      {
+        "stage": "transport",
+        "authority": "client packet projection",
+        "contract": "packages journal records without defining final rendition"
+      },
+      {
+        "stage": "client",
+        "authority": "rendering and interaction presentation policy",
+        "contract": "may omit, rearrange, enrich, or vocalize; actions remain backend-owned"
+      }
+    ],
+    "client_boundaries": {
+      "reference": "complete supported public vocabulary with documented fallback",
+      "third_party": "may consume a strict subset or derive richer output",
+      "prose_blind_bot": "may ignore prose and media, consume current state and offered action identities, and submit through the normal action contract",
+      "expanded_graph_access": "admin, development, offline-analysis, or explicitly disclosed capability"
+    },
+    "points": [
+      {
+        "name": "typed-neutral-fragments",
+        "projection_resolution": "middle",
+        "realization_binding": "renderer-neutral typed JSON",
+        "status": "supported floor",
+        "cost_and_replay": "bounded identity count; causal and semantic replay"
+      },
+      {
+        "name": "attributed-neutral-text",
+        "projection_resolution": "fine",
+        "realization_binding": "text plus explicit annotation spans",
+        "status": "experimental refinement",
+        "cost_and_replay": "more boundaries and validation; deterministic and replayable"
+      },
+      {
+        "name": "derived-structural-html-rich",
+        "projection_resolution": "fine to tessellated",
+        "realization_binding": "classed HTML or adapter-local Rich primitives",
+        "status": "supported derivation",
+        "cost_and_replay": "consumer work; exact historical rendition is not promised"
+      },
+      {
+        "name": "client-generated-from-coarse-gloss",
+        "projection_resolution": "coarse",
+        "realization_binding": "nondeterministic client refinement",
+        "status": "valid ephemeral realization of a stored typed packet",
+        "cost_and_replay": "low backend sampling; semantic replay without exact rendition replay"
+      }
+    ],
+    "bundle_positions": {
+      "prose-dialog": [
+        "typed-neutral-fragments",
+        "attributed-neutral-text"
+      ],
+      "mixed-packet": [
+        "typed-neutral-fragments"
+      ]
+    }
+  },
+  "bundles": [
+    {
+      "bundle_id": "prose-dialog",
+      "authored": {
+        "bundle_id": "prose-dialog",
+        "context": {
+          "reader": "Mira",
+          "storm": true
+        },
+        "fragments": [
+          {
+            "fragment_type": "content",
+            "uid": "10000000-0000-0000-0000-000000000001",
+            "origin_id": "10000000-0000-0000-0000-000000000101",
+            "source_id": "10000000-0000-0000-0000-000000000201",
+            "authored_markup": "::: {.block:admonition .tone:warning}\nWelcome, {{ reader }} \ud83c\udf29. [{% if storm %}The storm is close. {% else %}The road is clear. {% endif %}]{.inline:emphasis}[Keep your <lantern> lit.]{.unknown:glimmer}\n:::"
+          },
+          {
+            "fragment_type": "attributed",
+            "uid": "10000000-0000-0000-0000-000000000002",
+            "origin_id": "10000000-0000-0000-0000-000000000102",
+            "source_id": "10000000-0000-0000-0000-000000000202",
+            "who": "Guide",
+            "how": "quietly",
+            "media": "",
+            "hints": {
+              "style_tags": [
+                "fragment:dialog",
+                "speaker:guide"
+              ]
+            },
+            "authored_template": "{% if storm %}Meet me beneath the west arch, {{ reader }}.{% endif %}"
+          },
+          {
+            "fragment_type": "group",
+            "uid": "10000000-0000-0000-0000-000000000003",
+            "origin_id": "10000000-0000-0000-0000-000000000103",
+            "group_type": "dialog",
+            "member_ids": [
+              "10000000-0000-0000-0000-000000000002"
+            ]
+          }
+        ],
+        "ux_events": []
+      },
+      "authoring_adapter": {
+        "fragments": [
+          {
+            "uid": "10000000-0000-0000-0000-000000000001",
+            "fragment_type": "content",
+            "source_format": "pandoc-like",
+            "evaluated_markup": "::: {.block:admonition .tone:warning}\nWelcome, Mira \ud83c\udf29. [The storm is close. ]{.inline:emphasis}[Keep your <lantern> lit.]{.unknown:glimmer}\n:::",
+            "block_tokens": [
+              "block:admonition",
+              "tone:warning"
+            ],
+            "neutral_text": {
+              "text": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.",
+              "spans": [
+                {
+                  "start": 17,
+                  "end": 37,
+                  "tokens": [
+                    "inline:emphasis"
+                  ]
+                },
+                {
+                  "start": 37,
+                  "end": 61,
+                  "tokens": [
+                    "unknown:glimmer"
+                  ]
+                }
+              ],
+              "offset_unit": "unicode_scalar_values"
+            }
+          },
+          {
+            "uid": "10000000-0000-0000-0000-000000000002",
+            "fragment_type": "attributed",
+            "evaluated_template": "Meet me beneath the west arch, Mira.",
+            "neutral_text": {
+              "text": "Meet me beneath the west arch, Mira.",
+              "spans": [],
+              "offset_unit": "unicode_scalar_values"
+            }
+          },
+          {
+            "uid": "10000000-0000-0000-0000-000000000003",
+            "fragment_type": "group"
+          }
+        ],
+        "ux_events": [],
+        "offset_unit": "unicode_scalar_values",
+        "span_policy": "flat, non-overlapping, adjacent allowed"
+      },
+      "normalized": {
+        "fragments": [
+          {
+            "uid": "10000000-0000-0000-0000-000000000001",
+            "origin_id": "10000000-0000-0000-0000-000000000101",
+            "fragment_type": "content",
+            "content": {
+              "text": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.",
+              "spans": [
+                {
+                  "start": 17,
+                  "end": 37,
+                  "tokens": [
+                    "inline:emphasis"
+                  ]
+                },
+                {
+                  "start": 37,
+                  "end": 61,
+                  "tokens": [
+                    "unknown:glimmer"
+                  ]
+                }
+              ],
+              "offset_unit": "unicode_scalar_values"
+            },
+            "source_id": "10000000-0000-0000-0000-000000000201",
+            "hints": {
+              "style_tags": [
+                "block:admonition",
+                "tone:warning"
+              ],
+              "style_dict": {}
+            }
+          },
+          {
+            "uid": "10000000-0000-0000-0000-000000000002",
+            "origin_id": "10000000-0000-0000-0000-000000000102",
+            "content": {
+              "text": "Meet me beneath the west arch, Mira.",
+              "spans": [],
+              "offset_unit": "unicode_scalar_values"
+            },
+            "source_id": "10000000-0000-0000-0000-000000000202",
+            "hints": {
+              "style_tags": [
+                "fragment:dialog",
+                "speaker:guide"
+              ],
+              "style_dict": {}
+            },
+            "who": "Guide",
+            "how": "quietly",
+            "media": "",
+            "fragment_type": "attributed"
+          },
+          {
+            "uid": "10000000-0000-0000-0000-000000000003",
+            "origin_id": "10000000-0000-0000-0000-000000000103",
+            "fragment_type": "group",
+            "group_type": "dialog",
+            "member_ids": [
+              "10000000-0000-0000-0000-000000000002"
+            ]
+          }
+        ],
+        "ux_events": [],
+        "redirect_trace": [],
+        "metadata": {
+          "diagnostic_bundle": "prose-dialog"
+        }
+      },
+      "html": {
+        "markup": "<aside data-fragment-id=\"10000000-0000-0000-0000-000000000001\" data-origin-id=\"10000000-0000-0000-0000-000000000101\" data-source-id=\"10000000-0000-0000-0000-000000000201\" class=\"st-x626c6f636b3a61646d6f6e6974696f6e st-x746f6e653a7761726e696e67\">Welcome, Mira \ud83c\udf29. <span class=\"st-x696e6c696e653a656d706861736973\">The storm is close. </span><span class=\"st-x756e6b6e6f776e3a676c696d6d6572\">Keep your &lt;lantern&gt; lit.</span></aside>\n<p data-fragment-id=\"10000000-0000-0000-0000-000000000002\" data-origin-id=\"10000000-0000-0000-0000-000000000102\" data-source-id=\"10000000-0000-0000-0000-000000000202\" class=\"st-x667261676d656e743a6469616c6f67 st-x737065616b65723a6775696465\">GUIDE (quietly): Meet me beneath the west arch, Mira.</p>\n<div data-fragment-id=\"10000000-0000-0000-0000-000000000003\" data-origin-id=\"10000000-0000-0000-0000-000000000103\" data-member-ids=\"10000000-0000-0000-0000-000000000002\" aria-hidden=\"true\"></div>",
+        "plain_text": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.\nGUIDE (quietly): Meet me beneath the west arch, Mira.",
+        "manifest": {
+          "fragment_order": [
+            "10000000-0000-0000-0000-000000000001",
+            "10000000-0000-0000-0000-000000000002",
+            "10000000-0000-0000-0000-000000000003"
+          ],
+          "provenance": {
+            "10000000-0000-0000-0000-000000000001": {
+              "origin_id": "10000000-0000-0000-0000-000000000101",
+              "source_id": "10000000-0000-0000-0000-000000000201"
+            },
+            "10000000-0000-0000-0000-000000000002": {
+              "origin_id": "10000000-0000-0000-0000-000000000102",
+              "source_id": "10000000-0000-0000-0000-000000000202"
+            },
+            "10000000-0000-0000-0000-000000000003": {
+              "origin_id": "10000000-0000-0000-0000-000000000103"
+            }
+          },
+          "groups": {
+            "10000000-0000-0000-0000-000000000003": [
+              "10000000-0000-0000-0000-000000000002"
+            ]
+          },
+          "choices": [],
+          "media_fallbacks": {},
+          "ux_event_order": [],
+          "ux_events": []
+        }
+      },
+      "terminal": {
+        "rich_plain": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.\nGUIDE (quietly): Meet me beneath the west arch, Mira.",
+        "rich_spans": [
+          {
+            "start": 0,
+            "end": 17,
+            "style": "bold yellow yellow"
+          },
+          {
+            "start": 17,
+            "end": 37,
+            "style": "bold yellow yellow bold"
+          },
+          {
+            "start": 37,
+            "end": 61,
+            "style": "bold yellow yellow"
+          },
+          {
+            "start": 62,
+            "end": 79,
+            "style": "bold"
+          },
+          {
+            "start": 79,
+            "end": 115,
+            "style": "cyan cyan"
+          }
+        ],
+        "no_color": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.\nGUIDE (quietly): Meet me beneath the west arch, Mira.",
+        "manifest": {
+          "fragment_order": [
+            "10000000-0000-0000-0000-000000000001",
+            "10000000-0000-0000-0000-000000000002",
+            "10000000-0000-0000-0000-000000000003"
+          ],
+          "provenance": {
+            "10000000-0000-0000-0000-000000000001": {
+              "origin_id": "10000000-0000-0000-0000-000000000101",
+              "source_id": "10000000-0000-0000-0000-000000000201"
+            },
+            "10000000-0000-0000-0000-000000000002": {
+              "origin_id": "10000000-0000-0000-0000-000000000102",
+              "source_id": "10000000-0000-0000-0000-000000000202"
+            },
+            "10000000-0000-0000-0000-000000000003": {
+              "origin_id": "10000000-0000-0000-0000-000000000103"
+            }
+          },
+          "groups": {
+            "10000000-0000-0000-0000-000000000003": [
+              "10000000-0000-0000-0000-000000000002"
+            ]
+          },
+          "choices": [],
+          "media_fallbacks": {},
+          "ux_event_order": [],
+          "ux_events": []
+        }
+      },
+      "plain_fallback": "Welcome, Mira \ud83c\udf29. The storm is close. Keep your <lantern> lit.\nGUIDE (quietly): Meet me beneath the west arch, Mira.",
+      "safe_classes": {
+        "block:admonition": "st-x626c6f636b3a61646d6f6e6974696f6e",
+        "fragment:dialog": "st-x667261676d656e743a6469616c6f67",
+        "inline:emphasis": "st-x696e6c696e653a656d706861736973",
+        "speaker:guide": "st-x737065616b65723a6775696465",
+        "tone:warning": "st-x746f6e653a7761726e696e67",
+        "unknown:glimmer": "st-x756e6b6e6f776e3a676c696d6d6572"
+      }
+    },
+    {
+      "bundle_id": "mixed-packet",
+      "authored": {
+        "bundle_id": "mixed-packet",
+        "context": {
+          "gate_open": false,
+          "weather": "hard rain"
+        },
+        "fragments": [
+          {
+            "fragment_type": "content",
+            "uid": "20000000-0000-0000-0000-000000000001",
+            "origin_id": "20000000-0000-0000-0000-000000000101",
+            "source_id": "20000000-0000-0000-0000-000000000201",
+            "hints": {
+              "style_tags": [
+                "fragment:status"
+              ]
+            },
+            "authored_template": "Bridge watch: {{ weather }}",
+            "debug_payload": {
+              "text": "**not eligible** <unsafe>",
+              "nested": {
+                "content": "{{ untouched }}"
+              }
+            }
+          },
+          {
+            "fragment_type": "kv",
+            "uid": "20000000-0000-0000-0000-000000000002",
+            "origin_id": "20000000-0000-0000-0000-000000000102",
+            "authored_rows": [
+              {
+                "key": "Gate",
+                "value_template": "{% if gate_open %}open{% else %}closed{% endif %}"
+              },
+              {
+                "key": "Weather",
+                "value_template": "{{ weather }}"
+              }
+            ]
+          },
+          {
+            "fragment_type": "choice",
+            "uid": "20000000-0000-0000-0000-000000000003",
+            "origin_id": "20000000-0000-0000-0000-000000000103",
+            "edge_id": "20000000-0000-0000-0000-000000000303",
+            "available": false,
+            "unavailable_reason": "Gate closed",
+            "hints": {
+              "style_tags": [
+                "state:locked"
+              ]
+            },
+            "authored_template": "Cross the bridge"
+          },
+          {
+            "fragment_type": "media",
+            "uid": "20000000-0000-0000-0000-000000000004",
+            "origin_id": "20000000-0000-0000-0000-000000000104",
+            "source_id": "20000000-0000-0000-0000-000000000204",
+            "content": "bridge-storm.webp",
+            "content_format": "url",
+            "media_role": "narrative_im",
+            "fallback_template": "The bridge disappears into {{ weather }}."
+          },
+          {
+            "fragment_type": "group",
+            "uid": "20000000-0000-0000-0000-000000000005",
+            "origin_id": "20000000-0000-0000-0000-000000000105",
+            "group_type": "status_sidecar",
+            "zone_role": "packet",
+            "hints": {
+              "style_tags": [
+                "group:status_packet"
+              ]
+            },
+            "member_ids": [
+              "20000000-0000-0000-0000-000000000001",
+              "20000000-0000-0000-0000-000000000002",
+              "20000000-0000-0000-0000-000000000003",
+              "20000000-0000-0000-0000-000000000004"
+            ]
+          }
+        ],
+        "ux_events": [
+          {
+            "event_id": "20000000-0000-0000-0000-000000000401",
+            "event_type": "gate_refused",
+            "message_template": "The watch refuses passage in {{ weather }}.",
+            "presentation": "inline",
+            "replay": false,
+            "severity": "warning",
+            "details": {
+              "choice_id": "20000000-0000-0000-0000-000000000303"
+            }
+          },
+          {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "event_type": "storm_interrupt",
+            "message_template": "Lightning closes the bridge in {{ weather }}.",
+            "presentation": "interrupt",
+            "replay": true,
+            "severity": "error",
+            "details": {
+              "source_id": "20000000-0000-0000-0000-000000000204",
+              "requires_acknowledgement": true
+            }
+          }
+        ]
+      },
+      "authoring_adapter": {
+        "fragments": [
+          {
+            "uid": "20000000-0000-0000-0000-000000000001",
+            "fragment_type": "content",
+            "evaluated_template": "Bridge watch: hard rain",
+            "neutral_text": {
+              "text": "Bridge watch: hard rain",
+              "spans": [],
+              "offset_unit": "unicode_scalar_values"
+            }
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000002",
+            "fragment_type": "kv",
+            "evaluated_rows": [
+              {
+                "key": "Gate",
+                "value": "closed"
+              },
+              {
+                "key": "Weather",
+                "value": "hard rain"
+              }
+            ]
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000003",
+            "fragment_type": "choice",
+            "evaluated_template": "Cross the bridge",
+            "neutral_text": {
+              "text": "Cross the bridge",
+              "spans": [],
+              "offset_unit": "unicode_scalar_values"
+            }
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000004",
+            "fragment_type": "media",
+            "evaluated_fallback": "The bridge disappears into hard rain."
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000005",
+            "fragment_type": "group"
+          }
+        ],
+        "ux_events": [
+          {
+            "event_id": "20000000-0000-0000-0000-000000000401",
+            "evaluated_message": "The watch refuses passage in hard rain."
+          },
+          {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "evaluated_message": "Lightning closes the bridge in hard rain."
+          }
+        ],
+        "offset_unit": "unicode_scalar_values",
+        "span_policy": "flat, non-overlapping, adjacent allowed"
+      },
+      "normalized": {
+        "fragments": [
+          {
+            "uid": "20000000-0000-0000-0000-000000000001",
+            "origin_id": "20000000-0000-0000-0000-000000000101",
+            "fragment_type": "content",
+            "content": {
+              "text": "Bridge watch: hard rain",
+              "spans": [],
+              "offset_unit": "unicode_scalar_values"
+            },
+            "source_id": "20000000-0000-0000-0000-000000000201",
+            "hints": {
+              "style_tags": [
+                "fragment:status"
+              ],
+              "style_dict": {}
+            },
+            "debug_payload": {
+              "text": "**not eligible** <unsafe>",
+              "nested": {
+                "content": "{{ untouched }}"
+              }
+            }
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000002",
+            "origin_id": "20000000-0000-0000-0000-000000000102",
+            "fragment_type": "kv",
+            "content": [
+              {
+                "key": "Gate",
+                "value": "closed"
+              },
+              {
+                "key": "Weather",
+                "value": "hard rain"
+              }
+            ]
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000003",
+            "origin_id": "20000000-0000-0000-0000-000000000103",
+            "fragment_type": "choice",
+            "edge_id": "20000000-0000-0000-0000-000000000303",
+            "text": "Cross the bridge",
+            "available": false,
+            "unavailable_reason": "Gate closed",
+            "hints": {
+              "style_tags": [
+                "state:locked"
+              ]
+            }
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000004",
+            "origin_id": "20000000-0000-0000-0000-000000000104",
+            "fragment_type": "media",
+            "content": "bridge-storm.webp",
+            "source_id": "20000000-0000-0000-0000-000000000204",
+            "content_format": "url",
+            "content_type": "media",
+            "media_role": "narrative_im",
+            "scope": "world",
+            "fallback_text": "The bridge disappears into hard rain."
+          },
+          {
+            "uid": "20000000-0000-0000-0000-000000000005",
+            "origin_id": "20000000-0000-0000-0000-000000000105",
+            "fragment_type": "group",
+            "group_type": "status_sidecar",
+            "member_ids": [
+              "20000000-0000-0000-0000-000000000001",
+              "20000000-0000-0000-0000-000000000002",
+              "20000000-0000-0000-0000-000000000003",
+              "20000000-0000-0000-0000-000000000004"
+            ],
+            "zone_role": "packet",
+            "hints": {
+              "style_tags": [
+                "group:status_packet"
+              ],
+              "style_dict": {}
+            }
+          }
+        ],
+        "ux_events": [
+          {
+            "event_id": "20000000-0000-0000-0000-000000000401",
+            "event_type": "gate_refused",
+            "message": "The watch refuses passage in hard rain.",
+            "presentation": "inline",
+            "replay": false,
+            "severity": "warning",
+            "details": {
+              "choice_id": "20000000-0000-0000-0000-000000000303"
+            }
+          },
+          {
+            "event_id": "20000000-0000-0000-0000-000000000402",
+            "event_type": "storm_interrupt",
+            "message": "Lightning closes the bridge in hard rain.",
+            "presentation": "interrupt",
+            "replay": true,
+            "severity": "error",
+            "details": {
+              "source_id": "20000000-0000-0000-0000-000000000204",
+              "requires_acknowledgement": true
+            }
+          }
+        ],
+        "redirect_trace": [],
+        "metadata": {
+          "diagnostic_bundle": "mixed-packet"
+        }
+      },
+      "html": {
+        "markup": "<p data-fragment-id=\"20000000-0000-0000-0000-000000000001\" data-origin-id=\"20000000-0000-0000-0000-000000000101\" data-source-id=\"20000000-0000-0000-0000-000000000201\" class=\"st-x667261676d656e743a737461747573\">Bridge watch: hard rain</p>\n<dl data-fragment-id=\"20000000-0000-0000-0000-000000000002\" data-origin-id=\"20000000-0000-0000-0000-000000000102\"><div><dt>Gate</dt><dd>: closed</dd></div>\n<div><dt>Weather</dt><dd>: hard rain</dd></div></dl>\n<p data-fragment-id=\"20000000-0000-0000-0000-000000000003\" data-origin-id=\"20000000-0000-0000-0000-000000000103\" class=\"st-x73746174653a6c6f636b6564\">x) Cross the bridge [locked: Gate closed]</p>\n<figure data-fragment-id=\"20000000-0000-0000-0000-000000000004\" data-origin-id=\"20000000-0000-0000-0000-000000000104\" data-source-id=\"20000000-0000-0000-0000-000000000204\"><figcaption>[narrative_im: The bridge disappears into hard rain.]</figcaption></figure>\n<div data-fragment-id=\"20000000-0000-0000-0000-000000000005\" data-origin-id=\"20000000-0000-0000-0000-000000000105\" class=\"st-x67726f75703a7374617475735f7061636b6574\" data-member-ids=\"20000000-0000-0000-0000-000000000001 20000000-0000-0000-0000-000000000002 20000000-0000-0000-0000-000000000003 20000000-0000-0000-0000-000000000004\" aria-hidden=\"true\"></div>\n<aside data-event-id=\"20000000-0000-0000-0000-000000000401\" role=\"status\">[warning] The watch refuses passage in hard rain.</aside>\n<aside data-event-id=\"20000000-0000-0000-0000-000000000402\" role=\"alert\">[error] Lightning closes the bridge in hard rain.</aside>",
+        "plain_text": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
+        "manifest": {
+          "fragment_order": [
+            "20000000-0000-0000-0000-000000000001",
+            "20000000-0000-0000-0000-000000000002",
+            "20000000-0000-0000-0000-000000000003",
+            "20000000-0000-0000-0000-000000000004",
+            "20000000-0000-0000-0000-000000000005"
+          ],
+          "provenance": {
+            "20000000-0000-0000-0000-000000000001": {
+              "origin_id": "20000000-0000-0000-0000-000000000101",
+              "source_id": "20000000-0000-0000-0000-000000000201"
+            },
+            "20000000-0000-0000-0000-000000000002": {
+              "origin_id": "20000000-0000-0000-0000-000000000102"
+            },
+            "20000000-0000-0000-0000-000000000003": {
+              "origin_id": "20000000-0000-0000-0000-000000000103"
+            },
+            "20000000-0000-0000-0000-000000000004": {
+              "origin_id": "20000000-0000-0000-0000-000000000104",
+              "source_id": "20000000-0000-0000-0000-000000000204"
+            },
+            "20000000-0000-0000-0000-000000000005": {
+              "origin_id": "20000000-0000-0000-0000-000000000105"
+            }
+          },
+          "groups": {
+            "20000000-0000-0000-0000-000000000005": [
+              "20000000-0000-0000-0000-000000000001",
+              "20000000-0000-0000-0000-000000000002",
+              "20000000-0000-0000-0000-000000000003",
+              "20000000-0000-0000-0000-000000000004"
+            ]
+          },
+          "choices": [
+            {
+              "uid": "20000000-0000-0000-0000-000000000003",
+              "edge_id": "20000000-0000-0000-0000-000000000303",
+              "available": false,
+              "unavailable_reason": "Gate closed"
+            }
+          ],
+          "media_fallbacks": {
+            "20000000-0000-0000-0000-000000000004": "The bridge disappears into hard rain."
+          },
+          "ux_event_order": [
+            "20000000-0000-0000-0000-000000000401",
+            "20000000-0000-0000-0000-000000000402"
+          ],
+          "ux_events": [
+            {
+              "event_id": "20000000-0000-0000-0000-000000000401",
+              "event_type": "gate_refused",
+              "message": "The watch refuses passage in hard rain.",
+              "presentation": "inline",
+              "replay": false,
+              "severity": "warning",
+              "details": {
+                "choice_id": "20000000-0000-0000-0000-000000000303"
+              }
+            },
+            {
+              "event_id": "20000000-0000-0000-0000-000000000402",
+              "event_type": "storm_interrupt",
+              "message": "Lightning closes the bridge in hard rain.",
+              "presentation": "interrupt",
+              "replay": true,
+              "severity": "error",
+              "details": {
+                "source_id": "20000000-0000-0000-0000-000000000204",
+                "requires_acknowledgement": true
+              }
+            }
+          ]
+        }
+      },
+      "terminal": {
+        "rich_plain": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
+        "rich_spans": [
+          {
+            "start": 56,
+            "end": 97,
+            "style": "dim"
+          },
+          {
+            "start": 152,
+            "end": 201,
+            "style": "yellow"
+          }
+        ],
+        "no_color": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
+        "manifest": {
+          "fragment_order": [
+            "20000000-0000-0000-0000-000000000001",
+            "20000000-0000-0000-0000-000000000002",
+            "20000000-0000-0000-0000-000000000003",
+            "20000000-0000-0000-0000-000000000004",
+            "20000000-0000-0000-0000-000000000005"
+          ],
+          "provenance": {
+            "20000000-0000-0000-0000-000000000001": {
+              "origin_id": "20000000-0000-0000-0000-000000000101",
+              "source_id": "20000000-0000-0000-0000-000000000201"
+            },
+            "20000000-0000-0000-0000-000000000002": {
+              "origin_id": "20000000-0000-0000-0000-000000000102"
+            },
+            "20000000-0000-0000-0000-000000000003": {
+              "origin_id": "20000000-0000-0000-0000-000000000103"
+            },
+            "20000000-0000-0000-0000-000000000004": {
+              "origin_id": "20000000-0000-0000-0000-000000000104",
+              "source_id": "20000000-0000-0000-0000-000000000204"
+            },
+            "20000000-0000-0000-0000-000000000005": {
+              "origin_id": "20000000-0000-0000-0000-000000000105"
+            }
+          },
+          "groups": {
+            "20000000-0000-0000-0000-000000000005": [
+              "20000000-0000-0000-0000-000000000001",
+              "20000000-0000-0000-0000-000000000002",
+              "20000000-0000-0000-0000-000000000003",
+              "20000000-0000-0000-0000-000000000004"
+            ]
+          },
+          "choices": [
+            {
+              "uid": "20000000-0000-0000-0000-000000000003",
+              "edge_id": "20000000-0000-0000-0000-000000000303",
+              "available": false,
+              "unavailable_reason": "Gate closed"
+            }
+          ],
+          "media_fallbacks": {
+            "20000000-0000-0000-0000-000000000004": "The bridge disappears into hard rain."
+          },
+          "ux_event_order": [
+            "20000000-0000-0000-0000-000000000401",
+            "20000000-0000-0000-0000-000000000402"
+          ],
+          "ux_events": [
+            {
+              "event_id": "20000000-0000-0000-0000-000000000401",
+              "event_type": "gate_refused",
+              "message": "The watch refuses passage in hard rain.",
+              "presentation": "inline",
+              "replay": false,
+              "severity": "warning",
+              "details": {
+                "choice_id": "20000000-0000-0000-0000-000000000303"
+              }
+            },
+            {
+              "event_id": "20000000-0000-0000-0000-000000000402",
+              "event_type": "storm_interrupt",
+              "message": "Lightning closes the bridge in hard rain.",
+              "presentation": "interrupt",
+              "replay": true,
+              "severity": "error",
+              "details": {
+                "source_id": "20000000-0000-0000-0000-000000000204",
+                "requires_acknowledgement": true
+              }
+            }
+          ]
+        }
+      },
+      "plain_fallback": "Bridge watch: hard rain\nGate: closed\nWeather: hard rain\nx) Cross the bridge [locked: Gate closed]\n[narrative_im: The bridge disappears into hard rain.]\n[warning] The watch refuses passage in hard rain.\n[error] Lightning closes the bridge in hard rain.",
+      "safe_classes": {
+        "fragment:status": "st-x667261676d656e743a737461747573",
+        "group:status_packet": "st-x67726f75703a7374617475735f7061636b6574",
+        "state:locked": "st-x73746174653a6c6f636b6564"
+      }
+    }
+  ]
+}
