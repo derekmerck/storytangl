@@ -84,6 +84,72 @@ session hydration, or resource-opening helpers. In current v1 relay mode,
 protected upstream calls execute under one configured upstream identity rather
 than forwarding each caller's auth context end-to-end.
 
+### Deferred trusted live-debug interface
+
+The reference service retains the design for a privileged live-story console,
+tracked for reconnection in issue #478. It is intended for interactive world
+review and support, especially when a large story is easier to investigate from
+inside a running ledger than by reconstructing its state from authored inputs.
+The existing cmd2 `inspect`, `check`, `apply`, and `goto_node` commands and the
+restricted REST routes are currently stubs; this section records their intended
+contract, not an available public capability.
+
+Debug operations use the ordinary manager/session lifecycle. They open the
+ledger through `ServiceManager`, construct its real phase context and namespace,
+record any causality transition before potentially mutating work, checkpoint
+and persist through the normal writeback path, and return the ordinary typed
+response. They do not reach around the manager to mutate a graph dictionary.
+
+Ledger causality is a reproducibility receipt, not anti-cheat policy:
+
+- `clean` means the state and cursor derive from the world revision and recorded
+  reader choices under deterministic runtime inputs;
+- `soft_dirty` means trusted evaluation or state mutation occurred while the
+  current topology remains structurally credible, so normal availability and
+  provisioning still apply;
+- `hard_dirty` means reachability or topology was deliberately broken, such as
+  teleporting into a locked room. Availability relaxation and stub provisioning
+  then favor a playable exploratory frontier over preserving constraints whose
+  prerequisites were bypassed.
+
+The mode is monotonic within one ledger. A clean causal claim requires branching
+or restarting from a clean checkpoint; clearing a flag cannot reconstruct the
+missing cause. Dirty ledgers remain playable and persistable, but replay after
+the transition may rely on stored checkpoints/deltas rather than claiming that
+the original choice sequence produced the state.
+
+`inspect` is a bounded structured read. `check` evaluates a Python expression
+against the active namespace and marks soft dirty before evaluation because an
+apparently read-only expression can call a mutating method. `apply` executes an
+`Effect` and normally marks soft dirty. Cursor jumps, forced unavailable
+traversal, accepted unresolved stubs, and explicitly structural mutations
+escalate hard dirty before crossing the authored causal frontier.
+
+The direct manager-backed CLI is the primary intended adapter. Optional
+transport exposure uses two independent gates. The hosting application must
+explicitly enable its restricted/development surface (disabled by default), and
+the gateway must resolve the request's API key to a user whose account has the
+privilege flag before invoking a method marked `ServiceAccess.DEV`. Enabling
+development mode does not promote ordinary users, and possessing a privileged
+account does not make a production server expose routes it declined to mount or
+enable.
+
+The authorization groups are public, user, and admin. Public operations require
+no API key and include resources such as world information, media when exposed
+by the adapter, and the web client. Current v1 remote coverage does not expose
+world media. User operations require a valid unprivileged API key. Admin
+operations require a valid API key whose user has the privilege flag. These
+groups currently map to the `PUBLIC`, `CLIENT`, and `DEV` service access markers
+respectively; the marker names describe service exposure, not separate kinds of
+story player. The direct CLI should likewise make trusted debug mode explicit
+rather than infer admin privilege merely from being local. Remote parity is not
+required.
+
+Restricted builtins are not a security sandbox when the namespace contains live
+Python objects. The Python expression capability is deliberate for the
+reference-engine developer console and does not require a speculative
+cross-language expression replacement.
+
 ### Remote Setup (v1)
 
 Remote mode is selected through `build_service_manager(...)` or config:

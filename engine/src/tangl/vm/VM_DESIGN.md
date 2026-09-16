@@ -636,14 +636,19 @@ validation order that makes those postconditions hold at commit time.
 
 Runtime context carries a monotonic causality mode:
 
-- `CLEAN` — normal authored traversal assumptions hold.
-- `SOFT_DIRTY` — debug inspection/mutation occurred, but authored availability still runs.
-- `HARD_DIRTY` — causal chain is broken; availability becomes permissive and STUB linking
-  is allowed automatically.
+- `CLEAN` — normal authored traversal assumptions hold; bounded `inspect` reads do not
+  change this mode.
+- `SOFT_DIRTY` — `check`, `apply`, or another explicit non-structural debug mutation
+  occurred, but authored availability still runs.
+- `HARD_DIRTY` — the privileged Service debug `goto` operation, forced unavailable
+  traversal, an accepted unresolved `STUB`, or explicit structural mutation broke the
+  causal chain; availability becomes permissive and STUB linking is allowed automatically.
 
-`SOFT_DIRTY` is set by explicit debug actions (`jump`, `inspect`, `check`, `apply`).
-`HARD_DIRTY` is set on first accepted `STUB` dependency link. Transitions are append-only
-audit records in the ledger output stream via `CausalityTransitionRecord`.
+The low-level `Frame.goto_node()` method is also used for ordinary initialization and
+internal cursor movement, so calling it does not itself define a dirty transition. A
+privileged debug operation records the `HARD_DIRTY` transition before calling it.
+Transitions are append-only audit records in the ledger output stream via
+`CausalityTransitionRecord`.
 
 
 ### Authority Chain and Back-Pointer Aliasing
