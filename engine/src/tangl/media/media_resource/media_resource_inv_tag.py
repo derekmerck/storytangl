@@ -11,6 +11,8 @@ from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_val
 from tangl.core import HasContent, RegistryAware
 from tangl.core.bases import Hash, is_identifier
 from tangl.media.media_data_type import MediaDataType
+from tangl.media.sprite_sheets.ref import SpriteSheetRef
+from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.utils.hashing import compute_data_hash
 from tangl.utils.shelved2 import clear_shelf, shelved
 
@@ -77,6 +79,17 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
     worker_id: str | None = None
     generated_at: datetime | None = None
     source_step_id: UUID | None = None
+
+    sprite_sheet: SpriteSheetManifest | None = None
+    """Set on a sprite sheet: its frames, clips and timing."""
+
+    sprite_sheets: list[SpriteSheetRef] = Field(default_factory=list)
+    """Set on a still: the sheets indexed for it, in filename order.
+
+    Carried on the still, not looked up later, because a story copies this record
+    into its own graph and loses any handle on the world's inventory. See
+    :class:`~tangl.media.sprite_sheets.ref.SpriteSheetRef`.
+    """
 
     req_hash: ClassVar[bool] = True
 

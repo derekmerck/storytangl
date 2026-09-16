@@ -1,0 +1,143 @@
+{
+ "frames": [
+  {
+   "filename": "worker_sprite-4x1 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 112
+   },
+   "duration": 1800
+  },
+  {
+   "filename": "worker_sprite-4x1 1",
+   "frame": {
+    "x": 116,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 112
+   },
+   "duration": 200
+  },
+  {
+   "filename": "worker_sprite-4x1 2",
+   "frame": {
+    "x": 232,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 112
+   },
+   "duration": 1000
+  },
+  {
+   "filename": "worker_sprite-4x1 3",
+   "frame": {
+    "x": 348,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 112
+   },
+   "duration": 1000
+  }
+ ],
+ "meta": {
+  "app": "storytangl repartee sprite pipeline",
+  "image": "worker_sprite-4x1.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 464,
+   "h": 112
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "idle",
+    "from": 0,
+    "to": 1,
+    "direction": "forward"
+   },
+   {
+    "name": "call",
+    "from": 2,
+    "to": 2,
+    "direction": "forward"
+   },
+   {
+    "name": "response",
+    "from": 3,
+    "to": 3,
+    "direction": "forward"
+   }
+  ],
+  "slices": [
+   {
+    "name": "pivot",
+    "color": "#0000ffff",
+    "keys": [
+     {
+      "frame": 0,
+      "bounds": {
+       "x": 0,
+       "y": 0,
+       "w": 116,
+       "h": 112
+      },
+      "pivot": {
+       "x": 60,
+       "y": 111
+      }
+     }
+    ]
+   }
+  ]
+ }
+}
