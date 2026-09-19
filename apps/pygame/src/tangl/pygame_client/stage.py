@@ -19,6 +19,8 @@ import pygame
 
 from dataclasses import dataclass
 
+from tangl.presentation.hints import CARDINAL_X
+
 from .bridge import (
     UnsupportedAccepts,
     commit_payload,
@@ -964,34 +966,40 @@ class Stage:
 
         Centre, not left edge, so the same fraction means the same place
         whatever the image is wide -- and so it agrees with the bottom-centre
-        anchor a sprite sheet frame already uses. Clamped, because a figure
-        half off the stage is never what a placement meant.
+        anchor a sprite sheet frame already uses.
+
+        Not clamped. Off-stage is a real position: an image sliding from -0.5
+        to 0.2 is an entrance from the left, and every frame of that before it
+        arrives is partly outside the frame. Pulling it back would turn the
+        entrance into a figure stuck against the edge.
         """
 
-        left = round(frac * LOGICAL_SIZE[0]) - width // 2
-        return max(0, min(left, LOGICAL_SIZE[0] - width))
+        return round(frac * LOGICAL_SIZE[0]) - width // 2
 
     @staticmethod
     def _frac_y(frac: float, height: int) -> int:
         """Top edge for an image whose *bottom* sits ``frac`` down the stage.
 
         The bottom, because a staged figure stands on something and its
-        baseline is the part a placement is about. Clamped for the same reason
-        as :meth:`_frac_x`.
+        baseline is the part a placement is about. Unclamped for the same
+        reason as :meth:`_frac_x`.
         """
 
-        top = round(frac * LOGICAL_SIZE[1]) - height
-        return max(0, min(top, LOGICAL_SIZE[1] - height))
+        return round(frac * LOGICAL_SIZE[1]) - height
 
     @staticmethod
     def _slot_x(slot: str, width: int) -> int:
-        """Left edge for a horizontal staging slot. Unknown slots centre."""
+        """Left edge for a horizontal staging slot. Unknown slots centre.
 
-        if slot == "left":
-            return MARGIN
-        if slot == "right":
-            return LOGICAL_SIZE[0] - width - MARGIN
-        return (LOGICAL_SIZE[0] - width) // 2
+        A cardinal is sugar for a fraction, and the mapping lives in the
+        engine so a name and a number are one statement rather than two
+        implementations that can drift apart.
+        """
+
+        frac = CARDINAL_X.get(slot)
+        if frac is None:
+            return (LOGICAL_SIZE[0] - width) // 2
+        return Stage._frac_x(frac, width)
 
     def _rows(
         self, turn: Turn, unloadable: list[StageImage], *, columns: int = 74

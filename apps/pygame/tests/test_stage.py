@@ -402,11 +402,18 @@ def test_fractional_media_x_centres_the_image_on_the_fraction(stage: Stage) -> N
     assert wide + 80 // 2 == LOGICAL_SIZE[0] // 2
 
 
-def test_fractional_media_x_is_clamped_into_the_frame(stage: Stage) -> None:
-    """Half a figure off the edge is never what a placement meant."""
+def test_a_placement_may_sit_outside_the_frame(stage: Stage) -> None:
+    """Off-stage is a position, not a mistake.
 
-    assert Stage._frac_x(0.0, width=60) == 0
-    assert Stage._frac_x(1.0, width=60) == LOGICAL_SIZE[0] - 60
+    An image sliding from -0.5 to 0.2 is an entrance from the left, and every
+    frame of it before arrival is partly outside. Clamping would turn that
+    into a figure stuck against the edge.
+    """
+
+    assert Stage._frac_x(-0.5, width=60) < 0
+    assert Stage._frac_x(1.5, width=60) > LOGICAL_SIZE[0] - 60
+    # and the ordinary case still lands where it says
+    assert Stage._frac_x(0.5, width=60) + 30 == LOGICAL_SIZE[0] // 2
 
 
 def test_fractional_media_y_places_the_baseline_not_the_top(stage: Stage) -> None:
@@ -417,9 +424,49 @@ def test_fractional_media_y_places_the_baseline_not_the_top(stage: Stage) -> Non
     assert top + 40 == LOGICAL_SIZE[1] // 2
 
 
-def test_fractional_media_y_is_clamped_into_the_frame(stage: Stage) -> None:
-    assert Stage._frac_y(0.0, height=40) == 0
-    assert Stage._frac_y(1.0, height=40) == LOGICAL_SIZE[1] - 40
+def test_a_vertical_placement_may_sit_outside_the_frame(stage: Stage) -> None:
+    assert Stage._frac_y(-0.5, height=40) < 0
+    assert Stage._frac_y(1.5, height=40) > LOGICAL_SIZE[1] - 40
+
+
+def test_a_cardinal_is_the_same_statement_as_its_fraction(stage: Stage) -> None:
+    """A name is sugar for a position, so the two must agree exactly.
+
+    Quarters rather than edges: an edge-anchored cardinal is width-dependent,
+    which is what stops a name being expressible as a fraction at all.
+    """
+
+    from tangl.presentation.hints import CARDINAL_X
+
+    assert CARDINAL_X == {"left": 0.25, "mid": 0.5, "right": 0.75}
+    for name, frac in CARDINAL_X.items():
+        assert Stage._slot_x(name, width=60) == Stage._frac_x(frac, width=60)
+
+
+def test_cardinals_are_viewer_relative(stage: Stage) -> None:
+    """Pixel 0 is the viewer's left, so `right` is the larger fraction.
+
+    The theatrical frame inverts this and is refused by the hint model; this
+    pins the convention so a mapping change cannot silently mirror every
+    staged figure.
+    """
+
+    from tangl.presentation.hints import CARDINAL_X
+
+    assert CARDINAL_X["left"] < CARDINAL_X["mid"] < CARDINAL_X["right"]
+    assert Stage._slot_x("left", width=60) < Stage._slot_x("right", width=60)
+
+
+def test_a_staging_position_may_be_off_stage_but_not_a_unit_mistake() -> None:
+    """The bounds separate a position from someone who wrote 50 meaning half."""
+
+    from tangl.presentation.hints import STAGING_MAX, STAGING_MIN, StagingHints
+
+    assert StagingHints(media_x=-0.5).media_x == -0.5     # entering from the left
+    assert StagingHints(media_x=1.4).media_x == 1.4       # gone off the right
+    for unit_mistake in (50, -50, STAGING_MAX + 1, STAGING_MIN - 1):
+        with pytest.raises(Exception):
+            StagingHints(media_x=unit_mistake)
 
 
 def test_a_numeric_media_x_reads_as_a_fraction_not_a_slot() -> None:

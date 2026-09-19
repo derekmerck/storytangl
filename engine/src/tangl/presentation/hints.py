@@ -60,6 +60,34 @@ TimingName = Literal["start", "stop", "pause", "restart", "loop"]
 MediaXName = Literal["left", "mid", "right"]
 MediaYName = Literal["top", "mid", "bottom"]
 
+CARDINAL_X: dict[str, float] = {"left": 0.25, "mid": 0.5, "right": 0.75}
+CARDINAL_Y: dict[str, float] = {"top": 0.25, "mid": 0.5, "bottom": 0.75}
+"""What each cardinal means as a fraction, so a name and a number are the same
+statement and nothing has to reimplement the mapping.
+
+Quarters rather than edges. An edge-anchored cardinal is width-dependent -- the
+same name lands somewhere different for a wide image than a narrow one -- which
+is exactly what stops a name being expressible as a fraction at all. A quarter
+means the same place whatever is measured against it, which is also what lets a
+placement compose when frames nest.
+
+Viewer-relative throughout: 0.0 is the viewer's left, and `right` is 0.75. The
+theatrical frame inverts this and is rejected outright; see _normalize_axis.
+
+Subdivisions, when they arrive, are midpoints between neighbours -- mid_right
+is (0.5 + 0.75) / 2 -- so they need no table of their own.
+"""
+
+STAGING_MIN, STAGING_MAX = -2.0, 3.0
+"""How far outside the frame a placement may sit.
+
+Not a clamp: off-stage is a real position. An image sliding from -0.5 to 0.2 is
+an entrance from the left, and a placement parked outside the frame is an
+ordinary frame of that animation. The bounds exist only to separate a position
+from a unit mistake -- someone who wrote 50 meaning half way -- and are wide
+enough to park a full image clear of either edge.
+"""
+
 _AXIS_ALIASES = {
     "screen_left": "left", "screen_right": "right", "center": "mid", "centre": "mid",
     "middle": "mid",
@@ -85,10 +113,12 @@ class StagingHints(BaseModel, extra="allow"):
         if isinstance(value, bool):
             raise ValueError("a staging position is a name or a 0..1 fraction, not a bool")
         if isinstance(value, (int, float)):
-            if not 0.0 <= float(value) <= 1.0:
+            if not STAGING_MIN <= float(value) <= STAGING_MAX:
                 raise ValueError(
-                    f"{value!r} is not a staging fraction. Positions are measured "
-                    "0..1 across the frame, so 50 is not half way; use 0.5."
+                    f"{value!r} is not a staging position. Positions are measured "
+                    "0..1 across the frame -- so 50 is not half way, use 0.5 -- and "
+                    f"may sit outside it, from {STAGING_MIN} to {STAGING_MAX}, for "
+                    "an image entering or leaving."
                 )
             return float(value)
         if not isinstance(value, str):
