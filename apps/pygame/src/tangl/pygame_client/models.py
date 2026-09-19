@@ -50,6 +50,21 @@ class StageImage:
     the shared floor every slotted portrait sits on.
     """
 
+    rel: str | None = None
+    """From ``staging_hints.media_rel``: what this image's fractions are
+    measured against. ``None`` means the stage itself.
+
+    The stage case is plain screen NDC and is what this port resolves. Naming
+    another staged image instead is a composition -- the child's fractions are
+    read inside the parent's drawn rect, so eyes cropped from a portrait can be
+    placed on that portrait and follow it wherever it is staged, at whatever
+    size. That needs the parent's rect to be known before the child is drawn,
+    which is a placement pass this port does not have yet; until it does, a
+    named reference is carried and not honoured, and the image falls back to
+    the stage. Declaring it costs nothing and a client that grows the pass
+    reads it without the hint changing.
+    """
+
     flip_h: bool = False
     """From ``staging_hints.media_flip_h``. Other staging hints are ignored by
     this port; honouring a subset is expected of a conforming client."""

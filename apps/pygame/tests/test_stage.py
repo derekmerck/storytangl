@@ -24,6 +24,8 @@ from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     CHOICE_KEYS,
     LOGICAL_SIZE,
+    STAGED_LIMIT,
+    STAGED_ROLES,
     PANEL_W,
     SCALE,
     Stage,
@@ -461,3 +463,61 @@ def test_a_placed_image_ignores_arrival_order(stage: Stage) -> None:
 
     assert first.x_slot is None and second.x_slot is None
     assert Stage._frac_x(first.x_frac, 40) == Stage._frac_x(second.x_frac, 40)
+
+
+# ── staged images (scenery inhabitants) ──────────────────────────────────────
+
+
+def _staged(**kw):
+    from tangl.pygame_client.models import StageImage
+
+    return StageImage(role="staged_im", source=kw.pop("source", "s.png"), **kw)
+
+
+def test_staged_images_are_a_separate_role_from_portraits() -> None:
+    """A room's inhabitants must not compete for the dialog's three stations."""
+
+    from tangl.pygame_client.stage import PORTRAIT_ROLES
+
+    assert "staged_im" in STAGED_ROLES
+    assert not set(STAGED_ROLES) & set(PORTRAIT_ROLES)
+
+
+def test_staged_capacity_is_bounded_but_well_above_a_real_room() -> None:
+    """A bound, not a design limit: it exists so a generated cast degrades."""
+
+    assert STAGED_LIMIT >= 10
+
+
+def test_staged_images_draw_nearest_last(stage: Stage) -> None:
+    """Lower in the frame is nearer, so it draws later.
+
+    The same painter's rule a surface uses for its slots, so depth comes off
+    the placement rather than needing to be stated twice.
+    """
+
+    far, near = _staged(source="far.png", y_frac=0.2), _staged(source="near.png", y_frac=0.9)
+    ordered = sorted([far, near], key=lambda i: i.y_frac or 0.0)
+
+    assert [i.source for i in ordered] == ["far.png", "near.png"]
+
+
+def test_an_unplaced_staged_image_says_nothing_about_where_it_stands() -> None:
+    """It asked to be in the room without saying where; it does not get a slot."""
+
+    image = _staged()
+
+    assert image.x_frac is None and image.y_frac is None
+    assert image.x_slot is None
+
+
+def test_a_staged_image_may_name_what_its_fractions_are_relative_to() -> None:
+    """Carried for a composition this port cannot resolve yet.
+
+    Eyes cropped from a portrait want to be placed *on that portrait* and
+    follow it wherever it is staged. Declaring the reference costs nothing now
+    and is read unchanged once a placement pass exists.
+    """
+
+    assert _staged().rel is None
+    assert _staged(rel="portrait:clerk").rel == "portrait:clerk"

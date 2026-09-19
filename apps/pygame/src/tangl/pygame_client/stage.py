@@ -70,6 +70,25 @@ MAP_ROLES = ("map_im",)
 """A plate is full-frame but is not scenery: it is deliberately outside
 BACKGROUND_ROLES so a client with no map view never stages it as a backdrop."""
 
+STAGED_ROLES = ("staged_im",)
+"""Scenery inhabitants: images placed somewhere in the frame rather than
+stationed in a dialog slot.
+
+A separate role because the caps differ and mean different things. A backdrop
+is one image by nature; a dialog wants a couple of faces at fixed stations; a
+populated room wants as many figures as it has, each somewhere particular. A
+staged image is the third case, and putting it in PORTRAIT_ROLES would make it
+compete for three stations it never wanted.
+"""
+
+STAGED_LIMIT = 12
+"""How many staged images one turn may draw.
+
+Not a design limit -- roughly double the busiest hand-authored room -- but a
+bound, so a world that generates its cast in a loop degrades by dropping the
+tail rather than by drawing for a minute.
+"""
+
 PORTRAIT_HEIGHT = 112
 MARGIN = 10
 _DEFAULT_SLOTS = ("left", "right", "mid")
@@ -375,6 +394,9 @@ class Stage:
             else len(turn.choices)
         )
         choices_top = LOGICAL_SIZE[1] - 4 - below * 11
+        # Scenery before faces: an ornament stands in the room, a portrait
+        # speaks over it.
+        self._draw_staged(loaded)
         self._draw_portraits(turn, loaded, floor=choices_top)
         panelled = self._has_state(turn, placed=placed)
         width = LOGICAL_SIZE[0] - (PANEL_W if panelled else 0)
@@ -769,6 +791,41 @@ class Stage:
             self.surface.blit(pygame.transform.scale(surface, LOGICAL_SIZE), (0, 0))
         else:
             self.surface.fill(TEAL)
+
+    def _draw_staged(self, loaded: list[tuple[StageImage, pygame.Surface]]) -> None:
+        """Draw placed images at their fractions, nearest last.
+
+        Drawn at natural size: a staged image was conformed to this stage by
+        whoever packed it, so rescaling here would be a second opinion about a
+        size already decided.
+
+        Depth comes off the placement itself -- lower in the frame is nearer,
+        so it draws later -- which is the same painter's rule a surface already
+        uses for its slots. An image with no vertical placement sits at the
+        back, because it has said nothing about where it stands.
+        """
+
+        staged = self._pick(loaded, STAGED_ROLES)
+        if not staged:
+            return
+        ordered = sorted(staged, key=lambda entry: entry[0].y_frac or 0.0)
+        for image, surface in ordered[:STAGED_LIMIT]:
+            width, height = surface.get_size()
+            # An unplaced staged image centres on the floor: it asked to be in
+            # the room without saying where, and the middle is the honest
+            # reading of that.
+            box_x = (
+                self._frac_x(image.x_frac, width)
+                if image.x_frac is not None
+                else (LOGICAL_SIZE[0] - width) // 2
+            )
+            box_y = (
+                self._frac_y(image.y_frac, height)
+                if image.y_frac is not None
+                else LOGICAL_SIZE[1] - height
+            )
+            drawn = pygame.transform.flip(surface, True, False) if image.flip_h else surface
+            self.surface.blit(drawn, (box_x, box_y))
 
     def _draw_portraits(
         self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]], *, floor: int
