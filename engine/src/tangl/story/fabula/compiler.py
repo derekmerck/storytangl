@@ -1407,47 +1407,41 @@ class StoryCompiler:
     ) -> type[Entity]:
         """Resolve an authored ``kind`` to an Entity class.
 
-        Resolution order is cardinal vocabulary, then the world's contributed
-        ``class_registry``, then a dotted import path. The cardinal names win so
-        a bundle cannot quietly redefine ``Block`` or ``Scene``; everything the
-        core does not already name is the world's to supply.
+        Explicit class objects and dotted paths identify an Entity subclass
+        exactly. Bare strings resolve through the cardinal vocabulary before
+        the world's contributed ``class_registry``, so a bundle cannot quietly
+        redefine ``Block`` or ``Scene`` while explicit forms remain unambiguous.
 
         An authored name that resolves to nothing is reported rather than
         silently downgraded to ``fallback``. A world losing its own block kinds
         should not look like a world that never declared any.
         """
         if isinstance(raw_kind, type):
-            cardinal = self._map_external_kind(raw_kind.__name__)
-            if cardinal is not None:
-                return cardinal
             if issubclass(raw_kind, Entity):
                 return raw_kind
             return fallback
 
         if isinstance(raw_kind, str):
-            kind_name = raw_kind.split(".")[-1]
-            cardinal = self._map_external_kind(kind_name)
-            if cardinal is not None:
-                return cardinal
-            contributed = self._map_contributed_kind(kind_name, collector=collector)
-            if contributed is not None:
-                return contributed
             import_error: Exception | None = None
-            # Only a dotted name claims to be an import path. A bare name that
-            # resolved to nothing is a plain unknown kind, and reporting a
-            # rsplit ValueError against it would be noise, not a reason.
             if "." in raw_kind:
                 try:
                     module_name, class_name = raw_kind.rsplit(".", 1)
                     cls = getattr(import_module(module_name), class_name)
-                    if isinstance(cls, type):
-                        cardinal = self._map_external_kind(cls.__name__)
-                        if cardinal is not None:
-                            return cardinal
-                        if issubclass(cls, Entity):
-                            return cls
                 except Exception as exc:  # noqa: BLE001 - reported, not swallowed
                     import_error = exc
+                else:
+                    if isinstance(cls, type) and issubclass(cls, Entity):
+                        return cls
+                    import_error = TypeError(
+                        f"Imported target '{raw_kind}' is not an Entity subclass"
+                    )
+            else:
+                cardinal = self._map_external_kind(raw_kind)
+                if cardinal is not None:
+                    return cardinal
+                contributed = self._map_contributed_kind(raw_kind, collector=collector)
+                if contributed is not None:
+                    return contributed
             self._report_unresolved_kind(
                 raw_kind,
                 fallback=fallback,
@@ -1484,9 +1478,9 @@ class StoryCompiler:
             "fallback_kind": fallback.__name__,
             "known_kinds": sorted(collector.class_registry),
         }
-        # A dotted path that failed to import is a different authoring problem
-        # from a name nobody declared: one is a typo, the other is a broken
-        # domain module. Carry the reason so the author can tell them apart.
+        # A dotted path that failed to import or named a non-Entity target is a
+        # different authoring problem from a bare name nobody declared. Carry
+        # the reason so the author can tell them apart.
         if error is not None:
             details["error"] = f"{type(error).__name__}: {error}"
         collector.add_settled(

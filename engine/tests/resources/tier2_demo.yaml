@@ -21,7 +21,7 @@ items:
 
 actors:
   companion:
-    kind: tangl.story.concepts.actor.actor.Actor
+    kind: tangl.story.concepts.actor.Actor
     name: "Aria the Ranger"
     tags: [npc, ally]
 
@@ -29,7 +29,7 @@ scenes:
   village:
     roles:
       companion:
-        kind: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.role.Role
         actor_ref: companion
     blocks:
       start:
@@ -63,7 +63,7 @@ scenes:
   wilds:
     roles:
       companion:
-        kind: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.role.Role
         actor_ref: companion
     blocks:
       trail:
@@ -83,7 +83,7 @@ scenes:
   shrine:
     roles:
       companion:
-        kind: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.role.Role
         actor_ref: companion
     blocks:
       entrance:
