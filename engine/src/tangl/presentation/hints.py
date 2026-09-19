@@ -41,10 +41,22 @@ TimingName = Literal["start", "stop", "pause", "restart", "loop"]
 # audience's right, which reads backwards here and is rejected outright rather
 # than silently accepted (see StagingHints._normalize_axis).
 #
-# Subdivisions are the planned extension, keeping these three as the cardinals:
-# left_left, left, left_right, mid_left, mid, mid_right, right_left, right,
-# right_right — for staging crowds by nudging off a cardinal rather than by
-# hardcoded pixel offsets.
+# Names and fractions are one vocabulary, not two. A cardinal is sugar for a
+# position — `mid` is 0.5 — and the planned subdivisions (left_left, mid_right
+# and so on) are midpoints between cardinals, for staging a dialog crowd where
+# three avatars argue with one. Nothing downstream stores a pixel called
+# "mid"; a name resolves to a position like any other.
+#
+# A world may therefore say either, and should say whichever it means: a name
+# when it wants a station ("on the left", wherever this client puts that), a
+# fraction when it wants a placement (0.18, and the same 0.18 on any stage).
+#
+# Caveat worth knowing, because the pygame port does not implement the
+# equivalence cleanly: `mid` centres, so it really is 0.5, but `left` and
+# `right` anchor to an edge with a gutter, which is width-dependent and so is
+# no fixed fraction at all. A 60px image at `left` centres on 0.125; a 100px
+# one on 0.1875. Unifying those would move existing staged sprites, so it is
+# left alone here and noted rather than quietly changed.
 MediaXName = Literal["left", "mid", "right"]
 MediaYName = Literal["top", "mid", "bottom"]
 
@@ -70,6 +82,15 @@ class StagingHints(BaseModel, extra="allow"):
     def _normalize_axis(cls, value: Any) -> Any:
         """Accept screen-relative aliases; refuse theatrical ones outright."""
 
+        if isinstance(value, bool):
+            raise ValueError("a staging position is a name or a 0..1 fraction, not a bool")
+        if isinstance(value, (int, float)):
+            if not 0.0 <= float(value) <= 1.0:
+                raise ValueError(
+                    f"{value!r} is not a staging fraction. Positions are measured "
+                    "0..1 across the frame, so 50 is not half way; use 0.5."
+                )
+            return float(value)
         if not isinstance(value, str):
             return value
         name = value.strip().lower()
@@ -81,11 +102,20 @@ class StagingHints(BaseModel, extra="allow"):
             )
         return _AXIS_ALIASES.get(name, name)
 
-    media_x: MediaXName | None = None
-    """Horizontal staging slot, named from the viewer's side of the screen."""
+    media_x: MediaXName | float | None = None
+    """Where this image sits horizontally: a named station, or a fraction.
 
-    media_y: MediaYName | None = None
-    """Vertical staging level."""
+    A name is a station — "on the left" — and a client may honour it however
+    its layout prefers. A ``0..1`` fraction is a placement: the image's
+    horizontal *centre*, measured across whatever frame it is staged in.
+    """
+
+    media_y: MediaYName | float | None = None
+    """Where this image sits vertically: a named level, or a fraction.
+
+    A ``0..1`` fraction places the image's *bottom*, because a staged figure
+    stands on something and its baseline is what a placement is about.
+    """
 
     media_flip_h: bool | None = None
     """Mirror the asset horizontally when staged.
