@@ -440,7 +440,7 @@ def test_a_cardinal_is_the_same_statement_as_its_fraction(stage: Stage) -> None:
 
     assert CARDINAL_X == {"left": 0.25, "mid": 0.5, "right": 0.75}
     for name, frac in CARDINAL_X.items():
-        assert Stage._slot_x(name, width=60) == Stage._frac_x(frac, width=60)
+        assert stage._slot_x(name, width=60) == Stage._frac_x(frac, width=60)
 
 
 def test_cardinals_are_viewer_relative(stage: Stage) -> None:
@@ -454,7 +454,7 @@ def test_cardinals_are_viewer_relative(stage: Stage) -> None:
     from tangl.presentation.hints import CARDINAL_X
 
     assert CARDINAL_X["left"] < CARDINAL_X["mid"] < CARDINAL_X["right"]
-    assert Stage._slot_x("left", width=60) < Stage._slot_x("right", width=60)
+    assert stage._slot_x("left", width=60) < stage._slot_x("right", width=60)
 
 
 def test_a_staging_position_may_be_off_stage_but_not_a_unit_mistake() -> None:
@@ -568,3 +568,42 @@ def test_a_staged_image_may_name_what_its_fractions_are_relative_to() -> None:
 
     assert _staged().rel is None
     assert _staged(rel="portrait:clerk").rel == "portrait:clerk"
+
+
+def test_a_named_position_is_held_on_screen_for_a_wide_image(stage: Stage) -> None:
+    """A station is a request the client may interpret; a wide image still fits.
+
+    "On the right" for an image too wide to sit at 0.75 whole is answered by
+    the nearest position that shows all of it, rather than by clipping.
+    """
+
+    narrow, wide = 40, 200
+
+    assert stage._slot_x("right", narrow) == Stage._frac_x(0.75, narrow)
+    # pulled LEFT, because what overflowed was the right edge
+    assert stage._slot_x("right", wide) < Stage._frac_x(0.75, wide)
+    assert stage._slot_x("right", wide) + wide <= LOGICAL_SIZE[0]
+    assert stage._slot_x("left", wide) >= 0
+
+
+def test_an_explicit_fraction_is_never_held_on_screen(stage: Stage) -> None:
+    """A placement is a decision already made; adjusting it breaks entrances."""
+
+    assert stage.keep_on_screen
+    assert Stage._frac_x(-0.5, width=60) < 0
+
+
+def test_keep_on_screen_can_be_turned_off(stage: Stage) -> None:
+    from tangl.pygame_client.stage import Stage as S
+
+    off = S(keep_on_screen=False)
+    try:
+        assert off._slot_x("right", 200) == Stage._frac_x(0.75, 200)
+    finally:
+        pygame.quit()
+
+
+def test_an_image_wider_than_the_stage_centres(stage: Stage) -> None:
+    """The visible band has vanished; centring is the least-bad answer."""
+
+    assert Stage._visible_x(0.75, width=LOGICAL_SIZE[0] * 2) == 0.5

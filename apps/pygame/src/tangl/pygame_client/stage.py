@@ -255,6 +255,7 @@ class Stage:
         title: str = "StoryTangl",
         clock: Callable[[], float] | None = None,
         animate: bool = True,
+        keep_on_screen: bool = True,
     ) -> None:
         pygame.init()
         self.window = pygame.display.set_mode(
@@ -263,6 +264,11 @@ class Stage:
         pygame.display.set_caption(title)
         self.surface = pygame.Surface(LOGICAL_SIZE)
         self.asset_dir = asset_dir
+        self.keep_on_screen = keep_on_screen
+        """Hold a *named* position inside the frame when the image is too wide
+        to sit there whole. Client policy, not world data: an explicit fraction
+        is never adjusted, so an image meant to leave the frame still can."""
+
         self.font = pygame.font.Font(None, 11)
         self._cache: dict[str, pygame.Surface | None] = {}
         self.hitboxes: list[tuple[pygame.Rect, Action]] = []
@@ -988,17 +994,42 @@ class Stage:
         return round(frac * LOGICAL_SIZE[1]) - height
 
     @staticmethod
-    def _slot_x(slot: str, width: int) -> int:
+    def _visible_x(frac: float, width: int) -> float:
+        """``frac`` pulled to the nearest position showing the whole image.
+
+        The fully-visible band for an image is ``[w/2, 1 - w/2]`` in fractions
+        of the stage, which narrows as the image widens and vanishes once it is
+        wider than the stage -- in which case centring is the least-bad answer
+        and is what falling through gives.
+        """
+
+        half = width / (2 * LOGICAL_SIZE[0])
+        lo, hi = half, 1.0 - half
+        if lo > hi:
+            return 0.5
+        return min(max(frac, lo), hi)
+
+    def _slot_x(self, slot: str, width: int) -> int:
         """Left edge for a horizontal staging slot. Unknown slots centre.
 
-        A cardinal is sugar for a fraction, and the mapping lives in the
-        engine so a name and a number are one statement rather than two
+        A cardinal is sugar for a fraction, and the mapping lives in the engine
+        so a name and a number are one statement rather than two
         implementations that can drift apart.
+
+        Under :attr:`keep_on_screen` a name is also held inside the frame. That
+        is a liberty this client takes with *names* only: a name is a station
+        and asking for "the right" of a stage too narrow to hold the image
+        there is a request the client is entitled to interpret. An explicit
+        fraction is a placement and is honoured exactly, because a world that
+        computed a coordinate has already decided, and second-guessing it would
+        break every animation that means to leave the frame.
         """
 
         frac = CARDINAL_X.get(slot)
         if frac is None:
             return (LOGICAL_SIZE[0] - width) // 2
+        if self.keep_on_screen:
+            frac = self._visible_x(frac, width)
         return Stage._frac_x(frac, width)
 
     def _rows(
