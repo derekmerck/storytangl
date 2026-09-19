@@ -51,18 +51,22 @@ class StageImage:
     """
 
     rel: str | None = None
-    """From ``staging_hints.media_rel``: what this image's fractions are
-    measured against. ``None`` means the stage itself.
+    """From ``staging_hints.media_rel``: the frame this image's fractions are
+    measured in. ``None`` means the stage.
 
-    The stage case is plain screen NDC and is what this port resolves. Naming
-    another staged image instead is a composition -- the child's fractions are
-    read inside the parent's drawn rect, so eyes cropped from a portrait can be
-    placed on that portrait and follow it wherever it is staged, at whatever
-    size. That needs the parent's rect to be known before the child is drawn,
-    which is a placement pass this port does not have yet; until it does, a
-    named reference is carried and not honoured, and the image falls back to
-    the stage. Declaring it costs nothing and a client that grows the pass
-    reads it without the hint changing.
+    Fractions are always read inside some parent's rect. The stage is that
+    parent's identity case -- its rect *is* the frame, so screen NDC and a
+    composition are the same operation with nothing to compose. Naming another
+    image instead supplies a non-identity parent: the child's fractions are
+    read inside that image's drawn rect, so eyes cropped from a portrait sit on
+    that portrait and follow it wherever it is staged, at whatever size.
+
+    So this is one mechanism with the trivial case implemented, not a
+    placeholder for a different one. What a non-identity parent additionally
+    needs is the parent's rect before the child draws -- a placement pass this
+    port does not have. Until it does, a named reference falls back to the
+    stage. Nothing about the hint changes when the pass arrives, and nothing
+    here forecloses parents nesting further.
     """
 
     flip_h: bool = False

@@ -803,6 +803,11 @@ class Stage:
         so it draws later -- which is the same painter's rule a surface already
         uses for its slots. An image with no vertical placement sits at the
         back, because it has said nothing about where it stands.
+
+        Fractions are read against the stage, which is the identity case of
+        :attr:`StageImage.rel`: measuring inside a parent rect that happens to
+        be the whole frame. A non-identity parent needs its rect resolved
+        first, which is a pass this port does not have.
         """
 
         staged = self._pick(loaded, STAGED_ROLES)
