@@ -25,7 +25,30 @@ class StageImage:
     alt_text: str | None = None
     source_id: UUID | None = None
     x_slot: str | None = None
-    """From ``staging_hints.media_x``; ``None`` falls back to arrival order."""
+    """From ``staging_hints.media_x`` when it names a slot.
+
+    ``None`` falls back to arrival order. A numeric ``media_x`` sets
+    :attr:`x_frac` instead, and leaves this ``None``.
+    """
+
+    x_frac: float | None = None
+    """From a numeric ``staging_hints.media_x``: where the image's horizontal
+    centre goes, as a fraction of the stage's width.
+
+    Centre rather than left edge, so a placement means the same thing whatever
+    the image's width -- and so it agrees with the bottom-centre anchor a
+    sprite sheet already uses. ``None`` means this image is slotted, not
+    placed.
+    """
+
+    y_frac: float | None = None
+    """From a numeric ``staging_hints.media_y``: where the image's *bottom*
+    goes, as a fraction of the stage's height.
+
+    The bottom rather than the top, because a staged figure stands on
+    something: its baseline is the part a placement is about. ``None`` keeps
+    the shared floor every slotted portrait sits on.
+    """
 
     flip_h: bool = False
     """From ``staging_hints.media_flip_h``. Other staging hints are ignored by

@@ -790,12 +790,26 @@ class Stage:
             height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
             factor = height / portrait.get_height()
             width = max(1, round(portrait.get_width() * factor))
-            slot = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
-            box_x, box_y = self._slot_x(slot, width), floor - height
+            # A placement wins over a slot. The two are different questions --
+            # "which of three stations" versus "where exactly" -- and a world
+            # that answered the second should not be re-answered by arrival
+            # order. A client that ignores fractions still slots by arrival,
+            # which is what honouring a subset of the hints means.
+            if image.x_frac is not None:
+                placement = f"x={image.x_frac:.4f}"
+                box_x = self._frac_x(image.x_frac, width)
+            else:
+                placement = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
+                box_x = self._slot_x(placement, width)
+            box_y = (
+                self._frac_y(image.y_frac, height)
+                if image.y_frac is not None
+                else floor - height
+            )
 
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
-            placed = (image.role, image.source, slot)
+            placed = (image.role, image.source, placement)
             key = (*placed, occurrences[placed])
             occurrences[placed] += 1
 
@@ -881,6 +895,31 @@ class Stage:
         elif play.held_ms is not None:
             play.started_ms, play.held_ms = now - play.held_ms, None
         return play
+
+    @staticmethod
+    def _frac_x(frac: float, width: int) -> int:
+        """Left edge for an image whose *centre* sits ``frac`` across the stage.
+
+        Centre, not left edge, so the same fraction means the same place
+        whatever the image is wide -- and so it agrees with the bottom-centre
+        anchor a sprite sheet frame already uses. Clamped, because a figure
+        half off the stage is never what a placement meant.
+        """
+
+        left = round(frac * LOGICAL_SIZE[0]) - width // 2
+        return max(0, min(left, LOGICAL_SIZE[0] - width))
+
+    @staticmethod
+    def _frac_y(frac: float, height: int) -> int:
+        """Top edge for an image whose *bottom* sits ``frac`` down the stage.
+
+        The bottom, because a staged figure stands on something and its
+        baseline is the part a placement is about. Clamped for the same reason
+        as :meth:`_frac_x`.
+        """
+
+        top = round(frac * LOGICAL_SIZE[1]) - height
+        return max(0, min(top, LOGICAL_SIZE[1] - height))
 
     @staticmethod
     def _slot_x(slot: str, width: int) -> int:

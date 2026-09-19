@@ -385,3 +385,79 @@ def test_an_unsupported_map_choice_is_dimmed_and_explains_itself(stage) -> None:
     assert choice_action(choice) is None
     assert unsupported_reason(choice) == "needs text input"
     assert "needs text input" in Stage._choice_label(1, choice)
+
+
+# ── fractional staging (placement, not slotting) ─────────────────────────────
+
+
+def test_fractional_media_x_centres_the_image_on_the_fraction(stage: Stage) -> None:
+    """A placed image puts its *centre* on the fraction, whatever it is wide."""
+
+    narrow = Stage._frac_x(0.5, width=20)
+    wide = Stage._frac_x(0.5, width=80)
+
+    assert narrow + 20 // 2 == LOGICAL_SIZE[0] // 2
+    assert wide + 80 // 2 == LOGICAL_SIZE[0] // 2
+
+
+def test_fractional_media_x_is_clamped_into_the_frame(stage: Stage) -> None:
+    """Half a figure off the edge is never what a placement meant."""
+
+    assert Stage._frac_x(0.0, width=60) == 0
+    assert Stage._frac_x(1.0, width=60) == LOGICAL_SIZE[0] - 60
+
+
+def test_fractional_media_y_places_the_baseline_not_the_top(stage: Stage) -> None:
+    """A staged figure stands on something; the fraction is where it stands."""
+
+    top = Stage._frac_y(0.5, height=40)
+
+    assert top + 40 == LOGICAL_SIZE[1] // 2
+
+
+def test_fractional_media_y_is_clamped_into_the_frame(stage: Stage) -> None:
+    assert Stage._frac_y(0.0, height=40) == 0
+    assert Stage._frac_y(1.0, height=40) == LOGICAL_SIZE[1] - 40
+
+
+def test_a_numeric_media_x_reads_as_a_fraction_not_a_slot() -> None:
+    from tangl.pygame_client.bridge import _fraction
+
+    assert _fraction(0.42) == 0.42
+    assert _fraction(0) == 0.0
+    assert _fraction(1) == 1.0
+
+
+def test_a_non_fraction_media_x_falls_through_to_slot_handling() -> None:
+    """Slot names, percentages and out-of-range numbers are not placements.
+
+    Hints are authored data and may be anything. Coercing a stray value into a
+    placement would move a figure somewhere nobody asked for, so only a real
+    number inside the frame counts.
+    """
+
+    from tangl.pygame_client.bridge import _fraction
+
+    assert _fraction("left") is None
+    assert _fraction("0.42") is None       # a string is not a number
+    assert _fraction(42) is None           # out of range: a percentage, not a fraction
+    assert _fraction(-0.1) is None
+    assert _fraction(None) is None
+    assert _fraction(True) is None         # bool is an int subclass; not a placement
+
+
+def test_a_placed_image_ignores_arrival_order(stage: Stage) -> None:
+    """Placement answers a different question than slotting, and wins.
+
+    Two images that would otherwise take the first two default slots both sit
+    where their fractions say instead -- including on top of each other, which
+    is the world's business rather than the client's.
+    """
+
+    from tangl.pygame_client.models import StageImage
+
+    first = StageImage(role="dialog_im", source="a.png", x_frac=0.25)
+    second = StageImage(role="dialog_im", source="b.png", x_frac=0.25)
+
+    assert first.x_slot is None and second.x_slot is None
+    assert Stage._frac_x(first.x_frac, 40) == Stage._frac_x(second.x_frac, 40)
