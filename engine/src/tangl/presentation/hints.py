@@ -76,23 +76,19 @@ client-specific policy outside the vocabulary.
 MediaXName = Literal["left", "mid", "right"]
 MediaYName = Literal["top", "mid", "bottom"]
 
-CARDINAL_X: dict[str, float] = {"left": 0.25, "mid": 0.5, "right": 0.75}
-CARDINAL_Y: dict[str, float] = {"top": 0.25, "mid": 0.5, "bottom": 0.75}
-"""What each cardinal means as a fraction, so a name and a number are the same
-statement and nothing has to reimplement the mapping.
-
-Quarters rather than edges. An edge-anchored cardinal is width-dependent -- the
-same name lands somewhere different for a wide image than a narrow one -- which
-is exactly what stops a name being expressible as a fraction at all. A quarter
-means the same place whatever is measured against it, which is also what lets a
-placement compose when frames nest.
-
-Viewer-relative throughout: 0.0 is the viewer's left, and `right` is 0.75. The
-theatrical frame inverts this and is rejected outright; see _normalize_axis.
-
-Subdivisions, when they arrive, are midpoints between neighbours -- mid_right
-is (0.5 + 0.75) / 2 -- so they need no table of their own.
-"""
+# Names and fractions are the same vocabulary but not the same contract. A
+# cardinal is a *station* -- "on the left" -- and what that comes to in pixels
+# is the client's to decide: one may tuck it against the edge with a gutter,
+# another centre it on a quarter, a text client ignore it entirely. A fraction
+# is a *placement* and is exact everywhere.
+#
+# So no mapping lives here. Publishing one would turn an advisory station into
+# a coordinate every client owes, which is a different and much stronger
+# promise than the one the vocabulary makes -- and it would silently move
+# every figure already staged by name.
+#
+# Subdivisions, if they arrive (left_left, mid_right), stay stations too: finer
+# advice, not finer arithmetic.
 
 STAGING_MIN, STAGING_MAX = -2.0, 3.0
 """How far outside the frame a placement may sit.
@@ -151,16 +147,17 @@ class StagingHints(BaseModel, extra="allow"):
     media_x: MediaXName | float | None = None
     """Where this image sits horizontally: a named station, or a fraction.
 
-    A name is a station — "on the left" — and a client may honour it however
-    its layout prefers. A ``0..1`` fraction is a placement: the image's
-    horizontal *centre*, measured across whatever frame it is staged in.
+    A name is advisory and each client decides what it comes to. A fraction is
+    exact: the image's horizontal *centre*, measured across the frame, and
+    honoured as given -- including outside it, which is how an image enters.
     """
 
     media_y: MediaYName | float | None = None
     """Where this image sits vertically: a named level, or a fraction.
 
-    A ``0..1`` fraction places the image's *bottom*, because a staged figure
-    stands on something and its baseline is what a placement is about.
+    A fraction places the image's *bottom*, because a staged figure stands on
+    something and its baseline is what a placement is about. A name is advisory
+    in the same way as `media_x`.
     """
 
     media_keep: MediaKeepName | None = None

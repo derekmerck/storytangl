@@ -23,7 +23,7 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.persistence import PersistenceManagerFactory
-from tangl.presentation.hints import TimingName
+from tangl.presentation.hints import STAGING_MAX, STAGING_MIN, TimingName
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.media import (
     MediaContentProfile,
@@ -81,17 +81,22 @@ _SOURCE_KEY_BY_FORMAT = {"url": "url", "path": "path"}
 
 
 def _fraction(value: Any) -> float | None:
-    """A staging hint read as a 0..1 fraction, or ``None`` if it is not one.
+    """A staging hint read as a placement fraction, or ``None`` if it is not one.
 
-    Hints are authored data and may be anything. Only a real number inside the
-    frame counts: a slot name, a percentage string, or an out-of-range number
-    is not a fraction, and falls through to slot handling rather than being
+    The accepted span is the hint model's own, not a narrower copy of it. It
+    reaches past the frame because off-stage is a real position -- an image
+    entering from the left passes through negative fractions -- and a range
+    declared in one place and re-guessed in another silently discards exactly
+    those.
+
+    Hints are authored data and may be anything, so a slot name, a quoted
+    number or a bool still falls through to slot handling rather than being
     coerced into a placement nobody asked for.
     """
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return float(value) if 0.0 <= float(value) <= 1.0 else None
+    return float(value) if STAGING_MIN <= float(value) <= STAGING_MAX else None
 
 
 def _payload_source(payload: dict[str, Any]) -> str | None:
@@ -691,9 +696,10 @@ class PygameSessionBridge:
                 source_id=getattr(fragment, "rit_id", None),
                 x_slot=None if _fraction(hints.get("media_x")) is not None
                 else _text(hints.get("media_x")),
+                y_slot=None if _fraction(hints.get("media_y")) is not None
+                else _text(hints.get("media_y")),
                 x_frac=_fraction(hints.get("media_x")),
                 y_frac=_fraction(hints.get("media_y")),
-                rel=_text(hints.get("media_rel")),
                 keep=_text(hints.get("media_keep")),
                 flip_h=bool(hints.get("media_flip_h")),
                 clip=_text(hints.get("media_clip")),

@@ -31,6 +31,10 @@ class StageImage:
     :attr:`x_frac` instead, and leaves this ``None``.
     """
 
+    y_slot: str | None = None
+    """From ``staging_hints.media_y`` when it names a level. ``None`` takes the
+    shared floor. A numeric ``media_y`` sets :attr:`y_frac` instead."""
+
     x_frac: float | None = None
     """From a numeric ``staging_hints.media_x``: where the image's horizontal
     centre goes, as a fraction of the stage's width.

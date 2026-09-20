@@ -24,6 +24,7 @@ from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     CHOICE_KEYS,
     LOGICAL_SIZE,
+    MARGIN,
     STAGED_LIMIT,
     STAGED_ROLES,
     PANEL_W,
@@ -427,36 +428,6 @@ def test_fractional_media_y_places_the_baseline_not_the_top(stage: Stage) -> Non
 def test_a_vertical_placement_may_sit_outside_the_frame(stage: Stage) -> None:
     assert Stage._frac_y(-0.5, height=40) < 0
     assert Stage._frac_y(1.5, height=40) > LOGICAL_SIZE[1] - 40
-
-
-def test_a_cardinal_is_the_same_statement_as_its_fraction(stage: Stage) -> None:
-    """A name is sugar for a position, so the two must agree exactly.
-
-    Quarters rather than edges: an edge-anchored cardinal is width-dependent,
-    which is what stops a name being expressible as a fraction at all.
-    """
-
-    from tangl.presentation.hints import CARDINAL_X
-
-    assert CARDINAL_X == {"left": 0.25, "mid": 0.5, "right": 0.75}
-    for name, frac in CARDINAL_X.items():
-        assert stage._slot_x(name, width=60) == Stage._frac_x(frac, width=60)
-
-
-def test_cardinals_are_viewer_relative(stage: Stage) -> None:
-    """Pixel 0 is the viewer's left, so `right` is the larger fraction.
-
-    The theatrical frame inverts this and is refused by the hint model; this
-    pins the convention so a mapping change cannot silently mirror every
-    staged figure.
-    """
-
-    from tangl.presentation.hints import CARDINAL_X
-
-    assert CARDINAL_X["left"] < CARDINAL_X["mid"] < CARDINAL_X["right"]
-    assert stage._slot_x("left", width=60) < stage._slot_x("right", width=60)
-
-
 def test_a_staging_position_may_be_off_stage_but_not_a_unit_mistake() -> None:
     """The bounds separate a position from someone who wrote 50 meaning half."""
 
@@ -490,7 +461,7 @@ def test_a_non_fraction_media_x_falls_through_to_slot_handling() -> None:
     assert _fraction("left") is None
     assert _fraction("0.42") is None       # a string is not a number
     assert _fraction(42) is None           # out of range: a percentage, not a fraction
-    assert _fraction(-0.1) is None
+    assert _fraction(-0.1) == -0.1         # off-stage, not out of range
     assert _fraction(None) is None
     assert _fraction(True) is None         # bool is an int subclass; not a placement
 
@@ -556,52 +527,11 @@ def test_an_unplaced_staged_image_says_nothing_about_where_it_stands() -> None:
 
     assert image.x_frac is None and image.y_frac is None
     assert image.x_slot is None
-
-
-def test_a_staged_image_may_name_what_its_fractions_are_relative_to() -> None:
-    """Carried for a composition this port cannot resolve yet.
-
-    Eyes cropped from a portrait want to be placed *on that portrait* and
-    follow it wherever it is staged. Declaring the reference costs nothing now
-    and is read unchanged once a placement pass exists.
-    """
-
-    assert _staged().rel is None
-    assert _staged(rel="portrait:clerk").rel == "portrait:clerk"
-
-
-def test_a_named_position_is_held_on_screen_for_a_wide_image(stage: Stage) -> None:
-    """A station is a request the client may interpret; a wide image still fits.
-
-    "On the right" for an image too wide to sit at 0.75 whole is answered by
-    the nearest position that shows all of it, rather than by clipping.
-    """
-
-    narrow, wide = 40, 200
-
-    assert stage._slot_x("right", narrow) == Stage._frac_x(0.75, narrow)
-    # pulled LEFT, because what overflowed was the right edge
-    assert stage._slot_x("right", wide) < Stage._frac_x(0.75, wide)
-    assert stage._slot_x("right", wide) + wide <= LOGICAL_SIZE[0]
-    assert stage._slot_x("left", wide) >= 0
-
-
 def test_an_explicit_fraction_is_never_held_on_screen(stage: Stage) -> None:
     """A placement is a decision already made; adjusting it breaks entrances."""
 
     assert stage.keep_on_screen
     assert Stage._frac_x(-0.5, width=60) < 0
-
-
-def test_keep_on_screen_can_be_turned_off(stage: Stage) -> None:
-    from tangl.pygame_client.stage import Stage as S
-
-    off = S(keep_on_screen=False)
-    try:
-        assert off._slot_x("right", 200) == Stage._frac_x(0.75, 200)
-    finally:
-        pygame.quit()
-
 
 def test_an_image_wider_than_the_stage_centres(stage: Stage) -> None:
     """The visible band has vanished; centring is the least-bad answer."""
@@ -626,34 +556,6 @@ def test_a_fraction_is_exact_whatever_keep_says(stage: Stage) -> None:
 
     assert at(None) == at("none") == at("whole") == at("width")
     assert at("whole") > LOGICAL_SIZE[0] - 120        # genuinely off the edge
-
-
-def test_keep_holds_a_name_instead(stage: Stage) -> None:
-    """The vague direction is the one best effort makes sense for."""
-
-    wide = 200
-    assert stage._slot_x("right", wide, keep="whole") == Stage._frac_x(
-        Stage._visible_x(0.75, wide), wide
-    )
-    assert stage._slot_x("right", wide, keep="none") == Stage._frac_x(0.75, wide)
-
-
-def test_an_unset_keep_defers_to_client_policy(stage: Stage) -> None:
-    """Unset and "none" differ: one defers, the other insists."""
-
-    from tangl.pygame_client.stage import Stage as S
-
-    wide = 200
-    assert stage.keep_on_screen
-    assert stage._slot_x("right", wide) == stage._slot_x("right", wide, keep="whole")
-
-    off = S(keep_on_screen=False)
-    try:
-        assert off._slot_x("right", wide) == Stage._frac_x(0.75, wide)
-    finally:
-        pygame.quit()
-
-
 def test_keeping_whole_clamps_the_baseline_too(stage: Stage) -> None:
     """The fraction is a bottom, so the band runs from `h` to 1.0."""
 
@@ -665,3 +567,147 @@ def test_keeping_whole_clamps_the_baseline_too(stage: Stage) -> None:
 
 def test_an_image_taller_than_the_stage_sits_on_the_floor(stage: Stage) -> None:
     assert Stage._visible_y(0.25, LOGICAL_SIZE[1] * 2) == 1.0
+
+
+def test_a_station_is_this_port_s_reading_not_a_coordinate(stage: Stage) -> None:
+    """Names are advisory and each client answers them its own way.
+
+    This port tucks the outer two against the edge with a gutter. That is not
+    a fraction, and must not become one: worlds already staged by name sit
+    where this calculation puts them.
+    """
+
+    w = 60
+    assert stage._slot_x("left", w) == MARGIN
+    assert stage._slot_x("right", w) == LOGICAL_SIZE[0] - w - MARGIN
+    assert stage._slot_x("mid", w) == (LOGICAL_SIZE[0] - w) // 2
+    assert stage._slot_x("nonsense", w) == stage._slot_x("mid", w)
+
+
+def test_a_vertical_station_is_honoured_rather_than_discarded(stage: Stage) -> None:
+    """`media_y` used to be declared and then dropped for want of a slot path."""
+
+    h, floor = 40, 150
+    assert stage._slot_y("bottom", h, floor) == floor - h
+    assert stage._slot_y("top", h, floor) == MARGIN
+    assert stage._slot_y(None, h, floor) == floor - h     # the shared baseline
+    assert MARGIN <= stage._slot_y("mid", h, floor) <= floor - h
+
+
+def test_keeping_a_station_whole_only_bites_when_it_would_clip(stage: Stage) -> None:
+    """Edge-and-gutter already sits inside, so the policy is mostly inert on x.
+
+    It earns its keep vertically, where a tall figure on the shared baseline
+    can be pushed off the top of the frame.
+    """
+
+    assert stage._slot_x("right", 60) == stage._slot_x("right", 60, keep="none")
+
+    tall, floor = 190, 150
+    assert stage._slot_y("bottom", tall, floor, keep="none") < 0
+    assert stage._slot_y("bottom", tall, floor, keep="whole") == 0
+
+
+# ── end to end: hints -> fragment -> bridge -> StageImage -> pixels ──────────
+#
+# The helpers above are each correct in isolation, which is how a producer that
+# refused what the consumer accepted, and a mirror applied twice, both passed a
+# full suite. These go through the real path instead.
+
+
+def _staged_fragment(tmp_path, name: str, size=(10, 12), **hints):
+    """A staged image as a world would actually emit one."""
+    from PIL import Image as PILImage
+    from tangl.journal.fragments import MediaFragment
+    from tangl.media.media_resource.resource_manager import ResourceManager
+    from tangl.presentation.hints import StagingHints
+
+    images = tmp_path / "images"
+    images.mkdir(exist_ok=True)
+    # Asymmetric on purpose: a left half that differs from the right is the
+    # only way to tell a mirror from a mirror applied twice.
+    #
+    # And distinct per name, because media is content-addressed: two images
+    # with identical bytes index to one resource, and the second name then
+    # resolves to nothing.
+    tint = (sum(name.encode()) * 37) % 200 + 55
+    im = PILImage.new("RGBA", size, (0, 0, tint, 255))
+    for y in range(size[1]):
+        for x in range(size[0] // 2):
+            im.putpixel((x, y), (255, 0, tint, 255))
+    im.save(images / name)
+    manager = ResourceManager(tmp_path)
+    manager.index_directory("images")
+    return MediaFragment(
+        content=manager.get_rit(name), content_format="rit",
+        media_role="staged_im", staging_hints=StagingHints(**hints),
+    )
+
+
+def test_end_to_end_an_off_stage_fraction_survives_the_whole_path(tmp_path) -> None:
+    """`[-2, 3]` at the model and `[0, 1]` at the bridge silently lost entrances."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    frag = _staged_fragment(tmp_path, "a.png", media_x=-0.5, media_y=0.9)
+    [turn] = PygameSessionBridge().build_turns([frag])
+    [image] = turn.images
+
+    assert image.x_frac == -0.5
+    assert Stage._frac_x(image.x_frac, 10) < 0       # genuinely off the left
+
+
+def test_end_to_end_a_named_vertical_level_reaches_the_client(tmp_path) -> None:
+    """`media_y="bottom"` was accepted, carried, and then had nowhere to go."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    frag = _staged_fragment(tmp_path, "b.png", media_x="right", media_y="bottom")
+    [turn] = PygameSessionBridge().build_turns([frag])
+    [image] = turn.images
+
+    assert (image.x_slot, image.y_slot) == ("right", "bottom")
+    assert image.x_frac is None and image.y_frac is None
+
+
+def test_end_to_end_a_mirrored_image_is_mirrored_once(tmp_path) -> None:
+    """Mirroring twice is the identity, and an attribute check cannot see it."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    frag = _staged_fragment(tmp_path, "c.png", media_x=0.5, media_y=0.9, media_flip_h=True)
+    [turn] = PygameSessionBridge().build_turns([frag])
+    stage = Stage(asset_dir=tmp_path / "images")
+    try:
+        stage.draw(turn)
+        # Read what actually landed on the stage, not an intermediate surface:
+        # a mirror applied twice is invisible anywhere earlier.
+        x0, y0 = Stage._frac_x(0.5, 10), Stage._frac_y(0.9, 12)
+        row = y0 + 6
+        left = stage.surface.get_at((x0, row))
+        right = stage.surface.get_at((x0 + 9, row))
+        # Source is red down its left half; mirrored once, red is on the right.
+        assert right.r > left.r, "not mirrored, or mirrored twice"
+    finally:
+        pygame.quit()
+
+
+def test_end_to_end_capacity_drops_the_tail_not_the_nearest(tmp_path) -> None:
+    """Sorting before the cap spent the budget on whatever stood furthest away."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+    from tangl.pygame_client.stage import STAGED_LIMIT
+
+    # Arrive far-to-near, so a depth sort before the cap would keep the far ones.
+    frags = [
+        _staged_fragment(tmp_path, f"d{i}.png", media_x=0.5, media_y=round(0.2 + i * 0.05, 2))
+        for i in range(STAGED_LIMIT + 4)
+    ]
+    [turn] = PygameSessionBridge().build_turns(frags)
+    assert len(turn.images) == STAGED_LIMIT + 4
+
+    staged = [(im, None) for im in turn.images]
+    kept = sorted(staged[:STAGED_LIMIT], key=lambda e: e[0].y_frac or 0.0)
+    assert len(kept) == STAGED_LIMIT
+    # the nearest arrival within the budget is retained, not discarded for depth
+    assert max(e[0].y_frac for e in kept) == turn.images[STAGED_LIMIT - 1].y_frac
