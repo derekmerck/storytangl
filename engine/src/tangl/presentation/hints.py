@@ -147,6 +147,20 @@ class StagingHints(BaseModel, extra="allow"):
     stands on something and its baseline is what a placement is about.
     """
 
+    media_keep_on_screen: bool | None = None
+    """Ask that this image be held wholly inside the frame.
+
+    A placement is normally honoured exactly, because a world that computed a
+    coordinate has already decided -- that is what lets an image leave the
+    frame during a transition. Setting this says the opposite: the position is
+    a preference, and a client may pull it to the nearest one showing the whole
+    image. Useful for a figure whose size is not known when the placement is
+    written, which is most of them.
+
+    ``None`` leaves it to client policy, which for a named station is normally
+    to keep it visible.
+    """
+
     media_flip_h: bool | None = None
     """Mirror the asset horizontally when staged.
 

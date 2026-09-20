@@ -694,6 +694,10 @@ class PygameSessionBridge:
                 x_frac=_fraction(hints.get("media_x")),
                 y_frac=_fraction(hints.get("media_y")),
                 rel=_text(hints.get("media_rel")),
+                keep_on_screen=(
+                    None if hints.get("media_keep_on_screen") is None
+                    else bool(hints.get("media_keep_on_screen"))
+                ),
                 flip_h=bool(hints.get("media_flip_h")),
                 clip=_text(hints.get("media_clip")),
                 timing=_timing(hints.get("media_timing")),

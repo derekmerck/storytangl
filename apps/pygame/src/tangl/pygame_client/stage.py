@@ -828,15 +828,15 @@ class Stage:
             # the room without saying where, and the middle is the honest
             # reading of that.
             box_x = (
-                self._frac_x(image.x_frac, width)
-                if image.x_frac is not None
+                self._place_x(image, width, "mid")
+                if image.x_frac is not None or image.x_slot
                 else (LOGICAL_SIZE[0] - width) // 2
             )
-            box_y = (
-                self._frac_y(image.y_frac, height)
-                if image.y_frac is not None
-                else LOGICAL_SIZE[1] - height
-            )
+            if image.y_frac is None:
+                box_y = LOGICAL_SIZE[1] - height
+            else:
+                y = self._visible_y(image.y_frac, height) if image.keep_on_screen else image.y_frac
+                box_y = self._frac_y(y, height)
             drawn = pygame.transform.flip(surface, True, False) if image.flip_h else surface
             self.surface.blit(drawn, (box_x, box_y))
 
@@ -865,17 +865,17 @@ class Stage:
             # that answered the second should not be re-answered by arrival
             # order. A client that ignores fractions still slots by arrival,
             # which is what honouring a subset of the hints means.
-            if image.x_frac is not None:
-                placement = f"x={image.x_frac:.4f}"
-                box_x = self._frac_x(image.x_frac, width)
-            else:
-                placement = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
-                box_x = self._slot_x(placement, width)
-            box_y = (
-                self._frac_y(image.y_frac, height)
-                if image.y_frac is not None
-                else floor - height
+            fallback = _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
+            placement = (
+                f"x={image.x_frac:.4f}" if image.x_frac is not None
+                else (image.x_slot or fallback)
             )
+            box_x = self._place_x(image, width, fallback)
+            if image.y_frac is None:
+                box_y = floor - height
+            else:
+                y = self._visible_y(image.y_frac, height) if image.keep_on_screen else image.y_frac
+                box_y = self._frac_y(y, height)
 
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
@@ -1008,6 +1008,29 @@ class Stage:
         if lo > hi:
             return 0.5
         return min(max(frac, lo), hi)
+
+    @staticmethod
+    def _visible_y(frac: float, height: int) -> float:
+        """``frac`` pulled to the nearest baseline showing the whole image.
+
+        The fraction is a *bottom*, so the whole image shows when the baseline
+        sits between ``h`` (top flush with the frame) and ``1.0`` (bottom
+        flush). Taller than the stage and the band vanishes, where sitting on
+        the floor is the least-bad answer.
+        """
+
+        h = height / LOGICAL_SIZE[1]
+        return 1.0 if h > 1.0 else min(max(frac, h), 1.0)
+
+    def _place_x(self, image: "StageImage", width: int, fallback: str) -> int:
+        """Where this image goes horizontally, policy included."""
+
+        if image.x_frac is None:
+            return self._slot_x(image.x_slot or fallback, width)
+        frac = image.x_frac
+        if image.keep_on_screen:
+            frac = self._visible_x(frac, width)
+        return Stage._frac_x(frac, width)
 
     def _slot_x(self, slot: str, width: int) -> int:
         """Left edge for a horizontal staging slot. Unknown slots centre.

@@ -607,3 +607,33 @@ def test_an_image_wider_than_the_stage_centres(stage: Stage) -> None:
     """The visible band has vanished; centring is the least-bad answer."""
 
     assert Stage._visible_x(0.75, width=LOGICAL_SIZE[0] * 2) == 0.5
+
+
+def test_an_image_may_ask_to_be_kept_whole(stage: Stage) -> None:
+    """A placement is exact unless the image says it is a preference.
+
+    Size is often unknown when a placement is written, so "put me here, but
+    keep me visible" is the common case; "put me exactly here" is what a
+    transition needs.
+    """
+
+    from tangl.pygame_client.models import StageImage
+
+    exact = StageImage(role="staged_im", source="a.png", x_frac=0.98)
+    kept = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep_on_screen=True)
+
+    assert stage._place_x(exact, 120, "mid") > LOGICAL_SIZE[0] - 120
+    assert stage._place_x(kept, 120, "mid") == LOGICAL_SIZE[0] - 120
+
+
+def test_keeping_whole_clamps_the_baseline_too(stage: Stage) -> None:
+    """The fraction is a bottom, so the band runs from `h` to 1.0."""
+
+    tall = 150
+    assert Stage._visible_y(0.25, tall) == tall / LOGICAL_SIZE[1]
+    assert Stage._visible_y(0.9, tall) == 0.9
+    assert Stage._visible_y(1.4, tall) == 1.0
+
+
+def test_an_image_taller_than_the_stage_sits_on_the_floor(stage: Stage) -> None:
+    assert Stage._visible_y(0.25, LOGICAL_SIZE[1] * 2) == 1.0
