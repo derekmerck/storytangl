@@ -619,11 +619,27 @@ def test_an_image_may_ask_to_be_kept_whole(stage: Stage) -> None:
 
     from tangl.pygame_client.models import StageImage
 
-    exact = StageImage(role="staged_im", source="a.png", x_frac=0.98)
-    kept = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep_on_screen=True)
+    unset = StageImage(role="staged_im", source="a.png", x_frac=0.98)
+    refused = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="none")
+    kept = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="whole")
 
-    assert stage._place_x(exact, 120, "mid") > LOGICAL_SIZE[0] - 120
+    # unset defers to policy, which leaves a placement exact
+    assert stage._place_x(unset, 120, "mid") > LOGICAL_SIZE[0] - 120
+    # "none" says the same thing on purpose, without relying on the default
+    assert stage._place_x(refused, 120, "mid") == stage._place_x(unset, 120, "mid")
     assert stage._place_x(kept, 120, "mid") == LOGICAL_SIZE[0] - 120
+
+
+def test_the_axes_of_keep_are_separable(stage: Stage) -> None:
+    """A panorama may bleed off the sides; a tall figure off the top."""
+
+    from tangl.pygame_client.models import StageImage
+
+    w_only = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="width")
+    h_only = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="height")
+
+    assert stage._place_x(w_only, 120, "mid") == LOGICAL_SIZE[0] - 120
+    assert stage._place_x(h_only, 120, "mid") > LOGICAL_SIZE[0] - 120
 
 
 def test_keeping_whole_clamps_the_baseline_too(stage: Stage) -> None:

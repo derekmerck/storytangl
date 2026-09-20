@@ -57,6 +57,22 @@ TimingName = Literal["start", "stop", "pause", "restart", "loop"]
 # no fixed fraction at all. A 60px image at `left` centres on 0.125; a 100px
 # one on 0.1875. Unifying those would move existing staged sprites, so it is
 # left alone here and noted rather than quietly changed.
+MediaKeepName = Literal["whole", "width", "height", "none"]
+"""Which extent of an image a client should hold inside the frame.
+
+The axes are separable: a panorama may bleed off the sides while its height
+matters, a standing figure the reverse. ``"none"`` is a member rather than an
+absence because the two say different things -- an unset hint defers to
+whatever the client does, while ``"none"`` insists the placement is exact. An
+image meant to leave the frame has to be able to say so without knowing what
+the client would otherwise have done.
+
+Closed and typed, like every other staging hint. An open tag set is for
+vocabularies a world invents, such as plate regions; this one has four members
+known in advance. `extra="allow"` remains the escape hatch for a
+client-specific policy outside the vocabulary.
+"""
+
 MediaXName = Literal["left", "mid", "right"]
 MediaYName = Literal["top", "mid", "bottom"]
 
@@ -147,18 +163,22 @@ class StagingHints(BaseModel, extra="allow"):
     stands on something and its baseline is what a placement is about.
     """
 
-    media_keep_on_screen: bool | None = None
-    """Ask that this image be held wholly inside the frame.
+    media_keep: MediaKeepName | None = None
+    """Ask that this image be held inside the frame, on the axes named.
 
     A placement is normally honoured exactly, because a world that computed a
     coordinate has already decided -- that is what lets an image leave the
-    frame during a transition. Setting this says the opposite: the position is
-    a preference, and a client may pull it to the nearest one showing the whole
-    image. Useful for a figure whose size is not known when the placement is
-    written, which is most of them.
+    frame during a transition. Naming an extent says the opposite: the position
+    is a preference on those axes, and a client may pull it to the nearest one
+    showing them. Useful for a figure whose size is not known when the
+    placement is written, which is most of them.
 
-    ``None`` leaves it to client policy, which for a named station is normally
-    to keep it visible.
+    ``"width"`` and ``"height"`` are separable on purpose. A wide backdrop may
+    want its width held while it bleeds off the top; a tall figure the reverse.
+
+    ``None`` -- the hint unset -- leaves it to client policy, which for a named
+    station is normally to keep it visible. ``"none"`` is the opposite and says
+    the placement is exact, which is what an image leaving the frame needs.
     """
 
     media_flip_h: bool | None = None

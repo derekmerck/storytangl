@@ -835,7 +835,11 @@ class Stage:
             if image.y_frac is None:
                 box_y = LOGICAL_SIZE[1] - height
             else:
-                y = self._visible_y(image.y_frac, height) if image.keep_on_screen else image.y_frac
+                y = (
+                    self._visible_y(image.y_frac, height)
+                    if image.keep in ("whole", "height")
+                    else image.y_frac
+                )
                 box_y = self._frac_y(y, height)
             drawn = pygame.transform.flip(surface, True, False) if image.flip_h else surface
             self.surface.blit(drawn, (box_x, box_y))
@@ -874,7 +878,11 @@ class Stage:
             if image.y_frac is None:
                 box_y = floor - height
             else:
-                y = self._visible_y(image.y_frac, height) if image.keep_on_screen else image.y_frac
+                y = (
+                    self._visible_y(image.y_frac, height)
+                    if image.keep in ("whole", "height")
+                    else image.y_frac
+                )
                 box_y = self._frac_y(y, height)
 
             # One timer per staged occurrence: the same sprite used twice gets two,
@@ -1028,7 +1036,7 @@ class Stage:
         if image.x_frac is None:
             return self._slot_x(image.x_slot or fallback, width)
         frac = image.x_frac
-        if image.keep_on_screen:
+        if image.keep in ("whole", "width"):
             frac = self._visible_x(frac, width)
         return Stage._frac_x(frac, width)
 

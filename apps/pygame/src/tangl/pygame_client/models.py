@@ -69,12 +69,12 @@ class StageImage:
     here forecloses parents nesting further.
     """
 
-    keep_on_screen: bool | None = None
-    """From ``staging_hints.media_keep_on_screen``: hold this image whole.
+    keep: str | None = None
+    """From ``staging_hints.media_keep``: ``whole``, ``width`` or ``height``.
 
-    ``None`` defers to client policy. ``True`` asks that even an explicit
-    fraction be pulled into the visible band; ``False`` insists the placement
-    is exact, which is what an image leaving the frame needs.
+    Which extents of an explicit placement are preferences rather than
+    decisions. ``None`` defers to client policy and leaves a placement exact,
+    which is what an image leaving the frame needs.
     """
 
     flip_h: bool = False
