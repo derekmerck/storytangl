@@ -609,37 +609,49 @@ def test_an_image_wider_than_the_stage_centres(stage: Stage) -> None:
     assert Stage._visible_x(0.75, width=LOGICAL_SIZE[0] * 2) == 0.5
 
 
-def test_an_image_may_ask_to_be_kept_whole(stage: Stage) -> None:
-    """A placement is exact unless the image says it is a preference.
+def test_a_fraction_is_exact_whatever_keep_says(stage: Stage) -> None:
+    """Clamping preserves a name's meaning and destroys a number's.
 
-    Size is often unknown when a placement is written, so "put me here, but
-    keep me visible" is the common case; "put me exactly here" is what a
-    transition needs.
+    "Right" pulled into the visible band is still over that way. 0.75 pulled
+    in, for an image wider than half the stage, ends up near the middle --
+    a different position wearing the same hint. A world that cannot honour a
+    coordinate should say a name instead; that is what names are for.
     """
 
     from tangl.pygame_client.models import StageImage
 
-    unset = StageImage(role="staged_im", source="a.png", x_frac=0.98)
-    refused = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="none")
-    kept = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="whole")
+    at = lambda keep: stage._place_x(
+        StageImage(role="staged_im", source="a.png", x_frac=0.98, keep=keep), 120, "mid"
+    )
 
-    # unset defers to policy, which leaves a placement exact
-    assert stage._place_x(unset, 120, "mid") > LOGICAL_SIZE[0] - 120
-    # "none" says the same thing on purpose, without relying on the default
-    assert stage._place_x(refused, 120, "mid") == stage._place_x(unset, 120, "mid")
-    assert stage._place_x(kept, 120, "mid") == LOGICAL_SIZE[0] - 120
+    assert at(None) == at("none") == at("whole") == at("width")
+    assert at("whole") > LOGICAL_SIZE[0] - 120        # genuinely off the edge
 
 
-def test_the_axes_of_keep_are_separable(stage: Stage) -> None:
-    """A panorama may bleed off the sides; a tall figure off the top."""
+def test_keep_holds_a_name_instead(stage: Stage) -> None:
+    """The vague direction is the one best effort makes sense for."""
 
-    from tangl.pygame_client.models import StageImage
+    wide = 200
+    assert stage._slot_x("right", wide, keep="whole") == Stage._frac_x(
+        Stage._visible_x(0.75, wide), wide
+    )
+    assert stage._slot_x("right", wide, keep="none") == Stage._frac_x(0.75, wide)
 
-    w_only = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="width")
-    h_only = StageImage(role="staged_im", source="a.png", x_frac=0.98, keep="height")
 
-    assert stage._place_x(w_only, 120, "mid") == LOGICAL_SIZE[0] - 120
-    assert stage._place_x(h_only, 120, "mid") > LOGICAL_SIZE[0] - 120
+def test_an_unset_keep_defers_to_client_policy(stage: Stage) -> None:
+    """Unset and "none" differ: one defers, the other insists."""
+
+    from tangl.pygame_client.stage import Stage as S
+
+    wide = 200
+    assert stage.keep_on_screen
+    assert stage._slot_x("right", wide) == stage._slot_x("right", wide, keep="whole")
+
+    off = S(keep_on_screen=False)
+    try:
+        assert off._slot_x("right", wide) == Stage._frac_x(0.75, wide)
+    finally:
+        pygame.quit()
 
 
 def test_keeping_whole_clamps_the_baseline_too(stage: Stage) -> None:

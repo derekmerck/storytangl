@@ -832,15 +832,10 @@ class Stage:
                 if image.x_frac is not None or image.x_slot
                 else (LOGICAL_SIZE[0] - width) // 2
             )
-            if image.y_frac is None:
-                box_y = LOGICAL_SIZE[1] - height
-            else:
-                y = (
-                    self._visible_y(image.y_frac, height)
-                    if image.keep in ("whole", "height")
-                    else image.y_frac
-                )
-                box_y = self._frac_y(y, height)
+            box_y = (
+                LOGICAL_SIZE[1] - height if image.y_frac is None
+                else self._frac_y(image.y_frac, height)
+            )
             drawn = pygame.transform.flip(surface, True, False) if image.flip_h else surface
             self.surface.blit(drawn, (box_x, box_y))
 
@@ -875,15 +870,7 @@ class Stage:
                 else (image.x_slot or fallback)
             )
             box_x = self._place_x(image, width, fallback)
-            if image.y_frac is None:
-                box_y = floor - height
-            else:
-                y = (
-                    self._visible_y(image.y_frac, height)
-                    if image.keep in ("whole", "height")
-                    else image.y_frac
-                )
-                box_y = self._frac_y(y, height)
+            box_y = floor - height if image.y_frac is None else self._frac_y(image.y_frac, height)
 
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
@@ -1031,16 +1018,24 @@ class Stage:
         return 1.0 if h > 1.0 else min(max(frac, h), 1.0)
 
     def _place_x(self, image: "StageImage", width: int, fallback: str) -> int:
-        """Where this image goes horizontally, policy included."""
+        """Where this image goes horizontally.
 
-        if image.x_frac is None:
-            return self._slot_x(image.x_slot or fallback, width)
-        frac = image.x_frac
-        if image.keep in ("whole", "width"):
-            frac = self._visible_x(frac, width)
-        return Stage._frac_x(frac, width)
+        A fraction is honoured exactly and is never held on screen. Clamping
+        preserves what a *name* means -- "right" is still over that way once
+        pulled in -- but destroys what a *number* means: an image wider than
+        half the stage, pulled into the visible band from 0.75, ends up near
+        the middle, which is a different position wearing the same hint.
 
-    def _slot_x(self, slot: str, width: int) -> int:
+        A world that does not know the image's size should say a name. That is
+        what names are for, and asking for best effort on a coordinate you
+        could not honour is the error rather than the clamp's absence.
+        """
+
+        if image.x_frac is not None:
+            return Stage._frac_x(image.x_frac, width)
+        return self._slot_x(image.x_slot or fallback, width, keep=image.keep)
+
+    def _slot_x(self, slot: str, width: int, keep: str | None = None) -> int:
         """Left edge for a horizontal staging slot. Unknown slots centre.
 
         A cardinal is sugar for a fraction, and the mapping lives in the engine
@@ -1059,7 +1054,9 @@ class Stage:
         frac = CARDINAL_X.get(slot)
         if frac is None:
             return (LOGICAL_SIZE[0] - width) // 2
-        if self.keep_on_screen:
+        # The image decides when it says so; otherwise client policy does.
+        hold = self.keep_on_screen if keep is None else keep in ("whole", "width")
+        if hold:
             frac = self._visible_x(frac, width)
         return Stage._frac_x(frac, width)
 

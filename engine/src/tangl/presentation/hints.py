@@ -164,14 +164,18 @@ class StagingHints(BaseModel, extra="allow"):
     """
 
     media_keep: MediaKeepName | None = None
-    """Ask that this image be held inside the frame, on the axes named.
+    """Ask that a *named* position be held inside the frame, on the axes named.
 
-    A placement is normally honoured exactly, because a world that computed a
-    coordinate has already decided -- that is what lets an image leave the
-    frame during a transition. Naming an extent says the opposite: the position
-    is a preference on those axes, and a client may pull it to the nearest one
-    showing them. Useful for a figure whose size is not known when the
-    placement is written, which is most of them.
+    Applies to `media_x`/`media_y` given as names, never as fractions. Holding
+    an image on screen preserves what a name means -- "right" pulled in is
+    still over that way -- and destroys what a number means: 0.75, for an image
+    wider than half the frame, lands near the middle, which is a different
+    position wearing the same hint.
+
+    So a fraction is always exact. A world that does not know the image's size
+    should say a name; that is what names are for, and asking for best effort
+    on a coordinate it could not honour is the error rather than the clamp's
+    absence.
 
     ``"width"`` and ``"height"`` are separable on purpose. A wide backdrop may
     want its width held while it bleeds off the top; a tall figure the reverse.
