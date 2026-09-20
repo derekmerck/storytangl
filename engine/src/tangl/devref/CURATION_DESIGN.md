@@ -1,10 +1,12 @@
 # Curation Design
 
-**Status:** DESIGN, nothing landed; revised against review 2026-09-20  
+**Status:** DESIGN, nothing landed; revised against review 2026-09-20
+
 **Scope:** a standing gardener over the repository's own record — developer
 docs, the issue board, and authored world content — driven by deterministic
 checks plus a local reader model, producing prioritized nominations that a
-higher-tier agent triages  
+higher-tier agent triages
+
 **Background sources:** `docs/src/design/CANON_AND_REALIZATION.md` (registers,
 mismatch classes, review rhythm — this note defers to it), `tangl.devref`
 (index, topics, issues), `#282` (governing context on PRs; "no second issue/PR
@@ -453,13 +455,22 @@ the verdict that prompted it.
 ### Identity includes the evaluator
 
 ```
-(check_contract_version, unit_key, anchor_hash, counterpart_hash)
+(evaluator_fingerprint, unit_key, anchor_hash, counterpart_hash)
+
+evaluator_fingerprint = digest(check_contract_version, model,
+                               prompt_digest, harness_version)
 ```
 
-with `model`, `prompt_digest`, `harness_version`, and `input_revision` recorded
-alongside. A rejection suppresses a finding only while the *question* is
-unchanged; swapping the model or editing the prompt yields a materially
-different check, and old rejections must not silently suppress it.
+**The fingerprint is in the key, not beside it.** Recording the evaluator next
+to an identity that ignores it would not do the job — dedup would still match,
+and an old rejection would go on suppressing a materially different check. A
+rejection suppresses a finding only while the *question* is unchanged, so
+swapping the model or editing the prompt yields a new identity and the unit is
+re-read.
+
+`input_revision` is recorded but deliberately stays **out** of the key: content
+change is already carried by the anchor and counterpart hashes, and a new pinned
+revision should not by itself invalidate a human decision.
 
 ### Storage: durable, and outside the index
 
@@ -472,10 +483,25 @@ MCP surface can serve them.
 
 This also answers a constraint `CANON_AND_REALIZATION.md` sets on any review
 process — *"dossiers are disposable ... do not accumulate a second encyclopedia
-that itself needs maintenance."* The reconciliation is that **findings are
-regenerable and adjudications are not**. What persists is small: what a person
-decided, what has been swept, and with which evaluator. Findings themselves can
-be thrown away and recomputed from a pinned revision.
+that itself needs maintenance."*
+
+The reconciliation is narrower than "findings are disposable". **An adjudication
+must retain the immutable thing that was adjudicated**, or the decision becomes
+unauditable. Persisted with every human decision:
+
+- the finding identity, including its evaluator fingerprint
+- the verified receipt, as resolved at the time
+- the cited span, or a hash of the evidence it quoted
+- the decision, and who made it
+
+That record is small and immutable. What *is* regenerable is everything built on
+top of it — the rendered digest, the ranked queue, the topic dossier, and any
+finding no human has yet ruled on.
+
+The distinction matters most because the inputs are not stable. GitHub metadata
+is mutable and model output is nondeterministic, so a nomination someone
+rejected generally **cannot** be reconstructed by re-running the sweep later.
+The adjudicated record is the only durable evidence of what was decided.
 
 ### Coverage is part of the record
 
@@ -529,12 +555,15 @@ Deterministic checks are free and run at whatever scale fires. The reader pass
 works a ranked queue against a fixed call budget, so a topic sweep completes in
 bounded time rather than the whole corpus contending at once. A coarse pass is
 *triggered*, never scheduled — "running one against a canon that has not moved
-is relaxing against a reference that is not changing.
+is relaxing against a reference that is not changing."
 
 The one ranking heuristic that survived measurement: **exclude hubs.** In-degree
 is median 1, p90 3, max 43–63. High-in-degree units are generic funnels — "you
 are hit, turn to X" — where continuity judgment is meaningless. Excluding the
-top few percent removes a large slice of edges at zero risk.
+top few percent removes a large slice of edges. **That the saving is free is
+assumed, not measured** — the injected-error validation below must rewire some
+transitions *into and out of excluded hubs specifically*, or the exclusion is an
+unproven budget heuristic rather than a safe one.
 
 ## Measured Evidence (2026-09-17)
 
