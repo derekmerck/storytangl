@@ -102,7 +102,7 @@ does not introduce a schema migration.
 ```text
 tangl.media
 ├── Types          → media_data_type.py    (MediaDataType enum: IMAGE, VECTOR, AUDIO, etc.)
-│                  → media_role.py         (MediaRole enum: narrative_im, dialog_im, etc.)
+│                  → media_role.py         (MediaRole enum: narrative_im, dialog_im, staged_im, etc.)
 │                  → type_hints.py         (Media type aliases)
 ├── Resource       → media_resource/
 │                  → media_resource/media_resource_inv_tag.py  (MediaRIT: content-addressed entity)

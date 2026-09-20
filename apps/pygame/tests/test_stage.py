@@ -24,6 +24,9 @@ from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     CHOICE_KEYS,
     LOGICAL_SIZE,
+    MARGIN,
+    STAGED_LIMIT,
+    STAGED_ROLES,
     PANEL_W,
     SCALE,
     Stage,
@@ -385,3 +388,416 @@ def test_an_unsupported_map_choice_is_dimmed_and_explains_itself(stage) -> None:
     assert choice_action(choice) is None
     assert unsupported_reason(choice) == "needs text input"
     assert "needs text input" in Stage._choice_label(1, choice)
+
+
+# ── fractional staging (placement, not slotting) ─────────────────────────────
+
+
+def test_fractional_media_x_centres_the_image_on_the_fraction(stage: Stage) -> None:
+    """A placed image puts its *centre* on the fraction, whatever it is wide."""
+
+    narrow = Stage._frac_x(0.5, width=20)
+    wide = Stage._frac_x(0.5, width=80)
+
+    assert narrow + 20 // 2 == LOGICAL_SIZE[0] // 2
+    assert wide + 80 // 2 == LOGICAL_SIZE[0] // 2
+
+
+def test_a_placement_may_sit_outside_the_frame(stage: Stage) -> None:
+    """Off-stage is a position, not a mistake.
+
+    An image sliding from -0.5 to 0.2 is an entrance from the left, and every
+    frame of it before arrival is partly outside. Clamping would turn that
+    into a figure stuck against the edge.
+    """
+
+    assert Stage._frac_x(-0.5, width=60) < 0
+    assert Stage._frac_x(1.5, width=60) > LOGICAL_SIZE[0] - 60
+    # and the ordinary case still lands where it says
+    assert Stage._frac_x(0.5, width=60) + 30 == LOGICAL_SIZE[0] // 2
+
+
+def test_fractional_media_y_places_the_baseline_not_the_top(stage: Stage) -> None:
+    """A staged figure stands on something; the fraction is where it stands."""
+
+    top = Stage._frac_y(0.5, height=40)
+
+    assert top + 40 == LOGICAL_SIZE[1] // 2
+
+
+def test_a_vertical_placement_may_sit_outside_the_frame(stage: Stage) -> None:
+    assert Stage._frac_y(-0.5, height=40) < 0
+    assert Stage._frac_y(1.5, height=40) > LOGICAL_SIZE[1] - 40
+def test_a_staging_position_may_be_off_stage_but_not_a_unit_mistake() -> None:
+    """The bounds separate a position from someone who wrote 50 meaning half."""
+
+    from tangl.presentation.hints import STAGING_MAX, STAGING_MIN, StagingHints
+
+    assert StagingHints(media_x=-0.5).media_x == -0.5     # entering from the left
+    assert StagingHints(media_x=1.4).media_x == 1.4       # gone off the right
+    for unit_mistake in (50, -50, STAGING_MAX + 1, STAGING_MIN - 1):
+        with pytest.raises(Exception):
+            StagingHints(media_x=unit_mistake)
+
+
+def test_a_numeric_media_x_reads_as_a_fraction_not_a_slot() -> None:
+    from tangl.pygame_client.bridge import _fraction
+
+    assert _fraction(0.42) == 0.42
+    assert _fraction(0) == 0.0
+    assert _fraction(1) == 1.0
+
+
+def test_a_non_fraction_media_x_falls_through_to_slot_handling() -> None:
+    """Slot names, percentages and out-of-range numbers are not placements.
+
+    Hints are authored data and may be anything. Coercing a stray value into a
+    placement would move a figure somewhere nobody asked for, so only a real
+    number inside the frame counts.
+    """
+
+    from tangl.pygame_client.bridge import _fraction
+
+    assert _fraction("left") is None
+    assert _fraction("0.42") is None       # a string is not a number
+    assert _fraction(42) is None           # out of range: a percentage, not a fraction
+    assert _fraction(-0.1) == -0.1         # off-stage, not out of range
+    assert _fraction(None) is None
+    assert _fraction(True) is None         # bool is an int subclass; not a placement
+
+
+def test_a_placed_image_ignores_arrival_order(stage: Stage) -> None:
+    """Placement answers a different question than slotting, and wins.
+
+    Two images that would otherwise take the first two default slots both sit
+    where their fractions say instead -- including on top of each other, which
+    is the world's business rather than the client's.
+    """
+
+    from tangl.pygame_client.models import StageImage
+
+    first = StageImage(role="dialog_im", source="a.png", x_frac=0.25)
+    second = StageImage(role="dialog_im", source="b.png", x_frac=0.25)
+
+    assert first.x_slot is None and second.x_slot is None
+    assert Stage._frac_x(first.x_frac, 40) == Stage._frac_x(second.x_frac, 40)
+
+
+# ── staged images (scenery inhabitants) ──────────────────────────────────────
+
+
+def _staged(**kw):
+    from tangl.pygame_client.models import StageImage
+
+    return StageImage(role="staged_im", source=kw.pop("source", "s.png"), **kw)
+
+
+def test_staged_images_are_a_separate_role_from_portraits() -> None:
+    """A room's inhabitants must not compete for the dialog's three stations."""
+
+    from tangl.pygame_client.stage import PORTRAIT_ROLES
+
+    assert "staged_im" in STAGED_ROLES
+    assert not set(STAGED_ROLES) & set(PORTRAIT_ROLES)
+
+
+def test_staged_capacity_is_bounded_but_well_above_a_real_room() -> None:
+    """A bound, not a design limit: it exists so a generated cast degrades."""
+
+    assert STAGED_LIMIT >= 10
+
+
+def test_staged_images_draw_nearest_last(stage: Stage) -> None:
+    """Lower in the frame is nearer, so it draws later.
+
+    The same painter's rule a surface uses for its slots, so depth comes off
+    the placement rather than needing to be stated twice.
+    """
+
+    far, near = _staged(source="far.png", y_frac=0.2), _staged(source="near.png", y_frac=0.9)
+    ordered = sorted([far, near], key=lambda i: i.y_frac or 0.0)
+
+    assert [i.source for i in ordered] == ["far.png", "near.png"]
+
+
+def test_an_unplaced_staged_image_says_nothing_about_where_it_stands() -> None:
+    """It asked to be in the room without saying where; it does not get a slot."""
+
+    image = _staged()
+
+    assert image.x_frac is None and image.y_frac is None
+    assert image.x_slot is None
+def test_an_explicit_fraction_is_never_held_on_screen(stage: Stage) -> None:
+    """A placement is a decision already made; adjusting it breaks entrances."""
+
+    assert stage.keep_on_screen
+    assert Stage._frac_x(-0.5, width=60) < 0
+
+
+def test_a_fraction_is_exact_whatever_keep_says(stage: Stage) -> None:
+    """Clamping preserves a name's meaning and destroys a number's.
+
+    "Right" pulled into the visible band is still over that way. 0.75 pulled
+    in, for an image wider than half the stage, ends up near the middle --
+    a different position wearing the same hint. A world that cannot honour a
+    coordinate should say a name instead; that is what names are for.
+    """
+
+    from tangl.pygame_client.models import StageImage
+
+    at = lambda keep: stage._place_x(
+        StageImage(role="staged_im", source="a.png", x_frac=0.98, keep=keep), 120, "mid"
+    )
+
+    assert at(None) == at("none") == at("whole") == at("width")
+    assert at("whole") > LOGICAL_SIZE[0] - 120        # genuinely off the edge
+
+
+def test_a_station_is_this_port_s_reading_not_a_coordinate(stage: Stage) -> None:
+    """Names are advisory and each client answers them its own way.
+
+    This port tucks the outer two against the edge with a gutter. That is not
+    a fraction, and must not become one: worlds already staged by name sit
+    where this calculation puts them.
+    """
+
+    w = 60
+    assert stage._slot_x("left", w) == MARGIN
+    assert stage._slot_x("right", w) == LOGICAL_SIZE[0] - w - MARGIN
+    assert stage._slot_x("mid", w) == (LOGICAL_SIZE[0] - w) // 2
+    assert stage._slot_x("nonsense", w) == stage._slot_x("mid", w)
+
+
+def test_a_vertical_station_is_honoured_rather_than_discarded(stage: Stage) -> None:
+    """`media_y` used to be declared and then dropped for want of a slot path."""
+
+    h, floor = 40, 150
+    assert stage._slot_y("bottom", h, floor) == floor - h
+    assert stage._slot_y("top", h, floor) == MARGIN
+    assert stage._slot_y(None, h, floor) == floor - h     # the shared baseline
+    assert MARGIN <= stage._slot_y("mid", h, floor) <= floor - h
+
+
+def test_keeping_a_station_whole_only_bites_when_it_would_clip(stage: Stage) -> None:
+    """Edge-and-gutter already sits inside, so the policy is mostly inert on x.
+
+    It earns its keep vertically, where a tall figure on the shared baseline
+    can be pushed off the top of the frame.
+    """
+
+    assert stage._slot_x("right", 60) == stage._slot_x("right", 60, keep="none")
+
+    tall, floor = 190, 150
+    assert stage._slot_y("bottom", tall, floor, keep="none") < 0
+    assert stage._slot_y("bottom", tall, floor, keep="whole") == 0
+
+
+# ── end to end: hints -> fragment -> bridge -> StageImage -> pixels ──────────
+#
+# The helpers above are each correct in isolation, which is how a producer that
+# refused what the consumer accepted, and a mirror applied twice, both passed a
+# full suite. These go through the real path instead.
+
+
+def _staged_fragment(tmp_path, name: str, size=(10, 12), **hints):
+    """A staged image as a world would actually emit one."""
+    from PIL import Image as PILImage
+    from tangl.journal.fragments import MediaFragment
+    from tangl.media.media_resource.resource_manager import ResourceManager
+    from tangl.presentation.hints import StagingHints
+
+    images = tmp_path / "images"
+    images.mkdir(exist_ok=True)
+    # Asymmetric on purpose: a left half that differs from the right is the
+    # only way to tell a mirror from a mirror applied twice.
+    #
+    # And distinct per name, because media is content-addressed: two images
+    # with identical bytes index to one resource, and the second name then
+    # resolves to nothing.
+    tint = (sum(name.encode()) * 37) % 200 + 55
+    im = PILImage.new("RGBA", size, (0, 0, tint, 255))
+    for y in range(size[1]):
+        for x in range(size[0] // 2):
+            im.putpixel((x, y), (255, 0, tint, 255))
+    im.save(images / name)
+    manager = ResourceManager(tmp_path)
+    manager.index_directory("images")
+    return MediaFragment(
+        content=manager.get_rit(name), content_format="rit",
+        media_role="staged_im", staging_hints=StagingHints(**hints),
+    )
+
+
+def _tint(name: str) -> int:
+    """The blue channel `_staged_fragment` gives this name."""
+
+    return (sum(name.encode()) * 37) % 200 + 55
+
+
+def _found(stage: "Stage", name: str) -> tuple[int, int, int, int] | None:
+    """Bounding box of `name`'s pixels on the drawn stage, or None if absent.
+
+    Keys on green being zero, which every test image has and no palette colour
+    does, so scenery can never be mistaken for a figure. Reads the stage's own
+    surface rather than any intermediate, because that is the only place a
+    draw-order or clamping mistake actually shows.
+    """
+
+    want = _tint(name)
+    w, h = stage.surface.get_size()
+    xs, ys = [], []
+    for y in range(h):
+        for x in range(w):
+            r, g, b, _ = stage.surface.get_at((x, y))
+            if g == 0 and b == want:
+                xs.append(x)
+                ys.append(y)
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _drawn(turn, tmp_path) -> "Stage":
+    """A stage with `turn` actually rendered onto it."""
+
+    stage = Stage(asset_dir=tmp_path / "images")
+    stage.draw(turn)
+    return stage
+
+
+def test_end_to_end_an_off_stage_fraction_is_drawn_off_stage(tmp_path) -> None:
+    """`[-2, 3]` at the model and `[0, 1]` at the bridge silently lost entrances."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    # Centre a third of the way off the left edge, so part of it still lands.
+    frag = _staged_fragment(tmp_path, "a.png", size=(40, 40), media_x=-0.03125, media_y=0.9)
+    [turn] = PygameSessionBridge().build_turns([frag])
+    assert turn.images[0].x_frac == -0.03125
+
+    try:
+        box = _found(_drawn(turn, tmp_path), "a.png")
+        assert box is not None, "the image did not reach the stage at all"
+        left, _, right, _ = box
+        # Clipped by the frame, not pulled back into it: it starts hard against
+        # column zero and only a sliver of its 40px width survives.
+        assert left == 0
+        assert right - left + 1 < 40, "the whole image is showing, so it was clamped"
+        assert right == Stage._frac_x(-0.03125, 40) + 39
+    finally:
+        pygame.quit()
+
+
+def test_end_to_end_a_named_vertical_level_reaches_the_pixels(tmp_path) -> None:
+    """`media_y="bottom"` was accepted, carried, and then had nowhere to go."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    def baseline_of(name: str, level: str) -> int:
+        frag = _staged_fragment(tmp_path, name, size=(20, 30),
+                                media_x="mid", media_y=level)
+        [turn] = PygameSessionBridge().build_turns([frag])
+        assert turn.images[0].y_slot == level and turn.images[0].y_frac is None
+        box = _found(_drawn(turn, tmp_path), name)
+        assert box is not None, f"{level!r} put the image nowhere"
+        return box[3]
+
+    try:
+        high, low = baseline_of("hi.png", "top"), baseline_of("lo.png", "bottom")
+        assert high < low, "a named level did not move the image"
+        assert high == MARGIN + 29             # tucked under the top gutter
+        assert low == LOGICAL_SIZE[1] - 1      # standing on the floor
+    finally:
+        pygame.quit()
+
+
+def test_end_to_end_a_named_level_takes_its_turn_in_the_depth_sort(tmp_path) -> None:
+    """Sorting on `y_frac` alone gave every station a depth of zero.
+
+    A `top` image then painted over a `bottom` one purely by arriving later,
+    which is the painter's rule exactly backwards. Two overlapping figures --
+    one placed by fraction, one by name -- are the only way to see it: with one
+    vocabulary in play the bug is invisible.
+    """
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    # far.png's baseline is 100; tall.png is stationed at `top` but is tall
+    # enough that its feet land at 160, so it is the nearer of the two and
+    # belongs in front. They overlap on rows 60..99.
+    #
+    # tall.png arrives *first*, so arrival order and depth order disagree.
+    # That matters: sort is stable, so any key that does not distinguish these
+    # two -- the old `y_frac or 0.0`, which read the station as zero, or a
+    # constant -- leaves them in arrival order and paints the far one in front.
+    frags = [
+        _staged_fragment(tmp_path, "tall.png", size=(40, 150), media_x=0.5, media_y="top"),
+        _staged_fragment(tmp_path, "far.png", size=(40, 40), media_x=0.5, media_y=0.5),
+    ]
+    [turn] = PygameSessionBridge().build_turns(frags)
+
+    try:
+        stage = _drawn(turn, tmp_path)
+        r, g, b, _ = stage.surface.get_at((LOGICAL_SIZE[0] // 2, 80))
+        assert (g, b) == (0, _tint("tall.png")), (
+            "the far figure painted over the near one: the station did not "
+            "take its turn in the depth sort"
+        )
+    finally:
+        pygame.quit()
+
+
+def test_end_to_end_a_mirrored_image_is_mirrored_once(tmp_path) -> None:
+    """Mirroring twice is the identity, and an attribute check cannot see it."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    frag = _staged_fragment(tmp_path, "c.png", media_x=0.5, media_y=0.9, media_flip_h=True)
+    [turn] = PygameSessionBridge().build_turns([frag])
+    stage = Stage(asset_dir=tmp_path / "images")
+    try:
+        stage.draw(turn)
+        # Read what actually landed on the stage, not an intermediate surface:
+        # a mirror applied twice is invisible anywhere earlier.
+        x0, y0 = Stage._frac_x(0.5, 10), Stage._frac_y(0.9, 12)
+        row = y0 + 6
+        left = stage.surface.get_at((x0, row))
+        right = stage.surface.get_at((x0 + 9, row))
+        # Source is red down its left half; mirrored once, red is on the right.
+        assert right.r > left.r, "not mirrored, or mirrored twice"
+    finally:
+        pygame.quit()
+
+
+def test_end_to_end_capacity_drops_the_tail_not_the_nearest(tmp_path) -> None:
+    """Sorting before the cap spent the budget on whatever stood furthest away.
+
+    Arrivals run near-to-far, which is what makes the two orders separable. A
+    far-to-near fixture cannot fail: sorting ascending by depth returns the
+    arrival order unchanged, so cap-then-sort and sort-then-cap keep the same
+    images and the test passes either way.
+    """
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+    from tangl.pygame_client.stage import STAGED_LIMIT
+
+    over = 4
+    names = [f"d{i}.png" for i in range(STAGED_LIMIT + over)]
+    assert len({_tint(n) for n in names}) == len(names), "tints collided"
+    frags = [
+        _staged_fragment(tmp_path, name, size=(8, 8), media_x=0.5,
+                         media_y=round(0.95 - i * 0.05, 4))
+        for i, name in enumerate(names)
+    ]
+    [turn] = PygameSessionBridge().build_turns(frags)
+    assert len(turn.images) == STAGED_LIMIT + over
+
+    try:
+        stage = _drawn(turn, tmp_path)
+        drawn = {name for name in names if _found(stage, name) is not None}
+        # The budget goes to the first arrivals -- the nearest -- and the tail
+        # is what falls off. Sorting first would have kept the last `over`
+        # instead, which are the furthest away.
+        assert drawn == set(names[:STAGED_LIMIT])
+    finally:
+        pygame.quit()

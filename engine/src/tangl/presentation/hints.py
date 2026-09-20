@@ -41,12 +41,52 @@ TimingName = Literal["start", "stop", "pause", "restart", "loop"]
 # audience's right, which reads backwards here and is rejected outright rather
 # than silently accepted (see StagingHints._normalize_axis).
 #
-# Subdivisions are the planned extension, keeping these three as the cardinals:
-# left_left, left, left_right, mid_left, mid, mid_right, right_left, right,
-# right_right — for staging crowds by nudging off a cardinal rather than by
-# hardcoded pixel offsets.
+# A world may say either, and should say whichever it means: a name when it
+# wants a station ("on the left", wherever this client puts that), a fraction
+# when it wants a placement (0.18, and the same 0.18 on any stage). What the
+# two promise differs, and the difference is set out at MediaXName below.
+MediaKeepName = Literal["whole", "width", "height", "none"]
+"""Which extent of an image a client should hold inside the frame.
+
+The axes are separable: a panorama may bleed off the sides while its height
+matters, a standing figure the reverse. ``"none"`` is a member rather than an
+absence because the two say different things -- an unset hint defers to
+whatever the client does, while ``"none"`` insists the placement is exact. An
+image meant to leave the frame has to be able to say so without knowing what
+the client would otherwise have done.
+
+Closed and typed, like every other staging hint. An open tag set is for
+vocabularies a world invents, such as plate regions; this one has four members
+known in advance. `extra="allow"` remains the escape hatch for a
+client-specific policy outside the vocabulary.
+"""
+
 MediaXName = Literal["left", "mid", "right"]
 MediaYName = Literal["top", "mid", "bottom"]
+
+# Names and fractions are the same vocabulary but not the same contract. A
+# cardinal is a *station* -- "on the left" -- and what that comes to in pixels
+# is the client's to decide: one may tuck it against the edge with a gutter,
+# another centre it on a quarter, a text client ignore it entirely. A fraction
+# is a *placement* and is exact everywhere.
+#
+# So no mapping lives here. Publishing one would turn an advisory station into
+# a coordinate every client owes, which is a different and much stronger
+# promise than the one the vocabulary makes -- and it would silently move
+# every figure already staged by name.
+#
+# Subdivisions, if they arrive (left_left, mid_right), stay stations too: finer
+# advice, not finer arithmetic.
+
+STAGING_MIN, STAGING_MAX = -2.0, 3.0
+"""How far outside the frame a placement may sit.
+
+Not a clamp: off-stage is a real position. An image sliding from -0.5 to 0.2 is
+an entrance from the left, and a placement parked outside the frame is an
+ordinary frame of that animation. The bounds exist only to separate a position
+from a unit mistake -- someone who wrote 50 meaning half way -- and are wide
+enough to park a full image clear of either edge.
+"""
 
 _AXIS_ALIASES = {
     "screen_left": "left", "screen_right": "right", "center": "mid", "centre": "mid",
@@ -70,6 +110,20 @@ class StagingHints(BaseModel, extra="allow"):
     def _normalize_axis(cls, value: Any) -> Any:
         """Accept screen-relative aliases; refuse theatrical ones outright."""
 
+        if isinstance(value, bool):
+            raise ValueError(
+                f"a staging position is a name or a number in "
+                f"[{STAGING_MIN}, {STAGING_MAX}], not a bool"
+            )
+        if isinstance(value, (int, float)):
+            if not STAGING_MIN <= float(value) <= STAGING_MAX:
+                raise ValueError(
+                    f"{value!r} is not a staging position. Positions are measured "
+                    "0..1 across the frame -- so 50 is not half way, use 0.5 -- and "
+                    f"may sit outside it, from {STAGING_MIN} to {STAGING_MAX}, for "
+                    "an image entering or leaving."
+                )
+            return float(value)
         if not isinstance(value, str):
             return value
         name = value.strip().lower()
@@ -81,11 +135,43 @@ class StagingHints(BaseModel, extra="allow"):
             )
         return _AXIS_ALIASES.get(name, name)
 
-    media_x: MediaXName | None = None
-    """Horizontal staging slot, named from the viewer's side of the screen."""
+    media_x: MediaXName | float | None = None
+    """Where this image sits horizontally: a named station, or a fraction.
 
-    media_y: MediaYName | None = None
-    """Vertical staging level."""
+    A name is advisory and each client decides what it comes to. A fraction is
+    exact: the image's horizontal *centre*, measured across the frame, and
+    honoured as given -- including outside it, which is how an image enters.
+    """
+
+    media_y: MediaYName | float | None = None
+    """Where this image sits vertically: a named level, or a fraction.
+
+    A fraction places the image's *bottom*, because a staged figure stands on
+    something and its baseline is what a placement is about. A name is advisory
+    in the same way as `media_x`.
+    """
+
+    media_keep: MediaKeepName | None = None
+    """Ask that a *named* position be held inside the frame, on the axes named.
+
+    Applies to `media_x`/`media_y` given as names, never as fractions. Holding
+    an image on screen preserves what a name means -- "right" pulled in is
+    still over that way -- and destroys what a number means: 0.75, for an image
+    wider than half the frame, lands near the middle, which is a different
+    position wearing the same hint.
+
+    So a fraction is always exact. A world that does not know the image's size
+    should say a name; that is what names are for, and asking for best effort
+    on a coordinate it could not honour is the error rather than the clamp's
+    absence.
+
+    ``"width"`` and ``"height"`` are separable on purpose. A wide backdrop may
+    want its width held while it bleeds off the top; a tall figure the reverse.
+
+    ``None`` -- the hint unset -- leaves it to client policy, which for a named
+    station is normally to keep it visible. ``"none"`` is the opposite and says
+    the placement is exact, which is what an image leaving the frame needs.
+    """
 
     media_flip_h: bool | None = None
     """Mirror the asset horizontally when staged.
@@ -109,7 +195,10 @@ class StagingHints(BaseModel, extra="allow"):
 
 
 __all__ = [
+    "STAGING_MAX",
+    "STAGING_MIN",
     "DurationName",
+    "MediaKeepName",
     "MediaXName",
     "MediaYName",
     "PositionName",

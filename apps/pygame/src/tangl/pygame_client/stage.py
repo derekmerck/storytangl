@@ -19,6 +19,7 @@ import pygame
 
 from dataclasses import dataclass
 
+
 from .bridge import (
     UnsupportedAccepts,
     commit_payload,
@@ -69,6 +70,25 @@ PORTRAIT_ROLES = ("dialog_im", "avatar_im")
 MAP_ROLES = ("map_im",)
 """A plate is full-frame but is not scenery: it is deliberately outside
 BACKGROUND_ROLES so a client with no map view never stages it as a backdrop."""
+
+STAGED_ROLES = ("staged_im",)
+"""Scenery inhabitants: images placed somewhere in the frame rather than
+stationed in a dialog slot.
+
+A separate role because the caps differ and mean different things. A backdrop
+is one image by nature; a dialog wants a couple of faces at fixed stations; a
+populated room wants as many figures as it has, each somewhere particular. A
+staged image is the third case, and putting it in PORTRAIT_ROLES would make it
+compete for three stations it never wanted.
+"""
+
+STAGED_LIMIT = 12
+"""How many staged images one turn may draw.
+
+Not a design limit -- roughly double the busiest hand-authored room -- but a
+bound, so a world that generates its cast in a loop degrades by dropping the
+tail rather than by drawing for a minute.
+"""
 
 PORTRAIT_HEIGHT = 112
 MARGIN = 10
@@ -234,6 +254,7 @@ class Stage:
         title: str = "StoryTangl",
         clock: Callable[[], float] | None = None,
         animate: bool = True,
+        keep_on_screen: bool = True,
     ) -> None:
         pygame.init()
         self.window = pygame.display.set_mode(
@@ -242,6 +263,11 @@ class Stage:
         pygame.display.set_caption(title)
         self.surface = pygame.Surface(LOGICAL_SIZE)
         self.asset_dir = asset_dir
+        self.keep_on_screen = keep_on_screen
+        """Hold a *named* position inside the frame when the image is too wide
+        to sit there whole. Client policy, not world data: an explicit fraction
+        is never adjusted, so an image meant to leave the frame still can."""
+
         self.font = pygame.font.Font(None, 11)
         self._cache: dict[str, pygame.Surface | None] = {}
         self.hitboxes: list[tuple[pygame.Rect, Action]] = []
@@ -375,6 +401,9 @@ class Stage:
             else len(turn.choices)
         )
         choices_top = LOGICAL_SIZE[1] - 4 - below * 11
+        # Scenery before faces: an ornament stands in the room, a portrait
+        # speaks over it.
+        self._draw_staged(loaded)
         self._draw_portraits(turn, loaded, floor=choices_top)
         panelled = self._has_state(turn, placed=placed)
         width = LOGICAL_SIZE[0] - (PANEL_W if panelled else 0)
@@ -770,6 +799,58 @@ class Stage:
         else:
             self.surface.fill(TEAL)
 
+    def _draw_staged(self, loaded: list[tuple[StageImage, pygame.Surface]]) -> None:
+        """Draw placed images at their fractions, nearest last.
+
+        Drawn at natural size: a staged image was conformed to this stage by
+        whoever packed it, so rescaling here would be a second opinion about a
+        size already decided.
+
+        Depth comes off where a figure's feet land -- lower in the frame is
+        nearer, so it draws later -- which is the same painter's rule a surface
+        already uses for its slots.
+
+        The key is the resolved baseline, not the hint, so a station and a
+        fraction compete on the same terms. Sorting on ``y_frac`` alone gave
+        every named level a depth of zero, which let a ``top`` figure paint
+        over a ``bottom`` one whenever it happened to arrive later -- the exact
+        opposite of the rule, and invisible until two images disagreed about
+        which vocabulary to use. So the box is resolved first and ordered
+        after.
+        """
+
+        staged = self._pick(loaded, STAGED_ROLES)
+        if not staged:
+            return
+        # Bound first, then order. Sorting before the cap would spend the
+        # budget on whatever happens to be furthest away and discard the
+        # figures nearest the viewer, which is the opposite of what a limit on
+        # a crowded room should drop.
+        placed: list[tuple[int, int, int, pygame.Surface]] = []
+        for image, surface in staged[:STAGED_LIMIT]:
+            width, height = surface.get_size()
+            # An unplaced staged image centres on the floor: it asked to be in
+            # the room without saying where, and the middle is the honest
+            # reading of that.
+            box_x = (
+                self._place_x(image, width, "mid")
+                if image.x_frac is not None or image.x_slot
+                else (LOGICAL_SIZE[0] - width) // 2
+            )
+            box_y = (
+                self._slot_y(image.y_slot, height, LOGICAL_SIZE[1], keep=image.keep)
+                if image.y_frac is None
+                else self._frac_y(image.y_frac, height)
+            )
+            placed.append((box_y + height, box_x, box_y, surface))
+        # Stable, so figures sharing a baseline -- the common case, a room of
+        # people on one floor -- keep arrival order rather than shuffling.
+        placed.sort(key=lambda entry: entry[0])
+        for _, box_x, box_y, surface in placed:
+            # Not flipped here: _resolve_images already honoured media_flip_h,
+            # and mirroring twice is the identity.
+            self.surface.blit(surface, (box_x, box_y))
+
     def _draw_portraits(
         self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]], *, floor: int
     ) -> None:
@@ -790,12 +871,26 @@ class Stage:
             height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
             factor = height / portrait.get_height()
             width = max(1, round(portrait.get_width() * factor))
-            slot = image.x_slot or _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
-            box_x, box_y = self._slot_x(slot, width), floor - height
+            # A placement wins over a slot. The two are different questions --
+            # "which of three stations" versus "where exactly" -- and a world
+            # that answered the second should not be re-answered by arrival
+            # order. A client that ignores fractions still slots by arrival,
+            # which is what honouring a subset of the hints means.
+            fallback = _DEFAULT_SLOTS[min(index, len(_DEFAULT_SLOTS) - 1)]
+            placement = (
+                f"x={image.x_frac:.4f}" if image.x_frac is not None
+                else (image.x_slot or fallback)
+            )
+            box_x = self._place_x(image, width, fallback)
+            box_y = (
+                self._slot_y(image.y_slot, height, floor, keep=image.keep)
+                if image.y_frac is None
+                else self._frac_y(image.y_frac, height)
+            )
 
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
-            placed = (image.role, image.source, slot)
+            placed = (image.role, image.source, placement)
             key = (*placed, occurrences[placed])
             occurrences[placed] += 1
 
@@ -883,14 +978,98 @@ class Stage:
         return play
 
     @staticmethod
-    def _slot_x(slot: str, width: int) -> int:
-        """Left edge for a horizontal staging slot. Unknown slots centre."""
+    def _frac_x(frac: float, width: int) -> int:
+        """Left edge for an image whose *centre* sits ``frac`` across the stage.
 
+        Centre, not left edge, so the same fraction means the same place
+        whatever the image is wide -- and so it agrees with the bottom-centre
+        anchor a sprite sheet frame already uses.
+
+        Not clamped. Off-stage is a real position: an image sliding from -0.5
+        to 0.2 is an entrance from the left, and every frame of that before it
+        arrives is partly outside the frame. Pulling it back would turn the
+        entrance into a figure stuck against the edge.
+        """
+
+        return round(frac * LOGICAL_SIZE[0]) - width // 2
+
+    @staticmethod
+    def _frac_y(frac: float, height: int) -> int:
+        """Top edge for an image whose *bottom* sits ``frac`` down the stage.
+
+        The bottom, because a staged figure stands on something and its
+        baseline is the part a placement is about. Unclamped for the same
+        reason as :meth:`_frac_x`.
+        """
+
+        return round(frac * LOGICAL_SIZE[1]) - height
+
+    def _place_x(self, image: "StageImage", width: int, fallback: str) -> int:
+        """Where this image goes horizontally.
+
+        A fraction is honoured exactly and is never held on screen. Clamping
+        preserves what a *name* means -- "right" is still over that way once
+        pulled in -- but destroys what a *number* means: an image wider than
+        half the stage, pulled into the visible band from 0.75, ends up near
+        the middle, which is a different position wearing the same hint.
+
+        A world that does not know the image's size should say a name. That is
+        what names are for, and asking for best effort on a coordinate you
+        could not honour is the error rather than the clamp's absence.
+        """
+
+        if image.x_frac is not None:
+            return Stage._frac_x(image.x_frac, width)
+        return self._slot_x(image.x_slot or fallback, width, keep=image.keep)
+
+    def _slot_x(self, slot: str, width: int, keep: str | None = None) -> int:
+        """Left edge for a horizontal staging slot. Unknown slots centre.
+
+        A station is advisory and every client reads it its own way. This port
+        tucks the outer two against the edge with a gutter and centres the
+        rest, which is what it has always done and what worlds staged by name
+        already sit at. It is deliberately not a fraction: a name is a request
+        about where to stand, not a coordinate, and turning it into one would
+        move every figure already placed this way.
+
+        Under :attr:`keep_on_screen` -- or when the image says so -- the result
+        is held inside the frame. That liberty applies to names only. A
+        fraction is a placement and is honoured exactly, including off-stage.
+        """
+
+        hold = self.keep_on_screen if keep is None else keep in ("whole", "width")
         if slot == "left":
-            return MARGIN
-        if slot == "right":
-            return LOGICAL_SIZE[0] - width - MARGIN
-        return (LOGICAL_SIZE[0] - width) // 2
+            x = MARGIN
+        elif slot == "right":
+            x = LOGICAL_SIZE[0] - width - MARGIN
+        else:
+            x = (LOGICAL_SIZE[0] - width) // 2
+        if hold:
+            x = max(0, min(x, LOGICAL_SIZE[0] - width))
+        return x
+
+    def _slot_y(self, slot: str | None, height: int, floor: int,
+                keep: str | None = None) -> int:
+        """Top edge for a vertical staging level. Unknown levels take the floor.
+
+        The counterpart to :meth:`_slot_x`, and the reason `media_y` was being
+        declared and then discarded: a world could say ``bottom`` and this port
+        had nowhere to put it.
+
+        ``bottom`` is the shared baseline every staged figure already stands
+        on, so the common case is unchanged by naming it.
+        """
+
+        hold = self.keep_on_screen if keep is None else keep in ("whole", "height")
+        if slot == "top":
+            y = MARGIN
+        elif slot == "mid":
+            y = max(MARGIN, (floor - height) // 2)
+        else:
+            y = floor - height
+        if hold:
+            y = max(0, min(y, LOGICAL_SIZE[1] - height))
+        return y
 
     def _rows(
         self, turn: Turn, unloadable: list[StageImage], *, columns: int = 74

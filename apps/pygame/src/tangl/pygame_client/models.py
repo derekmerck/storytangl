@@ -25,7 +25,46 @@ class StageImage:
     alt_text: str | None = None
     source_id: UUID | None = None
     x_slot: str | None = None
-    """From ``staging_hints.media_x``; ``None`` falls back to arrival order."""
+    """From ``staging_hints.media_x`` when it names a slot.
+
+    ``None`` falls back to arrival order. A numeric ``media_x`` sets
+    :attr:`x_frac` instead, and leaves this ``None``.
+    """
+
+    y_slot: str | None = None
+    """From ``staging_hints.media_y`` when it names a level. ``None`` takes the
+    shared floor. A numeric ``media_y`` sets :attr:`y_frac` instead."""
+
+    x_frac: float | None = None
+    """From a numeric ``staging_hints.media_x``: where the image's horizontal
+    centre goes, as a fraction of the stage's width.
+
+    Centre rather than left edge, so a placement means the same thing whatever
+    the image's width -- and so it agrees with the bottom-centre anchor a
+    sprite sheet already uses. ``None`` means this image is slotted, not
+    placed.
+    """
+
+    y_frac: float | None = None
+    """From a numeric ``staging_hints.media_y``: where the image's *bottom*
+    goes, as a fraction of the stage's height.
+
+    The bottom rather than the top, because a staged figure stands on
+    something: its baseline is the part a placement is about. ``None`` keeps
+    the shared floor every slotted portrait sits on.
+    """
+
+    keep: str | None = None
+    """From ``staging_hints.media_keep``: ``whole``, ``width``, ``height`` or
+    ``none``.
+
+    Which extents of a *named station* this client may pull inside the frame.
+    It never touches a fraction: a placement is exact, including off-stage,
+    because holding a number on screen moves it somewhere else while keeping
+    the same hint. ``None`` defers to this client's own policy
+    (:attr:`Stage.keep_on_screen`); ``"none"`` overrides that policy and asks
+    for the station exactly where it falls.
+    """
 
     flip_h: bool = False
     """From ``staging_hints.media_flip_h``. Other staging hints are ignored by
