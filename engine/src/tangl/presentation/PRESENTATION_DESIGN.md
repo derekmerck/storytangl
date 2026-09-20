@@ -49,6 +49,43 @@ compact shorthands, and pairing sheets with stills are authoring and indexing
 concerns, and live in `tangl.media.sprite_sheets`; presentation stays a
 vocabulary rather than a format library.
 
+Staging an image answers two different questions, and `StagingHints` keeps
+them apart. `media_x` / `media_y` each take either a *name* or a *fraction*.
+
+A name — `left`, `mid`, `right`, `top`, `bottom` — is a **station**, and is
+advisory in the same sense as a slot rectangle: it says where a figure belongs,
+never what that comes to in pixels. No mapping from names to coordinates lives
+here, deliberately. Publishing one would turn advice into a coordinate every
+client owes, which is a far stronger promise than the vocabulary makes, and
+would relocate every figure already staged by name in a client that had read
+the advice differently. One port tucks the outer stations against the edge with
+a gutter; another may centre them on quarters; a text client honours none of
+it. All three conform.
+
+A fraction is a **placement**, and is exact everywhere. `media_x` places the
+image's horizontal *centre*, `media_y` its *bottom* — the centre so a fraction
+means the same place whatever the image is wide, the bottom because a staged
+figure stands on something and its baseline is the part a placement is about.
+Both agree with the bottom-centre anchor a sprite sheet frame already resolves
+against, so there is one anchor convention rather than two.
+
+Placements may sit outside the frame, within `[-2, 3]`. Off-stage is a
+position: an image entering from the left passes through negative fractions,
+and every frame before it arrives is partly outside. The bounds exist only to
+separate a position from a unit mistake — someone who wrote `50` meaning half
+way — and are wide enough to park a whole image clear of either edge.
+
+`media_keep` (`whole` / `width` / `height` / `none`) asks that a *station* be
+held inside the frame on the axes named. It does not apply to fractions.
+Holding an image on screen preserves what a name means — "right" pulled in is
+still over that way — and destroys what a number means: `0.75`, for an image
+wider than half the frame, lands near the middle, which is a different position
+wearing the same hint. A world that cannot honour a coordinate should say a
+name; that is what names are for. `none` is a member rather than an absence,
+because an unset hint defers to client policy while `none` insists the
+placement is exact, and an image meant to leave the frame must be able to say
+so without knowing what the client would otherwise have done.
+
 The module carries two laws -- which frame shows when, and where a frame lands
 over its still -- with a Python reference implementation of each. The reference
 is not code other clients share. The portable contract is the laws plus

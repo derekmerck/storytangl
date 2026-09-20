@@ -628,13 +628,38 @@ class MediaFragment(ContentFragment):
 | | |
 |---|---|
 | **Required** | `uid`, `content`, `content_format` |
-| **Optional** | `media_role` ∈ `cover_im` / `narrative_im` / `avatar_im` / `dialog_im` / `sfx` / `bgm` / `video`; `scope` ∈ `world` / `scene` / `turn`; `staging_hints` (shape, size, position, transition, duration, timing) |
-| **Container rule** | Routed by `media_role`, not by order. `cover_im` is persistent chrome; `narrative_im` belongs to the active content region; `avatar_im` / `dialog_im` bind to the nearest preceding `attributed`; `bgm` is timelined against `staging_hints.media_timing`. |
+| **Optional** | `media_role` ∈ `cover_im` / `narrative_im` / `avatar_im` / `dialog_im` / `staged_im` / `sfx` / `bgm` / `video`; `scope` ∈ `world` / `scene` / `turn`; `staging_hints` (shape, size, position, placement, keep, transition, duration, timing) |
+| **Container rule** | Routed by `media_role`, not by order. `cover_im` is persistent chrome; `narrative_im` belongs to the active content region; `avatar_im` / `dialog_im` bind to the nearest preceding `attributed`; `staged_im` belongs to the scene rather than to any line, and is drawn over the backdrop and under the faces; `bgm` is timelined against `staging_hints.media_timing`. |
 | **States** | **empty** → hide. **loading** → placeholder box with role label; ARIA busy. **pending** (`content_format="rit"` unresolved) → placeholder marked `data-pending`; swapped in place by later `update` to `url` or `data` — same widget, same DOM node, no reflow. **error** → placeholder + error text; preserve layout. |
 | **A11y** | Images need `content` labeled via `hints` or sibling text. Audio/video must expose native controls or keyboard toggle. `prefers-reduced-motion` disables `media_transition`. Time Parity (§5.2): the player MUST always be able to advance past time-bound media (audio/video) with a single action; the player MAY independently choose to let media continue playing. |
 | **Fallback** | Unknown `media_role` → render inline. `content_format="rit"` unresolved → pending placeholder. |
 
-**Port sketches.** Web: `<img>` / `<video>` / `<audio>` / placeholder; role maps to CSS class. CLI: `[img: <url>]` / `[♪ <url>]` single-line tokens. tkinter: `Label(image=…)` or placeholder `Frame`; audio/video out-of-band. Ren'Py: `scene <bg>` / `show <sprite>` / `play music` / `play sound`. Godot: `TextureRect` / `VideoStreamPlayer` / `AudioStreamPlayer`.
+**Placement vs station (§2.3.1).** `media_x` / `media_y` each take a *name* or
+a *fraction*, and they are different contracts.
+
+A name — `left` / `mid` / `right`, `top` / `mid` / `bottom` — is an advisory
+**station**. It says where a figure belongs, never what that is in pixels, and
+each port answers it in its own layout. No name→coordinate mapping is
+published; a client that invents one owes nothing to any other.
+
+A `0..1` **fraction** is exact everywhere: `media_x` places the image's
+horizontal *centre*, `media_y` its *bottom*. A placement may sit outside the
+frame, within `[-2, 3]` — an image entering from the left passes through
+negative fractions — and a client MUST NOT pull it back. The bounds separate a
+position from a unit mistake (`50` meaning half way), not a position from a
+valid one.
+
+`media_keep` ∈ `whole` / `width` / `height` / `none` asks that a **station** be
+held wholly inside the frame on the named axes. It does not apply to fractions:
+clamping preserves what a name means and destroys what a number means. `none`
+is distinct from unset — unset defers to client policy, `none` insists the
+placement is exact.
+
+**Capacity.** A port MAY bound how many `staged_im` it draws. It SHOULD bound
+arrivals before ordering them by depth; sorting first spends the budget on
+whatever stands furthest away and discards the figures nearest the viewer.
+
+**Port sketches.** Web: `<img>` / `<video>` / `<audio>` / placeholder; role maps to CSS class; `staged_im` absolutely positioned against the scene box. CLI: `[img: <url>]` / `[♪ <url>]` single-line tokens; stations and placements alike collapse to the token, which is the floor rule working as intended. tkinter: `Label(image=…)` or placeholder `Frame`; audio/video out-of-band. Ren'Py: `scene <bg>` / `show <sprite>` / `play music` / `play sound`. Godot: `TextureRect` / `VideoStreamPlayer` / `AudioStreamPlayer`.
 
 ### 2.4 `group` — Container
 

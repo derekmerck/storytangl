@@ -12,6 +12,10 @@ class MediaRole(Enum):
     AVATAR_IM = "avatar_im"        # portrait, dynamic svg, has actor look
     DIALOG_IM = "dialog_im"        # sm square, dynamic, has actor attitude
 
+    STAGED_IM = "staged_im"        # a figure standing in the scene, placed
+                                   # rather than stationed: an ornament on the
+                                   # furniture, not a face beside the prose
+
     INFO_IM = "info_im"            # landscape, used in ui info overlays
     LOGO_IM = "logo_im"            # sm square, used in nav bar/branding
 
