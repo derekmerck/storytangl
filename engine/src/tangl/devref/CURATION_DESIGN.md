@@ -1,30 +1,35 @@
 # Curation Design
 
-**Status:** DESIGN, nothing landed (2026-09-19)  
+**Status:** DESIGN, nothing landed; revised against review 2026-09-20  
 **Scope:** a standing gardener over the repository's own record — developer
 docs, the issue board, and authored world content — driven by deterministic
 checks plus a local reader model, producing prioritized nominations that a
 higher-tier agent triages  
-**Background sources:** `tangl.devref` (index, topics, issues), `#286`
-(authoring/runtime validation), `#396` (formal narrative analysis contract),
-`scripts/comfy_batch.py` (the job-runner-with-receipts pattern)
+**Background sources:** `docs/src/design/CANON_AND_REALIZATION.md` (registers,
+mismatch classes, review rhythm — this note defers to it), `tangl.devref`
+(index, topics, issues), `#282` (governing context on PRs; "no second issue/PR
+indexer"), `#286` (authoring/runtime validation), `#396` (formal narrative
+analysis contract), `scripts/comfy_batch.py` (job-runner-with-receipts)
 
 ## Why This Note Exists
 
 Three jobs keep recurring and keep being paid for in expensive tokens:
 
-1. **Doc drift.** 172 markdown files, ~2MB of prose, 1021 Python modules. Docs
-   claim things the code stopped doing, and nothing notices until someone reads
-   both.
-2. **Post-PR board grooming.** After every merge: close, consolidate, narrow,
+1. **Canon and realization drifting apart.** 172 markdown files, ~2MB of prose,
+   1021 Python modules. Documented claims and the code that realizes them move
+   independently, and nothing notices until someone reads both. Which of the two
+   is wrong is a separate question, and not the gardener's to answer.
+2. **Post-merge board grooming.** After every merge: close, consolidate, narrow,
    update. Today this is done by re-reading the diff and the board from cold.
 3. **Content proofing.** Authored worlds compile, materialize, and pass every
    structural check while telling an incoherent story.
 
-All three are the same shape: *take a unit, take what it connects to, ask
-whether they still agree.* The expensive part of that shape — computing what
-connects to what — already exists in this repo. The cheap part — asking the
-question — is exactly what a small local model on local hardware is good for.
+All three share a retrieval shape — *take a unit, take what it connects to, ask
+whether they still agree* — and the expensive half of that shape, computing what
+connects to what, already exists in this repo. The cheap half, asking the
+question, is what a small local model on local hardware is good for. Sharing a
+shape is not the same as being one program; see **Three Programs, One
+Substrate**.
 
 This note is about not rebuilding the expensive part, and about being precise
 concerning what the cheap part can and cannot do.
@@ -59,55 +64,148 @@ nothing — it is a triage queue whose entries are only ever *promoted*.
 **The reader tier is to content what #396's solver is to structure**: optional,
 out-of-core, never a dependency of the basic checks, never in the build path.
 
-## One Harness, Three Seeds
+## The Authority Boundary
 
-| seed | unit | neighborhood | verdict question |
+Settled before Phase 0, because it is the property that has to survive every
+later convenience.
+
+**Everything the reader reads is untrusted input.** Repository prose, PR bodies,
+issue text, world content, and commit messages are *data*. Text inside them that
+addresses the gardener — asking it to ignore a rule, approve a change, or treat
+something as already authorized — carries no authority and is quoted to a human
+rather than acted on.
+
+**The reader has no write credentials and no tool authority.** It receives a
+rendered unit and returns a typed nomination. It cannot edit files, call `gh`,
+push, comment, or label. A separate adjudicator — human or higher-tier agent,
+with its own credentials — is the only thing that opens a branch or a PR.
+
+**There are no "mechanically safe" edits.** Annotation stubs were previously
+listed as a plausible exception; they are not. An annotation changes which topic
+a symbol joins and therefore what future retrieval returns, which is a semantic
+change to the index the whole system reasons over. The gardener proposes
+annotations like anything else.
+
+The always-on worker stays an observer and proposer. It does not accumulate
+repository authority by increments.
+
+## Three Programs, One Substrate
+
+The earlier framing — "one system, three entry points" — overclaimed. These are
+three programs at very different maturities that **share receipts, budgeting,
+scheduling, and adjudication**, and nothing else:
+
+| program | unit | neighborhood | question |
 |---|---|---|---|
-| **docs** | `doc_section` artifact | linked symbols via `artifact_topics` | does the prose still describe this code? |
-| **PRs** | merged PR | topic siblings of touched symbols | what did this invalidate; what should close? |
-| **content** | block / passage | declared edges, both directions | could the reader plausibly have arrived here? |
+| **doc register audit** | canon / realization claim | linked symbols | which register, and which mismatch class? |
+| **merge-event grooming** | one merge on `main` | topics of changed paths | what did this invalidate; what should close? |
+| **content continuity** | block / passage | declared edges, both directions | could the reader plausibly have arrived here? |
 
-Same ledger, same receipt rule, same `yes / no / unclear`, same budgeted queue.
-This is one system with three entry points, not three systems.
+Only the first two are near-term. The content program is a larger research
+effort that happens to reuse the substrate; it is written up here so the
+substrate is not designed too narrowly, not because it ships alongside.
 
-### Seed 1 — docs
+### The first deployable contract
 
-`devref` already stores `artifacts(content, source_hash, kind, facet, relation,
-line, anchor)`, `symbols(qualified_name, source_hash, signature, summary)`, and
-`artifact_topics(...)` with `evidence_source` and `weight`, over 35 curated
-topics with FTS5 and incremental build. The curator never reads the codebase;
-it queries pre-computed pairs and hands the model one paragraph plus one
-symbol's signature and docstring — 2–4k tokens, comfortably inside a 16k window.
-
-### Seed 2 — PRs and issues
-
-`issues.py` already pulls a `gh` snapshot to `tmp/devref/issues.json` and joins
-on the `devref:<topic>` label convention. Its own docstring names the structure:
-"the issues <-> design-docs <-> code triangle." A PR is the fourth corner, and
-reaches the index the same way — an offline, deterministic, disposable snapshot.
+One line, and nothing in Phase 0 or 1 may exceed it:
 
 ```
-PR -> changed files -> symbols (source_path) -> topics (artifact_topics)
-                                                  |
+pinned main revision
+  -> deterministic candidate generation
+  -> read-only local classification
+  -> durable nominations
+  -> reviewed PR
+```
+
+Pinned, because a sweep must be attributable to a revision. Deterministic
+generation, because the model never chooses what to look at. Read-only, per the
+authority boundary. Durable nominations, so adjudication is not repeated.
+Reviewed PR, because a human merges.
+
+### Program 1 — doc register audit
+
+**This is not a yes/no correspondence test, and framing it as one would do
+damage.** `CANON_AND_REALIZATION.md` is the governing method note and this
+program implements a piece of it rather than competing with it.
+
+It separates three registers — **portable canon** (names no symbols, does not
+rot), **realization** (where this codebase currently makes canon true; rots
+constantly and *should be generated*), and **residue** (transitional, scheduled
+for deletion, and explicitly *not citable*). It then names three mismatch
+classes:
+
+| signal | direction | resolution |
+|---|---|---|
+| canon names a symbol that does not exist | canon decayed | mechanical — fix canon |
+| a public symbol or behaviour canon never mentions | realization pressing up | apply the promotion gate |
+| both exist and disagree on meaning | genuine negotiation | judgment; expensive and rare |
+
+**The first two are mechanizable and are this program's entire target.** The
+third is not automated; the point of mechanizing the first two is to
+*concentrate* human review on the third.
+
+Two consequences bind the design:
+
+1. **Unchanged prose next to moved code is not evidence of staleness.** Canon
+   moving toward realization is normative; realization pressing up into canon is
+   evidential; *both directions are legitimate*. A curator that treats every
+   mismatch as stale prose would quietly make canon follow implementation, which
+   is the specific failure this program exists to prevent. The nomination
+   therefore carries a **register and mismatch class**, never a repair.
+2. **Residue must stay unreachable from a canon read**, so the classifier has to
+   recognize residue as a register rather than reporting it as contradiction.
+
+`CANON_AND_REALIZATION.md` already names the intended vehicle — the proposed
+`devref audit`, in `#282` lineage — and records that no such command exists yet.
+This program is that command's nomination half, not a new parallel proposal.
+
+The index makes it feasible: `artifacts(content, source_hash, kind, facet,
+relation, line, anchor)`, `symbols(qualified_name, source_hash, signature,
+summary)`, and `artifact_topics(...)` over 35 curated topics. The curator never
+reads the codebase; it hands the model one paragraph plus one signature — 2–4k
+tokens inside a 16k window. What the index does *not* hold is history: "changed
+N times since" comes from **git**, not from devref, which stores only a current
+hash.
+
+### Program 2 — merge-event grooming
+
+**Correction from review: there is no PR indexer, and this note does not propose
+one.** `#282` lists "no second issue/PR indexer" and "no PR indexing merely for
+symmetry" as explicit non-goals, and prefers a static changed-path -> governing
+topic mapping. An earlier draft of this note proposed `ArtifactKind +=
+"pull_request"`, a `sync_prs()` snapshot, and writing mention edges into
+`artifact_links`. All three are withdrawn:
+
+- `artifact_links` is rebuilt wholesale by `compute_artifact_link_rows()` on
+  every build and holds document/symbol reference links derived from artifact
+  metadata. Anything written there is erased on the next build, and issue
+  extraction deliberately avoids deriving cross-artifact links.
+- `sync_issues()` indexes **open** issues only by default, with a documented
+  reason — indexing closed work "would present finished business as
+  outstanding". So a post-merge index cannot see the issue a merge just closed.
+- A current-state index cannot recover deleted symbols or per-symbol change
+  counts at all.
+
+The merge event is therefore an **ephemeral input, not an indexed artifact**:
+base/head from the merge plus GitHub metadata fetched at sweep time, joined
+against the index at a pinned revision, and discarded. Nothing about PRs is
+retained in the index; only the resulting nominations are durable.
+
+```
+merge on main -> changed paths -> topics (static map, #282) -> at pinned rev:
   +- issues on those topics ......... close / consolidate / narrow candidates
-  +- doc_sections on those topics whose source_hash did NOT move ... stale docs
-  +- test_modules on those topics that did NOT move ................ coverage gap
+  +- docs on those topics unchanged while the code moved (git) ... register audit
+  +- tests on those topics that did not move .................... coverage gap
 ```
 
-The middle row is the pre-emptive refresh, and it needs no model at all.
-
-Required additions, all small and mostly reusing existing shapes:
-
-- `ArtifactKind += "pull_request"`
-- `sync_prs()` mirroring `sync_issues()` -> `tmp/devref/prs.json`
-- mention parsing (`#\d+` from PR bodies) into the **existing**
-  `artifact_links(source_artifact_id, target_artifact_id, link_kind)` table
-- topic projection from changed files, not from labels
+This stays inside `#282`'s stated shape. If the static mapping proves
+inadequate, `#282` already says what to do next, and that conversation happens
+there rather than being pre-empted here.
 
 Run **post-merge on `main`**, not on the PR. Pre-merge is CodeRabbit's turf and
 the diff is not yet final.
 
-### Seed 3 — world and narrative content
+### Program 3 — world and narrative content
 
 Unlike docs, the neighborhood here is *declared*, not inferred: `successor`,
 `links.out.target`, `start_at`, `plates`, `kind`, `media.name`. The loader
@@ -116,7 +214,7 @@ curation — is solved for free. The unit is the block; the bundle is the block
 plus the tails of its predecessors and the heads of its successors. 600–1500
 tokens. Small worlds fit whole.
 
-Two distinct corpora share this seed: in-repo demo worlds (`worlds/`), and
+Two distinct corpora share this program: in-repo demo worlds (`worlds/`), and
 imported material such as the CarWars gamebook anthology, where the content
 arrived via OCR and carries a different, harder error profile.
 
@@ -125,22 +223,26 @@ arrived via OCR and carries a different, harder error profile.
 | need | existing mechanism |
 |---|---|
 | doc/symbol/topic joins | `tangl.devref` index + FTS5 |
-| issue -> topic join | `devref:<topic>` label convention; 44 of 62 open issues carry one |
-| PR -> issue edges | `artifact_links` table |
+| issue -> topic join | `devref:<topic>` label convention; 44 of 62 open issues carry one (open only, by design) |
+| changed-path -> governing topic | `#282`'s static mapping — **not** a PR indexer |
+| per-symbol change history | git, not devref (the index holds one current hash) |
+| register / mismatch vocabulary | `docs/src/design/CANON_AND_REALIZATION.md` |
+| review cadence | that note's Change / Topic / Layer / Coarse rhythm |
 | structural world validators | `#286` (entry/reference, reachability, media-link, materializability, finishability) |
 | structural findings channel | `AuthoringDiagnostic` + preflight |
 | mechanical prose checks | `lang/apis/language_tool.py`, `lang/helpers/spell_check.py`, `[lang.apis.languagetool]` in defaults |
 | local model endpoint | `[content.apis.ollama]` in `defaults.toml`, resolved the way `comfy_batch.py` resolves the render node |
 | job-runner + receipts pattern | `scripts/comfy_batch.py` |
-| query surface for the ledger | the `devref` MCP server |
+| query surface for a findings *projection* | the `devref` MCP server |
 
 **The deterministic world tier is `#286`, not new work.** It lands there and the
 curator consumes it. Mechanical prose checks (spelling, locale variants,
 terminology) go to LanguageTool, never to the reader model.
 
-That leaves the reader model a deliberately narrow remit across all three seeds:
-entity co-reference, transition continuity, mention-edge classification, and
-doc-claim verdicts. Four classification tasks. Nothing else.
+That leaves the reader model a deliberately narrow remit: register and
+mismatch-class classification, entity co-reference, transition continuity, and
+mention-edge classification. Four classification tasks. Nothing else, and none
+of them a repair.
 
 ## The Deterministic Tier
 
@@ -148,7 +250,8 @@ Free, high-confidence, runs nightly over everything.
 
 **Docs**
 - doc names a symbol absent from `symbols` -> dangling reference
-- doc `source_hash` static while linked symbols' hashes moved N times -> stale pressure
+- doc unchanged while linked symbols moved N times (**history from git**, not
+  from the index) -> register-audit candidate, *not* a staleness verdict
 - code fence does not parse, or its imports do not resolve
 - `source_path` no longer exists -> dead artifact
 - symbol or module with no `artifact_topics` row -> coverage gap
@@ -156,8 +259,8 @@ Free, high-confidence, runs nightly over everything.
 - unresolvable file path, issue number, or PR number -> broken pointer
 
 **PRs**
-- topic touched by the diff whose doc sections did not move -> **pre-emptive refresh**
-- `#N` mentioned in a PR body with no closing reference -> unlinked grooming candidate
+- topic touched by the merge whose doc sections did not move -> **register-audit candidate**
+- `#N` mentioned in a merged PR body with no closing reference -> unlinked grooming candidate
 - issue whose topics were all superseded by merged work -> close candidate
 - milestone whose children are all closed -> narrow candidate
 
@@ -332,15 +435,47 @@ self-consistent, wrong answer hides.
 
 Idempotence is the difference between a gardener and a spam machine.
 
-- key: `(check_id, unit_key, anchor_hash, counterpart_hash)`
-- state: `open | accepted | rejected | wontfix`
-- a rejection **persists** until one of the hashes moves
-- the rejected pile is a free few-shot corpus, and for content a de-facto style
-  profile for that world
+### Two dimensions, not one state machine
 
-Storage: a `curation_findings` table in the same SQLite as the index, so the
-existing `devref` MCP server can serve the queue. The rendered digest is a
-projection, not the truth.
+A reader verdict and a human decision are different facts about a finding and
+are stored separately:
+
+| dimension | values | owner |
+|---|---|---|
+| **verdict** | `yes` / `no` / `unclear` | the reader, per evaluation |
+| **adjudication** | `open` / `accepted` / `rejected` / `wontfix` | a person, per finding |
+
+Collapsing them loses two things. `unclear` must be **stored**, or the daemon
+re-spends calls on the same unit every sweep and abstention rate — the main
+calibration signal — becomes unmeasurable. And an adjudication has to outlive
+the verdict that prompted it.
+
+### Identity includes the evaluator
+
+```
+(check_contract_version, unit_key, anchor_hash, counterpart_hash)
+```
+
+with `model`, `prompt_digest`, `harness_version`, and `input_revision` recorded
+alongside. A rejection suppresses a finding only while the *question* is
+unchanged; swapping the model or editing the prompt yields a materially
+different check, and old rejections must not silently suppress it.
+
+### Storage: durable, and outside the index
+
+**The ledger cannot live in `tmp/devref/devref.sqlite3`.** `tmp*` is gitignored
+and the index is explicitly disposable and rebuilt wholesale — adjudications,
+coverage history, and calibration data are exactly the opposite. They go in a
+separate persistent store (or a replayable append-only log), and the index may
+carry a **disposable projection** of currently-open findings so the existing
+MCP surface can serve them.
+
+This also answers a constraint `CANON_AND_REALIZATION.md` sets on any review
+process — *"dossiers are disposable ... do not accumulate a second encyclopedia
+that itself needs maintenance."* The reconciliation is that **findings are
+regenerable and adjudications are not**. What persists is small: what a person
+decided, what has been swept, and with which evaluator. Findings themselves can
+be thrown away and recomputed from a pinned revision.
 
 ### Coverage is part of the record
 
@@ -379,9 +514,22 @@ that acting on the digest costs one `grep`, not a re-read.
 
 ## Budget and Ranking
 
-Deterministic checks run over everything, nightly, free. The reader pass works a
-ranked queue against a fixed call budget (~300/night), so the corpus is swept
-over roughly a week rather than choking on night one.
+Cadence is not invented here. `CANON_AND_REALIZATION.md` already defines the
+rhythm, and the gardener attaches to it rather than running an unmotivated
+nightly sweep:
+
+| scale | trigger | what the gardener contributes |
+|---|---|---|
+| **change** | every substantial merge | the merge-event nominations (Program 2) |
+| **topic** | routine | one topic's register audit, as a disposable dossier |
+| **layer** | periodic | census-shaped deterministic checks only |
+| **coarse** | triggered by a canon-level change | nothing automatic; a person decides |
+
+Deterministic checks are free and run at whatever scale fires. The reader pass
+works a ranked queue against a fixed call budget, so a topic sweep completes in
+bounded time rather than the whole corpus contending at once. A coarse pass is
+*triggered*, never scheduled — "running one against a canon that has not moved
+is relaxing against a reference that is not changing.
 
 The one ranking heuristic that survived measurement: **exclude hubs.** In-degree
 is median 1, p90 3, max 43–63. High-in-degree units are generic funnels — "you
@@ -473,18 +621,29 @@ render node resolves from settings — never a hardcoded host.
 ## Phases
 
 **Phase 0 — ledger and digest, no new checks, no model.**
-`curation_findings` table, dedup keying, state machine, receipt resolution,
-digest renderer. Fed initially by findings that already exist
-(`AuthoringDiagnostic`, preflight, graph analysis). Proves the digest is worth
-reading before anything is spent generating findings.
+Durable store, dedup keying with evaluator provenance, the two dimensions above,
+receipt resolution, digest renderer.
+
+**It composes existing facts; it does not copy them.** An earlier draft said the
+digest would be "fed by" `AuthoringDiagnostic` records, which would have built
+precisely the second diagnostic registry this note rejects — with a second copy
+of each record and a second place to adjudicate it. Instead the digest
+**references and joins** the factual surface at render time: diagnostics stay
+owned by preflight, and the ledger holds only nominations and adjudications.
+Proves the digest is worth reading before anything is spent generating
+findings.
 
 **Phase 1 — two deterministic indicators as proof of concept.**
 Chosen to serve the post-merge grooming ritual that is performed by hand today:
 
-1. **touched-topic / untouched-doc** — the pre-emptive refresh
-2. **mention-without-closing-ref** — PR body `#N` parsing into `artifact_links`
+1. **touched-topic / untouched-doc** — a register-audit candidate, reported as
+   "these claims and this code moved apart", never as "this doc is stale"
+2. **mention-without-closing-ref** — `#N` parsed from a merged PR body, held as
+   an ephemeral merge-event input and emitted as a nomination
 
-Both are pure SQL plus `gh` snapshot. Both produce output on the very next merge.
+Both are deterministic: a pinned revision, a git diff, a `gh` fetch at sweep
+time, and index queries. Neither writes to the index, neither adds an artifact
+kind, and both produce output on the very next merge.
 
 *Independent and parallel:* fix the `passages[r-1]` lookup in the CarWars ripper
 and re-read the false-root report. Model-free, and blocked on nothing above.
@@ -507,25 +666,39 @@ Hardest and most inferential; last.
 ## Non-Goals
 
 - No replacement for, or extension of, `AuthoringDiagnostic`. Facts and
-  nominations stay separate.
-- No second validation registry. The ledger validates nothing.
+  nominations stay separate, and the digest joins rather than copies.
+- No second validation registry, and no second diagnostic registry.
+- **No PR or issue indexer.** `#282`'s non-goal stands; merge events are
+  ephemeral inputs.
+- **No write credentials or tool authority for the reader.** Ever, and including
+  annotation stubs.
+- **No ledger inside the disposable index.** Adjudications outlive rebuilds.
+- **No staleness verdicts on docs.** Register and mismatch class only; direction
+  is a human decision.
 - No repair policy. The gardener proposes; it does not edit prose.
-- No model in the build path, ever.
+- No model in the build path.
 - No reader-model spend on checks LanguageTool or SQL already performs.
-- No generic drift-detection framework. Three named seeds, four named model
+- No generic drift-detection framework. Three named programs, four named model
   tasks.
 
 ## Open Questions
 
-1. **Does the curator ever write?** Current position: no — it proposes
-   annotations and never edits prose. Annotation stubs are the one plausible
-   exception, being mechanical.
-2. **Should it nag upstream?** Flagging a PR that mentions `#N` without a
+*Resolved by this revision:* whether the curator ever writes (no — see **The
+Authority Boundary**), and whether the ledger can share the index (no — see
+**Storage**).
+
+1. **What form does the durable store take?** A SQLite file outside `tmp*`, or
+   an append-only log replayed into one. The log is friendlier to review and to
+   git; the database is friendlier to query. Either way the index carries only a
+   disposable projection.
+2. **Should it nag upstream?** Flagging a merged PR that mentions `#N` without a
    closing keyword is the cheapest possible intervention and would make GitHub's
    own linkage worth reading. It is also the first thing that could become
    annoying.
-3. **Digest as file, DB, or both?** DB is truth and MCP-queryable; a rendered
-   in-repo digest is diffable, greppable, and survives a rebuild.
+3. **How does a topic dossier stay disposable?** `CANON_AND_REALIZATION.md`
+   requires it. The split proposed here — regenerable findings, durable
+   adjudications — needs proving against one real topic sweep before it is
+   trusted.
 4. **What plays the role of anchors for authored worlds?** Imported corpora have
    page numbers as an independent stream. Authored worlds have no equivalent and
    may not need one — their boundaries are declared rather than inferred — but
