@@ -655,6 +655,11 @@ clamping preserves what a name means and destroys what a number means. `none`
 is distinct from unset — unset defers to client policy, `none` insists the
 placement is exact.
 
+How much `media_keep` does depends on how a port reads stations, and both
+conform: edge-and-gutter already sits inside the frame, so it bites only for an
+image wider than the stage; quarter-centred stations need it routinely. A world
+SHOULD set it when it means it and not assume either reading.
+
 **Capacity.** A port MAY bound how many `staged_im` it draws. It SHOULD bound
 arrivals before ordering them by depth; sorting first spends the budget on
 whatever stands furthest away and discards the figures nearest the viewer.

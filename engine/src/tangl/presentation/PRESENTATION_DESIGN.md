@@ -86,6 +86,17 @@ because an unset hint defers to client policy while `none` insists the
 placement is exact, and an image meant to leave the frame must be able to say
 so without knowing what the client would otherwise have done.
 
+How often `media_keep` does anything is a property of the client, not of the
+hint, and both outcomes conform. A port that tucks stations against the edge
+with a gutter has already put them inside the frame, so the hint only bites for
+an image wider than the stage itself; a port that centres stations on quarters
+needs it routinely, because a wide image at three-quarters clips long before it
+is that large. The same is true vertically, where a shared baseline pushes a
+tall figure off the top of a short frame in any reading. This is the advisory
+nature of a station showing through rather than an inconsistency to resolve: a
+hint that governs interpretation does as much work as the interpretation leaves
+it.
+
 The module carries two laws -- which frame shows when, and where a frame lands
 over its still -- with a Python reference implementation of each. The reference
 is not code other clients share. The portable contract is the laws plus
