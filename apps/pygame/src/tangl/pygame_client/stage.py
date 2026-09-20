@@ -806,15 +806,17 @@ class Stage:
         whoever packed it, so rescaling here would be a second opinion about a
         size already decided.
 
-        Depth comes off the placement itself -- lower in the frame is nearer,
-        so it draws later -- which is the same painter's rule a surface already
-        uses for its slots. An image with no vertical placement sits at the
-        back, because it has said nothing about where it stands.
+        Depth comes off where a figure's feet land -- lower in the frame is
+        nearer, so it draws later -- which is the same painter's rule a surface
+        already uses for its slots.
 
-        Fractions are read against the stage, which is the identity case of
-        :attr:`StageImage.rel`: measuring inside a parent rect that happens to
-        be the whole frame. A non-identity parent needs its rect resolved
-        first, which is a pass this port does not have.
+        The key is the resolved baseline, not the hint, so a station and a
+        fraction compete on the same terms. Sorting on ``y_frac`` alone gave
+        every named level a depth of zero, which let a ``top`` figure paint
+        over a ``bottom`` one whenever it happened to arrive later -- the exact
+        opposite of the rule, and invisible until two images disagreed about
+        which vocabulary to use. So the box is resolved first and ordered
+        after.
         """
 
         staged = self._pick(loaded, STAGED_ROLES)
@@ -824,8 +826,8 @@ class Stage:
         # budget on whatever happens to be furthest away and discard the
         # figures nearest the viewer, which is the opposite of what a limit on
         # a crowded room should drop.
-        ordered = sorted(staged[:STAGED_LIMIT], key=lambda entry: entry[0].y_frac or 0.0)
-        for image, surface in ordered:
+        placed: list[tuple[int, int, int, pygame.Surface]] = []
+        for image, surface in staged[:STAGED_LIMIT]:
             width, height = surface.get_size()
             # An unplaced staged image centres on the floor: it asked to be in
             # the room without saying where, and the middle is the honest
@@ -840,6 +842,11 @@ class Stage:
                 if image.y_frac is None
                 else self._frac_y(image.y_frac, height)
             )
+            placed.append((box_y + height, box_x, box_y, surface))
+        # Stable, so figures sharing a baseline -- the common case, a room of
+        # people on one floor -- keep arrival order rather than shuffling.
+        placed.sort(key=lambda entry: entry[0])
+        for _, box_x, box_y, surface in placed:
             # Not flipped here: _resolve_images already honoured media_flip_h,
             # and mirroring twice is the identity.
             self.surface.blit(surface, (box_x, box_y))
@@ -996,35 +1003,6 @@ class Stage:
         """
 
         return round(frac * LOGICAL_SIZE[1]) - height
-
-    @staticmethod
-    def _visible_x(frac: float, width: int) -> float:
-        """``frac`` pulled to the nearest position showing the whole image.
-
-        The fully-visible band for an image is ``[w/2, 1 - w/2]`` in fractions
-        of the stage, which narrows as the image widens and vanishes once it is
-        wider than the stage -- in which case centring is the least-bad answer
-        and is what falling through gives.
-        """
-
-        half = width / (2 * LOGICAL_SIZE[0])
-        lo, hi = half, 1.0 - half
-        if lo > hi:
-            return 0.5
-        return min(max(frac, lo), hi)
-
-    @staticmethod
-    def _visible_y(frac: float, height: int) -> float:
-        """``frac`` pulled to the nearest baseline showing the whole image.
-
-        The fraction is a *bottom*, so the whole image shows when the baseline
-        sits between ``h`` (top flush with the frame) and ``1.0`` (bottom
-        flush). Taller than the stage and the band vanishes, where sitting on
-        the floor is the least-bad answer.
-        """
-
-        h = height / LOGICAL_SIZE[1]
-        return 1.0 if h > 1.0 else min(max(frac, h), 1.0)
 
     def _place_x(self, image: "StageImage", width: int, fallback: str) -> int:
         """Where this image goes horizontally.

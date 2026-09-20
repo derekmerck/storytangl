@@ -54,31 +54,16 @@ class StageImage:
     the shared floor every slotted portrait sits on.
     """
 
-    rel: str | None = None
-    """From ``staging_hints.media_rel``: the frame this image's fractions are
-    measured in. ``None`` means the stage.
-
-    Fractions are always read inside some parent's rect. The stage is that
-    parent's identity case -- its rect *is* the frame, so screen NDC and a
-    composition are the same operation with nothing to compose. Naming another
-    image instead supplies a non-identity parent: the child's fractions are
-    read inside that image's drawn rect, so eyes cropped from a portrait sit on
-    that portrait and follow it wherever it is staged, at whatever size.
-
-    So this is one mechanism with the trivial case implemented, not a
-    placeholder for a different one. What a non-identity parent additionally
-    needs is the parent's rect before the child draws -- a placement pass this
-    port does not have. Until it does, a named reference falls back to the
-    stage. Nothing about the hint changes when the pass arrives, and nothing
-    here forecloses parents nesting further.
-    """
-
     keep: str | None = None
-    """From ``staging_hints.media_keep``: ``whole``, ``width`` or ``height``.
+    """From ``staging_hints.media_keep``: ``whole``, ``width``, ``height`` or
+    ``none``.
 
-    Which extents of an explicit placement are preferences rather than
-    decisions. ``None`` defers to client policy and leaves a placement exact,
-    which is what an image leaving the frame needs.
+    Which extents of a *named station* this client may pull inside the frame.
+    It never touches a fraction: a placement is exact, including off-stage,
+    because holding a number on screen moves it somewhere else while keeping
+    the same hint. ``None`` defers to this client's own policy
+    (:attr:`Stage.keep_on_screen`); ``"none"`` overrides that policy and asks
+    for the station exactly where it falls.
     """
 
     flip_h: bool = False

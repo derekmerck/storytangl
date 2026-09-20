@@ -642,12 +642,12 @@ A name — `left` / `mid` / `right`, `top` / `mid` / `bottom` — is an advisory
 each port answers it in its own layout. No name→coordinate mapping is
 published; a client that invents one owes nothing to any other.
 
-A `0..1` **fraction** is exact everywhere: `media_x` places the image's
-horizontal *centre*, `media_y` its *bottom*. A placement may sit outside the
-frame, within `[-2, 3]` — an image entering from the left passes through
-negative fractions — and a client MUST NOT pull it back. The bounds separate a
-position from a unit mistake (`50` meaning half way), not a position from a
-valid one.
+A **fraction** is a placement and is exact everywhere: `media_x` places the
+image's horizontal *centre*, `media_y` its *bottom*. `0` to `1` spans the
+frame, and a placement may also sit outside it, anywhere in `[-2, 3]` — an
+image entering from the left passes through negative fractions — and a client
+MUST NOT pull it back. The bounds separate a position from a unit mistake
+(`50` meaning half way), not a position from a valid one.
 
 `media_keep` ∈ `whole` / `width` / `height` / `none` asks that a **station** be
 held wholly inside the frame on the named axes. It does not apply to fractions:
@@ -659,6 +659,12 @@ How much `media_keep` does depends on how a port reads stations, and both
 conform: edge-and-gutter already sits inside the frame, so it bites only for an
 image wider than the stage; quarter-centred stations need it routinely. A world
 SHOULD set it when it means it and not assume either reading.
+
+**Depth.** A port that overlaps staged figures SHOULD order them by *resolved
+baseline* — lower in the frame draws later — and MUST resolve stations to a
+baseline before comparing, so a station and a placement rank against each
+other on the same terms. Ordering on `media_y` as given ranks every station at
+zero, and a `top` figure then paints over a `bottom` one by arriving later.
 
 **Capacity.** A port MAY bound how many `staged_im` it draws. It SHOULD bound
 arrivals before ordering them by depth; sorting first spends the budget on

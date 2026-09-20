@@ -41,22 +41,10 @@ TimingName = Literal["start", "stop", "pause", "restart", "loop"]
 # audience's right, which reads backwards here and is rejected outright rather
 # than silently accepted (see StagingHints._normalize_axis).
 #
-# Names and fractions are one vocabulary, not two. A cardinal is sugar for a
-# position — `mid` is 0.5 — and the planned subdivisions (left_left, mid_right
-# and so on) are midpoints between cardinals, for staging a dialog crowd where
-# three avatars argue with one. Nothing downstream stores a pixel called
-# "mid"; a name resolves to a position like any other.
-#
-# A world may therefore say either, and should say whichever it means: a name
-# when it wants a station ("on the left", wherever this client puts that), a
-# fraction when it wants a placement (0.18, and the same 0.18 on any stage).
-#
-# Caveat worth knowing, because the pygame port does not implement the
-# equivalence cleanly: `mid` centres, so it really is 0.5, but `left` and
-# `right` anchor to an edge with a gutter, which is width-dependent and so is
-# no fixed fraction at all. A 60px image at `left` centres on 0.125; a 100px
-# one on 0.1875. Unifying those would move existing staged sprites, so it is
-# left alone here and noted rather than quietly changed.
+# A world may say either, and should say whichever it means: a name when it
+# wants a station ("on the left", wherever this client puts that), a fraction
+# when it wants a placement (0.18, and the same 0.18 on any stage). What the
+# two promise differs, and the difference is set out at MediaXName below.
 MediaKeepName = Literal["whole", "width", "height", "none"]
 """Which extent of an image a client should hold inside the frame.
 
@@ -123,7 +111,10 @@ class StagingHints(BaseModel, extra="allow"):
         """Accept screen-relative aliases; refuse theatrical ones outright."""
 
         if isinstance(value, bool):
-            raise ValueError("a staging position is a name or a 0..1 fraction, not a bool")
+            raise ValueError(
+                f"a staging position is a name or a number in "
+                f"[{STAGING_MIN}, {STAGING_MAX}], not a bool"
+            )
         if isinstance(value, (int, float)):
             if not STAGING_MIN <= float(value) <= STAGING_MAX:
                 raise ValueError(
@@ -204,7 +195,10 @@ class StagingHints(BaseModel, extra="allow"):
 
 
 __all__ = [
+    "STAGING_MAX",
+    "STAGING_MIN",
     "DurationName",
+    "MediaKeepName",
     "MediaXName",
     "MediaYName",
     "PositionName",

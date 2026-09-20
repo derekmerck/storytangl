@@ -75,6 +75,15 @@ and every frame before it arrives is partly outside. The bounds exist only to
 separate a position from a unit mistake — someone who wrote `50` meaning half
 way — and are wide enough to park a whole image clear of either edge.
 
+Depth, where a port draws staged figures at all, comes off the **resolved
+baseline** rather than off the hint. A station and a placement are two ways of
+saying where a figure's feet land, so once both are resolved they are the same
+kind of thing and order against each other on equal terms. Ordering on the
+fraction alone silently ranks every station at zero, and a figure stationed at
+`top` then paints over one placed near the floor purely by arriving later —
+which is the painter's rule exactly inverted, and invisible until a scene mixes
+the two vocabularies.
+
 `media_keep` (`whole` / `width` / `height` / `none`) asks that a *station* be
 held inside the frame on the axes named. It does not apply to fractions.
 Holding an image on screen preserves what a name means — "right" pulled in is
