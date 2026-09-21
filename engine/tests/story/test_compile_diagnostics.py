@@ -228,6 +228,40 @@ class TestCompileDiagnosticsSourceIntegrity:
         assert issue.source_ref is not None
         assert issue.source_ref.authored_path == "metadata.start_at"
 
+    def test_malformed_dialog_callout_is_source_attributed_during_compile(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["content"] = (
+            "> [!NPC.happy Guide\n> Missing the closing bracket."
+        )
+
+        bundle = StoryCompiler().compile(
+            script,
+            source_map={
+                "__source_files__": [
+                    {"path": "scripts/dialog.yaml", "story_key": "dialog_story"},
+                ]
+            },
+        )
+
+        assert len(bundle.issues) == 1
+        issue = bundle.issues[0]
+        assert issue.code == "compile:invalid_dialog_callout"
+        assert issue.severity is CompileSeverity.ERROR
+        assert issue.subject_label == "start"
+        assert issue.details == {"header": "> [!NPC.happy Guide"}
+        assert issue.source_ref is not None
+        assert issue.source_ref.path == "scripts/dialog.yaml"
+        assert issue.source_ref.story_key == "dialog_story"
+        assert issue.source_ref.authored_path == "scenes[0].intro.blocks[0].start.content"
+
+    def test_mixed_valid_dialog_and_ordinary_quote_have_no_compile_issue(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["content"] = (
+            "> [!NPC.happy] Guide\n> Welcome.\n\n> An ordinary quotation."
+        )
+
+        assert _compile(script).issues == []
+
 
 # ============================================================================
 # Payload Construction
