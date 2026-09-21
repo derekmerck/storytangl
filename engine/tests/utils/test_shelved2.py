@@ -11,12 +11,11 @@ import tangl.utils.shelved2 as shelved
 def patch_shelved(monkeypatch, tmp_path):
     # Reload the module to ensure it uses the modified cache_dir
     importlib.reload(shelved)
-    monkeypatch.setattr('tangl.utils.shelved2.cache_dir', tmp_path)
+    monkeypatch.setattr('tangl.utils.shelved2.cache_dir', tmp_path / "cache")
 
 
 def test_caching_with_shelved(patch_shelved):
-
-    assert os.path.isdir(str(shelved.cache_dir)), f"Cache directory does not exist: {shelved.cache_dir}"
+    assert not shelved.cache_dir.exists()
 
     shelf_name = 'test_cache'
 
@@ -27,6 +26,7 @@ def test_caching_with_shelved(patch_shelved):
     # Call the function twice with the same argument
     result1 = expensive_computation(2)
     assert result1 == 4
+    assert os.path.isdir(str(shelved.cache_dir))
     assert (shelved.hit_count, shelved.miss_count) == (0, 1)
 
     result2 = expensive_computation(2)
@@ -171,4 +171,3 @@ def test_clear_shelf(patch_shelved):
 
     # Verify that the function was called four times, indicating re-computation
     assert computation_mock.call_count == 4
-
