@@ -84,6 +84,12 @@ COPY --from=doc_builder /build/docs/html /app/docs
 ENV TANGL_SERVICE__PATHS__CLIENT_DIST='@path /app/client/'
 COPY --from=app_builder /app/dist /app/client
 
+# Keep writable runtime paths explicit to this deployment rather than relying
+# on the checkout-relative package defaults.
+ENV TANGL_SERVICE__PATHS__USER_DATA='@path /app/data/user/' \
+    TANGL_SERVICE__PATHS__STORY_MEDIA='@path /app/data/media/' \
+    TANGL_SERVICE__PATHS__CACHE_DATA='@path /app/cache/'
+
 # Install the application (cli + server extras).
 # The wheel is named through a variable because `/app/*.whl[cli,server]` is not
 # a glob plus an extras suffix: `[cli,server]` is a glob character class, so the

@@ -18,19 +18,13 @@ try:
 except ImportError:  # pragma: no cover
     shelve = None
 
-try:
-    cache_dir: Path = settings.service.paths.cache_data
-except AttributeError:  # pragma: no cover
-    cache_dir: Path = Path.cwd() / "shelf"
+cache_dir: Path = settings.service.paths.cache_data
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 SHELVED_CACHE_ENABLED = bool(settings.get("service.caches.shelved", True))
 SHELVED_BACKEND_AVAILABLE = shelve is not None and dbm is not None
-
-if SHELVED_CACHE_ENABLED:
-    os.makedirs(cache_dir, exist_ok=True)
 
 opened_shelves: dict[str, object] = {}
 shelf_locks: dict[str, threading.Lock] = {}
@@ -88,6 +82,7 @@ def shelved(fn, keep_open=True, skip_if_not_cached=False):
             key = generate_key(*args)
 
             if str(fn) not in opened_shelves:
+                cache_dir.mkdir(parents=True, exist_ok=True)
                 fp = cache_dir / fn
                 try:
                     opened_shelves[str(fn)] = shelve.open(str(fp), 'c')

@@ -59,11 +59,11 @@ media_url = "https://localhost:8000/media"   # media server root
 # TANGL_SERVICE__PATHS__WORLDS, the same way docs and client_dist are handled.
 # Shipping /app/worlds as a default only added a phantom root to every local
 # run, because this key is a list and merges rather than replaces.
-client_dist =   "@path /app/client/"        # file path for web client static dist
-docs =          "@path /app/docs/"          # package docs and user guide
-user_data =     "@path /app/data/user/"     # user/story data storage for file-based persistence
-story_media =   "@path /app/data/media/"    # user/story media files
-cache_data =    "@path /app/cache/"         # file loc shelve and pickle cache data
+client_dist =   "@path ./apps/web/dist/"    # file path for web client static dist
+docs =          "@path ./docs/build/html/"  # package docs and user guide
+user_data =     "@path ./tmp/user/"         # user/story data storage for file-based persistence
+story_media =   "@path ./tmp/media/"        # user/story media files
+cache_data =    "@path ./tmp/cache/"        # file loc shelve and pickle cache data
 # system_media: optional shared/system media root. Deliberately unset -- no
 # deployment in this repository ships one, and the image does not create
 # /app/media/sys, so defaulting to it only made mount_system_media log a
