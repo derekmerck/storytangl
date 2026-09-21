@@ -59,6 +59,62 @@ specification such as ``MediaSpec`` first resolves to a resource and then
 re-enters the same narrative output surface as ``MediaFragment``. It is not a
 parallel client-delivery channel.
 
+## Projection-to-realization pipeline
+
+The path from story state to a user's experience is a small dataflow pipeline,
+not one rendering operation:
+
+```text
+graph checkpoints and deltas
+    -> JOURNAL projection and composition
+    -> ordered journal registry
+    -> service envelope and transport
+    -> client display and interaction
+```
+
+The graph history is the replayable semantic source: it records accepted
+actions and their effects on the parameterized story shape. JOURNAL samples
+that evolving shape at the current cursor and linearizes the disclosed result.
+Its handlers may emit a coarse episode packet, a prose block, attributed
+utterances, choices, media requirements, or a procedural specification. The
+journal registry stores that ordered projection; it is neither a second story
+graph nor a record of pixels, HTML, terminal control sequences, generated
+speech, or other final client output.
+
+Service packages and transcribes the stored projection, adds lifecycle and
+transport metadata, and dereferences resources where its contract requires it.
+It must not invent narrative meaning or make a renderer-specific realization
+authoritative. A client maps the fragment vocabulary into its own display and
+input facilities. Reference clients should realize the supported public
+vocabulary completely, with accessible fallbacks; specialized clients may
+discard prose, enrich packets with maps, TTS, images, or generated text, or
+present the same choices differently. Only actions accepted by the backend and
+their resulting state changes return to semantic authority. Ephemeral client
+realizations need not be negotiated back into the journal.
+
+Two independent choices therefore remain open:
+
+- **Projection resolution** controls how densely JOURNAL samples and identifies
+  the episode: one gloss, one block, individual utterances, annotated spans, or
+  another typed packet. A fragment boundary is warranted by independent
+  semantic or interactive identity, provenance, ordering, replay, update, or
+  deletion—not merely by a styling boundary.
+- **Realization binding** controls how a projection is represented or rendered:
+  renderer-neutral JSON, bounded Markdown or attributed text, classed HTML,
+  Rich spans, ANSI, native widgets, audio, or another adapter-local form.
+  Styling and themes remain advisory mappings over semantic presentation
+  tokens rather than backend-mandated final appearance.
+
+These axes must not collapse into one closed render-profile taxonomy. New
+projection families may preserve, aggregate, refine, or interpolate the source,
+but must keep stable identity, provenance, and correspondence where those are
+observable; make lossy transformations explicit; preserve essential
+interaction or fail clearly; and default unsupported decoration to an identity
+or documented fallback. Three replay claims stay distinct: graph replay
+reconstructs causal state, journal replay re-emits the stored projection, and
+exact rendition replay would require an optional archival contract that is not
+currently promised.
+
 ## The rendering namespace
 
 Before rendering, the phase pipeline assembles the namespace valid for this

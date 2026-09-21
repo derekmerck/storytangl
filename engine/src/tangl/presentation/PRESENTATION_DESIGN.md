@@ -11,6 +11,11 @@ persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
 
+The cross-layer projection pipeline and its separate projection-resolution and
+realization-binding extension points are defined in
+`docs/src/design/story/EPISODE_SYUZHET_RENDERING.md`. This package supplies the
+domain-neutral vocabulary used at those seams; it does not own the pipeline.
+
 ## Status
 
 Current — Slice 2 also owns `UxEvent`, advisory grammar, `ProjectedState`,
