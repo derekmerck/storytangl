@@ -25,7 +25,7 @@ def test_templates_convert_to_basescriptitem():
                 "templates": {
                     "guard": {
                         "label": "guard",
-                        "kind": "tangl.story.concepts.actor.actor.Actor",
+                        "kind": "tangl.story.concepts.actor.Actor",
                         "custom_field": "preserved",
                     }
                 },

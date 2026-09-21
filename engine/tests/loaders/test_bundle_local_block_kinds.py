@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tangl.core import Entity
 from tangl.loaders.compiler import WorldCompiler
 from tangl.service.world_registry import WorldRegistry
-from tangl.story import Block, World
+from tangl.story import Block, Scene as CardinalScene, World
 from tangl.story.fabula import StoryCompiler
 from tangl.story.fabula.compiler import ISSUE_UNRESOLVED_KIND
 
@@ -30,6 +31,10 @@ class Workshop(Block):
 
 class Infirmary(Block):
     """A second contributed kind, to prove it is not a single-name special case."""
+
+
+class Scene(Block):
+    """A contributed Entity whose bare name collides with a cardinal kind."""
 '''
 
 
@@ -89,6 +94,27 @@ def _materialized_kinds(root: Path, label: str) -> dict[str, int]:
         World.clear_instances()
 
 
+def _compiled_payload_kind(
+    root: Path,
+    label: str,
+    payload_label: str,
+) -> tuple[type[Entity], type[Entity]]:
+    """Return one compiled payload kind and the bundle's contributed ``Scene``."""
+    World.clear_instances()
+    try:
+        bundle = WorldRegistry([root]).bundles[label]
+        world = WorldCompiler().compile(bundle)
+        resolved = next(
+            type(template.payload)
+            for template in world.bundle.template_registry.values()
+            if getattr(getattr(template, "payload", None), "label", None)
+            == payload_label
+        )
+        return resolved, world.class_registry["Scene"]
+    finally:
+        World.clear_instances()
+
+
 def test_domain_module_block_kinds_resolve_through_the_ordinary_world_path(
     tmp_path: Path,
 ) -> None:
@@ -108,10 +134,10 @@ def test_domain_module_block_kinds_resolve_through_the_ordinary_world_path(
 
 
 def _resolved_block_kind(
-    kind: str,
+    kind: str | type[Entity],
     *,
-    class_registry: dict[str, type] | None = None,
-) -> tuple[type, list[str]]:
+    class_registry: dict[str, type[Entity]] | None = None,
+) -> tuple[type[Entity], list[str]]:
     """Compile one authored block and return its resolved class and issue codes.
 
     Asserting on the compiled class itself rather than its name matters here:
@@ -130,24 +156,62 @@ def _resolved_block_kind(
     return resolved, [issue.code for issue in bundle.issues]
 
 
-def test_cardinal_kind_names_win_over_a_contributed_class() -> None:
+def test_explicit_dotted_kind_wins_by_imported_class_identity(tmp_path: Path) -> None:
+    """A dotted custom ``Scene`` is not remapped to the cardinal ``Scene``."""
+    label = "kinds_explicit_scene"
+    _write_kind_bundle(
+        tmp_path,
+        label=label,
+        kinds={"stage": f"{label}_domain.Scene"},
+    )
+
+    resolved, contributed = _compiled_payload_kind(tmp_path, label, "stage")
+
+    assert resolved is contributed
+    assert resolved is not CardinalScene
+
+
+def test_explicit_class_object_wins_by_identity_despite_cardinal_name() -> None:
+    """An explicit Entity class object is already an unambiguous kind."""
+
+    class CustomScene(Block):
+        """A directly supplied world-local class."""
+
+    CustomScene.__name__ = "Scene"
+
+    resolved, issues = _resolved_block_kind(CustomScene)
+
+    assert resolved is CustomScene
+    assert resolved is not CardinalScene
+    assert issues == []
+
+
+def test_bare_cardinal_scene_resolves_to_cardinal() -> None:
+    """The bare cardinal vocabulary retains its existing precedence."""
+    resolved, issues = _resolved_block_kind("Scene")
+
+    assert resolved is CardinalScene
+    assert ISSUE_UNRESOLVED_KIND not in issues
+
+
+def test_bare_cardinal_scene_wins_over_a_contributed_class() -> None:
     """A bundle cannot quietly redefine the cardinal vocabulary.
 
     The domain module exports classes by name, so a world can hand back a class
-    literally called ``Block``. Cardinal names resolve first, so the core class
+    literally called ``Scene``. Cardinal names resolve first, so the core class
     is what compiles.
     """
 
     class Shadow(Block):
         """A world-local class trying to take the cardinal name."""
 
-    Shadow.__name__ = "Block"
+    Shadow.__name__ = "Scene"
 
-    resolved, issues = _resolved_block_kind("Block", class_registry={"Block": Shadow})
+    resolved, issues = _resolved_block_kind("Scene", class_registry={"Scene": Shadow})
 
-    assert resolved is Block
+    assert resolved is CardinalScene
     assert resolved is not Shadow
-    assert issues == []
+    assert ISSUE_UNRESOLVED_KIND not in issues
 
 
 def test_authored_cardinal_kind_matching_the_section_fallback_is_resolved() -> None:
@@ -254,8 +318,12 @@ def test_unresolved_dotted_kind_carries_the_import_reason() -> None:
     broken = _unresolved_issues(
         {"label": "p", "scenes": {"s": {"blocks": {"b": {"kind": "no.such.mod.Thing"}}}}}
     )
+    non_entity = _unresolved_issues(
+        {"label": "p", "scenes": {"s": {"blocks": {"b": {"kind": "pathlib.Path"}}}}}
+    )
 
     # A bare name is not a claim to be an import path, so there is no reason to
     # report - a rsplit failure would be noise rather than a diagnosis.
     assert "error" not in typo[0].details
     assert broken[0].details["error"].startswith("ModuleNotFoundError")
+    assert non_entity[0].details["error"].startswith("TypeError")

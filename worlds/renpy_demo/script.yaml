@@ -10,7 +10,7 @@ scenes:
     title: "Rain At The Inn"
     roles:
       guide:
-        kind: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.role.Role
         actor_ref: guide
     blocks:
       arrival:
@@ -56,4 +56,3 @@ actors:
   guide:
     kind: renpy_demo.domain.RenPyGuide
     name: "Guide"
-

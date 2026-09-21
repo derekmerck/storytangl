@@ -298,7 +298,7 @@ def _grant_script() -> dict:
         "label": "grant_demo",
         "metadata": {"title": "Grant Demo", "start_at": "intro.start"},
         "actors": {
-            "guard": {"name": "Joe", "kind": "tangl.story.concepts.actor.actor.Actor"},
+            "guard": {"name": "Joe", "kind": "tangl.story.concepts.actor.Actor"},
         },
         "scenes": {
             "intro": {

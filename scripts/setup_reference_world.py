@@ -70,7 +70,7 @@ scenes:
     
     templates:
       aria:
-        kind: "tangl.story.concepts.actor.actor.Actor"
+        kind: "tangl.story.concepts.actor.Actor"
         name: "Aria"
         tags: ["companion", "main"]
     

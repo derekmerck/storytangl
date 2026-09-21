@@ -26,6 +26,7 @@ from tangl.story.fabula import (
     ResolutionFailureReason,
     StoryCompiler,
 )
+from tangl.story.fabula.compiler import ISSUE_UNRESOLVED_KIND
 from tangl.story.episode import Action, Block, Scene
 from tangl.core import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
 from tangl.story.dispatch import story_dispatch
@@ -44,13 +45,13 @@ def _base_script() -> dict:
         "actors": {
             "guard": {
                 "name": "Joe",
-                "kind": "tangl.story.concepts.actor.actor.Actor",
+                "kind": "tangl.story.concepts.actor.Actor",
             }
         },
         "locations": {
             "castle": {
                 "name": "Castle",
-                "kind": "tangl.story.concepts.location.location.Location",
+                "kind": "tangl.story.concepts.location.Location",
             }
         },
         "scenes": {
@@ -77,6 +78,7 @@ def test_compiler_emits_template_registry_and_entry_ids() -> None:
     assert bundle.entry_template_ids == ["intro.start"]
     assert bundle.template_registry.find_one(Selector(label="intro")) is not None
     assert bundle.template_registry.find_one(Selector(label="intro.start")) is not None
+    assert ISSUE_UNRESOLVED_KIND not in {issue.code for issue in bundle.issues}
 
 
 def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
