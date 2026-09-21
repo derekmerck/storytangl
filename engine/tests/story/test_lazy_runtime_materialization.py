@@ -46,13 +46,13 @@ def _runtime_parity_script() -> dict:
         "actors": {
             "guard": {
                 "name": "Joe",
-                "kind": "tangl.story.concepts.actor.actor.Actor",
+                "kind": "tangl.story.concepts.actor.Actor",
             }
         },
         "locations": {
             "castle": {
                 "name": "Castle",
-                "kind": "tangl.story.concepts.location.location.Location",
+                "kind": "tangl.story.concepts.location.Location",
             }
         },
         "scenes": {
@@ -117,7 +117,7 @@ def _ancestor_scope_script(*, actor_ref: str) -> dict:
         "actors": {
             "companion": {
                 "name": "Mina",
-                "kind": "tangl.story.concepts.actor.actor.Actor",
+                "kind": "tangl.story.concepts.actor.Actor",
             }
         },
         "scenes": {
