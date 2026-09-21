@@ -17,6 +17,7 @@ from tangl.ir.story_ir.scene_script_models import (
     DEFAULT_ACTIVATION_BY_FIELD,
     with_default_activation,
 )
+from tangl.prose.dialog import DialogHandler
 from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
@@ -35,6 +36,7 @@ ISSUE_EMPTY_ENTRY_RESOLUTION = "compile:empty_entry_resolution"
 ISSUE_PAYLOAD_CONSTRUCTION_FAILED = "compile:payload_construction_failed"
 ISSUE_UNKNOWN_AUTHORED_KEY = "compile:unknown_authored_key"
 ISSUE_UNRESOLVED_KIND = "compile:unresolved_kind"
+ISSUE_INVALID_DIALOG_CALLOUT = "compile:invalid_dialog_callout"
 
 # The cardinal story vocabulary. Authored ``kind`` names resolve here first,
 # so a world bundle cannot redefine a name the core already owns.
@@ -63,6 +65,7 @@ _COMPILE_ISSUE_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
     ISSUE_PAYLOAD_CONSTRUCTION_FAILED: ("kind", "fallback_kind", "error", "hint"),
     ISSUE_UNKNOWN_AUTHORED_KEY: ("key", "kind", "hint"),
     ISSUE_UNRESOLVED_KIND: ("kind", "fallback_kind", "known_kinds", "error"),
+    ISSUE_INVALID_DIALOG_CALLOUT: ("header",),
 }
 
 
@@ -460,6 +463,30 @@ def _report_payload_construction_failure(
         subject_label=label,
         authored_path=authored_path,
         details=details,
+    )
+
+
+def _report_invalid_dialog_callout(
+    *,
+    collector: _CompileCollector,
+    authored_path: str,
+    label: str,
+    content: str,
+) -> None:
+    """Report malformed prose that explicitly claims dialog callout syntax."""
+
+    header = DialogHandler.find_malformed_header(content)
+    if header is None:
+        return
+    message = f"Block {label!r} contains malformed Obsidian callout markup: {header!r}."
+    logger.warning("%s (authored at %s.content)", message, authored_path)
+    collector.add_settled(
+        code=ISSUE_INVALID_DIALOG_CALLOUT,
+        severity=CompileSeverity.ERROR,
+        message=message,
+        subject_label=label,
+        authored_path=f"{authored_path}.content",
+        details={"header": header},
     )
 
 
@@ -1516,6 +1543,14 @@ class StoryCompiler:
         authored_path: str,
     ) -> Entity:
         payload = dict(payload)
+
+        if issubclass(kind, Block) and isinstance(payload.get("content"), str):
+            _report_invalid_dialog_callout(
+                collector=collector,
+                authored_path=authored_path,
+                label=str(payload.get("label") or default_label),
+                content=payload["content"],
+            )
 
         if isinstance(payload.get("effects"), list):
             normalized_effects: list[dict[str, Any]] = []

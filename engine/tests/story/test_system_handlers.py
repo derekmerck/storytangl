@@ -541,6 +541,9 @@ def test_dispatch_journal_dialog_composition_enriches_speaker_formatting() -> No
     assert fragment.speaker_key == "guide"
     assert fragment.speaker_label == "guide_actor"
     assert fragment.presentation_hints.style_name == "npc"
+    assert "dialog_class:npc_annoyed" in fragment.tags
+    assert "dialog_mode:npc" in fragment.tags
+    assert "dialog_class:npc_annoyed" in fragment.presentation_hints.style_tags
     assert "speaker_key:guide" in fragment.presentation_hints.style_tags
     assert "attitude:annoyed" in fragment.presentation_hints.style_tags
     assert fragment.presentation_hints.style_dict == {

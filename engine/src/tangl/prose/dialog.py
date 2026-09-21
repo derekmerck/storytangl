@@ -1,13 +1,19 @@
 """
 Dialog parsing and rendering helpers.
 
-Dialog blocks follow a lightweight Obsidian-style admonition syntax::
+Dialog blocks use Obsidian's callout header syntax::
 
-    > [!POV] Speaker Name
+    > [!POV.attentive]+ Speaker Name
     > I am speaking now.
 
-Leading ``>`` markers denote dialog paragraphs; non-dialog paragraphs are
-emitted as narration micro-blocks.
+The bracketed value is the complete Obsidian callout type identifier, the
+optional ``+`` or ``-`` is fold syntax, and the optional title is the speaker
+label. StoryTangl separately interprets its established ``mode.attitude``
+house convention by splitting the type once at the first dot. Obsidian does
+not define that semantic split, and a colon has no special meaning here.
+
+Only paragraphs whose first line claims ``> [!`` syntax are dialog callouts.
+Other prose, including ordinary block quotes, is emitted as narration.
 """
 from __future__ import annotations
 
@@ -29,6 +35,12 @@ class DialogSpeakerBinding:
 
     key: str | None
     subject: Any
+
+
+@dataclass(frozen=True, slots=True)
+class _DialogHeader:
+    dialog_class: str
+    label: str | None
 
 
 def _normalized_text(value: Any) -> str:
@@ -256,21 +268,68 @@ class DialogMuBlock(MuBlock):
 class DialogHandler(MuBlockHandler):
     """Parse and render dialog micro-blocks."""
 
-    DIALOG_PATTERN = re.compile(r"^>\s+\[!", re.MULTILINE)
+    DIALOG_CLAIM_PATTERN = re.compile(r"^>\s*\[!")
+    DIALOG_HEADER_PATTERN = re.compile(
+        r"^>\s*\[!(?P<dialog_class>[^\]\s]+)\](?P<fold>[+-])?"
+        r"(?:[ \t]+(?P<label>\S(?:.*\S)?))?[ \t]*$"
+    )
+
+    @staticmethod
+    def _paragraphs(text: str) -> list[str]:
+        return re.split(r"\n(?:[ \t]*\n)+", text.strip()) if text.strip() else []
+
+    @staticmethod
+    def _paragraph_lines(paragraph: str) -> list[str]:
+        return [line for line in paragraph.split("\n") if line.strip()]
+
+    @classmethod
+    def _parse_dialog_header(cls, header: str) -> _DialogHeader | None:
+        if not cls.DIALOG_CLAIM_PATTERN.match(header):
+            return None
+        match = cls.DIALOG_HEADER_PATTERN.fullmatch(header)
+        if match is None:
+            raise ValueError(f"Invalid dialog syntax: {header}")
+        return _DialogHeader(
+            dialog_class=match.group("dialog_class"),
+            label=match.group("label"),
+        )
 
     @classmethod
     def has_mu_blocks(cls, text: str) -> bool:
-        return bool(cls.DIALOG_PATTERN.search(text))
+        for paragraph in cls._paragraphs(text):
+            lines = cls._paragraph_lines(paragraph)
+            if not lines:
+                continue
+            try:
+                if cls._parse_dialog_header(lines[0]) is not None:
+                    return True
+            except ValueError:
+                return True
+        return False
+
+    @classmethod
+    def find_malformed_header(cls, text: str) -> str | None:
+        """Return the first malformed line that claims dialog callout syntax."""
+        for paragraph in cls._paragraphs(text):
+            lines = cls._paragraph_lines(paragraph)
+            if not lines:
+                continue
+            try:
+                cls._parse_dialog_header(lines[0])
+            except ValueError:
+                return lines[0]
+        return None
 
     @classmethod
     def parse(
         cls, text: str, *, source_id: UUID | None = None, **_: object
     ) -> list[DialogMuBlock]:
-        paragraphs = re.split(r"\n{2,}", text.strip()) if text.strip() else []
         mu_blocks: list[DialogMuBlock] = []
 
-        for paragraph in paragraphs:
-            if paragraph.startswith(">"):
+        for paragraph in cls._paragraphs(text):
+            lines = cls._paragraph_lines(paragraph)
+            header = cls._parse_dialog_header(lines[0]) if lines else None
+            if header is not None:
                 mu_blocks.append(
                     cls._parse_dialog_paragraph(paragraph, source_id=source_id)
                 )
@@ -292,21 +351,18 @@ class DialogHandler(MuBlockHandler):
     def _parse_dialog_paragraph(
         cls, paragraph: str, *, source_id: UUID | None
     ) -> DialogMuBlock:
-        lines = [line for line in paragraph.split("\n") if line.strip()]
-        header = lines[0]
-        header_match = re.match(r">\s*\[!([\w\.-]+)\s*]\s*(\w.*)?", header)
-        if header_match is None:
+        lines = cls._paragraph_lines(paragraph)
+        header = lines[0] if lines else ""
+        parsed_header = cls._parse_dialog_header(header)
+        if parsed_header is None:
             raise ValueError(f"Invalid dialog syntax: {header}")
-
-        dialog_class = header_match.group(1).strip()
-        label = header_match.group(2).strip() if header_match.group(2) else None
         body_lines = (cls._strip_dialog_prefix(line) for line in lines[1:])
         body_text = " ".join(filter(None, body_lines))
 
         return DialogMuBlock(
             text=body_text,
-            label=label,
-            dialog_class=dialog_class,
+            label=parsed_header.label,
+            dialog_class=parsed_header.dialog_class,
             source_id=source_id,
         )
 

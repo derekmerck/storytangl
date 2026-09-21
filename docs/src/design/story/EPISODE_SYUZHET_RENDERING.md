@@ -59,6 +59,29 @@ specification such as ``MediaSpec`` first resolves to a resource and then
 re-enters the same narrative output surface as ``MediaFragment``. It is not a
 parallel client-delivery channel.
 
+### Dialog callout projection
+
+Dialog micro-blocks use Obsidian's documented callout header shape:
+``> [!type] Optional title``, with an optional ``+`` or ``-`` fold marker
+immediately after the closing bracket. The complete bracketed identifier is the
+callout type, the fold marker is syntax only, and the optional title supplies
+StoryTangl's speaker label. Custom types remain valid even when Obsidian has no
+built-in presentation for them.
+
+StoryTangl layers one semantic convention over that syntax: a type written as
+``mode.attitude`` is split once at the first dot for the attributed fragment's
+dialog mode and speaker attitude, while the full type remains its
+``dialog_class``. This dot convention is StoryTangl authoring vocabulary, not
+Obsidian modifier syntax. A colon is an ordinary character in a custom type and
+has no mode/attitude meaning.
+
+Header detection, runtime parsing, and compile validation use the same grammar.
+A paragraph whose first line clearly claims ``> [!`` syntax but is malformed is
+a source-attributed compile error; ordinary prose and ordinary block quotes are
+not. Runtime parsing retains a defensive error for malformed claimed syntax,
+but valid compiled content should not first discover it during JOURNAL
+composition.
+
 ## The rendering namespace
 
 Before rendering, the phase pipeline assembles the namespace valid for this
