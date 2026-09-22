@@ -84,6 +84,16 @@ def test_plates_are_conformed_to_the_client_surface(pack, name, entry) -> None:
     assert entry["conformed_from"]["transform"]
 
 
+@pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.parent.name)
+def test_visual_world_declares_the_extent_its_pack_targets(pack: Path) -> None:
+    world = yaml.safe_load((pack.parent / "world.yaml").read_text())
+
+    assert world["metadata"]["stage_extent"] == {
+        "width": LOGICAL_SIZE[0],
+        "height": LOGICAL_SIZE[1],
+    }
+
+
 def _staged_media_names(node) -> set[str]:
     """Every ``name`` under a block's ``media:`` list, anywhere in the script.
 

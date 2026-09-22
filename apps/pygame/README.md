@@ -14,8 +14,8 @@ Adapter proof of concept. The bridge and turn model are covered by ordinary
 - `src/tangl/pygame_client/models.py` — `Turn`, `Line`, `Choice`, `StageImage`.
 - `src/tangl/pygame_client/bridge.py` — `ServiceManager` → turn model. Imports
   no pygame, so the whole adaptation layer is testable headlessly.
-- `src/tangl/pygame_client/stage.py` — renders one turn to a 320×200 logical
-  surface, scaled nearest-neighbour, so output sits on a real pixel grid.
+- `src/tangl/pygame_client/stage.py` — renders one turn to the disclosed logical
+  stage, scaled nearest-neighbour by a client-local factor.
 - `src/tangl/pygame_client/__main__.py` — event loop.
 - `tests/` — adapter and live-session tests.
 
@@ -28,6 +28,16 @@ still plays, rendering flat colour plus text. Art is purely additive.
 Image geometry remains an orthogonal staging hint: Repartee's backgrounds use
 `media_shape: landscape`, while this stage is free to promote the current
 `narrative_im` to its full-frame background.
+
+**Logical extent comes from world info; window scale stays local.** Before it
+constructs `Stage`, the bridge discovers exact world-info channel `ui-stage`.
+Pygame supports declared extents 320×200 and 640×400 in this slice, with density
+1 and 2 layout metrics respectively; another declaration fails clearly before
+drawing. Worlds that advertise no channel retain the explicit client fallback
+of 320×200, which is not treated as a world declaration. `--scale` controls only
+the local window multiple. Backgrounds and map plates fill the logical surface;
+`staged_im` figures remain at natural pack size and are not rescaled a second
+time.
 
 **Every click resolves to an `edge_id`.** The input layer never commits a
 bespoke action, so a map hotspot produces the same payload as selecting the
@@ -226,7 +236,7 @@ the renderer tests need it, and they skip cleanly when it is absent.
 
 ```bash
 PYTHONPATH=engine/src:apps/pygame/src:worlds/repartee_loop \
-  python -m tangl.pygame_client --world repartee_loop
+  python -m tangl.pygame_client --world repartee_loop --scale 3
 ```
 
 `--assets DIR` resolves relative media sources. `--screenshot PATH` renders one

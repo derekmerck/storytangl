@@ -226,6 +226,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--world", default="repartee_loop")
     parser.add_argument("--assets", type=Path, default=None)
+    parser.add_argument(
+        "--scale",
+        type=int,
+        default=3,
+        help="client-local integer window scale (default: 3)",
+    )
     parser.add_argument("--screenshot", type=Path, help="render one frame, save it, and exit")
     parser.add_argument(
         "--reduced-motion",
@@ -239,11 +245,16 @@ def main(argv: list[str] | None = None) -> int:
         help="take N first-available choices before rendering; for headless checks",
     )
     args = parser.parse_args(argv)
+    if args.scale <= 0:
+        parser.error("--scale must be a positive integer")
 
     bridge = PygameSessionBridge()
+    logical_size = bridge.stage_extent(args.world)
     envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
+        logical_size=logical_size,
+        display_scale=args.scale,
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
     )

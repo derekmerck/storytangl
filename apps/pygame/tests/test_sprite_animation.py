@@ -35,7 +35,7 @@ from PIL import Image  # noqa: E402
 
 from tangl.presentation.sprite_sheet import SpriteSheetManifest  # noqa: E402
 from tangl.pygame_client.models import SheetSource, StageImage, Turn  # noqa: E402
-from tangl.pygame_client.stage import LOGICAL_SIZE, Stage  # noqa: E402
+from tangl.pygame_client.stage import Stage  # noqa: E402
 
 VECTORS = json.loads(
     (Path(__file__).parents[3] / "engine" / "contrib" / "conformance" / "sprite_sheets" / "playback.json").read_text()
@@ -417,7 +417,7 @@ def test_the_map_takes_the_stage_so_sprites_on_it_have_left_it(stage, art, clock
 
     from tangl.pygame_client.models import Choice, MapPlate, MapRegion
 
-    plate_image = pygame.Surface(LOGICAL_SIZE)
+    plate_image = pygame.Surface(stage.logical_size)
     plate_image.fill(PLATE_INK)
     pygame.image.save(plate_image, str(tmp_path / "quay_map.png"))
     still, sheet = art

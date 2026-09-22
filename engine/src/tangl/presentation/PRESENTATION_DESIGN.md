@@ -32,6 +32,13 @@ names the `piece_kind` that lies there and nothing more. Slot rectangles are
 advisory: they say where a thing would be drawn, never that it may be chosen —
 current offered-choice state remains the only source of selectable behaviour.
 
+`StageExtentValue` is the fixed logical width and height to which a world's
+staged presentation is composed. It is cacheable world metadata projected
+through the exact `ui-stage` world-info channel, not narrative state or a
+journal field. It deliberately carries no renderer scale, font, DPI, theme,
+widget, or asset-pack path: clients remain responsible for their local window
+zoom and may refuse extents they cannot lay out faithfully.
+
 Geometry arrived here from two places that were only ever its first consumers:
 the rectangle sat in `journal` because a fragment carried it, and the surface
 types sat in `mechanics` because a game block declared one. Neither owned the

@@ -13,6 +13,7 @@ from tangl.presentation.projection import (
     ProjectedSection,
     ProjectedState,
     ScalarValue,
+    StageExtentValue,
     ProjectionRequest,
     TableValue,
 )
@@ -82,6 +83,18 @@ def test_projected_state_to_dto_preserves_value_discriminators() -> None:
     assert payload["sections"][2]["value"]["value_type"] == "table"
     assert payload["sections"][4]["value"]["value_type"] == "scalar"
     assert ProjectedState.model_validate(payload) == state
+
+
+def test_stage_extent_value_is_typed_positive_geometry() -> None:
+    value = StageExtentValue(width=640, height=400)
+
+    assert value.model_dump(mode="json") == {
+        "value_type": "stage_extent",
+        "width": 640,
+        "height": 400,
+    }
+    with pytest.raises(ValueError, match="greater than 0"):
+        StageExtentValue(width=0, height=400)
 
 
 def test_projected_state_preserves_section_order_and_custom_kinds() -> None:

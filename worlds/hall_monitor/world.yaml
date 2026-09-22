@@ -7,4 +7,5 @@ assets:
     source: credential_types.yaml
 metadata:
   title: "Hall Monitor"
+  stage_extent: {width: 320, height: 200}
   description: "Inspect student passes and decide who may proceed through the halls."

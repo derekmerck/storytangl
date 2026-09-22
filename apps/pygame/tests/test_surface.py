@@ -38,9 +38,6 @@ from tangl.pygame_client.models import (  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     CREAM,
     SELECTION_ROWS,
-    LOGICAL_SIZE,
-    PROSE_TOP,
-    SCALE,
     Stage,
 )
 
@@ -113,8 +110,11 @@ def _box(stage, slot_name: str):
     return next(box for slot, _piece, box in stage.slot_boxes if slot.name == slot_name)
 
 
-def _centre(box) -> tuple[int, int]:
-    return (box.centerx * SCALE, box.centery * SCALE)
+def _centre(stage: Stage, box) -> tuple[int, int]:
+    return (
+        box.centerx * stage.display_scale,
+        box.centery * stage.display_scale,
+    )
 
 
 # ── the join ─────────────────────────────────────────────────────────────
@@ -184,7 +184,9 @@ def test_a_desk_click_and_its_number_key_pick_the_same_piece(stage, frame) -> No
     pending = PendingSelection(choice=frame.choices[0])
     stage.draw(frame, pending)
 
-    assert stage.hit(_centre(_box(stage, "papers"))) == PickPiece(piece_id="0:passport")
+    assert stage.hit(_centre(stage, _box(stage, "papers"))) == PickPiece(
+        piece_id="0:passport"
+    )
 
     number = stage.selection_numbers["0:passport"]
     assert _keyed(stage, frame, pending, number) == PickPiece(piece_id="0:passport")
@@ -234,7 +236,7 @@ def test_a_piece_on_the_desk_is_inert_until_a_selection_wants_it(stage, frame) -
 
     stage.draw(frame)
 
-    assert stage.hit(_centre(_box(stage, "papers"))) is None
+    assert stage.hit(_centre(stage, _box(stage, "papers"))) is None
 
 
 def test_an_empty_slot_refuses_the_click_while_picking(stage, frame) -> None:
@@ -327,7 +329,7 @@ def test_a_spent_piece_stays_on_the_desk_and_keeps_its_reason(stage, frame) -> N
     # Drawn, and not on offer by either route.
     assert "0:passport" in {piece.piece_id for _s, piece, _b in stage.slot_boxes}
     assert "0:passport" not in stage.selection_numbers
-    assert stage.hit(_centre(_box(stage, "papers"))) is None
+    assert stage.hit(_centre(stage, _box(stage, "papers"))) is None
 
     # And the reason is still readable somewhere. Joined and re-spaced because
     # the column wraps at its width, so the phrase legitimately spans two rows.

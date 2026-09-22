@@ -3,4 +3,5 @@ scripts: script.yaml
 domain_module: repartee_loop.domain
 metadata:
   title: "Repartee Loop"
+  stage_extent: {width: 320, height: 200}
   description: "A compact compiled-world proof of call-response acquisition and opportunity gating."

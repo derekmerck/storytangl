@@ -3,6 +3,7 @@ scripts: script.yaml
 domain_module: coronate_the_regent.domain
 metadata:
   title: "Coronate the Regent"
+  stage_extent: {width: 320, height: 200}
   description: >-
     A deadline-driven training, crisis, and coronation demo. Inspired by the
     design pattern of stat-training succession games: constrained repeated

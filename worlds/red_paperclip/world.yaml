@@ -3,4 +3,5 @@ scripts: script.yaml
 domain_module: red_paperclip.domain
 metadata:
   title: "One Red Paperclip"
+  stage_extent: {width: 320, height: 200}
   description: "A trading-graph puzzle: swap up through a district of traders and pick the corner you get stuck in."

@@ -26,6 +26,12 @@ def test_start_registers_a_user_and_binds_a_ledger(
     assert bridge.ledger_id is not None
 
 
+def test_repartee_discloses_its_maintained_stage_extent(
+    bridge: PygameSessionBridge, repartee_world: str
+) -> None:
+    assert bridge.stage_extent(repartee_world) == (320, 200)
+
+
 def test_opening_turn_carries_narration_and_an_available_choice(
     bridge: PygameSessionBridge, repartee_world: str
 ) -> None:

@@ -62,8 +62,8 @@ class _Row:
 REFUSED_PIN = "X"
 """What a map region pins when no key commits it. See :meth:`Stage._pin`."""
 
-LOGICAL_SIZE = (320, 200)
-SCALE = 3
+_DEFAULT_LOGICAL_SIZE = (320, 200)
+_SUPPORTED_DENSITIES = {_DEFAULT_LOGICAL_SIZE: 1, (640, 400): 2}
 
 BACKGROUND_ROLES = ("narrative_im", "cover_im")
 PORTRAIT_ROLES = ("dialog_im", "avatar_im")
@@ -90,13 +90,13 @@ bound, so a world that generates its cast in a loop degrades by dropping the
 tail rather than by drawing for a minute.
 """
 
-PORTRAIT_HEIGHT = 112
-MARGIN = 10
+_BASE_PORTRAIT_HEIGHT = 112
+_BASE_MARGIN = 10
 _DEFAULT_SLOTS = ("left", "right", "mid")
-ROW_H = 9
-PROSE_TOP = 24
+_BASE_ROW_HEIGHT = 9
+_BASE_PROSE_TOP = 24
 
-PANEL_W = 104
+_BASE_PANEL_WIDTH = 104
 """Width reserved for the state panel when a turn has state worth showing.
 
 Decision Legibility (§5.1) makes rendering pieces a requirement, not a
@@ -185,7 +185,7 @@ CONFIRM_KEY = 8
 PAGE_KEY = 9
 CANCEL_KEY = 0
 
-SURFACE_CONTOUR = 1
+_BASE_SURFACE_CONTOUR = 1
 SURFACE_WASH = 140
 CHOICE_KEYS = "123456789abcdefghijklmnopqrstuvwyz"
 """Keys a choice may be bound to, by position.
@@ -197,10 +197,10 @@ key that looks like the absence of one is worse than no key at all.
 A printed key is a promise, so a choice past the end of this alphabet prints
 no key rather than an ordinal nothing will accept. It stays clickable."""
 
-CHOICE_PITCH = 11
+_BASE_CHOICE_PITCH = 11
 """Vertical step between choice rows, one more than the backing they carry."""
 
-ROW_TEXT_LEFT = 8
+_BASE_ROW_TEXT_LEFT = 8
 """Left edge of row text. The backing sits three pixels outside it, so a row
 and a legend line share one margin however each surface lays them out."""
 
@@ -251,24 +251,51 @@ class Stage:
         self,
         asset_dir: Path | None = None,
         *,
+        logical_size: tuple[int, int] = _DEFAULT_LOGICAL_SIZE,
+        display_scale: int = 3,
         title: str = "StoryTangl",
         clock: Callable[[], float] | None = None,
         animate: bool = True,
         keep_on_screen: bool = True,
     ) -> None:
+        try:
+            self.density = _SUPPORTED_DENSITIES[logical_size]
+        except KeyError as exc:
+            supported = ", ".join(
+                f"{width}x{height}" for width, height in sorted(_SUPPORTED_DENSITIES)
+            )
+            raise ValueError(
+                f"pygame does not support logical size {logical_size[0]}x{logical_size[1]}; "
+                f"supported sizes: {supported}"
+            ) from exc
+        if display_scale <= 0:
+            raise ValueError("display_scale must be a positive integer")
+        self.logical_size = logical_size
+        self.display_scale = display_scale
+        self.portrait_height = _BASE_PORTRAIT_HEIGHT * self.density
+        self.margin = _BASE_MARGIN * self.density
+        self.row_height = _BASE_ROW_HEIGHT * self.density
+        self.prose_top = _BASE_PROSE_TOP * self.density
+        self.panel_width = _BASE_PANEL_WIDTH * self.density
+        self.choice_pitch = _BASE_CHOICE_PITCH * self.density
+        self.row_text_left = _BASE_ROW_TEXT_LEFT * self.density
+        self.surface_contour = _BASE_SURFACE_CONTOUR * self.density
         pygame.init()
         self.window = pygame.display.set_mode(
-            (LOGICAL_SIZE[0] * SCALE, LOGICAL_SIZE[1] * SCALE)
+            (
+                self.logical_size[0] * self.display_scale,
+                self.logical_size[1] * self.display_scale,
+            )
         )
         pygame.display.set_caption(title)
-        self.surface = pygame.Surface(LOGICAL_SIZE)
+        self.surface = pygame.Surface(self.logical_size)
         self.asset_dir = asset_dir
         self.keep_on_screen = keep_on_screen
         """Hold a *named* position inside the frame when the image is too wide
         to sit there whole. Client policy, not world data: an explicit fraction
         is never adjusted, so an image meant to leave the frame still can."""
 
-        self.font = pygame.font.Font(None, 11)
+        self.font = pygame.font.Font(None, 11 * self.density)
         self._cache: dict[str, pygame.Surface | None] = {}
         self.hitboxes: list[tuple[pygame.Rect, Action]] = []
         self.slot_boxes: list[tuple[SurfaceSlot, Piece, pygame.Rect]] = []
@@ -282,7 +309,7 @@ class Stage:
         self.max_scroll = 0
         self.selection_scroll = 0
         self.panel_scroll = 0
-        self.prose_floor = LOGICAL_SIZE[1]
+        self.prose_floor = self.logical_size[1]
         self.selection_numbers: dict[str, int] = {}
         self._last_turn: Turn | None = None
         self._now: Callable[[], float] = clock or pygame.time.get_ticks
@@ -400,14 +427,21 @@ class Stage:
             if pending is not None
             else len(turn.choices)
         )
-        choices_top = LOGICAL_SIZE[1] - 4 - below * 11
+        choices_top = (
+            self.logical_size[1] - 4 * self.density - below * self.choice_pitch
+        )
         # Scenery before faces: an ornament stands in the room, a portrait
         # speaks over it.
         self._draw_staged(loaded)
         self._draw_portraits(turn, loaded, floor=choices_top)
         panelled = self._has_state(turn, placed=placed)
-        width = LOGICAL_SIZE[0] - (PANEL_W if panelled else 0)
-        stage_rect = pygame.Rect(0, PROSE_TOP, width, choices_top - PROSE_TOP)
+        width = self.logical_size[0] - (self.panel_width if panelled else 0)
+        stage_rect = pygame.Rect(
+            0,
+            self.prose_top,
+            width,
+            choices_top - self.prose_top,
+        )
         # Recorded because it is a seam: the surface decides it and the prose
         # layout consumes it, and a test that re-derives it from row counts
         # instead passes whether or not the two agree.
@@ -415,8 +449,12 @@ class Stage:
             turn, placed, rect=stage_rect, pending=pending, numbers=numbers
         )
         prose_floor = self.prose_floor
-        rows = self._rows(turn, unloadable, columns=(width - 12) // 4)
-        capacity = max(1, (prose_floor - PROSE_TOP) // ROW_H)
+        rows = self._rows(
+            turn,
+            unloadable,
+            columns=(width - 12 * self.density) // (4 * self.density),
+        )
+        capacity = max(1, (prose_floor - self.prose_top) // self.row_height)
         self.max_scroll = max(0, len(rows) - capacity)
         if turn is not self._last_turn:
             self.scroll = self.max_scroll  # newest text first on a fresh turn
@@ -424,7 +462,12 @@ class Stage:
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
         self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
         if panelled:
-            self._draw_state_panel(turn, top=2, bottom=choices_top, placed=placed)
+            self._draw_state_panel(
+                turn,
+                top=2 * self.density,
+                bottom=choices_top,
+                placed=placed,
+            )
         if pending is not None:
             self._draw_selection(
                 turn, pending, top=choices_top, on_surface=on_surface, numbers=numbers
@@ -455,7 +498,7 @@ class Stage:
         if surface is None:
             return False
 
-        self.surface.blit(pygame.transform.scale(surface, LOGICAL_SIZE), (0, 0))
+        self.surface.blit(pygame.transform.scale(surface, self.logical_size), (0, 0))
         claimed = self._claimed_regions(turn, plate)
         for index, choice, region in claimed:
             self._draw_region(index, choice, region)
@@ -522,10 +565,10 @@ class Stage:
         """
 
         rect = pygame.Rect(
-            round(region.x * LOGICAL_SIZE[0]),
-            round(region.y * LOGICAL_SIZE[1]),
-            max(4, round(region.w * LOGICAL_SIZE[0])),
-            max(4, round(region.h * LOGICAL_SIZE[1])),
+            round(region.x * self.logical_size[0]),
+            round(region.y * self.logical_size[1]),
+            max(4 * self.density, round(region.w * self.logical_size[0])),
+            max(4 * self.density, round(region.h * self.logical_size[1])),
         )
         # Dim on actionability, not availability: a choice this port cannot
         # collect a value for has no hitbox either, and a live-looking box over
@@ -533,15 +576,20 @@ class Stage:
         # elsewhere.
         action = choice_action(choice)
         colour = CREAM if action is not None else DIM
-        pygame.draw.rect(self.surface, colour, rect, width=1)
+        pygame.draw.rect(self.surface, colour, rect, width=self.density)
 
         # `x` rather than a number for a refused region, for the same reason
         # its legend row carries one: the pin is the key, and this box has no
         # key. Dimmed box, `x` pin, `x)` row -- the three still tie together.
         text = self.font.render(self._pin(index, choice), False, colour)
-        pin = pygame.Rect(rect.x + 1, rect.y + 1, text.get_width() + 4, ROW_H)
+        pin = pygame.Rect(
+            rect.x + self.density,
+            rect.y + self.density,
+            text.get_width() + 4 * self.density,
+            self.row_height,
+        )
         self._wash(pin, INK)
-        self.surface.blit(text, (pin.x + 2, pin.y))
+        self.surface.blit(text, (pin.x + 2 * self.density, pin.y))
 
         if action is not None:
             self.hitboxes.append((rect, action))
@@ -575,7 +623,7 @@ class Stage:
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
 
         visible = rows[self.scroll : self.scroll + capacity]
-        y = LOGICAL_SIZE[1] - capacity * ROW_H - 2
+        y = self.logical_size[1] - capacity * self.row_height - 2 * self.density
         # Choices are keyed by their number rather than by row order, so a
         # scrolled-away choice stays selectable from the keyboard. Two refused
         # rows with the same text now share a key, since both are labelled
@@ -599,27 +647,38 @@ class Stage:
             self._wash(
                 self._backing(
                     text,
-                    left=ROW_TEXT_LEFT,
+                    left=self.row_text_left,
                     y=y,
                     kind=row.kind,
-                    width=LOGICAL_SIZE[0] - 2 * (ROW_TEXT_LEFT - 3),
-                    pitch=ROW_H,
+                    width=self.logical_size[0]
+                    - 2 * (self.row_text_left - 3 * self.density),
+                    pitch=self.row_height,
                 ),
                 INK,
             )
-            self.surface.blit(text, (ROW_TEXT_LEFT, y))
+            self.surface.blit(text, (self.row_text_left, y))
             if action is not None:
-                rect = pygame.Rect(ROW_TEXT_LEFT, y, text.get_width(), ROW_H)
+                rect = pygame.Rect(
+                    self.row_text_left,
+                    y,
+                    text.get_width(),
+                    self.row_height,
+                )
                 self.hitboxes.append((rect, action))
-            y += ROW_H
+            y += self.row_height
 
         if self.max_scroll:
             marker = f"{self.scroll + 1}/{self.max_scroll + 1}  \u2191\u2193"
             surface = self.font.render(marker, False, DIM)
             self.surface.blit(
                 surface,
-                (LOGICAL_SIZE[0] - surface.get_width() - 4,
-                 LOGICAL_SIZE[1] - capacity * ROW_H - ROW_H - 2),
+                (
+                    self.logical_size[0] - surface.get_width() - 4 * self.density,
+                    self.logical_size[1]
+                    - capacity * self.row_height
+                    - self.row_height
+                    - 2 * self.density,
+                ),
             )
 
     @staticmethod
@@ -704,7 +763,9 @@ class Stage:
             wash.fill((*INK, SURFACE_WASH))
             self.surface.blit(wash, band.topleft)
             pygame.draw.rect(
-                self.surface, CREAM, pygame.Rect(band.x, band.y, band.w, SURFACE_CONTOUR)
+                self.surface,
+                CREAM,
+                pygame.Rect(band.x, band.y, band.w, self.surface_contour),
             )
             floor = band.top
         for slot, _piece in placed:
@@ -758,7 +819,7 @@ class Stage:
         self.slot_boxes.append((slot, piece, box))
         edge = RUST if picked else (CREAM if piece.available else DIM)
         pygame.draw.rect(self.surface, CREAM if piece.available else INK, box)
-        pygame.draw.rect(self.surface, edge, box, 1)
+        pygame.draw.rect(self.surface, edge, box, self.density)
 
         label = piece.label or piece.piece_id
         if number is not None:
@@ -767,13 +828,18 @@ class Stage:
             # The same mark an inactive choice row carries. It says the card is
             # not on offer; the panel row still says why.
             label = f"(x) {label}"
-        for index, line in enumerate(self._wrap(label, max(1, (box.w - 4) // 4))):
-            y = box.y + 3 + index * ROW_H
-            if y + ROW_H > box.bottom:
+        for index, line in enumerate(
+            self._wrap(
+                label,
+                max(1, (box.w - 4 * self.density) // (4 * self.density)),
+            )
+        ):
+            y = box.y + 3 * self.density + index * self.row_height
+            if y + self.row_height > box.bottom:
                 break
             self.surface.blit(
                 self.font.render(line, False, INK if piece.available else DIM),
-                (box.x + 3, y),
+                (box.x + 3 * self.density, y),
             )
         if pickable:
             self.hitboxes.append((box, PickPiece(piece_id=piece.piece_id)))
@@ -795,7 +861,7 @@ class Stage:
         backgrounds = self._pick(loaded, BACKGROUND_ROLES)
         if backgrounds:
             surface = backgrounds[0][1]
-            self.surface.blit(pygame.transform.scale(surface, LOGICAL_SIZE), (0, 0))
+            self.surface.blit(pygame.transform.scale(surface, self.logical_size), (0, 0))
         else:
             self.surface.fill(TEAL)
 
@@ -835,10 +901,15 @@ class Stage:
             box_x = (
                 self._place_x(image, width, "mid")
                 if image.x_frac is not None or image.x_slot
-                else (LOGICAL_SIZE[0] - width) // 2
+                else (self.logical_size[0] - width) // 2
             )
             box_y = (
-                self._slot_y(image.y_slot, height, LOGICAL_SIZE[1], keep=image.keep)
+                self._slot_y(
+                    image.y_slot,
+                    height,
+                    self.logical_size[1],
+                    keep=image.keep,
+                )
                 if image.y_frac is None
                 else self._frac_y(image.y_frac, height)
             )
@@ -868,7 +939,10 @@ class Stage:
         seen: set[_ClipKey] = set()
         occurrences: Counter[tuple[str, str, str]] = Counter()
         for index, (image, portrait) in enumerate(staged):
-            height = min(PORTRAIT_HEIGHT, max(24, floor - 24))
+            height = min(
+                self.portrait_height,
+                max(24 * self.density, floor - 24 * self.density),
+            )
             factor = height / portrait.get_height()
             width = max(1, round(portrait.get_width() * factor))
             # A placement wins over a slot. The two are different questions --
@@ -901,7 +975,10 @@ class Stage:
                 seen.add(key)
             scaled = pygame.transform.scale(
                 drawn,
-                (max(1, round(drawn.get_width() * factor)), max(1, round(drawn.get_height() * factor))),
+                (
+                    max(1, round(drawn.get_width() * factor)),
+                    max(1, round(drawn.get_height() * factor)),
+                ),
             )
             self.surface.blit(scaled, (box_x + round(at_x * factor), box_y + round(at_y * factor)))
         # A sprite that left the stage starts its clip afresh when it comes back;
@@ -977,8 +1054,7 @@ class Stage:
             play.started_ms, play.held_ms = now - play.held_ms, None
         return play
 
-    @staticmethod
-    def _frac_x(frac: float, width: int) -> int:
+    def _frac_x(self, frac: float, width: int) -> int:
         """Left edge for an image whose *centre* sits ``frac`` across the stage.
 
         Centre, not left edge, so the same fraction means the same place
@@ -991,10 +1067,9 @@ class Stage:
         entrance into a figure stuck against the edge.
         """
 
-        return round(frac * LOGICAL_SIZE[0]) - width // 2
+        return round(frac * self.logical_size[0]) - width // 2
 
-    @staticmethod
-    def _frac_y(frac: float, height: int) -> int:
+    def _frac_y(self, frac: float, height: int) -> int:
         """Top edge for an image whose *bottom* sits ``frac`` down the stage.
 
         The bottom, because a staged figure stands on something and its
@@ -1002,7 +1077,7 @@ class Stage:
         reason as :meth:`_frac_x`.
         """
 
-        return round(frac * LOGICAL_SIZE[1]) - height
+        return round(frac * self.logical_size[1]) - height
 
     def _place_x(self, image: "StageImage", width: int, fallback: str) -> int:
         """Where this image goes horizontally.
@@ -1019,7 +1094,7 @@ class Stage:
         """
 
         if image.x_frac is not None:
-            return Stage._frac_x(image.x_frac, width)
+            return self._frac_x(image.x_frac, width)
         return self._slot_x(image.x_slot or fallback, width, keep=image.keep)
 
     def _slot_x(self, slot: str, width: int, keep: str | None = None) -> int:
@@ -1039,13 +1114,13 @@ class Stage:
 
         hold = self.keep_on_screen if keep is None else keep in ("whole", "width")
         if slot == "left":
-            x = MARGIN
+            x = self.margin
         elif slot == "right":
-            x = LOGICAL_SIZE[0] - width - MARGIN
+            x = self.logical_size[0] - width - self.margin
         else:
-            x = (LOGICAL_SIZE[0] - width) // 2
+            x = (self.logical_size[0] - width) // 2
         if hold:
-            x = max(0, min(x, LOGICAL_SIZE[0] - width))
+            x = max(0, min(x, self.logical_size[0] - width))
         return x
 
     def _slot_y(self, slot: str | None, height: int, floor: int,
@@ -1062,13 +1137,13 @@ class Stage:
 
         hold = self.keep_on_screen if keep is None else keep in ("whole", "height")
         if slot == "top":
-            y = MARGIN
+            y = self.margin
         elif slot == "mid":
-            y = max(MARGIN, (floor - height) // 2)
+            y = max(self.margin, (floor - height) // 2)
         else:
             y = floor - height
         if hold:
-            y = max(0, min(y, LOGICAL_SIZE[1] - height))
+            y = max(0, min(y, self.logical_size[1] - height))
         return y
 
     def _rows(
@@ -1089,8 +1164,8 @@ class Stage:
             rows.extend(_Row(part, "alt") for part in self._wrap(text, columns))
         return rows
 
-    @staticmethod
     def _backing(
+        self,
         rendered: pygame.Surface,
         *,
         left: int,
@@ -1123,9 +1198,17 @@ class Stage:
             # hairline of scene between them however the caller spaces them.
             # That gap is what makes a row read as a separate thing to click.
             return pygame.Rect(
-                max(0, left - 3), y, rendered.get_width() + 6, pitch - 1
+                max(0, left - 3 * self.density),
+                y,
+                rendered.get_width() + 6 * self.density,
+                pitch - self.density,
             )
-        return pygame.Rect(max(0, left - 3), y, width, ROW_H)
+        return pygame.Rect(
+            max(0, left - 3 * self.density),
+            y,
+            width,
+            self.row_height,
+        )
 
     def _wash(self, rect: pygame.Rect, colour: tuple[int, int, int]) -> None:
         """Lay a translucent backing under text.
@@ -1142,27 +1225,33 @@ class Stage:
     def _draw_rows(self, rows: list[_Row], *, capacity: int, width: int) -> None:
         """Draw one page of rows, bottom-aligned, with a scroll indicator."""
 
-        y = PROSE_TOP + max(0, capacity - len(rows)) * ROW_H
+        y = self.prose_top + max(0, capacity - len(rows)) * self.row_height
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
             rendered = self.font.render(row.text, False, colour)
             self._wash(
                 self._backing(
                     rendered,
-                    left=9,
+                    left=9 * self.density,
                     y=y,
                     kind=row.kind,
-                    width=width - 12,
-                    pitch=ROW_H,
+                    width=width - 12 * self.density,
+                    pitch=self.row_height,
                 ),
                 fill,
             )
-            self.surface.blit(rendered, (9, y))
-            y += ROW_H
+            self.surface.blit(rendered, (9 * self.density, y))
+            y += self.row_height
         if self.max_scroll:
             marker = f"{self.scroll + 1}/{self.max_scroll + 1}  \u2191\u2193"
             surface = self.font.render(marker, False, DIM)
-            self.surface.blit(surface, (LOGICAL_SIZE[0] - surface.get_width() - 8, PROSE_TOP - 10))
+            self.surface.blit(
+                surface,
+                (
+                    self.logical_size[0] - surface.get_width() - 8 * self.density,
+                    self.prose_top - 10 * self.density,
+                ),
+            )
 
     def scroll_by(self, delta: int) -> None:
         """Page through prose. Clamped; a no-op when everything already fits."""
@@ -1179,15 +1268,20 @@ class Stage:
         """
 
         surface = self.font.render(self._clip(f"{marker} {text}"), False, colour)
-        rect = pygame.Rect(8, y, surface.get_width(), surface.get_height())
+        rect = pygame.Rect(
+            8 * self.density,
+            y,
+            surface.get_width(),
+            surface.get_height(),
+        )
         self._wash(
             self._backing(
                 surface,
-                left=8,
+                left=8 * self.density,
                 y=y,
                 kind="choice",
-                width=LOGICAL_SIZE[0],
-                pitch=CHOICE_PITCH,
+                width=self.logical_size[0],
+                pitch=self.choice_pitch,
             ),
             INK,
         )
@@ -1209,7 +1303,7 @@ class Stage:
                 colour=CREAM if action is not None else DIM,
                 action=action,
             )
-            y += 11
+            y += self.choice_pitch
 
     @staticmethod
     def _shown(placed: list[tuple[SurfaceSlot, Piece]]) -> set[str]:
@@ -1356,23 +1450,31 @@ class Stage:
         reachable rather than merely acknowledged.
         """
 
-        left = LOGICAL_SIZE[0] - PANEL_W
-        self._wash(pygame.Rect(left, top, PANEL_W, bottom - top), INK)
-        columns = (PANEL_W - 10) // 4
+        left = self.logical_size[0] - self.panel_width
+        self._wash(pygame.Rect(left, top, self.panel_width, bottom - top), INK)
+        columns = (self.panel_width - 10 * self.density) // (4 * self.density)
         rows = self.panel_rows(turn, columns=columns, placed=placed)
-        capacity = max(1, (bottom - top - 4) // ROW_H)
+        capacity = max(1, (bottom - top - 4 * self.density) // self.row_height)
 
         page, pages, visible = self.panel_page(rows, capacity=capacity)
 
-        y = top + 2
+        y = top + 2 * self.density
         for text, colour in visible:
-            self.surface.blit(self.font.render(text, False, colour), (left + 4, y))
-            y += ROW_H
+            self.surface.blit(
+                self.font.render(text, False, colour),
+                (left + 4 * self.density, y),
+            )
+            y += self.row_height
 
         if pages > 1:
             label = f"page {page + 1}/{pages}  tab"
             surface = self.font.render(label, False, ALERT)
-            rect = pygame.Rect(left + 4, bottom - ROW_H, surface.get_width(), ROW_H)
+            rect = pygame.Rect(
+                left + 4 * self.density,
+                bottom - self.row_height,
+                surface.get_width(),
+                self.row_height,
+            )
             self.surface.blit(surface, rect.topleft)
             self.hitboxes.append((rect, PagePanel()))
 
@@ -1463,7 +1565,7 @@ class Stage:
                 colour=CREAM,
                 action=PickPiece(piece_id=piece.piece_id),
             )
-            y += 11
+            y += self.choice_pitch
 
         pages = self.selection_pages(turn, pending)
         if pages > 1:
@@ -1475,7 +1577,7 @@ class Stage:
                 colour=CREAM,
                 action=PageSelection(),
             )
-            y += 11
+            y += self.choice_pitch
 
         if pending.satisfied:
             # Only reachable once the minimum is met, and reachable by click as
@@ -1489,7 +1591,7 @@ class Stage:
                 colour=CREAM,
                 action=ConfirmSelection(),
             )
-            y += 11
+            y += self.choice_pitch
         else:
             # Keeps its number where a refused choice would print `x)`: this is
             # a control with a fixed binding, and the number is what the panel
@@ -1501,14 +1603,17 @@ class Stage:
                 colour=DIM,
                 action=None,
             )
-            y += 11
+            y += self.choice_pitch
 
         self._row(f"{CANCEL_KEY}.", "Cancel", y=y, colour=DIM, action=CancelSelection())
 
     def hit(self, position: tuple[int, int]) -> Action | None:
         """Map a window click to the action its row performs."""
 
-        logical = (position[0] // SCALE, position[1] // SCALE)
+        logical = (
+            position[0] // self.display_scale,
+            position[1] // self.display_scale,
+        )
         # Reverse draw order: the footer is drawn over the plate, so a legend
         # row sitting on top of a region must win the click it visibly owns.
         for rect, action in reversed(self.hitboxes):
@@ -1527,7 +1632,7 @@ class Stage:
         column budget would clip the wrong worlds.
         """
 
-        limit = LOGICAL_SIZE[0] - 12
+        limit = self.logical_size[0] - 12 * self.density
         if self.font.size(text)[0] <= limit:
             return text
         clipped = text

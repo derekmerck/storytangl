@@ -12,12 +12,14 @@ from tangl.presentation.projection import (
     ProjectionRequest,
     ProjectedSection,
     ProjectedState,
+    StageExtentValue,
     TableValue,
 )
 from tangl.story import World
 
 WORLD_STYLE_CHANNEL = "ui-style-hints-html"
 WORLD_BRANDING_CHANNEL = "ui-branding"
+WORLD_STAGE_CHANNEL = "ui-stage"
 
 service_dispatch = BehaviorRegistry(
     label="service_dispatch",
@@ -89,10 +91,15 @@ def advertise_world_info_channels(
 ) -> list[InfoAffordance]:
     """Advertise the fixed public presentation channels shared by worlds."""
 
-    return [
+    affordances = [
         InfoAffordance(channel_id=WORLD_STYLE_CHANNEL, label="HTML style hints"),
         InfoAffordance(channel_id=WORLD_BRANDING_CHANNEL, label="Branding"),
     ]
+    if caller.metadata.get("stage_extent") is not None:
+        affordances.append(
+            InfoAffordance(channel_id=WORLD_STAGE_CHANNEL, label="Stage extent")
+        )
+    return affordances
 
 
 def project_world_info(
@@ -129,6 +136,15 @@ def project_world_info(
                 title="Branding",
                 kind="branding",
                 value=BrandingValue.model_validate(branding),
+            )
+        )
+    if WORLD_STAGE_CHANNEL in channels:
+        sections.append(
+            ProjectedSection(
+                section_id=WORLD_STAGE_CHANNEL,
+                title="Stage extent",
+                kind="stage_extent",
+                value=StageExtentValue.model_validate(caller.metadata["stage_extent"]),
             )
         )
     return sections
@@ -198,5 +214,6 @@ __all__ = [
     "do_get_world_info",
     "WORLD_BRANDING_CHANNEL",
     "WORLD_STYLE_CHANNEL",
+    "WORLD_STAGE_CHANNEL",
     "service_dispatch",
 ]

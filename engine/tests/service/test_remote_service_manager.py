@@ -16,7 +16,12 @@ import requests
 from tangl.core import BaseFragment
 from tangl.journal.fragments import BlockFragment, ChoiceFragment
 from tangl.persistence import PersistenceManagerFactory
-from tangl.presentation.projection import KvListValue, ProjectedState, TableValue
+from tangl.presentation.projection import (
+    KvListValue,
+    ProjectedState,
+    StageExtentValue,
+    TableValue,
+)
 from tangl.service import (
     CommandEdgeQuery,
     DirectEdgeRequest,
@@ -553,6 +558,36 @@ class TestRemoteResponseHydration:
         assert session.calls[0]["url"] == "https://example.test/api/v2/story/info"
         assert session.calls[0]["params"] == {
             "channels": "ui-sidebar,ui-map,ui-inventory",
+            "render_profile": "raw",
+        }
+
+    def test_world_info_decodes_stage_extent_contract(self) -> None:
+        payload = {
+            "sections": [
+                {
+                    "section_id": "ui-stage",
+                    "title": "Stage extent",
+                    "kind": "stage_extent",
+                    "value": {
+                        "value_type": "stage_extent",
+                        "width": 640,
+                        "height": 400,
+                    },
+                }
+            ]
+        }
+        session = RecordingSession([StubResponse(200, payload)])
+        manager = RemoteServiceManager(
+            "https://example.test/api/v2",
+            session=session,
+        )
+
+        state = manager.get_world_info(world_id="large-stage", channels=["ui-stage"])
+
+        assert state.sections[0].value == StageExtentValue(width=640, height=400)
+        assert session.calls[0]["url"] == "https://example.test/api/v2/world/large-stage/info"
+        assert session.calls[0]["params"] == {
+            "channels": "ui-stage",
             "render_profile": "raw",
         }
 
