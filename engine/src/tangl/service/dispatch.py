@@ -95,7 +95,9 @@ def advertise_world_info_channels(
         InfoAffordance(channel_id=WORLD_STYLE_CHANNEL, label="HTML style hints"),
         InfoAffordance(channel_id=WORLD_BRANDING_CHANNEL, label="Branding"),
     ]
-    if caller.metadata.get("stage_extent") is not None:
+    stage_extent = caller.metadata.get("stage_extent")
+    if stage_extent is not None:
+        StageExtentValue.model_validate(stage_extent)
         affordances.append(
             InfoAffordance(channel_id=WORLD_STAGE_CHANNEL, label="Stage extent")
         )
