@@ -611,7 +611,7 @@ def test_keeping_a_station_whole_only_bites_when_it_would_clip(stage: Stage) -> 
 # full suite. These go through the real path instead.
 
 
-def _staged_fragment(tmp_path, name: str, size=(10, 12), **hints):
+def _staged_fragment(tmp_path, name: str, size=(10, 12), role: str = "staged_im", **hints):
     """A staged image as a world would actually emit one."""
     from PIL import Image as PILImage
     from tangl.journal.fragments import MediaFragment
@@ -636,7 +636,7 @@ def _staged_fragment(tmp_path, name: str, size=(10, 12), **hints):
     manager.index_directory("images")
     return MediaFragment(
         content=manager.get_rit(name), content_format="rit",
-        media_role="staged_im", staging_hints=StagingHints(**hints),
+        media_role=role, staging_hints=StagingHints(**hints),
     )
 
 
@@ -930,3 +930,47 @@ def test_input_coordinates_use_each_stage_local_display_scale(
 def test_stage_refuses_an_unsupported_logical_extent_before_drawing() -> None:
     with pytest.raises(ValueError, match="does not support logical size 800x600"):
         Stage(logical_size=(800, 600))
+
+
+def test_end_to_end_a_portrait_stands_on_the_stage_not_on_the_choice_list(
+    tmp_path,
+) -> None:
+    """A portrait's feet must not move because the turn offered one more option.
+
+    Portraits used to be floored at the top of the choice list, which cost them
+    exactly the height that list took: the same character stood higher *and*
+    drew smaller on a turn with eight choices than on one with one. Staged
+    ornaments were floored at the stage all along, so two figures sharing a room
+    disagreed about where the ground was, and the disagreement moved every turn.
+
+    Both numbers are checked, because flooring and sizing failed together and
+    either alone would leave the other free to drift.
+    """
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    def drawn(choice_count: int) -> tuple[tuple[int, int, int, int], int]:
+        # Stationed right, and the choices kept short, so the list is drawn
+        # over empty stage rather than over the figure we are measuring.
+        frag = _staged_fragment(
+            tmp_path, "face.png", size=(10, 12), role="dialog_im", media_x="right"
+        )
+        [turn] = PygameSessionBridge().build_turns([frag])
+        turn.choices = [
+            Choice(edge_id=uuid4(), text=f"c{index}") for index in range(choice_count)
+        ]
+        stage = _drawn(turn, tmp_path)
+        box = _found(stage, "face.png")
+        assert box is not None, "the portrait did not reach the stage at all"
+        return box, stage.logical_size[1]
+
+    (sparse, height), (crowded, _) = drawn(1), drawn(8)
+
+    assert sparse == crowded, (
+        "the portrait moved or resized when the choice list grew: "
+        f"{sparse} with one choice, {crowded} with eight"
+    )
+    # The stage's own last row, the same floor `_draw_staged` measures from.
+    assert sparse[3] == height - 1, (
+        f"the portrait's feet land at {sparse[3]}, not on the stage floor {height - 1}"
+    )

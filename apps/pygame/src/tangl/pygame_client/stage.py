@@ -431,9 +431,10 @@ class Stage:
             self.logical_size[1] - 4 * self.density - below * self.choice_pitch
         )
         # Scenery before faces: an ornament stands in the room, a portrait
-        # speaks over it.
+        # speaks over it. Both stand on the stage, not on the text: the
+        # choice list is drawn over them rather than holding them up.
         self._draw_staged(loaded)
-        self._draw_portraits(turn, loaded, floor=choices_top)
+        self._draw_portraits(turn, loaded)
         panelled = self._has_state(turn, placed=placed)
         width = self.logical_size[0] - (self.panel_width if panelled else 0)
         stage_rect = pygame.Rect(
@@ -923,7 +924,7 @@ class Stage:
             self.surface.blit(surface, (box_x, box_y))
 
     def _draw_portraits(
-        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]], *, floor: int
+        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]]
     ) -> None:
         """Place up to three sprites on a shared baseline, preserving aspect.
 
@@ -931,6 +932,13 @@ class Stage:
         playing, its frame is drawn over the same box where the manifest's
         placement puts it, so starting, stopping or switching a clip never moves
         the character.
+
+        The baseline is the stage's own bottom, the same one :meth:`_draw_staged`
+        uses. A portrait standing on the choice list instead would be a figure
+        whose feet move when the turn happens to offer one more option -- and
+        holding it clear of the text costs exactly the height the text takes,
+        so a long list shrank every face on stage. The list is UI drawn over
+        the room; the room does not rest on it.
         """
 
         fresh = turn is not self._staged_turn
@@ -938,11 +946,9 @@ class Stage:
         staged = self._pick(loaded, PORTRAIT_ROLES)[:3]
         seen: set[_ClipKey] = set()
         occurrences: Counter[tuple[str, str, str]] = Counter()
+        floor = self.logical_size[1]
         for index, (image, portrait) in enumerate(staged):
-            height = min(
-                self.portrait_height,
-                max(24 * self.density, floor - 24 * self.density),
-            )
+            height = self.portrait_height
             factor = height / portrait.get_height()
             width = max(1, round(portrait.get_width() * factor))
             # A placement wins over a slot. The two are different questions --
