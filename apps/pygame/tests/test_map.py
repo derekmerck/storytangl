@@ -27,9 +27,7 @@ from tangl.pygame_client.models import (  # noqa: E402
     Turn,
 )
 from tangl.pygame_client.stage import (  # noqa: E402
-    LOGICAL_SIZE,
-    ROW_TEXT_LEFT,
-    SCALE,
+    MAP_FOOTER_ROWS,
     Stage,
 )
 
@@ -44,11 +42,11 @@ PLATE = MapPlate(
 )
 
 
-def _plate_file(tmp_path):
+def _plate_file(tmp_path, logical_size=(320, 200)):
     """A stand-in plate. The renderer only needs something it can load."""
 
     path = tmp_path / "quay_map.png"
-    pygame.image.save(pygame.Surface(LOGICAL_SIZE), str(path))
+    pygame.image.save(pygame.Surface(logical_size), str(path))
     return path
 
 
@@ -87,12 +85,15 @@ def frame() -> Turn:
     )
 
 
-def _centre(region: MapRegion) -> tuple[int, int]:
+def _centre(stage: Stage, region: MapRegion) -> tuple[int, int]:
     """Window coordinates at the middle of a region."""
 
-    x = (region.x + region.w / 2) * LOGICAL_SIZE[0]
-    y = (region.y + region.h / 2) * LOGICAL_SIZE[1]
-    return (round(x) * SCALE, round(y) * SCALE)
+    x = (region.x + region.w / 2) * stage.logical_size[0]
+    y = (region.y + region.h / 2) * stage.logical_size[1]
+    return (
+        round(x) * stage.display_scale,
+        round(y) * stage.display_scale,
+    )
 
 
 def test_a_region_click_commits_what_its_numbered_entry_commits(stage, frame) -> None:
@@ -102,7 +103,7 @@ def test_a_region_click_commits_what_its_numbered_entry_commits(stage, frame) ->
 
     # The authored activation payload rides along; a hotspot commits exactly
     # what the numbered row commits, payload included.
-    assert stage.hit(_centre(quayside)) == Commit(
+    assert stage.hit(_centre(stage, quayside)) == Commit(
         edge_id=choice.edge_id, payload={"move": "quayside"}
     )
 
@@ -113,7 +114,7 @@ def test_a_guarded_region_is_drawn_but_refuses_the_click(stage, frame) -> None:
     stage.draw(frame)
     salon = next(r for r in PLATE.regions if r.name == "salon")
 
-    assert stage.hit(_centre(salon)) is None
+    assert stage.hit(_centre(stage, salon)) is None
 
 
 def test_a_refused_region_pins_x_where_a_live_one_pins_its_number(
@@ -157,7 +158,7 @@ def test_a_legend_row_is_clipped_like_any_other_row(stage, frame) -> None:
     stage.draw(replace(frame, choices=[long_choice]))
 
     for rect, _action in stage.hitboxes:
-        assert rect.right <= LOGICAL_SIZE[0]
+        assert rect.right <= stage.logical_size[0]
 
 
 def test_a_legend_row_backs_only_its_own_text(stage, frame) -> None:
@@ -171,10 +172,15 @@ def test_a_legend_row_backs_only_its_own_text(stage, frame) -> None:
     live = frame.choices[0]
     rendered = stage.font.render(stage._choice_label(1, live), False, (0, 0, 0))
     backing = stage._backing(
-        rendered, left=8, y=0, kind="choice", width=LOGICAL_SIZE[0] - 10, pitch=9
+        rendered,
+        left=stage.row_text_left,
+        y=0,
+        kind="choice",
+        width=stage.logical_size[0] - 10,
+        pitch=stage.row_height,
     )
 
-    assert backing.width < LOGICAL_SIZE[0]
+    assert backing.width < stage.logical_size[0]
     assert backing.width == rendered.get_width() + 6
     # Prose stays a block: a ragged edge on wrapped narration reads as damage.
     prose = stage._backing(
@@ -191,7 +197,7 @@ def test_a_region_no_choice_claims_is_inert(stage, frame) -> None:
     stage.draw(frame)
     lighthouse = next(r for r in PLATE.regions if r.name == "lighthouse")
 
-    assert stage.hit(_centre(lighthouse)) is None
+    assert stage.hit(_centre(stage, lighthouse)) is None
 
 
 def test_every_choice_stays_reachable_off_the_plate(stage, frame) -> None:
@@ -215,14 +221,14 @@ def test_a_turn_without_a_plate_falls_back_to_the_ordinary_layout(stage, frame) 
     stage.draw(frame)
     quayside = next(r for r in PLATE.regions if r.name == "quayside")
 
-    assert stage.hit(_centre(quayside)) is None
+    assert stage.hit(_centre(stage, quayside)) is None
     assert {a.edge_id for _rect, a in stage.hitboxes} == {frame.choices[0].edge_id}
 
 
 def test_the_plate_named_by_geometry_wins_over_a_stale_one(stage, frame, tmp_path):
     """A batch crossing two maps must not pair one picture with the other's rects."""
 
-    stale = pygame.Surface(LOGICAL_SIZE)
+    stale = pygame.Surface(stage.logical_size)
     stale.fill((255, 0, 0))
     pygame.image.save(stale, str(tmp_path / "old_map.png"))
     frame.images.insert(0, StageImage(role="map_im", source="old_map.png"))
@@ -237,14 +243,17 @@ def test_the_plate_named_by_geometry_wins_over_a_stale_one(stage, frame, tmp_pat
 def test_an_unnamed_plate_image_refuses_to_guess(stage, frame, tmp_path):
     """Two staged maps and no name is ambiguous, so nothing is drawn."""
 
-    pygame.image.save(pygame.Surface(LOGICAL_SIZE), str(tmp_path / "old_map.png"))
+    pygame.image.save(
+        pygame.Surface(stage.logical_size),
+        str(tmp_path / "old_map.png"),
+    )
     frame.images.insert(0, StageImage(role="map_im", source="old_map.png"))
     frame.plate = MapPlate(name="quay", image=None, regions=PLATE.regions)
 
     stage.draw(frame)
     quayside = next(r for r in PLATE.regions if r.name == "quayside")
 
-    assert stage.hit(_centre(quayside)) is None
+    assert stage.hit(_centre(stage, quayside)) is None
 
 
 def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
@@ -259,10 +268,13 @@ def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
     legend = next(
         rect for rect, action in stage.hitboxes
         if action.edge_id == frame.choices[0].edge_id
-        and rect.h == 9
-        and rect.x == ROW_TEXT_LEFT
+        and rect.h == stage.row_height
+        and rect.x == stage.row_text_left
     )
-    click = ((legend.x + 1) * SCALE, (legend.y + 1) * SCALE)
+    click = (
+        (legend.x + 1) * stage.display_scale,
+        (legend.y + 1) * stage.display_scale,
+    )
 
     # Both the region and the legend row cover this pixel; the legend is on top.
     assert wide.x == 0.0 and wide.y == 0.0  # the region really does cover it
@@ -281,11 +293,13 @@ def test_a_long_footer_pages_instead_of_covering_the_map(stage, frame):
     ]
     stage.draw(frame)
 
-    from tangl.pygame_client.stage import MAP_FOOTER_ROWS, ROW_H
-
     assert stage.max_scroll > 0
-    footer_top = LOGICAL_SIZE[1] - MAP_FOOTER_ROWS * ROW_H - 2
-    assert footer_top > LOGICAL_SIZE[1] // 2, "footer must not take half the plate"
+    footer_top = (
+        stage.logical_size[1]
+        - MAP_FOOTER_ROWS * stage.row_height
+        - 2 * stage.density
+    )
+    assert footer_top > stage.logical_size[1] // 2, "footer must not take half the plate"
     assert all(rect.y >= footer_top for rect, _action in stage.hitboxes)
 
 
@@ -315,3 +329,39 @@ def test_an_attributed_line_keeps_its_speaker_in_the_footer(stage, frame):
 
     assert any(row.kind == "heading" and "Master" in row.text for row in rows)
     assert any(row.kind == "dialog" for row in rows)
+
+
+def test_density_two_map_plate_and_footer_stay_within_the_stage(tmp_path) -> None:
+    plate_path = tmp_path / "large_map.png"
+    pygame.image.save(pygame.Surface((640, 400)), str(plate_path))
+    choice = Choice(
+        edge_id=uuid4(),
+        text="Cross the district",
+        tags=frozenset({"ui:plate:large:district"}),
+    )
+    turn = Turn(
+        step=1,
+        images=[StageImage(role="map_im", source=plate_path.name)],
+        lines=[Line(text="A long district report. " * 40)],
+        choices=[choice],
+        plate=MapPlate(
+            name="large",
+            image=plate_path.name,
+            regions=(
+                MapRegion(name="district", x=0.1, y=0.1, w=0.4, h=0.5),
+            ),
+        ),
+    )
+    stage = Stage(asset_dir=tmp_path, logical_size=(640, 400), display_scale=1)
+    try:
+        stage.draw(turn)
+
+        assert stage.max_scroll > 0
+        assert stage.hit((192, 140)) is not None
+        assert all(
+            0 <= rect.left <= rect.right <= 640
+            and 0 <= rect.top <= rect.bottom <= 400
+            for rect, _action in stage.hitboxes
+        )
+    finally:
+        pygame.quit()

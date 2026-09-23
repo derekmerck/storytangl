@@ -7,9 +7,11 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from PIL import Image
 
 WORLD = Path(__file__).resolve().parents[3] / "worlds" / "repartee_loop"
+LOGICAL_SIZE = (320, 200)
 PACKS = sorted(p for p in WORLD.glob("media*") if p.is_dir())
 MANIFEST_PACKS = [p for p in PACKS if (p / "manifest.json").is_file()]
 ASSET_NAMES = {
@@ -28,6 +30,15 @@ CASES = [case for pack in MANIFEST_PACKS for case in _entries(pack)]
 
 def test_demo_ships_both_interchangeable_art_packs() -> None:
     assert {pack.name for pack in PACKS} == {"media", "media_spaceport"}
+
+
+def test_world_declares_the_extent_both_packs_target() -> None:
+    world = yaml.safe_load((WORLD / "world.yaml").read_text())
+
+    assert world["metadata"]["stage_extent"] == {
+        "width": LOGICAL_SIZE[0],
+        "height": LOGICAL_SIZE[1],
+    }
 
 
 LFS_POINTER_MAGIC = b"version https://git-lfs.github.com/spec/v1"

@@ -24,6 +24,7 @@ from tangl.journal.fragments import (
 )
 from tangl.persistence import PersistenceManagerFactory
 from tangl.presentation.hints import STAGING_MAX, STAGING_MIN, TimingName
+from tangl.presentation.projection import StageExtentValue
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.media import (
     MediaContentProfile,
@@ -56,6 +57,9 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_STAGE_EXTENT = (320, 200)
+_SUPPORTED_STAGE_EXTENTS = {_DEFAULT_STAGE_EXTENT, (640, 400)}
 
 
 def _text(value: Any) -> str | None:
@@ -285,6 +289,34 @@ class PygameSessionBridge:
         )
 
     # ── session lifecycle ────────────────────────────────────────────────
+
+    def stage_extent(self, world_id: str) -> tuple[int, int]:
+        """Return this port's supported logical extent for ``world_id``.
+
+        Absence is an explicit client fallback, not a claim made by the world.
+        """
+
+        catalog = self.service_manager.get_world_info(world_id=world_id)
+        if not any(channel.channel_id == "ui-stage" for channel in catalog.channels):
+            return _DEFAULT_STAGE_EXTENT
+        state = self.service_manager.get_world_info(
+            world_id=world_id,
+            channels=["ui-stage"],
+        )
+        value = state.sections[0].value
+        if not isinstance(value, StageExtentValue):
+            raise TypeError(f"Expected StageExtentValue for ui-stage, got {type(value)!r}")
+        extent = (value.width, value.height)
+        if extent not in _SUPPORTED_STAGE_EXTENTS:
+            supported = ", ".join(
+                f"{width}x{height}"
+                for width, height in sorted(_SUPPORTED_STAGE_EXTENTS)
+            )
+            raise ValueError(
+                f"pygame does not support declared stage extent {value.width}x{value.height}; "
+                f"supported extents: {supported}"
+            )
+        return extent
 
     def start(self, world_id: str) -> RuntimeEnvelope:
         """Create a fresh story session for ``world_id``."""

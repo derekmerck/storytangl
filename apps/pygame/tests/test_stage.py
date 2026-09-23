@@ -15,20 +15,17 @@ from tangl.pygame_client.models import (  # noqa: E402
     Choice,
     Finding,
     Line,
+    PendingSelection,
     Piece,
     Turn,
     Zone,
 )
-from tangl.presentation.intent import TextAccepts  # noqa: E402
+from tangl.presentation.intent import PiecesAccepts, TextAccepts  # noqa: E402
 from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     CHOICE_KEYS,
-    LOGICAL_SIZE,
-    MARGIN,
     STAGED_LIMIT,
     STAGED_ROLES,
-    PANEL_W,
-    SCALE,
     Stage,
     choice_action,
     key_for_position,
@@ -68,7 +65,7 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
 
     assert len(stage.hitboxes) == 3
     for rect, _action in stage.hitboxes:
-        assert rect.bottom <= LOGICAL_SIZE[1]
+        assert rect.bottom <= stage.logical_size[1]
         assert rect.top >= 0
 
 
@@ -153,7 +150,7 @@ def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> No
     stage.draw(Turn(step=1, lines=[Line(text="At the strip.")], choices=[long_choice]))
 
     ((rect, _action),) = stage.hitboxes
-    assert rect.right <= LOGICAL_SIZE[0]
+    assert rect.right <= stage.logical_size[0]
     assert stage._clip(long_choice.text).endswith("…")
 
 
@@ -161,7 +158,10 @@ def test_every_available_choice_is_clickable(stage: Stage) -> None:
     stage.draw(_turn(12, choice_count=3))
 
     for rect, action in stage.hitboxes:
-        centre = (rect.centerx * SCALE, rect.centery * SCALE)
+        centre = (
+            rect.centerx * stage.display_scale,
+            rect.centery * stage.display_scale,
+        )
         assert stage.hit(centre) is not None
         assert stage.hit(centre).edge_id == action.edge_id
 
@@ -197,9 +197,17 @@ def test_a_paragraph_longer_than_the_surface_still_renders(stage: Stage) -> None
     )
     stage.draw(turn)
 
-    band = pygame.Surface((LOGICAL_SIZE[0], 140))
-    band.blit(stage.surface, (0, 0), pygame.Rect(0, 24, LOGICAL_SIZE[0], 140))
-    colours = {band.get_at((x, y))[:3] for x in range(0, LOGICAL_SIZE[0], 4) for y in range(0, 140, 4)}
+    band = pygame.Surface((stage.logical_size[0], 140))
+    band.blit(
+        stage.surface,
+        (0, 0),
+        pygame.Rect(0, stage.prose_top, stage.logical_size[0], 140),
+    )
+    colours = {
+        band.get_at((x, y))[:3]
+        for x in range(0, stage.logical_size[0], 4)
+        for y in range(0, 140, 4)
+    }
     assert len(colours) > 1, "prose band is blank"
     assert stage.max_scroll > 0, "an oversized paragraph should be scrollable"
 
@@ -282,12 +290,16 @@ def test_a_turn_with_state_narrows_the_prose_and_draws_a_panel(stage) -> None:
 
     plain = Turn(step=1, lines=[Line(text="word " * 60)])
     stage.draw(plain)
-    wide = len(stage._rows(plain, [], columns=(LOGICAL_SIZE[0] - 12) // 4))
+    wide = len(stage._rows(plain, [], columns=(stage.logical_size[0] - 12) // 4))
 
     panelled = _packet_turn(lines=[Line(text="word " * 60)])
     stage.draw(panelled)
     narrow = len(
-        stage._rows(panelled, [], columns=(LOGICAL_SIZE[0] - PANEL_W - 12) // 4)
+        stage._rows(
+            panelled,
+            [],
+            columns=(stage.logical_size[0] - stage.panel_width - 12) // 4,
+        )
     )
 
     assert narrow > wide, "prose rewraps into the narrower column"
@@ -335,7 +347,7 @@ def test_overflowing_panel_state_stays_reachable_by_paging(stage) -> None:
     """
 
     crowded = _crowded_turn()
-    columns = (PANEL_W - 10) // 4
+    columns = (stage.panel_width - 10) // 4
     rows = stage.panel_rows(crowded, columns=columns)
     capacity = 8
     _page, pages, _visible = stage.panel_page(rows, capacity=capacity)
@@ -353,7 +365,7 @@ def test_overflowing_panel_state_stays_reachable_by_paging(stage) -> None:
 
 def test_panel_paging_wraps_back_to_the_first_page(stage) -> None:
     crowded = _crowded_turn()
-    rows = stage.panel_rows(crowded, columns=(PANEL_W - 10) // 4)
+    rows = stage.panel_rows(crowded, columns=(stage.panel_width - 10) // 4)
     first = stage.panel_page(rows, capacity=8)
 
     _page, pages, _visible = first
@@ -396,11 +408,11 @@ def test_an_unsupported_map_choice_is_dimmed_and_explains_itself(stage) -> None:
 def test_fractional_media_x_centres_the_image_on_the_fraction(stage: Stage) -> None:
     """A placed image puts its *centre* on the fraction, whatever it is wide."""
 
-    narrow = Stage._frac_x(0.5, width=20)
-    wide = Stage._frac_x(0.5, width=80)
+    narrow = stage._frac_x(0.5, width=20)
+    wide = stage._frac_x(0.5, width=80)
 
-    assert narrow + 20 // 2 == LOGICAL_SIZE[0] // 2
-    assert wide + 80 // 2 == LOGICAL_SIZE[0] // 2
+    assert narrow + 20 // 2 == stage.logical_size[0] // 2
+    assert wide + 80 // 2 == stage.logical_size[0] // 2
 
 
 def test_a_placement_may_sit_outside_the_frame(stage: Stage) -> None:
@@ -411,23 +423,23 @@ def test_a_placement_may_sit_outside_the_frame(stage: Stage) -> None:
     into a figure stuck against the edge.
     """
 
-    assert Stage._frac_x(-0.5, width=60) < 0
-    assert Stage._frac_x(1.5, width=60) > LOGICAL_SIZE[0] - 60
+    assert stage._frac_x(-0.5, width=60) < 0
+    assert stage._frac_x(1.5, width=60) > stage.logical_size[0] - 60
     # and the ordinary case still lands where it says
-    assert Stage._frac_x(0.5, width=60) + 30 == LOGICAL_SIZE[0] // 2
+    assert stage._frac_x(0.5, width=60) + 30 == stage.logical_size[0] // 2
 
 
 def test_fractional_media_y_places_the_baseline_not_the_top(stage: Stage) -> None:
     """A staged figure stands on something; the fraction is where it stands."""
 
-    top = Stage._frac_y(0.5, height=40)
+    top = stage._frac_y(0.5, height=40)
 
-    assert top + 40 == LOGICAL_SIZE[1] // 2
+    assert top + 40 == stage.logical_size[1] // 2
 
 
 def test_a_vertical_placement_may_sit_outside_the_frame(stage: Stage) -> None:
-    assert Stage._frac_y(-0.5, height=40) < 0
-    assert Stage._frac_y(1.5, height=40) > LOGICAL_SIZE[1] - 40
+    assert stage._frac_y(-0.5, height=40) < 0
+    assert stage._frac_y(1.5, height=40) > stage.logical_size[1] - 40
 def test_a_staging_position_may_be_off_stage_but_not_a_unit_mistake() -> None:
     """The bounds separate a position from someone who wrote 50 meaning half."""
 
@@ -480,7 +492,7 @@ def test_a_placed_image_ignores_arrival_order(stage: Stage) -> None:
     second = StageImage(role="dialog_im", source="b.png", x_frac=0.25)
 
     assert first.x_slot is None and second.x_slot is None
-    assert Stage._frac_x(first.x_frac, 40) == Stage._frac_x(second.x_frac, 40)
+    assert stage._frac_x(first.x_frac, 40) == stage._frac_x(second.x_frac, 40)
 
 
 # ── staged images (scenery inhabitants) ──────────────────────────────────────
@@ -531,7 +543,7 @@ def test_an_explicit_fraction_is_never_held_on_screen(stage: Stage) -> None:
     """A placement is a decision already made; adjusting it breaks entrances."""
 
     assert stage.keep_on_screen
-    assert Stage._frac_x(-0.5, width=60) < 0
+    assert stage._frac_x(-0.5, width=60) < 0
 
 
 def test_a_fraction_is_exact_whatever_keep_says(stage: Stage) -> None:
@@ -550,7 +562,7 @@ def test_a_fraction_is_exact_whatever_keep_says(stage: Stage) -> None:
     )
 
     assert at(None) == at("none") == at("whole") == at("width")
-    assert at("whole") > LOGICAL_SIZE[0] - 120        # genuinely off the edge
+    assert at("whole") > stage.logical_size[0] - 120  # genuinely off the edge
 
 
 def test_a_station_is_this_port_s_reading_not_a_coordinate(stage: Stage) -> None:
@@ -562,9 +574,9 @@ def test_a_station_is_this_port_s_reading_not_a_coordinate(stage: Stage) -> None
     """
 
     w = 60
-    assert stage._slot_x("left", w) == MARGIN
-    assert stage._slot_x("right", w) == LOGICAL_SIZE[0] - w - MARGIN
-    assert stage._slot_x("mid", w) == (LOGICAL_SIZE[0] - w) // 2
+    assert stage._slot_x("left", w) == stage.margin
+    assert stage._slot_x("right", w) == stage.logical_size[0] - w - stage.margin
+    assert stage._slot_x("mid", w) == (stage.logical_size[0] - w) // 2
     assert stage._slot_x("nonsense", w) == stage._slot_x("mid", w)
 
 
@@ -573,9 +585,9 @@ def test_a_vertical_station_is_honoured_rather_than_discarded(stage: Stage) -> N
 
     h, floor = 40, 150
     assert stage._slot_y("bottom", h, floor) == floor - h
-    assert stage._slot_y("top", h, floor) == MARGIN
+    assert stage._slot_y("top", h, floor) == stage.margin
     assert stage._slot_y(None, h, floor) == floor - h     # the shared baseline
-    assert MARGIN <= stage._slot_y("mid", h, floor) <= floor - h
+    assert stage.margin <= stage._slot_y("mid", h, floor) <= floor - h
 
 
 def test_keeping_a_station_whole_only_bites_when_it_would_clip(stage: Stage) -> None:
@@ -665,7 +677,9 @@ def _drawn(turn, tmp_path) -> "Stage":
     return stage
 
 
-def test_end_to_end_an_off_stage_fraction_is_drawn_off_stage(tmp_path) -> None:
+def test_end_to_end_an_off_stage_fraction_is_drawn_off_stage(
+    stage: Stage, tmp_path
+) -> None:
     """`[-2, 3]` at the model and `[0, 1]` at the bridge silently lost entrances."""
 
     from tangl.pygame_client.bridge import PygameSessionBridge
@@ -683,12 +697,14 @@ def test_end_to_end_an_off_stage_fraction_is_drawn_off_stage(tmp_path) -> None:
         # column zero and only a sliver of its 40px width survives.
         assert left == 0
         assert right - left + 1 < 40, "the whole image is showing, so it was clamped"
-        assert right == Stage._frac_x(-0.03125, 40) + 39
+        assert right == stage._frac_x(-0.03125, 40) + 39
     finally:
         pygame.quit()
 
 
-def test_end_to_end_a_named_vertical_level_reaches_the_pixels(tmp_path) -> None:
+def test_end_to_end_a_named_vertical_level_reaches_the_pixels(
+    stage: Stage, tmp_path
+) -> None:
     """`media_y="bottom"` was accepted, carried, and then had nowhere to go."""
 
     from tangl.pygame_client.bridge import PygameSessionBridge
@@ -705,8 +721,8 @@ def test_end_to_end_a_named_vertical_level_reaches_the_pixels(tmp_path) -> None:
     try:
         high, low = baseline_of("hi.png", "top"), baseline_of("lo.png", "bottom")
         assert high < low, "a named level did not move the image"
-        assert high == MARGIN + 29             # tucked under the top gutter
-        assert low == LOGICAL_SIZE[1] - 1      # standing on the floor
+        assert high == stage.margin + 29  # tucked under the top gutter
+        assert low == stage.logical_size[1] - 1  # standing on the floor
     finally:
         pygame.quit()
 
@@ -738,7 +754,7 @@ def test_end_to_end_a_named_level_takes_its_turn_in_the_depth_sort(tmp_path) -> 
 
     try:
         stage = _drawn(turn, tmp_path)
-        r, g, b, _ = stage.surface.get_at((LOGICAL_SIZE[0] // 2, 80))
+        r, g, b, _ = stage.surface.get_at((stage.logical_size[0] // 2, 80))
         assert (g, b) == (0, _tint("tall.png")), (
             "the far figure painted over the near one: the station did not "
             "take its turn in the depth sort"
@@ -759,7 +775,7 @@ def test_end_to_end_a_mirrored_image_is_mirrored_once(tmp_path) -> None:
         stage.draw(turn)
         # Read what actually landed on the stage, not an intermediate surface:
         # a mirror applied twice is invisible anywhere earlier.
-        x0, y0 = Stage._frac_x(0.5, 10), Stage._frac_y(0.9, 12)
+        x0, y0 = stage._frac_x(0.5, 10), stage._frac_y(0.9, 12)
         row = y0 + 6
         left = stage.surface.get_at((x0, row))
         right = stage.surface.get_at((x0 + 9, row))
@@ -801,3 +817,116 @@ def test_end_to_end_capacity_drops_the_tail_not_the_nearest(tmp_path) -> None:
         assert drawn == set(names[:STAGED_LIMIT])
     finally:
         pygame.quit()
+
+
+def test_density_two_stage_scales_layout_but_not_staged_art(tmp_path) -> None:
+    """A 640x400 declaration doubles UI density while pack-sized art stays natural."""
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+    from tangl.pygame_client.models import Surface, SurfaceSlot
+
+    fragment = _staged_fragment(
+        tmp_path,
+        "large-stage.png",
+        size=(80, 120),
+        media_x=0.5,
+        media_y=1.0,
+    )
+    [turn] = PygameSessionBridge().build_turns([fragment])
+    staged_only = Turn(step=turn.step, images=list(turn.images))
+    turn.lines = [Line(text=f"Line {index} " * 12) for index in range(30)]
+    turn.choices = [Choice(edge_id=uuid4(), text=f"Choice {index}") for index in range(4)]
+    turn.pieces = [
+        Piece(piece_id=f"piece-{index}", kind="document", text=f"Document {index}")
+        for index in range(18)
+    ]
+    turn.findings = [Finding(key="status", value="review")]
+    turn.surface = Surface(
+        name="desk",
+        band=(0.0, 0.7, 1.0, 0.3),
+        slots=(
+            SurfaceSlot(
+                name="document",
+                holds="document",
+                x=0.05,
+                y=0.72,
+                w=0.2,
+                h=0.2,
+            ),
+        ),
+    )
+
+    stage = Stage(
+        asset_dir=tmp_path / "images",
+        logical_size=(640, 400),
+        display_scale=1,
+    )
+    try:
+        stage.draw(staged_only)
+        box = _found(stage, "large-stage.png")
+        assert box is not None
+        left, top, right, bottom = box
+        assert (right - left + 1, bottom - top + 1) == (80, 120)
+
+        stage.draw(turn)
+
+        assert stage.surface.get_size() == (640, 400)
+        assert stage.window.get_size() == (640, 400)
+        assert stage.density == 2
+        assert stage.row_height == 18
+        assert stage.margin == 20
+        assert stage.prose_top == 48
+        assert stage.panel_width == 208
+        assert stage.font.get_height() >= 14
+        assert stage.max_scroll > 0
+        assert stage.slot_boxes
+        assert stage.panel_page(
+            stage.panel_rows(turn, columns=20),
+            capacity=8,
+        )[1] > 1
+        assert all(
+            0 <= rect.left <= rect.right <= 640
+            and 0 <= rect.top <= rect.bottom <= 400
+            for rect, _action in stage.hitboxes
+        )
+
+        pending = PendingSelection(
+            choice=Choice(
+                edge_id=uuid4(),
+                text="Select documents",
+                accepts=PiecesAccepts(min=1, max=3),
+            )
+        )
+        stage.draw(turn, pending)
+        assert stage.selection_pages(turn, pending) > 1
+        assert all(rect.bottom <= 400 for rect, _action in stage.hitboxes)
+    finally:
+        pygame.quit()
+
+
+@pytest.mark.parametrize(
+    ("logical_size", "display_scale"),
+    [((320, 200), 3), ((640, 400), 1)],
+)
+def test_input_coordinates_use_each_stage_local_display_scale(
+    logical_size: tuple[int, int],
+    display_scale: int,
+) -> None:
+    choice = Choice(edge_id=uuid4(), text="Continue")
+    stage = Stage(logical_size=logical_size, display_scale=display_scale)
+    try:
+        stage.draw(Turn(step=1, choices=[choice]))
+        rect, action = stage.hitboxes[0]
+        click = (
+            rect.centerx * stage.display_scale,
+            rect.centery * stage.display_scale,
+        )
+
+        assert stage.hit(click) == action
+    finally:
+        pygame.quit()
+
+
+def test_stage_refuses_an_unsupported_logical_extent_before_drawing() -> None:
+    with pytest.raises(ValueError, match="does not support logical size 800x600"):
+        Stage(logical_size=(800, 600))

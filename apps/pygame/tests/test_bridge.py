@@ -24,6 +24,12 @@ from tangl.presentation.intent import (
     QuantityAccepts,
     TextAccepts,
 )
+from tangl.presentation.projection import (
+    InfoAffordance,
+    ProjectedSection,
+    ProjectedState,
+    StageExtentValue,
+)
 from tangl.presentation.values import KvRow
 from tangl.pygame_client.bridge import (
     PygameSessionBridge,
@@ -38,6 +44,55 @@ from tangl.pygame_client.models import Choice, PendingSelection
 @pytest.fixture
 def bridge() -> PygameSessionBridge:
     return PygameSessionBridge()
+
+
+class _WorldInfoService:
+    def __init__(self, extent: tuple[int, int] | None) -> None:
+        self.extent = extent
+        self.calls: list[list[str] | None] = []
+
+    def get_world_info(
+        self,
+        *,
+        world_id: str,
+        channels: list[str] | None = None,
+    ) -> ProjectedState:
+        assert world_id == "fixture_world"
+        self.calls.append(channels)
+        if channels is None:
+            available = [] if self.extent is None else [InfoAffordance(channel_id="ui-stage")]
+            return ProjectedState(channels=available)
+        assert channels == ["ui-stage"] and self.extent is not None
+        width, height = self.extent
+        return ProjectedState(
+            sections=[
+                ProjectedSection(
+                    section_id="ui-stage",
+                    title="Stage extent",
+                    value=StageExtentValue(width=width, height=height),
+                )
+            ]
+        )
+
+
+def test_stage_extent_uses_disclosed_value_or_explicit_client_fallback() -> None:
+    declared = _WorldInfoService((640, 400))
+    absent = _WorldInfoService(None)
+
+    assert PygameSessionBridge(declared).stage_extent("fixture_world") == (640, 400)
+    assert declared.calls == [None, ["ui-stage"]]
+    assert PygameSessionBridge(absent).stage_extent("fixture_world") == (320, 200)
+    assert absent.calls == [None]
+
+
+def test_stage_extent_refuses_an_unsupported_world_declaration() -> None:
+    service = _WorldInfoService((800, 600))
+
+    with pytest.raises(
+        ValueError,
+        match="does not support declared stage extent 800x600",
+    ):
+        PygameSessionBridge(service).stage_extent("fixture_world")
 
 
 def test_attributed_fragments_become_speaker_lines(bridge: PygameSessionBridge) -> None:

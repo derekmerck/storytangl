@@ -229,7 +229,11 @@ an unknown id is a bad request.
 `get_world_info` uses the same protocol for public, fixed, cacheable world
 projections. It is available without a story session and currently advertises
 common HTML class meanings plus advisory branding, light/dark tokens, and a
-logo media reference. These are suggestions a client may ignore or adjust.
+logo media reference. A world whose manifest metadata declares
+`stage_extent: {width, height}` additionally advertises exact channel
+`ui-stage`, whose `StageExtentValue` describes only that fixed logical extent.
+Window scale and DPI remain client-local. Worlds without the declaration do not
+advertise the channel.
 
 Service folds the presentation registry with story, world, and runtime-local
 authorities:

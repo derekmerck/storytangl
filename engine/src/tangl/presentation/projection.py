@@ -110,6 +110,14 @@ class BrandingValue(BaseModel):
     dark: ThemeTokens | None = None
 
 
+class StageExtentValue(BaseModel):
+    """Fixed logical extent used to compose a world's staged presentation."""
+
+    value_type: Literal["stage_extent"] = "stage_extent"
+    width: int = Field(gt=0, strict=True)
+    height: int = Field(gt=0, strict=True)
+
+
 SectionValue: TypeAlias = Annotated[
     (
         ScalarValue
@@ -118,6 +126,7 @@ SectionValue: TypeAlias = Annotated[
         | TableValue
         | BadgeListValue
         | BrandingValue
+        | StageExtentValue
     ),
     Field(discriminator="value_type"),
 ]
@@ -157,6 +166,7 @@ __all__ = [
     "ProjectedState",
     "ScalarValue",
     "SectionValue",
+    "StageExtentValue",
     "ProjectionRequest",
     "TableValue",
     "ThemeTokens",

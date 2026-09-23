@@ -91,6 +91,13 @@ presentation-owned typed `ProjectedSection` values, but those values are disclos
 than authority state. A client hint or hotspot never bypasses ordinary action
 selection for mutation.
 
+World-info uses the same discovery and exact-selection protocol for fixed,
+cacheable presentation metadata. The `ui-stage` channel is advertised only
+when `world.yaml` manifest metadata declares a positive-integer
+`stage_extent: {width, height}`. Its typed `StageExtentValue` is logical
+presentation geometry only; client window scale, DPI, and zoom do not cross the
+service boundary. Absence means the world makes no stage-extent claim.
+
 ## Extension Boundary
 
 Service delivers engine output; it does not select or implement story

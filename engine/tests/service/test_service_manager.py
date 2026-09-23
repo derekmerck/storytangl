@@ -13,7 +13,12 @@ import pytest
 from tangl.core import BaseFragment, Selector
 from tangl.journal.fragments import BlockFragment, ChoiceFragment, ContentFragment
 from tangl.persistence import PersistenceManagerFactory
-from tangl.presentation.projection import BrandingValue, ProjectedState, TableValue
+from tangl.presentation.projection import (
+    BrandingValue,
+    ProjectedState,
+    StageExtentValue,
+    TableValue,
+)
 from tangl.service.response import (
     CommandEdgeQuery,
     DirectEdgeRequest,
@@ -39,6 +44,7 @@ def _story_script(
     *,
     with_choice_payload_hints: bool = False,
     with_choice_blocker: bool = False,
+    stage_extent: dict[str, object] | None = None,
 ) -> dict[str, object]:
     action: dict[str, object] = {"text": "Continue", "successor": "end"}
     if with_choice_payload_hints:
@@ -69,13 +75,17 @@ def _story_script(
             }
         ]
 
+    metadata: dict[str, object] = {
+        "title": "Service Manager World",
+        "author": "Tests",
+        "start_at": "intro.start",
+    }
+    if stage_extent is not None:
+        metadata["stage_extent"] = stage_extent
+
     return {
         "label": "svc_manager_world",
-        "metadata": {
-            "title": "Service Manager World",
-            "author": "Tests",
-            "start_at": "intro.start",
-        },
+        "metadata": metadata,
         "scenes": {
             "intro": {
                 "blocks": {
@@ -443,6 +453,44 @@ def test_user_world_and_system_methods_return_typed_models(
 
     system_info = manager.get_system_info()
     assert system_info.engine
+
+
+def test_world_info_discloses_declared_stage_extent_only(manager: ServiceManager) -> None:
+    manager.load_world(
+        script_data=_story_script(stage_extent={"width": 640, "height": 400})
+    )
+
+    discovered = manager.get_world_info(world_id="service_manager_world")
+    assert [channel.channel_id for channel in discovered.channels] == [
+        "ui-style-hints-html",
+        "ui-branding",
+        "ui-stage",
+    ]
+
+    selected = manager.get_world_info(
+        world_id="service_manager_world",
+        channels=["ui-stage"],
+    )
+    assert len(selected.sections) == 1
+    assert selected.sections[0].section_id == "ui-stage"
+    assert selected.sections[0].value == StageExtentValue(width=640, height=400)
+
+
+@pytest.mark.parametrize(
+    "stage_extent",
+    [
+        {"width": 0, "height": 200},
+        {"width": "320", "height": 200},
+    ],
+)
+def test_world_info_refuses_to_advertise_malformed_stage_extent(
+    manager: ServiceManager,
+    stage_extent: dict[str, object],
+) -> None:
+    manager.load_world(script_data=_story_script(stage_extent=stage_extent))
+
+    with pytest.raises(ValueError):
+        manager.get_world_info(world_id="service_manager_world")
 
 
 def test_create_user_restores_an_existing_recovery_secret(

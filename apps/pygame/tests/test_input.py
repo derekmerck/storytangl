@@ -32,7 +32,6 @@ from tangl.pygame_client.models import (  # noqa: E402
     Turn,
     Zone,
 )
-from tangl.pygame_client.stage import SCALE  # noqa: E402
 from tangl.service import JsonValue, RuntimeEnvelope  # noqa: E402
 
 WORLD = "repartee_loop"
@@ -120,7 +119,10 @@ def test_mouse_click_commits_the_choice_under_the_cursor(
     stage = Stage()
     stage.draw(Turn(step=1, choices=gated))
     rect, action = stage.hitboxes[0]
-    position = (rect.centerx * SCALE, rect.centery * SCALE)
+    position = (
+        rect.centerx * stage.display_scale,
+        rect.centery * stage.display_scale,
+    )
     pygame.quit()
 
     _run([pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1, "pos": position})])
@@ -249,7 +251,10 @@ def test_a_click_on_a_piece_commits_what_its_number_commits(
     pending = PendingSelection(choice=packet)
     stage.draw(frame, pending)
     rect, action = stage.hitboxes[0]
-    position = (rect.centerx * SCALE, rect.centery * SCALE)
+    position = (
+        rect.centerx * stage.display_scale,
+        rect.centery * stage.display_scale,
+    )
     pygame.quit()
 
     _run([_key(pygame.K_1), pygame.event.Event(
@@ -437,7 +442,7 @@ def test_the_cancel_row_stays_on_the_surface_below_the_minimum(
     """
 
     pygame.init()
-    from tangl.pygame_client.stage import LOGICAL_SIZE, Stage
+    from tangl.pygame_client.stage import Stage
 
     choice = _packet_frame(monkeypatch, PiecesAccepts(min=2, max=2), count=7)
     frame = client._merge([])
@@ -453,7 +458,7 @@ def test_the_cancel_row_stays_on_the_surface_below_the_minimum(
             if isinstance(action, CancelSelection)
         ]
         assert cancels, f"cancel must be actionable with {len(picked)} picked"
-        assert cancels[0].bottom <= LOGICAL_SIZE[1], (
+        assert cancels[0].bottom <= stage.logical_size[1], (
             f"cancel clipped off the surface with {len(picked)} picked"
         )
     pygame.quit()
