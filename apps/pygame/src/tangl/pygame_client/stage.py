@@ -90,7 +90,16 @@ bound, so a world that generates its cast in a loop degrades by dropping the
 tail rather than by drawing for a minute.
 """
 
-_BASE_PORTRAIT_HEIGHT = 112
+_BASE_PORTRAIT_HEADROOM = 24
+"""How close to the top of the stage a portrait's head may come.
+
+A portrait draws at the size it was packed and is fitted only when it will not
+fit, so this is a ceiling rather than a target. It was arrived at as one: the
+old code fitted every portrait to a fixed 112 and then shrank it to clear the
+choice list, and 24 is where the top had risen to at the moment that shrinking
+began. Keeping the number and dropping the mechanism turns the highest a head
+ever went into the highest it may go.
+"""
 _BASE_MARGIN = 10
 _DEFAULT_SLOTS = ("left", "right", "mid")
 _BASE_ROW_HEIGHT = 9
@@ -272,7 +281,7 @@ class Stage:
             raise ValueError("display_scale must be a positive integer")
         self.logical_size = logical_size
         self.display_scale = display_scale
-        self.portrait_height = _BASE_PORTRAIT_HEIGHT * self.density
+        self.portrait_headroom = _BASE_PORTRAIT_HEADROOM * self.density
         self.margin = _BASE_MARGIN * self.density
         self.row_height = _BASE_ROW_HEIGHT * self.density
         self.prose_top = _BASE_PROSE_TOP * self.density
@@ -947,8 +956,15 @@ class Stage:
         seen: set[_ClipKey] = set()
         occurrences: Counter[tuple[str, str, str]] = Counter()
         floor = self.logical_size[1]
+        # Natural size, capped. A pack already decided how big a face is for
+        # the stage it was conformed to, and the stage is now declared, so
+        # re-deciding it here can only resample art that was already right --
+        # and at a fraction, which drops rows of pixel art unevenly. The cap is
+        # the one thing this client still owes: a portrait taller than the
+        # stage has to come down, because nothing else will bring it down.
+        ceiling = floor - self.portrait_headroom
         for index, (image, portrait) in enumerate(staged):
-            height = self.portrait_height
+            height = min(portrait.get_height(), ceiling)
             factor = height / portrait.get_height()
             width = max(1, round(portrait.get_width() * factor))
             # A placement wins over a slot. The two are different questions --

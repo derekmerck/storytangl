@@ -974,3 +974,56 @@ def test_end_to_end_a_portrait_stands_on_the_stage_not_on_the_choice_list(
     assert sparse[3] == height - 1, (
         f"the portrait's feet land at {sparse[3]}, not on the stage floor {height - 1}"
     )
+
+
+def test_end_to_end_a_portrait_draws_at_the_size_its_pack_chose(tmp_path) -> None:
+    """Two faces packed at different heights must arrive at different heights.
+
+    Fitting every portrait to one number re-decides something the pack already
+    decided against a stage the world now declares, and re-decides it by
+    resampling: a 300-tall face fitted to 224 lands on a 0.7467 nearest
+    neighbour, which drops rows of pixel art unevenly. Natural size is the
+    honest default once the extent is known, so the only number left here is a
+    ceiling.
+    """
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    short = _staged_fragment(
+        tmp_path, "short.png", size=(10, 40), role="dialog_im", media_x="left"
+    )
+    looming = _staged_fragment(
+        tmp_path, "looming.png", size=(10, 90), role="dialog_im", media_x="right"
+    )
+    [turn] = PygameSessionBridge().build_turns([short, looming])
+    stage = _drawn(turn, tmp_path)
+
+    near, far = _found(stage, "short.png"), _found(stage, "looming.png")
+    assert near is not None and far is not None, "a portrait did not reach the stage"
+    assert near[3] - near[1] + 1 == 40, "the short portrait was resized"
+    assert far[3] - far[1] + 1 == 90, "the tall portrait was resized"
+    # Different heights, one floor: they are standing in a room together.
+    assert near[3] == far[3] == stage.logical_size[1] - 1
+
+
+def test_end_to_end_a_portrait_taller_than_the_stage_comes_down(tmp_path) -> None:
+    """The one size decision this client still owes.
+
+    Natural size cannot be unconditional: a face taller than the surface has
+    nowhere to stand, and no other party will bring it down. The cap leaves it
+    exactly `portrait_headroom` of clearance, which is the height at which the
+    old fit-then-shrink mechanism used to start shrinking.
+    """
+
+    from tangl.pygame_client.bridge import PygameSessionBridge
+
+    frag = _staged_fragment(tmp_path, "huge.png", size=(10, 400), role="dialog_im")
+    [turn] = PygameSessionBridge().build_turns([frag])
+    stage = _drawn(turn, tmp_path)
+
+    box = _found(stage, "huge.png")
+    assert box is not None, "the portrait did not reach the stage at all"
+    ceiling = stage.logical_size[1] - stage.portrait_headroom
+    assert box[3] - box[1] + 1 == ceiling, "the oversized portrait was not capped"
+    assert box[1] == stage.portrait_headroom
+    assert box[3] == stage.logical_size[1] - 1
