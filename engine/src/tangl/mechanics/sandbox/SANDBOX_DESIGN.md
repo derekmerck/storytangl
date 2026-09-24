@@ -749,12 +749,14 @@ runtime about watts, minutes, oil volume, or battery chemistry. A tick handler
 may observe world-unit metadata, but it should only commit normalized runtime
 state.
 
-Sandbox location namespace gathering publishes this derived value as
-`world_time`, so ordinary location and projected-interaction predicates can use
-the same calendar view as schedules. `ScheduleEntry.run_day` matches one exact
-run day, while inclusive `run_day_from` / `run_day_through` bounds express
-windows such as "from day 5 onward." These are derived constraints over the
-single scoped `world_turn`, not a second clock.
+`SandboxScope` publishes this derived value as `world_time` to every descendant
+namespace, so ordinary scene/block, location, and projected-interaction predicates
+can use the same calendar view as schedules. A standalone `SandboxLocation` publishes
+its own derived value through its existing local handler. `ScheduleEntry.run_day`
+matches one exact run day, while inclusive `run_day_from` / `run_day_through` bounds
+express windows such as "from day 5 onward." These are derived constraints over the
+single scoped `world_turn`, not a second clock. A target outside that scope receives
+no implicit sandbox clock context; crossing that boundary requires an explicit contract.
 
 The current update order is:
 

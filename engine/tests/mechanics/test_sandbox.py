@@ -345,6 +345,35 @@ def test_world_time_is_available_to_location_and_scoped_event_predicates() -> No
     assert event.available(ctx=ctx)
 
 
+def test_sandbox_scope_publishes_world_time_to_descendant_blocks_after_restore() -> None:
+    graph = Graph(label="calendar_scope_namespace")
+    scope = SandboxScope(label="calendar_scope", locals={"world_turn": 24})
+    meeting = Block(
+        label="meeting",
+        availability=[Predicate(expr="world_time.run_day == 7 and world_time.day == 7")],
+    )
+    graph.add(scope)
+    graph.add(meeting)
+    scope.add_child(meeting)
+    ctx = PhaseCtx(graph=graph, cursor_id=meeting.uid)
+
+    assert meeting.available(ctx=ctx)
+    scope.locals["world_turn"] = 28
+    assert not meeting.available(ctx=PhaseCtx(graph=graph, cursor_id=meeting.uid))
+    scope.locals["world_turn"] = 24
+
+    restored = Ledger.structure(
+        Ledger.from_graph(graph, entry_id=meeting.uid).unstructure()
+    )
+    restored_meeting = restored.graph.find_one(
+        Selector(has_kind=Block, label="meeting")
+    )
+    assert isinstance(restored_meeting, Block)
+    assert restored_meeting.available(
+        ctx=PhaseCtx(graph=restored.graph, cursor_id=restored_meeting.uid)
+    )
+
+
 def test_ledger_round_trip_preserves_run_day_and_scheduled_offer() -> None:
     graph = Graph(label="calendar_restore")
     scope = SandboxScope(
