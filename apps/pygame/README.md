@@ -39,6 +39,24 @@ the local window multiple. Backgrounds and map plates fill the logical surface;
 `staged_im` figures remain at natural pack size and are not rescaled a second
 time.
 
+**Everything on stage stands on the stage.** Staged ornaments and portraits
+share one floor -- the logical surface's own bottom -- and the choice list is
+drawn over them. Flooring portraits at the top of the list instead made the UI
+load-bearing: it cost them exactly the height the list took, so the same
+character stood higher and drew smaller on a turn that happened to offer more
+options, while ornaments beside them never moved. The list is UI drawn over the
+room; the room does not rest on it.
+
+**A portrait draws at the size its pack chose.** Once a world declares its
+extent, the packer has already answered how big a face is on that stage, so
+re-answering it here can only resample art that was already right -- and at a
+fraction, which drops rows of pixel art unevenly. The client keeps one size
+decision, a ceiling: a portrait taller than the surface is brought down to
+leave `24 * density` of headroom, because nothing else will bring it down.
+That number is the old fit-to-`112` mechanism's own: it is the height at which
+that mechanism used to start shrinking. The shipped demo art is conformed to
+exactly 112, so it is unaffected either way.
+
 **Every click resolves to an `edge_id`.** The input layer never commits a
 bespoke action, so a map hotspot produces the same payload as selecting the
 numbered choice (widget vocabulary §5.3, Input Parity). That is now exercised
