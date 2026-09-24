@@ -99,6 +99,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _resolve_traversable_ref(
+    ctx: VmPhaseCtx,
+    ref: TraversableNode | UUID | str,
+) -> TraversableNode | None:
+    """Resolve one stable traversable reference against the active graph."""
+    if isinstance(ref, TraversableNode):
+        return ref
+    if isinstance(ref, UUID):
+        node = ctx.graph.get(ref)
+    else:
+        node = ctx.graph.find_one(
+            Selector(has_kind=TraversableNode, has_path=ref)
+        ) or ctx.graph.find_one(
+            Selector(has_kind=TraversableNode, has_identifier=ref)
+        )
+    return node if isinstance(node, TraversableNode) else None
+
+
 def _visited_query(ctx: VmPhaseCtx):
     """Build the ``visited(ref)`` an author calls from a condition."""
 
@@ -108,17 +126,32 @@ def _visited_query(ctx: VmPhaseCtx):
         A path resolves as materialization resolves one - a qualified path such
         as ``"scene.block"`` first, then a plain identifier or label.
         """
-        if isinstance(ref, TraversableNode):
-            node = ref
-        elif isinstance(ref, UUID):
-            node = ctx.graph.get(ref)
-        else:
-            node = ctx.graph.find_one(
-                Selector(has_kind=TraversableNode, has_path=ref)
-            ) or ctx.graph.find_one(Selector(has_kind=TraversableNode, has_identifier=ref))
+        node = _resolve_traversable_ref(ctx, ref)
         return isinstance(node, TraversableNode) and has_visited(node, ctx=ctx)
 
     return visited
+
+
+def _visit_count_query(ctx: VmPhaseCtx):
+    """Build the ``visit_count(ref)`` authored history query."""
+    history = cursor_history_from(ctx)
+
+    def visit_count(ref: TraversableNode | UUID | str) -> int:
+        node = _resolve_traversable_ref(ctx, ref)
+        return get_visit_count(node.uid, history) if node is not None else 0
+
+    return visit_count
+
+
+def _steps_since_visit_query(ctx: VmPhaseCtx):
+    """Build the ``steps_since_visit(ref)`` authored history query."""
+    history = cursor_history_from(ctx)
+
+    def steps_since_visit(ref: TraversableNode | UUID | str) -> int:
+        node = _resolve_traversable_ref(ctx, ref)
+        return steps_since_last_visit(node.uid, history) if node is not None else -1
+
+    return steps_since_visit
 
 
 # ---------------------------------------------------------------------------
@@ -297,17 +330,19 @@ def contribute_visit_stats(*, caller, ctx, **kw):
     """
     _ = kw
     history = cursor_history_from(ctx)
-    visit_count = get_visit_count(caller.uid, history)
-    visited = visit_count > 0
+    caller_visit_count = get_visit_count(caller.uid, history)
+    visited = caller_visit_count > 0
     return {
         "node_visited": visited,
-        "node_num_visits": visit_count,
+        "node_num_visits": caller_visit_count,
         "node_steps_since": steps_since_last_visit(caller.uid, history),
         "node_completed": visited,
         "is_first_visit": is_first_visit(caller.uid, history),
         # Ask about any other node, which is what an authored condition needs:
         # ``visited(gutter)``, ``not visited("garage.front_desk")``.
         "visited": _visited_query(ctx),
+        "visit_count": _visit_count_query(ctx),
+        "steps_since_visit": _steps_since_visit_query(ctx),
     }
 
 

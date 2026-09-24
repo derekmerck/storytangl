@@ -14,6 +14,7 @@ Organized by pipeline phase:
 from __future__ import annotations
 
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -310,6 +311,40 @@ class TestContributeVisitStats:
         assert ns["node_steps_since"] == 0
         assert ns["node_completed"] is True
         assert ns["is_first_visit"] is False
+
+    def test_arbitrary_visit_queries_share_stable_reference_resolution(self) -> None:
+        g = Graph()
+        scene = _node(g, label="scene")
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        scene.add_child(b)
+        runtime_ctx = SimpleNamespace(
+            graph=g,
+            cursor=b,
+            selected_edge=None,
+            get_meta=lambda: {
+                "cursor_history": [a.uid, b.uid, a.uid, b.uid, b.uid]
+            },
+            get_authorities=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+
+        ns = do_gather_ns(b, ctx=runtime_ctx)
+
+        for ref in (b, b.uid, "scene.b", "b"):
+            assert ns["visited"](ref) is True
+            assert ns["visit_count"](ref) == 3
+            assert ns["steps_since_visit"](ref) == 0
+        assert ns["visit_count"]("a") == 2
+        assert ns["steps_since_visit"]("a") == 2
+        assert Predicate(
+            expr='visit_count("a") == 2 and steps_since_visit("a") == 2'
+        )(ns)
+
+        for ref in ("unknown", uuid4()):
+            assert ns["visited"](ref) is False
+            assert ns["visit_count"](ref) == 0
+            assert ns["steps_since_visit"](ref) == -1
 
     def test_gather_ns_defaults_visit_stats_without_history(self, ctx) -> None:
         g = Graph()
