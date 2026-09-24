@@ -12,7 +12,7 @@ from tangl.vm import TraversableNode
 
 from .mob import SandboxMob
 from .schedule import ScheduledEvent, ScheduledPresence
-from .time import SandboxClockPolicy
+from .time import SandboxClockPolicy, current_world_time
 from .visibility import SandboxVisibilityRule
 
 
@@ -42,6 +42,7 @@ class SandboxScope(TraversableNode):
         return {
             "sandbox_scope": self.get_label(),
             "sandbox_scope_node": self,
+            "world_time": current_world_time(self),
             "sandbox_mobs": {mob.get_label(): mob for mob in self.mobs},
             "player_assets": self.player_assets,
             "player_inv": self.player_assets.assets,

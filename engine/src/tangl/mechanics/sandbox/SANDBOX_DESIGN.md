@@ -716,7 +716,8 @@ The old scratch sandbox work centered on world turn, world time, mobile actors,
 forced events, and selectable events. In v38 those become:
 
 - `world_turn` in locals
-- derived `WorldTime`
+- derived `WorldTime`, including one-based unbounded `run_day` alongside the
+  repeating weekday `day`
 - `SandboxClockPolicy` for scope-local normalized clock policy
 - `SandboxTimeCost` on generated actions for action-duration requests
 - explicit `advance_world_turn(...)` for the dumb clock increment
@@ -747,6 +748,15 @@ normalized grid or richer compiler policy, not by teaching the VM or sandbox
 runtime about watts, minutes, oil volume, or battery chemistry. A tick handler
 may observe world-unit metadata, but it should only commit normalized runtime
 state.
+
+`SandboxScope` publishes this derived value as `world_time` to every descendant
+namespace, so ordinary scene/block, location, and projected-interaction predicates
+can use the same calendar view as schedules. A standalone `SandboxLocation` publishes
+its own derived value through its existing local handler. `ScheduleEntry.run_day`
+matches one exact run day, while inclusive `run_day_from` / `run_day_through` bounds
+express windows such as "from day 5 onward." These are derived constraints over the
+single scoped `world_turn`, not a second clock. A target outside that scope receives
+no implicit sandbox clock context; crossing that boundary requires an explicit contract.
 
 The current update order is:
 

@@ -145,7 +145,8 @@ def test_sandbox_story_info_projects_disclosed_location_state() -> None:
     assert [(item.key, item.value) for item in sections["sandbox_time"].value.items] == [
         ("Turn", 2),
         ("Period", "evening"),
-        ("Day", 1),
+        ("Run day", 1),
+        ("Weekday", 1),
     ]
     assert _item_labels(sections["sandbox_inventory"]) == ["brass lantern"]
     inventory = sections["sandbox_inventory"].value

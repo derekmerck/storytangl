@@ -142,7 +142,8 @@ class _SandboxInfoSections:
                 key="Period",
                 value=_period_label(world_time.period, self.period_labels),
             ),
-            KvRow(key="Day", value=world_time.day),
+            KvRow(key="Run day", value=world_time.run_day),
+            KvRow(key="Weekday", value=world_time.day),
         ]
         return ProjectedSection(
             section_id="sandbox_time",

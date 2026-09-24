@@ -1159,11 +1159,12 @@ def _take_asset_from_mob(
     wants_exact_kind=False,
 )
 def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
-    """Publish simple sandbox inventory helpers for generated action predicates."""
+    """Publish sandbox runtime values and helpers for authored predicates."""
     if not isinstance(caller, SandboxLocation):
         return None
     inventory = frozenset(_sandbox_inventory(caller))
     return {
+        "world_time": current_world_time(caller),
         "sandbox_inventory": inventory,
         "sandbox_has_key": lambda key: str(key) in inventory,
         "sandbox_fixture_locked": lambda label: _fixture_locked(caller, str(label)),
