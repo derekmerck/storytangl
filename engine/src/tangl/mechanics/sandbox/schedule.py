@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tangl.core.runtime_op import Effect, Predicate
 
@@ -19,16 +19,46 @@ class ScheduleEntry(BaseModel):
     location: str | None = None
     actor: str | None = None
     period: int | None = None
+    run_day: int | None = Field(default=None, gt=0)
+    run_day_from: int | None = Field(default=None, gt=0)
+    run_day_through: int | None = Field(default=None, gt=0)
     day: int | None = None
     day_of_month: int | None = None
     month: int | None = None
     season: int | None = None
     year: int | None = None
 
+    @model_validator(mode="after")
+    def _validate_run_day_window(self) -> "ScheduleEntry":
+        if (
+            self.run_day_from is not None
+            and self.run_day_through is not None
+            and self.run_day_through < self.run_day_from
+        ):
+            raise ValueError("run_day_through must not precede run_day_from")
+        if self.run_day is not None and (
+            (self.run_day_from is not None and self.run_day < self.run_day_from)
+            or (
+                self.run_day_through is not None
+                and self.run_day > self.run_day_through
+            )
+        ):
+            raise ValueError("run_day must fall within the declared run-day window")
+        return self
+
     def matches_time(self, world_time: WorldTime) -> bool:
         """Return whether the entry's calendar fields match the supplied time."""
         return (
             (self.period is None or world_time.period == self.period)
+            and (self.run_day is None or world_time.run_day == self.run_day)
+            and (
+                self.run_day_from is None
+                or world_time.run_day >= self.run_day_from
+            )
+            and (
+                self.run_day_through is None
+                or world_time.run_day <= self.run_day_through
+            )
             and (self.day is None or world_time.day == self.day)
             and (
                 self.day_of_month is None

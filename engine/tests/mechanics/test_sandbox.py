@@ -150,6 +150,7 @@ def test_world_time_is_derived_from_world_turn() -> None:
     assert WorldTime.from_turn(0).model_dump() == {
         "turn": 0,
         "period": 1,
+        "run_day": 1,
         "day": 1,
         "day_of_month": 1,
         "month": 1,
@@ -164,6 +165,36 @@ def test_world_time_is_derived_from_world_turn() -> None:
     assert later.month == 4
     assert later.season == 2
     assert later.year == 1
+
+
+@pytest.mark.parametrize(
+    ("turn", "run_day", "period"),
+    [
+        (0, 1, 1),
+        (3, 1, 4),
+        (4, 2, 1),
+        (7, 2, 4),
+        (44, 12, 1),
+        (45, 12, 2),
+        (47, 12, 4),
+    ],
+)
+def test_world_time_run_day_is_one_based_and_unbounded(
+    turn: int,
+    run_day: int,
+    period: int,
+) -> None:
+    world_time = WorldTime.from_turn(turn)
+
+    assert world_time.run_day == run_day
+    assert world_time.period == period
+
+
+def test_world_time_run_day_preserves_weekday_cycle() -> None:
+    world_time = WorldTime.from_turn(4 * 7)
+
+    assert world_time.run_day == 8
+    assert world_time.day == 1
 
 
 def test_world_turn_helpers_use_mutable_locals() -> None:
@@ -236,6 +267,118 @@ def test_schedule_matches_time_location_and_presence() -> None:
     )
 
     assert [entry.label for entry in matches] == ["traveler"]
+
+
+def test_schedule_matches_exact_and_open_ended_run_days() -> None:
+    day_twelve_afternoon = WorldTime.from_turn(45)
+
+    assert ScheduleEntry(run_day=12, period=2).matches_time(day_twelve_afternoon)
+    assert ScheduleEntry(run_day_from=5).matches_time(day_twelve_afternoon)
+    assert not ScheduleEntry(run_day_through=11).matches_time(day_twelve_afternoon)
+
+
+def test_run_day_matching_is_inherited_by_presence_and_mob_schedules() -> None:
+    presence = ScheduledPresence(
+        actor="traveler",
+        location="road",
+        run_day=12,
+    )
+    mob = SandboxMob(
+        label="traveler",
+        location="road",
+        schedule=Schedule(
+            entries=[ScheduleEntry(location="building", run_day_from=5)]
+        ),
+    )
+
+    assert presence.matches(WorldTime.from_turn(44), location="road")
+    assert mob.scheduled_location(WorldTime.from_turn(15)) == "road"
+    assert mob.scheduled_location(WorldTime.from_turn(16)) == "building"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"run_day": 0},
+        {"run_day_from": 0},
+        {"run_day_through": 0},
+        {"run_day_from": 6, "run_day_through": 5},
+        {"run_day": 4, "run_day_from": 5},
+        {"run_day": 6, "run_day_through": 5},
+    ],
+)
+def test_schedule_rejects_invalid_run_day_declarations(
+    payload: dict[str, int],
+) -> None:
+    with pytest.raises(ValueError):
+        ScheduleEntry(**payload)
+
+
+def test_world_time_is_available_to_location_and_scoped_event_predicates() -> None:
+    graph = Graph(label="calendar_predicates")
+    scope = SandboxScope(label="calendar_scope", locals={"world_turn": 45})
+    road = SandboxLocation(
+        label="road",
+        availability=[Predicate(expr="world_time.run_day >= 5")],
+    )
+    scope.scheduled_events = [
+        ScheduledEvent(
+            label="day_twelve_afternoon",
+            target="current",
+            run_day=12,
+            period=2,
+            availability=[
+                Predicate(
+                    expr="world_time.run_day == 12 and world_time.period == 2"
+                )
+            ],
+        )
+    ]
+    graph.add(scope)
+    graph.add(road)
+    scope.add_child(road)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    assert road.available(ctx=ctx)
+    do_provision(road, ctx=ctx)
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    assert event.available(ctx=ctx)
+
+
+def test_ledger_round_trip_preserves_run_day_and_scheduled_offer() -> None:
+    graph = Graph(label="calendar_restore")
+    scope = SandboxScope(
+        label="calendar_scope",
+        locals={"world_turn": 45},
+        scheduled_events=[
+            ScheduledEvent(
+                label="day_twelve_afternoon",
+                target="current",
+                run_day=12,
+                period=2,
+                text="Attend the afternoon meeting",
+            )
+        ],
+    )
+    road = SandboxLocation(label="road")
+    graph.add(scope)
+    graph.add(road)
+    scope.add_child(road)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    restored = Ledger.structure(ledger.unstructure())
+    restored_road = restored.graph.find_one(
+        Selector(has_kind=SandboxLocation, label="road")
+    )
+    assert isinstance(restored_road, SandboxLocation)
+    assert current_world_time(restored_road).run_day == 12
+
+    do_provision(
+        restored_road,
+        ctx=PhaseCtx(graph=restored.graph, cursor_id=restored_road.uid),
+    )
+    events = _dynamic_sandbox_actions_with_tag(restored_road, "event")
+    assert [event.text for event in events] == ["Attend the afternoon meeting"]
 
 
 def test_scheduled_mob_presence_follows_world_time() -> None:

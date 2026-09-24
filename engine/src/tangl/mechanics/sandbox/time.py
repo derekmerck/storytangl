@@ -31,6 +31,7 @@ class WorldTime(BaseModelPlus):
 
     turn: int = 0
     period: int = 1
+    run_day: int = 1
     day: int = 1
     day_of_month: int = 1
     month: int = 1
@@ -68,6 +69,7 @@ class WorldTime(BaseModelPlus):
         return cls(
             turn=turn,
             period=(turn % periods_per_day) + 1,
+            run_day=day_index + 1,
             day=(day_index % days_per_week) + 1,
             day_of_month=(day_index % days_per_month) + 1,
             month=month,

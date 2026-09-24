@@ -58,7 +58,8 @@ Current first-pass surface:
 - `WorldTime` / `SandboxClockPolicy` / `SandboxTimeCost`: normalized clock and
   action-duration vocabulary. Authoring layers may speak in minutes, periods,
   turns, oil, or watts, but runtime sandbox ticking consumes normalized integer
-  counters.
+  counters. `WorldTime.run_day` is the one-based, unbounded day of the run;
+  `WorldTime.day` remains the repeating weekday.
 - `ScheduleEntry` / `Schedule` / `ScheduledEvent` / `ScheduledPresence`: small
   schedule matching primitives. `ScheduledEvent` is a time/presence gate over
   the same sponsored interaction surface used by locations, mobs, assets, and
@@ -169,6 +170,11 @@ choice. A `once` event is suppressed after its target has been visited, as the
 ledger's cursor history records it (`has_visited`). The `_visited` locals that
 the VM's `mark_visited` handler annotates onto a node are a convenience for a
 node reading its own state, not what `once` reads.
+
+Sandbox location namespaces publish the current derived `world_time` for
+authored predicates. Schedules may select an exact `run_day` or inclusive
+`run_day_from` / `run_day_through` bounds; these constrain the unbounded run
+calendar without changing weekday matching through `day`.
 
 Asset projection is deliberately modest. Locations are `HasAssets` holders, and
 the nearest `SandboxScope.player_assets` holder stands in for ready-at-hand
