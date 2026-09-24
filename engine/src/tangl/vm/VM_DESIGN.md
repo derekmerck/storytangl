@@ -447,6 +447,18 @@ evaluation) each get their own cached namespace. The cache dies with the PhaseCt
 UPDATE mutations are visible in the *next* pipeline pass via a fresh PhaseCtx — they do
 not retroactively affect cached namespaces within the current pass.
 
+**Visit-history queries resolve stable node references.** The VM namespace exposes
+`visited(ref)`, `visit_count(ref)`, and `steps_since_visit(ref)` through one resolver
+for a `TraversableNode`, UUID, qualified path, identifier, or label. Unknown references
+retain the query-specific empty result: `False`, `0`, and `-1`, respectively.
+`steps_since_visit` counts cursor-history edge follows since the most recent visit: it
+is `0` at the referenced current node, positive for an earlier visit, and `-1` when
+never visited. It is not elapsed sandbox time or `Ledger.turn`. Caller-relative
+`node_visited`, `node_num_visits`, `node_steps_since`, and `is_first_visit` remain
+available for arrival-local effects and rendering. All of these are uncached views over
+the ledger's existing cursor history, so persistence, rollback, and replay need no
+secondary visit index.
+
 **Child runtime contexts come from `PhaseCtx.derive()`.** Provisioning and
 post-materialization validation sometimes need a `PhaseCtx` scoped to a different cursor
 without losing tracing, RNG, dirty callbacks, or local authorities. The supported path is

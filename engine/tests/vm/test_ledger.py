@@ -18,6 +18,7 @@ from uuid import uuid4
 
 import pytest
 
+import tangl.vm.system_handlers as system_handlers
 from tangl.core import EntityTemplate, Graph, Selector, Snapshot, TemplateRegistry
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, JournalMarkerFragment
 from tangl.journal.media import MediaFragment as JournalMediaFragment
@@ -26,7 +27,7 @@ from tangl.vm import TraversableGraphFactory
 from tangl.vm.dispatch import on_prereqs
 from tangl.vm.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
 from tangl.vm.resolution_phase import ResolutionPhase
-from tangl.vm.runtime.frame import Frame
+from tangl.vm.runtime.frame import Frame, PhaseCtx
 from tangl.vm.runtime.causality import CausalityMode
 from tangl.vm.runtime.ledger import Ledger
 from tangl.vm.traversal import get_visit_count
@@ -644,6 +645,47 @@ class TestLedgerJournal:
 
 
 class TestLedgerReplayRollback:
+    @staticmethod
+    def _visit_queries(ledger: Ledger) -> dict[str, object]:
+        ctx = PhaseCtx(
+            graph=ledger.graph,
+            cursor_id=ledger.cursor_id,
+            meta={"cursor_history": list(ledger.cursor_history)},
+        )
+        return system_handlers.contribute_visit_stats(caller=ledger.cursor, ctx=ctx)
+
+    def test_visit_queries_follow_restore_rollback_and_replay(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge_ab = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        edge_ba = _edge(g, predecessor_id=b.uid, successor_id=a.uid)
+        ledger = Ledger.from_graph(graph=g, entry_id=a.uid)
+        ledger.resolve_choice(edge_ab.uid)
+        ledger.resolve_choice(edge_ba.uid)
+        ledger.resolve_choice(edge_ab.uid)
+
+        restored = Ledger.structure(ledger.unstructure())
+        restored_ns = self._visit_queries(restored)
+        assert restored_ns["visit_count"]("a") == 2
+        assert restored_ns["visit_count"]("b") == 2
+        assert restored_ns["steps_since_visit"]("a") == 1
+        assert restored_ns["steps_since_visit"]("b") == 0
+
+        restored.rollback_to_step(2)
+        rolled_back_ns = self._visit_queries(restored)
+        assert rolled_back_ns["visit_count"]("a") == 2
+        assert rolled_back_ns["visit_count"]("b") == 1
+        assert rolled_back_ns["steps_since_visit"]("a") == 0
+        assert rolled_back_ns["steps_since_visit"]("b") == 1
+
+        restored.resolve_choice(edge_ab.uid)
+        replayed_ns = self._visit_queries(restored)
+        assert replayed_ns["visit_count"]("a") == 2
+        assert replayed_ns["visit_count"]("b") == 2
+        assert replayed_ns["steps_since_visit"]("a") == 1
+        assert replayed_ns["steps_since_visit"]("b") == 0
+
     def test_rollback_truncates_and_appends_monument(self) -> None:
         g = Graph()
         a = _node(g, label="a")
