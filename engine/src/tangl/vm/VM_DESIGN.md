@@ -268,10 +268,12 @@ Wraps core's `Edge` with phase-control fields:
 - `return_phase` — marks this edge as a *call*. The frame pushes it onto the return
   stack before following, so the call is open for its whole traversal, and each phase
   context carries the open calls as `meta["call_stack_ids"]`. A call remains open while
-  the callee offers an available ordinary edge for reader selection. When its pipeline
-  has no redirect and no selectable continuation, the frame pops the stack and follows
-  `get_return_edge()` back to the predecessor at `return_phase`. Triggered edges are
-  redirects, not selectable continuations.
+  the callee offers an ordinary edge that its graph factory judges selectable for reader
+  input. The VM factory's default is traversal availability; a Story `World` also admits
+  viable selection-time provisioning. When the pipeline has no redirect and no selectable
+  continuation, the frame pops the stack and follows `get_return_edge()` back to the
+  predecessor at `return_phase`. Triggered edges are redirects, not selectable
+  continuations.
 - `once` — offer this edge only until its successor has been visited, by any route.
   "Visited" is the ledger's cursor history, read through the phase context by
   `has_visited(node, ctx=ctx)`; a node's `_visited` locals are not consulted.
@@ -500,6 +502,11 @@ boundaries, and return-stack unwind;
 the VM keeps this bus concrete rather than hiding it behind a generic phase-spec table
 because redirect capture, tracing, and return-edge resumption are part of the runtime
 contract.
+
+**Selectability is factory policy.** `TraversableGraphFactory.is_selectable_edge()`
+defaults to `edge.available(ctx=ctx)`. A higher-layer factory may refine that decision
+without VM importing its vocabulary; `World` uses the same Story policy that publishes
+available `ChoiceFragment` values, including viable lazy destinations.
 
 **`output_stream` is an `OrderedRegistry`.** Fragments (JOURNAL) and patches (FINALIZE)
 are appended to a shared `OrderedRegistry`. The registry's append-only, seq-ordered

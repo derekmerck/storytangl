@@ -5,7 +5,8 @@ from uuid import UUID
 
 from tangl.core import Graph, GraphFactory, TemplateRegistry
 
-from .traversable import TraversableNode, assert_traversal_contracts
+from .ctx import VmPhaseCtx
+from .traversable import TraversableEdge, TraversableNode, assert_traversal_contracts
 
 
 class TraversableGraph(Graph):
@@ -26,6 +27,15 @@ class TraversableGraphFactory(GraphFactory):
     """
 
     graph_type: type[Graph] = TraversableGraph
+
+    def is_selectable_edge(self, edge: TraversableEdge, *, ctx: VmPhaseCtx) -> bool:
+        """Return whether ``edge`` can hold a frame open for reader input.
+
+        Story factories may refine this for narrative choices that are viable
+        through selection-time provisioning. VM-only graphs use ordinary
+        traversal availability.
+        """
+        return edge.available(ctx=ctx)
 
     def materialize_graph(
         self,

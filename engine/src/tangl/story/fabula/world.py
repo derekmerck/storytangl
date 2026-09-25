@@ -10,9 +10,10 @@ from tangl.core import EntityTemplate, Selector, Singleton, TemplateRegistry, To
 from tangl.media import get_system_resource_manager
 from tangl.media.media_resource import MediaInventory
 from tangl.media.story_media import get_story_resource_manager
-from tangl.vm import TraversableGraphFactory, TraversableNode
+from tangl.vm import TraversableEdge, TraversableGraphFactory, TraversableNode
 from tangl.vm.ctx import VmPhaseCtx
 
+from ..episode import Action
 from ..story_graph import StoryGraph
 from .compiler import StoryCompiler
 from .materializer import StoryMaterializer
@@ -248,6 +249,15 @@ class World(TraversableGraphFactory):
     class_registry: dict[str, Any] = Field(default_factory=dict)
     modules: list[Any] = Field(default_factory=list)
     extra_authorities: list[Any] = Field(default_factory=list)
+
+    def is_selectable_edge(self, edge: TraversableEdge, *, ctx: VmPhaseCtx) -> bool:
+        """Apply Story choice viability when a frame decides whether to yield."""
+        if not isinstance(edge, Action):
+            return super().is_selectable_edge(edge, ctx=ctx)
+
+        from ..system_handlers import is_action_selectable
+
+        return is_action_selectable(edge=edge, ctx=ctx)
 
     @model_validator(mode="before")
     @classmethod

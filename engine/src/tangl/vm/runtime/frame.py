@@ -74,6 +74,7 @@ from tangl.core import (
 )
 from tangl.utils.hashing import hashing_func
 from ..ctx import VmPhaseCtx
+from ..factory import TraversableGraphFactory
 from ..dispatch import (
     do_finalize,
     do_gather_ns,
@@ -909,10 +910,15 @@ class Frame:
 
     def _has_selectable_continuation(self, *, ctx: VmPhaseCtx) -> bool:
         """Whether the current node offers an available player choice."""
+        factory = self.graph.factory
         return any(
             isinstance(edge, TraversableEdge)
             and edge.trigger_phase is None
-            and edge.available(ctx=ctx)
+            and (
+                factory.is_selectable_edge(edge, ctx=ctx)
+                if isinstance(factory, TraversableGraphFactory)
+                else edge.available(ctx=ctx)
+            )
             for edge in self.cursor.edges_out()
         )
 
