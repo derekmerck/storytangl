@@ -267,9 +267,11 @@ Wraps core's `Edge` with phase-control fields:
   edges set `entry_phase=UPDATE` to skip VALIDATE/PLANNING on already-processed nodes.
 - `return_phase` — marks this edge as a *call*. The frame pushes it onto the return
   stack before following, so the call is open for its whole traversal, and each phase
-  context carries the open calls as `meta["call_stack_ids"]`. When the callee pipeline
-  reaches a terminal, the frame pops the stack and follows `get_return_edge()` back to
-  the predecessor at `return_phase`.
+  context carries the open calls as `meta["call_stack_ids"]`. A call remains open while
+  the callee offers an available ordinary edge for reader selection. When its pipeline
+  has no redirect and no selectable continuation, the frame pops the stack and follows
+  `get_return_edge()` back to the predecessor at `return_phase`. Triggered edges are
+  redirects, not selectable continuations.
 - `once` — offer this edge only until its successor has been visited, by any route.
   "Visited" is the ledger's cursor history, read through the phase context by
   `has_visited(node, ctx=ctx)`; a node's `_visited` locals are not consulted.
@@ -483,7 +485,8 @@ choices produces the same random outcomes. `ctx.get_random()` exposes the shared
 ### Frame (`runtime/frame.py`)
 
 Drives one `resolve_choice` call: a sequence of `follow_edge` steps through the graph
-until the pipeline produces no redirect or the return stack is exhausted.
+until the pipeline reaches a selectable continuation, or a terminal unwinds the return
+stack and that stack is exhausted.
 
 **Frames are ephemeral.** Created by Ledger for each player action, consume edges,
 produce output into `output_stream`, then discarded. Their output is deterministically
@@ -492,7 +495,8 @@ reproducible from graph state and the chosen edge.
 **`follow_edge` is the unit of work.** Each call: (1) prepares the hop and validates
 the incoming edge, (2) advances cursor and builds a fresh PhaseCtx, (3) runs the full
 phase pipeline VALIDATE→POSTREQS, and (4) returns any redirect edge or `None`.
-`resolve_choice` remains an explicit loop over returned edges and return-stack unwind;
+`resolve_choice` remains an explicit loop over returned edges, selectable-continuation
+boundaries, and return-stack unwind;
 the VM keeps this bus concrete rather than hiding it behind a generic phase-spec table
 because redirect capture, tracing, and return-edge resumption are part of the runtime
 contract.
