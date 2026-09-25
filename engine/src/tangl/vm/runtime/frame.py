@@ -31,7 +31,8 @@ The pipeline phases in causal order:
 
 If PREREQS or POSTREQS returns an edge, ``follow_edge`` returns it and
 ``resolve_choice`` loops.  Otherwise the pipeline completes and
-``resolve_choice`` checks the return stack or yields to the caller.
+``resolve_choice`` yields to the caller when the current node has a selectable
+continuation; otherwise it checks the return stack.
 
 JOURNAL Mutation Policy
 -----------------------
@@ -73,6 +74,7 @@ from tangl.core import (
 )
 from tangl.utils.hashing import hashing_func
 from ..ctx import VmPhaseCtx
+from ..factory import TraversableGraphFactory
 from ..dispatch import (
     do_finalize,
     do_gather_ns,
@@ -898,12 +900,27 @@ class Frame:
         self,
         *,
         redirect: AnyTraversableEdge | None,
+        ctx: VmPhaseCtx,
     ) -> AnyTraversableEdge | None:
         if redirect is not None:
             return redirect
-        if self.return_stack:
+        if self.return_stack and not self._has_selectable_continuation(ctx=ctx):
             return self.return_stack.pop().get_return_edge()
         return None
+
+    def _has_selectable_continuation(self, *, ctx: VmPhaseCtx) -> bool:
+        """Whether the current node offers an available player choice."""
+        factory = self.graph.factory
+        return any(
+            isinstance(edge, TraversableEdge)
+            and edge.trigger_phase is None
+            and (
+                factory.is_selectable_edge(edge, ctx=ctx)
+                if isinstance(factory, TraversableGraphFactory)
+                else edge.available(ctx=ctx)
+            )
+            for edge in self.cursor.edges_out()
+        )
 
     def _run_resolve_iteration(
         self,
@@ -921,7 +938,7 @@ class Frame:
             was_choice=is_choice_edge,
             selected_payload_override=choice_payload if is_choice_edge else None,
         )
-        next_edge = self._next_resolve_edge(redirect=redirect)
+        next_edge = self._next_resolve_edge(redirect=redirect, ctx=self._make_ctx())
         self._emit_step_trace()
         return next_edge
 
@@ -1007,8 +1024,9 @@ class Frame:
         2. If redirect has ``return_phase``, push onto return stack, continue
            following (the redirect is the forward/call edge).
         3. If redirect has no ``return_phase``, it's a continuation — follow it.
-        4. If no redirect and return stack is non-empty, pop and follow return.
-        5. If no redirect and stack is empty, yield to caller (block for input).
+        4. If no redirect and the cursor has a selectable continuation, yield.
+        5. Otherwise, if the return stack is non-empty, pop and follow return.
+        6. If no redirect and stack is empty, yield to caller (block for input).
 
         Parameters
         ----------

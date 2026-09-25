@@ -11,8 +11,8 @@ Organized by contract:
 
 - Stack invariants: push requires ``return_phase``, empty pop raises
 - Nesting: multiple push/pop levels preserve LIFO order
-- Frame integration: ``resolve_choice`` pushes on call-edges and pops on
-  terminal pipeline completion
+- Frame integration: ``resolve_choice`` keeps calls open across selectable
+  continuations and pops them only at a terminal
 - Return-edge semantics: the return edge targets the predecessor at
   ``return_phase``, skipping earlier phases
 - Persistence: ``call_stack_ids`` survives ``unstructure`` / ``structure``
@@ -43,6 +43,7 @@ from tangl.vm.runtime.frame import Frame
 from tangl.vm.runtime.ledger import Ledger
 from tangl.vm.traversable import (
     AnonymousEdge,
+    Predicate,
     TraversableEdge,
     TraversableNode,
 )
@@ -243,6 +244,75 @@ class TestReturnEdgeSemantics:
 class TestFrameCallReturn:
     """Frame.resolve_choice integrates call/return via return_stack."""
 
+    def test_call_waits_for_callee_choice_before_returning(
+        self, clean_vm_dispatch
+    ) -> None:
+        """A call remains open while the callee offers a selectable edge."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        middle = _node(g, label="middle")
+        terminal = _node(g, label="terminal")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        callee_choice = _edge(
+            g,
+            predecessor_id=callee.uid,
+            successor_id=middle.uid,
+        )
+        terminal_choice = _edge(
+            g,
+            predecessor_id=middle.uid,
+            successor_id=terminal.uid,
+        )
+        ledger = _ledger(g, caller)
+
+        ledger.resolve_choice(call_edge.uid)
+
+        assert ledger.cursor_id == callee.uid
+        assert ledger.call_stack_ids == [call_edge.uid]
+
+        ledger.resolve_choice(callee_choice.uid)
+
+        assert ledger.cursor_id == middle.uid
+        assert ledger.call_stack_ids == [call_edge.uid]
+
+        ledger.resolve_choice(terminal_choice.uid)
+
+        assert ledger.cursor_id == caller.uid
+        assert ledger.call_stack_ids == []
+
+    def test_unavailable_callee_choice_does_not_hold_call_open(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Only a selectable continuation delays a return."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        unreachable = _node(g, label="unreachable")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        _edge(
+            g,
+            predecessor_id=callee.uid,
+            successor_id=unreachable.uid,
+            availability=[Predicate(expr="False")],
+        )
+        ledger = _ledger(g, caller)
+
+        ledger.resolve_choice(call_edge.uid)
+
+        assert ledger.cursor_id == caller.uid
+        assert ledger.call_stack_ids == []
+
     def test_resolve_choice_pushes_call_edge_before_unwind(
         self, clean_vm_dispatch  # noqa: F811  # from conftest autouse
     ) -> None:
@@ -307,6 +377,7 @@ class TestFrameCallReturn:
         bc_call = _edge(
             g, predecessor_id=b.uid, successor_id=c.uid,
             return_phase=ResolutionPhase.UPDATE,
+            trigger_phase=ResolutionPhase.POSTREQS,
         )
 
         # Register a POSTREQS handler that only fires on first arrival at b.
@@ -423,6 +494,34 @@ class TestCallStackPersistence:
         resolved = restored._call_stack()
         assert len(resolved) == 1
         assert resolved[0].uid == call_edge.uid
+
+    def test_suspended_call_resumes_after_structure_roundtrip(
+        self, clean_vm_dispatch
+    ) -> None:
+        """A saved callee choice returns through its restored call stack."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        terminal = _node(g, label="terminal")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        callee_choice = _edge(
+            g,
+            predecessor_id=callee.uid,
+            successor_id=terminal.uid,
+        )
+        ledger = _ledger(g, caller)
+        ledger.resolve_choice(call_edge.uid)
+
+        restored = Ledger.structure(ledger.unstructure())
+        restored.resolve_choice(callee_choice.uid)
+
+        assert restored.cursor_id == caller.uid
+        assert restored.call_stack_ids == []
 
     def test_stale_call_stack_id_raises_on_resolution(self) -> None:
         """If graph is replaced without the call edge, resolution fails."""

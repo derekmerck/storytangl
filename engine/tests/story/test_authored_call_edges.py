@@ -5,12 +5,10 @@ interaction with ``return_to_location`` - but nothing carried the field from an
 authored script, so a gamebook's "return to the paragraph from which you came"
 could only be compiled as a dead end.
 
-The call is one-shot: the destination's content and effects land, and the reader
-is returned to the caller in the same step. So nothing inside the call can stop and
-offer choices - not the destination, and not anywhere it redirects or continues -
-and none of it journals them either, since they could never be taken from where
-the reader ends up. A call that waits for the
-reader needs the ledger's call stack to survive the step.
+The call remains open when its destination offers a selectable action. The reader
+then receives that action as an ordinary choice, and the call returns only after
+the selected path reaches a terminal. Automatic continuations still run before
+the reader receives control, so their intermediate choices must not be published.
 """
 
 from __future__ import annotations
@@ -56,11 +54,17 @@ def _script(clinic: dict, call: dict) -> dict:
     }
 
 
-def _graph(label: str, *, clinic: dict | None = None, call: dict | None = None):
+def _graph(
+    label: str,
+    *,
+    clinic: dict | None = None,
+    call: dict | None = None,
+    init_mode: InitMode = InitMode.EAGER,
+):
     world = World.from_script_data(
         script_data=_script(clinic or {}, call if call is not None else {"return": True})
     )
-    return world.create_story(label, init_mode=InitMode.EAGER).graph
+    return world.create_story(label, init_mode=init_mode).graph
 
 
 def _node(graph, label: str):
@@ -130,14 +134,8 @@ def test_the_call_is_marked_on_the_edge() -> None:
     assert _edge(graph, "road", "Drive on").return_phase is None
 
 
-def test_a_called_destination_does_not_offer_choices_the_reader_cannot_take() -> None:
-    """The reader returns in the same step, so the destination's choices are moot.
-
-    Journalled, they would reach the client as live buttons beside the caller's
-    - and a choice id is accepted without checking that its edge starts at the
-    cursor, so taking one would jump from the caller along the callee's edge.
-    The destination's content still lands; only its choices are withheld.
-    """
+def test_a_called_destination_offers_its_selectable_choices() -> None:
+    """A call suspends at its callee until the reader selects its action."""
     graph = _graph(
         "call_nested",
         clinic={"actions": [{"text": "Ask about the scar", "successor": "town"}]},
@@ -150,15 +148,20 @@ def test_a_called_destination_does_not_offer_choices_the_reader_cannot_take() ->
         and fragment.step >= ledger.current_update_start_step
     }
 
-    assert ledger.cursor.get_label() == "road"
-    assert offered == {"Get medical help", "Drive on"}
-    assert "Ask about the scar" not in offered
+    assert ledger.cursor.get_label() == "clinic"
+    assert ledger.call_stack_ids == [_edge(graph, "road", "Get medical help").uid]
+    assert offered == {"Ask about the scar"}
     content = [
         getattr(fragment, "content", None)
         for fragment in ledger.get_journal()
         if getattr(fragment, "step", -1) >= ledger.current_update_start_step
     ]
     assert "The doctor patches you up." in content
+
+    ledger.resolve_choice(_edge(graph, "clinic", "Ask about the scar").uid)
+
+    assert ledger.cursor.get_label() == "road"
+    assert _offered_now(ledger) == {"Get medical help", "Drive on"}
 
 
 def test_the_same_block_reached_without_a_call_still_offers_its_choices() -> None:
@@ -189,16 +192,14 @@ def _offered_now(ledger) -> set[str]:
     }
 
 
-def test_choices_are_withheld_for_the_whole_call_not_only_its_destination() -> None:
-    """road --call--> clinic --continue--> exam, and exam offers "Stale".
-
-    The call is open while the clinic continues into the exam room, and the
-    reader is returned past both in the same step. Checking only the edge the
-    destination was entered by would miss the exam room.
-    """
+def test_redirecting_intermediate_block_does_not_publish_stale_choices() -> None:
+    """Only the redirect's final block can publish a live call choice."""
     graph = _graph(
         "call_continues",
-        clinic={"continues": [{"successor": "exam", "trigger": "last"}]},
+        clinic={
+            "actions": [{"text": "Stale clinic choice", "successor": "town"}],
+            "continues": [{"successor": "exam", "trigger": "last"}],
+        },
     )
     ledger = _visit(graph)
 
@@ -206,8 +207,48 @@ def test_choices_are_withheld_for_the_whole_call_not_only_its_destination() -> N
         "road",
         "clinic",
         "exam",
-        "road",
     ]
+    assert ledger.cursor.get_label() == "exam"
+    assert _offered_now(ledger) == {"Stale"}
+
+
+def test_lazy_called_destination_keeps_a_viable_unresolved_choice_open() -> None:
+    """Selection-time provisioning counts as a selectable call continuation."""
+    graph = _graph(
+        "lazy_call",
+        clinic={"actions": [{"text": "Ask about the scar", "successor": "town"}]},
+        init_mode=InitMode.LAZY,
+    )
+    ledger = _visit(graph)
+
+    assert ledger.cursor.get_label() == "clinic"
+    assert ledger.call_stack_ids == [_edge(graph, "road", "Get medical help").uid]
+    assert _offered_now(ledger) == {"Ask about the scar"}
+
+    ledger.resolve_choice(_edge(graph, "clinic", "Ask about the scar").uid)
+
+    assert ledger.cursor.get_label() == "road"
+    assert ledger.call_stack_ids == []
+
+
+def test_unavailable_called_action_does_not_hold_the_call_open() -> None:
+    """A rendered-but-unavailable Story choice is not a call continuation."""
+    graph = _graph(
+        "locked_call",
+        clinic={
+            "actions": [
+                {
+                    "text": "Ask about the scar",
+                    "successor": "town",
+                    "conditions": ["False"],
+                }
+            ]
+        },
+    )
+    ledger = _visit(graph)
+
+    assert ledger.cursor.get_label() == "road"
+    assert ledger.call_stack_ids == []
     assert _offered_now(ledger) == {"Get medical help", "Drive on"}
 
 
