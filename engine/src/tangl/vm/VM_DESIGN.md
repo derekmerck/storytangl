@@ -508,6 +508,13 @@ defaults to `edge.available(ctx=ctx)`. A higher-layer factory may refine that de
 without VM importing its vocabulary; `World` uses the same Story policy that publishes
 available `ChoiceFragment` values, including viable lazy destinations.
 
+**POSTREQS decides live choice publication.** JOURNAL and FINALIZE both execute before
+POSTREQS, but Frame collects their records until that single POSTREQS dispatch finishes.
+If it redirects, Frame drops only `ChoiceFragment` records from the intermediate cursor
+before appending the batch, so a client never receives controls it cannot select. This
+does not add a phase or repeat POSTREQS; content and FINALIZE records keep their normal
+causal order.
+
 **`output_stream` is an `OrderedRegistry`.** Fragments (JOURNAL) and patches (FINALIZE)
 are appended to a shared `OrderedRegistry`. The registry's append-only, seq-ordered
 semantics ensure the output is total-ordered and reproducible.

@@ -34,6 +34,11 @@ If PREREQS or POSTREQS returns an edge, ``follow_edge`` returns it and
 ``resolve_choice`` yields to the caller when the current node has a selectable
 continuation; otherwise it checks the return stack.
 
+JOURNAL output is collected until POSTREQS has run once. When POSTREQS redirects,
+choice fragments from that intermediate cursor are discarded before publication;
+content and FINALIZE records retain their normal order. This is output commitment,
+not a new phase boundary: every phase still runs exactly once in causal order.
+
 JOURNAL Mutation Policy
 -----------------------
 JOURNAL handlers are expected to primarily emit records. UPDATE/FINALIZE remain
@@ -63,6 +68,7 @@ from uuid import UUID
 
 
 from tangl.core import (
+    BaseFragment,
     Behavior,
     BehaviorRegistry,
     Graph,
@@ -825,22 +831,25 @@ class Frame:
         ctx.current_phase = ResolutionPhase.UPDATE
         do_update(self.cursor, ctx=ctx)
 
-    def _append_phase_records(self, values: Any, *, step: int) -> None:
+    def _collect_phase_records(self, values: Any, *, step: int) -> list[Any]:
         if not values:
-            return
+            return []
         if isinstance(values, Iterable) and not isinstance(values, (Record, str, bytes)):
+            records: list[Any] = []
             for value in values:
-                self._append_phase_records(value, step=step)
-            return
-        record = self._with_step(values, step=step) if isinstance(values, Record) else values
-        self.output_stream.append(record)
+                records.extend(self._collect_phase_records(value, step=step))
+            return records
+        return [self._with_step(values, step=step) if isinstance(values, Record) else values]
 
-    def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+    def _append_phase_records(self, values: Any, *, step: int) -> None:
+        self.output_stream.extend(self._collect_phase_records(values, step=step))
+
+    def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> list[Any]:
         if entry_phase > ResolutionPhase.JOURNAL:
-            return
+            return []
         ctx.current_phase = ResolutionPhase.JOURNAL
         journal_hash_before = self.graph.value_hash()
-        self._append_phase_records(do_journal(self.cursor, ctx=ctx), step=ctx.step)
+        records = self._collect_phase_records(do_journal(self.cursor, ctx=ctx), step=ctx.step)
         if logger.isEnabledFor(logging.DEBUG):
             journal_hash_after = self.graph.value_hash()
             if journal_hash_after != journal_hash_before:
@@ -850,17 +859,25 @@ class Frame:
                     ctx.step,
                     self.cursor.uid,
                 )
+        return records
 
-    def _run_finalize_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+    def _run_finalize_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> list[Any]:
         if entry_phase > ResolutionPhase.FINALIZE:
-            return
+            return []
         ctx.current_phase = ResolutionPhase.FINALIZE
-        self._append_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
+        return self._collect_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
 
-    def _run_terminal_phases(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+    def _run_terminal_phases(
+        self,
+        *,
+        ctx: VmPhaseCtx,
+        entry_phase: ResolutionPhase,
+    ) -> tuple[list[Any], list[Any]]:
         self._run_update_phase(ctx=ctx, entry_phase=entry_phase)
-        self._run_journal_phase(ctx=ctx, entry_phase=entry_phase)
-        self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase)
+        return (
+            self._run_journal_phase(ctx=ctx, entry_phase=entry_phase),
+            self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase),
+        )
 
     def _finish_follow_edge(
         self,
@@ -938,7 +955,13 @@ class Frame:
             was_choice=is_choice_edge,
             selected_payload_override=choice_payload if is_choice_edge else None,
         )
-        next_edge = self._next_resolve_edge(redirect=redirect, ctx=self._make_ctx())
+        next_edge = self._next_resolve_edge(
+            redirect=redirect,
+            ctx=self._make_ctx(
+                incoming_edge=edge,
+                incoming_payload=self.selected_payload,
+            ),
+        )
         self._emit_step_trace()
         return next_edge
 
@@ -984,7 +1007,10 @@ class Frame:
         if redirect is not None:
             return redirect
 
-        self._run_terminal_phases(ctx=ctx, entry_phase=entry_phase)
+        journal_records, finalize_records = self._run_terminal_phases(
+            ctx=ctx,
+            entry_phase=entry_phase,
+        )
 
         redirect = self._run_redirect_phase(
             ctx=ctx,
@@ -995,6 +1021,17 @@ class Frame:
             was_choice=was_choice,
             before_graph=before_graph,
         )
+        if redirect is not None:
+            journal_records = [
+                record
+                for record in journal_records
+                if not (
+                    isinstance(record, BaseFragment)
+                    and record.fragment_type == "choice"
+                )
+            ]
+        self._append_phase_records(journal_records, step=ctx.step)
+        self._append_phase_records(finalize_records, step=ctx.step)
         if redirect is not None:
             return redirect
 

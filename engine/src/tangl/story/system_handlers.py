@@ -25,7 +25,6 @@ from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
-    ResolutionPhase,
     TraversableNode,
     ViabilityResult,
     do_compose_journal,
@@ -261,6 +260,9 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     if edge.successor is None:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
         if preview is not None and preview.viable:
+            if not edge.source_available(ctx=ctx):
+                authored = _authored_blocker(edge)
+                return authored.code if authored is not None else "guard_failed_or_unavailable"
             return None
         return "missing_successor"
 
@@ -338,6 +340,20 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
         if preview is not None:
             if preview.viable:
+                if not edge.source_available(ctx=ctx):
+                    return [
+                        blocker.model_copy(
+                            update={
+                                "message": _render_text(blocker.message, source=edge, ctx=ctx)
+                            }
+                        )
+                        for blocker in edge.blockers or ()
+                    ] or [
+                        Blocker(
+                            code="guard_failed_or_unavailable",
+                            message=_blocker_message("guard_failed_or_unavailable"),
+                        )
+                    ]
                 return []
             preview_blockers = _preview_blockers(preview)
             if preview_blockers:
@@ -740,21 +756,12 @@ def render_block_media(*, caller, ctx, **_kw):
 def render_block_choices(*, caller, ctx, **_kw):
     """Render block outbound actions into choice fragments.
 
-    Called blocks publish ordinary choices when the frame yields there. A block
-    with an available POSTREQS action instead redirects before the reader gets
-    control, and a called block with no selectable actions immediately returns;
-    neither may publish stale client controls.
+    Called blocks publish ordinary choices when the frame yields there. A called
+    block with no selectable actions immediately returns, so it does not publish
+    stale client controls.
     """
     if not isinstance(caller, Block):
         return None
-    if any(
-        edge.available(ctx=ctx)
-        for edge in caller.edges_out(
-            Selector(has_kind=Action, trigger_phase=ResolutionPhase.POSTREQS)
-        )
-    ):
-        return None
-
     actions = list(caller.edges_out(Selector(has_kind=Action, trigger_phase=None)))
     choices = [
         (edge, _choice_unavailable_reason(edge=edge, ctx=ctx))

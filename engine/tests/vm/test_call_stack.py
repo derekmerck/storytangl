@@ -32,9 +32,11 @@ from typing import Callable, Iterator
 
 import pytest
 
+import tangl.vm.system_handlers as vm_system_handlers
 from tangl.core import Graph
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
+    on_gather_ns,
     on_postreqs,
     on_prereqs,
 )
@@ -312,6 +314,35 @@ class TestFrameCallReturn:
 
         assert ledger.cursor_id == caller.uid
         assert ledger.call_stack_ids == []
+
+    def test_call_continuation_uses_completed_edge_context(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Continuation availability retains the selected edge namespace."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        terminal = _node(g, label="terminal")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        _edge(
+            g,
+            predecessor_id=callee.uid,
+            successor_id=terminal.uid,
+            availability=[Predicate(expr="_edge.return_phase is not None")],
+        )
+        on_gather_ns(vm_system_handlers.contribute_selected_edge_context)
+
+        with _cleanup_behaviors(vm_system_handlers.contribute_selected_edge_context):
+            frame = Frame(graph=g, cursor=caller)
+            frame.resolve_choice(call_edge)
+
+        assert frame.cursor is callee
+        assert frame.return_stack == [call_edge]
 
     def test_resolve_choice_pushes_call_edge_before_unwind(
         self, clean_vm_dispatch  # noqa: F811  # from conftest autouse

@@ -22,7 +22,10 @@ from tangl.journal.fragments import ChoiceFragment
 from tangl.story import InitMode
 from tangl.story.episode import Action
 from tangl.story.fabula.world import World
-from tangl.vm import Ledger, ResolutionPhase
+from tangl.story.system_handlers import render_block_choices
+from tangl.vm import AnonymousEdge, Ledger, ResolutionPhase
+from tangl.vm.dispatch import dispatch as vm_dispatch, on_postreqs
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _script(clinic: dict, call: dict) -> dict:
@@ -212,6 +215,33 @@ def test_redirecting_intermediate_block_does_not_publish_stale_choices() -> None
     assert _offered_now(ledger) == {"Stale"}
 
 
+def test_postreq_hook_redirect_does_not_publish_intermediate_choices() -> None:
+    """A postreq hook redirects before the client receives a live choice."""
+    graph = _graph(
+        "hook_redirect_call",
+        clinic={"actions": [{"text": "Stale clinic choice", "successor": "town"}]},
+    )
+    clinic = _node(graph, "clinic")
+    exam = _node(graph, "exam")
+    postreq_callers: list[str] = []
+
+    @on_postreqs
+    def redirect_to_exam(caller, *, ctx, **_kw):
+        postreq_callers.append(caller.get_label())
+        if caller is clinic:
+            return AnonymousEdge(predecessor=clinic, successor=exam)
+        return None
+
+    try:
+        ledger = _visit(graph)
+    finally:
+        vm_dispatch.remove(redirect_to_exam._behavior.uid)
+
+    assert ledger.cursor.get_label() == "exam"
+    assert _offered_now(ledger) == {"Stale"}
+    assert postreq_callers == ["clinic", "exam"]
+
+
 def test_lazy_called_destination_keeps_a_viable_unresolved_choice_open() -> None:
     """Selection-time provisioning counts as a selectable call continuation."""
     graph = _graph(
@@ -250,6 +280,37 @@ def test_unavailable_called_action_does_not_hold_the_call_open() -> None:
     assert ledger.cursor.get_label() == "road"
     assert ledger.call_stack_ids == []
     assert _offered_now(ledger) == {"Get medical help", "Drive on"}
+
+
+def test_guarded_lazy_called_action_is_unavailable_and_returns() -> None:
+    """A viable lazy destination does not override an action's own guard."""
+    graph = _graph(
+        "guarded_lazy_call",
+        clinic={
+            "actions": [
+                {
+                    "text": "Ask about the scar",
+                    "successor": "town",
+                    "conditions": ["False"],
+                }
+            ]
+        },
+        init_mode=InitMode.LAZY,
+    )
+    ledger = _visit(graph)
+    clinic = _node(graph, "clinic")
+    ctx = PhaseCtx(graph=graph, cursor_id=clinic.uid)
+
+    choice = next(
+        fragment
+        for fragment in render_block_choices(caller=clinic, ctx=ctx) or []
+        if isinstance(fragment, ChoiceFragment)
+    )
+
+    assert choice.available is False
+    assert choice.unavailable_reason == "guard_failed_or_unavailable"
+    assert ledger.cursor.get_label() == "road"
+    assert ledger.call_stack_ids == []
 
 
 def test_return_is_declared_script_vocabulary() -> None:
