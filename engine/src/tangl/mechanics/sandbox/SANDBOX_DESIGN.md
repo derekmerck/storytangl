@@ -7,7 +7,8 @@
 :related: open_link, traversal, journal, games
 ```
 
-**Status:** IMPLEMENTED FIRST-SPIKE + ASPIRATIONAL DESIGN NOTE
+**Status:** IMPLEMENTED FIRST-SPIKE; selected event time charges at origin +
+ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,
 `scratch/mechanics/sandbox/*`
@@ -769,9 +770,12 @@ FINALIZE / POSTREQS
 ```
 
 `advance_world_turn(...)` remains dumb. The higher-level sandbox time advance
-resolves the selected action's `SandboxTimeCost`, advances the nearest sandbox
-scope clock, and runs `do_sandbox_tick` once per normalized tick. The first tick
-consumer is charged-asset depletion. Future consumers such as hazards,
+resolves the selected action's `SandboxTimeCost` at its origin location,
+advances the nearest sandbox scope clock once on entry, and runs
+`do_sandbox_tick` once per normalized tick. A block-target event can keep its
+own internal choices open, but those choices do not repeat the entry charge.
+The first tick consumer is charged-asset depletion. Future consumers such as
+hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach
 to the same tick chain so simulation remains a domain-local refinement of
 UPDATE rather than a parallel runtime.

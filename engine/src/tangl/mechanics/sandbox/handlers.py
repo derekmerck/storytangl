@@ -2326,19 +2326,21 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
 
 
 @on_update(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
     priority=Priority.LATE,
 )
 def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
-    """Advance sandbox-local time for selected sandbox actions."""
-    if not isinstance(caller, SandboxLocation):
+    """Advance time once at the origin of a selected sandbox action."""
+    selected_edge = ctx.selected_edge
+    if not isinstance(selected_edge, Action):
+        return None
+    origin = ctx.graph.get(selected_edge.predecessor_id)
+    if not isinstance(origin, SandboxLocation):
         return None
 
     cost = _selected_sandbox_time_cost(ctx)
     if cost is None:
         return None
-    _sandbox_time_advance(caller, ctx=ctx, cost=cost)
+    _sandbox_time_advance(origin, ctx=ctx, cost=cost)
     return None
 
 
