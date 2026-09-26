@@ -1271,6 +1271,178 @@ def test_scheduled_event_uses_interaction_journal_effects_and_availability() -> 
     assert road.locals["bell_rung"] is True
 
 
+def _event_time_graph(*, return_to_location: bool = False) -> tuple[
+    Graph,
+    SandboxScope,
+    SandboxLocation,
+    Block,
+]:
+    """Build a scheduled event whose block target inherits the scope clock."""
+    graph = Graph(label="event_time")
+    scope = SandboxScope(label="event_time_scope", locals={"world_turn": 3})
+    road = SandboxLocation(
+        label="road",
+        location_name="Road",
+        scheduled_events=[
+            ScheduledEvent(
+                label="night_event",
+                target="event_beat",
+                text="Attend the night event",
+                return_to_location=return_to_location,
+            ),
+            ScheduledEvent(
+                label="empty_period",
+                period=2,
+                target="quiet_beat",
+                text="Attend the empty-period event",
+            ),
+        ],
+    )
+    square = SandboxLocation(
+        label="square",
+        location_name="Square",
+        scheduled_events=[
+            ScheduledEvent(
+                label="market_event",
+                target="market_beat",
+                text="Attend the market event",
+            )
+        ],
+    )
+    event_beat = Block(label="event_beat", content="The event begins.")
+    market_beat = Block(label="market_beat", content="The market opens.")
+    quiet_beat = Block(label="quiet_beat", content="Nothing happens.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(square)
+    graph.add(event_beat)
+    graph.add(market_beat)
+    graph.add(quiet_beat)
+    scope.add_child(road)
+    scope.add_child(square)
+    scope.add_child(event_beat)
+    scope.add_child(market_beat)
+    scope.add_child(quiet_beat)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(square, ctx=PhaseCtx(graph=graph, cursor_id=square.uid))
+    return graph, scope, road, event_beat
+
+
+def test_selected_event_charges_once_at_origin_and_rolls_calendar() -> None:
+    """A block-target event spends its period before its first content."""
+    graph, scope, road, event_beat = _event_time_graph()
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    square = graph.find_one(Selector(has_kind=SandboxLocation, label="square"))
+
+    assert isinstance(square, SandboxLocation)
+    assert [action.text for action in _dynamic_sandbox_actions_with_tag(road, "event")] == [
+        "Attend the night event"
+    ]
+    assert [action.text for action in _dynamic_sandbox_actions_with_tag(square, "event")] == [
+        "Attend the market event"
+    ]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(event.uid)
+
+    assert ledger.cursor is event_beat
+    assert scope.locals["world_turn"] == 4
+    world_time = current_world_time(event_beat)
+    assert world_time.turn == 4
+    assert world_time.period == 1
+    assert world_time.run_day == 2
+
+
+def test_current_target_event_keeps_one_step_time_charge() -> None:
+    """The existing self-target event remains the one-step baseline."""
+    graph = Graph(label="current_event_time")
+    scope = SandboxScope(label="current_event_scope", locals={"world_turn": 0})
+    road = SandboxLocation(
+        label="road",
+        scheduled_events=[
+            ScheduledEvent(label="bell", target="current", text="Ring the bell"),
+        ],
+    )
+    graph.add(scope)
+    graph.add(road)
+    scope.add_child(road)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 1
+
+
+def test_returning_event_internal_choice_does_not_charge_again_after_restore() -> None:
+    """A restored open event call preserves its one entry charge."""
+    graph, scope, road, event_beat = _event_time_graph(return_to_location=True)
+    ending = Block(label="event_ending", content="The event concludes.")
+    alternate = Block(
+        label="event_alternate",
+        content="The event takes another turn.",
+    )
+    graph.add(ending)
+    graph.add(alternate)
+    scope.add_child(ending)
+    scope.add_child(alternate)
+    internal_choice = Action(
+        registry=graph,
+        label="event_internal_choice",
+        predecessor_id=event_beat.uid,
+        successor_id=ending.uid,
+        text="Make the internal choice",
+    )
+    Action(
+        registry=graph,
+        label="event_alternate_choice",
+        predecessor_id=event_beat.uid,
+        successor_id=alternate.uid,
+        text="Take the alternate choice",
+    )
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.checkpoint_cadence = 3
+
+    ledger.resolve_choice(event.uid)
+    assert ledger.cursor is event_beat
+    assert scope.locals["world_turn"] == 4
+
+    restored = Ledger.structure(ledger.unstructure())
+    restored_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
+    restored_road = restored.graph.find_one(
+        Selector(has_kind=SandboxLocation, label="road")
+    )
+    restored_choice = restored.graph.get(internal_choice.uid)
+
+    assert isinstance(restored_scope, SandboxScope)
+    assert isinstance(restored_road, SandboxLocation)
+    assert isinstance(restored_choice, Action)
+    restored.resolve_choice(restored_choice.uid)
+
+    assert restored.cursor is restored_road
+    assert restored_scope.locals["world_turn"] == 4
+
+    restored.rollback_to_step(1, reason="replay event entry")
+    replayed_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
+
+    assert isinstance(replayed_scope, SandboxScope)
+    assert restored.cursor.get_label() == "event_beat"
+    assert replayed_scope.locals["world_turn"] == 4
+
+
+def test_rejected_event_selection_does_not_charge_time() -> None:
+    """Validation rejects a stale event before the origin clock advances."""
+    graph, scope, road, _event_beat = _event_time_graph()
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    event.availability = [Predicate(expr="False")]
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 3
+
+
 def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
     graph = Graph(label="tiny_cave")
     scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0})
