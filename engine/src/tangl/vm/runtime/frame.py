@@ -3,8 +3,8 @@
 
 A Frame drives one ``resolve_choice`` call: a sequence of ``follow_edge`` steps
 that move the cursor through the graph, running the phase pipeline at each node,
-until the pipeline produces no redirect (block for input) or the return stack
-is exhausted.
+until the reader can select a continuation or traversal terminates after
+unwinding any open calls.
 
 Frames are ephemeral — they are created by the Ledger for each player action,
 consume edges, produce output (fragments, patches) into the output stream, and
@@ -31,7 +31,13 @@ The pipeline phases in causal order:
 
 If PREREQS or POSTREQS returns an edge, ``follow_edge`` returns it and
 ``resolve_choice`` loops.  Otherwise the pipeline completes and
-``resolve_choice`` checks the return stack or yields to the caller.
+``resolve_choice`` yields to the caller when the current node has a selectable
+continuation; otherwise it checks the return stack.
+
+JOURNAL output is collected until POSTREQS has run once. When POSTREQS redirects,
+choice fragments from that intermediate cursor are discarded before publication;
+content and FINALIZE records retain their normal order. This is output commitment,
+not a new phase boundary: every phase still runs exactly once in causal order.
 
 JOURNAL Mutation Policy
 -----------------------
@@ -62,6 +68,7 @@ from uuid import UUID
 
 
 from tangl.core import (
+    BaseFragment,
     Behavior,
     BehaviorRegistry,
     Graph,
@@ -73,6 +80,7 @@ from tangl.core import (
 )
 from tangl.utils.hashing import hashing_func
 from ..ctx import VmPhaseCtx
+from ..factory import TraversableGraphFactory
 from ..dispatch import (
     do_finalize,
     do_gather_ns,
@@ -453,8 +461,8 @@ class Frame:
     ``resolve_choice`` call).  It moves the cursor through the graph by
     repeatedly calling ``follow_edge``, which runs the phase pipeline at
     each destination node.  Redirects from PREREQS or POSTREQS cause the
-    loop to continue; when the pipeline produces no redirect, the frame
-    either pops the return stack or yields control back to the caller.
+    loop to continue; without a redirect, the frame yields at a selectable
+    continuation or pops the return stack at a terminal.
 
     Frame does NOT know about containers, scenes, or story semantics.  It
     knows about nodes, edges, the phase pipeline, and the return stack.
@@ -595,8 +603,7 @@ class Frame:
             combined_history.extend(self.cursor_trace)
         if combined_history:
             meta["cursor_history"] = combined_history
-        # The calls this traversal is inside. While any is open, the loop in
-        # ``resolve_choice`` cannot hand control back to the reader.
+        # Open calls remain on the stack when a callee yields for reader input.
         meta["call_stack_ids"] = [call.uid for call in self.return_stack]
         return PhaseCtx(
             graph=self.graph,
@@ -823,22 +830,25 @@ class Frame:
         ctx.current_phase = ResolutionPhase.UPDATE
         do_update(self.cursor, ctx=ctx)
 
-    def _append_phase_records(self, values: Any, *, step: int) -> None:
+    def _collect_phase_records(self, values: Any, *, step: int) -> list[Any]:
         if not values:
-            return
+            return []
         if isinstance(values, Iterable) and not isinstance(values, (Record, str, bytes)):
+            records: list[Any] = []
             for value in values:
-                self._append_phase_records(value, step=step)
-            return
-        record = self._with_step(values, step=step) if isinstance(values, Record) else values
-        self.output_stream.append(record)
+                records.extend(self._collect_phase_records(value, step=step))
+            return records
+        return [self._with_step(values, step=step) if isinstance(values, Record) else values]
 
-    def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+    def _append_phase_records(self, values: Any, *, step: int) -> None:
+        self.output_stream.extend(self._collect_phase_records(values, step=step))
+
+    def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> list[Any]:
         if entry_phase > ResolutionPhase.JOURNAL:
-            return
+            return []
         ctx.current_phase = ResolutionPhase.JOURNAL
         journal_hash_before = self.graph.value_hash()
-        self._append_phase_records(do_journal(self.cursor, ctx=ctx), step=ctx.step)
+        records = self._collect_phase_records(do_journal(self.cursor, ctx=ctx), step=ctx.step)
         if logger.isEnabledFor(logging.DEBUG):
             journal_hash_after = self.graph.value_hash()
             if journal_hash_after != journal_hash_before:
@@ -848,17 +858,25 @@ class Frame:
                     ctx.step,
                     self.cursor.uid,
                 )
+        return records
 
-    def _run_finalize_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+    def _run_finalize_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> list[Any]:
         if entry_phase > ResolutionPhase.FINALIZE:
-            return
+            return []
         ctx.current_phase = ResolutionPhase.FINALIZE
-        self._append_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
+        return self._collect_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
 
-    def _run_terminal_phases(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+    def _run_terminal_phases(
+        self,
+        *,
+        ctx: VmPhaseCtx,
+        entry_phase: ResolutionPhase,
+    ) -> tuple[list[Any], list[Any]]:
         self._run_update_phase(ctx=ctx, entry_phase=entry_phase)
-        self._run_journal_phase(ctx=ctx, entry_phase=entry_phase)
-        self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase)
+        return (
+            self._run_journal_phase(ctx=ctx, entry_phase=entry_phase),
+            self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase),
+        )
 
     def _finish_follow_edge(
         self,
@@ -898,12 +916,27 @@ class Frame:
         self,
         *,
         redirect: AnyTraversableEdge | None,
+        ctx: VmPhaseCtx,
     ) -> AnyTraversableEdge | None:
         if redirect is not None:
             return redirect
-        if self.return_stack:
+        if self.return_stack and not self._has_selectable_continuation(ctx=ctx):
             return self.return_stack.pop().get_return_edge()
         return None
+
+    def _has_selectable_continuation(self, *, ctx: VmPhaseCtx) -> bool:
+        """Whether the current node offers an available player choice."""
+        factory = self.graph.factory
+        return any(
+            isinstance(edge, TraversableEdge)
+            and edge.trigger_phase is None
+            and (
+                factory.is_selectable_edge(edge, ctx=ctx)
+                if isinstance(factory, TraversableGraphFactory)
+                else edge.available(ctx=ctx)
+            )
+            for edge in self.cursor.edges_out()
+        )
 
     def _run_resolve_iteration(
         self,
@@ -921,7 +954,13 @@ class Frame:
             was_choice=is_choice_edge,
             selected_payload_override=choice_payload if is_choice_edge else None,
         )
-        next_edge = self._next_resolve_edge(redirect=redirect)
+        next_edge = self._next_resolve_edge(
+            redirect=redirect,
+            ctx=self._make_ctx(
+                incoming_edge=edge,
+                incoming_payload=self.selected_payload,
+            ),
+        )
         self._emit_step_trace()
         return next_edge
 
@@ -967,7 +1006,10 @@ class Frame:
         if redirect is not None:
             return redirect
 
-        self._run_terminal_phases(ctx=ctx, entry_phase=entry_phase)
+        journal_records, finalize_records = self._run_terminal_phases(
+            ctx=ctx,
+            entry_phase=entry_phase,
+        )
 
         redirect = self._run_redirect_phase(
             ctx=ctx,
@@ -978,6 +1020,17 @@ class Frame:
             was_choice=was_choice,
             before_graph=before_graph,
         )
+        if redirect is not None:
+            journal_records = [
+                record
+                for record in journal_records
+                if not (
+                    isinstance(record, BaseFragment)
+                    and record.fragment_type == "choice"
+                )
+            ]
+        self._append_phase_records(journal_records, step=ctx.step)
+        self._append_phase_records(finalize_records, step=ctx.step)
         if redirect is not None:
             return redirect
 
@@ -1007,8 +1060,9 @@ class Frame:
         2. If redirect has ``return_phase``, push onto return stack, continue
            following (the redirect is the forward/call edge).
         3. If redirect has no ``return_phase``, it's a continuation — follow it.
-        4. If no redirect and return stack is non-empty, pop and follow return.
-        5. If no redirect and stack is empty, yield to caller (block for input).
+        4. If no redirect and the cursor has a selectable continuation, yield.
+        5. Otherwise, if the return stack is non-empty, pop and follow return.
+        6. If no redirect and stack is empty, yield to caller (block for input).
 
         Parameters
         ----------

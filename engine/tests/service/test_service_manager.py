@@ -44,6 +44,7 @@ def _story_script(
     *,
     with_choice_payload_hints: bool = False,
     with_choice_blocker: bool = False,
+    with_call: bool = False,
     stage_extent: dict[str, object] | None = None,
 ) -> dict[str, object]:
     action: dict[str, object] = {"text": "Continue", "successor": "end"}
@@ -83,19 +84,38 @@ def _story_script(
     if stage_extent is not None:
         metadata["stage_extent"] = stage_extent
 
+    blocks: dict[str, object] = {
+        "start": {
+            "content": "Start",
+            "actions": [action],
+        },
+        "end": {
+            "content": "End",
+        },
+    }
+    if with_call:
+        blocks = {
+            "start": {
+                "content": "Start",
+                "actions": [
+                    {"text": "Get help", "successor": "clinic", "return": True},
+                    {"text": "Leave", "successor": "end"},
+                ],
+            },
+            "clinic": {
+                "content": "Clinic",
+                "actions": [{"text": "Continue treatment", "successor": "end"}],
+            },
+            "end": {"content": "End"},
+        }
+
     return {
         "label": "svc_manager_world",
         "metadata": metadata,
         "scenes": {
             "intro": {
                 "blocks": {
-                    "start": {
-                        "content": "Start",
-                        "actions": [action],
-                    },
-                    "end": {
-                        "content": "End",
-                    },
+                    **blocks,
                 },
             },
         },
@@ -207,6 +227,53 @@ def test_story_methods_return_typed_runtime_payloads(
 
     projected = manager.get_story_info(user_id=user.uid)
     assert isinstance(projected, ProjectedState)
+
+
+def test_service_resolves_a_suspended_call_through_the_callee_choice(
+    manager: ServiceManager,
+    persistence,
+    user: User,
+) -> None:
+    """The client receives and can submit a choice from a called block."""
+    world = World.from_script_data(script_data=_story_script(with_call=True))
+    created = manager.create_story(
+        user_id=user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc_manager_call_flow",
+    )
+    call_choice = next(
+        fragment
+        for fragment in created.fragments
+        if isinstance(fragment, ChoiceFragment) and fragment.text == "Get help"
+    )
+
+    suspended = manager.resolve_choice(
+        user_id=user.uid,
+        request=DirectEdgeRequest(edge_id=call_choice.edge_id),
+    )
+
+    callee_choice = next(
+        fragment
+        for fragment in suspended.fragments
+        if isinstance(fragment, ChoiceFragment) and fragment.text == "Continue treatment"
+    )
+    ledger = persistence[user.current_ledger_id]
+    assert ledger.cursor.label == "clinic"
+    assert len(ledger.call_stack_ids) == 1
+
+    returned = manager.resolve_choice(
+        user_id=user.uid,
+        request=DirectEdgeRequest(edge_id=callee_choice.edge_id),
+    )
+
+    assert {fragment.text for fragment in returned.fragments if isinstance(fragment, ChoiceFragment)} == {
+        "Get help",
+        "Leave",
+    }
+    assert ledger.cursor.label == "start"
+    assert ledger.call_stack_ids == []
 
 
 def test_find_edge_request_resolves_command_or_returns_transient_guidance(

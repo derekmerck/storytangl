@@ -757,9 +757,9 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
       and planning on a node that was already processed.
     - ``return_phase``: if set, this edge represents a **call**.  The frame
       pushes it onto the return stack before following.  When the callee's
-      pipeline reaches a terminal (no redirect), the frame pops the stack
-      and follows ``get_return_edge()`` back to the predecessor at the
-      specified phase.
+      pipeline reaches a terminal (no redirect or selectable continuation),
+      the frame pops the stack and follows ``get_return_edge()`` back to the
+      predecessor at the specified phase.
 
     Key Features
     ------------
@@ -889,20 +889,10 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
             return False
         if self.once and has_visited(successor, ctx=ctx):
             return False
-        rand = _resolve_rand(rand=None, ctx=ctx)
-        predecessor = self.predecessor
-        edge_ns = ns
-        if edge_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
-            edge_ns = ctx.get_ns(predecessor or successor)
-
-        if self.predicate:
-            resolved_ns = edge_ns or {}
-            if not bool(resolved_ns.get(self.predicate)):
-                return False
-
-        if not HasAvailability.available(self, ns=edge_ns, ctx=ctx, rand=rand):
+        if not self.source_available(ctx=ctx, ns=ns):
             return False
 
+        rand = _resolve_rand(rand=None, ctx=ctx)
         successor_ns = ns
         if successor_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             successor_ns = ctx.get_ns(successor)
@@ -913,6 +903,21 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
         if not hasattr(successor, "available"):
             return True
         return successor.available(ns=successor_ns, ctx=ctx, rand=rand)
+
+    def source_available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
+        """Return whether this edge's predecessor-side guards permit selection."""
+        rand = _resolve_rand(rand=None, ctx=ctx)
+        predecessor = self.predecessor
+        edge_ns = ns
+        if edge_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            edge_ns = ctx.get_ns(predecessor or self.successor)
+
+        if self.predicate:
+            resolved_ns = edge_ns or {}
+            if not bool(resolved_ns.get(self.predicate)):
+                return False
+
+        return HasAvailability.available(self, ns=edge_ns, ctx=ctx, rand=rand)
 
     def get_return_edge(self) -> AnonymousEdge:
         """Construct the return edge from this call edge.

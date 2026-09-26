@@ -260,6 +260,9 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     if edge.successor is None:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
         if preview is not None and preview.viable:
+            if not edge.source_available(ctx=ctx):
+                authored = _authored_blocker(edge)
+                return authored.code if authored is not None else "guard_failed_or_unavailable"
             return None
         return "missing_successor"
 
@@ -282,6 +285,11 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
         return authored.code if authored is not None else "guard_failed_or_unavailable"
 
     return None
+
+
+def is_action_selectable(*, edge: Action, ctx) -> bool:
+    """Whether a Story action can be selected at the current cursor."""
+    return _choice_unavailable_reason(edge=edge, ctx=ctx) is None
 
 
 def _authored_blocker(edge: Action) -> Blocker | None:
@@ -332,6 +340,20 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
         if preview is not None:
             if preview.viable:
+                if not edge.source_available(ctx=ctx):
+                    return [
+                        blocker.model_copy(
+                            update={
+                                "message": _render_text(blocker.message, source=edge, ctx=ctx)
+                            }
+                        )
+                        for blocker in edge.blockers or ()
+                    ] or [
+                        Blocker(
+                            code="guard_failed_or_unavailable",
+                            message=_blocker_message("guard_failed_or_unavailable"),
+                        )
+                    ]
                 return []
             preview_blockers = _preview_blockers(preview)
             if preview_blockers:
@@ -734,22 +756,24 @@ def render_block_media(*, caller, ctx, **_kw):
 def render_block_choices(*, caller, ctx, **_kw):
     """Render block outbound actions into choice fragments.
 
-    A block journalled inside a call renders none - the callee, and anywhere it
-    redirects or continues. The step cannot end while a call is open, so the
-    reader is returned past every such block before getting control back, and
-    its choices could never be taken from where the reader ends up. Journalled
-    anyway, they would reach the client as live buttons, and a choice id is
-    accepted without checking that its edge starts at the cursor.
+    Called blocks publish ordinary choices when the frame yields there. A called
+    block with no selectable actions immediately returns, so it does not publish
+    stale client controls.
     """
     if not isinstance(caller, Block):
         return None
-    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())):
+    actions = list(caller.edges_out(Selector(has_kind=Action, trigger_phase=None)))
+    choices = [
+        (edge, _choice_unavailable_reason(edge=edge, ctx=ctx))
+        for edge in actions
+    ]
+    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
+        reason is None for _, reason in choices
+    ):
         return None
 
     fragments: list[ChoiceFragment] = []
-
-    for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
-        reason = _choice_unavailable_reason(edge=edge, ctx=ctx)
+    for edge, reason in choices:
         available = reason is None
         blockers = [] if available else _choice_blockers(edge=edge, ctx=ctx)
         fragments.append(
