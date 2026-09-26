@@ -757,9 +757,9 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
       and planning on a node that was already processed.
     - ``return_phase``: if set, this edge represents a **call**.  The frame
       pushes it onto the return stack before following.  When the callee's
-      pipeline reaches a terminal (no redirect), the frame pops the stack
-      and follows ``get_return_edge()`` back to the predecessor at the
-      specified phase.
+      pipeline reaches a terminal (no redirect or selectable continuation),
+      the frame pops the stack and follows ``get_return_edge()`` back to the
+      predecessor at the specified phase.
 
     Key Features
     ------------

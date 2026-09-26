@@ -3,8 +3,8 @@
 
 A Frame drives one ``resolve_choice`` call: a sequence of ``follow_edge`` steps
 that move the cursor through the graph, running the phase pipeline at each node,
-until the pipeline produces no redirect (block for input) or the return stack
-is exhausted.
+until the reader can select a continuation or traversal terminates after
+unwinding any open calls.
 
 Frames are ephemeral — they are created by the Ledger for each player action,
 consume edges, produce output (fragments, patches) into the output stream, and
@@ -461,8 +461,8 @@ class Frame:
     ``resolve_choice`` call).  It moves the cursor through the graph by
     repeatedly calling ``follow_edge``, which runs the phase pipeline at
     each destination node.  Redirects from PREREQS or POSTREQS cause the
-    loop to continue; when the pipeline produces no redirect, the frame
-    either pops the return stack or yields control back to the caller.
+    loop to continue; without a redirect, the frame yields at a selectable
+    continuation or pops the return stack at a terminal.
 
     Frame does NOT know about containers, scenes, or story semantics.  It
     knows about nodes, edges, the phase pipeline, and the return stack.
@@ -603,8 +603,7 @@ class Frame:
             combined_history.extend(self.cursor_trace)
         if combined_history:
             meta["cursor_history"] = combined_history
-        # The calls this traversal is inside. While any is open, the loop in
-        # ``resolve_choice`` cannot hand control back to the reader.
+        # Open calls remain on the stack when a callee yields for reader input.
         meta["call_stack_ids"] = [call.uid for call in self.return_stack]
         return PhaseCtx(
             graph=self.graph,
