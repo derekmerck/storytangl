@@ -924,7 +924,8 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
 
         The return edge targets the predecessor (the call site) and starts
         the pipeline at ``return_phase`` (skipping phases already completed
-        before the call).
+        before the call). It carries this call with it, so the call's
+        FINALIZE effects fire on arrival back at the call site.
 
         Raises
         ------
@@ -938,6 +939,7 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
         return AnonymousEdge(
             successor=self.predecessor,
             entry_phase=self.return_phase,
+            returns_from=self,
         )
 
 
@@ -976,6 +978,11 @@ class AnonymousEdge:
     push targets for the return stack — only persistent ``TraversableEdge``
     instances (with graph-stable UUIDs) serve as call bookmarks.
 
+    A return edge names the call it closes in ``returns_from``. The frame fires
+    that call's FINALIZE effects on arrival, before the call site re-plans: the
+    call's own post-content bookkeeping. A return journals nothing of its own,
+    so arrival is its one mutation point.
+
     Examples
     --------
     >>> from tangl.core import Graph
@@ -1005,6 +1012,9 @@ class AnonymousEdge:
 
     entry_phase: Optional[ResolutionPhase] = None
     """Pipeline phase to start at when following this edge."""
+
+    returns_from: Optional[TraversableEdge] = None
+    """The call this edge returns from, when it is a return edge."""
 
     def __repr__(self) -> str:
         src = self.predecessor.get_label() if self.predecessor is not None else "anon"

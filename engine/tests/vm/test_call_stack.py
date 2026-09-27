@@ -39,6 +39,7 @@ from tangl.vm.dispatch import (
     on_gather_ns,
     on_postreqs,
     on_prereqs,
+    on_provision,
 )
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import Frame
@@ -47,6 +48,7 @@ from tangl.vm.traversable import (
     AnonymousEdge,
     Predicate,
     TraversableEdge,
+    TraversableEffect,
     TraversableNode,
 )
 
@@ -287,6 +289,48 @@ class TestFrameCallReturn:
 
         assert ledger.cursor_id == caller.uid
         assert ledger.call_stack_ids == []
+
+    def test_return_closes_the_call_before_the_call_site_replans(
+        self, clean_vm_dispatch
+    ) -> None:
+        """A call's FINALIZE effects are its own closing bookkeeping.
+
+        They fire once, when the call returns: not when it is taken, while the
+        callee's content still describes the state the call began with, and not
+        after the call site has already planned against the stale state.
+        """
+        g = Graph()
+        caller = _node(g, label="caller", locals={"closed": 0})
+        callee = _node(g, label="callee")
+        terminal = _node(g, label="terminal")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+            effects=[TraversableEffect(
+                expr="closed = closed + 1",
+                trigger_phase=ResolutionPhase.FINALIZE,
+            )],
+        )
+        callee_choice = _edge(g, predecessor_id=callee.uid, successor_id=terminal.uid)
+        planned_with: list[int] = []
+
+        @on_provision
+        def record_caller_planning(*, caller: TraversableNode, **_kw):
+            if caller.get_label() == "caller":
+                planned_with.append(caller.locals["closed"])
+
+        with _cleanup_behaviors(record_caller_planning):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+            assert caller.locals["closed"] == 0
+
+            ledger.resolve_choice(callee_choice.uid)
+
+        assert ledger.cursor_id == caller.uid
+        assert caller.locals["closed"] == 1
+        assert planned_with == [1]
 
     def test_unavailable_callee_choice_does_not_hold_call_open(
         self, clean_vm_dispatch

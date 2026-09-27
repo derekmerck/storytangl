@@ -1375,8 +1375,12 @@ def test_current_target_event_keeps_one_step_time_charge() -> None:
     assert scope.locals["world_turn"] == 1
 
 
-def test_returning_event_internal_choice_does_not_charge_again_after_restore() -> None:
-    """A restored open event call preserves its one entry charge."""
+def test_returning_event_closes_its_period_once_on_return_after_restore() -> None:
+    """A returning event spends its period when it returns, restored or not.
+
+    While the call is open the clock still reads the period being spent; the
+    return closes it exactly once, and replaying the entry reopens it.
+    """
     graph, scope, road, event_beat = _event_time_graph(return_to_location=True)
     ending = Block(label="event_ending", content="The event concludes.")
     alternate = Block(
@@ -1407,7 +1411,7 @@ def test_returning_event_internal_choice_does_not_charge_again_after_restore() -
 
     ledger.resolve_choice(event.uid)
     assert ledger.cursor is event_beat
-    assert scope.locals["world_turn"] == 4
+    assert scope.locals["world_turn"] == 3
 
     restored = Ledger.structure(ledger.unstructure())
     restored.push_snapshot()
@@ -1430,7 +1434,40 @@ def test_returning_event_internal_choice_does_not_charge_again_after_restore() -
 
     assert isinstance(replayed_scope, SandboxScope)
     assert restored.cursor.get_label() == "event_beat"
-    assert replayed_scope.locals["world_turn"] == 4
+    assert replayed_scope.locals["world_turn"] == 3
+
+
+def test_returning_event_content_sees_the_period_it_spends() -> None:
+    """Inside a returning event the clock reads the period being spent.
+
+    A choice gated on that period stays available throughout, and the origin
+    plans the next period's offers only once the event has returned.
+    """
+    graph, scope, road, event_beat = _event_time_graph(return_to_location=True)
+    ending = Block(label="event_ending", content="The event concludes.")
+    graph.add(ending)
+    scope.add_child(ending)
+    night_only = Action(
+        registry=graph,
+        label="night_only_choice",
+        predecessor_id=event_beat.uid,
+        successor_id=ending.uid,
+        text="Stay for the rest of the night",
+        availability=[Predicate(expr="world_time.period == 4")],
+    )
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    ledger.resolve_choice(event.uid)
+    inside = current_world_time(event_beat)
+    assert ledger.cursor is event_beat
+    assert (inside.run_day, inside.period) == (1, 4)
+
+    ledger.resolve_choice(night_only.uid)
+    after = current_world_time(road)
+    assert ledger.cursor is road
+    assert (after.run_day, after.period) == (2, 1)
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
 
 
 def test_rejected_event_selection_does_not_charge_time() -> None:

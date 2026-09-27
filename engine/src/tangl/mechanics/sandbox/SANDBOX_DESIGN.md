@@ -759,30 +759,41 @@ express windows such as "from day 5 onward." These are derived constraints over 
 single scoped `world_turn`, not a second clock. A target outside that scope receives
 no implicit sandbox clock context; crossing that boundary requires an explicit contract.
 
-The current selected-event order is:
+A selected event spends one period. When that period closes depends on whether
+the event returns.
+
+A **returning** event (`return_to_location=True`) is a call, and it spends its
+period the way `player.inv.pop("sword")` should follow the line that names the
+sword: after its content, before anything plans against the result. Its call
+edge carries the close as a FINALIZE effect; the frame fires it when the call
+returns, on arrival back at the origin and before the origin re-plans:
 
 ```text
-selected edge VALIDATE
-PLANNING
-scheduled-event origin charge and tick reconciliation
-target PREREQS redirects
-selected edge UPDATE effects
-node UPDATE effects
-JOURNAL
-FINALIZE / POSTREQS
+selected edge VALIDATE (schedule revalidated; a stale offer charges nothing)
+event blocks: PLANNING .. JOURNAL .. FINALIZE   -- world_time reads the period being spent
+  .. internal choices, none of which charge ..
+return: close the period (tick reconciliation, tick fragments)
+origin PLANNING                                 -- offers for the next period
+origin JOURNAL / FINALIZE
 ```
 
+So `world_time` inside a returning event is the period it is spending, and no
+event-start snapshot is needed: a block gated on `world_time.period` stays
+available for the whole event.
+
+A **non-returning** event -- `target="current"`, or a block chain that leaves by
+its own edge -- has no return to close on. It is charged once at its origin in
+early PREREQS, before a target redirect can bypass UPDATE, and its content sees
+the clock after the charge.
+
 `advance_world_turn(...)` remains dumb. The higher-level sandbox time advance
-resolves the selected action's `SandboxTimeCost` at its origin location,
-revalidates that the original scheduled contribution remains offered at
-selection, then advances the nearest sandbox scope clock once in early PREREQS
-before a target redirect can bypass UPDATE. The projection carries a stable
-fingerprint of that contribution's declarative value and sponsor, rather than a
-firing record, event catalog entry, generated label, or list position. It runs
-`do_sandbox_tick` once per normalized tick. A
-block-target event can keep its own internal choices open, but those choices do
-not repeat the entry charge. Non-event sandbox actions retain their UPDATE-time
-charge.
+resolves an action's `SandboxTimeCost` at its origin location, advances the
+nearest sandbox scope clock, and runs `do_sandbox_tick` once per normalized
+tick. At selection it revalidates that the original scheduled contribution is
+still offered; the projection carries a stable fingerprint of that
+contribution's declarative value and sponsor, rather than a firing record, event
+catalog entry, generated label, or list position. Non-event sandbox actions
+retain their UPDATE-time charge.
 The first tick consumer is charged-asset depletion. Future consumers such as
 hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach

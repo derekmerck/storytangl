@@ -763,6 +763,21 @@ class Frame:
         )
         return entry_phase, before_graph, ctx
 
+    def _close_returned_call(self, edge: AnyTraversableEdge, *, ctx: VmPhaseCtx) -> None:
+        """Fire a returned call's FINALIZE effects on arrival at its call site.
+
+        This is the call's own post-content bookkeeping. Everything inside the
+        call has been journaled against the state it began with; the call site
+        re-plans against the state the call leaves behind. A return journals
+        nothing of its own, so arrival -- before PLANNING -- is its one mutation
+        point. Mutating later would re-plan the call site against stale state;
+        mutating at the call would change what the callee's content describes.
+        """
+        if not isinstance(edge, AnonymousEdge) or edge.returns_from is None:
+            return
+        edge.returns_from.apply_effects_to(self.cursor, phase=ResolutionPhase.FINALIZE, ctx=ctx)
+        ctx.invalidate_namespaces()
+
     def _run_planning_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
         if entry_phase > ResolutionPhase.PLANNING:
             return
@@ -992,6 +1007,7 @@ class Frame:
             edge=edge,
             selected_payload_override=selected_payload_override,
         )
+        self._close_returned_call(edge, ctx=ctx)
         self._run_planning_phase(ctx=ctx, entry_phase=entry_phase)
 
         redirect = self._run_redirect_phase(
@@ -1061,7 +1077,8 @@ class Frame:
            following (the redirect is the forward/call edge).
         3. If redirect has no ``return_phase``, it's a continuation — follow it.
         4. If no redirect and the cursor has a selectable continuation, yield.
-        5. Otherwise, if the return stack is non-empty, pop and follow return.
+        5. Otherwise, if the return stack is non-empty, pop and follow return;
+           arriving back fires the call's FINALIZE effects before re-planning.
         6. If no redirect and stack is empty, yield to caller (block for input).
 
         Parameters

@@ -27,6 +27,7 @@ from tangl.vm import (
     on_update,
 )
 from tangl.vm.dispatch import on_compose_journal, on_gather_ns
+from tangl.vm.traversable import TraversableEffect
 
 from .dispatch import do_sandbox_tick, on_sandbox_tick
 from .facets import ChargeFacet, ContainerFacet, LightSourceFacet, SwitchableFacet
@@ -688,6 +689,7 @@ def _project_sandbox_interaction(
         interaction_label=interaction.label,
     )
     availability = list(interaction.availability)
+    effects = list(interaction.effects)
     if contribution_kind == "event":
         assert event_contribution_key is not None
         availability.append(
@@ -698,6 +700,15 @@ def _project_sandbox_interaction(
                 )
             )
         )
+        if interaction.return_to_location:
+            # A returning event spends its period when it is over. The close
+            # rides the call edge and fires on the way back: after every block
+            # inside has journaled the period it is spending, and before the
+            # origin plans the next one.
+            effects.append(TraversableEffect(
+                expr=f"sandbox_close_event({contribution_kind!r})",
+                trigger_phase=ResolutionPhase.FINALIZE,
+            ))
     return Action(
         registry=graph,
         label=action_label,
@@ -707,7 +718,7 @@ def _project_sandbox_interaction(
         trigger_phase=Action.trigger_phase_from_activation(interaction.activation),
         return_phase=ResolutionPhase.PLANNING if interaction.return_to_location else None,
         availability=availability,
-        effects=list(interaction.effects),
+        effects=effects,
         journal_text=interaction.journal_text,
         tags={"dynamic", "sandbox", "interaction", tag, *tags},
         ui_hints=_sandbox_contribution_hints(
@@ -1234,6 +1245,11 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
         "world_time": current_world_time(caller),
         "sandbox_inventory": inventory,
         "sandbox_has_key": lambda key: str(key) in inventory,
+        "sandbox_close_event": lambda kind: _sandbox_time_advance(
+            caller,
+            ctx=ctx,
+            cost=SandboxTimeCost(kind=str(kind)),
+        ),
         "sandbox_fixture_locked": lambda label: _fixture_locked(caller, str(label)),
         "sandbox_fixture_open": lambda label: _fixture_open(caller, str(label)),
         "sandbox_fixture_can_unlock": lambda label: _fixture_can_unlock(
@@ -2421,9 +2437,15 @@ def _selected_sandbox_action_origin(
     priority=Priority.EARLY,
 )
 def advance_sandbox_event_time_on_entry(*, caller, ctx, **_kw):
-    """Charge an admitted scheduled event before target prereq redirects."""
+    """Charge an admitted scheduled event before target prereq redirects.
+
+    Only an event that does not return is charged here. A returning event is a
+    call, and closes its own period when it returns: its call edge carries a
+    `sandbox_close_event` FINALIZE effect, which the frame fires on arrival back
+    at the origin, before the origin re-plans.
+    """
     origin = _selected_sandbox_action_origin(ctx, events_only=True)
-    if origin is None:
+    if origin is None or ctx.selected_edge.return_phase is not None:
         return None
     cost = _selected_sandbox_time_cost(ctx)
     if cost is not None:

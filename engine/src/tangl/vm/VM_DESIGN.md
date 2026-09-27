@@ -273,7 +273,11 @@ Wraps core's `Edge` with phase-control fields:
   viable selection-time provisioning. When the pipeline has no redirect and no selectable
   continuation, the frame pops the stack and follows `get_return_edge()` back to the
   predecessor at `return_phase`. Triggered edges are redirects, not selectable
-  continuations.
+  continuations. The return edge carries its call (`returns_from`), and arriving back
+  fires the call's FINALIZE effects on the call site before anything re-plans: the
+  call's own post-content bookkeeping. Everything inside the call journals against the
+  state it began with, and the call site plans against the state it leaves behind -- the
+  same before/after rule as popping an item only after the line that names it.
 - `once` — offer this edge only until its successor has been visited, by any route.
   "Visited" is the ledger's cursor history, read through the phase context by
   `has_visited(node, ctx=ctx)`; a node's `_visited` locals are not consulted.
