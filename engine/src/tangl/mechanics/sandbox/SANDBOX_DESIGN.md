@@ -7,7 +7,7 @@
 :related: open_link, traversal, journal, games
 ```
 
-**Status:** IMPLEMENTED FIRST-SPIKE; selected event time charges at origin +
+**Status:** IMPLEMENTED FIRST-SPIKE; selected event time charges at origin before prereqs +
 ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,
@@ -759,21 +759,27 @@ express windows such as "from day 5 onward." These are derived constraints over 
 single scoped `world_turn`, not a second clock. A target outside that scope receives
 no implicit sandbox clock context; crossing that boundary requires an explicit contract.
 
-The current update order is:
+The current selected-event order is:
 
 ```text
+selected edge VALIDATE
+PLANNING
+scheduled-event origin charge and tick reconciliation
+target PREREQS redirects
 selected edge UPDATE effects
 node UPDATE effects
-sandbox time advance and tick reconciliation
 JOURNAL
 FINALIZE / POSTREQS
 ```
 
 `advance_world_turn(...)` remains dumb. The higher-level sandbox time advance
 resolves the selected action's `SandboxTimeCost` at its origin location,
-advances the nearest sandbox scope clock once on entry, and runs
-`do_sandbox_tick` once per normalized tick. A block-target event can keep its
-own internal choices open, but those choices do not repeat the entry charge.
+revalidates that a scheduled event remains offered at selection, then advances
+the nearest sandbox scope clock once in early PREREQS before a target redirect
+can bypass UPDATE. It runs `do_sandbox_tick` once per normalized tick. A
+block-target event can keep its own internal choices open, but those choices do
+not repeat the entry charge. Non-event sandbox actions retain their UPDATE-time
+charge.
 The first tick consumer is charged-asset depletion. Future consumers such as
 hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach
