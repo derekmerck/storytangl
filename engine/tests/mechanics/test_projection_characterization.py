@@ -476,11 +476,15 @@ def test_sandbox_scheduled_event_action_shape() -> None:
     }
     assert dawn.payload is None
     assert dawn.accepts is None
-    # Schedule admission is re-evaluated at ordinary edge validation, so a
-    # projected event cannot be selected after its time or presence has changed.
-    assert _availability_exprs(dawn) == [
-        "sandbox_scheduled_event_available('sandbox_sandbox_schedule_road_char_scope_dawn')"
-    ]
+    # Schedule admission is re-evaluated against the projected contribution,
+    # not its label or its current position among contributions.
+    [availability] = _availability_exprs(dawn)
+    prefix = "sandbox_scheduled_event_available('"
+    assert availability.startswith(prefix)
+    assert availability.endswith("')")
+    contribution_key = availability.removeprefix(prefix).removesuffix("')")
+    assert len(contribution_key) == 64
+    assert all(character in "0123456789abcdef" for character in contribution_key)
     assert dawn.trigger_phase is None
     assert dawn.return_phase is None
     assert dawn.successor is road

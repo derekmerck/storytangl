@@ -1457,6 +1457,68 @@ def test_stale_scheduled_event_is_rejected_before_its_origin_is_charged() -> Non
     assert scope.locals["world_turn"] == 4
 
 
+def test_stale_duplicate_label_event_is_rejected_before_its_origin_is_charged() -> None:
+    """Live admission remains bound to the selected duplicate-label contribution."""
+    graph, scope, road, event_beat = _event_time_graph()
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="shared",
+            period=1,
+            target=event_beat.get_label(),
+            text="First shared event",
+        ),
+        ScheduledEvent(
+            label="shared",
+            period=2,
+            target=event_beat.get_label(),
+            text="Second shared event",
+        ),
+    ]
+    scope.locals["world_turn"] = 1
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    scope.locals["world_turn"] = 0
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 0
+
+
+def test_stale_unlabeled_event_is_rejected_after_schedule_reordering() -> None:
+    """Live admission does not use an unlabeled event's current list position."""
+    graph, scope, road, event_beat = _event_time_graph()
+    first = ScheduledEvent(
+        period=1,
+        target=event_beat.get_label(),
+        text="First unlabeled event",
+    )
+    second = ScheduledEvent(
+        period=2,
+        target=event_beat.get_label(),
+        text="Second unlabeled event",
+    )
+    road.scheduled_events = [first, second]
+    scope.locals["world_turn"] = 1
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    restored = Ledger.structure(Ledger.from_graph(graph, entry_id=road.uid).unstructure())
+    restored_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
+    restored_road = restored.graph.find_one(
+        Selector(has_kind=SandboxLocation, label="road")
+    )
+
+    assert isinstance(restored_scope, SandboxScope)
+    assert isinstance(restored_road, SandboxLocation)
+    event = _dynamic_sandbox_actions_with_tag(restored_road, "event")[0]
+    restored_road.scheduled_events.reverse()
+    restored_scope.locals["world_turn"] = 0
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        restored.resolve_choice(event.uid)
+
+    assert restored_scope.locals["world_turn"] == 0
+
+
 def test_scheduled_event_charges_before_target_prereq_redirect() -> None:
     """A successful event pays once even when its target immediately redirects."""
     graph, scope, road, event_beat = _event_time_graph()

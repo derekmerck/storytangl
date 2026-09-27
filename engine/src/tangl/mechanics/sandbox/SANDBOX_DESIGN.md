@@ -774,9 +774,12 @@ FINALIZE / POSTREQS
 
 `advance_world_turn(...)` remains dumb. The higher-level sandbox time advance
 resolves the selected action's `SandboxTimeCost` at its origin location,
-revalidates that a scheduled event remains offered at selection, then advances
-the nearest sandbox scope clock once in early PREREQS before a target redirect
-can bypass UPDATE. It runs `do_sandbox_tick` once per normalized tick. A
+revalidates that the original scheduled contribution remains offered at
+selection, then advances the nearest sandbox scope clock once in early PREREQS
+before a target redirect can bypass UPDATE. The projection carries a stable
+fingerprint of that contribution's declarative value and sponsor, rather than a
+firing record, event catalog entry, generated label, or list position. It runs
+`do_sandbox_tick` once per normalized tick. A
 block-target event can keep its own internal choices open, but those choices do
 not repeat the entry charge. Non-event sandbox actions retain their UPDATE-time
 charge.
