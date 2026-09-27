@@ -476,9 +476,11 @@ def test_sandbox_scheduled_event_action_shape() -> None:
     }
     assert dawn.payload is None
     assert dawn.accepts is None
-    # The schedule gate is the projection-time admission predicate; nothing
-    # lands on the edge as live availability ("Availability is after binding").
-    assert _availability_exprs(dawn) == []
+    # Schedule admission is re-evaluated at ordinary edge validation, so a
+    # projected event cannot be selected after its time or presence has changed.
+    assert _availability_exprs(dawn) == [
+        "sandbox_scheduled_event_available('sandbox_sandbox_schedule_road_char_scope_dawn')"
+    ]
     assert dawn.trigger_phase is None
     assert dawn.return_phase is None
     assert dawn.successor is road

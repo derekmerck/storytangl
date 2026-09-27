@@ -48,7 +48,7 @@ from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
 from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block_choices
-from tangl.vm import Ledger, Requirement
+from tangl.vm import Ledger, Requirement, ResolutionPhase
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
@@ -1286,6 +1286,7 @@ def _event_time_graph(*, return_to_location: bool = False) -> tuple[
         scheduled_events=[
             ScheduledEvent(
                 label="night_event",
+                period=4,
                 target="event_beat",
                 text="Attend the night event",
                 return_to_location=return_to_location,
@@ -1409,6 +1410,7 @@ def test_returning_event_internal_choice_does_not_charge_again_after_restore() -
     assert scope.locals["world_turn"] == 4
 
     restored = Ledger.structure(ledger.unstructure())
+    restored.push_snapshot()
     restored_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
     restored_road = restored.graph.find_one(
         Selector(has_kind=SandboxLocation, label="road")
@@ -1441,6 +1443,40 @@ def test_rejected_event_selection_does_not_charge_time() -> None:
         Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
 
     assert scope.locals["world_turn"] == 3
+
+
+def test_stale_scheduled_event_is_rejected_before_its_origin_is_charged() -> None:
+    """Schedule matching remains a live selection guard, not projection-only."""
+    graph, scope, road, _event_beat = _event_time_graph()
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    scope.locals["world_turn"] = 4
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 4
+
+
+def test_scheduled_event_charges_before_target_prereq_redirect() -> None:
+    """A successful event pays once even when its target immediately redirects."""
+    graph, scope, road, event_beat = _event_time_graph()
+    landing = Block(label="redirect_landing", content="The event redirects here.")
+    graph.add(landing)
+    scope.add_child(landing)
+    Action(
+        registry=graph,
+        label="event_prereq_redirect",
+        predecessor_id=event_beat.uid,
+        successor_id=landing.uid,
+        trigger_phase=ResolutionPhase.PREREQS,
+    )
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(event.uid)
+
+    assert ledger.cursor is landing
+    assert scope.locals["world_turn"] == 4
 
 
 def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
