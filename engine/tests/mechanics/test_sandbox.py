@@ -703,6 +703,35 @@ def test_location_interaction_can_be_trivial_self_loop_action() -> None:
     ]
 
 
+def test_block_targeted_interaction_does_not_acquire_a_location_time_charge() -> None:
+    graph = Graph(label="interaction_block_target")
+    scope = SandboxScope(label="scope", locals={"world_turn": 0})
+    road = SandboxLocation(
+        label="road",
+        interactions=[
+            SandboxInteraction(
+                label="enter",
+                text="Enter the building",
+                target="building",
+            )
+        ],
+    )
+    building = Block(label="building", content="Inside.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    scope.add_child(road)
+    scope.add_child(building)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    interaction = _dynamic_sandbox_actions_with_tag(road, "interaction")[0]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(interaction.uid)
+
+    assert ledger.cursor is building
+    assert scope.locals["world_turn"] == 0
+
+
 def test_assets_project_sponsored_interactions_when_present_or_carried() -> None:
     graph = Graph(label="tiny_cave")
     scope = SandboxScope(label="tiny_cave_scope")

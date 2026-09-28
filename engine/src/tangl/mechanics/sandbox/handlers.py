@@ -2397,30 +2397,23 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
     return None
 
 
-def _selected_sandbox_action_origin(ctx: VmPhaseCtx) -> SandboxLocation | None:
-    """Return the selected sandbox action's origin location, if applicable."""
-    selected_edge = ctx.selected_edge
-    if not isinstance(selected_edge, Action):
-        return None
-    if "sandbox" not in (selected_edge.tags or set()):
-        return None
-    origin = ctx.graph.get(selected_edge.predecessor_id)
-    return origin if isinstance(origin, SandboxLocation) else None
-
-
 @on_update(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
     priority=Priority.LATE,
 )
 def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
-    """Advance non-event sandbox actions at their origin during UPDATE."""
-    origin = _selected_sandbox_action_origin(ctx)
-    if origin is None or "event" in (ctx.selected_edge.tags or set()):
+    """Advance non-event sandbox actions while updating a sandbox location."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    selected_edge = ctx.selected_edge
+    if not isinstance(selected_edge, Action) or "event" in (selected_edge.tags or set()):
         return None
 
     cost = _selected_sandbox_time_cost(ctx)
     if cost is None:
         return None
-    _sandbox_time_advance(origin, ctx=ctx, cost=cost)
+    _sandbox_time_advance(caller, ctx=ctx, cost=cost)
     return None
 
 
