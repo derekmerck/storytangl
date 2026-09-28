@@ -921,6 +921,7 @@ class StoryMaterializer:
                 payload=spec.get("payload"),
                 accepts=spec.get("accepts") or spec.get("payload_schema"),
                 blockers=spec.get("blockers"),
+                unavailable_choice_disclosure=spec.get("unavailable_choice_disclosure"),
                 ui_hints=(
                     spec.get("ui_hints")
                     or spec.get("ui_hint")
