@@ -7,7 +7,7 @@
 :related: open_link, traversal, journal, games
 ```
 
-**Status:** IMPLEMENTED FIRST-SPIKE; selected event time charges at origin before prereqs +
+**Status:** IMPLEMENTED FIRST-SPIKE; scheduled-event binding/disclosure slice +
 ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,
@@ -674,10 +674,19 @@ pattern is shared.
 
 Selectable and triggered scheduled events are temporal gates over the same
 sponsored interaction surface used by locations, mobs, assets, and fixtures.
-The schedule fields decide whether the affordance is primed at the current
-`WorldTime`, location, and actor-presence set; the interaction fields then carry
-the ordinary `target`, `activation`, `return_to_location`, `availability`,
-`effects`, and selected-action journal text.
+Projection creates a stable candidate path for each known contribution before
+its current `WorldTime`, location, or actor-presence gate matches. The candidate
+carries a fail-closed fingerprint of its declarative contribution and sponsor;
+ordinary action availability re-evaluates that live contribution and its gate at
+render, selection, and trigger time. The interaction fields then carry the
+ordinary `target`, `activation`, `return_to_location`, `availability`, `effects`,
+and selected-action journal text.
+
+Availability does not decide disclosure. An unavailable candidate is an
+ordinary unavailable Story choice: the world may use
+`unavailable_choice_disclosure: hide` in its locals to omit it, or leave the
+ordinary Story default to disclose it with blockers. Sandbox adds no second
+disclosure rule, and a hidden candidate remains rejected on direct submission.
 
 `activation` is the authored timing hint copied from story actions: unset means
 a normal visible choice, `first` maps to a PREREQS redirect before the current
@@ -724,7 +733,7 @@ forced events, and selectable events. In v38 those become:
 - explicit `advance_world_turn(...)` for the dumb clock increment
 - sandbox tick as a domain-local UPDATE refinement
 - schedule matching against time, location, and optional presence
-- scheduled events as time-gated sponsored interactions
+- scheduled-event candidates with live time/location/presence gates
 - forced scheduled events as ordinary triggered actions
 - selectable scheduled events as ordinary generated choices
 
@@ -764,7 +773,6 @@ The current selected-event order is:
 ```text
 selected edge VALIDATE
 PLANNING
-scheduled-event origin charge and tick reconciliation
 target PREREQS redirects
 selected edge UPDATE effects
 node UPDATE effects
@@ -772,17 +780,15 @@ JOURNAL
 FINALIZE / POSTREQS
 ```
 
-`advance_world_turn(...)` remains dumb. The higher-level sandbox time advance
-resolves the selected action's `SandboxTimeCost` at its origin location,
-revalidates that the original scheduled contribution remains offered at
-selection, then advances the nearest sandbox scope clock once in early PREREQS
-before a target redirect can bypass UPDATE. The projection carries a stable
-fingerprint of that contribution's declarative value and sponsor, rather than a
-firing record, event catalog entry, generated label, or list position. It runs
-`do_sandbox_tick` once per normalized tick. A
-block-target event can keep its own internal choices open, but those choices do
-not repeat the entry charge. Non-event sandbox actions retain their UPDATE-time
-charge.
+`advance_world_turn(...)` remains dumb. Scheduled-event candidates do not
+advance sandbox time on entry and are excluded from the generic UPDATE charge.
+Their stable contribution fingerprint is revalidated before traversal rather
+than becoming a firing record, event catalog entry, generated label, or list
+position. Movement, waits, information, and local actions retain their
+UPDATE-time charge and run `do_sandbox_tick` once per normalized tick. Future
+scene exit and block entry costs are explicit authored locals
+(`scene.locals['exit_time_cost']` and `block.locals['entry_time_cost']`);
+an absent value is zero and those costs are outside this slice.
 The first tick consumer is charged-asset depletion. Future consumers such as
 hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach

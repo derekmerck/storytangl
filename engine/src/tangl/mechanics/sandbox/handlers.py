@@ -23,7 +23,6 @@ from tangl.vm import (
     has_visited,
     on_journal,
     on_provision,
-    on_prereqs,
     on_update,
 )
 from tangl.vm.dispatch import on_compose_journal, on_gather_ns
@@ -484,7 +483,7 @@ def _scheduled_event_contributions(
                 for event in fixture.scheduled_events
             )
     if not projection_state.suppress_location_description:
-        for mob in _present_mobs(location):
+        for mob in _sandbox_mobs(location):
             mob_label = mob.get_label()
             contributions.extend(
                 ScheduledEventContribution(
@@ -574,6 +573,10 @@ def _scheduled_event_is_live(
     for contribution in _scheduled_event_contributions(location, ctx):
         if contribution_key != _scheduled_event_contribution_key(contribution):
             continue
+        if contribution.source_kind == "mob":
+            mob = _mob_by_label(location, contribution.source_label)
+            if mob is None or not _mob_present_at_location(location, mob):
+                return False
         return contribution.event.matches(
             world_time,
             location=location.get_label(),
@@ -671,6 +674,7 @@ def _project_sandbox_interaction(
     tags: set[str],
     contribution_kind: str = "interaction",
     event_contribution_key: str | None = None,
+    projection_label: str | None = None,
     **hints: Any,
 ) -> Action | None:
     tag = _interaction_tag(interaction.label)
@@ -685,7 +689,7 @@ def _project_sandbox_interaction(
         location,
         source=source,
         sponsor_label=sponsor_label,
-        interaction_label=interaction.label,
+        interaction_label=projection_label or interaction.label,
     )
     availability = list(interaction.availability)
     if contribution_kind == "event":
@@ -2360,7 +2364,7 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
     wants_exact_kind=False,
 )
 def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
-    """Project matching scheduled events into normal dynamic actions."""
+    """Project known scheduled events as normal, live-gated dynamic actions."""
     if not isinstance(caller, SandboxLocation):
         return None
     if not caller.auto_provision:
@@ -2371,18 +2375,10 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
 
     _clear_dynamic_sandbox_actions(caller, action_kind="event", ctx=ctx)
 
-    world_time = current_world_time(caller)
-    location_label = caller.get_label()
-    actors_present = _actors_present(caller)
-    for index, contribution in enumerate(_scheduled_event_contributions(caller, ctx)):
+    for contribution in _scheduled_event_contributions(caller, ctx):
         event = contribution.event
-        if not event.matches(
-            world_time,
-            location=location_label,
-            actors_present=actors_present,
-        ):
-            continue
-        event_label = event.label or f"event_{index}"
+        contribution_key = _scheduled_event_contribution_key(contribution)
+        event_label = event.label or event.target
         _project_sandbox_interaction(
             caller,
             graph=graph,
@@ -2393,42 +2389,23 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             sponsor_kind=contribution.source_kind,
             tags={"event"},
             contribution_kind="event",
-            event_contribution_key=_scheduled_event_contribution_key(contribution),
-            event=event_label,
+            event_contribution_key=contribution_key,
+            projection_label=f"{event_label}_{contribution_key[:12]}",
+            event=event.label or event.target,
             **contribution.hints,
         )
     return None
 
 
-def _selected_sandbox_action_origin(
-    ctx: VmPhaseCtx,
-    *,
-    events_only: bool = False,
-) -> SandboxLocation | None:
+def _selected_sandbox_action_origin(ctx: VmPhaseCtx) -> SandboxLocation | None:
     """Return the selected sandbox action's origin location, if applicable."""
     selected_edge = ctx.selected_edge
     if not isinstance(selected_edge, Action):
         return None
     if "sandbox" not in (selected_edge.tags or set()):
         return None
-    if events_only and "event" not in (selected_edge.tags or set()):
-        return None
     origin = ctx.graph.get(selected_edge.predecessor_id)
     return origin if isinstance(origin, SandboxLocation) else None
-
-
-@on_prereqs(
-    priority=Priority.EARLY,
-)
-def advance_sandbox_event_time_on_entry(*, caller, ctx, **_kw):
-    """Charge an admitted scheduled event before target prereq redirects."""
-    origin = _selected_sandbox_action_origin(ctx, events_only=True)
-    if origin is None:
-        return None
-    cost = _selected_sandbox_time_cost(ctx)
-    if cost is not None:
-        _sandbox_time_advance(origin, ctx=ctx, cost=cost)
-    return None
 
 
 @on_update(
