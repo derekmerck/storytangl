@@ -4,11 +4,11 @@ from typing import Any
 
 from pydantic import field_serializer
 
+from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
 from tangl.presentation.intent import (
     Accepts,
     Blocker,
     UIHints,
-    UnavailableChoiceDisclosure,
 )
 from tangl.vm import ResolutionPhase, TraversableEdge
 

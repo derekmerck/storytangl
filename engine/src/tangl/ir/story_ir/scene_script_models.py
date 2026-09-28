@@ -10,11 +10,11 @@ from pydantic import Field, model_validator, ConfigDict, field_validator
 from tangl.core import Entity
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.media_ir.media_script_model import MediaItemScript
+from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
 from tangl.presentation.intent import (
     Accepts,
     Blocker,
     UIHints,
-    UnavailableChoiceDisclosure,
 )
 from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
 from .actor_script_models import RoleScript

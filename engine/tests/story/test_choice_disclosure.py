@@ -5,8 +5,9 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Selector
+from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
 from tangl.journal.fragments import ChoiceFragment
-from tangl.presentation.intent import Blocker, UnavailableChoiceDisclosure
+from tangl.presentation.intent import Blocker
 from tangl.story import InitMode
 from tangl.story.episode import Action
 from tangl.story.fabula.world import World
@@ -122,7 +123,7 @@ def test_scoped_and_action_policy_control_only_unavailable_disclosure(
 
 
 def test_authored_action_override_is_typed_and_materialized() -> None:
-    action = _action(_graph(action_policy="hide"), "Hidden lock")
+    action = _action(_graph(action_policy="HIDE"), "Hidden lock")
 
     assert action.unavailable_choice_disclosure is UnavailableChoiceDisclosure.HIDE
 
