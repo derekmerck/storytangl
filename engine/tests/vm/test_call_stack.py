@@ -29,16 +29,20 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from typing import Callable, Iterator
+from uuid import UUID
 
 import pytest
 
 import tangl.vm.system_handlers as vm_system_handlers
-from tangl.core import Graph
+from tangl.core import BaseFragment, Graph
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
+    on_complete_call,
     on_gather_ns,
+    on_journal,
     on_postreqs,
     on_prereqs,
+    on_provision,
 )
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import Frame
@@ -314,6 +318,211 @@ class TestFrameCallReturn:
 
         assert ledger.cursor_id == caller.uid
         assert ledger.call_stack_ids == []
+
+    def test_exhausted_call_completes_before_origin_planning(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Completion receives the original call once before the origin replans."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+        completed: list[TraversableEdge] = []
+        planned_after: list[list[TraversableEdge]] = []
+
+        @on_complete_call
+        def record_completion(*, caller, **_kw):
+            completed.append(caller)
+            return BaseFragment(fragment_type="content", content="The call closes.")
+
+        @on_provision
+        def record_origin_planning(*, caller, **_kw):
+            if caller is call_edge.predecessor:
+                planned_after.append(list(completed))
+            return None
+
+        @on_journal
+        def render_call_content(*, caller, **_kw):
+            if caller is callee:
+                return BaseFragment(fragment_type="content", content="Callee content.")
+            if caller is call_edge.predecessor:
+                return BaseFragment(fragment_type="content", content="Caller content.")
+            return None
+
+        with _cleanup_behaviors(
+            record_completion,
+            record_origin_planning,
+            render_call_content,
+        ):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+
+        assert completed == [call_edge]
+        assert planned_after == [[call_edge]]
+        assert [fragment.content for fragment in ledger.get_journal()] == [
+            "Callee content.",
+            "The call closes.",
+            "Caller content.",
+        ]
+
+    def test_open_call_defers_completion_until_last_internal_choice(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Selectable callee choices keep the call open without completing it."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        terminal = _node(g, label="terminal")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        internal_choice = _edge(g, predecessor_id=callee.uid, successor_id=terminal.uid)
+        completed: list[TraversableEdge] = []
+
+        @on_complete_call
+        def record_completion(*, caller, **_kw):
+            completed.append(caller)
+            return None
+
+        with _cleanup_behaviors(record_completion):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+            assert ledger.cursor is callee
+            assert completed == []
+
+            ledger.resolve_choice(internal_choice.uid)
+
+        assert ledger.cursor is caller
+        assert completed == [call_edge]
+
+    def test_nested_exhausted_calls_complete_lifo(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Nested calls complete inner-first, once each, as their stack unwinds."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        outer_callee = _node(g, label="outer_callee")
+        inner_callee = _node(g, label="inner_callee")
+        outer_call = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=outer_callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+        inner_call = _edge(
+            g,
+            predecessor_id=outer_callee.uid,
+            successor_id=inner_callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+            once=True,
+        )
+        completed: list[TraversableEdge] = []
+
+        @on_complete_call
+        def record_completion(*, caller, **_kw):
+            completed.append(caller)
+            return None
+
+        with _cleanup_behaviors(record_completion):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(outer_call.uid)
+            assert ledger.cursor is outer_callee
+
+            ledger.resolve_choice(inner_call.uid)
+
+        assert ledger.cursor is caller
+        assert completed == [inner_call, outer_call]
+
+    def test_completion_fragments_survive_an_origin_prereqs_redirect(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Return-side redirects cannot discard already committed completion output."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        landing = _node(g, label="landing")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+        redirect = _edge(g, predecessor_id=caller.uid, successor_id=landing.uid)
+
+        @on_complete_call
+        def emit_completion(*, caller, **_kw):
+            assert caller is call_edge
+            return BaseFragment(fragment_type="content", content="The call closes.")
+
+        @on_prereqs
+        def redirect_on_return(*, caller, ctx, **_kw):
+            if caller is call_edge.predecessor and isinstance(ctx.selected_edge, AnonymousEdge):
+                return redirect
+            return None
+
+        with _cleanup_behaviors(emit_completion, redirect_on_return):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+
+        assert ledger.cursor is landing
+        assert [fragment.content for fragment in ledger.get_journal()] == [
+            "The call closes."
+        ]
+
+    def test_completion_replays_once_after_restore_and_rollback(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Restoring an open call and replaying its exit does not duplicate output."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        terminal = _node(g, label="terminal")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+        internal_choice = _edge(g, predecessor_id=callee.uid, successor_id=terminal.uid)
+        completed_ids: list[UUID] = []
+
+        @on_complete_call
+        def emit_completion(*, caller, **_kw):
+            completed_ids.append(caller.uid)
+            return BaseFragment(fragment_type="content", content="The call closes.")
+
+        with _cleanup_behaviors(emit_completion):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+            restored = Ledger.structure(ledger.unstructure())
+            restored_choice = restored.graph.get(internal_choice.uid)
+
+            assert isinstance(restored_choice, TraversableEdge)
+            restored.resolve_choice(restored_choice.uid)
+            assert [fragment.content for fragment in restored.get_journal()] == [
+                "The call closes."
+            ]
+
+            restored.rollback_to_step(1, reason="replay exhausted call")
+            replayed_choice = restored.graph.get(internal_choice.uid)
+
+            assert isinstance(replayed_choice, TraversableEdge)
+            assert restored.cursor.get_label() == "callee"
+            assert restored.call_stack_ids == [call_edge.uid]
+            restored.resolve_choice(replayed_choice.uid)
+
+        assert completed_ids == [call_edge.uid, call_edge.uid]
+        assert [fragment.content for fragment in restored.get_journal()] == [
+            "The call closes."
+        ]
 
     def test_call_continuation_uses_completed_edge_context(
         self, clean_vm_dispatch

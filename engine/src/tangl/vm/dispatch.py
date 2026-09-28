@@ -187,6 +187,7 @@ on_journal   = _make_on_hook("render_journal")
 on_compose_journal = _make_on_hook("compose_journal")
 on_finalize  = _make_on_hook("finalize_step")
 on_postreqs  = _make_on_hook("get_postreqs")
+on_complete_call = _make_on_hook("complete_call")
 
 # Execution hooks with explicit phase-level type contracts
 def do_validate(caller, *, ctx, **kwargs) -> bool:
@@ -297,6 +298,25 @@ def do_finalize(caller, *, ctx, **kwargs):
 def do_postreqs(caller, *, ctx, **kwargs):
     result = CallReceipt.first_result(*_run_task("get_postreqs", caller=caller, ctx=ctx, **kwargs))
     return _assert_redirect_result(result, task="get_postreqs")
+
+
+def do_complete_call(caller, *, ctx, **kwargs):
+    """Collect fragments emitted when an exhausted call closes."""
+    results = CallReceipt.gather_results(
+        *_run_task("complete_call", caller=caller, ctx=ctx, **kwargs)
+    )
+    fragments: list[Record] = []
+    for value in results:
+        normalized = _assert_fragment_result(value, task="complete_call")
+        if normalized is None:
+            continue
+        if isinstance(normalized, Record):
+            fragments.append(normalized)
+        else:
+            fragments.extend(normalized)
+    if not fragments:
+        return None
+    return fragments[0] if len(fragments) == 1 else fragments
 
 
 # ---------------------------------------------------------------------------
@@ -461,6 +481,7 @@ __all__ = [
     "on_compose_journal", "do_compose_journal",
     "on_finalize", "do_finalize",
     "on_postreqs", "do_postreqs",
+    "on_complete_call", "do_complete_call",
     # helper decos and invocation
     "on_gather_ns", "do_gather_ns",
     "on_resolve", "do_resolve",

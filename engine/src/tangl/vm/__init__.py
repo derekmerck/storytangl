@@ -104,6 +104,7 @@ from .replay import Event, Patch
 # Provides:
 # - phase bus hooks
 from .dispatch import (
+    on_complete_call,
     do_compose_journal,
     on_compose_journal,
     on_finalize,
@@ -163,6 +164,7 @@ __all__ = [
     "is_first_visit",
     "is_self_loop",
     "assert_traversal_contracts",
+    "on_complete_call",
     "do_compose_journal",
     "on_finalize",
     "on_compose_journal",

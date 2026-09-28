@@ -82,6 +82,7 @@ from tangl.utils.hashing import hashing_func
 from ..ctx import VmPhaseCtx
 from ..factory import TraversableGraphFactory
 from ..dispatch import (
+    do_complete_call,
     do_finalize,
     do_gather_ns,
     do_journal,
@@ -921,7 +922,9 @@ class Frame:
         if redirect is not None:
             return redirect
         if self.return_stack and not self._has_selectable_continuation(ctx=ctx):
-            return self.return_stack.pop().get_return_edge()
+            call = self.return_stack.pop()
+            self._append_phase_records(do_complete_call(call, ctx=ctx), step=ctx.step)
+            return call.get_return_edge()
         return None
 
     def _has_selectable_continuation(self, *, ctx: VmPhaseCtx) -> bool:
