@@ -857,6 +857,16 @@ class Frame:
             )
         ]
 
+    @staticmethod
+    def _require_completion_without_choices(records: list[Any]) -> list[Any]:
+        """Reject controls from completion, which has no selectable frontier."""
+        if any(
+            isinstance(record, BaseFragment) and record.fragment_type == "choice"
+            for record in records
+        ):
+            raise TypeError("complete_call must not return ChoiceFragment values")
+        return records
+
     def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> list[Any]:
         if entry_phase > ResolutionPhase.JOURNAL:
             return []
@@ -940,11 +950,13 @@ class Frame:
             do_complete_call(call, ctx=ctx),
             step=ctx.step,
         )
+        self._require_completion_without_choices(records)
         if records:
             composed = do_compose_journal(self.cursor, fragments=records, ctx=ctx)
             if composed is not None:
                 records = self._collect_phase_records(composed, step=ctx.step)
-        return call.get_return_edge(), self._without_choice_fragments(records)
+                self._require_completion_without_choices(records)
+        return call.get_return_edge(), records
 
     def _has_selectable_continuation(self, *, ctx: VmPhaseCtx) -> bool:
         """Whether the current node offers an available player choice."""
@@ -1036,13 +1048,14 @@ class Frame:
             before_graph=before_graph,
         )
         completion_return = None
+        completion_records: list[Any] = []
         if redirect is not None:
             journal_records = self._without_choice_fragments(journal_records)
         else:
             completion_return, completion_records = self._complete_exhausted_call(ctx=ctx)
-            journal_records.extend(completion_records)
         self._append_phase_records(journal_records, step=ctx.step)
         self._append_phase_records(finalize_records, step=ctx.step)
+        self._append_phase_records(completion_records, step=ctx.step)
         if redirect is not None:
             return redirect
 

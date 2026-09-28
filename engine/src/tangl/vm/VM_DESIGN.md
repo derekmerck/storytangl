@@ -277,9 +277,10 @@ Wraps core's `Edge` with phase-control fields:
   with the original call edge as its caller. Completion is after the callee's last
   JOURNAL output and before the return edge reaches the origin's next PLANNING or
   presentation frontier. Completion fragments run through the current callee's normal
-  JOURNAL composition fold, then commit before that return pipeline; completion cannot
-  publish `ChoiceFragment` controls, so an origin PREREQS redirect cannot discard or
-  strand them. This is causal ledger traversal,
+  JOURNAL composition fold after the callee's FINALIZE records, then commit before that
+  return pipeline. A `complete_call` handler that returns a `ChoiceFragment` fails
+  loudly before composition because completion has no selectable frontier. This is
+  causal ledger traversal,
   not calendar time; it does not make a node's ordinary FINALIZE phase a whole-scene
   completion signal.
 - `once` — offer this edge only until its successor has been visited, by any route.

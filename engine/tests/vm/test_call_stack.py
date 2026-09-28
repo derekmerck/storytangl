@@ -34,11 +34,12 @@ from uuid import UUID
 import pytest
 
 import tangl.vm.system_handlers as vm_system_handlers
-from tangl.core import BaseFragment, Graph, Selector
+from tangl.core import BaseFragment, Graph, Record, Selector
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     on_complete_call,
     on_compose_journal,
+    on_finalize,
     on_gather_ns,
     on_journal,
     on_postreqs,
@@ -482,7 +483,7 @@ class TestFrameCallReturn:
     def test_completion_output_uses_journal_composition_without_choices(
         self, clean_vm_dispatch
     ) -> None:
-        """Completion output shares JOURNAL transforms but cannot publish controls."""
+        """Completion output shares the callee's JOURNAL transforms."""
         g = Graph()
         caller = _node(g, label="caller")
         callee = _node(g, label="callee")
@@ -497,10 +498,7 @@ class TestFrameCallReturn:
         @on_complete_call
         def emit_completion(*, caller, **_kw):
             assert caller is call_edge
-            return [
-                BaseFragment(fragment_type="content", content="Raw completion."),
-                BaseFragment(fragment_type="choice", content="Stale choice."),
-            ]
+            return BaseFragment(fragment_type="content", content="Raw completion.")
 
         @on_compose_journal
         def compose_completion(*, caller, fragments, **_kw):
@@ -511,7 +509,6 @@ class TestFrameCallReturn:
                     fragment_type="content",
                     content=f"Composed: {fragments[0].content}",
                 ),
-                *fragments[1:],
             ]
 
         with _cleanup_behaviors(emit_completion, compose_completion):
@@ -519,11 +516,95 @@ class TestFrameCallReturn:
             ledger.resolve_choice(call_edge.uid)
 
         assert [[fragment.content for fragment in fragments] for fragments in composed_from] == [
-            ["Raw completion.", "Stale choice."]
+            ["Raw completion."]
         ]
         assert [fragment.content for fragment in ledger.get_journal()] == [
             "Composed: Raw completion."
         ]
+
+    def test_completion_output_follows_terminal_finalize_records(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Completion output follows the exhausted callee's JOURNAL and FINALIZE."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+
+        @on_journal
+        def render_content(*, caller, **_kw):
+            if caller is callee:
+                return BaseFragment(fragment_type="content", content="Callee journal.")
+            if caller is call_edge.predecessor:
+                return BaseFragment(fragment_type="content", content="Origin journal.")
+            return None
+
+        @on_finalize
+        def emit_finalize_record(*, caller, **_kw):
+            if caller is callee:
+                return Record(content="Callee finalize.")
+            return None
+
+        @on_complete_call
+        def emit_completion(*, caller, **_kw):
+            assert caller is call_edge
+            return BaseFragment(fragment_type="content", content="Call completion.")
+
+        with _cleanup_behaviors(
+            render_content,
+            emit_finalize_record,
+            emit_completion,
+        ):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+
+        output_contents = [
+            record.content
+            for record in ledger.output_stream.values()
+            if getattr(record, "content", None) in {
+                "Callee journal.",
+                "Callee finalize.",
+                "Call completion.",
+                "Origin journal.",
+            }
+        ]
+        assert output_contents == [
+            "Callee journal.",
+            "Callee finalize.",
+            "Call completion.",
+            "Origin journal.",
+        ]
+
+    def test_completion_choice_output_fails_before_journal_composition(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Completion controls are a handler contract error, not hidden output."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+
+        @on_complete_call
+        def emit_choice(**_kw):
+            return BaseFragment(fragment_type="choice", content="Invalid completion choice.")
+
+        @on_compose_journal
+        def composition_must_not_run(**_kw):
+            raise AssertionError("completion choice reached journal composition")
+
+        with _cleanup_behaviors(emit_choice, composition_must_not_run):
+            with pytest.raises(TypeError, match="complete_call must not return ChoiceFragment"):
+                _ledger(g, caller).resolve_choice(call_edge.uid)
 
     def test_completion_mutation_is_recorded_on_the_terminal_step(
         self, clean_vm_dispatch
