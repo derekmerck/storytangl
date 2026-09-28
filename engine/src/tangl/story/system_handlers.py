@@ -20,7 +20,7 @@ from tangl.core import Priority, Record, Selector
 from tangl.prose import DialogHandler
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
-from tangl.presentation.intent import Blocker
+from tangl.presentation.intent import Blocker, UnavailableChoiceDisclosure
 from tangl.vm import (
     Affordance,
     Dependency,
@@ -43,6 +43,19 @@ from .dispatch import on_compose_journal, on_find_edges, on_gather_ns, on_journa
 from .episode import Action, Block, MenuBlock
 
 logger = logging.getLogger(__name__)
+
+
+def _unavailable_choice_disclosure(
+    *, edge: Action, caller: Block, ctx
+) -> UnavailableChoiceDisclosure:
+    """Resolve Story's unavailable-choice presentation policy for one edge."""
+    if edge.unavailable_choice_disclosure is not None:
+        return edge.unavailable_choice_disclosure
+    value = ctx.get_ns(caller).get(
+        "unavailable_choice_disclosure",
+        UnavailableChoiceDisclosure.DISCLOSE,
+    )
+    return UnavailableChoiceDisclosure(value)
 
 
 def _command_key(value: str) -> str:
@@ -775,6 +788,12 @@ def render_block_choices(*, caller, ctx, **_kw):
     fragments: list[ChoiceFragment] = []
     for edge, reason in choices:
         available = reason is None
+        if (
+            not available
+            and _unavailable_choice_disclosure(edge=edge, caller=caller, ctx=ctx)
+            is UnavailableChoiceDisclosure.HIDE
+        ):
+            continue
         blockers = [] if available else _choice_blockers(edge=edge, ctx=ctx)
         fragments.append(
             ChoiceFragment(

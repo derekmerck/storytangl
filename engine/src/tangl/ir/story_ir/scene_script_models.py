@@ -10,7 +10,12 @@ from pydantic import Field, model_validator, ConfigDict, field_validator
 from tangl.core import Entity
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.media_ir.media_script_model import MediaItemScript
-from tangl.presentation.intent import Accepts, Blocker, UIHints
+from tangl.presentation.intent import (
+    Accepts,
+    Blocker,
+    UIHints,
+    UnavailableChoiceDisclosure,
+)
 from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
 from .actor_script_models import RoleScript
 from .location_script_models import SettingScript
@@ -166,6 +171,13 @@ class ActionScript(BaseScriptItem):
     blockers: list[Blocker] | None = Field(
         None,
         description="Optional player-facing explanations shown when the action is unavailable.",
+    )
+    unavailable_choice_disclosure: UnavailableChoiceDisclosure | None = Field(
+        None,
+        description=(
+            "Optional override for an unavailable choice: disclose it with blockers or hide it. "
+            "When omitted, inherit the current scoped namespace policy."
+        ),
     )
     ui_hints: UIHints | None = Field(
         None,

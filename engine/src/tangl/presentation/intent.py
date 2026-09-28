@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import ConfigDict, Field
 
 from tangl.core.bases import Unstructurable
+
+
+class UnavailableChoiceDisclosure(str, Enum):
+    """Whether an unavailable Story choice is emitted to the reader."""
+
+    DISCLOSE = "disclose"
+    HIDE = "hide"
 
 
 class IntentModel(Unstructurable):
@@ -203,5 +211,6 @@ __all__ = [
     "RegexValidator",
     "TextAccepts",
     "UIHints",
+    "UnavailableChoiceDisclosure",
     "Validator",
 ]

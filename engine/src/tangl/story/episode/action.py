@@ -4,7 +4,12 @@ from typing import Any
 
 from pydantic import field_serializer
 
-from tangl.presentation.intent import Accepts, Blocker, UIHints
+from tangl.presentation.intent import (
+    Accepts,
+    Blocker,
+    UIHints,
+    UnavailableChoiceDisclosure,
+)
 from tangl.vm import ResolutionPhase, TraversableEdge
 
 
@@ -26,6 +31,7 @@ class Action(TraversableEdge):
     payload: Any = None
     accepts: Accepts | None = None
     blockers: list[Blocker] | None = None
+    unavailable_choice_disclosure: UnavailableChoiceDisclosure | None = None
     ui_hints: UIHints | None = None
     journal_text: str | None = None
 

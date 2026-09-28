@@ -40,6 +40,21 @@ factory. Generic topology materialization belongs to `GraphFactory` and
 `TraversableGraphFactory`; story keeps only story-specific post-passes and
 preview/prelink policy.
 
+## Choice Disclosure
+
+Choice availability and disclosure are separate Story contracts. Availability
+continues to decide whether an `Action` can be selected. Disclosure decides
+only whether an unavailable action is emitted as a disabled `ChoiceFragment`
+with its blockers, or omitted from the reader's menu. Omission never makes a
+path selectable; direct submission still follows ordinary VM validation.
+
+At rendering, `unavailable_choice_disclosure` resolves from the current scoped
+namespace (`"disclose"` by default, `"hide"` when authored), so world locals
+provide a default and nested scene/container/block locals override it. An
+`Action.unavailable_choice_disclosure` is an optional typed per-choice override
+that inherits the scoped policy when absent. This is server-side Story policy,
+not advisory `UIHints` and not a new client vocabulary.
+
 ## Runtime Authority Model
 
 World/factory authority is the canonical story runtime model.
