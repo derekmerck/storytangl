@@ -83,6 +83,7 @@ from ..ctx import VmPhaseCtx
 from ..factory import TraversableGraphFactory
 from ..dispatch import (
     do_complete_call,
+    do_compose_journal,
     do_finalize,
     do_gather_ns,
     do_journal,
@@ -844,6 +845,18 @@ class Frame:
     def _append_phase_records(self, values: Any, *, step: int) -> None:
         self.output_stream.extend(self._collect_phase_records(values, step=step))
 
+    @staticmethod
+    def _without_choice_fragments(records: list[Any]) -> list[Any]:
+        """Remove controls that cannot be selected from an output batch."""
+        return [
+            record
+            for record in records
+            if not (
+                isinstance(record, BaseFragment)
+                and record.fragment_type == "choice"
+            )
+        ]
+
     def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> list[Any]:
         if entry_phase > ResolutionPhase.JOURNAL:
             return []
@@ -913,19 +926,25 @@ class Frame:
         if getattr(edge, "return_phase", None) is not None:
             self.return_stack.append(edge)
 
-    def _next_resolve_edge(
+    def _complete_exhausted_call(
         self,
         *,
-        redirect: AnyTraversableEdge | None,
         ctx: VmPhaseCtx,
-    ) -> AnyTraversableEdge | None:
-        if redirect is not None:
-            return redirect
-        if self.return_stack and not self._has_selectable_continuation(ctx=ctx):
-            call = self.return_stack.pop()
-            self._append_phase_records(do_complete_call(call, ctx=ctx), step=ctx.step)
-            return call.get_return_edge()
-        return None
+    ) -> tuple[AnyTraversableEdge | None, list[Any]]:
+        """Complete the top call before recording its terminal traversal hop."""
+        if not self.return_stack or self._has_selectable_continuation(ctx=ctx):
+            return None, []
+
+        call = self.return_stack.pop()
+        records = self._collect_phase_records(
+            do_complete_call(call, ctx=ctx),
+            step=ctx.step,
+        )
+        if records:
+            composed = do_compose_journal(self.cursor, fragments=records, ctx=ctx)
+            if composed is not None:
+                records = self._collect_phase_records(composed, step=ctx.step)
+        return call.get_return_edge(), self._without_choice_fragments(records)
 
     def _has_selectable_continuation(self, *, ctx: VmPhaseCtx) -> bool:
         """Whether the current node offers an available player choice."""
@@ -957,15 +976,8 @@ class Frame:
             was_choice=is_choice_edge,
             selected_payload_override=choice_payload if is_choice_edge else None,
         )
-        next_edge = self._next_resolve_edge(
-            redirect=redirect,
-            ctx=self._make_ctx(
-                incoming_edge=edge,
-                incoming_payload=self.selected_payload,
-            ),
-        )
         self._emit_step_trace()
-        return next_edge
+        return redirect
 
     # -- Pipeline execution -------------------------------------------------
 
@@ -1023,15 +1035,12 @@ class Frame:
             was_choice=was_choice,
             before_graph=before_graph,
         )
+        completion_return = None
         if redirect is not None:
-            journal_records = [
-                record
-                for record in journal_records
-                if not (
-                    isinstance(record, BaseFragment)
-                    and record.fragment_type == "choice"
-                )
-            ]
+            journal_records = self._without_choice_fragments(journal_records)
+        else:
+            completion_return, completion_records = self._complete_exhausted_call(ctx=ctx)
+            journal_records.extend(completion_records)
         self._append_phase_records(journal_records, step=ctx.step)
         self._append_phase_records(finalize_records, step=ctx.step)
         if redirect is not None:
@@ -1044,7 +1053,7 @@ class Frame:
             was_choice=was_choice,
             before_graph=before_graph,
         )
-        return None
+        return completion_return
 
     # -- Choice resolution --------------------------------------------------
 

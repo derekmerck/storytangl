@@ -276,8 +276,10 @@ Wraps core's `Edge` with phase-control fields:
   continuations. Popping an exhausted call runs the VM `complete_call` dispatch once
   with the original call edge as its caller. Completion is after the callee's last
   JOURNAL output and before the return edge reaches the origin's next PLANNING or
-  presentation frontier. Completion fragments commit before that return pipeline, so
-  an origin PREREQS redirect cannot discard them. This is causal ledger traversal,
+  presentation frontier. Completion fragments run through the current callee's normal
+  JOURNAL composition fold, then commit before that return pipeline; completion cannot
+  publish `ChoiceFragment` controls, so an origin PREREQS redirect cannot discard or
+  strand them. This is causal ledger traversal,
   not calendar time; it does not make a node's ordinary FINALIZE phase a whole-scene
   completion signal.
 - `once` — offer this edge only until its successor has been visited, by any route.
@@ -297,9 +299,11 @@ FINALIZE belongs to every traversal step, including an open multi-node callee; i
 not imply that a scene or subcall has ended. Only the frame's stack pop proves that the
 current call has no selectable internal continuation. At that point the existing VM
 dispatch registry runs `complete_call` with the persistent call edge as `caller` and
-commits its fragments before following the transient return edge. The ledger persists
-only the still-open call-edge UUIDs, so restore and replay reproduce the same one
-completion per exhausted traversal without a second completion record or time state.
+composes its fragments in the callee's JOURNAL context before following the transient
+return edge. Completion runs before the exhausted callee hop's replay trace is sealed,
+so its graph mutations belong to that terminal step's delta and state hash. The ledger
+persists only the still-open call-edge UUIDs, so restore and replay reproduce the same
+one completion per exhausted traversal without a second completion record or time state.
 
 **Edge availability is action activation, not destination entry.** A door can publish
 an "unlock door" action while locked, make that action activatable only when a key is

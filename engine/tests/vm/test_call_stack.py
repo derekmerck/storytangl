@@ -34,10 +34,11 @@ from uuid import UUID
 import pytest
 
 import tangl.vm.system_handlers as vm_system_handlers
-from tangl.core import BaseFragment, Graph
+from tangl.core import BaseFragment, Graph, Selector
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     on_complete_call,
+    on_compose_journal,
     on_gather_ns,
     on_journal,
     on_postreqs,
@@ -45,6 +46,7 @@ from tangl.vm.dispatch import (
     on_provision,
 )
 from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.replay import StepRecord
 from tangl.vm.runtime.frame import Frame
 from tangl.vm.runtime.ledger import Ledger
 from tangl.vm.traversable import (
@@ -476,6 +478,98 @@ class TestFrameCallReturn:
         assert [fragment.content for fragment in ledger.get_journal()] == [
             "The call closes."
         ]
+
+    def test_completion_output_uses_journal_composition_without_choices(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Completion output shares JOURNAL transforms but cannot publish controls."""
+        g = Graph()
+        caller = _node(g, label="caller")
+        callee = _node(g, label="callee")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+        composed_from: list[list[BaseFragment]] = []
+
+        @on_complete_call
+        def emit_completion(*, caller, **_kw):
+            assert caller is call_edge
+            return [
+                BaseFragment(fragment_type="content", content="Raw completion."),
+                BaseFragment(fragment_type="choice", content="Stale choice."),
+            ]
+
+        @on_compose_journal
+        def compose_completion(*, caller, fragments, **_kw):
+            assert caller is callee
+            composed_from.append(list(fragments))
+            return [
+                BaseFragment(
+                    fragment_type="content",
+                    content=f"Composed: {fragments[0].content}",
+                ),
+                *fragments[1:],
+            ]
+
+        with _cleanup_behaviors(emit_completion, compose_completion):
+            ledger = _ledger(g, caller)
+            ledger.resolve_choice(call_edge.uid)
+
+        assert [[fragment.content for fragment in fragments] for fragments in composed_from] == [
+            ["Raw completion.", "Stale choice."]
+        ]
+        assert [fragment.content for fragment in ledger.get_journal()] == [
+            "Composed: Raw completion."
+        ]
+
+    def test_completion_mutation_is_recorded_on_the_terminal_step(
+        self, clean_vm_dispatch
+    ) -> None:
+        """Completion mutations replay and roll back with the exhausted callee hop."""
+        g = Graph()
+        caller = _node(g, label="caller", locals={"completion_count": 0})
+        callee = _node(g, label="callee")
+        call_edge = _edge(
+            g,
+            predecessor_id=caller.uid,
+            successor_id=callee.uid,
+            return_phase=ResolutionPhase.PLANNING,
+        )
+
+        @on_complete_call
+        def increment_completion(*, caller, **_kw):
+            caller.predecessor.locals["completion_count"] += 1
+            return None
+
+        with _cleanup_behaviors(increment_completion):
+            ledger = _ledger(g, caller)
+            ledger.save_snapshot(force=True)
+            ledger.resolve_choice(call_edge.uid)
+            terminal_step = next(
+                record
+                for record in Selector(has_kind=StepRecord).filter(ledger.output_stream)
+                if record.cursor_id == callee.uid
+            )
+
+            assert caller.locals["completion_count"] == 1
+            assert terminal_step.delta_id is not None
+            assert terminal_step.state_hash == ledger.graph.value_hash()
+
+            ledger.rollback_to_step(1, reason="verify completion replay")
+            replayed_caller = ledger.graph.get(caller.uid)
+
+            assert isinstance(replayed_caller, TraversableNode)
+            assert replayed_caller.locals["completion_count"] == 1
+            assert ledger.graph.value_hash() == terminal_step.state_hash
+
+            ledger.rollback_to_step(0, reason="undo completion replay")
+            original_caller = ledger.graph.get(caller.uid)
+
+            assert isinstance(original_caller, TraversableNode)
+            assert original_caller.locals["completion_count"] == 0
 
     def test_completion_replays_once_after_restore_and_rollback(
         self, clean_vm_dispatch
