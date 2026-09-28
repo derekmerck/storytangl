@@ -273,7 +273,16 @@ Wraps core's `Edge` with phase-control fields:
   viable selection-time provisioning. When the pipeline has no redirect and no selectable
   continuation, the frame pops the stack and follows `get_return_edge()` back to the
   predecessor at `return_phase`. Triggered edges are redirects, not selectable
-  continuations.
+  continuations. Popping an exhausted call runs the VM `complete_call` dispatch once
+  with the original call edge as its caller. Completion is after the callee's last
+  JOURNAL output and before the return edge reaches the origin's next PLANNING or
+  presentation frontier. Completion fragments run through the current callee's normal
+  JOURNAL composition fold after the callee's FINALIZE records, then commit before that
+  return pipeline. A `complete_call` handler that returns a `ChoiceFragment` fails
+  loudly before composition because completion has no selectable frontier. This is
+  causal ledger traversal,
+  not calendar time; it does not make a node's ordinary FINALIZE phase a whole-scene
+  completion signal.
 - `once` — offer this edge only until its successor has been visited, by any route.
   "Visited" is the ledger's cursor history, read through the phase context by
   `has_visited(node, ctx=ctx)`; a node's `_visited` locals are not consulted.
@@ -285,6 +294,17 @@ Wraps core's `Edge` with phase-control fields:
 **Call/return semantics are edge properties, not graph structure.** One edge UUID in the
 graph serves as the call bookmark — there is no separate return-edge data structure.
 `get_return_edge()` constructs an `AnonymousEdge` pointing back to the predecessor.
+
+**Exhausted-call completion is explicit, not node FINALIZE.** A node's ordinary
+FINALIZE belongs to every traversal step, including an open multi-node callee; it does
+not imply that a scene or subcall has ended. Only the frame's stack pop proves that the
+current call has no selectable internal continuation. At that point the existing VM
+dispatch registry runs `complete_call` with the persistent call edge as `caller` and
+composes its fragments in the callee's JOURNAL context before following the transient
+return edge. Completion runs before the exhausted callee hop's replay trace is sealed,
+so its graph mutations belong to that terminal step's delta and state hash. The ledger
+persists only the still-open call-edge UUIDs, so restore and replay reproduce the same
+one completion per exhausted traversal without a second completion record or time state.
 
 **Edge availability is action activation, not destination entry.** A door can publish
 an "unlock door" action while locked, make that action activatable only when a key is
