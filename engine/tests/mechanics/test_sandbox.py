@@ -48,7 +48,7 @@ from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
 from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block_choices
-from tangl.vm import Ledger, Requirement
+from tangl.vm import Ledger, Requirement, ResolutionPhase
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
@@ -514,7 +514,9 @@ def test_scheduled_mob_presence_can_gate_scheduled_events() -> None:
     )
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
-    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+    events = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert [event.text for event in events] == ["Talk to pirate"]
+    assert not events[0].available(ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
 
 def test_present_mob_projects_traversable_interaction_with_return() -> None:
@@ -699,6 +701,35 @@ def test_location_interaction_can_be_trivial_self_loop_action() -> None:
         "You crouch behind the broken wall.",
         "Cover is good.",
     ]
+
+
+def test_block_targeted_interaction_does_not_acquire_a_location_time_charge() -> None:
+    graph = Graph(label="interaction_block_target")
+    scope = SandboxScope(label="scope", locals={"world_turn": 0})
+    road = SandboxLocation(
+        label="road",
+        interactions=[
+            SandboxInteraction(
+                label="enter",
+                text="Enter the building",
+                target="building",
+            )
+        ],
+    )
+    building = Block(label="building", content="Inside.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    scope.add_child(road)
+    scope.add_child(building)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    interaction = _dynamic_sandbox_actions_with_tag(road, "interaction")[0]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(interaction.uid)
+
+    assert ledger.cursor is building
+    assert scope.locals["world_turn"] == 0
 
 
 def test_assets_project_sponsored_interactions_when_present_or_carried() -> None:
@@ -1185,7 +1216,7 @@ def test_sandbox_incremental_update_rejects_unsupported_move_kind() -> None:
         sandbox_incremental.process_sandbox_incremental_game_move(caller=hub, ctx=ctx)
 
 
-def test_scheduled_event_projects_only_at_matching_location_and_time() -> None:
+def test_scheduled_event_candidate_becomes_available_without_reprovisioning() -> None:
     graph, road, _building, _cave_entrance = _sandbox_graph()
     traveler = Block(label="traveler_arrives", content="A traveler waves from the road.")
     graph.add(traveler)
@@ -1202,16 +1233,14 @@ def test_scheduled_event_projects_only_at_matching_location_and_time() -> None:
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
 
     do_provision(road, ctx=ctx)
-    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    assert event.text == "Talk to traveler"
+    assert event.successor is traveler
+    assert not event.available(ctx=ctx)
 
     road.locals["world_turn"] = 2
     ctx._ns_cache.clear()
-    do_provision(road, ctx=ctx)
-    events = _dynamic_sandbox_actions_with_tag(road, "event")
-
-    assert len(events) == 1
-    assert events[0].text == "Talk to traveler"
-    assert events[0].successor is traveler
+    assert event.available(ctx=ctx)
 
 
 def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
@@ -1235,6 +1264,42 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
     choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
 
     assert any(choice.text == "Talk to traveler" and choice.available for choice in choices)
+
+
+def test_scheduled_event_uses_story_disclosure_policy_when_unavailable() -> None:
+    graph = StoryGraph(
+        label="scheduled_event_disclosure",
+        locals={"unavailable_choice_disclosure": "disclose"},
+    )
+    road = SandboxLocation(
+        label="road",
+        locals={"world_turn": 1},
+        scheduled_events=[
+            ScheduledEvent(
+                label="traveler",
+                location="road",
+                period=3,
+                target="traveler_arrives",
+                text="Talk to traveler",
+            )
+        ],
+    )
+    traveler = Block(label="traveler_arrives", content="A traveler waves.")
+    graph.add(road)
+    graph.add(traveler)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+
+    disclosed = render_block_choices(caller=road, ctx=ctx) or []
+    choice = next(fragment for fragment in disclosed if fragment.text == "Talk to traveler")
+    assert choice.available is False
+
+    graph.locals["unavailable_choice_disclosure"] = "hide"
+    hidden = render_block_choices(
+        caller=road,
+        ctx=PhaseCtx(graph=graph, cursor_id=road.uid),
+    ) or []
+    assert all(fragment.text != "Talk to traveler" for fragment in hidden)
 
 
 def test_scheduled_event_uses_interaction_journal_effects_and_availability() -> None:
@@ -1269,6 +1334,287 @@ def test_scheduled_event_uses_interaction_journal_effects_and_availability() -> 
     Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
 
     assert road.locals["bell_rung"] is True
+
+
+def _event_time_graph(*, return_to_location: bool = False) -> tuple[
+    Graph,
+    SandboxScope,
+    SandboxLocation,
+    Block,
+]:
+    """Build a scheduled event whose block target inherits the scope clock."""
+    graph = Graph(label="event_time")
+    scope = SandboxScope(label="event_time_scope", locals={"world_turn": 3})
+    road = SandboxLocation(
+        label="road",
+        location_name="Road",
+        scheduled_events=[
+            ScheduledEvent(
+                label="night_event",
+                period=4,
+                target="event_beat",
+                text="Attend the night event",
+                return_to_location=return_to_location,
+            ),
+            ScheduledEvent(
+                label="empty_period",
+                period=2,
+                target="quiet_beat",
+                text="Attend the empty-period event",
+            ),
+        ],
+    )
+    square = SandboxLocation(
+        label="square",
+        location_name="Square",
+        scheduled_events=[
+            ScheduledEvent(
+                label="market_event",
+                target="market_beat",
+                text="Attend the market event",
+            )
+        ],
+    )
+    event_beat = Block(label="event_beat", content="The event begins.")
+    market_beat = Block(label="market_beat", content="The market opens.")
+    quiet_beat = Block(label="quiet_beat", content="Nothing happens.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(square)
+    graph.add(event_beat)
+    graph.add(market_beat)
+    graph.add(quiet_beat)
+    scope.add_child(road)
+    scope.add_child(square)
+    scope.add_child(event_beat)
+    scope.add_child(market_beat)
+    scope.add_child(quiet_beat)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(square, ctx=PhaseCtx(graph=graph, cursor_id=square.uid))
+    return graph, scope, road, event_beat
+
+
+def test_selected_event_does_not_charge_or_change_its_candidate_set() -> None:
+    """Scheduled events bind and validate without advancing the sandbox clock."""
+    graph, scope, road, event_beat = _event_time_graph()
+    event = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "event")
+        if action.text == "Attend the night event"
+    )
+    square = graph.find_one(Selector(has_kind=SandboxLocation, label="square"))
+
+    assert isinstance(square, SandboxLocation)
+    assert [action.text for action in _dynamic_sandbox_actions_with_tag(road, "event")] == [
+        "Attend the night event",
+        "Attend the empty-period event",
+    ]
+    assert [action.text for action in _dynamic_sandbox_actions_with_tag(square, "event")] == [
+        "Attend the market event"
+    ]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(event.uid)
+
+    assert ledger.cursor is event_beat
+    assert scope.locals["world_turn"] == 3
+    world_time = current_world_time(event_beat)
+    assert world_time.turn == 3
+
+
+def test_current_target_event_does_not_charge_time() -> None:
+    """A self-target scheduled event remains an ordinary no-charge action."""
+    graph = Graph(label="current_event_time")
+    scope = SandboxScope(label="current_event_scope", locals={"world_turn": 0})
+    road = SandboxLocation(
+        label="road",
+        scheduled_events=[
+            ScheduledEvent(label="bell", target="current", text="Ring the bell"),
+        ],
+    )
+    graph.add(scope)
+    graph.add(road)
+    scope.add_child(road)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 0
+
+
+def test_returning_event_restore_and_replay_preserve_no_charge() -> None:
+    """A restored open event call remains a no-charge binding projection."""
+    graph, scope, road, event_beat = _event_time_graph(return_to_location=True)
+    ending = Block(label="event_ending", content="The event concludes.")
+    alternate = Block(
+        label="event_alternate",
+        content="The event takes another turn.",
+    )
+    graph.add(ending)
+    graph.add(alternate)
+    scope.add_child(ending)
+    scope.add_child(alternate)
+    internal_choice = Action(
+        registry=graph,
+        label="event_internal_choice",
+        predecessor_id=event_beat.uid,
+        successor_id=ending.uid,
+        text="Make the internal choice",
+    )
+    Action(
+        registry=graph,
+        label="event_alternate_choice",
+        predecessor_id=event_beat.uid,
+        successor_id=alternate.uid,
+        text="Take the alternate choice",
+    )
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.checkpoint_cadence = 3
+
+    ledger.resolve_choice(event.uid)
+    assert ledger.cursor is event_beat
+    assert scope.locals["world_turn"] == 3
+
+    restored = Ledger.structure(ledger.unstructure())
+    restored.push_snapshot()
+    restored_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
+    restored_road = restored.graph.find_one(
+        Selector(has_kind=SandboxLocation, label="road")
+    )
+    restored_choice = restored.graph.get(internal_choice.uid)
+
+    assert isinstance(restored_scope, SandboxScope)
+    assert isinstance(restored_road, SandboxLocation)
+    assert isinstance(restored_choice, Action)
+    restored.resolve_choice(restored_choice.uid)
+
+    assert restored.cursor is restored_road
+    assert restored_scope.locals["world_turn"] == 3
+
+    restored.rollback_to_step(1, reason="replay event entry")
+    replayed_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
+
+    assert isinstance(replayed_scope, SandboxScope)
+    assert restored.cursor.get_label() == "event_beat"
+    assert replayed_scope.locals["world_turn"] == 3
+
+
+def test_rejected_event_selection_does_not_change_time() -> None:
+    """Validation rejects a stale event without any sandbox clock side effect."""
+    graph, scope, road, _event_beat = _event_time_graph()
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    event.availability = [Predicate(expr="False")]
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 3
+
+
+def test_stale_scheduled_event_is_rejected_before_entry() -> None:
+    """Schedule matching remains a live selection guard, not projection-only."""
+    graph, scope, road, _event_beat = _event_time_graph()
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+    scope.locals["world_turn"] = 4
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 4
+
+
+def test_stale_duplicate_label_event_is_rejected_before_entry() -> None:
+    """Live admission remains bound to the selected duplicate-label contribution."""
+    graph, scope, road, event_beat = _event_time_graph()
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="shared",
+            period=1,
+            target=event_beat.get_label(),
+            text="First shared event",
+        ),
+        ScheduledEvent(
+            label="shared",
+            period=2,
+            target=event_beat.get_label(),
+            text="Second shared event",
+        ),
+    ]
+    scope.locals["world_turn"] = 1
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    event = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(road, "event")
+        if action.text == "Second shared event"
+    )
+    scope.locals["world_turn"] = 0
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
+
+    assert scope.locals["world_turn"] == 0
+
+
+def test_stale_unlabeled_event_is_rejected_after_schedule_reordering() -> None:
+    """Live admission does not use an unlabeled event's current list position."""
+    graph, scope, road, event_beat = _event_time_graph()
+    first = ScheduledEvent(
+        period=1,
+        target=event_beat.get_label(),
+        text="First unlabeled event",
+    )
+    second = ScheduledEvent(
+        period=2,
+        target=event_beat.get_label(),
+        text="Second unlabeled event",
+    )
+    road.scheduled_events = [first, second]
+    scope.locals["world_turn"] = 1
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    restored = Ledger.structure(Ledger.from_graph(graph, entry_id=road.uid).unstructure())
+    restored_scope = restored.graph.find_one(Selector(has_kind=SandboxScope))
+    restored_road = restored.graph.find_one(
+        Selector(has_kind=SandboxLocation, label="road")
+    )
+
+    assert isinstance(restored_scope, SandboxScope)
+    assert isinstance(restored_road, SandboxLocation)
+    event = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(restored_road, "event")
+        if action.text == "Second unlabeled event"
+    )
+    restored_road.scheduled_events.reverse()
+    restored_scope.locals["world_turn"] = 0
+
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        restored.resolve_choice(event.uid)
+
+    assert restored_scope.locals["world_turn"] == 0
+
+
+def test_scheduled_event_redirect_does_not_charge_time() -> None:
+    """A target redirect does not turn a scheduled event into a clock charge."""
+    graph, scope, road, event_beat = _event_time_graph()
+    landing = Block(label="redirect_landing", content="The event redirects here.")
+    graph.add(landing)
+    scope.add_child(landing)
+    Action(
+        registry=graph,
+        label="event_prereq_redirect",
+        predecessor_id=event_beat.uid,
+        successor_id=landing.uid,
+        trigger_phase=ResolutionPhase.PREREQS,
+    )
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(event.uid)
+
+    assert ledger.cursor is landing
+    assert scope.locals["world_turn"] == 3
 
 
 def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
@@ -1313,7 +1659,11 @@ def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
     assert [event.text for event in road_events] == ["Parley with the pirate"]
     assert road_events[0].ui_hints.source_kind == "mob"
     assert road_events[0].ui_hints.mob == "pirate"
-    assert _dynamic_sandbox_actions_with_tag(building, "event") == []
+    building_events = _dynamic_sandbox_actions_with_tag(building, "event")
+    assert [event.text for event in building_events] == ["Parley with the pirate"]
+    assert not building_events[0].available(
+        ctx=PhaseCtx(graph=graph, cursor_id=building.uid)
+    )
 
 
 def test_hidden_mob_does_not_project_scheduled_events() -> None:
@@ -2106,7 +2456,10 @@ def test_scope_scheduled_event_is_donated_to_matching_child_location() -> None:
     road_events = _dynamic_sandbox_actions_with_tag(road, "event")
     building_events = _dynamic_sandbox_actions_with_tag(building, "event")
     assert [event.text for event in road_events] == ["Talk to traveler"]
-    assert building_events == []
+    assert [event.text for event in building_events] == ["Talk to traveler"]
+    assert not building_events[0].available(
+        ctx=PhaseCtx(graph=graph, cursor_id=building.uid)
+    )
 
 
 def test_scope_once_event_triggers_on_entry_returns_and_suppresses_after_target_visit() -> None:
@@ -2167,6 +2520,37 @@ def test_scope_once_event_triggers_on_entry_returns_and_suppresses_after_target_
     assert _dynamic_sandbox_actions_with_tag(building, "event") == []
 
 
+def test_unavailable_triggered_event_does_not_auto_enter() -> None:
+    graph = Graph(label="triggered_event_gate")
+    scope = SandboxScope(label="scope", locals={"world_turn": 0})
+    start = Block(label="start")
+    road = SandboxLocation(
+        label="road",
+        scheduled_events=[
+            ScheduledEvent(
+                label="late_arrival",
+                period=2,
+                target="arrival",
+                activation="first",
+                text="A late arrival",
+            )
+        ],
+    )
+    arrival = Block(label="arrival", content="The arrival.")
+    graph.add(scope)
+    graph.add(start)
+    graph.add(road)
+    graph.add(arrival)
+    scope.add_child(road)
+    Action(registry=graph, predecessor_id=start.uid, successor_id=road.uid, text="Enter")
+
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    enter = next(iter(start.edges_out(Selector(has_kind=Action))))
+    ledger.resolve_choice(enter.uid)
+
+    assert ledger.cursor is road
+
+
 def test_scope_presence_can_gate_scheduled_events() -> None:
     graph = Graph(label="tiny_cave")
     scope = SandboxScope(
@@ -2204,9 +2588,10 @@ def test_scope_presence_can_gate_scheduled_events() -> None:
         "Talk to traveler"
     ]
 
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
     scope.scheduled_presence = []
-    do_provision(road, ctx=ctx)
-    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
 
 
 def test_role_provider_can_donate_sandbox_events() -> None:

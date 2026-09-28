@@ -446,7 +446,7 @@ def test_sandbox_interaction_cleanup_is_scoped_to_owning_family() -> None:
 def test_sandbox_scheduled_event_action_shape() -> None:
     """Audit-table row: "Sandbox scheduled events".
 
-    A matching scheduled event projects through the same
+    A scheduled-event candidate projects through the same
     `_project_sandbox_interaction` stanza (``event.as_interaction()``), with
     contribution kind ``event`` and the sponsoring scope as source.
     """
@@ -460,7 +460,7 @@ def test_sandbox_scheduled_event_action_shape() -> None:
     )
 
     assert dawn is not None
-    assert dawn.label == "sandbox_sandbox_schedule_road_char_scope_dawn"
+    assert dawn.label.startswith("sandbox_sandbox_schedule_road_char_scope_dawn_")
     assert dawn.text == "Notice the dawn"
     assert dawn.tags == {"dynamic", "sandbox", "interaction", "interaction:dawn", "event"}
     assert _hints(dawn) == {
@@ -476,35 +476,40 @@ def test_sandbox_scheduled_event_action_shape() -> None:
     }
     assert dawn.payload is None
     assert dawn.accepts is None
-    # The schedule gate is the projection-time admission predicate; nothing
-    # lands on the edge as live availability ("Availability is after binding").
-    assert _availability_exprs(dawn) == []
+    # Schedule admission is re-evaluated against the projected contribution,
+    # not its label or its current position among contributions.
+    [availability] = _availability_exprs(dawn)
+    prefix = "sandbox_scheduled_event_available('"
+    assert availability.startswith(prefix)
+    assert availability.endswith("')")
+    contribution_key = availability.removeprefix(prefix).removesuffix("')")
+    assert len(contribution_key) == 64
+    assert all(character in "0123456789abcdef" for character in contribution_key)
     assert dawn.trigger_phase is None
     assert dawn.return_phase is None
     assert dawn.successor is road
 
 
-def test_sandbox_scheduled_event_admission_is_projection_time() -> None:
+def test_sandbox_scheduled_event_admission_remains_live_after_projection() -> None:
     """Audit-table row: "Sandbox scheduled events".
 
-    ``event.matches(...)`` decides whether the edge is emitted at all — the
-    gate is admission/binding, not an availability predicate on a persistent
-    edge. A non-matching pass clears the family and projects nothing.
+    ``event.matches(...)`` remains availability on a persistent candidate, not
+    projection-time admission. A time change therefore changes the same path's
+    availability without rebuilding the frontier.
     """
     compiled = SandboxSliceCompiler().compile(CHARACTERIZATION_SLICE)
     road = compiled.locations["road"]
     graph = compiled.graph
 
     _provision(road, graph)  # world_turn 0 → period 1 → dawn matches
-    assert len(_dynamic_actions(road, "dynamic", "sandbox", "event")) == 1
+    [dawn] = _dynamic_actions(road, "dynamic", "sandbox", "event")
+    assert dawn.available(ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
     road.locals["world_turn"] = 1  # period 2 → dawn (period=1) no longer matches
-    _provision(road, graph)
-    assert _dynamic_actions(road, "dynamic", "sandbox", "event") == []
+    assert not dawn.available(ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
     road.locals["world_turn"] = 0
-    _provision(road, graph)
-    assert len(_dynamic_actions(road, "dynamic", "sandbox", "event")) == 1
+    assert dawn.available(ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
 
 def test_sandbox_scheduled_event_cleanup_is_scoped_to_owning_family() -> None:

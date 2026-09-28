@@ -91,9 +91,10 @@ Current first-pass surface:
   location-sponsored interactions as ordinary choices.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
-- `project_sandbox_scheduled_events`: planning handler that projects matching
-  scope, location, mob, asset, fixture, and concept-provider scheduled events
-  through the normal sponsored interaction path.
+- `project_sandbox_scheduled_events`: planning handler that projects known
+  scope, location, mob, asset, fixture, and concept-provider scheduled-event
+  candidates through the normal sponsored interaction path; their gates remain
+  live action availability rather than projection filters.
 - `project_sandbox_unlocks`: planning handler that projects locked local objects
   as self-loop unlock choices with normal edge availability, effects, and
   selected-action journal text.

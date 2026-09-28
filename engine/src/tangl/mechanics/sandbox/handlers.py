@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -481,7 +483,7 @@ def _scheduled_event_contributions(
                 for event in fixture.scheduled_events
             )
     if not projection_state.suppress_location_description:
-        for mob in _present_mobs(location):
+        for mob in _sandbox_mobs(location):
             mob_label = mob.get_label()
             contributions.extend(
                 ScheduledEventContribution(
@@ -528,6 +530,59 @@ def _scheduled_event_contributions(
         for event in _provider_scheduled_events(location, ctx=ctx)
     )
     return contributions
+
+
+def _sandbox_interaction_action_label(
+    location: SandboxLocation,
+    *,
+    source: str,
+    sponsor_label: str,
+    interaction_label: str,
+) -> str:
+    """Return the deterministic graph label for a projected interaction."""
+    return f"sandbox_{source}_{location.get_label()}_{sponsor_label}_{interaction_label}"
+
+
+def _scheduled_event_contribution_key(contribution: ScheduledEventContribution) -> str:
+    """Return a replay-stable identity for one scheduled-event contribution.
+
+    Scheduled events deliberately have no runtime identity or firing history.
+    Their declarative value, together with the sponsoring concept, is enough to
+    bind a projected action to the same currently offered contribution.
+    """
+    payload = {
+        "event": contribution.event.model_dump(mode="json"),
+        "source": contribution.source,
+        "source_kind": contribution.source_kind,
+        "source_label": contribution.source_label,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def _scheduled_event_is_live(
+    location: SandboxLocation,
+    *,
+    ctx: VmPhaseCtx,
+    contribution_key: str,
+) -> bool:
+    """Re-evaluate whether a projected scheduled-event action remains offered."""
+    world_time = current_world_time(location)
+    actors_present = _actors_present(location)
+    for contribution in _scheduled_event_contributions(location, ctx):
+        if contribution_key != _scheduled_event_contribution_key(contribution):
+            continue
+        if contribution.source_kind == "mob":
+            mob = _mob_by_label(location, contribution.source_label)
+            if mob is None or not _mob_present_at_location(location, mob):
+                return False
+        return contribution.event.matches(
+            world_time,
+            location=location.get_label(),
+            actors_present=actors_present,
+        )
+    return False
 
 
 def _scheduled_presence(location: SandboxLocation) -> list[ScheduledPresence]:
@@ -618,6 +673,8 @@ def _project_sandbox_interaction(
     sponsor_kind: str,
     tags: set[str],
     contribution_kind: str = "interaction",
+    event_contribution_key: str | None = None,
+    projection_label: str | None = None,
     **hints: Any,
 ) -> Action | None:
     tag = _interaction_tag(interaction.label)
@@ -628,18 +685,32 @@ def _project_sandbox_interaction(
         return None
     if interaction.once and has_visited(target, ctx=ctx):
         return None
+    action_label = _sandbox_interaction_action_label(
+        location,
+        source=source,
+        sponsor_label=sponsor_label,
+        interaction_label=projection_label or interaction.label,
+    )
+    availability = list(interaction.availability)
+    if contribution_kind == "event":
+        assert event_contribution_key is not None
+        availability.append(
+            Predicate(
+                expr=(
+                    "sandbox_scheduled_event_available("
+                    f"{event_contribution_key!r})"
+                )
+            )
+        )
     return Action(
         registry=graph,
-        label=(
-            f"sandbox_{source}_{location.get_label()}_"
-            f"{sponsor_label}_{interaction.label}"
-        ),
+        label=action_label,
         predecessor_id=location.uid,
         successor_id=target.uid,
         text=interaction.text,
         trigger_phase=Action.trigger_phase_from_activation(interaction.activation),
         return_phase=ResolutionPhase.PLANNING if interaction.return_to_location else None,
-        availability=list(interaction.availability),
+        availability=availability,
         effects=list(interaction.effects),
         journal_text=interaction.journal_text,
         tags={"dynamic", "sandbox", "interaction", tag, *tags},
@@ -1184,6 +1255,13 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
         "sandbox_fixture_can_close": lambda label: _fixture_can_close(
             caller,
             str(label),
+        ),
+        "sandbox_scheduled_event_available": (
+            lambda contribution_key: _scheduled_event_is_live(
+                caller,
+                ctx=ctx,
+                contribution_key=str(contribution_key),
+            )
         ),
         "sandbox_fixture_can_receive_asset": (
             lambda fixture_label, asset_label: _fixture_can_receive_asset(
@@ -2286,7 +2364,7 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
     wants_exact_kind=False,
 )
 def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
-    """Project matching scheduled events into normal dynamic actions."""
+    """Project known scheduled events as normal, live-gated dynamic actions."""
     if not isinstance(caller, SandboxLocation):
         return None
     if not caller.auto_provision:
@@ -2297,18 +2375,10 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
 
     _clear_dynamic_sandbox_actions(caller, action_kind="event", ctx=ctx)
 
-    world_time = current_world_time(caller)
-    location_label = caller.get_label()
-    actors_present = _actors_present(caller)
-    for index, contribution in enumerate(_scheduled_event_contributions(caller, ctx)):
+    for contribution in _scheduled_event_contributions(caller, ctx):
         event = contribution.event
-        if not event.matches(
-            world_time,
-            location=location_label,
-            actors_present=actors_present,
-        ):
-            continue
-        event_label = event.label or f"event_{index}"
+        contribution_key = _scheduled_event_contribution_key(contribution)
+        event_label = event.label or event.target
         _project_sandbox_interaction(
             caller,
             graph=graph,
@@ -2319,7 +2389,9 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             sponsor_kind=contribution.source_kind,
             tags={"event"},
             contribution_kind="event",
-            event=event_label,
+            event_contribution_key=contribution_key,
+            projection_label=f"{event_label}_{contribution_key[:12]}",
+            event=event.label or event.target,
             **contribution.hints,
         )
     return None
@@ -2331,8 +2403,11 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
     priority=Priority.LATE,
 )
 def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
-    """Advance sandbox-local time for selected sandbox actions."""
+    """Advance non-event sandbox actions while updating a sandbox location."""
     if not isinstance(caller, SandboxLocation):
+        return None
+    selected_edge = ctx.selected_edge
+    if not isinstance(selected_edge, Action) or "event" in (selected_edge.tags or set()):
         return None
 
     cost = _selected_sandbox_time_cost(ctx)
