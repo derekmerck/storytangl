@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from tangl.media.media_data_type import MediaDataType
 from tangl.presentation.sprite_sheet import (
     SheetClip,
     SheetFrame,
@@ -213,6 +214,8 @@ def index_standard_filename(caller: "MediaRIT", *, ctx: object) -> "MediaRIT":
         for index, segment in enumerate(segments[1:], start=1)
         if index not in excluded
     )
+    if caller.sheet_declaration is not None or caller.data_type is not MediaDataType.IMAGE:
+        return caller
     total_ms = None
     if duration is not None:
         total_ms = int(duration["amount"]) * (1000 if duration["unit"] == "s" else 1)

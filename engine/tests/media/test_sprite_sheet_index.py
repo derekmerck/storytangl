@@ -237,6 +237,24 @@ def test_standard_filename_handler_adds_metadata_and_declares_optional_duration(
     assert still.tags >= {"subject:other@place", "tag:night"}
 
 
+def test_standard_filename_handler_respects_an_explicit_opt_out_and_non_image_records(
+    tmp_path: Path,
+) -> None:
+    image_path = _png(tmp_path / "images" / "subject@place-alt-2x1.png", (20, 12), 20)
+    audio_path = tmp_path / "images" / "other@place-alt-2x1.mp3"
+    audio_path.write_bytes(b"not an audio decoder test")
+
+    opted_out = MediaRIT(path=image_path, sheet_declaration=False)
+    audio = MediaRIT(path=audio_path)
+    index_standard_filename(opted_out, ctx=object())
+    index_standard_filename(audio, ctx=object())
+
+    assert opted_out.sheet_declaration is False
+    assert opted_out.tags >= {"subject:subject@place"}
+    assert audio.sheet_declaration is None
+    assert audio.tags >= {"subject:other@place"}
+
+
 def test_sheet_target_does_not_cross_directories(tmp_path: Path) -> None:
     _png(tmp_path / "images" / "stills" / "subject@place.png", (10, 12), 10)
     _png(tmp_path / "images" / "sheets" / "subject@place-alt-1x1.png", (10, 12), 20)
