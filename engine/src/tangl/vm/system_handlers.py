@@ -432,7 +432,7 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
         # entry_phase controls where the pipeline starts after taking the edge.
         trigger = getattr(edge, "trigger_phase", None)
         if trigger == ResolutionPhase.PREREQS:
-            if edge.successor is not None and edge.available(ctx=ctx):
+            if edge.successor is not None and edge.available(ctx=ctx) and _target_viable(edge, ctx):
                 logger.debug("Prereq redirect: %s → %s", caller.get_label(), edge.successor.get_label())
                 return edge
 
@@ -525,6 +525,29 @@ def apply_final_runtime_effects(*, caller, ctx, **kw):
 # POSTREQS — continuation redirect after content, before player chooses
 # ---------------------------------------------------------------------------
 
+def _target_viable(edge: TraversableEdge, ctx: VmPhaseCtx) -> bool:
+    """Whether a triggered edge's target can be entered.
+
+    A choice is previewed before it is offered; a triggered edge is followed
+    without being offered, so it gets the same check here. A target can be
+    bound and still not viable -- materialized by another route, with hard
+    dependencies nothing can provision -- and following it would enter a node
+    that cannot run. Only a target with something unresolved, or a container
+    whose entry decides, needs the preview.
+    """
+    from .provision import Dependency, Resolver
+
+    successor = edge.successor
+    unresolved = next(successor.edges_out(Selector(has_kind=Dependency, satisfied=False)), None)
+    if unresolved is None and not successor.is_container:
+        return True
+    return Resolver.from_ctx(ctx).preview_frontier_node(
+        successor,
+        allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
+        _ctx=ctx,
+    ).viable
+
+
 @on_postreqs
 def follow_triggered_postreqs(*, caller, ctx, **kw):
     """Follow the first available auto-triggering POSTREQS edge.
@@ -541,7 +564,7 @@ def follow_triggered_postreqs(*, caller, ctx, **kw):
             continue
         trigger = getattr(edge, "trigger_phase", None)
         if trigger == ResolutionPhase.POSTREQS:
-            if edge.successor is not None and edge.available(ctx=ctx):
+            if edge.successor is not None and edge.available(ctx=ctx) and _target_viable(edge, ctx):
                 logger.debug("Postreq redirect: %s → %s", caller.get_label(), edge.successor.get_label())
                 return edge
 

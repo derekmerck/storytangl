@@ -1637,14 +1637,10 @@ class Resolver:
         A lazily materialized edge has no successor until its ``destination``
         dependency resolves. Returns whether the edge has a successor now.
         """
-        graph = edge.graph
         dep = next(
-            graph.find_edges(
+            edge.graph.find_edges(
                 Selector(has_kind=Dependency, predecessor=edge, label="destination", satisfied=False)
             ),
-            None,
-        ) or next(
-            graph.find_edges(Selector(has_kind=Dependency, predecessor=edge, satisfied=False)),
             None,
         )
         if dep is None:

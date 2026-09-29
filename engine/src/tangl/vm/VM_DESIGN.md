@@ -130,11 +130,15 @@ PLANNING establishes the topology of the next frontier. From the current node it
 provisions the successor nodes, providers, dependencies, and actions that may be
 selected next. Those successors must exist before they are presented: a disclosed
 “note on the door” is either a fact on an already-provisioned provider or a durable
-constraint that any remaining lazy realization must satisfy. That includes a lazily
-materialized edge's destination, which the edge carries as a dependency of its own: the
-current node's are provisioned as it is entered, continuations and choices alike, and an
-edge whose destination cannot be provisioned keeps no successor, so it is neither
-followed nor offered.
+constraint that any remaining lazy realization must satisfy.
+
+A lazily materialized edge carries its destination as a dependency of its own. A choice
+stays that way until it is selected: it is previewed when offered and provisioned when
+chosen. A triggered edge (a continuation or redirect) is followed without being chosen,
+so the current node's triggered destinations are provisioned as the node is entered, and
+a triggered edge is followed only into a target that can be entered. One whose
+destination cannot be provisioned, or whose target's hard dependencies cannot be, is not
+followed.
 
 UPDATE changes committed state after the frontier's shape is mostly settled. It may
 lock or unlock already-provisioned doors, transfer custody, apply injury, change

@@ -35,6 +35,7 @@ from tangl.vm.traversable import (
     TraversableNode,
 )
 from tangl.vm import Dependency, Requirement
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -47,6 +48,19 @@ def _edge(graph: Graph, **kwargs) -> TraversableEdge:
     edge = TraversableEdge(**kwargs)
     graph.add(edge)
     return edge
+
+def _first_target_unviable(trigger: ResolutionPhase) -> tuple[Graph, TraversableNode, TraversableNode]:
+    """``a`` triggers to ``b``, then to ``c``. ``b`` exists but has a hard
+    dependency nothing can provide, so it cannot be entered."""
+    g = Graph()
+    a = _node(g, label="a")
+    b = _node(g, label="b")
+    c = _node(g, label="c")
+    g.add(Dependency(predecessor_id=b.uid, label="companion",
+                     requirement=Requirement(has_identifier="nobody")))
+    for target in (b, c):
+        _edge(g, predecessor_id=a.uid, successor_id=target.uid, trigger_phase=trigger)
+    return g, a, c
 
 # Import registers the handlers — must happen after clean_vm_dispatch yields
 import tangl.vm.system_handlers as sh
@@ -479,6 +493,12 @@ class TestFollowTriggeredPrereqs:
         result = sh.follow_triggered_prereqs(caller=a, ctx=ctx)
         assert result is None
 
+    def test_prereq_edge_to_a_target_that_cannot_be_entered_not_returned(self) -> None:
+        g, a, c = _first_target_unviable(ResolutionPhase.PREREQS)
+        result = sh.follow_triggered_prereqs(caller=a, ctx=PhaseCtx(graph=g, cursor_id=a.uid))
+        assert result is not None
+        assert result.successor is c
+
 
 # ============================================================================
 # Update: mark_visited
@@ -614,3 +634,9 @@ class TestFollowTriggeredPostreqs:
         )
         result = sh.follow_triggered_postreqs(caller=a, ctx=ctx)
         assert result is None
+
+    def test_postreq_edge_to_a_target_that_cannot_be_entered_not_returned(self) -> None:
+        g, a, c = _first_target_unviable(ResolutionPhase.POSTREQS)
+        result = sh.follow_triggered_postreqs(caller=a, ctx=PhaseCtx(graph=g, cursor_id=a.uid))
+        assert result is not None
+        assert result.successor is c
