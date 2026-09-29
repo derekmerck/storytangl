@@ -109,6 +109,10 @@ arrival effects and departure effects without needing separate `entry_effects` /
 system handler for FINALIZE fires effects tagged FINALIZE. Same mechanism, declared
 intent at the data level.
 
+Story authoring lowers Block `pre_effects` / `post_effects` into that same list with
+UPDATE / FINALIZE annotations. The older Block `effects` spelling remains an UPDATE
+alias; it is not a second runtime store.
+
 **Phase is VM vocabulary; core knows nothing about it.** `ResolutionPhase` must not be
 imported into `core`. This is why `HasAvailability`, `HasEffects`, and
 `TraversableEffect` live in `vm.traversable` rather than `core.bases`, even though

@@ -121,6 +121,31 @@ def test_decompile_recompiles_importable_domain_block_kind() -> None:
     assert isinstance(custom.payload, DomainBlock)
 
 
+def test_decompile_round_trips_timed_block_in_generic_templates() -> None:
+    compiler = StoryCompiler()
+    source = {
+        "label": "timed_template",
+        "templates": {
+            "timed": {
+                "kind": Block,
+                "effects": ["graph.locals['state'] = 'prepared'"],
+                "post_effects": ["graph.locals['state'] = 'finished'"],
+            },
+        },
+    }
+
+    canonical = compiler.decompile(compiler.compile(source))
+    restored = compiler.compile(canonical)
+
+    assert canonical["templates"]["timed"]["effects"] == [
+        {"expr": "graph.locals['state'] = 'prepared'"},
+    ]
+    assert canonical["templates"]["timed"]["post_effects"] == [
+        {"expr": "graph.locals['state'] = 'finished'"},
+    ]
+    assert compiler.decompile(restored) == canonical
+
+
 def test_decompile_makes_inferred_and_multiple_entries_explicit() -> None:
     compiler = StoryCompiler()
     inferred = compiler.decompile(

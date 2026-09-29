@@ -18,7 +18,8 @@ from tangl.ir.story_ir.scene_script_models import (
     with_default_activation,
 )
 from tangl.prose.dialog import DialogHandler
-from tangl.vm import TraversableNode
+from tangl.vm import ResolutionPhase, TraversableNode
+from tangl.vm.traversable import TraversableEffect
 
 from ..concepts import Actor, Location
 from ..episode import Action, Block, MenuBlock, Scene
@@ -1108,8 +1109,39 @@ class StoryCompiler:
             scene_data["templates"] = templates
         return scene_data
 
+    @staticmethod
+    def _decompile_block_effects(data: dict[str, Any]) -> None:
+        """Recover Block's author-facing timing names from VM effect annotations."""
+        effects = data.pop("effects", None)
+        if not isinstance(effects, list):
+            if effects is not None:
+                data["effects"] = effects
+            return
+
+        pre_effects: list[Any] = []
+        post_effects: list[Any] = []
+        for effect in effects:
+            if not isinstance(effect, dict):
+                pre_effects.append(effect)
+                continue
+            source_effect = dict(effect)
+            phase = source_effect.pop("trigger_phase", ResolutionPhase.UPDATE)
+            if phase == ResolutionPhase.UPDATE or phase == ResolutionPhase.UPDATE.value:
+                pre_effects.append(source_effect)
+            elif phase == ResolutionPhase.FINALIZE or phase == ResolutionPhase.FINALIZE.value:
+                post_effects.append(source_effect)
+            else:
+                raise ValueError(f"Cannot decompile Block effect phase {phase!r}.")
+
+        if pre_effects:
+            data["effects"] = pre_effects
+        if post_effects:
+            data["post_effects"] = post_effects
+
     def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
         data = _decompile_source_value(EntityTemplate.decompile(template))
+        if isinstance(template.payload, Block):
+            self._decompile_block_effects(data)
         if isinstance(template, TemplateGroup):
             children = list(template.members())
             if children:
@@ -1544,6 +1576,9 @@ class StoryCompiler:
     ) -> Entity:
         payload = dict(payload)
 
+        if issubclass(kind, Block):
+            StoryCompiler._lower_node_effects(payload)
+
         if issubclass(kind, Block) and isinstance(payload.get("content"), str):
             _report_invalid_dialog_callout(
                 collector=collector,
@@ -1553,12 +1588,14 @@ class StoryCompiler:
             )
 
         if isinstance(payload.get("effects"), list):
-            normalized_effects: list[dict[str, Any]] = []
+            normalized_effects: list[dict[str, Any] | TraversableEffect] = []
             for effect in payload["effects"]:
                 if isinstance(effect, str):
                     normalized_effects.append({"expr": effect})
                 elif isinstance(effect, dict):
                     normalized_effects.append(dict(effect))
+                elif isinstance(effect, TraversableEffect):
+                    normalized_effects.append(effect)
             payload["effects"] = normalized_effects
 
         # Authored ``conditions`` are availability predicates: map them onto
@@ -1636,3 +1673,53 @@ class StoryCompiler:
             if "locals" in payload and isinstance(payload["locals"], dict):
                 fallback.locals.update(payload["locals"])
             return fallback
+
+    @staticmethod
+    def _lower_node_effects(payload: dict[str, Any]) -> None:
+        """Lower authored node timing names into VM's one phase-tagged effect list."""
+        if "effects" in payload and "pre_effects" in payload:
+            raise ValueError("Use either 'effects' or 'pre_effects', not both.")
+
+        if "effects" in payload:
+            authored_effects = payload.pop("effects")
+        else:
+            authored_effects = payload.pop("pre_effects", None)
+        post_effects = payload.pop("post_effects", None)
+        if authored_effects is None and post_effects is None:
+            return
+
+        payload["effects"] = [
+            *StoryCompiler._phase_effects(authored_effects, ResolutionPhase.UPDATE),
+            *StoryCompiler._phase_effects(post_effects, ResolutionPhase.FINALIZE),
+        ]
+
+    @staticmethod
+    def _phase_effects(
+        effects: Any,
+        phase: ResolutionPhase,
+    ) -> list[TraversableEffect]:
+        """Build authored node effects with their field's fixed phase."""
+        if effects is None:
+            return []
+        if not isinstance(effects, list):
+            raise ValueError("Node effects must be a list.")
+
+        lowered: list[TraversableEffect] = []
+        for effect in effects:
+            if isinstance(effect, str):
+                lowered.append(TraversableEffect(expr=effect, trigger_phase=phase))
+                continue
+            if isinstance(effect, dict):
+                if "trigger_phase" in effect:
+                    raise ValueError(
+                        "Node effect timing belongs to 'pre_effects' or 'post_effects', "
+                        "not 'trigger_phase'.",
+                    )
+                lowered.append(
+                    TraversableEffect.model_validate(
+                        {**effect, "trigger_phase": phase},
+                    ),
+                )
+                continue
+            raise ValueError("Each node effect must be an expression string or mapping.")
+        return lowered
