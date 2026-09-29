@@ -467,9 +467,11 @@ inventories use the same authority pattern through `get_token_catalogs(...)` and
 two-phase model: (1) caller + ancestors contribute via `get_ns()`, (2) immediate-caller
 dispatch contributors add runtime/context layers. Different nodes during the same
 pipeline pass (cursor, frontier nodes during PLANNING, ancestors during condition
-evaluation) each get their own cached namespace. The cache dies with the PhaseCtx, so
-UPDATE mutations are visible in the *next* pipeline pass via a fresh PhaseCtx — they do
-not retroactively affect cached namespaces within the current pass.
+evaluation) each get their own cached namespace. The cache is discarded after each
+mutating phase: JOURNAL renders what UPDATE changed, and the node's own triggered
+continues read what UPDATE and FINALIZE changed. That is what the split between the two
+is for -- state for arrival in UPDATE, which the content then describes, and bookkeeping
+after the content in FINALIZE. The cache dies with the PhaseCtx.
 
 **Visit-history queries resolve stable node references.** The VM namespace exposes
 `visited(ref)`, `visit_count(ref)`, and `steps_since_visit(ref)` through one resolver
@@ -896,7 +898,7 @@ and passes the annotated list to the renderer. The renderer decides presentation
 | Phase dispatch | Manual aggregation per `do_*` function | `AggregationMode` table driving factory (planned) | Eliminate copy-paste; aggregation mode is data |
 | Provisioner registration | Implicit (attached to context) | Explicit call in `gather_offers` | Clear source of truth for what generates offers |
 | RNG | `Random()` on each use | `ctx.get_random()`, seeded from graph state | Deterministic replay |
-| Namespace | Rebuilt per expression | Cached per node per PhaseCtx | Performance; stable within pipeline pass |
+| Namespace | Rebuilt per expression | Cached per node per PhaseCtx, discarded after UPDATE and FINALIZE | Performance; each phase reads the state the phases before it left |
 | Container descent | `enter()` / `exit()` methods | `enter()` only; ascent via normal edge/stack | Ascent is not a node operation — it's a pipeline continuation |
 | TraversableSubgraph | Synthetic source/sink nodes with auto-wired edges | `source_id` / `sink_id` on existing members | No hidden graph pollution |
 

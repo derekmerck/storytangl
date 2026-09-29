@@ -137,14 +137,14 @@ class PhaseCtx:
     ``get_ns(node)`` delegates to ``do_gather_ns`` which assembles a scoped
     namespace in two phases: caller/ancestor entity-local ``get_ns()`` maps,
     then immediate-caller dispatch contributors. Results are cached per node
-    UID for the lifetime of this context — the assembled view is stable within
-    a single pipeline pass.
+    UID, and the cache is discarded after each mutating phase: what UPDATE
+    changes, JOURNAL renders and the node's own continues read, and what
+    FINALIZE changes, the continues read too.
 
     The cache is keyed by node UID, so different nodes (cursor vs. frontier
     nodes during PLANNING, different ancestors during condition evaluation)
     each get their own cached namespace.  The cache dies with the context
-    (one ``follow_edge`` call), so mutations in UPDATE are reflected in the
-    next pipeline pass.
+    (one ``follow_edge`` call).
 
     API
     ---
@@ -340,7 +340,7 @@ class PhaseCtx:
         return self._ns_cache[uid]
 
     def invalidate_namespaces(self) -> None:
-        """Discard namespace views after an in-place UPDATE mutation."""
+        """Discard namespace views after an in-place UPDATE or FINALIZE mutation."""
 
         self._ns_cache.clear()
 
@@ -831,6 +831,7 @@ class Frame:
             return
         ctx.current_phase = ResolutionPhase.UPDATE
         do_update(self.cursor, ctx=ctx)
+        ctx.invalidate_namespaces()
 
     def _collect_phase_records(self, values: Any, *, step: int) -> list[Any]:
         if not values:
@@ -888,7 +889,9 @@ class Frame:
         if entry_phase > ResolutionPhase.FINALIZE:
             return []
         ctx.current_phase = ResolutionPhase.FINALIZE
-        return self._collect_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
+        records = self._collect_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
+        ctx.invalidate_namespaces()
+        return records
 
     def _run_terminal_phases(
         self,
