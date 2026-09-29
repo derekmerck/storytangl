@@ -43,7 +43,7 @@ from tangl.mechanics.sandbox import (
     normalize_sandbox_direction,
 )
 from tangl.mechanics.sandbox import incremental as sandbox_incremental
-from tangl.story import Action, Block, StoryGraph
+from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
 from tangl.story.fragments import ChoiceFragment, ContentFragment
@@ -1241,6 +1241,57 @@ def test_scheduled_event_candidate_becomes_available_without_reprovisioning() ->
     road.locals["world_turn"] = 2
     ctx._ns_cache.clear()
     assert event.available(ctx=ctx)
+
+
+def test_scheduled_event_targets_a_qualified_block_path() -> None:
+    graph = Graph(label="qualified_event")
+    road = SandboxLocation(label="road", location_name="Road", locals={"world_turn": 2})
+    scene = Scene(label="scene")
+    target = Block(label="block", content="The event begins.")
+    graph.add(road)
+    graph.add(scene)
+    graph.add(target)
+    scene.add_child(target)
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="traveler",
+            location="road",
+            period=3,
+            target="scene.block",
+            text="Talk to traveler",
+        ),
+    ]
+
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+
+    [event] = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert event.successor is target
+    assert event.available(ctx=ctx)
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(event.uid)
+    assert ledger.cursor is target
+
+
+def test_scheduled_event_with_missing_target_warns_and_stays_inert(caplog: pytest.LogCaptureFixture) -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.locals["world_turn"] = 2
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="traveler",
+            location="road",
+            period=3,
+            target="scene.missing",
+            text="Talk to traveler",
+        ),
+    ]
+
+    with caplog.at_level("WARNING", logger="tangl.mechanics.sandbox.handlers"):
+        do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+    assert "unresolved target 'scene.missing'" in caplog.text
 
 
 def test_scheduled_event_renders_as_normal_choice_fragment() -> None:

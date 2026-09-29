@@ -235,9 +235,15 @@ def _resolve_ref(
 
     candidates = [
         candidate
-        for candidate in graph.find_all(Selector.from_identifier(target_ref))
+        for candidate in graph.find_all(Selector(has_path=target_ref))
         if isinstance(candidate, kind)
     ]
+    if not candidates:
+        candidates = [
+            candidate
+            for candidate in graph.find_all(Selector.from_identifier(target_ref))
+            if isinstance(candidate, kind)
+        ]
     if not candidates and "." not in target_ref:
         scoped_ref = f"{location.sandbox_scope}.{target_ref}" if location.sandbox_scope else None
         if scoped_ref:
@@ -682,6 +688,13 @@ def _project_sandbox_interaction(
         return None
     target = _interaction_target(location, interaction)
     if target is None:
+        logger.warning(
+            "Sandbox %s %r at %r has unresolved target %r; leaving it inert.",
+            contribution_kind,
+            interaction.label,
+            location.get_label(),
+            interaction.target,
+        )
         return None
     if interaction.once and has_visited(target, ctx=ctx):
         return None
