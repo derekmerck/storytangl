@@ -28,7 +28,7 @@ from tangl.story.fabula import (
 )
 from tangl.story.fabula.compiler import ISSUE_UNRESOLVED_KIND
 from tangl.story.episode import Action, Block, Scene
-from tangl.core import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
+from tangl.core import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, Singleton, TemplateRegistry
 from tangl.story.dispatch import story_dispatch
 from tangl.vm import Ledger
 
@@ -122,6 +122,38 @@ def test_story_graph_roundtrip_preserves_world_factory_identity() -> None:
     assert restored.factory is world
     assert restored.world is world
     assert restored.world.find_template("intro.start") is world.find_template("intro.start")
+
+
+class SeedReference(Singleton):
+    """Reference-like value used to pin global seed identity."""
+
+
+def test_story_globals_are_independent_mutable_seeds() -> None:
+    SeedReference.clear_instances()
+    reference = SeedReference(label="reference")
+    script = _base_script()
+    script["globals"] = {
+        "state": {"items": ["seed"], "flags": {"ready"}},
+        "reference": reference,
+    }
+    world = World.from_script_data(script_data=script)
+
+    first = world.create_story("first", init_mode=InitMode.EAGER).graph
+    second = world.create_story("second", init_mode=InitMode.EAGER).graph
+    first.locals["state"]["items"].append("first")
+    first.locals["state"]["flags"].add("changed")
+
+    assert second.locals["state"] == {"items": ["seed"], "flags": {"ready"}}
+    assert world.locals["state"] == {"items": ["seed"], "flags": {"ready"}}
+    assert first.locals["reference"] is reference
+    assert second.locals["reference"] is reference
+
+    restored = type(first).structure(first.unstructure())
+    assert restored.locals["state"] == {
+        "items": ["seed", "first"],
+        "flags": {"ready", "changed"},
+    }
+    SeedReference.clear_instances()
 
 
 def test_create_story_preserves_seed_entry_ids_when_explicit_entries_are_cleared() -> None:

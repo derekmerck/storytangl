@@ -28,6 +28,19 @@ def _copy_bundle_value(value: Any) -> Any:
     return value
 
 
+def _copy_story_locals(value: Any) -> Any:
+    """Copy native namespace containers while preserving reference-like values."""
+    if isinstance(value, dict):
+        return {key: _copy_story_locals(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_copy_story_locals(item) for item in value]
+    if isinstance(value, set):
+        return {_copy_story_locals(item) for item in value}
+    if isinstance(value, tuple):
+        return tuple(_copy_story_locals(item) for item in value)
+    return value
+
+
 def _template_depth(templ: Any) -> tuple[int, int, str]:
     depth = 0
     current = getattr(templ, "parent", None)
@@ -554,7 +567,7 @@ class World(TraversableGraphFactory):
         graph = StoryGraph(
             label=story_label,
             frozen_shape=(init_mode is InitMode.EAGER and freeze_shape),
-            locals=dict(self.locals),
+            locals=_copy_story_locals(self.locals),
             factory=self,
         )
         graph.story_id = graph.uid
