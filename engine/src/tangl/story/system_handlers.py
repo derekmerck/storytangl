@@ -18,7 +18,8 @@ from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector
 from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
-from tangl.prose import DialogHandler
+from tangl.ir.story_ir.text_template import TextTemplate
+from tangl.prose import DialogHandler, TextRenderSession
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
 from tangl.presentation.intent import Blocker
@@ -42,6 +43,7 @@ from tangl.journal.fragments import (
 
 from .dispatch import on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
+from .presentation import render_text_as
 
 logger = logging.getLogger(__name__)
 
@@ -195,13 +197,34 @@ def _render_block_content(block: Block, *, ctx) -> str:
 
 
 def _render_text(content: str, *, source: object, ctx) -> str:
-    """Best-effort templating for journal text against the gathered namespace."""
+    """Best-effort templating for journal text against the gathered namespace.
+
+    The template language is Story policy read from that namespace as
+    ``text_template``: a script declares it in its globals, and a scene or block
+    may override it in its locals. ``fstring``, the default, formats ``{name}``
+    placeholders with ``str.format_map``. ``jinja`` renders through
+    :class:`~tangl.prose.TextRenderSession`, which renders again any template
+    text a value produces -- ``{{ outfit.get_desc() }}`` returning more template
+    -- until it bottoms out, with cycles and depth bounded.
+
+    A declared language the enum does not know is an authoring error and is
+    raised. Text that fails to render in its language comes back as written;
+    a Jinja failure also logs, since an unknown name there is strict.
+    """
     if not content:
         return ""
     if ctx is None or not hasattr(ctx, "get_ns"):
         return content
+    ns = dict(ctx.get_ns(source))
+    language = TextTemplate(ns.get("text_template", TextTemplate.FSTRING))
+    if language is TextTemplate.JINJA:
+        try:
+            session = TextRenderSession(ctx=ctx, text_resolver=render_text_as)
+            return session.render(content, source=source)
+        except Exception:
+            logger.warning("could not render jinja text for %r", source, exc_info=True)
+            return content
     try:
-        ns = dict(ctx.get_ns(source))
         return content.format_map(_SafeFormatDict(ns))
     except Exception:
         return content
