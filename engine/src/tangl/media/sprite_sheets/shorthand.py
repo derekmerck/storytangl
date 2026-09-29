@@ -4,7 +4,7 @@ Two lighter ways to describe a sheet than an Aseprite export, and both expand
 into :class:`~tangl.presentation.sprite_sheet.SpriteSheetManifest`, so there is one
 validated shape and one reader:
 
-- a **filename** such as ``master_sprite-idle-4x1-1600ms`` (see :class:`SheetName`);
+- a **filename** such as ``master_sprite-idle-4x1-1600ms`` (see :class:`SheetDeclaration`);
 - a **compact form** (:class:`CompactSheet`) whose per-cell fields each take one
   value or one value per cell -- a single value repeats, like array broadcasting.
 
@@ -159,8 +159,8 @@ _SHEET_NAME = re.compile(
 )
 
 
-class SheetName(BaseModel):
-    """What a sheet's filename says about it.
+class SheetDeclaration(BaseModel):
+    """A sheet's target still and shorthand facts.
 
     ``<root>[-<clip>]-<columns>x<rows>[-<total>(ms|s)]``. Underscore binds the root
     and hyphen separates segments, so ``master_sprite-idle-4x1-1600ms`` is a
@@ -180,7 +180,7 @@ class SheetName(BaseModel):
     total_ms: int | None = None
 
     @classmethod
-    def parse(cls, stem: str) -> "SheetName | None":
+    def parse(cls, stem: str) -> "SheetDeclaration | None":
         match = _SHEET_NAME.match(stem)
         if match is None:
             return None
@@ -195,7 +195,7 @@ class SheetName(BaseModel):
         return CompactSheet(sheet=f"{self.cols}x{self.rows}", role=self.clip, total=self.total_ms)
 
     def disagreements(self, manifest: SpriteSheetManifest) -> list[str]:
-        """Everything this name states that ``manifest`` contradicts.
+        """Everything this declaration states that ``manifest`` contradicts.
 
         When a sidecar and a filename both describe a sheet the sidecar is
         authoritative, but the two must still agree, or one fact is declared twice
@@ -205,7 +205,10 @@ class SheetName(BaseModel):
         problems: list[str] = []
         size = (manifest.size.w, manifest.size.h)
         if len(manifest.frames) != self.cols * self.rows:
-            problems.append(f"it declares {len(manifest.frames)} frames but its name says {self.cols}x{self.rows}")
+                problems.append(
+                    f"it declares {len(manifest.frames)} frames but the declaration says "
+                    f"{self.cols}x{self.rows}",
+                )
         else:
             try:
                 cells = grid_rects(self.cols, self.rows, size)
@@ -220,16 +223,19 @@ class SheetName(BaseModel):
                     if r.x < cell.x or r.y < cell.y or r.x + r.w > cell.x + cell.w or r.y + r.h > cell.y + cell.h:
                         problems.append(
                             f"frame {index} sits at {r.model_dump()}, not in the {self.cols}x{self.rows} "
-                            f"cell its name says {cell.model_dump()}"
+                            f"cell the declaration says {cell.model_dump()}"
                         )
                         break
         if self.clip is not None and self.clip not in manifest.clip_names():
-            problems.append(f"the filename names clip {self.clip!r}, which the export does not tag")
+            problems.append(f"the declaration names clip {self.clip!r}, which the export does not tag")
         if self.total_ms is not None:
             actual = sum(frame.duration_ms for frame in manifest.frames)
             if actual != self.total_ms:
-                problems.append(f"the filename says {self.total_ms} ms, the export's frames last {actual} ms")
+                problems.append(
+                    f"the declaration says {self.total_ms} ms, the export's frames last "
+                    f"{actual} ms",
+                )
         return problems
 
 
-__all__ = ["DEFAULT_FRAME_MS", "CompactSheet", "SheetName", "grid_rects"]
+__all__ = ["DEFAULT_FRAME_MS", "CompactSheet", "SheetDeclaration", "grid_rects"]

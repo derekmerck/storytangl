@@ -13,7 +13,7 @@ import itertools
 import pytest
 
 from tangl.media.sprite_sheets.aseprite import read_aseprite_export
-from tangl.media.sprite_sheets.shorthand import DEFAULT_FRAME_MS, CompactSheet, SheetName, _distribute
+from tangl.media.sprite_sheets.shorthand import DEFAULT_FRAME_MS, CompactSheet, SheetDeclaration, _distribute
 
 
 # ── filenames ────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ from tangl.media.sprite_sheets.shorthand import DEFAULT_FRAME_MS, CompactSheet, 
     ],
 )
 def test_a_sheet_name_states_root_clip_grid_and_total(stem: str, expected: tuple) -> None:
-    name = SheetName.parse(stem)
+    name = SheetDeclaration.parse(stem)
 
     assert (name.root, name.clip, name.cols, name.rows, name.total_ms) == expected
 
@@ -46,7 +46,7 @@ def test_a_sheet_name_states_root_clip_grid_and_total(stem: str, expected: tuple
     ],
 )
 def test_names_that_are_not_sheets_are_not_read_as_sheets(stem: str) -> None:
-    assert SheetName.parse(stem) is None
+    assert SheetDeclaration.parse(stem) is None
 
 
 # ── the compact form ─────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ def _export(image: str, cells: int, durations: list[int], tags: list[dict]) -> d
 
 
 def test_a_filename_is_shorthand_for_exactly_the_manifest_an_export_would_give() -> None:
-    from_name = SheetName.parse("hero-walk-3x1-600ms").compact().to_manifest("hero-walk-3x1-600ms.png", (30, 12))
+    from_name = SheetDeclaration.parse("hero-walk-3x1-600ms").compact().to_manifest("hero-walk-3x1-600ms.png", (30, 12))
     exported = read_aseprite_export(
         _export("hero-walk-3x1-600ms.png", 3, [200, 200, 200], [{"name": "walk", "from": 0, "to": 2}])
     )
@@ -135,7 +135,7 @@ def test_a_filename_is_shorthand_for_exactly_the_manifest_an_export_would_give()
 def test_a_name_and_an_export_that_agree_have_nothing_to_report() -> None:
     exported = read_aseprite_export(_export("hero-idle-4x1.png", 4, [100] * 4, [{"name": "idle", "from": 0, "to": 3}]))
 
-    assert SheetName.parse("hero-idle-4x1-400ms").disagreements(exported) == []
+    assert SheetDeclaration.parse("hero-idle-4x1-400ms").disagreements(exported) == []
 
 
 def test_a_name_catches_an_export_laid_out_on_another_grid() -> None:
@@ -143,6 +143,6 @@ def test_a_name_catches_an_export_laid_out_on_another_grid() -> None:
 
     four_across = CompactSheet(sheet="4x1").to_manifest("hero-4x1.png", (40, 12))
 
-    assert SheetName.parse("hero-4x1").disagreements(four_across) == []
-    [problem] = SheetName.parse("hero-2x2").disagreements(four_across)
-    assert "not in the 2x2 cell its name says" in problem
+    assert SheetDeclaration.parse("hero-4x1").disagreements(four_across) == []
+    [problem] = SheetDeclaration.parse("hero-2x2").disagreements(four_across)
+    assert "not in the 2x2 cell the declaration says" in problem

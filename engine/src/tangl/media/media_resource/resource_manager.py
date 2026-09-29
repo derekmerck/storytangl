@@ -9,7 +9,7 @@ import logging
 from tangl.core import Behavior, Selector
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
-from tangl.media.sprite_sheets.index import index_default_sheet_names, link_sprite_sheets
+from tangl.media.sprite_sheets.index import index_default_sheet_declarations, link_sprite_sheets
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -88,7 +88,7 @@ class ResourceManager:
         # Across files, not per file: a sheet sorts before its still ("-" < "."),
         # so no single-file handler could ever see both.
         indexed = self.registry.values()
-        index_default_sheet_names(indexed)
+        index_default_sheet_declarations(indexed)
         link_sprite_sheets(indexed)
         return records
 
@@ -109,7 +109,7 @@ class ResourceManager:
             record.label = resolved_path.name
         record.tags = set(record.tags or set()) | self.default_tags | set(tags)
         indexed = self.registry.values()
-        index_default_sheet_names(indexed)
+        index_default_sheet_declarations(indexed)
         link_sprite_sheets(indexed)
         return record
 

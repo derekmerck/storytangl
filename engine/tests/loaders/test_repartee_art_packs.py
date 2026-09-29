@@ -90,9 +90,9 @@ def test_manifest_hash_and_size_match_the_shipped_file(
 
 
 def _is_sheet(stem: str) -> bool:
-    from tangl.media.sprite_sheets import SheetName
+    from tangl.media.sprite_sheets import SheetDeclaration
 
-    return SheetName.parse(stem) is not None
+    return SheetDeclaration.parse(stem) is not None
 
 
 @pytest.mark.parametrize("pack", PACKS, ids=lambda p: p.name)
@@ -132,7 +132,7 @@ def test_the_spaceport_pack_ships_a_sheet_for_every_sprite() -> None:
 def test_a_shipped_sheet_belongs_to_a_shipped_still_and_says_so_consistently(pack, name, entry) -> None:
     """The manifest, the filename and the sidecar each state the sheet's still and clips."""
 
-    from tangl.media.sprite_sheets import SheetName, read_aseprite_export
+    from tangl.media.sprite_sheets import SheetDeclaration, read_aseprite_export
 
     sheet = entry["sprite_sheet"]
     sidecar = pack / "images" / sheet["sidecar"]["file"]
@@ -140,7 +140,7 @@ def test_a_shipped_sheet_belongs_to_a_shipped_still_and_says_so_consistently(pac
     parsed = read_aseprite_export(sidecar.read_text())
 
     assert sheet["of"] in ASSET_NAMES
-    assert SheetName.parse(Path(entry["file"]).stem).root == sheet["of"]
+    assert SheetDeclaration.parse(Path(entry["file"]).stem).root == sheet["of"]
     assert sheet["clips"] == parsed.clip_names()
     assert [frame.pivot.model_dump() for frame in parsed.frames] == [sheet["pivot"]] * len(parsed.frames)
 
