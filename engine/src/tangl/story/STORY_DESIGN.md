@@ -127,10 +127,11 @@ side effect of ordinary concept mutation.
 
 ### World Global Seeds
 
-Each call to `World.create_story()` copies native mutable containers from the
-world's global namespace into the new graph. Nested dictionaries, lists, and
-sets belong to that graph; reference-like values remain references rather than
-becoming a second persistence or ownership mechanism.
+Each call to `World.create_story()` copies a finite graph of native mutable
+containers from the world's global namespace into the new graph. Nested
+dictionaries, lists, and sets belong to that graph, and repeated references in
+the source remain repeated references in its copy; reference-like values remain
+references rather than becoming a second persistence or ownership mechanism.
 
 ### Authored Node Effect Timing
 

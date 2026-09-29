@@ -131,9 +131,12 @@ class SeedReference(Singleton):
 def test_story_globals_are_independent_mutable_seeds() -> None:
     SeedReference.clear_instances()
     reference = SeedReference(label="reference")
+    shared = ["seed"]
     script = _base_script()
     script["globals"] = {
         "state": {"items": ["seed"], "flags": {"ready"}},
+        "aliases": shared,
+        "aliases_again": shared,
         "reference": reference,
     }
     world = World.from_script_data(script_data=script)
@@ -145,6 +148,9 @@ def test_story_globals_are_independent_mutable_seeds() -> None:
 
     assert second.locals["state"] == {"items": ["seed"], "flags": {"ready"}}
     assert world.locals["state"] == {"items": ["seed"], "flags": {"ready"}}
+    assert first.locals["aliases"] is first.locals["aliases_again"]
+    assert first.locals["aliases"] is not world.locals["aliases"]
+    assert second.locals["aliases"] is not first.locals["aliases"]
     assert first.locals["reference"] is reference
     assert second.locals["reference"] is reference
 

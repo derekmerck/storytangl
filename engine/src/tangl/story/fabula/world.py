@@ -28,16 +28,32 @@ def _copy_bundle_value(value: Any) -> Any:
     return value
 
 
-def _copy_story_locals(value: Any) -> Any:
-    """Copy native namespace containers while preserving reference-like values."""
+def _copy_story_locals(value: Any, memo: dict[int, Any] | None = None) -> Any:
+    """Copy a finite native namespace graph while preserving reference-like values."""
+
+    memo = {} if memo is None else memo
+    value_id = id(value)
+    if value_id in memo:
+        return memo[value_id]
     if isinstance(value, dict):
-        return {key: _copy_story_locals(item) for key, item in value.items()}
+        copied: dict[Any, Any] = {}
+        memo[value_id] = copied
+        copied.update({key: _copy_story_locals(item, memo) for key, item in value.items()})
+        return copied
     if isinstance(value, list):
-        return [_copy_story_locals(item) for item in value]
+        copied = []
+        memo[value_id] = copied
+        copied.extend(_copy_story_locals(item, memo) for item in value)
+        return copied
     if isinstance(value, set):
-        return {_copy_story_locals(item) for item in value}
+        copied = set()
+        memo[value_id] = copied
+        copied.update(_copy_story_locals(item, memo) for item in value)
+        return copied
     if isinstance(value, tuple):
-        return tuple(_copy_story_locals(item) for item in value)
+        copied = tuple(_copy_story_locals(item, memo) for item in value)
+        memo[value_id] = copied
+        return copied
     return value
 
 
