@@ -18,6 +18,7 @@ from tangl.core import Graph
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.media.sprite_sheets.index import SpriteSheetError
+from tangl.media.sprite_sheets.shorthand import SheetDeclaration
 
 
 def _png(path: Path, size: tuple[int, int], shade: int) -> Path:
@@ -84,6 +85,31 @@ def test_linking_does_not_depend_on_which_file_is_indexed_first(pack: Path) -> N
     assert [r.path.name for r in _still(manager).sprite_sheets] == ["hero-idle-2x1.png"]
 
 
+@pytest.mark.parametrize("register_sheet_first", [True, False])
+def test_relative_manager_pairs_mixed_registration_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    register_sheet_first: bool,
+) -> None:
+    pack = tmp_path / "pack"
+    monkeypatch.chdir(tmp_path)
+    manager = ResourceManager(Path("pack"))
+
+    if register_sheet_first:
+        _png(pack / "images" / "hero-idle-2x1.png", (20, 12), 20)
+        manager.register_file(Path("images/hero-idle-2x1.png"))
+        _png(pack / "images" / "hero.png", (10, 12), 10)
+        manager.index_directory("images")
+    else:
+        _png(pack / "images" / "hero.png", (10, 12), 10)
+        manager.index_directory("images")
+        _png(pack / "images" / "hero-idle-2x1.png", (20, 12), 20)
+        manager.register_file(Path("images/hero-idle-2x1.png"))
+
+    [ref] = manager.get_rit("hero.png").sprite_sheets
+    assert ref.path.name == "hero-idle-2x1.png"
+
+
 def test_reindexing_does_not_attach_a_sheet_twice(pack: Path) -> None:
     _png(pack / "images" / "hero-idle-2x1.png", (20, 12), 20)
     manager = ResourceManager(pack)
@@ -110,9 +136,9 @@ def test_a_sidecar_export_is_authoritative(pack: Path) -> None:
     [
         ("hero-2x1.png", (20, 12), _export("hero-2x1.png", (30, 12), 2, [], [100, 100]), "image is 20x12"),
         ("hero-2x1.png", (20, 12), _export("other.png", (20, 12), 2, [], [100, 100]), "names image 'other.png'"),
-        ("hero-4x1.png", (40, 12), _export("hero-4x1.png", (40, 12), 2, [], [100, 100]), "its name says 4x1"),
+        ("hero-4x1.png", (40, 12), _export("hero-4x1.png", (40, 12), 2, [], [100, 100]), "declaration says 4x1"),
         ("hero-call-2x1.png", (20, 12), _export("hero-call-2x1.png", (20, 12), 2, [{"name": "idle", "from": 0, "to": 1}], [100, 100]), "names clip 'call'"),
-        ("hero-idle-2x1-500ms.png", (20, 12), _export("hero-idle-2x1-500ms.png", (20, 12), 2, [{"name": "idle", "from": 0, "to": 1}], [100, 100]), "says 500 ms"),
+        ("hero-idle-2x1-500ms.png", (20, 12), _export("hero-idle-2x1-500ms.png", (20, 12), 2, [{"name": "idle", "from": 0, "to": 1}], [100, 100]), "declaration says 500 ms"),
     ],
 )
 def test_a_sidecar_that_contradicts_its_filename_fails_at_load(pack, image_name, size, export, message) -> None:
@@ -172,6 +198,45 @@ def test_a_sheet_with_no_still_is_inert_rather_than_an_error(tmp_path: Path) -> 
     assert manager.get_rit("ghost-idle-2x1.png").sprite_sheet.clip_names() == ["idle"]
 
 
+def test_world_handler_can_declare_a_sheet_target_outside_the_default_grammar(tmp_path: Path) -> None:
+    _png(tmp_path / "images" / "subject@place.png", (10, 12), 10)
+    _png(tmp_path / "images" / "subject@place-alt-1x1.png", (10, 12), 20)
+
+    def _index_sheet(record: MediaRIT, *, ctx: object) -> MediaRIT:
+        _ = ctx
+        if record.path and record.path.name == "subject@place-alt-1x1.png":
+            record.sheet_declaration = SheetDeclaration(
+                root="subject@place", clip="alt", cols=1, rows=1,
+            )
+        return record
+
+    manager = ResourceManager(tmp_path, index_handlers=[_index_sheet])
+    manager.index_directory("images")
+
+    [ref] = manager.get_rit("subject@place.png").sprite_sheets
+    assert ref.path.name == "subject@place-alt-1x1.png"
+    assert ref.manifest.clip_names() == ["alt"]
+
+
+def test_sheet_target_does_not_cross_directories(tmp_path: Path) -> None:
+    _png(tmp_path / "images" / "stills" / "subject@place.png", (10, 12), 10)
+    _png(tmp_path / "images" / "sheets" / "subject@place-alt-1x1.png", (10, 12), 20)
+
+    def _index_sheet(record: MediaRIT, *, ctx: object) -> MediaRIT:
+        _ = ctx
+        if record.path and record.path.name == "subject@place-alt-1x1.png":
+            record.sheet_declaration = SheetDeclaration(
+                root="subject@place", clip="alt", cols=1, rows=1,
+            )
+        return record
+
+    manager = ResourceManager(tmp_path, index_handlers=[_index_sheet])
+    manager.index_directory("images")
+
+    assert manager.get_rit("images/stills/subject@place.png").sprite_sheets == []
+    assert manager.get_rit("images/sheets/subject@place-alt-1x1.png").sprite_sheet is not None
+
+
 def test_loose_frame_names_are_stills_not_sheets(pack: Path) -> None:
     """#418's ``-01`` suffix stays a separate convention."""
 
@@ -181,6 +246,23 @@ def test_loose_frame_names_are_stills_not_sheets(pack: Path) -> None:
 
     assert manager.get_rit("hero-idle-01.png").sprite_sheet is None
     assert _still(manager).sprite_sheets == []
+
+
+def test_world_handler_can_reject_legacy_sheet_classification(tmp_path: Path) -> None:
+    _png(tmp_path / "images" / "foo-2x1.png", (20, 12), 20)
+
+    def _reject_sheet(record: MediaRIT, *, ctx: object) -> MediaRIT:
+        _ = ctx
+        if record.path and record.path.name == "foo-2x1.png":
+            record.sheet_declaration = False
+        return record
+
+    manager = ResourceManager(tmp_path, index_handlers=[_reject_sheet])
+    manager.index_directory("images")
+
+    record = manager.get_rit("foo-2x1.png")
+    assert record.sheet_declaration is False
+    assert record.sprite_sheet is None
 
 
 def test_sheets_survive_a_story_copying_the_still_into_its_graph(pack: Path) -> None:
@@ -198,7 +280,12 @@ def test_sheets_survive_a_story_copying_the_still_into_its_graph(pack: Path) -> 
 
     graph = Graph()
     graph.add(MediaRIT.structure(_still(manager).unstructure()))
-    restored = next(e for e in Graph.structure(graph.unstructure()).values() if isinstance(e, MediaRIT))
+    graph.add(MediaRIT.structure(manager.get_rit("hero-idle-2x1.png").unstructure()))
+    restored = [e for e in Graph.structure(graph.unstructure()).values() if isinstance(e, MediaRIT)]
+    still = next(record for record in restored if record.path.name == "hero.png")
+    sheet = next(record for record in restored if record.path.name == "hero-idle-2x1.png")
 
-    assert [r.path.name for r in restored.sprite_sheets] == ["hero-idle-2x1.png"]
-    assert restored.sprite_sheets[0].manifest.clip_names() == ["idle"]
+    assert [r.path.name for r in still.sprite_sheets] == ["hero-idle-2x1.png"]
+    assert still.sprite_sheets[0].manifest.clip_names() == ["idle"]
+    assert still.sprite_sheets[0].manifest.image == "hero-idle-2x1.png"
+    assert sheet.sheet_declaration == SheetDeclaration(root="hero", clip="idle", cols=2, rows=1)

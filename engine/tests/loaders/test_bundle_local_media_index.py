@@ -11,7 +11,10 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
+from PIL import Image
+
 from tangl.loaders.compiler import WorldCompiler
+from tangl.media.sprite_sheets import SheetDeclaration
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import World
 
@@ -44,6 +47,29 @@ def get_media_index_handlers() -> list[object]:
 # does not depend on the hook being present.
 BARE_DOMAIN_SOURCE = '''\
 from __future__ import annotations
+'''
+
+SHEET_DOMAIN_SOURCE = '''\
+from __future__ import annotations
+
+from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.media.sprite_sheets import SheetDeclaration
+
+
+def declare_sheet(caller: MediaRIT, *, ctx: object) -> MediaRIT:
+    _ = ctx
+    if caller.path is not None and caller.path.name == "subject@place-alt-1x1.png":
+        caller.sheet_declaration = SheetDeclaration(
+            root="subject@place",
+            clip="alt",
+            cols=1,
+            rows=1,
+        )
+    return caller
+
+
+def get_media_index_handlers() -> list[object]:
+    return [declare_sheet]
 '''
 
 
@@ -133,6 +159,33 @@ def test_media_indexing_works_without_the_hook(tmp_path: Path) -> None:
         "sign-north.svg"
     ]
     assert not {tag for tag in _tags(world) if tag.startswith("local:")}
+
+
+def test_world_index_handler_declares_sprite_sheet_before_default_fill(
+    tmp_path: Path,
+) -> None:
+    _write_media_bundle(
+        tmp_path,
+        label="media_sheet_local",
+        domain_source=SHEET_DOMAIN_SOURCE,
+    )
+    media_dir = tmp_path / "media_sheet_local" / "media"
+    Image.new("RGBA", (10, 12), (10, 10, 10, 255)).save(media_dir / "subject@place.png")
+    Image.new("RGBA", (10, 12), (20, 20, 20, 255)).save(
+        media_dir / "subject@place-alt-1x1.png",
+    )
+
+    world = _compile(tmp_path, "media_sheet_local")
+    indexed = {record.path.name: record for record in world.resources.registry.values()}
+
+    assert indexed["subject@place-alt-1x1.png"].sheet_declaration == SheetDeclaration(
+        root="subject@place",
+        clip="alt",
+        cols=1,
+        rows=1,
+    )
+    [ref] = indexed["subject@place.png"].sprite_sheets
+    assert ref.path.name == "subject@place-alt-1x1.png"
 
 
 def test_hooks_are_invoked_per_domain_adjunct_load_not_once_per_import(

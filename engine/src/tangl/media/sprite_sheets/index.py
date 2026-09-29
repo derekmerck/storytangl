@@ -23,7 +23,7 @@ from tangl.presentation.sprite_sheet import SpriteSheetManifest
 
 from .aseprite import read_aseprite_export
 from .ref import SpriteSheetRef
-from .shorthand import SheetName
+from .shorthand import SheetDeclaration
 
 if TYPE_CHECKING:
     from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
@@ -33,11 +33,11 @@ class SpriteSheetError(ValueError):
     """A sheet whose manifest, name and image cannot all be true at once."""
 
 
-def load_sheet_manifest(path: Path, name: SheetName) -> SpriteSheetManifest:
+def load_sheet_manifest(path: Path, declaration: SheetDeclaration) -> SpriteSheetManifest:
     """The manifest for one sheet image: its Aseprite sidecar, or its name expanded.
 
     A sidecar is authoritative, but it cannot contradict the image or what the
-    filename states, because two declarations of one fact that disagree would
+    declaration states, because two declarations of one fact that disagree would
     otherwise be settled by whichever a client happened to read.
     """
 
@@ -49,7 +49,7 @@ def load_sheet_manifest(path: Path, name: SheetName) -> SpriteSheetManifest:
     sidecar = path.with_suffix(".json")
     if not sidecar.is_file():
         try:
-            return name.compact().to_manifest(path.name, size)
+            return declaration.compact().to_manifest(path.name, size)
         except ValueError as exc:
             raise SpriteSheetError(f"{path.name}: {exc}") from exc
 
@@ -63,10 +63,22 @@ def load_sheet_manifest(path: Path, name: SheetName) -> SpriteSheetManifest:
         problems.append(f"declares {manifest.size.w}x{manifest.size.h} but the image is {size[0]}x{size[1]}")
     if manifest.image != path.name:
         problems.append(f"names image {manifest.image!r}, not {path.name!r}")
-    problems += name.disagreements(manifest)
+    problems += declaration.disagreements(manifest)
     if problems:
         raise SpriteSheetError(f"{sidecar.name} disagrees with {path.name}: " + "; ".join(problems))
     return manifest
+
+
+def index_default_sheet_declarations(records: Iterable["MediaRIT"]) -> None:
+    """Fill the legacy filename declaration after world handlers have had their say."""
+    for record in records:
+        path = record.path
+        if (
+            record.sheet_declaration is None
+            and isinstance(path, Path)
+            and record.data_type is MediaDataType.IMAGE
+        ):
+            record.sheet_declaration = SheetDeclaration.parse(path.stem)
 
 
 def _hex(record: "MediaRIT") -> str:
@@ -102,32 +114,37 @@ def _refuse_ambiguity(still: str, refs: list[SpriteSheetRef]) -> None:
 def link_sprite_sheets(records: Iterable["MediaRIT"]) -> None:
     """Attach manifests to sheets and references to the stills they belong to."""
 
-    stills: dict[str, list["MediaRIT"]] = {}
-    sheets: list[tuple["MediaRIT", SheetName]] = []
+    stills: dict[tuple[Path, str], list["MediaRIT"]] = {}
+    sheets: list[tuple["MediaRIT", SheetDeclaration]] = []
     for record in records:
         path = getattr(record, "path", None)
         if not isinstance(path, Path) or record.data_type is not MediaDataType.IMAGE:
             continue
-        name = SheetName.parse(path.stem)
-        if name is None:
-            stills.setdefault(path.stem, []).append(record)
+        name = record.sheet_declaration
+        if name is None or name is False:
+            stills.setdefault((path.parent.resolve(), path.stem), []).append(record)
         else:
             sheets.append((record, name))
 
-    refs: dict[str, list[SpriteSheetRef]] = {}
-    for record, name in sorted(sheets, key=lambda pair: pair[0].path.name):
+    refs: dict[tuple[Path, str], list[SpriteSheetRef]] = {}
+    for record, name in sorted(sheets, key=lambda pair: str(pair[0].path)):
         manifest = load_sheet_manifest(record.path, name)
         record.sprite_sheet = manifest
-        refs.setdefault(name.root, []).append(
+        refs.setdefault((record.path.parent.resolve(), name.root), []).append(
             SpriteSheetRef(path=record.path, rit_id=record.uid, content_hash=_hex(record), manifest=manifest)
         )
 
-    for root, group in stills.items():
-        attached = refs.get(root, [])
+    for (_directory, root), group in stills.items():
+        attached = refs.get((_directory, root), [])
         if attached:
             _refuse_ambiguity(root, attached)
         for still in group:
             still.sprite_sheets = list(attached)
 
 
-__all__ = ["SpriteSheetError", "link_sprite_sheets", "load_sheet_manifest"]
+__all__ = [
+    "SpriteSheetError",
+    "index_default_sheet_declarations",
+    "link_sprite_sheets",
+    "load_sheet_manifest",
+]
