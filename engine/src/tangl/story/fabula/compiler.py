@@ -1100,7 +1100,6 @@ class StoryCompiler:
             child_data = self._decompile_template(child)
             child_key = _template_mapping_key(child, parent=scene)
             if isinstance(child.payload, Block):
-                self._decompile_block_effects(child_data)
                 _insert_decompiled_template(blocks, key=child_key, data=child_data)
             else:
                 _insert_decompiled_template(templates, key=child_key, data=child_data)
@@ -1141,6 +1140,8 @@ class StoryCompiler:
 
     def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
         data = _decompile_source_value(EntityTemplate.decompile(template))
+        if isinstance(template.payload, Block):
+            self._decompile_block_effects(data)
         if isinstance(template, TemplateGroup):
             children = list(template.members())
             if children:
