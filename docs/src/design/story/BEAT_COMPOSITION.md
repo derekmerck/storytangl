@@ -18,8 +18,11 @@ One step's journal output is assembled in three moves:
 **Gather.** `do_gather_ns` builds the scoped namespace: entity-local
 `get_ns()` layers from the cursor and its ancestors (closest scope first),
 then merged `gather_ns` dispatch contributions (later dispatch layers win).
-Block content is rendered against this namespace with `format_map`, so any
-named value — a *chunk* — is directly authorable as a `{placeholder}`.
+Block content is rendered against this namespace in the template language the
+namespace declares as `text_template`: `format_map` by default, so any named
+value — a *chunk* — is directly authorable as a `{placeholder}`, or recursive
+Jinja (`{{ placeholder }}`) where a script's globals, or a scene or block's
+locals, say `jinja`.
 
 **Enrich.** Extra fragments join the merged batch from two directions:
 `render_journal` handlers contribute conditionally at render time, and

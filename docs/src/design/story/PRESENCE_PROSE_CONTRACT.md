@@ -6,8 +6,10 @@ Presence/Prose Contract Spike
 > Current contract: see `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md` for the live journal-composition boundary and `engine/src/tangl/story/STORY_DESIGN.md` for current story runtime layering.
 
 **Scope:** partially landed prose and presence integration. Ordinary authored
-block content remains `format_map`-based; named recursive text presentation and
-opt-in JOURNAL dialog composition are active parallel seams.
+block content is `format_map`-based unless its namespace declares
+`text_template: jinja`, when it renders through the same recursive
+`TextRenderSession` as named text presentation; opt-in JOURNAL dialog
+composition is an active parallel seam.
 
 ## Why This Spike Exists
 
