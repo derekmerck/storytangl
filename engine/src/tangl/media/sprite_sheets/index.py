@@ -69,6 +69,18 @@ def load_sheet_manifest(path: Path, name: SheetName) -> SpriteSheetManifest:
     return manifest
 
 
+def index_default_sheet_names(records: Iterable["MediaRIT"]) -> None:
+    """Fill the legacy filename descriptor after world handlers have had their say."""
+    for record in records:
+        path = record.path
+        if (
+            record.sheet_index is None
+            and isinstance(path, Path)
+            and record.data_type is MediaDataType.IMAGE
+        ):
+            record.sheet_index = SheetName.parse(path.stem)
+
+
 def _hex(record: "MediaRIT") -> str:
     digest = record.content_hash()
     return digest.hex() if isinstance(digest, bytes) else str(digest)
@@ -102,32 +114,32 @@ def _refuse_ambiguity(still: str, refs: list[SpriteSheetRef]) -> None:
 def link_sprite_sheets(records: Iterable["MediaRIT"]) -> None:
     """Attach manifests to sheets and references to the stills they belong to."""
 
-    stills: dict[str, list["MediaRIT"]] = {}
+    stills: dict[tuple[Path, str], list["MediaRIT"]] = {}
     sheets: list[tuple["MediaRIT", SheetName]] = []
     for record in records:
         path = getattr(record, "path", None)
         if not isinstance(path, Path) or record.data_type is not MediaDataType.IMAGE:
             continue
-        name = SheetName.parse(path.stem)
+        name = record.sheet_index
         if name is None:
-            stills.setdefault(path.stem, []).append(record)
+            stills.setdefault((path.parent, path.stem), []).append(record)
         else:
             sheets.append((record, name))
 
-    refs: dict[str, list[SpriteSheetRef]] = {}
-    for record, name in sorted(sheets, key=lambda pair: pair[0].path.name):
+    refs: dict[tuple[Path, str], list[SpriteSheetRef]] = {}
+    for record, name in sorted(sheets, key=lambda pair: str(pair[0].path)):
         manifest = load_sheet_manifest(record.path, name)
         record.sprite_sheet = manifest
-        refs.setdefault(name.root, []).append(
+        refs.setdefault((record.path.parent, name.root), []).append(
             SpriteSheetRef(path=record.path, rit_id=record.uid, content_hash=_hex(record), manifest=manifest)
         )
 
-    for root, group in stills.items():
-        attached = refs.get(root, [])
+    for (_directory, root), group in stills.items():
+        attached = refs.get((_directory, root), [])
         if attached:
             _refuse_ambiguity(root, attached)
         for still in group:
             still.sprite_sheets = list(attached)
 
 
-__all__ = ["SpriteSheetError", "link_sprite_sheets", "load_sheet_manifest"]
+__all__ = ["SpriteSheetError", "index_default_sheet_names", "link_sprite_sheets", "load_sheet_manifest"]

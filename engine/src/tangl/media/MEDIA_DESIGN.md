@@ -296,10 +296,12 @@ everything that turns an authored sheet into the client-facing
 `tangl.presentation.sprite_sheet.SpriteSheetManifest`: the Aseprite export reader
 (trim offsets, per-frame pivots from slice keys, ping-pong repeat, and a refusal
 for anything it cannot honour), the filename and compact shorthands, and
-indexing. After every indexing pass, `link_sprite_sheets` finds images named as
-sheets (`master_sprite-4x1.png`), attaches each one's manifest -- read from its
-sidecar export or expanded from its name -- and adds a `SpriteSheetRef` to the
-still it names. Every clip name must lead to one sheet, so two sheets may not
+indexing. A world index handler may set a sheet's `MediaRIT.sheet_index` descriptor
+(target still, grid, clip, and timing); after handlers run, the legacy `SheetName`
+grammar fills only descriptors still absent. After every indexing pass,
+`link_sprite_sheets` consumes that descriptor, attaches each one's manifest -- read
+from its sidecar export or expanded from its descriptor -- and adds a
+`SpriteSheetRef` to the still it names in the same directory. Every clip name must lead to one sheet, so two sheets may not
 define one clip, and a sheet with no clips, which answers to any name, must be
 its still's only sheet. Two
 constraints fix that design. Linking must run across files, since a sheet always

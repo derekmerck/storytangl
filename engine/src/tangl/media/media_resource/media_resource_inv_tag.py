@@ -12,6 +12,7 @@ from tangl.core import HasContent, RegistryAware
 from tangl.core.bases import Hash, is_identifier
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.sprite_sheets.ref import SpriteSheetRef
+from tangl.media.sprite_sheets.shorthand import SheetName
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.utils.hashing import compute_data_hash
 from tangl.utils.shelved2 import clear_shelf, shelved
@@ -82,6 +83,9 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
 
     sprite_sheet: SpriteSheetManifest | None = None
     """Set on a sprite sheet: its frames, clips and timing."""
+
+    sheet_index: SheetName | None = None
+    """Indexed sheet target and shorthand facts, before cross-file linking."""
 
     sprite_sheets: list[SpriteSheetRef] = Field(default_factory=list)
     """Set on a still: the sheets indexed for it, in filename order.

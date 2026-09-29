@@ -18,6 +18,7 @@ from tangl.core import Graph
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.media.sprite_sheets.index import SpriteSheetError
+from tangl.media.sprite_sheets.shorthand import SheetName
 
 
 def _png(path: Path, size: tuple[int, int], shade: int) -> Path:
@@ -172,6 +173,41 @@ def test_a_sheet_with_no_still_is_inert_rather_than_an_error(tmp_path: Path) -> 
     assert manager.get_rit("ghost-idle-2x1.png").sprite_sheet.clip_names() == ["idle"]
 
 
+def test_world_handler_can_declare_a_sheet_target_outside_the_default_grammar(tmp_path: Path) -> None:
+    _png(tmp_path / "images" / "subject@place.png", (10, 12), 10)
+    _png(tmp_path / "images" / "subject@place-alt-1x1.png", (10, 12), 20)
+
+    def _index_sheet(record: MediaRIT, *, ctx: object) -> MediaRIT:
+        _ = ctx
+        if record.path and record.path.name == "subject@place-alt-1x1.png":
+            record.sheet_index = SheetName(root="subject@place", clip="alt", cols=1, rows=1)
+        return record
+
+    manager = ResourceManager(tmp_path, index_handlers=[_index_sheet])
+    manager.index_directory("images")
+
+    [ref] = manager.get_rit("subject@place.png").sprite_sheets
+    assert ref.path.name == "subject@place-alt-1x1.png"
+    assert ref.manifest.clip_names() == ["alt"]
+
+
+def test_sheet_target_does_not_cross_directories(tmp_path: Path) -> None:
+    _png(tmp_path / "images" / "stills" / "subject@place.png", (10, 12), 10)
+    _png(tmp_path / "images" / "sheets" / "subject@place-alt-1x1.png", (10, 12), 20)
+
+    def _index_sheet(record: MediaRIT, *, ctx: object) -> MediaRIT:
+        _ = ctx
+        if record.path and record.path.name == "subject@place-alt-1x1.png":
+            record.sheet_index = SheetName(root="subject@place", clip="alt", cols=1, rows=1)
+        return record
+
+    manager = ResourceManager(tmp_path, index_handlers=[_index_sheet])
+    manager.index_directory("images")
+
+    assert manager.get_rit("images/stills/subject@place.png").sprite_sheets == []
+    assert manager.get_rit("images/sheets/subject@place-alt-1x1.png").sprite_sheet is not None
+
+
 def test_loose_frame_names_are_stills_not_sheets(pack: Path) -> None:
     """#418's ``-01`` suffix stays a separate convention."""
 
@@ -198,7 +234,12 @@ def test_sheets_survive_a_story_copying_the_still_into_its_graph(pack: Path) -> 
 
     graph = Graph()
     graph.add(MediaRIT.structure(_still(manager).unstructure()))
-    restored = next(e for e in Graph.structure(graph.unstructure()).values() if isinstance(e, MediaRIT))
+    graph.add(MediaRIT.structure(manager.get_rit("hero-idle-2x1.png").unstructure()))
+    restored = [e for e in Graph.structure(graph.unstructure()).values() if isinstance(e, MediaRIT)]
+    still = next(record for record in restored if record.path.name == "hero.png")
+    sheet = next(record for record in restored if record.path.name == "hero-idle-2x1.png")
 
-    assert [r.path.name for r in restored.sprite_sheets] == ["hero-idle-2x1.png"]
-    assert restored.sprite_sheets[0].manifest.clip_names() == ["idle"]
+    assert [r.path.name for r in still.sprite_sheets] == ["hero-idle-2x1.png"]
+    assert still.sprite_sheets[0].manifest.clip_names() == ["idle"]
+    assert still.sprite_sheets[0].manifest.image == "hero-idle-2x1.png"
+    assert sheet.sheet_index == SheetName(root="hero", clip="idle", cols=2, rows=1)
