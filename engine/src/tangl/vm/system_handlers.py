@@ -533,7 +533,9 @@ def _target_viable(edge: TraversableEdge, ctx: VmPhaseCtx) -> bool:
     bound and still not viable -- materialized by another route, with hard
     dependencies nothing can provision -- and following it would enter a node
     that cannot run. Only a target with something unresolved, or a container
-    whose entry decides, needs the preview.
+    whose entry decides, needs the preview. It is previewed from the target's
+    own context, as PLANNING provisions it: provider and template scope follow
+    the cursor, so the source's context can answer differently across scopes.
     """
     from .provision import Dependency, Resolver
 
@@ -541,10 +543,11 @@ def _target_viable(edge: TraversableEdge, ctx: VmPhaseCtx) -> bool:
     unresolved = next(successor.edges_out(Selector(has_kind=Dependency, satisfied=False)), None)
     if unresolved is None and not successor.is_container:
         return True
-    return Resolver.from_ctx(ctx).preview_frontier_node(
+    target_ctx = ctx.derive(cursor_id=successor.uid)
+    return Resolver.from_ctx(target_ctx).preview_frontier_node(
         successor,
-        allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
-        _ctx=ctx,
+        allow_stubs=target_ctx.causality_mode == CausalityMode.HARD_DIRTY,
+        _ctx=target_ctx,
     ).viable
 
 

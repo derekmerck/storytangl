@@ -18,7 +18,7 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core import Graph, Selector
+from tangl.core import EntityTemplate, Graph, GraphFactory, Selector, TemplateRegistry
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
@@ -640,3 +640,42 @@ class TestFollowTriggeredPostreqs:
         result = sh.follow_triggered_postreqs(caller=a, ctx=PhaseCtx(graph=g, cursor_id=a.uid))
         assert result is not None
         assert result.successor is c
+
+    def test_postreq_target_is_judged_from_its_own_scope(self) -> None:
+        # The gate's companion comes from a template admitted only inside
+        # `castle`. Judged from the source cursor in `village`, the gate would
+        # look unviable; PLANNING provisions it from the gate's own context,
+        # where it is viable, and the guard must agree.
+        class ScopedFactory(GraphFactory):
+            pass
+
+        ScopedFactory.clear_instances()
+        try:
+            templates = TemplateRegistry(label="castle_templates")
+            templates.add(EntityTemplate(
+                label="castle.gatehouse",
+                payload=TraversableNode(label="gatehouse"),
+                admission_scope="castle.*",
+            ))
+            g = Graph()
+            g.bind_factory(ScopedFactory(label="scoped_factory", templates=templates))
+            village = _node(g, label="village")
+            castle = _node(g, label="castle")
+            gate = _node(g, label="gate")
+            fallback = _node(g, label="fallback")
+            castle.add_child(gate)
+            g.add(Dependency(predecessor_id=gate.uid, label="companion", requirement=Requirement(
+                has_kind=TraversableNode, has_identifier="gatehouse",
+                authored_path="gatehouse", is_qualified=False,
+            )))
+            for target in (gate, fallback):
+                _edge(g, predecessor_id=village.uid, successor_id=target.uid,
+                      trigger_phase=ResolutionPhase.POSTREQS)
+
+            result = sh.follow_triggered_postreqs(
+                caller=village, ctx=PhaseCtx(graph=g, cursor_id=village.uid))
+            assert result is not None
+            assert result.successor is gate
+        finally:
+            ScopedFactory.clear_instances()
+
