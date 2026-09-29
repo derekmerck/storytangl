@@ -95,7 +95,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from copy import deepcopy
-from functools import total_ordering
+from functools import lru_cache, total_ordering
 from inspect import isclass, signature
 import logging
 import time
@@ -122,6 +122,27 @@ from shortuuid import ShortUUID
 from tangl.type_hints import Identifier, Label, StringMap, Tag, UnstructuredData, Hash
 from tangl.utils.hashing import hashing_func
 from ._pydantic import BaseModelPlus
+
+
+# A uid never changes, so what is derived from it alone is computed once. These
+# are asked for on every identifier comparison, and a lookup compares against
+# every candidate: recomputing them dominated materializing a large story.
+#
+# Bounded, so a long-lived process does not keep the identifiers of every story
+# it ever loaded. The bound has to exceed a live graph: a lookup scans every
+# entity in turn, and an LRU smaller than the scan evicts each entry just before
+# it is asked for again.
+_UID_CACHE_SIZE = 65_536
+
+
+@lru_cache(maxsize=_UID_CACHE_SIZE)
+def _shortcode(uid: UUID) -> str:
+    return ShortUUID().encode(uid)
+
+
+@lru_cache(maxsize=_UID_CACHE_SIZE)
+def _id_hash(cls: type, uid: UUID) -> Hash:
+    return hashing_func(cls, uid)
 
 logger = logging.getLogger(__name__)
 
@@ -203,8 +224,7 @@ class HasIdentity(BaseModelPlus):
     @is_identifier
     def id_hash(self) -> Hash:
         # distinct from value_hash, content_hash
-        # this _is_ frozen, so we could make this a cached- or shelved-property
-        return hashing_func(self.__class__, self.uid)
+        return _id_hash(self.__class__, self.uid)
 
     def eq_by_id(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:
@@ -216,7 +236,7 @@ class HasIdentity(BaseModelPlus):
 
     @is_identifier
     def shortcode(self) -> str:
-        return ShortUUID().encode(self.uid)
+        return _shortcode(self.uid)
 
     def get_identifiers(self) -> set[Identifier]:
         return set(self._schema_matches(is_identifier=True).values())

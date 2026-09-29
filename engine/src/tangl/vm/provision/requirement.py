@@ -97,9 +97,9 @@ class Requirement(Selector, Generic[PT]):
         return False
 
     def satisfied_by(self, entity: PT) -> bool:
-        if not self._matches_identifier(entity):
-            return False
-
+        # Kind, then identifier, then the rest. Kind rules out most candidates
+        # cheaply; the identifier match builds the candidate's whole identifier
+        # set; and a predicate written for one kind must not run on another.
         criteria = dict(self.__pydantic_extra__ or {})
         for key in (
             "has_identifier",
@@ -109,6 +109,11 @@ class Requirement(Selector, Generic[PT]):
             "adapted_spec",
         ):
             criteria.pop(key, None)
+        kind = criteria.get("has_kind")
+        if kind is not None and not Selector(has_kind=kind).matches(entity):
+            return False
+        if not self._matches_identifier(entity):
+            return False
         return Selector(predicate=self.predicate, **criteria).matches(entity)
 
     def _validate_satisfied_by(self, entity: PT) -> bool:
