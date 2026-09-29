@@ -5,9 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from tangl.core import Selector
 from tangl.ir.story_ir import StoryScript
-from tangl.story import InitMode, Scene
+from tangl.story import InitMode
 from tangl.story.fabula.compiler import StoryCompiler
 from tangl.story.fabula.world import World
 from tangl.vm import Ledger, ResolutionPhase
@@ -52,15 +51,8 @@ def test_authored_node_effects_lower_to_explicit_runtime_phases() -> None:
         pre_effects=["graph.locals['sword'] = 'drawn'"],
         post_effects=["graph.locals['sword'] = 'discarded'"],
     )
-    scene = script["scenes"]["s"]
-    scene["pre_effects"] = ["graph.locals['scene_entered'] = True"]
-    scene["post_effects"] = ["graph.locals['scene_finished'] = True"]
-
     validated = StoryCompiler.validate_ir(script)
-    scene_ir = validated.scenes["s"]
     start_ir = validated.scenes["s"].blocks["start"]
-    assert scene_ir.pre_effects == ["graph.locals['scene_entered'] = True"]
-    assert scene_ir.post_effects == ["graph.locals['scene_finished'] = True"]
     assert start_ir.pre_effects == ["graph.locals['sword'] = 'drawn'"]
     assert start_ir.post_effects == ["graph.locals['sword'] = 'discarded'"]
 
@@ -68,19 +60,8 @@ def test_authored_node_effects_lower_to_explicit_runtime_phases() -> None:
         script_data=validated.model_dump(by_alias=True, exclude_none=True),
     )
     graph = world.create_story("node_effect_timing", init_mode=InitMode.EAGER).graph
-    scene = next(Selector(has_kind=Scene, label="s").filter(graph.values()))
     start = graph.get(graph.initial_cursor_id)
 
-    assert scene.effects == [
-        TraversableEffect(
-            expr="graph.locals['scene_entered'] = True",
-            trigger_phase=ResolutionPhase.UPDATE,
-        ),
-        TraversableEffect(
-            expr="graph.locals['scene_finished'] = True",
-            trigger_phase=ResolutionPhase.FINALIZE,
-        ),
-    ]
     assert start.effects == [
         TraversableEffect(
             expr="graph.locals['sword'] = 'drawn'",
@@ -104,6 +85,38 @@ def test_authored_pre_and_post_effects_bracket_journal() -> None:
     text = [getattr(record, "content", "") for record in ledger.output_stream]
     assert "The sword is drawn." in text
     assert ledger.graph.locals["sword"] == "discarded"
+
+
+def test_block_effect_timing_round_trips_through_decompile() -> None:
+    source = _script(
+        pre_effects=[
+            "graph.locals['sword'] = 'drawn'",
+            "graph.locals['sword'] = 'ready'",
+        ],
+        post_effects=[
+            "graph.locals['sword'] = 'discarded'",
+            "graph.locals['sword'] = 'stored'",
+        ],
+    )
+    compiler = StoryCompiler()
+    canonical = compiler.decompile(compiler.compile(source))
+    restored = compiler.compile(canonical)
+
+    block = canonical["scenes"]["s"]["blocks"]["start"]
+    assert block["effects"] == [
+        {"expr": "graph.locals['sword'] = 'drawn'"},
+        {"expr": "graph.locals['sword'] = 'ready'"},
+    ]
+    assert block["post_effects"] == [
+        {"expr": "graph.locals['sword'] = 'discarded'"},
+        {"expr": "graph.locals['sword'] = 'stored'"},
+    ]
+    assert restored.issues == []
+
+    ledger = _enter(canonical)
+    text = [getattr(record, "content", "") for record in ledger.output_stream]
+    assert "The sword is ready." in text
+    assert ledger.graph.locals["sword"] == "stored"
 
 
 def test_effects_remains_the_pre_effects_alias() -> None:

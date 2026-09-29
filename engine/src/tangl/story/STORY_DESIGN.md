@@ -127,12 +127,12 @@ side effect of ordinary concept mutation.
 
 ### Authored Node Effect Timing
 
-Scenes and blocks may name `pre_effects` for UPDATE and `post_effects` for
-FINALIZE. The older node `effects` spelling is an UPDATE alias for
-`pre_effects`; an author may not provide both spellings on the same node.
-Compilation lowers both names into the VM's one `effects` list as
-`TraversableEffect` values with explicit trigger phases. This is node vocabulary:
-actions remain edges and retain their ordinary UPDATE `effects` behavior.
+Blocks may name `pre_effects` for UPDATE and `post_effects` for FINALIZE. The
+older Block `effects` spelling is an UPDATE alias for `pre_effects`; an author
+may not provide both spellings on the same block. Compilation lowers both names
+into the VM's one `effects` list as `TraversableEffect` values with explicit
+trigger phases, and decompilation restores the author-facing pair. Actions
+remain edges and retain their ordinary UPDATE `effects` behavior.
 
 `StoryCompiler` validates authored script data and produces:
 

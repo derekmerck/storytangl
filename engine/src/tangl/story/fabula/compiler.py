@@ -1100,6 +1100,7 @@ class StoryCompiler:
             child_data = self._decompile_template(child)
             child_key = _template_mapping_key(child, parent=scene)
             if isinstance(child.payload, Block):
+                self._decompile_block_effects(child_data)
                 _insert_decompiled_template(blocks, key=child_key, data=child_data)
             else:
                 _insert_decompiled_template(templates, key=child_key, data=child_data)
@@ -1108,6 +1109,35 @@ class StoryCompiler:
         if templates:
             scene_data["templates"] = templates
         return scene_data
+
+    @staticmethod
+    def _decompile_block_effects(data: dict[str, Any]) -> None:
+        """Recover Block's author-facing timing names from VM effect annotations."""
+        effects = data.pop("effects", None)
+        if not isinstance(effects, list):
+            if effects is not None:
+                data["effects"] = effects
+            return
+
+        pre_effects: list[Any] = []
+        post_effects: list[Any] = []
+        for effect in effects:
+            if not isinstance(effect, dict):
+                pre_effects.append(effect)
+                continue
+            source_effect = dict(effect)
+            phase = source_effect.pop("trigger_phase", ResolutionPhase.UPDATE)
+            if phase == ResolutionPhase.UPDATE or phase == ResolutionPhase.UPDATE.value:
+                pre_effects.append(source_effect)
+            elif phase == ResolutionPhase.FINALIZE or phase == ResolutionPhase.FINALIZE.value:
+                post_effects.append(source_effect)
+            else:
+                raise ValueError(f"Cannot decompile Block effect phase {phase!r}.")
+
+        if pre_effects:
+            data["effects"] = pre_effects
+        if post_effects:
+            data["post_effects"] = post_effects
 
     def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
         data = _decompile_source_value(EntityTemplate.decompile(template))
@@ -1545,7 +1575,7 @@ class StoryCompiler:
     ) -> Entity:
         payload = dict(payload)
 
-        if issubclass(kind, (Block, Scene)):
+        if issubclass(kind, Block):
             StoryCompiler._lower_node_effects(payload)
 
         if issubclass(kind, Block) and isinstance(payload.get("content"), str):

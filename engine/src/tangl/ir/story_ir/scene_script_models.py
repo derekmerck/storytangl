@@ -351,25 +351,12 @@ class SceneScript(BaseScriptItem):
         return Scene
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
-    pre_effects: list[Expr] | None = Field(
-        None,
-        description="Effects applied during UPDATE before this scene is journaled.",
-    )
-    post_effects: list[Expr] | None = Field(
-        None,
-        description="Effects applied during FINALIZE after this scene is journaled.",
-    )
 
     # Mechanic-specific authored block kinds remain a compiler-extension concern.
     blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     assets: list[AssetsScript] = Field(None, description="A list of asset types and items associated with the scene.")
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_effect_alias_conflict(cls, data: Any) -> Any:
-        return _reject_effect_alias_conflict(data)
 
     # @field_validator('blocks', 'roles', 'settings', mode="before")
     # @classmethod
