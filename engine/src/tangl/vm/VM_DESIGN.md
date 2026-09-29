@@ -136,14 +136,23 @@ selected next. Those successors must exist before they are presented: a disclose
 “note on the door” is either a fact on an already-provisioned provider or a durable
 constraint that any remaining lazy realization must satisfy.
 
+A lazily materialized edge carries its destination as a dependency of its own. A choice
+stays that way until it is selected: it is previewed when offered and provisioned when
+chosen. A triggered edge (a continuation or redirect) is followed without being chosen,
+so the current node's triggered destinations are provisioned as the node is entered, and
+a triggered edge is followed only into a target that can be entered. One whose
+destination cannot be provisioned, or whose target's hard dependencies cannot be, is not
+followed.
+
 UPDATE changes committed state after the frontier's shape is mostly settled. It may
 lock or unlock already-provisioned doors, transfer custody, apply injury, change
 relationships, or activate the selected successor. Availability and presentation then
 interpret the provisioned frontier under that updated state.
 
 UPDATE may create an entity when creation is itself a consequence, but the new entity
-does not retroactively participate in a namespace/frontier assembled earlier in the
-same turn. Ordinary interaction with it begins during the following turn's PLANNING.
+does not retroactively participate in a frontier assembled earlier in the same turn.
+(Namespaces are gathered again after UPDATE, so values it changes are read; the
+frontier's topology is not.) Ordinary interaction with it begins during the following turn's PLANNING.
 If same-turn use appears necessary, the design has usually hidden another turn;
 represent that as an automatic setup/continuation step instead.
 
