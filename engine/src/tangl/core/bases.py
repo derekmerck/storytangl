@@ -95,7 +95,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from copy import deepcopy
-from functools import cache, total_ordering
+from functools import lru_cache, total_ordering
 from inspect import isclass, signature
 import logging
 import time
@@ -127,12 +127,20 @@ from ._pydantic import BaseModelPlus
 # A uid never changes, so what is derived from it alone is computed once. These
 # are asked for on every identifier comparison, and a lookup compares against
 # every candidate: recomputing them dominated materializing a large story.
-@cache
+#
+# Bounded, so a long-lived process does not keep the identifiers of every story
+# it ever loaded. The bound has to exceed a live graph: a lookup scans every
+# entity in turn, and an LRU smaller than the scan evicts each entry just before
+# it is asked for again.
+_UID_CACHE_SIZE = 65_536
+
+
+@lru_cache(maxsize=_UID_CACHE_SIZE)
 def _shortcode(uid: UUID) -> str:
     return ShortUUID().encode(uid)
 
 
-@cache
+@lru_cache(maxsize=_UID_CACHE_SIZE)
 def _id_hash(cls: type, uid: UUID) -> Hash:
     return hashing_func(cls, uid)
 

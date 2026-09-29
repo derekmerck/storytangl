@@ -24,6 +24,12 @@ from tangl.vm.provision import (
 from tangl.vm.runtime.frame import PhaseCtx
 
 
+class Person(Entity):
+    """An entity kind with a field other kinds lack."""
+
+    age: int = 0
+
+
 # ============================================================================
 # Requirement
 # ============================================================================
@@ -53,6 +59,19 @@ class TestRequirementSatisfaction:
         e = Entity(label="bar")
         req = Requirement.from_identifier("foo")
         assert not req.satisfied_by(e)
+
+    def test_predicate_only_sees_candidates_of_its_kind_and_identifier(self) -> None:
+        # The predicate reads `age`, which only a Person has. Checked against a
+        # mixed pool it must answer, not raise, for every other candidate.
+        req = Requirement(has_kind=Person, has_identifier="joe", predicate=lambda p: p.age >= 18)
+        pool = [
+            Entity(label="lamp"),
+            Entity(label="joe"),
+            Person(label="ann", age=30),
+            Person(label="joe", age=12),
+            Person(label="joe", age=20),
+        ]
+        assert [e for e in pool if req.satisfied_by(e)] == [pool[4]]
 
 
 class TestRequirementPolicy:
