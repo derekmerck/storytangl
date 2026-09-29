@@ -125,6 +125,15 @@ side effect of ordinary concept mutation.
 
 ## Compilation and World Assembly
 
+### Authored Node Effect Timing
+
+Scenes and blocks may name `pre_effects` for UPDATE and `post_effects` for
+FINALIZE. The older node `effects` spelling is an UPDATE alias for
+`pre_effects`; an author may not provide both spellings on the same node.
+Compilation lowers both names into the VM's one `effects` list as
+`TraversableEffect` values with explicit trigger phases. This is node vocabulary:
+actions remain edges and retain their ordinary UPDATE `effects` behavior.
+
 `StoryCompiler` validates authored script data and produces:
 
 - a `TemplateRegistry`

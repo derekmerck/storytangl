@@ -16,7 +16,7 @@ from tangl.presentation.intent import (
     Blocker,
     UIHints,
 )
-from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
+from tangl.type_hints import ClassName, Expr, StringMap, Tag, UniqueLabel
 from .actor_script_models import RoleScript
 from .location_script_models import SettingScript
 from .asset_script_models import AssetsScript
@@ -274,6 +274,13 @@ def _apply_default_trigger(data, field_name: str):
     return [with_default_activation(entry, default) for entry in data]
 
 
+def _reject_effect_alias_conflict(data: Any) -> Any:
+    """Keep the legacy UPDATE spelling from silently overriding ``pre_effects``."""
+    if isinstance(data, dict) and "effects" in data and "pre_effects" in data:
+        raise ValueError("Use either 'effects' or 'pre_effects', not both.")
+    return data
+
+
 class BlockScript(BaseScriptItem):
 
     @classmethod
@@ -283,6 +290,14 @@ class BlockScript(BaseScriptItem):
         return Block
 
     media: list[MediaItemScript] | None = None
+    pre_effects: list[Expr] | None = Field(
+        None,
+        description="Effects applied during UPDATE before this block is journaled.",
+    )
+    post_effects: list[Expr] | None = Field(
+        None,
+        description="Effects applied during FINALIZE after this block is journaled.",
+    )
 
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.", json_schema_extra={"visit_field": True})
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.", json_schema_extra={"visit_field": True})
@@ -295,6 +310,11 @@ class BlockScript(BaseScriptItem):
         None,
         description="Settings scoped to this block, provided as a list or mapping.", json_schema_extra={"visit_field": True}
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_effect_alias_conflict(cls, data: Any) -> Any:
+        return _reject_effect_alias_conflict(data)
 
     @pydantic.field_validator('redirects', mode='before')
     @classmethod
@@ -331,12 +351,25 @@ class SceneScript(BaseScriptItem):
         return Scene
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
+    pre_effects: list[Expr] | None = Field(
+        None,
+        description="Effects applied during UPDATE before this scene is journaled.",
+    )
+    post_effects: list[Expr] | None = Field(
+        None,
+        description="Effects applied during FINALIZE after this scene is journaled.",
+    )
 
     # Mechanic-specific authored block kinds remain a compiler-extension concern.
     blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     assets: list[AssetsScript] = Field(None, description="A list of asset types and items associated with the scene.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_effect_alias_conflict(cls, data: Any) -> Any:
+        return _reject_effect_alias_conflict(data)
 
     # @field_validator('blocks', 'roles', 'settings', mode="before")
     # @classmethod
