@@ -312,6 +312,14 @@ longer reachable, so a sheet looked up at payload time would be found in a quick
 test and missing in every live session. The ref is plain data, so a saved graph
 carries no class path for it.
 
+Worlds that choose the standard hyphenated convention can return
+`index_standard_filename` from `get_media_index_handlers()`. It adds
+`subject:<first-segment>` and `tag:<segment>` metadata without changing the
+filename label. A grid segment declares a sheet, its preceding segment is the
+clip, and a following `ms` or `s` segment supplies total duration. This helper is
+never installed globally, so worlds that do not opt in retain the legacy parser
+and their existing inventory records.
+
 
 ### MediaFragment and StagingHints
 

@@ -9,7 +9,7 @@ with its still -- so the presentation layer stays a vocabulary, not a format lib
 from .aseprite import AsepriteExport, read_aseprite_export
 from .index import SpriteSheetError, link_sprite_sheets, load_sheet_manifest
 from .ref import SpriteSheetRef
-from .shorthand import CompactSheet, SheetDeclaration
+from .shorthand import CompactSheet, SheetDeclaration, index_standard_filename
 
 __all__ = [
     "AsepriteExport",
@@ -18,6 +18,7 @@ __all__ = [
     "SpriteSheetError",
     "SpriteSheetRef",
     "link_sprite_sheets",
+    "index_standard_filename",
     "load_sheet_manifest",
     "read_aseprite_export",
 ]

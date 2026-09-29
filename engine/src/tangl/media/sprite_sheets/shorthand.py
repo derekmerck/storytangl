@@ -15,7 +15,7 @@ is an Aseprite export.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -26,6 +26,9 @@ from tangl.presentation.sprite_sheet import (
     SheetSize,
     SpriteSheetManifest,
 )
+
+if TYPE_CHECKING:
+    from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 DEFAULT_FRAME_MS = 100
 """Aseprite's default frame duration, used when a shorthand states no timing."""
@@ -157,6 +160,70 @@ _SHEET_NAME = re.compile(
     r"-(?P<cols>[1-9]\d*)x(?P<rows>[1-9]\d*)"
     r"(?:-(?P<amount>[1-9]\d*)(?P<unit>ms|s))?$"
 )
+_GRID_SEGMENT = re.compile(r"^(?P<cols>[1-9]\d*)x(?P<rows>[1-9]\d*)$")
+_DURATION_SEGMENT = re.compile(r"^(?P<amount>[1-9]\d*)(?P<unit>ms|s)$")
+
+
+def index_standard_filename(caller: "MediaRIT", *, ctx: object) -> "MediaRIT":
+    """Add opt-in subject tags and a sheet declaration from a hyphenated filename.
+
+    The first segment is the subject, including ``@`` when a world uses it. A
+    grid segment makes a sheet; its immediately preceding segment is the clip,
+    and an immediately following duration gives the total animation time. All
+    other segments are tags. Ambiguous multiple-grid names remain undeclared so
+    the world's normal legacy fallback can decide them.
+    """
+
+    _ = ctx
+    if caller.path is None:
+        return caller
+
+    segments = caller.path.stem.split("-")
+    subject, *remainder = segments
+    if not subject:
+        return caller
+    caller.tags.add(f"subject:{subject}")
+
+    grids = [
+        index
+        for index, segment in enumerate(remainder, start=1)
+        if _GRID_SEGMENT.fullmatch(segment)
+    ]
+    if len(grids) != 1:
+        caller.tags.update(f"tag:{segment}" for segment in remainder)
+        return caller
+
+    grid_index = grids[0]
+    grid = _GRID_SEGMENT.fullmatch(segments[grid_index])
+    assert grid is not None
+    clip_index = grid_index - 1 if grid_index > 1 else None
+    duration_index = grid_index + 1 if grid_index + 1 < len(segments) else None
+    duration = (
+        _DURATION_SEGMENT.fullmatch(segments[duration_index])
+        if duration_index is not None
+        else None
+    )
+    excluded = {grid_index}
+    if clip_index is not None:
+        excluded.add(clip_index)
+    if duration is not None and duration_index is not None:
+        excluded.add(duration_index)
+    caller.tags.update(
+        f"tag:{segment}"
+        for index, segment in enumerate(segments[1:], start=1)
+        if index not in excluded
+    )
+    total_ms = None
+    if duration is not None:
+        total_ms = int(duration["amount"]) * (1000 if duration["unit"] == "s" else 1)
+    caller.sheet_declaration = SheetDeclaration(
+        root=subject,
+        clip=segments[clip_index] if clip_index is not None else None,
+        cols=int(grid["cols"]),
+        rows=int(grid["rows"]),
+        total_ms=total_ms,
+    )
+    return caller
 
 
 class SheetDeclaration(BaseModel):
@@ -238,4 +305,10 @@ class SheetDeclaration(BaseModel):
         return problems
 
 
-__all__ = ["DEFAULT_FRAME_MS", "CompactSheet", "SheetDeclaration", "grid_rects"]
+__all__ = [
+    "DEFAULT_FRAME_MS",
+    "CompactSheet",
+    "SheetDeclaration",
+    "grid_rects",
+    "index_standard_filename",
+]
