@@ -718,6 +718,10 @@ settings, roles, and token assets remain normal concept providers, but can
 donate normal sandbox `ScheduledEvent`s when their local type or instance state
 notices the right surrounding namespace.
 
+An event target resolves as a stable graph path before identifier and local
+scope fallbacks. An unresolved target remains inert, but the projector warns so
+an event that otherwise matched its schedule is not silently lost.
+
 ### World Time And Schedule
 
 Time and schedule are the main genuinely new vocabulary.
