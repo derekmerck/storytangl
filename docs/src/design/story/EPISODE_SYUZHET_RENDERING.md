@@ -187,8 +187,11 @@ Jinja internals.
 A script chooses it for its own text by declaring `text_template: jinja` in its
 globals (a scene or block may override the choice in its locals); block content,
 action journal text and blocker messages then render through
-`TextRenderSession`. The default is `fstring`, which formats `{name}`
-placeholders. A codec emitting story data declares the same way.
+`TextRenderSession`, blocker messages in their block's namespace. Whole block
+text keeps its whitespace, since its indentation and newlines are Markdown, and
+a failure there is raised with the text's source rather than printed as template
+source. The default is `fstring`, which formats `{name}` placeholders. A codec
+emitting story data declares the same way.
 
 ## Other valid adapters
 

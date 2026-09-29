@@ -207,9 +207,11 @@ def _render_text(content: str, *, source: object, ctx) -> str:
     text a value produces -- ``{{ outfit.get_desc() }}`` returning more template
     -- until it bottoms out, with cycles and depth bounded.
 
-    A declared language the enum does not know is an authoring error and is
-    raised. Text that fails to render in its language comes back as written;
-    a Jinja failure also logs, since an unknown name there is strict.
+    Jinja text keeps its whitespace, since block text is Markdown and indentation
+    and trailing newlines carry meaning there. Its failures are authoring errors
+    and are raised as they are, with the text's source noted; a declared
+    language the enum does not know is raised too. The fstring path keeps its
+    fallback: text it cannot format comes back as written.
     """
     if not content:
         return ""
@@ -218,12 +220,12 @@ def _render_text(content: str, *, source: object, ctx) -> str:
     ns = dict(ctx.get_ns(source))
     language = TextTemplate(ns.get("text_template", TextTemplate.FSTRING))
     if language is TextTemplate.JINJA:
+        session = TextRenderSession(ctx=ctx, text_resolver=render_text_as)
         try:
-            session = TextRenderSession(ctx=ctx, text_resolver=render_text_as)
-            return session.render(content, source=source)
-        except Exception:
-            logger.warning("could not render jinja text for %r", source, exc_info=True)
-            return content
+            return session.render(content, source=source, preserve_whitespace=True)
+        except Exception as exc:
+            exc.add_note(f"while rendering jinja text for {source!r}")
+            raise
     try:
         return content.format_map(_SafeFormatDict(ns))
     except Exception:
@@ -381,7 +383,7 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
                     return [
                         blocker.model_copy(
                             update={
-                                "message": _render_text(blocker.message, source=edge, ctx=ctx)
+                                "message": _render_text(blocker.message, source=edge.predecessor, ctx=ctx)
                             }
                         )
                         for blocker in edge.blockers or ()
@@ -421,7 +423,7 @@ def _choice_blockers(*, edge: Action, ctx) -> list[Blocker]:
             return [
                 blocker.model_copy(
                     update={
-                        "message": _render_text(blocker.message, source=edge, ctx=ctx)
+                        "message": _render_text(blocker.message, source=edge.predecessor, ctx=ctx)
                     }
                 )
                 for blocker in edge.blockers

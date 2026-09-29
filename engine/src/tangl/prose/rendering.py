@@ -49,7 +49,7 @@ def _render_as_filter(
 
 
 def _default_environment() -> jinja2.Environment:
-    return jinja2.Environment(undefined=jinja2.StrictUndefined)
+    return jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
 
 
 class RecursiveRenderError(RuntimeError):
@@ -125,12 +125,17 @@ class TextRenderSession:
         source: object | None = None,
         subject: object | None = None,
         bindings: Mapping[str, object] | None = None,
+        preserve_whitespace: bool = False,
     ) -> str:
         """Render text against the source's gathered namespace.
 
         ``subject`` is the template-visible child binding for nested rendering.
         Jinja reserves ``self`` for its own template reference, so it cannot be
         repurposed as an authored variable.
+
+        Each pass is stripped by default, which suits a fragment rendered into
+        other text. ``preserve_whitespace`` keeps it, for whole text whose
+        indentation and newlines are markup -- a block's Markdown.
         """
         scope_source = source if source is not None else self.ctx.cursor
         scope: Scope = dict(self.ctx.get_ns(scope_source))
@@ -146,12 +151,14 @@ class TextRenderSession:
         frame_identity = _frame_identity(subject, scope_source)
         state = self._active_state
         if state is not None:
-            return self._render_recursive(content, scope, frame_identity, state)
+            return self._render_recursive(content, scope, frame_identity, state,
+                                          strip=not preserve_whitespace)
 
         state = _RecursiveRenderState()
         self._active_state = state
         try:
-            return self._render_recursive(content, scope, frame_identity, state)
+            return self._render_recursive(content, scope, frame_identity, state,
+                                          strip=not preserve_whitespace)
         finally:
             self._active_state = None
 
@@ -207,6 +214,8 @@ class TextRenderSession:
         scope: Scope,
         frame_identity: tuple[IdentityKey, IdentityKey],
         state: _RecursiveRenderState,
+        *,
+        strip: bool = True,
     ) -> str:
         current = content
         frames: list[RenderFrameKey] = []
@@ -228,7 +237,9 @@ class TextRenderSession:
                     current,
                     template_class=RecursiveTemplate,
                 )
-                rendered = template.render_once(scope).strip()
+                rendered = template.render_once(scope)
+                if strip:
+                    rendered = rendered.strip()
                 if not _contains_template_syntax(rendered, self.environment):
                     return rendered
                 if rendered in state.outputs:
