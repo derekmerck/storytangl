@@ -22,7 +22,8 @@ current pipeline.
 The pipeline phases in causal order:
 
 - **VALIDATE** — is the movement legal? (all_true)
-- **PLANNING** — provision this node + frontier in place (handlers return `None`)
+- **PLANNING** — provision this node, its edges' destinations, and the frontier in place
+  (handlers return `None`)
 - **PREREQS** — auto-redirect? container descent? (first_result → edge)
 - **UPDATE** — mutate state for arrival in place (handlers return `None`)
 - **JOURNAL** — emit content fragments (merge all handler contributions)
@@ -76,6 +77,7 @@ from tangl.core import (
     Node,
     OrderedRegistry,
     Record,
+    Selector,
     TemplateRegistry,
 )
 from tangl.utils.hashing import hashing_func
@@ -770,6 +772,7 @@ class Frame:
             return
         ctx.current_phase = ResolutionPhase.PLANNING
         do_provision(self.cursor, ctx=ctx)
+        self._provision_destinations(ctx=ctx)
         for successor in list(self.cursor.successors()):
             if isinstance(successor, TraversableNode):
                 successor_ctx = ctx.derive(
@@ -777,6 +780,31 @@ class Frame:
                     current_phase=ResolutionPhase.PLANNING,
                 )
                 do_provision(successor, ctx=successor_ctx)
+
+    def _provision_destinations(self, *, ctx: VmPhaseCtx) -> None:
+        """Provision the destinations the cursor's edges do not have yet.
+
+        A lazily materialized edge carries its destination as a dependency of
+        its own. The cursor's are resolved as it is entered -- continues and
+        choices alike, one step ahead -- and an edge whose destination cannot
+        be provisioned keeps no successor, so nothing follows or offers it.
+        """
+        from ..provision import Resolver  # provisioning imports the runtime
+
+        edges = [
+            edge
+            for edge in self.cursor.edges_out(Selector(has_kind=TraversableEdge))
+            if edge.successor is None
+        ]
+        if not edges:
+            return
+        resolver = Resolver.from_ctx(ctx)
+        for edge in edges:
+            resolver.provision_destination(
+                edge,
+                allow_stubs=ctx.causality_mode is CausalityMode.HARD_DIRTY,
+                _ctx=ctx,
+            )
 
     def _handle_redirect(
         self,

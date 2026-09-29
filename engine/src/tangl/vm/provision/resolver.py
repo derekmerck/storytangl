@@ -17,7 +17,7 @@ from tangl.core import (
 from ..dispatch import on_provision
 from ..ctx import VmPhaseCtx
 from ..runtime.causality import CausalityMode
-from ..traversable import TraversableNode
+from ..traversable import TraversableEdge, TraversableNode
 from .materialization import (
     MaterializeRole,
     attach_child,
@@ -1624,6 +1624,34 @@ class Resolver:
                 include_candidates=True,
             )
         ]
+
+    def provision_destination(
+        self,
+        edge: TraversableEdge,
+        *,
+        allow_stubs: bool = False,
+        _ctx: VmPhaseCtx | None = None,
+    ) -> bool:
+        """Resolve the destination an edge carries as a dependency, and bind it.
+
+        A lazily materialized edge has no successor until its ``destination``
+        dependency resolves. Returns whether the edge has a successor now.
+        """
+        graph = edge.graph
+        dep = next(
+            graph.find_edges(
+                Selector(has_kind=Dependency, predecessor=edge, label="destination", satisfied=False)
+            ),
+            None,
+        ) or next(
+            graph.find_edges(Selector(has_kind=Dependency, predecessor=edge, satisfied=False)),
+            None,
+        )
+        if dep is None:
+            return False
+        if self.resolve_dependency(dep, allow_stubs=allow_stubs, _ctx=_ctx) and dep.successor is not None:
+            edge.set_successor(dep.successor, _ctx=_ctx)
+        return edge.successor is not None
 
     def resolve_dependency(
         self,

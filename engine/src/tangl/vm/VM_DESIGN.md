@@ -130,7 +130,11 @@ PLANNING establishes the topology of the next frontier. From the current node it
 provisions the successor nodes, providers, dependencies, and actions that may be
 selected next. Those successors must exist before they are presented: a disclosed
 “note on the door” is either a fact on an already-provisioned provider or a durable
-constraint that any remaining lazy realization must satisfy.
+constraint that any remaining lazy realization must satisfy. That includes a lazily
+materialized edge's destination, which the edge carries as a dependency of its own: the
+current node's are provisioned as it is entered, continuations and choices alike, and an
+edge whose destination cannot be provisioned keeps no successor, so it is neither
+followed nor offered.
 
 UPDATE changes committed state after the frontier's shape is mostly settled. It may
 lock or unlock already-provisioned doors, transfer custody, apply injury, change
@@ -138,8 +142,9 @@ relationships, or activate the selected successor. Availability and presentation
 interpret the provisioned frontier under that updated state.
 
 UPDATE may create an entity when creation is itself a consequence, but the new entity
-does not retroactively participate in a namespace/frontier assembled earlier in the
-same turn. Ordinary interaction with it begins during the following turn's PLANNING.
+does not retroactively participate in a frontier assembled earlier in the same turn.
+(Namespaces are gathered again after UPDATE, so values it changes are read; the
+frontier's topology is not.) Ordinary interaction with it begins during the following turn's PLANNING.
 If same-turn use appears necessary, the design has usually hidden another turn;
 represent that as an automatic setup/continuation step instead.
 

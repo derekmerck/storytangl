@@ -373,48 +373,23 @@ class Ledger(Entity):
             step=trace.step,
         )
 
-    @staticmethod
-    def _selection_destination_dependency(edge: TraversableEdge) -> Optional["Dependency"]:
-        from tangl.vm import Dependency
-
-        graph = getattr(edge, "graph", None)
-        if graph is None:
-            return None
-
-        deps = graph.find_edges(
-            Selector(
-                has_kind=Dependency,
-                predecessor=edge,
-                label="destination",
-                satisfied=False,
-            )
-        )
-        dep = next(deps, None)
-        if dep is not None:
-            return dep
-        deps = graph.find_edges(
-            Selector(has_kind=Dependency, predecessor=edge, satisfied=False)
-        )
-        return next(deps, None)
-
     def _provision_selected_destination(self, edge: TraversableEdge) -> None:
+        """Provision a selected edge's destination if planning never reached it.
+
+        The frame provisions the cursor's destinations when it enters the
+        cursor. This covers a ledger that is choosing before its cursor was
+        ever entered.
+        """
         if edge.successor is not None:
             return
-
-        dep = self._selection_destination_dependency(edge)
-        if dep is None:
-            return
-
         from tangl.vm import Resolver
 
         ctx = self._make_phase_ctx()
-        resolved = Resolver.from_ctx(ctx).resolve_dependency(
-            dep,
+        Resolver.from_ctx(ctx).provision_destination(
+            edge,
             allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
             _ctx=ctx,
         )
-        if resolved and dep.successor is not None and edge.successor is None:
-            edge.set_successor(dep.successor, _ctx=ctx)
 
     def _make_phase_ctx(self) -> PhaseCtx:
         return PhaseCtx(

@@ -383,3 +383,67 @@ def test_rebuild_runtime_materialization_state_warns_and_skips_malformed_node(
         and str(scene2.uid) in record.message
         for record in caplog.records
     )
+
+
+def _continue_chain_script(*, second: str = "middle") -> dict:
+    """``start`` continues to ``second``, else to ``fallback``.
+
+    ``cast.entry`` stands in a scene whose hard role no actor can fill, so its
+    destination cannot be provisioned; eager initialization rejects that
+    outright, so the scene is only included when ``second`` names it.
+    """
+    script = {
+        "label": "lazy_continue_chain",
+        "metadata": {"title": "Lazy Continue Chain", "author": "Tests", "start_at": "s.start"},
+        "actors": {"companion": {"name": "Mina", "kind": "tangl.story.concepts.actor.Actor"}},
+        "scenes": {
+            "s": {
+                "blocks": {
+                    "start": {
+                        "content": "Start",
+                        "continues": [
+                            {"successor": second, "trigger": "last"},
+                            {"successor": "fallback", "trigger": "last"},
+                        ],
+                    },
+                    "middle": {
+                        "content": "Middle",
+                        "continues": [{"successor": "last", "trigger": "last"}],
+                    },
+                    "last": {"content": "Last"},
+                    "fallback": {"content": "Fallback"},
+                }
+            },
+        },
+    }
+    if second.startswith("cast."):
+        script["scenes"]["cast"] = {
+            "roles": [{"label": "companion", "actor_ref": "missing", "hard": True}],
+            "blocks": {"entry": {"content": "Hello {companion.name}"}},
+        }
+    return script
+
+
+def _entered(world: World, mode: InitMode) -> Block:
+    """Where the entry step comes to rest, following its continues."""
+    story = world.create_story(f"continue_chain_{mode.value}", init_mode=mode)
+    ledger = Ledger.from_graph(story.graph, entry_id=story.graph.initial_cursor_id)
+    frame = ledger.get_frame()
+    frame.goto_node(ledger.cursor)
+    return frame.cursor
+
+
+def test_lazy_continues_provision_their_destinations_on_entry() -> None:
+    world = World.from_script_data(script_data=_continue_chain_script())
+    eager = _entered(world, InitMode.EAGER)
+    lazy = _entered(world, InitMode.LAZY)
+
+    assert eager.label == "last"
+    assert lazy.label == "last"
+
+
+def test_lazy_continue_whose_destination_cannot_be_provisioned_is_not_followed() -> None:
+    world = World.from_script_data(script_data=_continue_chain_script(second="cast.entry"))
+    lazy = _entered(world, InitMode.LAZY)
+
+    assert lazy.label == "fallback"
