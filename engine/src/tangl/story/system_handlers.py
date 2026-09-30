@@ -801,11 +801,18 @@ def render_block_choices(*, caller, ctx, **_kw):
     """
     if not isinstance(caller, Block):
         return None
-    actions = list(caller.edges_out(Selector(has_kind=Action, trigger_phase=None)))
-    choices = [
-        (edge, _choice_unavailable_reason(edge=edge, ctx=ctx))
-        for edge in actions
-    ]
+    choices = []
+    for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
+        # A choice its own guard refuses is hidden whatever else stands in its
+        # way, so the costlier look at its destination is left to the choices
+        # that will be shown.
+        if (
+            _unavailable_choice_disclosure(edge=edge, caller=caller, ctx=ctx)
+            is UnavailableChoiceDisclosure.HIDE
+            and not edge.source_available(ctx=ctx)
+        ):
+            continue
+        choices.append((edge, _choice_unavailable_reason(edge=edge, ctx=ctx)))
     if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
         reason is None for _, reason in choices
     ):

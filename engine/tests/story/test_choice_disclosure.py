@@ -136,3 +136,22 @@ def test_hidden_unavailable_choice_still_rejects_direct_selection() -> None:
     assert all(choice.edge_id != hidden.uid for choice in _choices(graph))
     with pytest.raises(ValueError, match="Edge validation failed"):
         ledger.resolve_choice(hidden.uid)
+
+
+def test_a_hidden_choice_its_guard_refuses_is_not_asked_why(monkeypatch) -> None:
+    # Working out why a choice is unavailable previews its destination, which is
+    # the costly part of rendering a menu. A hidden choice needs no reason.
+    from tangl.story import system_handlers
+
+    asked: list[str] = []
+    reason = system_handlers._choice_unavailable_reason
+
+    def spy(*, edge, ctx):
+        asked.append(edge.text)
+        return reason(edge=edge, ctx=ctx)
+
+    monkeypatch.setattr(system_handlers, "_choice_unavailable_reason", spy)
+    choices = _choices(_graph(world_policy="hide"))
+
+    assert asked == ["Always available"]
+    assert [choice.text for choice in choices] == ["Always available"]
