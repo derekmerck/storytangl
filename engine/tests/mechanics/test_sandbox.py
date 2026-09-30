@@ -1650,6 +1650,35 @@ def test_rejected_event_selection_does_not_change_time() -> None:
     assert scope.locals["world_turn"] == 3
 
 
+def test_returning_event_explicit_zero_cost_stays_free() -> None:
+    graph = Graph()
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene", locals={"exit_time_cost": {"kind": "event", "duration": 0}})
+    graph.add(road)
+    graph.add(scene)
+    call = Action(registry=graph, predecessor_id=road.uid, successor_id=scene.uid, tags={"event"})
+
+    assert sandbox_handlers._returning_event_cost(call) == SandboxTimeCost(kind="event", duration=0)
+
+
+def test_returning_event_conflicting_action_and_scene_costs_fail_loudly() -> None:
+    graph = Graph()
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene", locals={"exit_time_cost": {"kind": "event", "duration": 1}})
+    graph.add(road)
+    graph.add(scene)
+    call = Action(
+        registry=graph,
+        predecessor_id=road.uid,
+        successor_id=scene.uid,
+        tags={"event"},
+        payload={"sandbox_time_cost": {"kind": "event", "duration": 2}},
+    )
+
+    with pytest.raises(ValueError, match="conflicting action and scene"):
+        sandbox_handlers._returning_event_cost(call)
+
+
 def test_stale_scheduled_event_is_rejected_before_entry() -> None:
     """Schedule matching remains a live selection guard, not projection-only."""
     graph, scope, road, _event_beat = _event_time_graph()
