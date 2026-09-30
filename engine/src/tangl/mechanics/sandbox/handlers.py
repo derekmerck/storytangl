@@ -14,7 +14,7 @@ from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
 from tangl.journal.fragments import ContentFragment
-from tangl.story import Action, Scene, StoryGraph
+from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import (
     ResolutionPhase,
@@ -821,6 +821,17 @@ def _returning_event_cost(call: Action) -> SandboxTimeCost | None:
             "Returning scheduled event has conflicting action and scene exit time costs",
         )
     return action_cost if action_cost is not None else scene_cost
+
+
+def _block_entry_origin(block: Block, ctx: VmPhaseCtx) -> SandboxLocation | None:
+    for edge_id in reversed(ctx.get_meta().get("call_stack_ids") or ()):
+        call = ctx.graph.get(edge_id)
+        if isinstance(call, Action) and isinstance(call.predecessor, SandboxLocation):
+            origin = call.predecessor
+            if _time_owner(origin) is _time_owner(block):
+                return origin
+            return None
+    return None
 
 
 def _charged_assets(location: SandboxLocation) -> list[Token]:
@@ -2456,6 +2467,22 @@ def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
     if cost is None:
         return None
     _sandbox_time_advance(caller, ctx=ctx, cost=cost)
+    return None
+
+
+@on_update(wants_caller_kind=Block, wants_exact_kind=False, priority=Priority.LATE)
+def advance_sandbox_time_on_block_entry(*, caller, ctx, **_kw):
+    """Pay a block's own entry cost after authored UPDATE effects, before JOURNAL."""
+    if not isinstance(caller, Block) or "entry_time_cost" not in caller.locals:
+        return None
+    cost = _coerce_time_cost(caller.locals["entry_time_cost"])
+    if cost is None:
+        return None
+    origin = _block_entry_origin(caller, ctx)
+    if origin is None:
+        raise ValueError("Costed block entry requires a sandbox call origin in the same clock scope")
+    origin_ctx = ctx.derive(cursor_id=origin.uid)
+    _sandbox_time_advance(origin, ctx=origin_ctx, cost=cost)
     return None
 
 

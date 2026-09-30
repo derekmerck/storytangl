@@ -1691,6 +1691,27 @@ def test_returning_event_explicit_zero_cost_stays_free() -> None:
     assert sandbox_handlers._returning_event_cost(call) == SandboxTimeCost(kind="event", duration=0)
 
 
+def test_block_entry_cost_uses_the_open_call_origin_and_own_locals() -> None:
+    graph = Graph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene", locals={"entry_time_cost": {"duration": 9}})
+    block = Block(label="block", locals={"entry_time_cost": {"kind": "event", "duration": 1}})
+    graph.add(scope)
+    graph.add(road)
+    graph.add(scene)
+    graph.add(block)
+    scope.add_child(road)
+    scope.add_child(scene)
+    scene.add_child(block)
+    call = Action(registry=graph, predecessor_id=road.uid, successor_id=scene.uid, tags={"event"})
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid, meta={"call_stack_ids": [call.uid]})
+
+    sandbox_handlers.advance_sandbox_time_on_block_entry(caller=block, ctx=ctx)
+
+    assert scope.locals["world_turn"] == 4
+
+
 def test_returning_event_conflicting_action_and_scene_costs_fail_loudly() -> None:
     graph = Graph()
     road = SandboxLocation(label="road")
