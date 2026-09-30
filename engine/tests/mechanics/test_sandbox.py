@@ -1668,7 +1668,8 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
 
 def test_rejected_event_selection_does_not_change_time() -> None:
     """Validation rejects a stale event without any sandbox clock side effect."""
-    graph, scope, road, _event_beat = _event_time_graph()
+    graph, scope, road, event_beat = _event_time_graph()
+    event_beat.locals["entry_time_cost"] = {"duration": 1}
     event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
     event.availability = [Predicate(expr="False")]
 
