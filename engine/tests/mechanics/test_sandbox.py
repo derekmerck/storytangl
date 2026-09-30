@@ -1609,7 +1609,7 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
 
     @on_sandbox_tick
     def observe_completion_tick(*, caller, clock_tick, **_kw):
-        if caller is road:
+        if caller.get_label() == "road":
             return SandboxTickEvent(kind="witness", text=f"Tick {clock_tick}", clock_tick=clock_tick)
         return []
 
@@ -1620,14 +1620,21 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         assert ledger.cursor is start
         assert scope.locals["world_turn"] == 3
         assert internal.available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
-        ledger.resolve_choice(internal.uid)
+        restored = Ledger.structure(ledger.unstructure())
+        restored_internal = restored.graph.get(internal.uid)
+        assert isinstance(restored_internal, Action)
+        restored.resolve_choice(restored_internal.uid)
 
-        assert ledger.cursor is road
-        assert scope.locals["world_turn"] == 4
-        assert current_world_time(road).period == 1
+        restored_road = restored.graph.get(road.uid)
+        restored_scope = restored.graph.get(scope.uid)
+        assert isinstance(restored_road, SandboxLocation)
+        assert isinstance(restored_scope, SandboxScope)
+        assert restored.cursor is restored_road
+        assert restored_scope.locals["world_turn"] == 4
+        assert current_world_time(restored_road).period == 1
         returned_menu = render_block_choices(
-            caller=road,
-            ctx=PhaseCtx(graph=graph, cursor_id=road.uid),
+            caller=restored_road,
+            ctx=PhaseCtx(graph=restored.graph, cursor_id=restored_road.uid),
         ) or []
         returned_event = next(
             fragment
@@ -1637,13 +1644,26 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         assert returned_event.available is False
         assert [
             fragment.content
-            for fragment in ledger.get_journal()
+            for fragment in restored.get_journal()
             if isinstance(getattr(fragment, "content", None), str)
         ] == [
             "The night begins at 4.",
             "The night ends at 4.",
             "Tick 4",
         ]
+        restored.rollback_to_step(1, reason="replay charged event completion")
+        replayed_internal = restored.graph.get(internal.uid)
+        replayed_scope = restored.graph.get(scope.uid)
+        assert isinstance(replayed_internal, Action)
+        assert isinstance(replayed_scope, SandboxScope)
+        assert replayed_scope.locals["world_turn"] == 3
+        restored.resolve_choice(replayed_internal.uid)
+        assert replayed_scope.locals["world_turn"] == 4
+        assert [
+            fragment.content
+            for fragment in restored.get_journal()
+            if isinstance(getattr(fragment, "content", None), str)
+        ].count("Tick 4") == 1
     finally:
         sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
 
