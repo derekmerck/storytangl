@@ -45,6 +45,8 @@ from tangl.mechanics.sandbox import (
 )
 from tangl.mechanics.sandbox import handlers as sandbox_handlers
 from tangl.mechanics.sandbox import incremental as sandbox_incremental
+from tangl.mechanics.sandbox.dispatch import on_sandbox_tick, sandbox_dispatch
+from tangl.mechanics.sandbox.time import SandboxTickEvent
 from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
@@ -1605,17 +1607,27 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
     do_provision(square, ctx=PhaseCtx(graph=graph, cursor_id=square.uid))
     event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
 
-    ledger = Ledger.from_graph(graph, entry_id=road.uid)
-    ledger.resolve_choice(event.uid)
+    @on_sandbox_tick
+    def observe_completion_tick(*, caller, clock_tick, **_kw):
+        if caller is road:
+            return SandboxTickEvent(kind="witness", text=f"Tick {clock_tick}", clock_tick=clock_tick)
+        return []
 
-    assert ledger.cursor is start
-    assert scope.locals["world_turn"] == 3
-    assert internal.available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
-    ledger.resolve_choice(internal.uid)
+    try:
+        ledger = Ledger.from_graph(graph, entry_id=road.uid)
+        ledger.resolve_choice(event.uid)
 
-    assert ledger.cursor is road
-    assert scope.locals["world_turn"] == 4
-    assert current_world_time(road).period == 1
+        assert ledger.cursor is start
+        assert scope.locals["world_turn"] == 3
+        assert internal.available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
+        ledger.resolve_choice(internal.uid)
+
+        assert ledger.cursor is road
+        assert scope.locals["world_turn"] == 4
+        assert current_world_time(road).period == 1
+        assert [fragment.content for fragment in ledger.get_journal()] == ["Tick 4"]
+    finally:
+        sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
 
 
 def test_rejected_event_selection_does_not_change_time() -> None:
