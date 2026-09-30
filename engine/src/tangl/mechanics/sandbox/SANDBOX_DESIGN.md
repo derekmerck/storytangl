@@ -798,7 +798,12 @@ observable tick fragments into completion journaling before origin PLANNING.
 An explicit `sandbox_time_cost` on the original call action is the equivalent
 override; absent cost is zero and a conflicting action/scene declaration fails
 loudly. The entry schedule is never rechecked while inside or closing the call.
-Block `entry_time_cost` remains outside this slice.
+An arriving block may declare its own `locals['entry_time_cost']`. It pays that
+cost during late UPDATE, after ordinary authored UPDATE effects and before
+JOURNAL, using the innermost open sandbox call's original location when both
+share a clock scope. The value is never inherited from a scene or container;
+absent and explicit-zero costs are free. Scene exit and block entry costs are
+independent and intentionally additive.
 The first tick consumer is charged-asset depletion. Future consumers such as
 hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach
