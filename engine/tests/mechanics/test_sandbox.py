@@ -31,6 +31,7 @@ from tangl.mechanics.sandbox import (
     SandboxMob,
     SandboxMobAffordance,
     SandboxScope,
+    SandboxTimeCost,
     SandboxVisibilityRule,
     Schedule,
     ScheduleEntry,
@@ -42,6 +43,7 @@ from tangl.mechanics.sandbox import (
     current_world_time,
     normalize_sandbox_direction,
 )
+from tangl.mechanics.sandbox import handlers as sandbox_handlers
 from tangl.mechanics.sandbox import incremental as sandbox_incremental
 from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.concepts import Actor, Role
@@ -2516,6 +2518,31 @@ def test_scope_donates_wait_to_child_locations() -> None:
 
     do_provision(peer, ctx=PhaseCtx(graph=graph, cursor_id=peer.uid))
     assert _dynamic_sandbox_actions_with_tag(peer, "wait") == []
+
+
+def test_each_sandbox_tick_sees_its_advanced_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph = Graph(label="tick_namespace")
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(label="road")
+    graph.add(scope)
+    graph.add(road)
+    scope.add_child(road)
+    observed: list[tuple[int, int]] = []
+
+    def observe_tick(caller, *, ctx, clock_tick, **_kw):
+        observed.append((clock_tick, ctx.get_ns(caller)["world_time"].turn))
+        return []
+
+    monkeypatch.setattr(sandbox_handlers, "do_sandbox_tick", observe_tick)
+    sandbox_handlers._sandbox_time_advance(
+        road,
+        ctx=PhaseCtx(graph=graph, cursor_id=road.uid),
+        cost=SandboxTimeCost(kind="event", duration=2),
+    )
+
+    assert observed == [(4, 4), (5, 5)]
 
 
 def test_scope_wait_advances_shared_scope_time() -> None:

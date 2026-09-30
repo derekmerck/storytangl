@@ -784,6 +784,7 @@ def _sandbox_time_advance(
     charged_assets = _charged_assets(location)
     for _ in range(duration):
         clock_tick = advance_world_turn(time_owner, 1)
+        ctx.invalidate_namespaces()
         result.elapsed += 1
         result.events.extend(
             do_sandbox_tick(
