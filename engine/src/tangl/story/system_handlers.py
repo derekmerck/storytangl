@@ -294,8 +294,12 @@ def _preview_blockers(preview: ViabilityResult) -> list[Blocker]:
     return blockers
 
 
-def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
-    """Return a coarse reason for unavailable choices."""
+def _choice_unavailable_reason(*, edge: Action, ctx, available: bool | None = None) -> str | None:
+    """Return a coarse reason for unavailable choices.
+
+    ``available`` is the edge's availability when the caller has already asked.
+    A guard may count or draw randomness, so it is asked once, not again here.
+    """
     if edge.successor is None:
         preview = _preview_destination_viability(edge=edge, ctx=ctx)
         if preview is not None and preview.viable:
@@ -314,7 +318,7 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     if _hard_unresolved_dependencies(edge=edge):
         return "missing_dependency"
 
-    if not edge.available(ctx=ctx):
+    if not (edge.available(ctx=ctx) if available is None else available):
         # An authored blocker names this refusal in the world's own vocabulary
         # and carries a code alongside its message; reporting the generic code
         # beside a specific message would say two different things about one
@@ -801,11 +805,25 @@ def render_block_choices(*, caller, ctx, **_kw):
     """
     if not isinstance(caller, Block):
         return None
-    actions = list(caller.edges_out(Selector(has_kind=Action, trigger_phase=None)))
-    choices = [
-        (edge, _choice_unavailable_reason(edge=edge, ctx=ctx))
-        for edge in actions
-    ]
+    choices = []
+    for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
+        # A hidden choice needs no reason, so ask whether it is available before
+        # the costlier look at its destination; a guard that refuses it stops
+        # there. The answer is passed on rather than asked twice. An edge whose
+        # destination is not bound yet is judged by that look, so it keeps the
+        # full path.
+        available = None
+        if (
+            edge.successor is not None
+            and _unavailable_choice_disclosure(edge=edge, caller=caller, ctx=ctx)
+            is UnavailableChoiceDisclosure.HIDE
+        ):
+            available = edge.available(ctx=ctx)
+            if not available:
+                continue
+        choices.append(
+            (edge, _choice_unavailable_reason(edge=edge, ctx=ctx, available=available))
+        )
     if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
         reason is None for _, reason in choices
     ):

@@ -136,3 +136,45 @@ def test_hidden_unavailable_choice_still_rejects_direct_selection() -> None:
     assert all(choice.edge_id != hidden.uid for choice in _choices(graph))
     with pytest.raises(ValueError, match="Edge validation failed"):
         ledger.resolve_choice(hidden.uid)
+
+
+def test_a_hidden_choice_its_guard_refuses_is_not_asked_why(monkeypatch) -> None:
+    # Working out why a choice is unavailable previews its destination, which is
+    # the costly part of rendering a menu. A hidden choice needs no reason.
+    from tangl.story import system_handlers
+
+    asked: list[str] = []
+    reason = system_handlers._choice_unavailable_reason
+
+    def spy(*, edge, ctx, available=None):
+        asked.append(edge.text)
+        return reason(edge=edge, ctx=ctx, available=available)
+
+    monkeypatch.setattr(system_handlers, "_choice_unavailable_reason", spy)
+    choices = _choices(_graph(world_policy="hide"))
+
+    assert asked == ["Always available"]
+    assert [choice.text for choice in choices] == ["Always available"]
+
+
+def test_a_shown_choice_under_hide_asks_its_guard_once() -> None:
+    # A guard may count or draw randomness, so asking it a second time can
+    # change the answer, and every draw after it.
+    asked: list[str] = []
+
+    def door_open() -> bool:
+        asked.append("door")
+        return True
+
+    script = _script(world_policy="hide")
+    script["label"] = "choice_disclosure_guard_count"
+    script["locals"]["door_open"] = door_open
+    script["scenes"]["s"]["blocks"]["start"]["actions"][1]["conditions"] = ["door_open()"]
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("choice_disclosure_guard_count", init_mode=InitMode.EAGER).graph
+    asked.clear()
+
+    choices = _choices(graph)
+
+    assert [choice.text for choice in choices] == ["Always available"]
+    assert asked == ["door"]
