@@ -1552,6 +1552,70 @@ def test_returning_event_restore_and_replay_preserve_no_charge() -> None:
     assert replayed_scope.locals["world_turn"] == 3
 
 
+def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice() -> None:
+    """The event remains in its offered period until its call, not its entry, closes."""
+    graph = Graph(label="returning_event_time")
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(
+        label="road",
+        scheduled_events=[
+            ScheduledEvent(
+                label="night_event",
+                period=4,
+                target="night_scene",
+                text="Attend the night event",
+                return_to_location=True,
+            ),
+        ],
+    )
+    square = SandboxLocation(
+        label="square",
+        scheduled_events=[
+            ScheduledEvent(label="other_offer", period=4, target="other", text="Other offer"),
+        ],
+    )
+    scene = Scene(label="night_scene", locals={"exit_time_cost": {"kind": "event", "duration": 1}})
+    start = Block(label="night_start", content="The night begins.")
+    ending = Block(label="night_ending", content="The night ends.")
+    other = Block(label="other")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(square)
+    graph.add(scene)
+    graph.add(start)
+    graph.add(ending)
+    graph.add(other)
+    scope.add_child(road)
+    scope.add_child(square)
+    scope.add_child(scene)
+    scope.add_child(other)
+    scene.add_child(start)
+    scene.add_child(ending)
+    scene.finalize_container_contract()
+    internal = Action(
+        registry=graph,
+        label="night_continue",
+        predecessor_id=start.uid,
+        successor_id=ending.uid,
+        availability=[Predicate(expr="world_time.period == 4")],
+    )
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(square, ctx=PhaseCtx(graph=graph, cursor_id=square.uid))
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(event.uid)
+
+    assert ledger.cursor is start
+    assert scope.locals["world_turn"] == 3
+    assert internal.available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
+    ledger.resolve_choice(internal.uid)
+
+    assert ledger.cursor is road
+    assert scope.locals["world_turn"] == 4
+    assert current_world_time(road).period == 1
+
+
 def test_rejected_event_selection_does_not_change_time() -> None:
     """Validation rejects a stale event without any sandbox clock side effect."""
     graph, scope, road, _event_beat = _event_time_graph()

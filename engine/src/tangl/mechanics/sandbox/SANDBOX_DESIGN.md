@@ -789,10 +789,16 @@ advance sandbox time on entry and are excluded from the generic UPDATE charge.
 Their stable contribution fingerprint is revalidated before traversal rather
 than becoming a firing record, event catalog entry, generated label, or list
 position. Movement, waits, information, and local actions retain their
-UPDATE-time charge and run `do_sandbox_tick` once per normalized tick. Future
-scene exit and block entry costs are explicit authored locals
-(`scene.locals['exit_time_cost']` and `block.locals['entry_time_cost']`);
-an absent value is zero and those costs are outside this slice.
+UPDATE-time charge and run `do_sandbox_tick` once per normalized tick. A
+returning scheduled event instead closes an explicit
+`scene.locals['exit_time_cost']` once its call exhausts: its final block still
+journals and tests internal choices at the original period, then
+`complete_call` advances the sponsoring location's scope clock and folds
+observable tick fragments into completion journaling before origin PLANNING.
+An explicit `sandbox_time_cost` on the original call action is the equivalent
+override; absent cost is zero and a conflicting action/scene declaration fails
+loudly. The entry schedule is never rechecked while inside or closing the call.
+Block `entry_time_cost` remains outside this slice.
 The first tick consumer is charged-asset depletion. Future consumers such as
 hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach
