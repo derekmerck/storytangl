@@ -1625,6 +1625,16 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         assert ledger.cursor is road
         assert scope.locals["world_turn"] == 4
         assert current_world_time(road).period == 1
+        returned_menu = render_block_choices(
+            caller=road,
+            ctx=PhaseCtx(graph=graph, cursor_id=road.uid),
+        ) or []
+        returned_event = next(
+            fragment
+            for fragment in returned_menu
+            if isinstance(fragment, ChoiceFragment) and fragment.text == "Attend the night event"
+        )
+        assert returned_event.available is False
         assert [
             fragment.content
             for fragment in ledger.get_journal()
