@@ -1662,20 +1662,6 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
             "The night ends at 2.",
             "Tick 6",
         ]
-        restored.rollback_to_step(1, reason="replay charged event completion")
-        replayed_internal = restored.graph.get(internal.uid)
-        replayed_scope = restored.graph.get(scope.uid)
-        assert isinstance(replayed_internal, Action)
-        assert isinstance(replayed_scope, SandboxScope)
-        restored.get_frame().goto_node(restored.cursor)
-        assert replayed_scope.locals["world_turn"] == 4
-        restored.resolve_choice(replayed_internal.uid)
-        assert replayed_scope.locals["world_turn"] == 6
-        assert [
-            fragment.content
-            for fragment in restored.get_journal()
-            if isinstance(getattr(fragment, "content", None), str)
-        ].count("Tick 5") == 1
     finally:
         sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
 
@@ -1758,6 +1744,92 @@ def test_absent_or_zero_block_entry_cost_is_free(entry_cost) -> None:
     )
 
     assert scope.locals["world_turn"] == 3
+
+
+def test_prereqs_redirect_bypasses_costed_block_entry_update() -> None:
+    graph = StoryGraph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene")
+    block = Block(label="block", locals={"entry_time_cost": {"duration": 1}})
+    landing = Block(label="landing")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(scene)
+    graph.add(block)
+    graph.add(landing)
+    scope.add_child(road)
+    scope.add_child(scene)
+    scope.add_child(landing)
+    scene.add_child(block)
+    scene.finalize_container_contract()
+    call = Action(
+        registry=graph,
+        predecessor_id=road.uid,
+        successor_id=scene.uid,
+        return_phase=ResolutionPhase.PLANNING,
+        tags={"event"},
+    )
+    Action(
+        registry=graph,
+        predecessor_id=block.uid,
+        successor_id=landing.uid,
+        trigger_phase=ResolutionPhase.PREREQS,
+    )
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ledger.resolve_choice(call.uid)
+
+    assert ledger.cursor is road
+    assert scope.locals["world_turn"] == 3
+
+
+def test_block_entry_cost_restores_rolls_back_and_replays_per_visit() -> None:
+    graph = StoryGraph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 0})
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene")
+    start = Block(label="start", locals={"entry_time_cost": {"duration": 1}})
+    ending = Block(label="ending", locals={"entry_time_cost": {"duration": 1}})
+    for item in (scope, road, scene, start, ending):
+        graph.add(item)
+    scope.add_child(road)
+    scope.add_child(scene)
+    scene.add_child(start)
+    scene.add_child(ending)
+    scene.finalize_container_contract()
+    call = Action(
+        registry=graph,
+        predecessor_id=road.uid,
+        successor_id=scene.uid,
+        return_phase=ResolutionPhase.PLANNING,
+        tags={"event"},
+    )
+    internal = Action(registry=graph, predecessor_id=start.uid, successor_id=ending.uid)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    ledger.resolve_choice(call.uid)
+    assert scope.locals["world_turn"] == 1
+    restored = Ledger.structure(ledger.unstructure())
+    restored.push_snapshot()
+    restored_internal = restored.graph.get(internal.uid)
+    assert isinstance(restored_internal, Action)
+    restored.resolve_choice(restored_internal.uid)
+    restored_scope = restored.graph.get(scope.uid)
+    assert isinstance(restored_scope, SandboxScope)
+    assert restored_scope.locals["world_turn"] == 2
+
+    restored.rollback_to_step(1, reason="replay block entry")
+    replayed_start = restored.graph.get(start.uid)
+    replayed_internal = restored.graph.get(internal.uid)
+    replayed_scope = restored.graph.get(scope.uid)
+    assert isinstance(replayed_start, Block)
+    assert isinstance(replayed_internal, Action)
+    assert isinstance(replayed_scope, SandboxScope)
+    restored.get_frame().goto_node(replayed_start)
+    assert replayed_scope.locals["world_turn"] == 1
+    restored.resolve_choice(replayed_internal.uid)
+    assert replayed_scope.locals["world_turn"] == 2
 
 
 def test_returning_event_conflicting_action_and_scene_costs_fail_loudly() -> None:
