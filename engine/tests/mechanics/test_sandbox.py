@@ -1556,7 +1556,10 @@ def test_returning_event_restore_and_replay_preserve_no_charge() -> None:
     assert replayed_scope.locals["world_turn"] == 3
 
 
-def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice() -> None:
+@pytest.mark.parametrize("entry_costs", [False, True], ids=["exit-only", "entry-and-exit"])
+def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice(
+    entry_costs: bool,
+) -> None:
     """The event remains in its offered period until its call, not its entry, closes."""
     graph = StoryGraph(label="returning_event_time")
     scope = SandboxScope(label="scope", locals={"world_turn": 3})
@@ -1582,12 +1585,12 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
     start = Block(
         label="night_start",
         content="The night begins at {world_time.period}.",
-        locals={"entry_time_cost": {"kind": "event", "duration": 1}},
+        locals={"entry_time_cost": {"kind": "event", "duration": 1}} if entry_costs else {},
     )
     ending = Block(
         label="night_ending",
         content="The night ends at {world_time.period}.",
-        locals={"entry_time_cost": {"kind": "event", "duration": 1}},
+        locals={"entry_time_cost": {"kind": "event", "duration": 1}} if entry_costs else {},
     )
     other = Block(label="other")
     graph.add(scope)
@@ -1609,7 +1612,7 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         label="night_continue",
         predecessor_id=start.uid,
         successor_id=ending.uid,
-        availability=[Predicate(expr="world_time.period == 1")],
+        availability=[Predicate(expr=f"world_time.period == {1 if entry_costs else 4}")],
     )
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
     do_provision(square, ctx=PhaseCtx(graph=graph, cursor_id=square.uid))
@@ -1626,7 +1629,7 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         ledger.resolve_choice(event.uid)
 
         assert ledger.cursor is start
-        assert scope.locals["world_turn"] == 4
+        assert scope.locals["world_turn"] == (4 if entry_costs else 3)
         assert internal.available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
         restored = Ledger.structure(ledger.unstructure())
         restored_internal = restored.graph.get(internal.uid)
@@ -1639,8 +1642,8 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         assert isinstance(restored_road, SandboxLocation)
         assert isinstance(restored_scope, SandboxScope)
         assert restored.cursor is restored_road
-        assert restored_scope.locals["world_turn"] == 6
-        assert current_world_time(restored_road).period == 3
+        assert restored_scope.locals["world_turn"] == (6 if entry_costs else 4)
+        assert current_world_time(restored_road).period == (3 if entry_costs else 1)
         returned_menu = render_block_choices(
             caller=restored_road,
             ctx=PhaseCtx(graph=restored.graph, cursor_id=restored_road.uid),
@@ -1655,13 +1658,11 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
             fragment.content
             for fragment in restored.get_journal()
             if isinstance(getattr(fragment, "content", None), str)
-        ] == [
-            "Tick 4",
-            "The night begins at 1.",
-            "Tick 5",
-            "The night ends at 2.",
-            "Tick 6",
-        ]
+        ] == (
+            ["Tick 4", "The night begins at 1.", "Tick 5", "The night ends at 2.", "Tick 6"]
+            if entry_costs
+            else ["The night begins at 4.", "The night ends at 4.", "Tick 4"]
+        )
     finally:
         sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
 

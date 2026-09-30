@@ -801,9 +801,12 @@ loudly. The entry schedule is never rechecked while inside or closing the call.
 An arriving block may declare its own `locals['entry_time_cost']`. It pays that
 cost during late UPDATE, after ordinary authored UPDATE effects and before
 JOURNAL, using the innermost open sandbox call's original location when both
-share a clock scope. The value is never inherited from a scene or container;
-absent and explicit-zero costs are free. Scene exit and block entry costs are
-independent and intentionally additive.
+share a clock scope. A `SandboxLocation` instead hosts its own entry tick.
+An ordinary costed block with no same-clock call origin fails loudly: sandbox
+does not inject clocks into unrelated targets. The value is never inherited
+from a scene or container; absent and explicit-zero costs are free. Scene exit
+and block entry costs are independent and intentionally additive. Non-returning
+scenes have no implicit completion boundary and do not receive an exit charge.
 The first tick consumer is charged-asset depletion. Future consumers such as
 hazards,
 deadlines, mobile actors, service completions, or queueing metrics should attach
