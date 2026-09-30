@@ -1558,7 +1558,7 @@ def test_returning_event_restore_and_replay_preserve_no_charge() -> None:
 
 def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice() -> None:
     """The event remains in its offered period until its call, not its entry, closes."""
-    graph = Graph(label="returning_event_time")
+    graph = StoryGraph(label="returning_event_time")
     scope = SandboxScope(label="scope", locals={"world_turn": 3})
     road = SandboxLocation(
         label="road",
@@ -1579,8 +1579,8 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         ],
     )
     scene = Scene(label="night_scene", locals={"exit_time_cost": {"kind": "event", "duration": 1}})
-    start = Block(label="night_start", content="The night begins.")
-    ending = Block(label="night_ending", content="The night ends.")
+    start = Block(label="night_start", content="The night begins at {world_time.period}.")
+    ending = Block(label="night_ending", content="The night ends at {world_time.period}.")
     other = Block(label="other")
     graph.add(scope)
     graph.add(road)
@@ -1625,7 +1625,15 @@ def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice()
         assert ledger.cursor is road
         assert scope.locals["world_turn"] == 4
         assert current_world_time(road).period == 1
-        assert [fragment.content for fragment in ledger.get_journal()] == ["Tick 4"]
+        assert [
+            fragment.content
+            for fragment in ledger.get_journal()
+            if isinstance(getattr(fragment, "content", None), str)
+        ] == [
+            "The night begins at 4.",
+            "The night ends at 4.",
+            "Tick 4",
+        ]
     finally:
         sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
 
