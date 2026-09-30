@@ -18,7 +18,7 @@ from tangl.core import Graph
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.media.sprite_sheets.index import SpriteSheetError
-from tangl.media.sprite_sheets.shorthand import SheetDeclaration
+from tangl.media.sprite_sheets.shorthand import SheetDeclaration, index_standard_filename
 
 
 def _png(path: Path, size: tuple[int, int], shade: int) -> Path:
@@ -216,6 +216,43 @@ def test_world_handler_can_declare_a_sheet_target_outside_the_default_grammar(tm
     [ref] = manager.get_rit("subject@place.png").sprite_sheets
     assert ref.path.name == "subject@place-alt-1x1.png"
     assert ref.manifest.clip_names() == ["alt"]
+
+
+def test_standard_filename_handler_adds_metadata_and_declares_optional_duration(tmp_path: Path) -> None:
+    sheet_path = _png(tmp_path / "images" / "subject@place-dawn-alt-2x1-1500ms.png", (20, 12), 20)
+    still_path = _png(tmp_path / "images" / "other@place-night.png", (10, 12), 10)
+
+    sheet = index_standard_filename(MediaRIT(path=sheet_path), ctx=object())
+    still = index_standard_filename(MediaRIT(path=still_path), ctx=object())
+
+    assert sheet.sheet_declaration == SheetDeclaration(
+        root="subject@place",
+        clip="alt",
+        cols=2,
+        rows=1,
+        total_ms=1500,
+    )
+    assert sheet.tags >= {"subject:subject@place", "tag:dawn"}
+    assert still.sheet_declaration is None
+    assert still.tags >= {"subject:other@place", "tag:night"}
+
+
+def test_standard_filename_handler_respects_an_explicit_opt_out_and_non_image_records(
+    tmp_path: Path,
+) -> None:
+    image_path = _png(tmp_path / "images" / "subject@place-alt-2x1.png", (20, 12), 20)
+    audio_path = tmp_path / "images" / "other@place-alt-2x1.mp3"
+    audio_path.write_bytes(b"not an audio decoder test")
+
+    opted_out = MediaRIT(path=image_path, sheet_declaration=False)
+    audio = MediaRIT(path=audio_path)
+    index_standard_filename(opted_out, ctx=object())
+    index_standard_filename(audio, ctx=object())
+
+    assert opted_out.sheet_declaration is False
+    assert opted_out.tags >= {"subject:subject@place"}
+    assert audio.sheet_declaration is None
+    assert audio.tags >= {"subject:other@place"}
 
 
 def test_sheet_target_does_not_cross_directories(tmp_path: Path) -> None:

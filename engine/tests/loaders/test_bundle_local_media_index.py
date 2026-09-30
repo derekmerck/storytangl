@@ -52,24 +52,11 @@ from __future__ import annotations
 SHEET_DOMAIN_SOURCE = '''\
 from __future__ import annotations
 
-from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.media.sprite_sheets import SheetDeclaration
-
-
-def declare_sheet(caller: MediaRIT, *, ctx: object) -> MediaRIT:
-    _ = ctx
-    if caller.path is not None and caller.path.name == "subject@place-alt-1x1.png":
-        caller.sheet_declaration = SheetDeclaration(
-            root="subject@place",
-            clip="alt",
-            cols=1,
-            rows=1,
-        )
-    return caller
+from tangl.media.sprite_sheets import index_standard_filename
 
 
 def get_media_index_handlers() -> list[object]:
-    return [declare_sheet]
+    return [index_standard_filename]
 '''
 
 
@@ -174,6 +161,7 @@ def test_world_index_handler_declares_sprite_sheet_before_default_fill(
     Image.new("RGBA", (10, 12), (20, 20, 20, 255)).save(
         media_dir / "subject@place-alt-1x1.png",
     )
+    Image.new("RGBA", (10, 12), (30, 30, 30, 255)).save(media_dir / "other@place-dawn.png")
 
     world = _compile(tmp_path, "media_sheet_local")
     indexed = {record.path.name: record for record in world.resources.registry.values()}
@@ -186,6 +174,28 @@ def test_world_index_handler_declares_sprite_sheet_before_default_fill(
     )
     [ref] = indexed["subject@place.png"].sprite_sheets
     assert ref.path.name == "subject@place-alt-1x1.png"
+    assert indexed["subject@place.png"].label == "subject@place.png"
+    assert indexed["other@place-dawn.png"].tags >= {"subject:other@place", "tag:dawn"}
+
+
+def test_non_adopting_world_keeps_standard_filename_as_an_ordinary_still(tmp_path: Path) -> None:
+    _write_media_bundle(
+        tmp_path,
+        label="media_no_standard_index",
+        domain_source=BARE_DOMAIN_SOURCE,
+    )
+    media_dir = tmp_path / "media_no_standard_index" / "media"
+    Image.new("RGBA", (10, 12), (10, 10, 10, 255)).save(media_dir / "subject@place.png")
+    Image.new("RGBA", (10, 12), (20, 20, 20, 255)).save(
+        media_dir / "subject@place-alt-1x1.png",
+    )
+
+    world = _compile(tmp_path, "media_no_standard_index")
+    indexed = {record.path.name: record for record in world.resources.registry.values()}
+
+    assert indexed["subject@place-alt-1x1.png"].sheet_declaration is None
+    assert indexed["subject@place.png"].sprite_sheets == []
+    assert not {tag for tag in _tags(world) if tag.startswith(("subject:", "tag:"))}
 
 
 def test_hooks_are_invoked_per_domain_adjunct_load_not_once_per_import(
