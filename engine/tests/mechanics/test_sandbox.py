@@ -1712,6 +1712,18 @@ def test_block_entry_cost_uses_the_open_call_origin_and_own_locals() -> None:
     assert scope.locals["world_turn"] == 4
 
 
+def test_costed_block_entry_without_a_sandbox_call_origin_fails_loudly() -> None:
+    graph = Graph()
+    block = Block(label="block", locals={"entry_time_cost": {"duration": 1}})
+    graph.add(block)
+
+    with pytest.raises(ValueError, match="sandbox call origin"):
+        sandbox_handlers.advance_sandbox_time_on_block_entry(
+            caller=block,
+            ctx=PhaseCtx(graph=graph, cursor_id=block.uid),
+        )
+
+
 def test_returning_event_conflicting_action_and_scene_costs_fail_loudly() -> None:
     graph = Graph()
     road = SandboxLocation(label="road")
