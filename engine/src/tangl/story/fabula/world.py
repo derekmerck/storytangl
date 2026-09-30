@@ -28,6 +28,35 @@ def _copy_bundle_value(value: Any) -> Any:
     return value
 
 
+def _copy_story_locals(value: Any, memo: dict[int, Any] | None = None) -> Any:
+    """Copy a finite native namespace graph while preserving reference-like values."""
+
+    memo = {} if memo is None else memo
+    value_id = id(value)
+    if value_id in memo:
+        return memo[value_id]
+    if isinstance(value, dict):
+        copied: dict[Any, Any] = {}
+        memo[value_id] = copied
+        copied.update({key: _copy_story_locals(item, memo) for key, item in value.items()})
+        return copied
+    if isinstance(value, list):
+        copied = []
+        memo[value_id] = copied
+        copied.extend(_copy_story_locals(item, memo) for item in value)
+        return copied
+    if isinstance(value, set):
+        copied = set()
+        memo[value_id] = copied
+        copied.update(_copy_story_locals(item, memo) for item in value)
+        return copied
+    if isinstance(value, tuple):
+        copied = tuple(_copy_story_locals(item, memo) for item in value)
+        memo[value_id] = copied
+        return copied
+    return value
+
+
 def _template_depth(templ: Any) -> tuple[int, int, str]:
     depth = 0
     current = getattr(templ, "parent", None)
@@ -554,7 +583,7 @@ class World(TraversableGraphFactory):
         graph = StoryGraph(
             label=story_label,
             frozen_shape=(init_mode is InitMode.EAGER and freeze_shape),
-            locals=dict(self.locals),
+            locals=_copy_story_locals(self.locals),
             factory=self,
         )
         graph.story_id = graph.uid

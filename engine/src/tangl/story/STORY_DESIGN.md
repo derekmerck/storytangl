@@ -125,6 +125,14 @@ side effect of ordinary concept mutation.
 
 ## Compilation and World Assembly
 
+### World Global Seeds
+
+Each call to `World.create_story()` copies a finite graph of native mutable
+containers from the world's global namespace into the new graph. Nested
+dictionaries, lists, and sets belong to that graph, and repeated references in
+the source remain repeated references in its copy; reference-like values remain
+references rather than becoming a second persistence or ownership mechanism.
+
 ### Authored Node Effect Timing
 
 Blocks may name `pre_effects` for UPDATE and `post_effects` for FINALIZE. The
