@@ -31,6 +31,7 @@ from tangl.mechanics.sandbox import (
     SandboxMob,
     SandboxMobAffordance,
     SandboxScope,
+    SandboxTimeCost,
     SandboxVisibilityRule,
     Schedule,
     ScheduleEntry,
@@ -42,7 +43,10 @@ from tangl.mechanics.sandbox import (
     current_world_time,
     normalize_sandbox_direction,
 )
+from tangl.mechanics.sandbox import handlers as sandbox_handlers
 from tangl.mechanics.sandbox import incremental as sandbox_incremental
+from tangl.mechanics.sandbox.dispatch import on_sandbox_tick, sandbox_dispatch
+from tangl.mechanics.sandbox.time import SandboxTickEvent
 from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
@@ -1552,6 +1556,118 @@ def test_returning_event_restore_and_replay_preserve_no_charge() -> None:
     assert replayed_scope.locals["world_turn"] == 3
 
 
+def test_returning_event_charges_its_scene_exit_after_its_last_internal_choice() -> None:
+    """The event remains in its offered period until its call, not its entry, closes."""
+    graph = StoryGraph(label="returning_event_time")
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(
+        label="road",
+        scheduled_events=[
+            ScheduledEvent(
+                label="night_event",
+                period=4,
+                target="night_scene",
+                text="Attend the night event",
+                return_to_location=True,
+            ),
+        ],
+    )
+    square = SandboxLocation(
+        label="square",
+        scheduled_events=[
+            ScheduledEvent(label="other_offer", period=4, target="other", text="Other offer"),
+        ],
+    )
+    scene = Scene(label="night_scene", locals={"exit_time_cost": {"kind": "event", "duration": 1}})
+    start = Block(label="night_start", content="The night begins at {world_time.period}.")
+    ending = Block(label="night_ending", content="The night ends at {world_time.period}.")
+    other = Block(label="other")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(square)
+    graph.add(scene)
+    graph.add(start)
+    graph.add(ending)
+    graph.add(other)
+    scope.add_child(road)
+    scope.add_child(square)
+    scope.add_child(scene)
+    scope.add_child(other)
+    scene.add_child(start)
+    scene.add_child(ending)
+    scene.finalize_container_contract()
+    internal = Action(
+        registry=graph,
+        label="night_continue",
+        predecessor_id=start.uid,
+        successor_id=ending.uid,
+        availability=[Predicate(expr="world_time.period == 4")],
+    )
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(square, ctx=PhaseCtx(graph=graph, cursor_id=square.uid))
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    @on_sandbox_tick
+    def observe_completion_tick(*, caller, clock_tick, **_kw):
+        if caller.get_label() == "road":
+            return SandboxTickEvent(kind="witness", text=f"Tick {clock_tick}", clock_tick=clock_tick)
+        return []
+
+    try:
+        ledger = Ledger.from_graph(graph, entry_id=road.uid)
+        ledger.resolve_choice(event.uid)
+
+        assert ledger.cursor is start
+        assert scope.locals["world_turn"] == 3
+        assert internal.available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
+        restored = Ledger.structure(ledger.unstructure())
+        restored_internal = restored.graph.get(internal.uid)
+        assert isinstance(restored_internal, Action)
+        restored.resolve_choice(restored_internal.uid)
+
+        restored_road = restored.graph.get(road.uid)
+        restored_scope = restored.graph.get(scope.uid)
+        assert isinstance(restored_road, SandboxLocation)
+        assert isinstance(restored_scope, SandboxScope)
+        assert restored.cursor is restored_road
+        assert restored_scope.locals["world_turn"] == 4
+        assert current_world_time(restored_road).period == 1
+        returned_menu = render_block_choices(
+            caller=restored_road,
+            ctx=PhaseCtx(graph=restored.graph, cursor_id=restored_road.uid),
+        ) or []
+        returned_event = next(
+            fragment
+            for fragment in returned_menu
+            if isinstance(fragment, ChoiceFragment) and fragment.text == "Attend the night event"
+        )
+        assert returned_event.available is False
+        assert [
+            fragment.content
+            for fragment in restored.get_journal()
+            if isinstance(getattr(fragment, "content", None), str)
+        ] == [
+            "The night begins at 4.",
+            "The night ends at 4.",
+            "Tick 4",
+        ]
+        restored.rollback_to_step(1, reason="replay charged event completion")
+        replayed_internal = restored.graph.get(internal.uid)
+        replayed_scope = restored.graph.get(scope.uid)
+        assert isinstance(replayed_internal, Action)
+        assert isinstance(replayed_scope, SandboxScope)
+        assert replayed_scope.locals["world_turn"] == 3
+        restored.resolve_choice(replayed_internal.uid)
+        assert replayed_scope.locals["world_turn"] == 4
+        assert [
+            fragment.content
+            for fragment in restored.get_journal()
+            if isinstance(getattr(fragment, "content", None), str)
+        ].count("Tick 4") == 1
+    finally:
+        sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
+
+
 def test_rejected_event_selection_does_not_change_time() -> None:
     """Validation rejects a stale event without any sandbox clock side effect."""
     graph, scope, road, _event_beat = _event_time_graph()
@@ -1562,6 +1678,35 @@ def test_rejected_event_selection_does_not_change_time() -> None:
         Ledger.from_graph(graph, entry_id=road.uid).resolve_choice(event.uid)
 
     assert scope.locals["world_turn"] == 3
+
+
+def test_returning_event_explicit_zero_cost_stays_free() -> None:
+    graph = Graph()
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene", locals={"exit_time_cost": {"kind": "event", "duration": 0}})
+    graph.add(road)
+    graph.add(scene)
+    call = Action(registry=graph, predecessor_id=road.uid, successor_id=scene.uid, tags={"event"})
+
+    assert sandbox_handlers._returning_event_cost(call) == SandboxTimeCost(kind="event", duration=0)
+
+
+def test_returning_event_conflicting_action_and_scene_costs_fail_loudly() -> None:
+    graph = Graph()
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene", locals={"exit_time_cost": {"kind": "event", "duration": 1}})
+    graph.add(road)
+    graph.add(scene)
+    call = Action(
+        registry=graph,
+        predecessor_id=road.uid,
+        successor_id=scene.uid,
+        tags={"event"},
+        payload={"sandbox_time_cost": {"kind": "event", "duration": 2}},
+    )
+
+    with pytest.raises(ValueError, match="conflicting action and scene"):
+        sandbox_handlers._returning_event_cost(call)
 
 
 def test_stale_scheduled_event_is_rejected_before_entry() -> None:
@@ -2452,6 +2597,31 @@ def test_scope_donates_wait_to_child_locations() -> None:
 
     do_provision(peer, ctx=PhaseCtx(graph=graph, cursor_id=peer.uid))
     assert _dynamic_sandbox_actions_with_tag(peer, "wait") == []
+
+
+def test_each_sandbox_tick_sees_its_advanced_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph = Graph(label="tick_namespace")
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(label="road")
+    graph.add(scope)
+    graph.add(road)
+    scope.add_child(road)
+    observed: list[tuple[int, int]] = []
+
+    def observe_tick(caller, *, ctx, clock_tick, **_kw):
+        observed.append((clock_tick, ctx.get_ns(caller)["world_time"].turn))
+        return []
+
+    monkeypatch.setattr(sandbox_handlers, "do_sandbox_tick", observe_tick)
+    sandbox_handlers._sandbox_time_advance(
+        road,
+        ctx=PhaseCtx(graph=graph, cursor_id=road.uid),
+        cost=SandboxTimeCost(kind="event", duration=2),
+    )
+
+    assert observed == [(4, 4), (5, 5)]
 
 
 def test_scope_wait_advances_shared_scope_time() -> None:

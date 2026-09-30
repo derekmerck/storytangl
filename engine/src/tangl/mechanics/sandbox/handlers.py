@@ -14,7 +14,7 @@ from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
 from tangl.journal.fragments import ContentFragment
-from tangl.story import Action, StoryGraph
+from tangl.story import Action, Scene, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import (
     ResolutionPhase,
@@ -22,6 +22,7 @@ from tangl.vm import (
     VmPhaseCtx,
     has_visited,
     on_journal,
+    on_complete_call,
     on_provision,
     on_update,
 )
@@ -748,22 +749,23 @@ def _time_owner(location: SandboxLocation) -> Any:
     return location
 
 
-def _inject_tick_fragments(
-    ctx: VmPhaseCtx,
+def _tick_fragments(
     location: SandboxLocation,
     result: SandboxTickResult,
-) -> None:
+) -> list[ContentFragment]:
+    fragments: list[ContentFragment] = []
     for event in result.events:
         if not event.observable or not event.text:
             continue
         source_id = event.source_id or location.uid
-        ctx.injected_journal_fragments.append(
+        fragments.append(
             ContentFragment(
                 content=event.text,
                 source_id=source_id,
                 origin_id=source_id,
             )
         )
+    return fragments
 
 
 def _sandbox_time_advance(
@@ -771,6 +773,7 @@ def _sandbox_time_advance(
     *,
     ctx: VmPhaseCtx,
     cost: SandboxTimeCost | None,
+    inject_fragments: bool = True,
 ) -> SandboxTickResult:
     duration = _clock_policy(location).action_duration(cost)
     result = SandboxTickResult(requested=duration)
@@ -781,6 +784,7 @@ def _sandbox_time_advance(
     charged_assets = _charged_assets(location)
     for _ in range(duration):
         clock_tick = advance_world_turn(time_owner, 1)
+        ctx.invalidate_namespaces()
         result.elapsed += 1
         result.events.extend(
             do_sandbox_tick(
@@ -790,8 +794,33 @@ def _sandbox_time_advance(
                 charged_assets=charged_assets,
             )
         )
-    _inject_tick_fragments(ctx, location, result)
+    if inject_fragments:
+        ctx.injected_journal_fragments.extend(_tick_fragments(location, result))
     return result
+
+
+def _returning_event_scene(call: Action) -> Scene | None:
+    for candidate in (call.successor, *call.successor.ancestors):
+        if isinstance(candidate, Scene):
+            return candidate
+    return None
+
+
+def _returning_event_cost(call: Action) -> SandboxTimeCost | None:
+    action_cost = None
+    if isinstance(call.payload, dict) and "sandbox_time_cost" in call.payload:
+        action_cost = _coerce_time_cost(call.payload["sandbox_time_cost"])
+    scene = _returning_event_scene(call)
+    scene_cost = (
+        _coerce_time_cost(scene.locals["exit_time_cost"])
+        if scene is not None and "exit_time_cost" in scene.locals
+        else None
+    )
+    if action_cost is not None and scene_cost is not None and action_cost != scene_cost:
+        raise ValueError(
+            "Returning scheduled event has conflicting action and scene exit time costs",
+        )
+    return action_cost if action_cost is not None else scene_cost
 
 
 def _charged_assets(location: SandboxLocation) -> list[Token]:
@@ -2428,6 +2457,27 @@ def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
         return None
     _sandbox_time_advance(caller, ctx=ctx, cost=cost)
     return None
+
+
+@on_complete_call
+def advance_returning_scheduled_event_time(*, caller, ctx, **_kw):
+    """Close a returning scheduled event's declared time after its final output."""
+    if not isinstance(caller, Action) or "event" not in (caller.tags or set()):
+        return None
+    origin = caller.predecessor
+    if not isinstance(origin, SandboxLocation):
+        return None
+    cost = _returning_event_cost(caller)
+    if cost is None:
+        return None
+    origin_ctx = ctx.derive(cursor_id=origin.uid)
+    result = _sandbox_time_advance(
+        origin,
+        ctx=origin_ctx,
+        cost=cost,
+        inject_fragments=False,
+    )
+    return _tick_fragments(origin, result)
 
 
 @on_sandbox_tick(
