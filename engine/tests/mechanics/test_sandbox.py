@@ -1723,6 +1723,23 @@ def test_costed_block_entry_without_a_sandbox_call_origin_fails_loudly() -> None
         )
 
 
+def test_costed_sandbox_location_uses_its_own_tick_origin() -> None:
+    graph = Graph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 0})
+    start = SandboxLocation(label="start")
+    destination = SandboxLocation(label="destination", locals={"entry_time_cost": {"duration": 1}})
+    graph.add(scope)
+    graph.add(start)
+    graph.add(destination)
+    scope.add_child(start)
+    scope.add_child(destination)
+    travel = Action(registry=graph, predecessor_id=start.uid, successor_id=destination.uid)
+
+    Ledger.from_graph(graph, entry_id=start.uid).resolve_choice(travel.uid)
+
+    assert scope.locals["world_turn"] == 1
+
+
 @pytest.mark.parametrize("entry_cost", [None, {"kind": "event", "duration": 0}])
 def test_absent_or_zero_block_entry_cost_is_free(entry_cost) -> None:
     graph = Graph()
@@ -1831,6 +1848,39 @@ def test_block_entry_cost_restores_rolls_back_and_replays_per_visit() -> None:
     assert replayed_scope.locals["world_turn"] == 1
     restored.resolve_choice(replayed_internal.uid)
     assert replayed_scope.locals["world_turn"] == 2
+
+
+def test_internal_return_revisits_and_repays_a_costed_block() -> None:
+    graph = StoryGraph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 0})
+    road = SandboxLocation(label="road")
+    scene = Scene(label="scene")
+    start = Block(label="start", locals={"entry_time_cost": {"duration": 1}})
+    ending = Block(label="ending")
+    for item in (scope, road, scene, start, ending):
+        graph.add(item)
+    scope.add_child(road)
+    scope.add_child(scene)
+    scene.add_child(start)
+    scene.add_child(ending)
+    scene.finalize_container_contract()
+    call = Action(
+        registry=graph,
+        predecessor_id=road.uid,
+        successor_id=scene.uid,
+        return_phase=ResolutionPhase.PLANNING,
+        tags={"event"},
+    )
+    onward = Action(registry=graph, predecessor_id=start.uid, successor_id=ending.uid)
+    back = Action(registry=graph, predecessor_id=ending.uid, successor_id=start.uid)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    ledger.resolve_choice(call.uid)
+    assert scope.locals["world_turn"] == 1
+    ledger.resolve_choice(onward.uid)
+    ledger.resolve_choice(back.uid)
+    assert ledger.cursor.get_label() == "start"
+    assert scope.locals["world_turn"] == 2
 
 
 def test_returning_event_conflicting_action_and_scene_costs_fail_loudly() -> None:

@@ -2478,7 +2478,7 @@ def advance_sandbox_time_on_block_entry(*, caller, ctx, **_kw):
     cost = _coerce_time_cost(caller.locals["entry_time_cost"])
     if cost is None:
         return None
-    origin = _block_entry_origin(caller, ctx)
+    origin = caller if isinstance(caller, SandboxLocation) else _block_entry_origin(caller, ctx)
     if origin is None:
         raise ValueError("Costed block entry requires a sandbox call origin in the same clock scope")
     origin_ctx = ctx.derive(cursor_id=origin.uid)
