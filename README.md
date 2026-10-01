@@ -353,6 +353,7 @@ Optional extras:
 poetry install -E server    # FastAPI + uvicorn + storage extras
 poetry install -E cli       # cmd2 CLI only
 poetry install -E docs      # Sphinx documentation extras
+poetry install -E dicebear  # deterministic local portrait backend
 ```
 
 ### Run Tests

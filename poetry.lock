@@ -44,7 +44,7 @@ trio = ["trio (>=0.31.0)", "trio (>=0.32.0)"]
 name = "attrs"
 version = "26.1.0"
 description = "Classes Without Boilerplate"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "attrs-26.1.0-py3-none-any.whl", hash = "sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"},
@@ -702,7 +702,7 @@ tests = ["pytest", "pytest-cov", "pytest-xdist"]
 name = "dicebear-core"
 version = "10.3.0"
 description = "Unique avatars from dozens of styles — deterministic, customizable, vector-based."
-optional = false
+optional = true
 python-versions = ">=3.10"
 files = [
     {file = "dicebear_core-10.3.0-py3-none-any.whl", hash = "sha256:32746779504b24fa1c19580b4d3515c14303457deb8b5600b291456442f5ed85"},
@@ -720,7 +720,7 @@ dev = ["mypy (>=1.8)", "pytest (>=8.0)", "ruff (>=0.6)"]
 name = "dicebear-schema"
 version = "1.3.0"
 description = "JSON Schema definitions for DiceBear avatar styles and options"
-optional = false
+optional = true
 python-versions = ">=3.10"
 files = [
     {file = "dicebear_schema-1.3.0-py3-none-any.whl", hash = "sha256:56fb9d656b48a6383a4704ad5f67d1ce82b23c8dcfa8d82b676cf2d4a21e7b40"},
@@ -731,7 +731,7 @@ files = [
 name = "dicebear-styles"
 version = "10.3.0rc1"
 description = "Definition files of the DiceBear avatar styles."
-optional = false
+optional = true
 python-versions = ">=3.10"
 files = [
     {file = "dicebear_styles-10.3.0rc1-py3-none-any.whl", hash = "sha256:69ba792ad8bef1f1a610d8f63c5340d2fcc367cfeb8fe4f02f7b5a5d7e87f738"},
@@ -1083,7 +1083,7 @@ files = [
 name = "jsonschema"
 version = "4.26.0"
 description = "An implementation of JSON Schema validation for Python"
-optional = false
+optional = true
 python-versions = ">=3.10"
 files = [
     {file = "jsonschema-4.26.0-py3-none-any.whl", hash = "sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"},
@@ -1104,7 +1104,7 @@ format-nongpl = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-
 name = "jsonschema-specifications"
 version = "2025.9.1"
 description = "The JSON Schema meta-schemas and vocabularies, exposed as a Registry"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe"},
@@ -2555,7 +2555,7 @@ ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==23.2.1)", "requests (>=2.31.0)"
 name = "referencing"
 version = "0.37.0"
 description = "JSON Referencing + Python"
-optional = false
+optional = true
 python-versions = ">=3.10"
 files = [
     {file = "referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231"},
@@ -2649,7 +2649,7 @@ roman-numerals = "4.1.0"
 name = "rpds-py"
 version = "2026.6.3"
 description = "Python bindings to Rust's persistent data structures (rpds)"
-optional = false
+optional = true
 python-versions = ">=3.11"
 files = [
     {file = "rpds_py-2026.6.3-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:7b689145a1485c335569bd056464f3243a29af7ed3871c7be31ad624ba239bc7"},
@@ -3424,6 +3424,7 @@ files = [
 [extras]
 cli = ["cmd2"]
 cli-rich = ["cmd2", "rich"]
+dicebear = ["dicebear-core", "dicebear-styles"]
 docs = ["fastapi", "furo", "linkify-it-py", "myst-parser", "sphinx", "sphinx-markdown-builder"]
 server = ["cmd2", "fastapi", "pymongo", "redis", "uvicorn"]
 solver = ["clingo"]
@@ -3431,4 +3432,4 @@ solver = ["clingo"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4"
-content-hash = "0dc1c54becda108699d1d2004e6a1fee00d74db6306c6ae0a483651e9c408024"
+content-hash = "e0b70eb40bb37f3737506f4bf42e752c764a28345dd32768df317262805e598c"

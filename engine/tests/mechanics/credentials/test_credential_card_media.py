@@ -12,6 +12,8 @@ import pytest
 
 from tangl.core import Graph, Selector, TokenCatalog
 from tangl.journal.fragments import GroupFragment, MediaFragment, PieceFragment
+from tangl.loaders import WorldBundle
+from tangl.loaders.compiler import WorldCompiler
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
@@ -51,6 +53,13 @@ def clear_credential_definitions():
 class _CredentialsBlock(HasGame, Block):
     _game_class = CredentialsGame
     _game_handler_class = CredentialsGameHandler
+
+
+@pytest.fixture(scope="module", autouse=True)
+def activate_hall_monitor_portraits() -> None:
+    """Load the opted-in world through its ordinary domain composition path."""
+    root = Path(__file__).resolve().parents[4] / "worlds" / "hall_monitor"
+    WorldCompiler().compile(WorldBundle.load(root))
 
 
 def _story_media_root(tmp_path: Path):
