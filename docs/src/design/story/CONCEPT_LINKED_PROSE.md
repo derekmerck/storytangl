@@ -3,7 +3,7 @@
 ```{storytangl-topic}
 :topics: prose, journal, revoicing
 :facets: design
-:relation: proposes
+:relation: documents
 :related: observation, lang, roles, journal, compiler
 ```
 
