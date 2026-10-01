@@ -129,6 +129,15 @@ def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
     return frame
 
 
+def _preference_lines(bridge: PygameSessionBridge, preferences) -> tuple[str, ...]:
+    return tuple(
+        f"{preference.shortcut}: {preference.label} {'on' if bridge.preferences[preference.preference_id] else 'off'}"
+        for preference in preferences
+        if preference.shortcut is not None
+        and preference.shortcut.lower() in {f"f{number}" for number in range(1, 13)}
+    )
+
+
 def _keyed(
     stage: Stage,
     frame: Turn,
@@ -250,6 +259,13 @@ def main(argv: list[str] | None = None) -> int:
 
     bridge = PygameSessionBridge()
     logical_size = bridge.stage_extent(args.world)
+    preferences = bridge.discover_preferences(args.world)
+    preference_keys = {
+        getattr(pygame, f"K_{preference.shortcut.upper()}"): preference.preference_id
+        for preference in preferences
+        if preference.shortcut is not None
+        and preference.shortcut.lower() in {f"f{number}" for number in range(1, 13)}
+    }
     envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
@@ -258,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
     )
+    stage.preference_lines = _preference_lines(bridge, preferences)
     frame = _frame(bridge, envelope)
 
     for step in range(args.advance):
@@ -289,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         frame = _frame(bridge, envelope)
 
-    stage.draw(frame)
+    stage.draw(bridge.apply_preferences(frame))
 
     if args.screenshot is not None:
         pygame.image.save(stage.window, str(args.screenshot))
@@ -307,22 +324,27 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 action = stage.hit(event.pos)
             elif event.type == pygame.KEYDOWN:
+                if pending is None and event.key in preference_keys:
+                    bridge.toggle_preference(preference_keys[event.key])
+                    stage.preference_lines = _preference_lines(bridge, preferences)
+                    stage.draw(bridge.apply_preferences(frame))
+                    continue
                 if event.key == pygame.K_ESCAPE:
                     # Escape leaves a selection before it leaves the game: a
                     # player who opened one by mistake should not have to quit.
                     if pending is not None:
                         pending = None
-                        stage.draw(frame)
+                        stage.draw(bridge.apply_preferences(frame))
                     else:
                         running = False
                 elif event.key == pygame.K_TAB:
                     action = PagePanel()
                 elif event.key in (pygame.K_UP, pygame.K_PAGEUP):
                     stage.scroll_by(-1 if event.key == pygame.K_UP else -4)
-                    stage.draw(frame, pending)
+                    stage.draw(bridge.apply_preferences(frame), pending)
                 elif event.key in (pygame.K_DOWN, pygame.K_PAGEDOWN):
                     stage.scroll_by(1 if event.key == pygame.K_DOWN else 4)
-                    stage.draw(frame, pending)
+                    stage.draw(bridge.apply_preferences(frame), pending)
                 elif pygame.K_0 <= event.key <= pygame.K_9:
                     action = _keyed(stage, frame, pending, event.key - pygame.K_0)
                 elif pending is None and (
@@ -338,12 +360,12 @@ def main(argv: list[str] | None = None) -> int:
             pending, envelope = _apply(bridge, stage, frame, pending, action)
             if envelope is not None:
                 frame = _frame(bridge, envelope)
-            stage.draw(frame, pending)
+            stage.draw(bridge.apply_preferences(frame), pending)
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze
         # every clip for as long as the pointer moved.
         if stage.animating and stage.since_drawn_ms() >= FRAME_MS:
-            stage.draw(frame, pending)
+            stage.draw(bridge.apply_preferences(frame), pending)
     pygame.quit()
     return 0
 

@@ -87,6 +87,8 @@ class StageImage:
     sheets: tuple["SheetSource", ...] = ()
     """Sprite sheets delivered beside the still. The still stays the floor."""
 
+    visibility_preference: str | None = None
+
 
 @dataclass(slots=True, frozen=True)
 class SheetSource:

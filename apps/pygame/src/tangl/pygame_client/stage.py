@@ -320,6 +320,7 @@ class Stage:
         self.panel_scroll = 0
         self.prose_floor = self.logical_size[1]
         self.selection_numbers: dict[str, int] = {}
+        self.preference_lines: tuple[str, ...] = ()
         self._last_turn: Turn | None = None
         self._now: Callable[[], float] = clock or pygame.time.get_ticks
         """Milliseconds. Injected by tests, so no assertion depends on wall time."""
@@ -386,7 +387,12 @@ class Stage:
 
     # ── drawing ──────────────────────────────────────────────────────────
 
-    def draw(self, turn: Turn, pending: PendingSelection | None = None) -> None:
+    def draw(
+        self,
+        turn: Turn,
+        pending: PendingSelection | None = None,
+        preference_lines: tuple[str, ...] = (),
+    ) -> None:
         """Render one turn and record its hitboxes for the input layer.
 
         While ``pending`` is set the choice list is replaced by the pieces that
@@ -411,6 +417,16 @@ class Stage:
             pygame.display.flip()
             return
         self._draw_background(loaded)
+        for index, line in enumerate(self.preference_lines):
+            self.surface.blit(
+                self.font.render(line, False, INK),
+                (2 * self.density, 2 * self.density + index * self.row_height),
+            )
+        for index, line in enumerate(preference_lines):
+            self.surface.blit(
+                self.font.render(line, False, INK),
+                (2 * self.density, 2 * self.density + index * self.row_height),
+            )
         # Rows below are laid out first and always reserved, so a long exchange
         # can never push the only way to continue off the logical surface.
         # Placement is pure data -- slots against piece kinds, no pixels -- so it

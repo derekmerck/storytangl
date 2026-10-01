@@ -13,6 +13,12 @@ them. Backend state remains authoritative for every action.
 
 ## Status
 
+Slice 4 begins declarative client preferences: worlds may publish typed boolean
+declarations through exact `ui-preferences` world-info. Clients retain values
+locally per world and only explicit staged-media visibility delegations read
+them. This first slice does not add dynamic disclosure/status, enum variants,
+server persistence, or a new dispatch/widget surface.
+
 Current — Slice 2 also owns `UxEvent`, advisory grammar, `ProjectedState`,
 `ProjectedSection`, section value variants, info affordances/state, and the
 exact-channel `ProjectionRequest` that lower-layer providers consume. An empty
