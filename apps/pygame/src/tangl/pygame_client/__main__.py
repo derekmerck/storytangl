@@ -39,9 +39,11 @@ from .models import (
     PagePanel,
     PageSelection,
     Piece,
+    PreferenceControl,
     PickPiece,
     StageImage,
     Turn,
+    TogglePreference,
     Zone,
 )
 from .stage import (
@@ -129,12 +131,16 @@ def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
     return frame
 
 
-def _preference_lines(bridge: PygameSessionBridge, preferences) -> tuple[str, ...]:
+def _preference_controls(bridge: PygameSessionBridge, preferences) -> tuple[PreferenceControl, ...]:
     return tuple(
-        f"{preference.shortcut}: {preference.label} {'on' if bridge.preferences[preference.preference_id] else 'off'}"
+        PreferenceControl(
+            preference_id=preference.preference_id,
+            label=preference.label,
+            help=preference.help,
+            enabled=bridge.preferences[preference.preference_id],
+            shortcut=preference.shortcut,
+        )
         for preference in preferences
-        if preference.shortcut is not None
-        and preference.shortcut.lower() in {f"f{number}" for number in range(1, 13)}
     )
 
 
@@ -180,6 +186,9 @@ def _apply(
     the action reached the service, the envelope it produced."""
 
     match action:
+        case TogglePreference(preference_id=preference_id):
+            bridge.toggle_preference(preference_id)
+            return pending, None
         case CancelSelection():
             return None, None
         case BeginSelection(choice=choice):
@@ -274,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
     )
-    stage.preference_lines = _preference_lines(bridge, preferences)
+    stage.preference_controls = _preference_controls(bridge, preferences)
     frame = _frame(bridge, envelope)
 
     for step in range(args.advance):
@@ -326,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.KEYDOWN:
                 if pending is None and event.key in preference_keys:
                     bridge.toggle_preference(preference_keys[event.key])
-                    stage.preference_lines = _preference_lines(bridge, preferences)
+                    stage.preference_controls = _preference_controls(bridge, preferences)
                     stage.draw(frame, media_visibility=bridge.media_visibility(frame))
                     continue
                 if event.key == pygame.K_ESCAPE:
@@ -358,6 +367,8 @@ def main(argv: list[str] | None = None) -> int:
             if action is None:
                 continue
             pending, envelope = _apply(bridge, stage, frame, pending, action)
+            if isinstance(action, TogglePreference):
+                stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
                 frame = _frame(bridge, envelope)
             stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))

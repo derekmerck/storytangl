@@ -38,9 +38,11 @@ from .models import (
     PagePanel,
     PageSelection,
     PendingSelection,
+    PreferenceControl,
     Piece,
     PickPiece,
     StageImage,
+    TogglePreference,
     Surface,
     SurfaceSlot,
     Turn,
@@ -320,7 +322,7 @@ class Stage:
         self.panel_scroll = 0
         self.prose_floor = self.logical_size[1]
         self.selection_numbers: dict[str, int] = {}
-        self.preference_lines: tuple[str, ...] = ()
+        self.preference_controls: tuple[PreferenceControl, ...] = ()
         self._last_turn: Turn | None = None
         self._now: Callable[[], float] = clock or pygame.time.get_ticks
         """Milliseconds. Injected by tests, so no assertion depends on wall time."""
@@ -415,6 +417,7 @@ class Stage:
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
         if pending is None and self._draw_map(turn, loaded):
+            self._draw_preferences()
             # The map replaces the stage, so every sprite has left it: drop their
             # playback, or a clip resumes mid-cycle on the far side of the map.
             self._clips.clear()
@@ -423,11 +426,7 @@ class Stage:
             pygame.display.flip()
             return
         self._draw_background(loaded)
-        for index, line in enumerate(self.preference_lines):
-            self.surface.blit(
-                self.font.render(line, False, INK),
-                (2 * self.density, 2 * self.density + index * self.row_height),
-            )
+        self._draw_preferences()
         # Rows below are laid out first and always reserved, so a long exchange
         # can never push the only way to continue off the logical surface.
         # Placement is pure data -- slots against piece kinds, no pixels -- so it
@@ -511,6 +510,21 @@ class Stage:
             self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
+
+    def _draw_preferences(self) -> None:
+        for index, control in enumerate(self.preference_controls[:2]):
+            shortcut = f"{control.shortcut}: " if control.shortcut else ""
+            help_text = f" — {control.help}" if control.help else ""
+            text = f"{shortcut}{control.label}: {'on' if control.enabled else 'off'}{help_text}"
+            surface = self.font.render(text, False, INK)
+            rect = pygame.Rect(
+                2 * self.density,
+                2 * self.density + index * self.row_height,
+                surface.get_width(),
+                self.row_height,
+            )
+            self.surface.blit(surface, rect.topleft)
+            self.hitboxes.append((rect, TogglePreference(control.preference_id)))
 
     # ── map view ─────────────────────────────────────────────────────────
 
