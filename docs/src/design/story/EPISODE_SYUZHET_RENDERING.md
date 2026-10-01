@@ -329,8 +329,10 @@ Future work should be driven by a concrete second consumer:
    recursive text without replacing ``compose_journal``.
 2. Observation/vantage may graduate when a world needs disclosure policy that
    cannot be expressed by current scoped namespace and presentation adapters.
-3. Revoicing may graduate when exact replay, localization, or point-of-view
-   conversion supplies behavioral fixtures.
+3. Concept linking and revoicing may graduate through the source-reference
+   contract proposed in [Concept-Linked Prose and Journal Revoicing](CONCEPT_LINKED_PROSE.md),
+   beginning with exact role-linked naming fixtures before broader localization or
+   point-of-view conversion.
 4. Richer media selection and composition remain media concerns; they consume
    semantic projections rather than becoming story truth.
 
@@ -342,6 +344,7 @@ presentation systems.
 
 - [Mechanics Families](MECHANICS_FAMILIES.md)
 - [Journal Compose Contract](JOURNAL_COMPOSE_CONTRACT.md)
+- [Concept-Linked Prose and Journal Revoicing](CONCEPT_LINKED_PROSE.md)
 - [Presence/Prose Contract Spike](PRESENCE_PROSE_CONTRACT.md)
 - [Generative Media Design](../GENERATIVE_MEDIA_DESIGN.md)
 - [Fragment Stream Contract](../service/FRAGMENT_STREAM_CONTRACT.md)
