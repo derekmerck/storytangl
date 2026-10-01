@@ -359,6 +359,9 @@ poetry install -E dicebear  # deterministic local portrait backend
 ### Run Tests
 
 ```bash
+# The full repository suite includes Hall Monitor's DiceBear portrait checks.
+poetry install --with dev -E dicebear
+
 # Configured repository suite: engine, docs, scripts, and reference adapters
 poetry run pytest
 
