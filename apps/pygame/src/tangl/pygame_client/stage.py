@@ -11,7 +11,7 @@ colour plus text.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from uuid import UUID
 
@@ -359,7 +359,7 @@ class Stage:
         return surface
 
     def _resolve_images(
-        self, turn: Turn
+        self, turn: Turn, media_visibility: Mapping[str, bool]
     ) -> tuple[list[tuple[StageImage, pygame.Surface]], list[StageImage]]:
         """Split staged images into drawable surfaces and those that are not.
 
@@ -370,6 +370,11 @@ class Stage:
         loaded: list[tuple[StageImage, pygame.Surface]] = []
         unloadable: list[StageImage] = []
         for image in turn.images:
+            if (
+                image.visibility_preference is not None
+                and not media_visibility[image.visibility_preference]
+            ):
+                continue
             surface = self._load(image.source)
             if surface is None:
                 unloadable.append(image)
@@ -391,7 +396,7 @@ class Stage:
         self,
         turn: Turn,
         pending: PendingSelection | None = None,
-        preference_lines: tuple[str, ...] = (),
+        media_visibility: Mapping[str, bool] | None = None,
     ) -> None:
         """Render one turn and record its hitboxes for the input layer.
 
@@ -405,7 +410,8 @@ class Stage:
         self.slot_boxes.clear()
         self.animating = False
         self._drawn_at = self._now()
-        loaded, unloadable = self._resolve_images(turn)
+        visibility = media_visibility or {}
+        loaded, unloadable = self._resolve_images(turn, visibility)
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
         if pending is None and self._draw_map(turn, loaded):
@@ -418,11 +424,6 @@ class Stage:
             return
         self._draw_background(loaded)
         for index, line in enumerate(self.preference_lines):
-            self.surface.blit(
-                self.font.render(line, False, INK),
-                (2 * self.density, 2 * self.density + index * self.row_height),
-            )
-        for index, line in enumerate(preference_lines):
             self.surface.blit(
                 self.font.render(line, False, INK),
                 (2 * self.density, 2 * self.density + index * self.row_height),
@@ -459,7 +460,15 @@ class Stage:
         # speaks over it. Both stand on the stage, not on the text: the
         # choice list is drawn over them rather than holding them up.
         self._draw_staged(loaded)
-        self._draw_portraits(turn, loaded)
+        self._draw_portraits(
+            turn,
+            loaded,
+            preserve_hidden_clips=any(
+                image.visibility_preference is not None
+                and not visibility[image.visibility_preference]
+                for image in turn.images
+            ),
+        )
         panelled = self._has_state(turn, placed=placed)
         width = self.logical_size[0] - (self.panel_width if panelled else 0)
         stage_rect = pygame.Rect(
@@ -949,7 +958,11 @@ class Stage:
             self.surface.blit(surface, (box_x, box_y))
 
     def _draw_portraits(
-        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]]
+        self,
+        turn: Turn,
+        loaded: list[tuple[StageImage, pygame.Surface]],
+        *,
+        preserve_hidden_clips: bool = False,
     ) -> None:
         """Place up to three sprites on a shared baseline, preserving aspect.
 
@@ -1021,7 +1034,8 @@ class Stage:
             self.surface.blit(scaled, (box_x + round(at_x * factor), box_y + round(at_y * factor)))
         # A sprite that left the stage starts its clip afresh when it comes back;
         # one merely restated by the next turn carries on where it was.
-        self._clips = {key: play for key, play in self._clips.items() if key in seen}
+        if not preserve_hidden_clips:
+            self._clips = {key: play for key, play in self._clips.items() if key in seen}
 
     def _clip_frame(
         self,

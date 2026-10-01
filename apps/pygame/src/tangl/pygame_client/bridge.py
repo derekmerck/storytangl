@@ -7,9 +7,8 @@ pytest. The renderer lives in :mod:`tangl.pygame_client.stage`.
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from pathlib import Path
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, get_args
 from uuid import UUID
 
@@ -285,6 +284,7 @@ class PygameSessionBridge:
         self.ledger_id: UUID | None = None
         self.world_id: str | None = None
         self.preferences: dict[str, bool] = {}
+        self._preference_ids: frozenset[str] = frozenset()
         self.media_render_profile = media_render_profile or MediaRenderProfile(
             pending_policy=MediaPendingPolicy.FALLBACK,
             content_profile=MediaContentProfile.PASSTHROUGH,
@@ -329,7 +329,11 @@ class PygameSessionBridge:
         value = state.sections[0].value
         if not isinstance(value, UiPreferencesValue):
             raise TypeError(f"Expected UiPreferencesValue for ui-preferences, got {type(value)!r}")
-        self.preferences = {preference.preference_id: preference.default for preference in value.preferences}
+        self.preferences = {
+            preference.preference_id: preference.default
+            for preference in value.preferences
+        }
+        self._preference_ids = frozenset(self.preferences)
         return value.preferences
 
     def toggle_preference(self, preference_id: str) -> bool:
@@ -339,17 +343,16 @@ class PygameSessionBridge:
         self.preferences[preference_id] = not self.preferences[preference_id]
         return self.preferences[preference_id]
 
-    def apply_preferences(self, turn: Turn) -> Turn:
-        """Return a presentation-only view with delegated images filtered locally."""
-        return replace(
-            turn,
-            images=[
-                image
-                for image in turn.images
-                if image.visibility_preference is None
-                or self.preferences.get(image.visibility_preference, True)
-            ],
-        )
+    def media_visibility(self, turn: Turn) -> Mapping[str, bool]:
+        """Validate and expose local media visibility for this unchanged turn."""
+        for image in turn.images:
+            preference_id = image.visibility_preference
+            if preference_id is not None and preference_id not in self._preference_ids:
+                raise ValueError(
+                    f"Media visibility preference {preference_id!r} was not declared by "
+                    f"world {self.world_id!r}"
+                )
+        return self.preferences
 
     def start(self, world_id: str) -> RuntimeEnvelope:
         """Create a fresh story session for ``world_id``."""

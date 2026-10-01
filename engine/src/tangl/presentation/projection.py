@@ -140,6 +140,13 @@ class UiPreferencesValue(BaseModel):
         ids = [preference.preference_id for preference in self.preferences]
         if len(ids) != len(set(ids)):
             raise ValueError("ui preference ids must be unique")
+        shortcuts = [
+            preference.shortcut.casefold()
+            for preference in self.preferences
+            if preference.shortcut is not None
+        ]
+        if len(shortcuts) != len(set(shortcuts)):
+            raise ValueError("ui preference shortcuts must be unique case-insensitively")
         return self
 
 
