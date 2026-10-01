@@ -52,8 +52,9 @@ from tangl.story.concepts import Actor, Role
 from tangl.story.concepts.asset import AssetTransactionManager, AssetType
 from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block_choices
-from tangl.vm import Ledger, Requirement, ResolutionPhase
-from tangl.vm.dispatch import do_provision
+from tangl.vm import AnonymousEdge, Ledger, Requirement, ResolutionPhase
+from tangl.vm.dispatch import dispatch as vm_dispatch
+from tangl.vm.dispatch import do_provision, on_prereqs
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -1855,13 +1856,15 @@ def test_each_returning_event_terminal_path_closes_its_exit_cost_once(terminal: 
     road = SandboxLocation(label="road")
     scene = Scene(label="scene", locals={"exit_time_cost": {"duration": 1}})
     start = Block(label="start")
+    middle = Block(label="middle")
     chosen = Block(label="chosen")
     early = Block(label="early")
-    for item in (scope, road, scene, start, chosen, early):
+    for item in (scope, road, scene, start, middle, chosen, early):
         graph.add(item)
     scope.add_child(road)
     scope.add_child(scene)
     scene.add_child(start)
+    scene.add_child(middle)
     scene.add_child(chosen)
     scene.add_child(early)
     scene.finalize_container_contract()
@@ -1872,11 +1875,13 @@ def test_each_returning_event_terminal_path_closes_its_exit_cost_once(terminal: 
         return_phase=ResolutionPhase.PLANNING,
         tags={"event"},
     )
-    terminal_edge = Action(
+    continue_edge = Action(
         registry=graph,
         predecessor_id=start.uid,
-        successor_id=chosen.uid if terminal == "chosen" else early.uid,
+        successor_id=middle.uid,
     )
+    early_edge = Action(registry=graph, predecessor_id=start.uid, successor_id=early.uid)
+    finish_edge = Action(registry=graph, predecessor_id=middle.uid, successor_id=chosen.uid)
     ticks: list[int] = []
 
     @on_sandbox_tick
@@ -1888,13 +1893,81 @@ def test_each_returning_event_terminal_path_closes_its_exit_cost_once(terminal: 
     try:
         ledger = Ledger.from_graph(graph, entry_id=road.uid)
         ledger.resolve_choice(call.uid)
-        ledger.resolve_choice(terminal_edge.uid)
+        assert scope.locals["world_turn"] == 0
+        assert ticks == []
+        if terminal == "chosen":
+            ledger.resolve_choice(continue_edge.uid)
+            assert ledger.cursor is middle
+            assert scope.locals["world_turn"] == 0
+            ledger.resolve_choice(finish_edge.uid)
+        else:
+            ledger.resolve_choice(early_edge.uid)
 
         assert ledger.cursor is road
         assert scope.locals["world_turn"] == 1
         assert ticks == [1]
     finally:
         sandbox_dispatch.remove(observe_completion_tick._behavior.uid)
+
+
+def test_returning_event_completion_tick_survives_an_origin_prereqs_redirect() -> None:
+    graph = StoryGraph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 3})
+    road = SandboxLocation(
+        label="road",
+        scheduled_events=[
+            ScheduledEvent(
+                label="event",
+                period=4,
+                target="scene",
+                text="Attend the event",
+                return_to_location=True,
+            )
+        ],
+    )
+    scene = Scene(label="scene", locals={"exit_time_cost": {"duration": 1}})
+    terminal = Block(label="terminal", content="Event at {world_time.period}.")
+    landing = Block(label="landing", content="Landing at {world_time.period}.")
+    for item in (scope, road, scene, terminal, landing):
+        graph.add(item)
+    scope.add_child(road)
+    scope.add_child(scene)
+    scope.add_child(landing)
+    scene.add_child(terminal)
+    scene.finalize_container_contract()
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    event = _dynamic_sandbox_actions_with_tag(road, "event")[0]
+
+    @on_sandbox_tick
+    def observe_tick(*, caller, clock_tick, **_kw):
+        if caller is road:
+            return SandboxTickEvent(
+                kind="witness",
+                text=f"Tick {clock_tick}",
+                clock_tick=clock_tick,
+            )
+        return []
+
+    @on_prereqs
+    def redirect_return(*, caller, ctx, **_kw):
+        if caller is road and isinstance(ctx.selected_edge, AnonymousEdge):
+            return AnonymousEdge(predecessor=road, successor=landing)
+        return None
+
+    try:
+        ledger = Ledger.from_graph(graph, entry_id=road.uid)
+        ledger.resolve_choice(event.uid)
+
+        assert ledger.cursor is landing
+        assert scope.locals["world_turn"] == 4
+        assert [fragment.content for fragment in ledger.get_journal()] == [
+            "Event at 4.",
+            "Tick 4",
+            "Landing at 1.",
+        ]
+    finally:
+        sandbox_dispatch.remove(observe_tick._behavior.uid)
+        vm_dispatch.remove(redirect_return._behavior.uid)
 
 
 def test_nested_sandbox_calls_charge_the_innermost_location_and_unwind_lifo() -> None:
