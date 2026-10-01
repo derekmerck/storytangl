@@ -13,7 +13,7 @@ them. Backend state remains authoritative for every action.
 
 ## Status
 
-Slice 4 begins declarative client preferences: worlds may publish typed boolean
+Slice 4 adds declarative client preferences: worlds may publish typed boolean
 declarations through exact `ui-preferences` world-info. Clients retain values
 locally per world and only explicit staged-media visibility delegations read
 them. This first slice does not add dynamic disclosure/status, enum variants,
