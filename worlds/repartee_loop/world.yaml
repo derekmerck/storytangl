@@ -4,4 +4,10 @@ domain_module: repartee_loop.domain
 metadata:
   title: "Repartee Loop"
   stage_extent: {width: 320, height: 200}
+  ui_preferences:
+    - id: sprites-visible
+      label: "Decorative sprites"
+      help: "Show optional staged character art."
+      default: true
+      shortcut: F1
   description: "A compact compiled-world proof of call-response acquisition and opportunity gating."
