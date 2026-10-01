@@ -13,7 +13,11 @@ description protocol over them, and a strawman prose pipeline. Not a migration p
 The current rendering and output contracts remain
 `docs/src/design/story/EPISODE_SYUZHET_RENDERING.md` and
 `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`; this note proposes an
-optional semantic projection before those landed seams.
+optional semantic projection before those landed seams. The source-reference
+linking and journal revoicing side of that pipeline is now split out into
+`docs/src/design/story/CONCEPT_LINKED_PROSE.md`; this note remains authoritative
+for vantage, observation, disclosure, and the distinction between persistent
+knowledge and transient discourse realization.
 *v0.2: three-stage prose pipeline (self-description / observation / realization),
 discourse-context-vs-vantage split, strawman referring-expression selection policy.
 v0.3: stage 3 corrected to constrained RE-realization of authored prose (parse →
@@ -673,6 +677,10 @@ construction:
   subject matter, different intent — do not merge them.
 - **Journal fragments** are downstream: `observe → describe → prose → ContentFragment`.
   Observation must not become a parallel fragment channel.
+- **Concept-linked prose** is the source-reference layer downstream of semantic
+  identity and upstream of surface realization. It binds clean authored prose to
+  scene-local roles and preserves realization intent; see
+  `docs/src/design/story/CONCEPT_LINKED_PROSE.md`. It does not own disclosure policy.
 - **The four parity axes** in `docs/src/design/story/STORYTANGL_WIDGET_VOCAB.md` §0.2
   resolve cleanly against this stack: `observe()` is the **information parity**
   (decision legibility) boundary; `describe()` and its dispatch spine
