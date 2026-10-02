@@ -139,7 +139,7 @@ def _preference_controls(bridge: PygameSessionBridge, preferences) -> tuple[Pref
             preference_id=preference.preference_id,
             label=preference.label,
             help=preference.help,
-            enabled=bridge.preferences[preference.preference_id],
+            value=bridge.preferences[preference.preference_id],
             shortcut=(
                 preference.shortcut
                 if preference.shortcut is not None
@@ -197,7 +197,7 @@ def _apply(
             stage.preference_page += 1
             return pending, None
         case TogglePreference(preference_id=preference_id):
-            bridge.toggle_preference(preference_id)
+            bridge.cycle_preference(preference_id)
             return pending, None
         case CancelSelection():
             return None, None
@@ -346,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
                 action = stage.hit(event.pos)
             elif event.type == pygame.KEYDOWN:
                 if pending is None and event.key in preference_keys:
-                    bridge.toggle_preference(preference_keys[event.key])
+                    bridge.cycle_preference(preference_keys[event.key])
                     stage.preference_controls = _preference_controls(bridge, preferences)
                     stage.draw(frame, media_visibility=bridge.media_visibility(frame))
                     continue

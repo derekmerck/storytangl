@@ -23,8 +23,14 @@ from tangl.journal.fragments import (
     PieceFragment,
 )
 from tangl.persistence import PersistenceManagerFactory
-from tangl.presentation.hints import STAGING_MAX, STAGING_MIN, TimingName
-from tangl.presentation.projection import BooleanPreference, StageExtentValue, UiPreferencesValue
+from tangl.presentation.hints import ClipBinding, STAGING_MAX, STAGING_MIN, TimingName, VisibilityBinding
+from tangl.presentation.projection import (
+    BooleanPreference,
+    EnumPreference,
+    PreferenceDeclaration,
+    StageExtentValue,
+    UiPreferencesValue,
+)
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.media import (
     MediaContentProfile,
@@ -283,8 +289,9 @@ class PygameSessionBridge:
         self.user_secret = user_secret
         self.ledger_id: UUID | None = None
         self.world_id: str | None = None
-        self.preferences: dict[str, bool] = {}
+        self.preferences: dict[str, bool | str] = {}
         self._preference_ids: frozenset[str] = frozenset()
+        self._preference_declarations: dict[str, PreferenceDeclaration] = {}
         self.media_render_profile = media_render_profile or MediaRenderProfile(
             pending_policy=MediaPendingPolicy.FALLBACK,
             content_profile=MediaContentProfile.PASSTHROUGH,
@@ -320,7 +327,7 @@ class PygameSessionBridge:
             )
         return extent
 
-    def discover_preferences(self, world_id: str) -> list[BooleanPreference]:
+    def discover_preferences(self, world_id: str) -> list[PreferenceDeclaration]:
         """Fetch world-static declarations once and retain local values."""
         catalog = self.service_manager.get_world_info(world_id=world_id)
         if not any(channel.channel_id == "ui-preferences" for channel in catalog.channels):
@@ -333,20 +340,30 @@ class PygameSessionBridge:
             preference.preference_id: preference.default
             for preference in value.preferences
         }
+        self._preference_declarations = {
+            preference.preference_id: preference
+            for preference in value.preferences
+        }
         self._preference_ids = frozenset(self.preferences)
         return value.preferences
 
-    def toggle_preference(self, preference_id: str) -> bool:
-        """Flip one already-declared local value without contacting the service."""
-        if preference_id not in self.preferences:
+    def cycle_preference(self, preference_id: str) -> bool | str:
+        """Advance one declared local preference without contacting the service."""
+        declaration = self._preference_declarations.get(preference_id)
+        if declaration is None:
             raise KeyError(f"Unknown ui preference {preference_id!r}")
-        self.preferences[preference_id] = not self.preferences[preference_id]
+        if isinstance(declaration, BooleanPreference):
+            self.preferences[preference_id] = not self.preferences[preference_id]
+        elif isinstance(declaration, EnumPreference):
+            index = declaration.values.index(self.preferences[preference_id])
+            self.preferences[preference_id] = declaration.values[(index + 1) % len(declaration.values)]
         return self.preferences[preference_id]
 
     def media_visibility(self, turn: Turn) -> Mapping[str, bool]:
         """Validate and expose local media visibility for this unchanged turn."""
         for image in turn.images:
-            preference_id = image.visibility_preference
+            binding = image.visibility
+            preference_id = binding.preference_id if binding is not None else None
             if preference_id is not None and preference_id not in self._preference_ids:
                 raise ValueError(
                     f"Media visibility preference {preference_id!r} was not declared by "
@@ -773,6 +790,15 @@ class PygameSessionBridge:
                 clip=_text(hints.get("media_clip")),
                 timing=_timing(hints.get("media_timing")),
                 sheets=self._sheets(payload),
-                visibility_preference=_text(hints.get("media_visibility_preference")),
+                visibility=(
+                    VisibilityBinding.model_validate(hints["media_visibility"])
+                    if hints.get("media_visibility") is not None
+                    else None
+                ),
+                clip_binding=(
+                    ClipBinding.model_validate(hints["media_clip_binding"])
+                    if hints.get("media_clip_binding") is not None
+                    else None
+                ),
             )
         )

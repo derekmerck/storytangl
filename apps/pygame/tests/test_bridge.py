@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 
 from tangl.presentation.hints import PresentationHints
+from tangl.presentation.hints import VisibilityBinding
 from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
@@ -122,11 +123,11 @@ def test_media_visibility_rejects_an_undeclared_binding() -> None:
     bridge.discover_preferences("fixture_world")
 
     assert bridge.media_visibility(
-        Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility_preference="sprites-visible")])
+        Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility=VisibilityBinding(preference_id="sprites-visible", values=[True]))])
     ) == {"sprites-visible": True}
     with pytest.raises(ValueError, match="was not declared"):
         bridge.media_visibility(
-            Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility_preference="unknown")])
+            Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility=VisibilityBinding(preference_id="unknown", values=[True]))])
         )
 
 

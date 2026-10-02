@@ -34,6 +34,7 @@ pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client r
 from PIL import Image  # noqa: E402
 
 from tangl.presentation.sprite_sheet import SpriteSheetManifest  # noqa: E402
+from tangl.presentation.hints import VisibilityBinding  # noqa: E402
 from tangl.pygame_client.models import SheetSource, StageImage, Turn  # noqa: E402
 from tangl.pygame_client.stage import Stage  # noqa: E402
 
@@ -379,7 +380,7 @@ def test_visibility_toggle_keeps_the_same_turn_clip_progress(stage, art, clock) 
         sheet,
         clip="idle",
         timing="restart",
-        visibility_preference="sprites-visible",
+        visibility=VisibilityBinding(preference_id="sprites-visible", values=[True]),
     )
 
     stage.draw(turn, media_visibility={"sprites-visible": True})

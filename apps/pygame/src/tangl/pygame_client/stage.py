@@ -374,10 +374,7 @@ class Stage:
         loaded: list[tuple[StageImage, pygame.Surface]] = []
         unloadable: list[StageImage] = []
         for image in turn.images:
-            if (
-                image.visibility_preference is not None
-                and not media_visibility[image.visibility_preference]
-            ):
+            if image.visibility is not None and media_visibility[image.visibility.preference_id] not in image.visibility.values:
                 continue
             surface = self._load(image.source)
             if surface is None:
@@ -465,8 +462,8 @@ class Stage:
             turn,
             loaded,
             preserve_hidden_clips=any(
-                image.visibility_preference is not None
-                and not visibility[image.visibility_preference]
+                image.visibility is not None
+                and visibility[image.visibility.preference_id] not in image.visibility.values
                 for image in turn.images
             ),
         )
@@ -521,7 +518,8 @@ class Stage:
         for index, control in enumerate(controls):
             shortcut = f"{control.shortcut}: " if control.shortcut else ""
             help_text = f" — {control.help}" if control.help else ""
-            text = f"{shortcut}{control.label}: {'on' if control.enabled else 'off'}{help_text}"
+            value = "on" if control.value is True else "off" if control.value is False else control.value
+            text = f"{shortcut}{control.label}: {value}{help_text}"
             surface = self.font.render(text, False, INK)
             rect = pygame.Rect(
                 2 * self.density,

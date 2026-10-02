@@ -54,7 +54,7 @@ scenes:
             media_role: narrative_im
             staging_hints:
               media_shape: landscape
-              media_visibility_preference: paperclip-art
+              media_visibility: {preference_id: paperclip-art, values: [true]}
         links:
           out:
             target: road

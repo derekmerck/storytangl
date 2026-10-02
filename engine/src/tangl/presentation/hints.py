@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from tangl.type_hints import StyleClass, StyleDict, StyleId
 
@@ -35,6 +35,45 @@ TransitionName = Literal[
 ]
 DurationName = Literal["short", "medium", "long"]
 TimingName = Literal["start", "stop", "pause", "restart", "loop"]
+PreferenceValue = bool | str
+
+
+class ClipBindingRow(BaseModel):
+    values: list[PreferenceValue]
+    clip: str = Field(min_length=1)
+
+
+class ClipBinding(BaseModel):
+    axes: list[str] = Field(min_length=1)
+    rows: list[ClipBindingRow] = Field(min_length=1)
+
+    @field_validator("axes")
+    @classmethod
+    def _unique_axes(cls, value: list[str]) -> list[str]:
+        if any(not axis for axis in value) or len(value) != len(set(value)):
+            raise ValueError("clip binding axes must be nonempty and unique")
+        return value
+
+    @model_validator(mode="after")
+    def _row_shape(self):
+        assignments = [tuple(row.values) for row in self.rows]
+        if any(len(row.values) != len(self.axes) for row in self.rows):
+            raise ValueError("clip binding row values must match axes")
+        if len(assignments) != len(set(assignments)):
+            raise ValueError("clip binding rows must be unique")
+        return self
+
+
+class VisibilityBinding(BaseModel):
+    preference_id: str = Field(min_length=1)
+    values: list[PreferenceValue] = Field(min_length=1)
+
+    @field_validator("values")
+    @classmethod
+    def _unique_values(cls, value: list[PreferenceValue]) -> list[PreferenceValue]:
+        if len(value) != len(set(value)):
+            raise ValueError("visibility binding values must be unique")
+        return value
 
 # Coarse staging grid, named from the viewer's side of the screen. Deliberately
 # not theatrical: "stage left" is the performer's left and therefore the
@@ -104,7 +143,7 @@ class StagingHints(BaseModel, extra="allow"):
     media_transition: TransitionName | None = None
     media_duration: DurationName | float | None = None
     media_timing: TimingName | None = None
-    media_visibility_preference: str | None = None
+    media_visibility: VisibilityBinding | None = None
 
     @field_validator("media_x", "media_y", mode="before")
     @classmethod
@@ -185,6 +224,13 @@ class StagingHints(BaseModel, extra="allow"):
     """
 
     media_clip: str | None = None
+    media_clip_binding: ClipBinding | None = None
+
+    @model_validator(mode="after")
+    def _reject_retired_visibility_preference(self):
+        if "media_visibility_preference" in (self.__pydantic_extra__ or {}):
+            raise ValueError("media_visibility_preference was replaced by media_visibility")
+        return self
     """Which named clip of the media's sprite sheet to play for this use.
 
     A clip name from the sheet's manifest -- ``idle``, ``call``, ``response``. It
