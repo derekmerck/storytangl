@@ -584,6 +584,11 @@ def _scheduled_event_is_live(
             mob = _mob_by_label(location, contribution.source_label)
             if mob is None or not _mob_present_at_location(location, mob):
                 return False
+        target = _interaction_target(location, contribution.event.as_interaction(
+            contribution.event.label or contribution.event.target
+        ))
+        if contribution.event.once and target is not None and has_visited(target, ctx=ctx):
+            return False
         return contribution.event.matches(
             world_time,
             location=location.get_label(),
@@ -682,6 +687,7 @@ def _project_sandbox_interaction(
     contribution_kind: str = "interaction",
     event_contribution_key: str | None = None,
     projection_label: str | None = None,
+    retain_once: bool = False,
     **hints: Any,
 ) -> Action | None:
     tag = _interaction_tag(interaction.label)
@@ -697,7 +703,7 @@ def _project_sandbox_interaction(
             interaction.target,
         )
         return None
-    if interaction.once and has_visited(target, ctx=ctx):
+    if interaction.once and not retain_once and has_visited(target, ctx=ctx):
         return None
     action_label = _sandbox_interaction_action_label(
         location,
@@ -705,6 +711,10 @@ def _project_sandbox_interaction(
         sponsor_label=sponsor_label,
         interaction_label=projection_label or interaction.label,
     )
+    if retain_once:
+        existing = graph.find_one(Selector(has_kind=Action, label=action_label))
+        if isinstance(existing, Action) and existing.predecessor_id == location.uid:
+            return existing
     availability = list(interaction.availability)
     if contribution_kind == "event":
         assert event_contribution_key is not None
@@ -737,6 +747,7 @@ def _project_sandbox_interaction(
             interaction=interaction.label,
             target=target.get_label(),
             return_to_location=interaction.return_to_location,
+            event_contribution_key=event_contribution_key,
             **hints,
         ),
     )
@@ -2426,12 +2437,18 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
     if graph is None or _graph_frozen_shape(graph):
         return None
 
-    _clear_dynamic_sandbox_actions(caller, action_kind="event", ctx=ctx)
+    for action in list(caller.edges_out(Selector(has_kind=Action))):
+        if not _has_tags(action, "dynamic", "sandbox", "event"):
+            continue
+        hints = action.ui_hints.model_dump() if action.ui_hints is not None else {}
+        if hints.get("source_kind") not in {"location", "scope"}:
+            graph.remove(action.uid, _ctx=ctx)
 
     for contribution in _scheduled_event_contributions(caller, ctx):
         event = contribution.event
         contribution_key = _scheduled_event_contribution_key(contribution)
         event_label = event.label or event.target
+        retained = contribution.source_kind in {"location", "scope"}
         _project_sandbox_interaction(
             caller,
             graph=graph,
@@ -2445,6 +2462,7 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             event_contribution_key=contribution_key,
             projection_label=f"{event_label}_{contribution_key[:12]}",
             event=event.label or event.target,
+            retain_once=retained,
             **contribution.hints,
         )
     return None

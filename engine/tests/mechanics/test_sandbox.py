@@ -1247,6 +1247,9 @@ def test_scheduled_event_candidate_becomes_available_without_reprovisioning() ->
     ctx._ns_cache.clear()
     assert event.available(ctx=ctx)
 
+    do_provision(road, ctx=ctx)
+    assert _dynamic_sandbox_actions_with_tag(road, "event")[0].uid == event.uid
+
 
 def test_scheduled_event_targets_a_qualified_block_path() -> None:
     graph = Graph(label="qualified_event")
@@ -3116,11 +3119,15 @@ def test_scope_once_event_triggers_on_entry_returns_and_suppresses_after_target_
     history = {"cursor_history": list(ledger.cursor_history)}
     assert orientation.uid in ledger.cursor_history
 
-    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid, meta=history))
-    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+    revisit_ctx = PhaseCtx(graph=graph, cursor_id=road.uid, meta=history)
+    do_provision(road, ctx=revisit_ctx)
+    (retained_event,) = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert retained_event.available(ctx=revisit_ctx) is False
 
-    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid, meta=history))
-    assert _dynamic_sandbox_actions_with_tag(building, "event") == []
+    building_ctx = PhaseCtx(graph=graph, cursor_id=building.uid, meta=history)
+    do_provision(building, ctx=building_ctx)
+    (building_event,) = _dynamic_sandbox_actions_with_tag(building, "event")
+    assert building_event.available(ctx=building_ctx) is False
 
 
 def test_unavailable_triggered_event_does_not_auto_enter() -> None:
