@@ -167,6 +167,12 @@ JIT provisioning of the current node is an exceptional recovery path for startup
 out-of-order/debug traversal, stale derived frontier state, or explicit on-demand
 projections such as a map. It is not the ordinary choice lifecycle.
 
+A generic provisioning handler may skip constructing a resolver only when its
+node has no provider-less dependency and no fanout work permitted by the current
+shape policy. This is a dispatch-local fast path, not a viability judgement:
+explicit previews, availability checks, triggered destinations, and every other
+`on_provision` contributor still run through their normal callers.
+
 ```
 user input
   → validate selected choice

@@ -235,6 +235,103 @@ class TestResolveFrontierNode:
         success = resolver.resolve_frontier_node(frontier)
         assert success is True
 
+    def test_generic_provision_skips_resolver_for_a_closed_frontier(self, monkeypatch) -> None:
+        """The dispatch hook avoids construction only when no generic work remains."""
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="closed", registry=graph)
+
+        def unexpected(cls, ctx):
+            raise AssertionError("closed frontier constructed a Resolver")
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(unexpected))
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+
+    def test_repeated_bound_destinations_construct_no_resolvers(self, monkeypatch) -> None:
+        """A deterministic hub witness counts the avoided generic constructions.
+
+        This is intentionally a construction-count witness, not a claim about a
+        downstream world's wall-clock performance or sandbox projector churn.
+        """
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        provider = TraversableNode(label="bound-provider", registry=graph)
+        destinations = [TraversableNode(label=f"destination-{index}", registry=graph) for index in range(32)]
+        for destination in destinations:
+            dependency = Dependency(
+                registry=graph,
+                predecessor_id=destination.uid,
+                requirement=Requirement.from_identifier("bound-provider"),
+            )
+            dependency.set_provider(provider)
+        constructions = 0
+
+        def counted(cls, ctx):
+            nonlocal constructions
+            constructions += 1
+            raise AssertionError("bound destination constructed a Resolver")
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(counted))
+        for _visit in range(3):
+            for destination in destinations:
+                provision_node(destination, ctx=PhaseCtx(graph=graph, cursor_id=destination.uid))
+
+        assert constructions == 0
+
+    def test_generic_provision_constructs_resolver_for_open_dependency(self, monkeypatch) -> None:
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="open", registry=graph)
+        Dependency(registry=graph, predecessor_id=node.uid, requirement=Requirement(has_identifier="missing"))
+        calls = []
+
+        class StubResolver:
+            def resolve_frontier_node(self, **kwargs):
+                calls.append(kwargs["node"])
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(lambda cls, ctx: StubResolver()))
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        assert calls == [node]
+
+    def test_generic_provision_keeps_unfrozen_fanout_work(self, monkeypatch) -> None:
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="fanout", registry=graph)
+        Fanout(registry=graph, predecessor_id=node.uid, requirement=Requirement(has_kind=TraversableNode))
+        calls = []
+
+        class StubResolver:
+            def resolve_frontier_node(self, **kwargs):
+                calls.append(kwargs["node"])
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(lambda cls, ctx: StubResolver()))
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        assert calls == [node]
+
+    def test_generic_provision_skips_frozen_fanout(self, monkeypatch) -> None:
+        from tangl.story import StoryGraph
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = StoryGraph(frozen_shape=True)
+        node = TraversableNode(label="frozen", registry=graph)
+        Fanout(registry=graph, predecessor_id=node.uid, requirement=Requirement(has_kind=TraversableNode))
+
+        monkeypatch.setattr(
+            Resolver,
+            "from_ctx",
+            classmethod(lambda cls, ctx: (_ for _ in ()).throw(AssertionError("unexpected Resolver"))),
+        )
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+
     def test_satisfied_dep_not_re_resolved(self) -> None:
         """Already-satisfied deps are skipped by resolve_frontier_node."""
         g = Graph()
@@ -348,6 +445,33 @@ class TestDispatchIntegration:
             assert successor_contexts == [
                 (successor, successor.uid, ResolutionPhase.PLANNING),
             ]
+
+    def test_closed_generic_frontier_keeps_other_provision_handlers(self, clean_vm_dispatch, monkeypatch) -> None:
+        """The generic fast path never short-circuits the phase dispatch chain."""
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="closed", registry=graph)
+        called = []
+
+        @on_provision
+        def world_projection(caller, *, ctx, **kwargs):
+            called.append(caller)
+            return None
+
+        monkeypatch.setattr(
+            Resolver,
+            "from_ctx",
+            classmethod(lambda cls, ctx: (_ for _ in ()).throw(AssertionError("unexpected Resolver"))),
+        )
+        on_provision(provision_node)
+        try:
+            do_provision(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        finally:
+            vm_dispatch.remove(world_projection._behavior.uid)
+            vm_dispatch.remove(provision_node._behavior.uid)
+        assert called == [node]
 
     def test_provision_handler_can_add_entity_to_graph(
         self, clean_vm_dispatch
