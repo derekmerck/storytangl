@@ -470,6 +470,35 @@ def test_binding_residents_keep_time_when_hidden_or_showing_a_still(stage, art, 
     assert stage.animating is True
 
 
+def test_staged_cap_counts_only_visible_occurrences(stage, art) -> None:
+    still, sheet = art
+    binding = ClipBinding(axes=["look"], rows=[ClipBindingRow(values=["shown"], clip="idle")])
+    images = [
+        _image(
+            still,
+            sheet,
+            role="staged_im",
+            x_frac=(index + 1) / 20,
+            y_frac=1.0,
+            clip_binding=binding,
+            timing="loop",
+            visibility=VisibilityBinding(
+                preference_id="visible",
+                values=["hidden" if index < 13 else "shown"],
+            ),
+        )
+        for index in range(18)
+    ]
+    turn = Turn(step=1, images=images)
+
+    stage.draw(turn, media_visibility={"look": "shown", "visible": "shown"})
+
+    # The five visible figures occur after the former authored-position cap.
+    # All eighteen nevertheless retain resident clocks for a later toggle.
+    assert len(stage._clips) == 18
+    assert stage.animating is True
+
+
 def test_pause_holds_the_frame_and_the_next_play_resumes_from_it(stage, art, clock) -> None:
     still, sheet = art
     stage.draw(_turn(still))

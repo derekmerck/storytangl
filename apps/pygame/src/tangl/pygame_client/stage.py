@@ -969,13 +969,12 @@ class Stage:
         staged = [image for image in turn.images if image.role in STAGED_ROLES]
         if not staged:
             return
-        # Bound first, then order. Sorting before the cap would spend the
-        # budget on whatever happens to be furthest away and discard the
-        # figures nearest the viewer, which is the opposite of what a limit on
-        # a crowded room should drop.
+        # Resolve every authored occurrence first. Visibility controls drawing,
+        # not residency: a suppressed alternative keeps its identity and clock.
+        # The cap is likewise a visible-pixel budget, not a resident-state cap.
         placed: list[tuple[int, int, int, pygame.Surface]] = []
         occurrences: Counter[tuple[str, str, str]] = Counter()
-        for index, image in enumerate(staged[:STAGED_LIMIT]):
+        for image in staged:
             clip, selected = self._selected_clip(image, preferences)
             image = replace(image, clip=clip, client_selected_clip=selected)
             placement = (
@@ -985,6 +984,7 @@ class Stage:
             key = (*identity, occurrences[identity])
             occurrences[identity] += 1
             visible = image.visibility is None or preferences[image.visibility.preference_id] in image.visibility.values
+            admitted = visible and len(placed) < STAGED_LIMIT
             if image.clip is not None or image.clip_binding is not None:
                 self._resident_keys.add(key)
             surface = self._load(image.source)
@@ -1011,21 +1011,20 @@ class Stage:
                 if image.y_frac is None
                 else self._frac_y(image.y_frac, height)
             )
+            baseline = box_y + height
             frame, offset = self._clip_frame(
-                image, surface.get_size(), key, fresh=fresh, schedule=visible
+                image, surface.get_size(), key, fresh=fresh, schedule=admitted
             )
             if frame is not None:
                 surface = frame
                 box_x += offset[0]
                 box_y += offset[1]
-            if visible:
-                placed.append((box_y + height, box_x, box_y, surface))
+            if admitted:
+                placed.append((baseline, box_x, box_y, surface))
         # Stable, so figures sharing a baseline -- the common case, a room of
         # people on one floor -- keep arrival order rather than shuffling.
         placed.sort(key=lambda entry: entry[0])
         for _, box_x, box_y, surface in placed:
-            # Not flipped here: _resolve_images already honoured media_flip_h,
-            # and mirroring twice is the identity.
             self.surface.blit(surface, (box_x, box_y))
 
     def _draw_portraits(

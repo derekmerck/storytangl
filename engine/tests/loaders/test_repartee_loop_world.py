@@ -91,6 +91,12 @@ class TestReparteeLoopWorld:
             ),
             (
                 lambda world, hints: hints.update(
+                    media_visibility={"preference_id": "sprites-visible", "values": ["true"]}
+                ),
+                "outside ui preference",
+            ),
+            (
+                lambda world, hints: hints.update(
                     media_clip_binding={"axes": ["clerk-motion", "clerk-motion"], "rows": []}
                 ),
                 "clip binding",
@@ -101,6 +107,13 @@ class TestReparteeLoopWorld:
                     "values": ["idle"], "default": "missing",
                 }),
                 "default must be one",
+            ),
+            (
+                lambda world, hints: (
+                    world.__setitem__("media_dir", "media_spaceport"),
+                    hints.__setitem__("media_clip", "missing"),
+                ),
+                "has no sprite-sheet clips",
             ),
         ],
     )
