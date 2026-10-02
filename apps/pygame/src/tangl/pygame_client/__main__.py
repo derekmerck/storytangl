@@ -37,6 +37,7 @@ from .models import (
     Finding,
     PendingSelection,
     PagePanel,
+    PagePreferences,
     PageSelection,
     Piece,
     PreferenceControl,
@@ -132,13 +133,19 @@ def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
 
 
 def _preference_controls(bridge: PygameSessionBridge, preferences) -> tuple[PreferenceControl, ...]:
+    supported_shortcuts = {f"f{number}" for number in range(1, 13)}
     return tuple(
         PreferenceControl(
             preference_id=preference.preference_id,
             label=preference.label,
             help=preference.help,
             enabled=bridge.preferences[preference.preference_id],
-            shortcut=preference.shortcut,
+            shortcut=(
+                preference.shortcut
+                if preference.shortcut is not None
+                and preference.shortcut.casefold() in supported_shortcuts
+                else None
+            ),
         )
         for preference in preferences
     )
@@ -186,6 +193,9 @@ def _apply(
     the action reached the service, the envelope it produced."""
 
     match action:
+        case PagePreferences():
+            stage.preference_page += 1
+            return pending, None
         case TogglePreference(preference_id=preference_id):
             bridge.toggle_preference(preference_id)
             return pending, None
@@ -269,10 +279,12 @@ def main(argv: list[str] | None = None) -> int:
     bridge = PygameSessionBridge()
     logical_size = bridge.stage_extent(args.world)
     preferences = bridge.discover_preferences(args.world)
+    supported_preference_shortcuts = {f"f{number}" for number in range(1, 13)}
     preference_keys = {
         key: preference.preference_id
         for preference in preferences
         if preference.shortcut is not None
+        and preference.shortcut.casefold() in supported_preference_shortcuts
         and (key := getattr(pygame, f"K_{preference.shortcut.upper()}", None)) is not None
     }
     envelope = bridge.start(args.world)

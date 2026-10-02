@@ -336,6 +336,11 @@ class TogglePreference:
     preference_id: str
 
 
+@dataclass(slots=True, frozen=True)
+class PagePreferences:
+    """Cycle the local preference-control page."""
+
+
 Action = (
     Commit
     | BeginSelection
@@ -345,6 +350,7 @@ Action = (
     | PagePanel
     | CancelSelection
     | TogglePreference
+    | PagePreferences
 )
 
 

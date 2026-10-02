@@ -36,6 +36,7 @@ from .models import (
     MapPlate,
     MapRegion,
     PagePanel,
+    PagePreferences,
     PageSelection,
     PendingSelection,
     PreferenceControl,
@@ -323,6 +324,7 @@ class Stage:
         self.prose_floor = self.logical_size[1]
         self.selection_numbers: dict[str, int] = {}
         self.preference_controls: tuple[PreferenceControl, ...] = ()
+        self.preference_page = 0
         self._last_turn: Turn | None = None
         self._now: Callable[[], float] = clock or pygame.time.get_ticks
         """Milliseconds. Injected by tests, so no assertion depends on wall time."""
@@ -512,7 +514,11 @@ class Stage:
         pygame.display.flip()
 
     def _draw_preferences(self) -> None:
-        for index, control in enumerate(self.preference_controls[:2]):
+        page_size = 2
+        pages = max(1, -(-len(self.preference_controls) // page_size))
+        page = self.preference_page % pages
+        controls = self.preference_controls[page * page_size : page * page_size + page_size]
+        for index, control in enumerate(controls):
             shortcut = f"{control.shortcut}: " if control.shortcut else ""
             help_text = f" — {control.help}" if control.help else ""
             text = f"{shortcut}{control.label}: {'on' if control.enabled else 'off'}{help_text}"
@@ -525,6 +531,16 @@ class Stage:
             )
             self.surface.blit(surface, rect.topleft)
             self.hitboxes.append((rect, TogglePreference(control.preference_id)))
+        if pages > 1:
+            label = self.font.render(f"more {page + 1}/{pages}", False, ALERT)
+            rect = pygame.Rect(
+                self.logical_size[0] - label.get_width() - 2 * self.density,
+                2 * self.density,
+                label.get_width(),
+                self.row_height,
+            )
+            self.surface.blit(label, rect.topleft)
+            self.hitboxes.append((rect, PagePreferences()))
 
     # ── map view ─────────────────────────────────────────────────────────
 
