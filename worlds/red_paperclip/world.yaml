@@ -4,4 +4,9 @@ domain_module: red_paperclip.domain
 metadata:
   title: "One Red Paperclip"
   stage_extent: {width: 320, height: 200}
+  ui_preferences:
+    - id: paperclip-art
+      label: "Decorative art"
+      default: true
+      shortcut: F2
   description: "A trading-graph puzzle: swap up through a district of traders and pick the corner you get stuck in."

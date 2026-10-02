@@ -5,6 +5,7 @@ import pytest
 from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     BadgeListValue,
+    BooleanPreference,
     InfoAffordance,
     InfoState,
     ItemListValue,
@@ -16,6 +17,7 @@ from tangl.presentation.projection import (
     StageExtentValue,
     ProjectionRequest,
     TableValue,
+    UiPreferencesValue,
 )
 from tangl.presentation.values import KvRow
 
@@ -161,3 +163,13 @@ def test_projection_request_deduplicates_exact_channels_in_request_order() -> No
     request = ProjectionRequest(channels=["ui-map", "ui-sidebar", "ui-map"])
 
     assert request.requested_channels() == ["ui-map", "ui-sidebar"]
+
+
+def test_ui_preferences_reject_case_insensitive_shortcut_collisions() -> None:
+    with pytest.raises(ValueError, match="shortcuts must be unique case-insensitively"):
+        UiPreferencesValue(
+            preferences=[
+                BooleanPreference(id="sprites", label="Sprites", default=True, shortcut="F1"),
+                BooleanPreference(id="music", label="Music", default=True, shortcut="f1"),
+            ]
+        )

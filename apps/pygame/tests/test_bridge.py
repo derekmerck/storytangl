@@ -25,10 +25,12 @@ from tangl.presentation.intent import (
     TextAccepts,
 )
 from tangl.presentation.projection import (
+    BooleanPreference,
     InfoAffordance,
     ProjectedSection,
     ProjectedState,
     StageExtentValue,
+    UiPreferencesValue,
 )
 from tangl.presentation.values import KvRow
 from tangl.pygame_client.bridge import (
@@ -38,7 +40,7 @@ from tangl.pygame_client.bridge import (
     remaining_pieces,
     selectable_pieces,
 )
-from tangl.pygame_client.models import Choice, PendingSelection
+from tangl.pygame_client.models import Choice, PendingSelection, StageImage, Turn
 
 
 @pytest.fixture
@@ -93,6 +95,39 @@ def test_stage_extent_refuses_an_unsupported_world_declaration() -> None:
         match="does not support declared stage extent 800x600",
     ):
         PygameSessionBridge(service).stage_extent("fixture_world")
+
+
+class _PreferenceService:
+    def get_world_info(self, *, world_id: str, channels: list[str] | None = None) -> ProjectedState:
+        if channels is None:
+            return ProjectedState(channels=[InfoAffordance(channel_id="ui-preferences")])
+        assert channels == ["ui-preferences"]
+        return ProjectedState(
+            sections=[
+                ProjectedSection(
+                    section_id="ui-preferences",
+                    title="Preferences",
+                    value=UiPreferencesValue(
+                        preferences=[
+                            BooleanPreference(id="sprites-visible", label="Sprites", default=True)
+                        ]
+                    ),
+                )
+            ]
+        )
+
+
+def test_media_visibility_rejects_an_undeclared_binding() -> None:
+    bridge = PygameSessionBridge(_PreferenceService())
+    bridge.discover_preferences("fixture_world")
+
+    assert bridge.media_visibility(
+        Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility_preference="sprites-visible")])
+    ) == {"sprites-visible": True}
+    with pytest.raises(ValueError, match="was not declared"):
+        bridge.media_visibility(
+            Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility_preference="unknown")])
+        )
 
 
 def test_attributed_fragments_become_speaker_lines(bridge: PygameSessionBridge) -> None:

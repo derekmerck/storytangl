@@ -368,6 +368,31 @@ def test_restart_starts_over_on_each_new_turn_but_not_on_a_redraw(stage, art, cl
     assert _probe(stage, still_only, left=True) == BLINK_L
 
 
+def test_visibility_toggle_keeps_the_same_turn_clip_progress(stage, art, clock) -> None:
+    """Client-local visibility must not restate a turn or restart its clip."""
+
+    still, sheet = art
+    stage.draw(_turn(still))
+    still_only = _pixels(stage)
+    turn = _turn(
+        still,
+        sheet,
+        clip="idle",
+        timing="restart",
+        visibility_preference="sprites-visible",
+    )
+
+    stage.draw(turn, media_visibility={"sprites-visible": True})
+    clock.ms = 1850
+    stage.draw(turn, media_visibility={"sprites-visible": True})
+    assert _probe(stage, still_only, left=True) == BLINK_L
+
+    stage.draw(turn, media_visibility={"sprites-visible": False})
+    clock.ms = 3850
+    stage.draw(turn, media_visibility={"sprites-visible": True})
+    assert _probe(stage, still_only, left=True) == BLINK_L
+
+
 def test_pause_holds_the_frame_and_the_next_play_resumes_from_it(stage, art, clock) -> None:
     still, sheet = art
     stage.draw(_turn(still))

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, get_args
 from uuid import UUID
 
@@ -24,7 +24,7 @@ from tangl.journal.fragments import (
 )
 from tangl.persistence import PersistenceManagerFactory
 from tangl.presentation.hints import STAGING_MAX, STAGING_MIN, TimingName
-from tangl.presentation.projection import StageExtentValue
+from tangl.presentation.projection import BooleanPreference, StageExtentValue, UiPreferencesValue
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.media import (
     MediaContentProfile,
@@ -283,6 +283,8 @@ class PygameSessionBridge:
         self.user_secret = user_secret
         self.ledger_id: UUID | None = None
         self.world_id: str | None = None
+        self.preferences: dict[str, bool] = {}
+        self._preference_ids: frozenset[str] = frozenset()
         self.media_render_profile = media_render_profile or MediaRenderProfile(
             pending_policy=MediaPendingPolicy.FALLBACK,
             content_profile=MediaContentProfile.PASSTHROUGH,
@@ -317,6 +319,40 @@ class PygameSessionBridge:
                 f"supported extents: {supported}"
             )
         return extent
+
+    def discover_preferences(self, world_id: str) -> list[BooleanPreference]:
+        """Fetch world-static declarations once and retain local values."""
+        catalog = self.service_manager.get_world_info(world_id=world_id)
+        if not any(channel.channel_id == "ui-preferences" for channel in catalog.channels):
+            return []
+        state = self.service_manager.get_world_info(world_id=world_id, channels=["ui-preferences"])
+        value = state.sections[0].value
+        if not isinstance(value, UiPreferencesValue):
+            raise TypeError(f"Expected UiPreferencesValue for ui-preferences, got {type(value)!r}")
+        self.preferences = {
+            preference.preference_id: preference.default
+            for preference in value.preferences
+        }
+        self._preference_ids = frozenset(self.preferences)
+        return value.preferences
+
+    def toggle_preference(self, preference_id: str) -> bool:
+        """Flip one already-declared local value without contacting the service."""
+        if preference_id not in self.preferences:
+            raise KeyError(f"Unknown ui preference {preference_id!r}")
+        self.preferences[preference_id] = not self.preferences[preference_id]
+        return self.preferences[preference_id]
+
+    def media_visibility(self, turn: Turn) -> Mapping[str, bool]:
+        """Validate and expose local media visibility for this unchanged turn."""
+        for image in turn.images:
+            preference_id = image.visibility_preference
+            if preference_id is not None and preference_id not in self._preference_ids:
+                raise ValueError(
+                    f"Media visibility preference {preference_id!r} was not declared by "
+                    f"world {self.world_id!r}"
+                )
+        return self.preferences
 
     def start(self, world_id: str) -> RuntimeEnvelope:
         """Create a fresh story session for ``world_id``."""
@@ -737,5 +773,6 @@ class PygameSessionBridge:
                 clip=_text(hints.get("media_clip")),
                 timing=_timing(hints.get("media_timing")),
                 sheets=self._sheets(payload),
+                visibility_preference=_text(hints.get("media_visibility_preference")),
             )
         )
