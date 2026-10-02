@@ -1,13 +1,13 @@
 label: incremental_yard
 
 metadata:
-  title: "Incremental Yard"
+  title: "The Salvage Yard"
   description: "A tiny authored proof for the incremental shell."
   start_at: yard.entrance
 
 scenes:
   yard:
-    title: "Incremental Yard"
+    title: "The Salvage Yard"
     blocks:
       entrance:
         content: |

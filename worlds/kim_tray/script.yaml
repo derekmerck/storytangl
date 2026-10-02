@@ -1,13 +1,13 @@
 label: kim_tray
 
 metadata:
-  title: "Kim Tray"
+  title: "The Silver Thimble"
   description: "A tiny authored proof for the shared picking kernel."
   start_at: tray_room.entrance
 
 scenes:
   tray_room:
-    title: "Kim Tray"
+    title: "The Silver Thimble"
     blocks:
       entrance:
         content: |

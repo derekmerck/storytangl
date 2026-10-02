@@ -1,13 +1,13 @@
 label: ed_queue_demo
 
 metadata:
-  title: "ED Queue Demo"
+  title: "Night Shift"
   description: "A deterministic queueing simulation proof."
   start_at: ed_queue.entrance
 
 scenes:
   ed_queue:
-    title: "ED Queue Demo"
+    title: "Night Shift"
     blocks:
       entrance:
         content: |

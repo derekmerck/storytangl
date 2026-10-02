@@ -1,13 +1,13 @@
 label: colony_loop
 
 metadata:
-  title: "Colony Loop"
+  title: "Hungry Colony"
   description: "A composite proof for shell-plus-spike game composition."
   start_at: colony.entrance
 
 scenes:
   colony:
-    title: "Colony Loop"
+    title: "Hungry Colony"
     blocks:
       entrance:
         content: |

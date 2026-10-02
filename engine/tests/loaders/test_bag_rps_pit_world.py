@@ -33,7 +33,7 @@ class TestBagRpsPitWorld:
         assert "bag_rps_pit" in registry.bundles
         bundle = registry.bundles["bag_rps_pit"]
         assert bundle.manifest.label == "bag_rps_pit"
-        assert bundle.manifest.metadata["title"] == "Bag RPS Pit"
+        assert bundle.manifest.metadata["title"] == "The Contest Pit"
 
     def test_bag_rps_pit_compiles_and_routes_to_victory(self) -> None:
         bundle = WorldBundle.load(_bag_rps_root())

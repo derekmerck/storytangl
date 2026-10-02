@@ -33,7 +33,7 @@ class TestKimTrayWorld:
         assert "kim_tray" in registry.bundles
         bundle = registry.bundles["kim_tray"]
         assert bundle.manifest.label == "kim_tray"
-        assert bundle.manifest.metadata["title"] == "Kim Tray"
+        assert bundle.manifest.metadata["title"] == "The Silver Thimble"
 
     def test_kim_tray_compiles_and_routes_to_victory(self) -> None:
         bundle = WorldBundle.load(_kim_tray_root())

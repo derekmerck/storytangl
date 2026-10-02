@@ -35,7 +35,7 @@ class TestBlackjackParlourWorld:
         assert "blackjack_parlour" in registry.bundles
         bundle = registry.bundles["blackjack_parlour"]
         assert bundle.manifest.label == "blackjack_parlour"
-        assert bundle.manifest.metadata["title"] == "Blackjack Parlour"
+        assert bundle.manifest.metadata["title"] == "The Back-Room Table"
 
     def test_blackjack_parlour_compiles_and_routes_game_to_victory(self) -> None:
         bundle = WorldBundle.load(_blackjack_root())

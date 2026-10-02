@@ -1,13 +1,13 @@
 label: bag_rps_pit
 
 metadata:
-  title: "Bag RPS Pit"
+  title: "The Contest Pit"
   description: "A tiny authored proof for aggregate-force contests."
   start_at: pit.entrance
 
 scenes:
   pit:
-    title: "Bag RPS Pit"
+    title: "The Contest Pit"
     blocks:
       entrance:
         content: |

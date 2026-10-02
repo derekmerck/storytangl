@@ -34,7 +34,7 @@ class TestEdQueueDemoWorld:
         assert "ed_queue_demo" in registry.bundles
         bundle = registry.bundles["ed_queue_demo"]
         assert bundle.manifest.label == "ed_queue_demo"
-        assert bundle.manifest.metadata["title"] == "ED Queue Demo"
+        assert bundle.manifest.metadata["title"] == "Night Shift"
 
     def test_ed_queue_demo_compiles_and_runs_to_summary(self) -> None:
         bundle = WorldBundle.load(_ed_queue_root())

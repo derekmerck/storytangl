@@ -1,13 +1,13 @@
 label: rps_tavern
 
 metadata:
-  title: "RPS Tavern"
+  title: "Three Hands at the Tavern"
   description: "Challenge the bartender to Rock Paper Scissors."
   start_at: tavern.entrance
 
 scenes:
   tavern:
-    title: "RPS Tavern"
+    title: "Three Hands at the Tavern"
     blocks:
       entrance:
         content: |

@@ -1,7 +1,7 @@
 label: credential_gate
 
 metadata:
-  title: "Credential Gate"
+  title: "The Checkpoint"
   description: "Work a checkpoint shift: inspect each traveler's packet and rule on a disposition."
   start_at: gate.entrance
 
@@ -12,7 +12,7 @@ metadata:
 # the game's POSTREQS game_won / game_lost exits route to the shared summary.
 scenes:
   gate:
-    title: "Credential Gate"
+    title: "The Checkpoint"
     blocks:
       entrance:
         content: |
