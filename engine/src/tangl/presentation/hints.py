@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator, model_validator
 
 from tangl.type_hints import StyleClass, StyleDict, StyleId
 
@@ -35,7 +35,7 @@ TransitionName = Literal[
 ]
 DurationName = Literal["short", "medium", "long"]
 TimingName = Literal["start", "stop", "pause", "restart", "loop"]
-PreferenceValue = bool | str
+PreferenceValue = StrictBool | StrictStr
 
 
 class ClipBindingRow(BaseModel):

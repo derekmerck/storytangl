@@ -6,6 +6,7 @@ from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     BadgeListValue,
     BooleanPreference,
+    EnumPreference,
     InfoAffordance,
     InfoState,
     ItemListValue,
@@ -173,3 +174,16 @@ def test_ui_preferences_reject_case_insensitive_shortcut_collisions() -> None:
                 BooleanPreference(id="music", label="Music", default=True, shortcut="f1"),
             ]
         )
+
+
+def test_enum_preference_requires_an_ordered_finite_domain() -> None:
+    preference = EnumPreference(
+        id="look",
+        label="Look",
+        values=["calm", "alert", "stern"],
+        default="calm",
+    )
+
+    assert preference.model_dump(by_alias=True)["kind"] == "enum"
+    with pytest.raises(ValueError, match="default must be one"):
+        EnumPreference(id="look", label="Look", values=["calm"], default="alert")

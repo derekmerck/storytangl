@@ -11,4 +11,11 @@ metadata:
       help: "Show optional staged character art."
       default: true
       shortcut: F1
+    - id: clerk-motion
+      kind: enum
+      label: "Clerk motion"
+      help: "Choose the clerk's local sprite pose."
+      values: [idle, call, response]
+      default: idle
+      shortcut: F2
   description: "A compact compiled-world proof of call-response acquisition and opportunity gating."

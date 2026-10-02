@@ -359,16 +359,8 @@ class PygameSessionBridge:
             self.preferences[preference_id] = declaration.values[(index + 1) % len(declaration.values)]
         return self.preferences[preference_id]
 
-    def media_visibility(self, turn: Turn) -> Mapping[str, bool]:
-        """Validate and expose local media visibility for this unchanged turn."""
-        for image in turn.images:
-            binding = image.visibility
-            preference_id = binding.preference_id if binding is not None else None
-            if preference_id is not None and preference_id not in self._preference_ids:
-                raise ValueError(
-                    f"Media visibility preference {preference_id!r} was not declared by "
-                    f"world {self.world_id!r}"
-                )
+    def media_visibility(self) -> Mapping[str, bool | str]:
+        """Expose the already-declared local values for renderer binding."""
         return self.preferences
 
     def start(self, world_id: str) -> RuntimeEnvelope:

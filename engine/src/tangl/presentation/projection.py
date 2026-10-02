@@ -229,6 +229,8 @@ __all__ = [
     "SectionValue",
     "StageExtentValue",
     "BooleanPreference",
+    "EnumPreference",
+    "PreferenceDeclaration",
     "UiPreferencesValue",
     "ProjectionRequest",
     "TableValue",

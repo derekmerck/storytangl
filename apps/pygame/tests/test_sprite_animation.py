@@ -34,7 +34,7 @@ pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client r
 from PIL import Image  # noqa: E402
 
 from tangl.presentation.sprite_sheet import SpriteSheetManifest  # noqa: E402
-from tangl.presentation.hints import VisibilityBinding  # noqa: E402
+from tangl.presentation.hints import ClipBinding, ClipBindingRow, VisibilityBinding  # noqa: E402
 from tangl.pygame_client.models import SheetSource, StageImage, Turn  # noqa: E402
 from tangl.pygame_client.stage import Stage  # noqa: E402
 
@@ -392,6 +392,26 @@ def test_visibility_toggle_keeps_the_same_turn_clip_progress(stage, art, clock) 
     clock.ms = 3850
     stage.draw(turn, media_visibility={"sprites-visible": True})
     assert _probe(stage, still_only, left=True) == BLINK_L
+
+
+def test_client_selected_clip_preserves_elapsed_time(stage, art, clock) -> None:
+    still, sheet = art
+    stage.draw(_turn(still))
+    still_only = _pixels(stage)
+    turn = _turn(
+        still,
+        sheet,
+        clip="idle",
+        timing="loop",
+        clip_binding=ClipBinding(
+            axes=["look"],
+            rows=[ClipBindingRow(values=[True], clip="idle"), ClipBindingRow(values=[False], clip="call")],
+        ),
+    )
+    stage.draw(turn, media_visibility={"look": True})
+    clock.ms = 2000
+    stage.draw(turn, media_visibility={"look": False})
+    assert _probe(stage, still_only, left=True) == HOLD_L
 
 
 def test_pause_holds_the_frame_and_the_next_play_resumes_from_it(stage, art, clock) -> None:

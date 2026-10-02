@@ -11,6 +11,7 @@ colour plus text.
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from uuid import UUID
@@ -363,7 +364,7 @@ class Stage:
         return surface
 
     def _resolve_images(
-        self, turn: Turn, media_visibility: Mapping[str, bool]
+        self, turn: Turn, media_visibility: Mapping[str, bool | str]
     ) -> tuple[list[tuple[StageImage, pygame.Surface]], list[StageImage]]:
         """Split staged images into drawable surfaces and those that are not.
 
@@ -376,6 +377,8 @@ class Stage:
         for image in turn.images:
             if image.visibility is not None and media_visibility[image.visibility.preference_id] not in image.visibility.values:
                 continue
+            clip, client_selected = self._selected_clip(image, media_visibility)
+            image = replace(image, clip=clip, client_selected_clip=client_selected)
             surface = self._load(image.source)
             if surface is None:
                 unloadable.append(image)
@@ -384,6 +387,22 @@ class Stage:
                 surface = pygame.transform.flip(surface, True, False)
             loaded.append((image, surface))
         return loaded, unloadable
+
+    @staticmethod
+    def _selected_clip(
+        image: StageImage, preferences: Mapping[str, bool | str]
+    ) -> tuple[str | None, bool]:
+        binding = image.clip_binding
+        if binding is not None:
+            values = [preferences[axis] for axis in binding.axes]
+            for row in binding.rows:
+                if row.values == values:
+                    return row.clip, True
+            # A missing row deliberately falls back to the authored clip (or
+            # still), but it is still a preference-driven selection: changing
+            # back and forth must not restart this occurrence's elapsed time.
+            return image.clip, True
+        return image.clip, False
 
     @staticmethod
     def _pick(
@@ -397,7 +416,7 @@ class Stage:
         self,
         turn: Turn,
         pending: PendingSelection | None = None,
-        media_visibility: Mapping[str, bool] | None = None,
+        media_visibility: Mapping[str, bool | str] | None = None,
     ) -> None:
         """Render one turn and record its hitboxes for the input layer.
 
@@ -458,15 +477,7 @@ class Stage:
         # speaks over it. Both stand on the stage, not on the text: the
         # choice list is drawn over them rather than holding them up.
         self._draw_staged(loaded)
-        self._draw_portraits(
-            turn,
-            loaded,
-            preserve_hidden_clips=any(
-                image.visibility is not None
-                and visibility[image.visibility.preference_id] not in image.visibility.values
-                for image in turn.images
-            ),
-        )
+        self._draw_portraits(turn, visibility)
         panelled = self._has_state(turn, placed=placed)
         width = self.logical_size[0] - (self.panel_width if panelled else 0)
         stage_rect = pygame.Rect(
@@ -988,9 +999,7 @@ class Stage:
     def _draw_portraits(
         self,
         turn: Turn,
-        loaded: list[tuple[StageImage, pygame.Surface]],
-        *,
-        preserve_hidden_clips: bool = False,
+        preferences: Mapping[str, bool | str],
     ) -> None:
         """Place up to three sprites on a shared baseline, preserving aspect.
 
@@ -1009,7 +1018,7 @@ class Stage:
 
         fresh = turn is not self._staged_turn
         self._staged_turn = turn
-        staged = self._pick(loaded, PORTRAIT_ROLES)[:3]
+        staged = [image for image in turn.images if image.role in PORTRAIT_ROLES][:3]
         seen: set[_ClipKey] = set()
         occurrences: Counter[tuple[str, str, str]] = Counter()
         floor = self.logical_size[1]
@@ -1020,10 +1029,9 @@ class Stage:
         # the one thing this client still owes: a portrait taller than the
         # stage has to come down, because nothing else will bring it down.
         ceiling = floor - self.portrait_headroom
-        for index, (image, portrait) in enumerate(staged):
-            height = min(portrait.get_height(), ceiling)
-            factor = height / portrait.get_height()
-            width = max(1, round(portrait.get_width() * factor))
+        for index, image in enumerate(staged):
+            clip, client_selected = self._selected_clip(image, preferences)
+            image = replace(image, clip=clip, client_selected_clip=client_selected)
             # A placement wins over a slot. The two are different questions --
             # "which of three stations" versus "where exactly" -- and a world
             # that answered the second should not be re-answered by arrival
@@ -1034,6 +1042,18 @@ class Stage:
                 f"x={image.x_frac:.4f}" if image.x_frac is not None
                 else (image.x_slot or fallback)
             )
+            placed = (image.role, image.source, placement)
+            key = (*placed, occurrences[placed])
+            occurrences[placed] += 1
+
+            portrait = self._load(image.source)
+            if portrait is None:
+                continue
+            if image.flip_h:
+                portrait = pygame.transform.flip(portrait, True, False)
+            height = min(portrait.get_height(), ceiling)
+            factor = height / portrait.get_height()
+            width = max(1, round(portrait.get_width() * factor))
             box_x = self._place_x(image, width, fallback)
             box_y = (
                 self._slot_y(image.y_slot, height, floor, keep=image.keep)
@@ -1043,15 +1063,18 @@ class Stage:
 
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
-            placed = (image.role, image.source, placement)
-            key = (*placed, occurrences[placed])
-            occurrences[placed] += 1
 
             drawn, (at_x, at_y) = self._clip_frame(image, portrait.get_size(), key, fresh=fresh)
             if drawn is None:
                 drawn, at_x, at_y = portrait, 0, 0
             else:
                 seen.add(key)
+            visible = (
+                image.visibility is None
+                or preferences[image.visibility.preference_id] in image.visibility.values
+            )
+            if not visible:
+                continue
             scaled = pygame.transform.scale(
                 drawn,
                 (
@@ -1060,10 +1083,10 @@ class Stage:
                 ),
             )
             self.surface.blit(scaled, (box_x + round(at_x * factor), box_y + round(at_y * factor)))
-        # A sprite that left the stage starts its clip afresh when it comes back;
-        # one merely restated by the next turn carries on where it was.
-        if not preserve_hidden_clips:
-            self._clips = {key: play for key, play in self._clips.items() if key in seen}
+        # Staging is established before a local visibility preference filters
+        # pixels. Hidden portraits therefore retain their slot and clock; only a
+        # portrait absent from this turn loses playback state.
+        self._clips = {key: play for key, play in self._clips.items() if key in seen}
 
     def _clip_frame(
         self,
@@ -1122,9 +1145,15 @@ class Stage:
 
         now = self._now()
         play = self._clips.get(key)
-        if play is None or play.clip != image.clip or (fresh and image.timing == "restart"):
+        if (
+            play is None
+            or (fresh and image.timing == "restart")
+            or (play.clip != image.clip and not image.client_selected_clip)
+        ):
             play = _ClipPlay(clip=image.clip, started_ms=now)
             self._clips[key] = play
+        else:
+            play.clip = image.clip
         if image.timing == "stop":
             play.started_ms, play.held_ms = now, 0.0
         elif image.timing == "pause":

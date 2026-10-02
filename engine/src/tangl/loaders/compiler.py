@@ -135,7 +135,7 @@ class WorldCompiler:
                 domain_adjuncts.class_registry if domain_adjuncts is not None else None
             ),
         )
-        self._validate_preference_bindings(story_bundle)
+        self._validate_preference_bindings(story_bundle, resources_facet)
         world = WorldBuilder().build(
             label=bundle.manifest.story_label(story_key),
             bundle=story_bundle,
@@ -203,7 +203,7 @@ class WorldCompiler:
                     else None
                 ),
             )
-            self._validate_preference_bindings(story_bundle)
+            self._validate_preference_bindings(story_bundle, world_resources_facet)
             world = WorldBuilder().build(
                 label=bundle.manifest.story_label(story_key),
                 bundle=story_bundle,
@@ -231,7 +231,10 @@ class WorldCompiler:
         return worlds
 
     @staticmethod
-    def _validate_preference_bindings(bundle: StoryTemplateBundle) -> None:
+    def _validate_preference_bindings(
+        bundle: StoryTemplateBundle,
+        resources: ResourceManager | None,
+    ) -> None:
         """Check explicit staged-media delegation against world-static declarations."""
         declared = UiPreferencesValue.model_validate(
             {"preferences": bundle.metadata.get("ui_preferences", [])}
@@ -262,6 +265,38 @@ class WorldCompiler:
                     for row in hints.media_clip_binding.rows:
                         for axis, value in zip(hints.media_clip_binding.axes, row.values, strict=True):
                             WorldCompiler._validate_binding_values(axis, [value], domains)
+                WorldCompiler._validate_media_clips(media, hints, resources)
+
+    @staticmethod
+    def _validate_media_clips(
+        media: dict[str, Any],
+        hints: StagingHints,
+        resources: ResourceManager | None,
+    ) -> None:
+        """Refuse authored clip names absent from a locally indexed still's sheets."""
+        if resources is None:
+            return
+        clips = [clip for clip in [hints.media_clip] if clip is not None]
+        if hints.media_clip_binding is not None:
+            clips.extend(row.clip for row in hints.media_clip_binding.rows)
+        if not clips:
+            return
+        name = media.get("name")
+        if not isinstance(name, str):
+            return
+        resource = resources.get_rit(name)
+        if resource is None:
+            return
+        available = {
+            clip.name
+            for sheet in resource.sprite_sheets
+            for clip in sheet.manifest.clips
+        }
+        if not available:
+            return
+        unknown = sorted(set(clips) - available)
+        if unknown:
+            raise ValueError(f"Media {name!r} has no sprite-sheet clips: {', '.join(unknown)}")
 
     @staticmethod
     def _validate_binding_values(

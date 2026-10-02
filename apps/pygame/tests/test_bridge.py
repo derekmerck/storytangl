@@ -27,6 +27,7 @@ from tangl.presentation.intent import (
 )
 from tangl.presentation.projection import (
     BooleanPreference,
+    EnumPreference,
     InfoAffordance,
     ProjectedSection,
     ProjectedState,
@@ -118,17 +119,28 @@ class _PreferenceService:
         )
 
 
-def test_media_visibility_rejects_an_undeclared_binding() -> None:
+def test_media_visibility_exposes_declared_local_values() -> None:
     bridge = PygameSessionBridge(_PreferenceService())
     bridge.discover_preferences("fixture_world")
 
-    assert bridge.media_visibility(
-        Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility=VisibilityBinding(preference_id="sprites-visible", values=[True]))])
-    ) == {"sprites-visible": True}
-    with pytest.raises(ValueError, match="was not declared"):
-        bridge.media_visibility(
-            Turn(step=1, images=[StageImage(role="dialog_im", source="sprite.png", visibility=VisibilityBinding(preference_id="unknown", values=[True]))])
+    assert bridge.media_visibility() == {"sprites-visible": True}
+
+
+def test_enum_preference_cycles_in_declared_order() -> None:
+    bridge = PygameSessionBridge(_PreferenceService())
+    bridge.preferences = {"look": "calm"}
+    bridge._preference_declarations = {
+        "look": EnumPreference(
+            id="look",
+            label="Look",
+            values=["calm", "alert", "stern"],
+            default="calm",
         )
+    }
+
+    assert bridge.cycle_preference("look") == "alert"
+    assert bridge.cycle_preference("look") == "stern"
+    assert bridge.cycle_preference("look") == "calm"
 
 
 def test_attributed_fragments_become_speaker_lines(bridge: PygameSessionBridge) -> None:

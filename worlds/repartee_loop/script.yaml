@@ -44,6 +44,12 @@ scenes:
               media_transition: from_left
               media_flip_h: true
               media_clip: idle
+              media_clip_binding:
+                axes: [clerk-motion]
+                rows:
+                  - {values: [idle], clip: idle}
+                  - {values: [call], clip: call}
+                  - {values: [response], clip: response}
               media_timing: loop
               media_visibility: {preference_id: sprites-visible, values: [true]}
         kind: "repartee_loop.domain.ReparteeSetupBlock"

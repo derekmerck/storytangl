@@ -90,6 +90,7 @@ class StageImage:
 
     visibility: VisibilityBinding | None = None
     clip_binding: ClipBinding | None = None
+    client_selected_clip: bool = False
 
 
 @dataclass(slots=True, frozen=True)
