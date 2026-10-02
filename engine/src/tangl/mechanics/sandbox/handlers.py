@@ -557,7 +557,11 @@ def _sandbox_interaction_action_label(
     return f"sandbox_{source}_{location.get_label()}_{sponsor_label}_{interaction_label}"
 
 
-def _scheduled_event_contribution_key(contribution: ScheduledEventContribution) -> str:
+def _scheduled_event_contribution_key(
+    contribution: ScheduledEventContribution,
+    *,
+    include_event_index: bool = True,
+) -> str:
     """Return a replay-stable identity for one scheduled-event contribution.
 
     Scheduled events deliberately have no runtime identity or firing history.
@@ -570,8 +574,9 @@ def _scheduled_event_contribution_key(contribution: ScheduledEventContribution) 
         "source_kind": contribution.source_kind,
         "source_label": contribution.source_label,
         "sponsor_id": str(contribution.sponsor_id) if contribution.sponsor_id else None,
-        "event_index": contribution.event_index,
     }
+    if include_event_index:
+        payload["event_index"] = contribution.event_index
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -750,10 +755,6 @@ def _project_sandbox_interaction(
         sponsor_label=sponsor_label,
         interaction_label=projection_label or interaction.label,
     )
-    if reuse_retained_binding:
-        existing = location.edges_out(Selector(has_kind=Action, label=action_label))
-        if (action := next(existing, None)) is not None:
-            return cast(Action, action)
     availability = list(interaction.availability)
     if static_event_binding is not None:
         sponsor_id, event_index, declaration = static_event_binding
@@ -771,6 +772,14 @@ def _project_sandbox_interaction(
         availability.append(
             Predicate(expr=f"sandbox_scheduled_event_available({event_contribution_key!r})")
         )
+    if reuse_retained_binding:
+        existing = location.edges_out(Selector(has_kind=Action, label=action_label))
+        if (action := next(existing, None)) is not None:
+            action = cast(Action, action)
+            if action.successor_id == target.uid:
+                action.availability = availability
+                return action
+            graph.remove(action.uid, _ctx=ctx)
     return Action(
         registry=graph,
         label=action_label,
@@ -2498,7 +2507,7 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             source=contribution.source,
             sponsor_label=contribution.source_label,
             interaction_label=(contribution.event.label or contribution.event.target)
-            + f"_{_scheduled_event_contribution_key(contribution)[:12]}",
+            + f"_{_scheduled_event_contribution_key(contribution, include_event_index=False)[:12]}",
         )
         for contribution in contributions
         if contribution.source_kind in {"location", "scope"}
@@ -2518,6 +2527,10 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
         contribution_key = _scheduled_event_contribution_key(contribution)
         event_label = event.label or event.target
         retained = contribution.source_kind in {"location", "scope"}
+        binding_key = _scheduled_event_contribution_key(
+            contribution,
+            include_event_index=not retained,
+        )
         static_binding = None
         if retained:
             assert contribution.sponsor_id is not None
@@ -2538,7 +2551,7 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             tags={"event"},
             contribution_kind="event",
             event_contribution_key=contribution_key,
-            projection_label=f"{event_label}_{contribution_key[:12]}",
+            projection_label=f"{event_label}_{binding_key[:12]}",
             event=event.label or event.target,
             reuse_retained_binding=retained,
             static_event_binding=static_binding,

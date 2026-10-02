@@ -2198,6 +2198,67 @@ def test_replacing_static_event_prunes_only_its_binding_and_refreshes_dynamic_ev
     assert all(event.available(ctx=ctx) for event in _dynamic_sandbox_actions_with_tag(road, "event"))
 
 
+def test_retained_event_identity_survives_declaration_reordering_and_restore() -> None:
+    graph = Graph(label="event_identity")
+    road = SandboxLocation(label="road")
+    target = Block(label="target", content="Target")
+    graph.add(road)
+    graph.add(target)
+    deleted = ScheduledEvent(label="deleted", target="target", text="Deleted")
+    keep = ScheduledEvent(label="keep", target="target", text="Keep")
+    road.scheduled_events = [deleted, keep]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+    original = next(
+        event for event in _dynamic_sandbox_actions_with_tag(road, "event") if event.text == "Keep"
+    )
+
+    road.scheduled_events.pop(0)
+    road.scheduled_events.insert(0, ScheduledEvent(label="inserted", target="target", text="Inserted"))
+    road.scheduled_events.reverse()
+    do_provision(road, ctx=ctx)
+    kept = next(
+        event for event in _dynamic_sandbox_actions_with_tag(road, "event") if event.text == "Keep"
+    )
+    assert kept.uid == original.uid
+    assert kept.available(ctx=ctx)
+
+    restored = Ledger.structure(Ledger.from_graph(graph, entry_id=road.uid).unstructure())
+    restored_road = restored.graph.find_one(Selector(has_kind=SandboxLocation, label="road"))
+    assert isinstance(restored_road, SandboxLocation)
+    restored_ctx = PhaseCtx(graph=restored.graph, cursor_id=restored_road.uid)
+    do_provision(restored_road, ctx=restored_ctx)
+    kept = next(
+        event
+        for event in _dynamic_sandbox_actions_with_tag(restored_road, "event")
+        if event.text == "Keep"
+    )
+    assert kept.uid == original.uid
+    assert kept.available(ctx=restored_ctx)
+
+
+def test_retained_event_rebinds_when_its_target_is_replaced() -> None:
+    graph = Graph(label="event_target_replacement")
+    road = SandboxLocation(label="road")
+    original_target = Block(label="target", content="Original target")
+    graph.add(road)
+    graph.add(original_target)
+    road.scheduled_events = [ScheduledEvent(label="event", target="target", text="Attend")]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+    (event,) = _dynamic_sandbox_actions_with_tag(road, "event")
+
+    graph.remove(original_target.uid)
+    replacement = Block(label="target", content="Replacement target")
+    graph.add(replacement)
+    do_provision(road, ctx=ctx)
+
+    (rebound,) = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert rebound.uid != event.uid
+    assert rebound.successor is replacement
+    assert rebound.available(ctx=ctx)
+
+
 def test_stale_duplicate_label_event_is_rejected_before_entry() -> None:
     """Live admission remains bound to the selected duplicate-label contribution."""
     graph, scope, road, event_beat = _event_time_graph()

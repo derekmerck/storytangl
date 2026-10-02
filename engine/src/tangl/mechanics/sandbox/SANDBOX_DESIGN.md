@@ -177,10 +177,11 @@ Dynamic sandbox affordances remain ephemeral except location- and scope-sponsore
 scheduled-event bindings. Those declarations establish one durable ordinary
 Action per receiving location and sponsor/declaration identity; schedule, actor,
 predicate, disclosure, and once eligibility remain live availability questions.
-Each retained binding carries the sponsoring node plus the declaration's persisted
-position and fingerprint through ordinary constructor-form data, and uses its
-already-bound successor for a once-after-visit check; it does not re-gather the
-event catalog at display time.
+Each retained binding carries the sponsoring node plus a declaration fingerprint
+through ordinary constructor-form data. Provisioning refreshes its current list
+position and rebinds it when its target changes; use-time availability uses its
+already-bound successor for a once-after-visit check and does not re-gather the
+event catalog.
 Mobs, fixtures, assets, provider events, and game moves still refresh their
 generated actions on each visit. This keeps the retained binding narrow without
 turning general sandbox projection into a cache.
