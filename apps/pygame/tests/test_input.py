@@ -489,9 +489,9 @@ def test_every_panel_page_is_reachable_from_the_keyboard(
     seen: list[int] = []
     original = client.Stage.draw
 
-    def record(self, turn, pending=None):
+    def record(self, turn, pending=None, **kwargs):
         seen.append(self.panel_scroll)
-        return original(self, turn, pending)
+        return original(self, turn, pending, **kwargs)
 
     monkeypatch.setattr(client.Stage, "draw", record)
 

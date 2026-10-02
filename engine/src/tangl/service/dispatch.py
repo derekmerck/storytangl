@@ -14,12 +14,14 @@ from tangl.presentation.projection import (
     ProjectedState,
     StageExtentValue,
     TableValue,
+    UiPreferencesValue,
 )
 from tangl.story import World
 
 WORLD_STYLE_CHANNEL = "ui-style-hints-html"
 WORLD_BRANDING_CHANNEL = "ui-branding"
 WORLD_STAGE_CHANNEL = "ui-stage"
+WORLD_PREFERENCES_CHANNEL = "ui-preferences"
 
 service_dispatch = BehaviorRegistry(
     label="service_dispatch",
@@ -101,6 +103,12 @@ def advertise_world_info_channels(
         affordances.append(
             InfoAffordance(channel_id=WORLD_STAGE_CHANNEL, label="Stage extent")
         )
+    preferences = caller.metadata.get("ui_preferences")
+    if preferences is not None:
+        UiPreferencesValue.model_validate({"preferences": preferences})
+        affordances.append(
+            InfoAffordance(channel_id=WORLD_PREFERENCES_CHANNEL, label="Preferences")
+        )
     return affordances
 
 
@@ -147,6 +155,17 @@ def project_world_info(
                 title="Stage extent",
                 kind="stage_extent",
                 value=StageExtentValue.model_validate(caller.metadata["stage_extent"]),
+            )
+        )
+    if WORLD_PREFERENCES_CHANNEL in channels:
+        sections.append(
+            ProjectedSection(
+                section_id=WORLD_PREFERENCES_CHANNEL,
+                title="Preferences",
+                kind="ui_preferences",
+                value=UiPreferencesValue.model_validate(
+                    {"preferences": caller.metadata["ui_preferences"]}
+                ),
             )
         )
     return sections

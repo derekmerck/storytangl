@@ -363,11 +363,15 @@ Optional extras:
 poetry install -E server    # FastAPI + uvicorn + storage extras
 poetry install -E cli       # cmd2 CLI only
 poetry install -E docs      # Sphinx documentation extras
+poetry install -E dicebear  # deterministic local portrait backend
 ```
 
 ### Run Tests
 
 ```bash
+# The full repository suite includes Hall Monitor's DiceBear portrait checks.
+poetry install --with dev -E dicebear
+
 # Configured repository suite: engine, docs, scripts, and reference adapters
 poetry run pytest
 

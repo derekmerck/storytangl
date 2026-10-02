@@ -45,6 +45,7 @@ scenes:
               media_flip_h: true
               media_clip: idle
               media_timing: loop
+              media_visibility_preference: sprites-visible
         kind: "repartee_loop.domain.ReparteeSetupBlock"
         content: "The clerk hands you one opening line and a warning not to waste it."
         actions:

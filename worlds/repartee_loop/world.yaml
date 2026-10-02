@@ -4,4 +4,10 @@ domain_module: repartee_loop.domain
 metadata:
   title: "Marmoset Island"
   stage_extent: {width: 320, height: 200}
-  description: "A battle-of-wits loop with learned responses, retained repertoire, gated opportunities, maps, sprites, and swappable visual skins."
+  ui_preferences:
+    - id: sprites-visible
+      label: "Decorative sprites"
+      help: "Show optional staged character art."
+      default: true
+      shortcut: F1
+  description: "A compact compiled-world proof of call-response acquisition and opportunity gating."

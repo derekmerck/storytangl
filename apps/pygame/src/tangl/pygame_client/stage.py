@@ -11,7 +11,7 @@ colour plus text.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from uuid import UUID
 
@@ -36,11 +36,14 @@ from .models import (
     MapPlate,
     MapRegion,
     PagePanel,
+    PagePreferences,
     PageSelection,
     PendingSelection,
+    PreferenceControl,
     Piece,
     PickPiece,
     StageImage,
+    TogglePreference,
     Surface,
     SurfaceSlot,
     Turn,
@@ -320,6 +323,8 @@ class Stage:
         self.panel_scroll = 0
         self.prose_floor = self.logical_size[1]
         self.selection_numbers: dict[str, int] = {}
+        self.preference_controls: tuple[PreferenceControl, ...] = ()
+        self.preference_page = 0
         self._last_turn: Turn | None = None
         self._now: Callable[[], float] = clock or pygame.time.get_ticks
         """Milliseconds. Injected by tests, so no assertion depends on wall time."""
@@ -358,7 +363,7 @@ class Stage:
         return surface
 
     def _resolve_images(
-        self, turn: Turn
+        self, turn: Turn, media_visibility: Mapping[str, bool]
     ) -> tuple[list[tuple[StageImage, pygame.Surface]], list[StageImage]]:
         """Split staged images into drawable surfaces and those that are not.
 
@@ -369,6 +374,11 @@ class Stage:
         loaded: list[tuple[StageImage, pygame.Surface]] = []
         unloadable: list[StageImage] = []
         for image in turn.images:
+            if (
+                image.visibility_preference is not None
+                and not media_visibility[image.visibility_preference]
+            ):
+                continue
             surface = self._load(image.source)
             if surface is None:
                 unloadable.append(image)
@@ -386,7 +396,12 @@ class Stage:
 
     # ── drawing ──────────────────────────────────────────────────────────
 
-    def draw(self, turn: Turn, pending: PendingSelection | None = None) -> None:
+    def draw(
+        self,
+        turn: Turn,
+        pending: PendingSelection | None = None,
+        media_visibility: Mapping[str, bool] | None = None,
+    ) -> None:
         """Render one turn and record its hitboxes for the input layer.
 
         While ``pending`` is set the choice list is replaced by the pieces that
@@ -399,10 +414,12 @@ class Stage:
         self.slot_boxes.clear()
         self.animating = False
         self._drawn_at = self._now()
-        loaded, unloadable = self._resolve_images(turn)
+        visibility = media_visibility or {}
+        loaded, unloadable = self._resolve_images(turn, visibility)
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
         if pending is None and self._draw_map(turn, loaded):
+            self._draw_preferences()
             # The map replaces the stage, so every sprite has left it: drop their
             # playback, or a clip resumes mid-cycle on the far side of the map.
             self._clips.clear()
@@ -411,6 +428,7 @@ class Stage:
             pygame.display.flip()
             return
         self._draw_background(loaded)
+        self._draw_preferences()
         # Rows below are laid out first and always reserved, so a long exchange
         # can never push the only way to continue off the logical surface.
         # Placement is pure data -- slots against piece kinds, no pixels -- so it
@@ -443,7 +461,15 @@ class Stage:
         # speaks over it. Both stand on the stage, not on the text: the
         # choice list is drawn over them rather than holding them up.
         self._draw_staged(loaded)
-        self._draw_portraits(turn, loaded)
+        self._draw_portraits(
+            turn,
+            loaded,
+            preserve_hidden_clips=any(
+                image.visibility_preference is not None
+                and not visibility[image.visibility_preference]
+                for image in turn.images
+            ),
+        )
         panelled = self._has_state(turn, placed=placed)
         width = self.logical_size[0] - (self.panel_width if panelled else 0)
         stage_rect = pygame.Rect(
@@ -486,6 +512,35 @@ class Stage:
             self._draw_choices(turn, top=choices_top)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
+
+    def _draw_preferences(self) -> None:
+        page_size = 2
+        pages = max(1, -(-len(self.preference_controls) // page_size))
+        page = self.preference_page % pages
+        controls = self.preference_controls[page * page_size : page * page_size + page_size]
+        for index, control in enumerate(controls):
+            shortcut = f"{control.shortcut}: " if control.shortcut else ""
+            help_text = f" — {control.help}" if control.help else ""
+            text = f"{shortcut}{control.label}: {'on' if control.enabled else 'off'}{help_text}"
+            surface = self.font.render(text, False, INK)
+            rect = pygame.Rect(
+                2 * self.density,
+                2 * self.density + index * self.row_height,
+                surface.get_width(),
+                self.row_height,
+            )
+            self.surface.blit(surface, rect.topleft)
+            self.hitboxes.append((rect, TogglePreference(control.preference_id)))
+        if pages > 1:
+            label = self.font.render(f"more {page + 1}/{pages}", False, ALERT)
+            rect = pygame.Rect(
+                self.logical_size[0] - label.get_width() - 2 * self.density,
+                2 * self.density,
+                label.get_width(),
+                self.row_height,
+            )
+            self.surface.blit(label, rect.topleft)
+            self.hitboxes.append((rect, PagePreferences()))
 
     # ── map view ─────────────────────────────────────────────────────────
 
@@ -933,7 +988,11 @@ class Stage:
             self.surface.blit(surface, (box_x, box_y))
 
     def _draw_portraits(
-        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]]
+        self,
+        turn: Turn,
+        loaded: list[tuple[StageImage, pygame.Surface]],
+        *,
+        preserve_hidden_clips: bool = False,
     ) -> None:
         """Place up to three sprites on a shared baseline, preserving aspect.
 
@@ -1005,7 +1064,8 @@ class Stage:
             self.surface.blit(scaled, (box_x + round(at_x * factor), box_y + round(at_y * factor)))
         # A sprite that left the stage starts its clip afresh when it comes back;
         # one merely restated by the next turn carries on where it was.
-        self._clips = {key: play for key, play in self._clips.items() if key in seen}
+        if not preserve_hidden_clips:
+            self._clips = {key: play for key, play in self._clips.items() if key in seen}
 
     def _clip_frame(
         self,

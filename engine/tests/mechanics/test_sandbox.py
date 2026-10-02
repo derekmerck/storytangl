@@ -1749,9 +1749,20 @@ def test_costed_sandbox_location_uses_its_own_tick_origin() -> None:
     scope.add_child(destination)
     travel = Action(registry=graph, predecessor_id=start.uid, successor_id=destination.uid)
 
-    Ledger.from_graph(graph, entry_id=start.uid).resolve_choice(travel.uid)
+    ticks: list[tuple[object, int]] = []
+
+    @on_sandbox_tick
+    def observe_location_tick(*, caller, clock_tick, **_kw):
+        ticks.append((caller.uid, clock_tick))
+        return []
+
+    try:
+        Ledger.from_graph(graph, entry_id=start.uid).resolve_choice(travel.uid)
+    finally:
+        sandbox_dispatch.remove(observe_location_tick._behavior.uid)
 
     assert scope.locals["world_turn"] == 1
+    assert ticks == [(destination.uid, 1)]
 
 
 @pytest.mark.parametrize("entry_cost", [None, {"kind": "event", "duration": 0}])
@@ -1816,7 +1827,7 @@ def test_prereqs_redirect_bypasses_costed_block_entry_update() -> None:
     assert scope.locals["world_turn"] == 3
 
 
-def test_internal_return_revisits_and_repays_a_costed_block() -> None:
+def test_internal_return_revisits_and_repays_a_costed_block_after_restore_replay() -> None:
     graph = StoryGraph()
     scope = SandboxScope(label="scope", locals={"world_turn": 0})
     road = SandboxLocation(label="road")
@@ -1839,14 +1850,60 @@ def test_internal_return_revisits_and_repays_a_costed_block() -> None:
     )
     onward = Action(registry=graph, predecessor_id=start.uid, successor_id=ending.uid)
     back = Action(registry=graph, predecessor_id=ending.uid, successor_id=start.uid)
-    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    @on_sandbox_tick
+    def observe_tick(*, caller, clock_tick, **_kw):
+        if caller.uid == road.uid:
+            return SandboxTickEvent(
+                kind="witness",
+                text=f"Tick {clock_tick}",
+                clock_tick=clock_tick,
+            )
+        return []
 
-    ledger.resolve_choice(call.uid)
-    assert scope.locals["world_turn"] == 1
-    ledger.resolve_choice(onward.uid)
-    ledger.resolve_choice(back.uid)
-    assert ledger.cursor.get_label() == "start"
-    assert scope.locals["world_turn"] == 2
+    try:
+        ledger = Ledger.from_graph(graph, entry_id=road.uid)
+        ledger.resolve_choice(call.uid)
+        assert scope.locals["world_turn"] == 1
+
+        restored = Ledger.structure(ledger.unstructure())
+        restored.push_snapshot()
+        entry_step = restored.cursor_steps
+        restored_onward = restored.graph.get(onward.uid)
+        restored_back = restored.graph.get(back.uid)
+        restored_scope = restored.graph.get(scope.uid)
+        assert isinstance(restored_onward, Action)
+        assert isinstance(restored_back, Action)
+        assert isinstance(restored_scope, SandboxScope)
+
+        restored.resolve_choice(restored_onward.uid)
+        restored.resolve_choice(restored_back.uid)
+        assert restored.cursor.get_label() == "start"
+        assert restored_scope.locals["world_turn"] == 2
+        assert [
+            fragment.content
+            for fragment in restored.get_journal()
+            if isinstance(fragment.content, str)
+        ] == ["Tick 1", "Tick 2"]
+
+        restored.rollback_to_step(entry_step, reason="replay internal return")
+        replayed_onward = restored.graph.get(onward.uid)
+        replayed_back = restored.graph.get(back.uid)
+        replayed_scope = restored.graph.get(scope.uid)
+        assert isinstance(replayed_onward, Action)
+        assert isinstance(replayed_back, Action)
+        assert isinstance(replayed_scope, SandboxScope)
+
+        restored.resolve_choice(replayed_onward.uid)
+        restored.resolve_choice(replayed_back.uid)
+        assert restored.cursor.get_label() == "start"
+        assert replayed_scope.locals["world_turn"] == 2
+        assert [
+            fragment.content
+            for fragment in restored.get_journal()
+            if isinstance(fragment.content, str)
+        ] == ["Tick 1", "Tick 2"]
+    finally:
+        sandbox_dispatch.remove(observe_tick._behavior.uid)
 
 
 @pytest.mark.parametrize("terminal", ["chosen", "early"])

@@ -90,14 +90,14 @@ ENV TANGL_SERVICE__PATHS__USER_DATA='@path /app/data/user/' \
     TANGL_SERVICE__PATHS__STORY_MEDIA='@path /app/data/media/' \
     TANGL_SERVICE__PATHS__CACHE_DATA='@path /app/cache/'
 
-# Install the application (cli + server extras).
-# The wheel is named through a variable because `/app/*.whl[cli,server]` is not
-# a glob plus an extras suffix: `[cli,server]` is a glob character class, so the
-# shell looks for a file ending `.whl` plus one of c/l/i/,/s/e/r/v, finds none,
-# and passes the pattern through to pip literally.
+# Install the application and the portrait backend used by the shipped Hall
+# Monitor world. The wheel is named through a variable because adding extras to
+# `/app/*.whl` is not a glob plus an extras suffix: the bracketed extras are a
+# glob character class, so the shell can pass the pattern through to pip
+# literally.
 RUN pip install --upgrade pip \
  && WHEEL="$(ls /app/*.whl)" \
- && pip install "${WHEEL}[cli,server]" \
+ && pip install "${WHEEL}[cli,server,dicebear]" \
  && rm /app/*.whl
 
 EXPOSE 8000

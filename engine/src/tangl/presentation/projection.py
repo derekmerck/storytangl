@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Self, TypeAlias
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .hints import PresentationHints
 from .values import KvRow, PrimitiveValue
@@ -118,6 +118,38 @@ class StageExtentValue(BaseModel):
     height: int = Field(gt=0, strict=True)
 
 
+class BooleanPreference(BaseModel):
+    """One world-static, client-local boolean preference declaration."""
+
+    model_config = ConfigDict(populate_by_name=True)
+    preference_id: str = Field(min_length=1, alias="id")
+    label: str = Field(min_length=1)
+    default: bool
+    help: str | None = None
+    shortcut: str | None = None
+
+
+class UiPreferencesValue(BaseModel):
+    """Exact world-info payload for declarative client preferences."""
+
+    value_type: Literal["ui_preferences"] = "ui_preferences"
+    preferences: list[BooleanPreference]
+
+    @model_validator(mode="after")
+    def _validate_unique_ids(self) -> Self:
+        ids = [preference.preference_id for preference in self.preferences]
+        if len(ids) != len(set(ids)):
+            raise ValueError("ui preference ids must be unique")
+        shortcuts = [
+            preference.shortcut.casefold()
+            for preference in self.preferences
+            if preference.shortcut is not None
+        ]
+        if len(shortcuts) != len(set(shortcuts)):
+            raise ValueError("ui preference shortcuts must be unique case-insensitively")
+        return self
+
+
 SectionValue: TypeAlias = Annotated[
     (
         ScalarValue
@@ -127,6 +159,7 @@ SectionValue: TypeAlias = Annotated[
         | BadgeListValue
         | BrandingValue
         | StageExtentValue
+        | UiPreferencesValue
     ),
     Field(discriminator="value_type"),
 ]
@@ -167,6 +200,8 @@ __all__ = [
     "ScalarValue",
     "SectionValue",
     "StageExtentValue",
+    "BooleanPreference",
+    "UiPreferencesValue",
     "ProjectionRequest",
     "TableValue",
     "ThemeTokens",
