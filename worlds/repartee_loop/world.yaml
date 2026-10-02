@@ -2,6 +2,6 @@ label: repartee_loop
 scripts: script.yaml
 domain_module: repartee_loop.domain
 metadata:
-  title: "Repartee Loop"
+  title: "Marmoset Island"
   stage_extent: {width: 320, height: 200}
-  description: "A compact compiled-world proof of call-response acquisition and opportunity gating."
+  description: "A battle-of-wits loop with learned responses, retained repertoire, gated opportunities, maps, sprites, and swappable visual skins."

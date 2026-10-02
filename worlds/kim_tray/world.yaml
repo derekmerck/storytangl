@@ -2,5 +2,5 @@ label: kim_tray
 scripts: script.yaml
 domain_module: kim_tray.domain
 metadata:
-  title: "Kim Tray"
+  title: "The Silver Thimble"
   description: "Study a tray of small objects and name what vanished."

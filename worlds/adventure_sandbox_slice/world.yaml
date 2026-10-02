@@ -3,7 +3,7 @@ scripts: script.yaml
 domain_module: adventure_sandbox_slice.domain
 
 metadata:
-  title: "Adventure Sandbox Slice"
-  description: "A feel-preserving Colossal Cave-style sandbox mechanics demo."
+  title: "Grand Grotto"
+  description: "A Colossal Cave-style sandbox slice with projected spatial affordances and parser-like text interaction."
   start_at: adventure.entrance
   proof_class: open-ended

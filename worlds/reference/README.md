@@ -1,96 +1,49 @@
-# The Crossroads Inn - Reference World
+# The Crossroads Inn
 
-A comprehensive reference implementation demonstrating StoryTangl's core features.
+**The Crossroads Inn** is the author-facing baseline world. It is deliberately
+small and ordinary: enough structure to show what a StoryTangl bundle looks like
+without asking the reader to understand a domain mechanic, custom projection, or
+adapter at the same time.
 
-## Overview
+Follow a traveler into an inn, meet Aria, take one of several ordinary choices,
+and eventually choose a route toward the Northern Pass.
 
-**The Crossroads Inn** serves as a complete example of a StoryTangl world bundle.
-Follow a traveler who meets a mysterious guide and embarks on a journey.
+## What it actually demonstrates
 
-## Features Demonstrated
+- convention-based world discovery through `world.yaml`;
+- near-native YAML compilation;
+- scenes, blocks, successor actions, and cross-scene references;
+- one scene-level `Actor` template;
+- optional narrative and avatar media roles;
+- ordinary materialization into a playable story graph.
 
-- ✅ Multiple scenes with transitions
-- ✅ Branching narrative paths  
-- ✅ Character interactions
-- ✅ State management
-- ✅ Media integration (SVG images)
-- ✅ Convention-based bundle format
+The script currently declares a couple of local values in its opening block,
+but does not use them to drive later behavior. This world therefore does **not**
+claim stateful consequence as part of its teaching surface.
 
-## Bundle Structure
+## Why it stays small
 
-```
+This is the world to copy when the question is “what does a normal StoryTangl
+story look like?” Focused mechanics live in sibling worlds; composed game
+grammars live in the recipe section of [the worlds catalog](../README.md); codec
+and client adapters live in the advanced section.
+
+Keeping those concerns separate makes this directory useful as a starting point
+instead of turning it into a museum of every feature the engine has ever grown.
+
+## Bundle structure
+
+```text
 reference/
-├── world.yaml          # Manifest
-├── script.yaml         # Story script
-├── README.md           # This file
+├── world.yaml
+├── script.yaml
+├── README.md
 └── media/
     └── images/
-        ├── tavern.svg      # Tavern scene
-        ├── forest.svg      # Forest path
-        └── companion.svg   # Aria portrait
+        ├── tavern.svg
+        ├── forest.svg
+        └── companion.svg
 ```
 
-## Quick Start
-
-### Python API
-
-```python
-from tangl.service.world_registry import WorldRegistry
-
-# Discover and load
-registry = WorldRegistry()
-world = registry.get_world("reference")
-
-# Create story instance
-story = world.create_story("my_playthrough")
-
-# Get starting block
-start = story.get(story.initial_cursor_id)
-print(start.content)
-```
-
-### CLI
-
-```bash
-# List worlds
-tangl world list
-
-# Play interactively
-tangl play reference
-```
-
-## Story Structure
-
-### Prologue: The Crossroads Inn
-- Arrive at the tavern
-- Meet Aria, the guide
-- Learn about the Northern Pass
-
-### Chapter 1: The Journey
-- Trek through the forest
-- Face a pivotal choice
-
-### Epilogue: The Fortress
-- Reach your destination
-- [To be continued...]
-
-## State Variables
-
-- `companion_trust` - Aria's trust level
-- `has_map` - Whether you obtained the map
-
-## Extending
-
-See the [main worlds README](../README.md) for details on:
-- Adding new scenes
-- Including media
-- Custom domain classes
-- Best practices
-
-## License
-
-MIT - Free to use as a template.
-
-## Credits
-
-Created by the StoryTangl team as a reference implementation.
+See the repository [README](../../README.md) for current install and runtime
+commands.

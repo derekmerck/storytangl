@@ -1,9 +1,9 @@
-# Composed Beat Demo
+# Fogbound Manifest
 
-Reference walkthrough of journal **beat composition**: one five-block scene
-that exercises every contribution channel of the gather → enrich → compose
-pipeline. Use it as the template for story beats with deliberate syuzhet
-assembly.
+Focused walkthrough of journal **beat composition**: one five-block dockside
+scene that exercises the contribution channels of the gather → enrich → compose
+pipeline. Use it as the small specimen for story beats with deliberate syuzhet
+assembly rather than as a general-purpose world template.
 
 See `docs/src/design/story/BEAT_COMPOSITION.md` for the pattern this world
 demonstrates, and `engine/tests/loaders/test_composed_beat_demo_world.py`
@@ -23,7 +23,7 @@ for the conformance assertions.
 ## Walkthrough
 
 From `arrival`, the muddy gangway drops `reputation` on the story graph;
-declaring cargo then assembles the full beat — setting, the injected
-manifest incident, and Maro's reaction in slot order, bound by a
-`GroupFragment` beat overlay. Pressing on to `fogbound` swaps the setting
-fragment for the fog line via `replace_first`.
+declaring cargo then assembles the full beat — setting, the injected manifest
+incident, and Maro's reaction in slot order, bound by a `GroupFragment` beat
+overlay. Pressing on to `fogbound` swaps the setting fragment for the fog line
+via `replace_first`.

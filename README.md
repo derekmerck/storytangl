@@ -63,8 +63,9 @@ are never wired directly to each other; the consequence travels as state.
 
 ### The same story, wearing something else
 
-A different world, `repartee_loop`, at the same opening beat -- rendered twice
-through the pygame port:
+A different world, **Marmoset Island** (`repartee_loop`), at the same opening
+beat -- rendered twice through the pygame port. The alternate pack is
+**Marmoset Orbital Station**:
 
 <p align="center">
   <img src=".github/assets/repartee-quay.png"
@@ -86,16 +87,25 @@ media_dir: media_spaceport   # default: media
 Structure and presentation are separate objects here, so a reskin is a
 different *reading* of one story rather than a second story.
 
-### Many stories, many skins, many realizations
+### A teaching collection, not a feature checklist
 
-Eighteen reference worlds ship in [`worlds/`](worlds/), from a blackjack
-parlour to a hall-monitor credential check. Each renders through whichever
-surface is asked for -- a text floor, a pixel-art stage, a REST service, a web
-client, a Ren'Py export -- from the same fragment stream, and each accepts
-whatever art pack it is pointed at. See
-[Run The Reference Apps](#run-the-reference-apps), and
-[`worlds/repartee_loop/`](worlds/repartee_loop/) for how a pack is built and
-captured.
+The reference worlds in [`worlds/`](worlds/) are organized as a small
+curriculum: **The Crossroads Inn** for ordinary authoring, focused worlds that
+isolate one mechanic at a time, composed worlds that recreate recognizable
+game grammars, and advanced examples that probe alternate authoring formats or
+presentation hosts.
+
+Some worlds deliberately exercise richer surfaces: **Grand Grotto** projects
+sandbox choices as parser-like typed commands; **One Red Paperclip** can render
+its route choices as pygame map hitboxes; **Marmoset Island** adds staged
+sprites, animation, and a swappable visual skin; **The Ruined Tower** arrives
+through the Twee/Twine codec; and the Ren'Py demo shows the engine hosted by a
+foreign VN runtime. The common service/fragment model is meant to keep those
+worlds portable, but the catalog distinguishes deliberate witnesses from
+clients that are merely expected to be compatible.
+
+See the [`worlds/` catalog](worlds/) for the teaching order, mechanical lineage,
+and the best example to copy for a particular job.
 
 ---
 
@@ -235,9 +245,9 @@ current repository rather than the full design vocabulary.
   web client, and Ren'Py and pygame reference ports consume its typed responses;
   the non-web ports remain proofs of concept rather than supported products.
 - Assembly, transactions, credentials, progression primitives, sandbox
-  projection, and several game kernels are implemented. The `repartee_loop`
-  world demonstrates retained repertoire, contest aftermath, prize-gated
-  choices, attributed dialog, and two interchangeable art packs.
+  projection, and several game kernels are implemented. **Marmoset Island** (`repartee_loop`) demonstrates retained repertoire,
+  contest aftermath, prize-gated choices, attributed dialog, and two
+  interchangeable art packs.
 - File-backed media travels through world inventory, provisioning, journal
   fragments, service dereferencing, and client-neutral roles/staging hints. A
   ComfyUI-backed creator lifecycle and a separate receipt-based batch helper are

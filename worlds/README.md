@@ -1,227 +1,123 @@
 # StoryTangl Worlds
 
-World bundles for the StoryTangl narrative engine.
+The worlds in this directory are a teaching collection, not a ladder of
+increasingly complete games. They are organized by the kind of idea an author
+is likely to be looking for: first an ordinary StoryTangl world, then isolated
+mechanics, then compositions that produce recognizable game grammars, and
+finally architectural proofs and adapters.
 
-## Available Worlds
+Reader-facing titles are allowed to be memorable; directory names and manifest
+labels are the stable machine identifiers.
 
-### reference/
-**The Crossroads Inn** - Complete reference implementation.
+The descriptions below state **intent**. They do not imply that every possible
+client, persistence path, or integration surface is currently exercised for
+every world. The maintained conformance classification is tracked separately in
+[#438](https://github.com/derekmerck/storytangl/issues/438). The catalog work
+itself is tracked in
+[#461](https://github.com/derekmerck/storytangl/issues/461), and the distinction
+between focused fixtures, conformance worlds, and showcase stories is described
+in [#395](https://github.com/derekmerck/storytangl/issues/395).
 
-See [reference/README.md](reference/README.md) for details.
+## Start Here
 
-### logic_demo/
-**Logic Demo** - Native YAML finite-state-machine showcase with parity, half
-adder, and full adder machines.
+### [The Crossroads Inn](reference/) — `reference`
 
-See [logic_demo/README.md](logic_demo/README.md) for details.
+**Role:** author-facing tutorial.
 
-### twine_logic_demo/
-**Twine Logic Demo** - The same state-machine idea authored in Twee/Twine and
-decoded through the built-in Twine codec.
+A deliberately ordinary near-native YAML world: scenes contain blocks, blocks
+offer choices, one actor is templated, and media is optional. Nothing in this
+world is meant to be clever. Copy it when you want to see the smallest
+recognizable StoryTangl story bundle before adding a mechanic.
 
-### composed_beat_demo/
-**Composed Beat Demo** - Reference walkthrough of journal beat composition:
-chunk overrides, conditional and cross-phase enrichment, and post-merge
-syuzhet assembly.
+## Small Pieces: One Mechanic at a Time
 
-See [composed_beat_demo/README.md](composed_beat_demo/README.md) for details.
+These worlds keep the surrounding fiction thin so the reusable interaction
+shape stays visible.
 
-### adventure_sandbox_slice/
-**Adventure Sandbox Slice** - A compact Colossal Cave-style sandbox mechanics
-demo with location links, inventory, a lamp, a lockable grate, darkness, and a
-present mob interaction.
+| World | What it isolates | Good starting point when... |
+| --- | --- | --- |
+| **Three Hands at the Tavern** (`rps_tavern`) | A minimal Rock-Paper-Scissors `HasGame` encounter inside an ordinary story shell. | You want one compact competitive game block. |
+| **The Contest Pit** (`bag_rps_pit`) | Bag-RPS: commit a reserve of force and deplete an opponent. | You want a contest over aggregate resources rather than one symbolic move. |
+| **The Back-Room Table** (`blackjack_parlour`) | One narratively loaded hand of blackjack. | You want a card-game kernel embedded in traversal. |
+| **The Silver Thimble** (`kim_tray`) | Observation, retention, and recall over a small object set. | You want a memory/recognition interaction. |
+| **The Salvage Yard** (`incremental_yard`) | Repeated re-entry, accumulation, and cycle resolution. | You want a small incremental/planning loop. |
+| **Night Shift** (`ed_queue_demo`) | A deterministic discrete-event queue simulation that reports through normal journal fragments. | You want simulation state to participate in a story without a second runtime. |
+| **[Fogbound Manifest](composed_beat_demo/)** (`composed_beat_demo`) | Journal gather → enrich → compose, including cross-phase contribution and post-merge assembly. | You want to control how several semantic contributions become one narrated beat. |
 
-### red_paperclip/
-**One Red Paperclip** - A trading-graph puzzle. Six hubs, twenty-one traders,
-and a `trades.d2` data file that reads as a graph because it is one.
+## Game Recipes: Familiar Flavors from Ordinary StoryTangl Parts
 
-See [red_paperclip/README.md](red_paperclip/README.md) for details.
+These are compositions rather than new runtimes. The comparisons below describe
+**mechanical flavor and organizational lineage**, not content adaptation.
 
-### ed_queue_demo/
-**ED Queue Demo** - A deterministic queueing/DES mechanics proof rendered
-through normal StoryTangl journal fragments.
+| World | Mechanical recipe | Presentation / interaction lesson |
+| --- | --- | --- |
+| **[The Checkpoint](credential_gate/)** (`credential_gate`) | Inspection and disposition in the tradition of *Papers, Please*: examine evidence against rules, then rule on the case. | Structured credential packets, inspection, mediation, and disposition over the shared credentials mechanic. |
+| **[Hall Monitor](hall_monitor/)** (`hall_monitor`) | The same credentials evaluator under school vocabulary, with a recurring bearer and delayed world-authored consequence. | Shows that the mechanic is semantic rather than checkpoint-specific: the same packet/disposition lifecycle projects into a very different fiction. |
+| **[Coronate the Regent](coronate_the_regent/)** (`coronate_the_regent`) | Preparation under a fixed schedule in the tradition of *Long Live the Queen*: train now, discover much later which earlier choices mattered. | Ordinary journal and optional scene art carry a mechanically richer loop without requiring a special client. |
+| **Grand Grotto** (`adventure_sandbox_slice`) | A *Colossal Cave*-style spatial adventure slice: locations, inventory, light, locks, darkness, and projected affordances. | The text UI can disguise the current typed choice frontier as completable command phrases, producing a parser-like interaction without a second parser runtime. |
+| **[One Red Paperclip](red_paperclip/)** (`red_paperclip`) | A one-slot barter and route-planning puzzle over a graph of traders and holdings. | The same semantic choices work as CLI rows or pygame map hitboxes; the world also has its own graph-analysis tooling. |
+| **Hungry Colony** (`colony_loop`) | Production → force conversion → raid → attrition/reward fed back into the production shell. | Demonstrates composition: two small kernels constrain the same durable state instead of appearing as disconnected minigames. |
+| **[Marmoset Island](repartee_loop/)** (`repartee_loop`) | A battle-of-wits loop in the tradition of *Monkey Island*: lose to learn a response, retain it, recognize the matching call later, and reuse it. | CLI floor plus pygame map, staged sprites, animation, and a swappable visual reskin. The alternate art pack is **Marmoset Orbital Station**: the graph, prose, choices, and staging semantics stay the same while the presentation changes. |
 
-## Creating a New World
+## Advanced: Architecture, Authoring Adapters, and Foreign Hosts
 
-### Quick Start
+These examples are not “my first game” templates. They probe how far the same
+runtime model can be pushed or approached from a different authoring or
+presentation environment.
 
-```bash
-# Copy reference as template
-cp -r worlds/reference worlds/my_world
+| World | Question it answers |
+| --- | --- |
+| **[Loomworks](logic_demo/)** (`logic_demo`) | Can authored graph topology and traversal perform computation without handing arbitrary code to `exec`/`eval`? The world contains parity, half-adder, and full-adder machines plus a sparse narrative skin over the same topology. |
+| **The Ruined Tower** (`twine_reference`) | Can a small Twee/Twine story be consumed as foreign source and compiled into the ordinary StoryTangl runtime graph? |
+| **[Twine Logic Demo](twine_logic_demo/)** (`twine_logic_demo`) | A secondary parity fixture for the same codec path. It is useful for authoring-format parity, but is not the recommended first Twine example. |
+| **Ren'Py Demo** (`renpy_demo`) | Can Ren'Py act as a foreign presentation host while StoryTangl remains the narrative backend? The current world is intentionally still a compact adapter proof and is due for a more coherent vignette/art pass. |
 
-# Update manifest
-vim worlds/my_world/world.yaml
-# Change: label: my_world
+The advanced trio is deliberately asymmetric:
 
-# Edit story
-vim worlds/my_world/script.yaml
+```text
+foreign authoring                    foreign presentation host
+      Twee/Twine  ->  StoryTangl  ->  Ren'Py
+                          |
+                          +-> Loomworks: the graph itself as a machine
 ```
 
-### From Scratch
+## Choosing an Example
 
-```bash
-mkdir -p worlds/my_world/media/images
+If you are writing your first world, copy **The Crossroads Inn**.
 
-cat > worlds/my_world/world.yaml <<EOF
-label: my_world
-metadata:
-  title: "My Story"
-  author: "Your Name"
-EOF
+If you need one reusable interaction, start from the smallest world that isolates
+it. If you are trying to reproduce the *feel* of a known game structure, look at
+the recipe worlds and ask which durable state and mechanics create that flavor.
+If you are changing source formats or clients, start in the advanced section.
 
-cat > worlds/my_world/script.yaml <<EOF
-label: my_world
-scenes:
-  intro:
-    blocks:
-      start:
-        content: "Your story begins..."
-EOF
+A strong demo does not need to exercise every StoryTangl feature. Its job is to
+make one useful idea unusually easy to see.
+
+## Minimal Bundle Shape
+
+Near-native worlds conventionally look like:
+
+```text
+my_world/
+├── world.yaml
+├── script.yaml
+└── media/          # optional
 ```
 
-## Discovery
-
-Worlds are automatically discovered if:
-1. Directory name matches `label` in world.yaml
-2. Located in configured world paths
-
-Default: `./worlds`
-
-Configure in `settings.toml`:
-
-```toml
-[service.paths]
-worlds = ["./worlds"]
-```
-
-## Loading Worlds
-
-### Python
-
-```python
-from tangl.service.world_registry import WorldRegistry
-
-registry = WorldRegistry()
-world = registry.get_world("reference")
-```
-
-### CLI
-
-```bash
-tangl world list
-tangl play reference
-```
-
-## Bundle Format
-
-### Manifest (world.yaml)
-
-```yaml
-label: my_world          # Must match directory name
-codec: near_native       # Optional (default: near_native)
-scripts: script.yaml     # Optional (legacy single-story shorthand)
-media_dir: media         # Optional (defaults to "media")
-metadata:
-  title: "My Story"
-  author: "Your Name"
-  version: "1.0.0"
-```
-
-### Multi-Story Manifest (anthology)
-
-```yaml
-label: my_anthology
-codec: near_native
-metadata:
-  title: "My Anthology"
-stories:
-  book1:
-    scripts:
-      - content/book1.yaml
-  book2:
-    codec: near_native
-    scripts:
-      - content/book2_part1.yaml
-      - content/book2_part2.yaml
-```
-
-### Twine / Twee 3 Manifest
-
-```yaml
-label: twine_reference
-codec: twee3_1_0
-metadata:
-  author: "StoryTangl Team"
-scripts: story.twee
-```
-
-### Codec contract (first pass)
-
-StoryTangl now treats the runtime representation as canonical and delegates
-on-disk translation to codecs.
-
-- `decode`: on-disk source -> runtime-ready script data (+ provenance map)
-- `encode`: runtime data -> on-disk source shape
-
-Current status:
-1. Built-in near-native YAML codec is included.
-2. Built-in Twine / Twee 3 import is available as `twine`, `twee`, `twee3`,
-   and `twee3_1_0`.
-3. The Twine codec currently supports passage headers, `StoryTitle`,
-   `StoryData`, plain prose, basic `[[...]]` link forms, simple `<<set>>`
-   assignments, and link-only `<<if>>` / `<<elseif>>` / `<<else>>` gating with
-   optional simple link setters.
-4. Source mapping is file-level only (`__source_files__`) in MVP.
-5. Per-node/per-span mapping is intentionally deferred.
-6. Unknown codecs can still be bridged by custom script compilers that expose
-   `load_from_path` (migration shortcut, not long-term architecture).
-
-### Script (script.yaml)
+A minimal manifest is:
 
 ```yaml
 label: my_world
 metadata:
   title: "My Story"
-
-scenes:
-  intro:
-    blocks:
-      start:
-        content: "Narrative text"
-        actions:
-          - text: "Choice text"
-            successor: next_block
+scripts: script.yaml
 ```
 
-## Best Practices
+For alternate codecs, domain modules, multi-story anthologies, or custom media
+inventory, use the nearest example above rather than growing the beginner world
+into an omnibus template.
 
-1. Directory name = manifest label
-2. Prefer explicit `stories:` for multi-story bundles.
-3. Keep codec choice explicit when you are not using near-native YAML.
-4. Include README.md
-5. Use conventions (script.yaml, media/)
-6. Test with WorldRegistry
-7. Version in metadata
-
-## Troubleshooting
-
-### World not discovered?
-
-```python
-from tangl.service.world_registry import WorldRegistry
-from pathlib import Path
-
-registry = WorldRegistry([Path("./worlds")])
-print(registry.list_worlds())
-```
-
-### Label mismatch?
-
-```bash
-# Check consistency
-cat worlds/my_world/world.yaml | grep label
-```
-
-## Contributing
-
-New reference worlds welcome! Submit via pull request.
+World discovery, runtime startup, and client commands are documented in the
+repository [README](../README.md). New demo worlds should state their intent
+clearly and should not claim integration surfaces their maintained witnesses do
+not actually exercise.

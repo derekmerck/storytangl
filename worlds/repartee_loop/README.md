@@ -1,6 +1,6 @@
-# Repartee Loop
+# Marmoset Island
 
-`repartee_loop` is the launchable CLI reference world for the completed
+**Marmoset Island** (`repartee_loop`) is the launchable CLI reference world for the completed
 call-response feature track. It composes three layers without adding another
 mechanic:
 
@@ -58,7 +58,7 @@ explicitly requested channel. The reader-facing `map` channel stays a
 gazetteer of place names; a text client asking to see the map is not handed a
 table of hitbox coordinates it cannot draw.
 
-## Art packs
+## Marmoset Island and Marmoset Orbital Station
 
 <p align="center">
   <img src="../../.github/assets/repartee-quay.png"
@@ -80,9 +80,9 @@ media_dir: media_spaceport   # default: media
 ```
 
 Nothing else changes — not the script, not the staging hints, not any client.
-`media/` is the quayside set; `media_spaceport/` reskins the same beats as a
-night spaceport, with the clerk as a service robot and the dockhand as an
-alien stevedore.
+`media/` is **Marmoset Island**, the quayside set; `media_spaceport/` is
+**Marmoset Orbital Station**, reskinning the same beats as a night spaceport,
+with the clerk as a service robot and the dockhand as an alien stevedore.
 
 ### Sprite sheets
 

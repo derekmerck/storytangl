@@ -2,5 +2,5 @@ label: logic_demo
 scripts: script.yaml
 domain_module: logic_demo.domain
 metadata:
-  title: "Logic Demo"
-  description: "Parity and half-adder machines authored directly in StoryTangl YAML."
+  title: "Loomworks"
+  description: "A graph-as-computation proof: parity and adder machines executed through authored topology and traversal rather than eval/exec."

@@ -1,5 +1,7 @@
 label: twine_reference
 codec: twee3_1_0
 metadata:
+  title: "The Ruined Tower"
   author: "StoryTangl Team"
+  description: "A tiny Twee-authored story compiled into the ordinary StoryTangl runtime graph."
 scripts: story.twee
