@@ -48,6 +48,8 @@ from tangl.mechanics.games.credentials_roster import (
 # Importing the surface story-info module registers the surface_plate /
 # surface_slots channels on the service dispatch when this world loads.
 import tangl.mechanics.surface_story_info  # noqa: F401
+# Hall Monitor chooses the optional deterministic portrait backend.
+import tangl.media.media_creators.dicebear_forge  # noqa: F401
 
 from tangl.story import Action, Block, on_journal
 from tangl.story.presentation import render_text_as

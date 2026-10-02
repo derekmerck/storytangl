@@ -87,6 +87,8 @@ class StageImage:
     sheets: tuple["SheetSource", ...] = ()
     """Sprite sheets delivered beside the still. The still stays the floor."""
 
+    visibility_preference: str | None = None
+
 
 @dataclass(slots=True, frozen=True)
 class SheetSource:
@@ -260,6 +262,15 @@ class Turn:
     the block changes, not when the player acts."""
 
 
+@dataclass(slots=True, frozen=True)
+class PreferenceControl:
+    preference_id: str
+    label: str
+    help: str | None
+    enabled: bool
+    shortcut: str | None
+
+
 # ── input actions ────────────────────────────────────────────────────────────
 #
 # A click or key resolves to one of these rather than straight to a commit. A
@@ -320,6 +331,16 @@ class CancelSelection:
     """
 
 
+@dataclass(slots=True, frozen=True)
+class TogglePreference:
+    preference_id: str
+
+
+@dataclass(slots=True, frozen=True)
+class PagePreferences:
+    """Cycle the local preference-control page."""
+
+
 Action = (
     Commit
     | BeginSelection
@@ -328,6 +349,8 @@ Action = (
     | PageSelection
     | PagePanel
     | CancelSelection
+    | TogglePreference
+    | PagePreferences
 )
 
 

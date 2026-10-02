@@ -104,6 +104,7 @@ class StagingHints(BaseModel, extra="allow"):
     media_transition: TransitionName | None = None
     media_duration: DurationName | float | None = None
     media_timing: TimingName | None = None
+    media_visibility_preference: str | None = None
 
     @field_validator("media_x", "media_y", mode="before")
     @classmethod

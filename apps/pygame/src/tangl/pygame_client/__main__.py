@@ -37,11 +37,14 @@ from .models import (
     Finding,
     PendingSelection,
     PagePanel,
+    PagePreferences,
     PageSelection,
     Piece,
+    PreferenceControl,
     PickPiece,
     StageImage,
     Turn,
+    TogglePreference,
     Zone,
 )
 from .stage import (
@@ -129,6 +132,25 @@ def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
     return frame
 
 
+def _preference_controls(bridge: PygameSessionBridge, preferences) -> tuple[PreferenceControl, ...]:
+    supported_shortcuts = {f"f{number}" for number in range(1, 13)}
+    return tuple(
+        PreferenceControl(
+            preference_id=preference.preference_id,
+            label=preference.label,
+            help=preference.help,
+            enabled=bridge.preferences[preference.preference_id],
+            shortcut=(
+                preference.shortcut
+                if preference.shortcut is not None
+                and preference.shortcut.casefold() in supported_shortcuts
+                else None
+            ),
+        )
+        for preference in preferences
+    )
+
+
 def _keyed(
     stage: Stage,
     frame: Turn,
@@ -171,6 +193,12 @@ def _apply(
     the action reached the service, the envelope it produced."""
 
     match action:
+        case PagePreferences():
+            stage.preference_page += 1
+            return pending, None
+        case TogglePreference(preference_id=preference_id):
+            bridge.toggle_preference(preference_id)
+            return pending, None
         case CancelSelection():
             return None, None
         case BeginSelection(choice=choice):
@@ -250,6 +278,15 @@ def main(argv: list[str] | None = None) -> int:
 
     bridge = PygameSessionBridge()
     logical_size = bridge.stage_extent(args.world)
+    preferences = bridge.discover_preferences(args.world)
+    supported_preference_shortcuts = {f"f{number}" for number in range(1, 13)}
+    preference_keys = {
+        key: preference.preference_id
+        for preference in preferences
+        if preference.shortcut is not None
+        and preference.shortcut.casefold() in supported_preference_shortcuts
+        and (key := getattr(pygame, f"K_{preference.shortcut.upper()}", None)) is not None
+    }
     envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
@@ -258,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
     )
+    stage.preference_controls = _preference_controls(bridge, preferences)
     frame = _frame(bridge, envelope)
 
     for step in range(args.advance):
@@ -289,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         frame = _frame(bridge, envelope)
 
-    stage.draw(frame)
+    stage.draw(frame, media_visibility=bridge.media_visibility(frame))
 
     if args.screenshot is not None:
         pygame.image.save(stage.window, str(args.screenshot))
@@ -307,22 +345,27 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 action = stage.hit(event.pos)
             elif event.type == pygame.KEYDOWN:
+                if pending is None and event.key in preference_keys:
+                    bridge.toggle_preference(preference_keys[event.key])
+                    stage.preference_controls = _preference_controls(bridge, preferences)
+                    stage.draw(frame, media_visibility=bridge.media_visibility(frame))
+                    continue
                 if event.key == pygame.K_ESCAPE:
                     # Escape leaves a selection before it leaves the game: a
                     # player who opened one by mistake should not have to quit.
                     if pending is not None:
                         pending = None
-                        stage.draw(frame)
+                        stage.draw(frame, media_visibility=bridge.media_visibility(frame))
                     else:
                         running = False
                 elif event.key == pygame.K_TAB:
                     action = PagePanel()
                 elif event.key in (pygame.K_UP, pygame.K_PAGEUP):
                     stage.scroll_by(-1 if event.key == pygame.K_UP else -4)
-                    stage.draw(frame, pending)
+                    stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
                 elif event.key in (pygame.K_DOWN, pygame.K_PAGEDOWN):
                     stage.scroll_by(1 if event.key == pygame.K_DOWN else 4)
-                    stage.draw(frame, pending)
+                    stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
                 elif pygame.K_0 <= event.key <= pygame.K_9:
                     action = _keyed(stage, frame, pending, event.key - pygame.K_0)
                 elif pending is None and (
@@ -336,14 +379,16 @@ def main(argv: list[str] | None = None) -> int:
             if action is None:
                 continue
             pending, envelope = _apply(bridge, stage, frame, pending, action)
+            if isinstance(action, TogglePreference):
+                stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
                 frame = _frame(bridge, envelope)
-            stage.draw(frame, pending)
+            stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze
         # every clip for as long as the pointer moved.
         if stage.animating and stage.since_drawn_ms() >= FRAME_MS:
-            stage.draw(frame, pending)
+            stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
     pygame.quit()
     return 0
 
