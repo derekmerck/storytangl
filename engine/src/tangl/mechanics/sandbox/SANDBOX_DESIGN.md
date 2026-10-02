@@ -173,11 +173,13 @@ scope-local state or assets, not VM cursors. `HasGame` may wrap that scope when
 the rules want a game facade, but the underlying traversal remains normal VM
 container entry projection.
 
-Dynamic sandbox affordances remain ephemeral. Each projector clears only the
-actions it previously generated for the active owner node, then rebuilds from
-current location, inventory, mobs, schedule, and scope state. This is the same
-refresh pattern used by game move projection: re-entering a hub means
-recomputing the visible frontier, not trusting stale generated edges.
+Dynamic sandbox affordances remain ephemeral except location- and scope-sponsored
+scheduled-event bindings. Those declarations establish one durable ordinary
+Action per receiving location and sponsor/declaration identity; schedule, actor,
+predicate, disclosure, and once eligibility remain live availability questions.
+Mobs, fixtures, assets, provider events, and game moves still refresh their
+generated actions on each visit. This keeps the retained binding narrow without
+turning general sandbox projection into a cache.
 
 ### Architectural Legitimacy Guardrail
 
