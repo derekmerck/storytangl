@@ -1,13 +1,13 @@
 label: adventure_sandbox_slice
 
 metadata:
-  title: "Adventure Sandbox Slice"
+  title: "Grand Grotto"
   description: "A compact Adventure-like sandbox demo."
   start_at: adventure.entrance
 
 scenes:
   adventure:
-    title: "Adventure Sandbox Slice"
+    title: "Grand Grotto"
     blocks:
       entrance:
         content: |

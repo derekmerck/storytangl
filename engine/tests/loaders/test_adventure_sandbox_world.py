@@ -57,7 +57,7 @@ class TestAdventureSandboxWorld:
         assert "adventure_sandbox_slice" in registry.bundles
         bundle = registry.bundles["adventure_sandbox_slice"]
         assert bundle.manifest.label == "adventure_sandbox_slice"
-        assert bundle.manifest.metadata["title"] == "Adventure Sandbox Slice"
+        assert bundle.manifest.metadata["title"] == "Grand Grotto"
 
     def test_adventure_sandbox_world_runs_core_walkthrough(self) -> None:
         bundle = WorldBundle.load(_adventure_root())

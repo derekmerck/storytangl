@@ -164,7 +164,7 @@ class TestCredentialGateWorld:
         assert "credential_gate" in registry.bundles
         bundle = registry.bundles["credential_gate"]
         assert bundle.manifest.label == "credential_gate"
-        assert bundle.manifest.metadata["title"] == "Credential Gate"
+        assert bundle.manifest.metadata["title"] == "The Checkpoint"
 
     def test_compiles_qualified_credential_catalog_idempotently(self) -> None:
         bundle = WorldBundle.load(_credential_gate_root())

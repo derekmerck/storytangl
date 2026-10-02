@@ -2,7 +2,7 @@ label: repartee_loop
 scripts: script.yaml
 domain_module: repartee_loop.domain
 metadata:
-  title: "Repartee Loop"
+  title: "Marmoset Island"
   stage_extent: {width: 320, height: 200}
   ui_preferences:
     - id: sprites-visible

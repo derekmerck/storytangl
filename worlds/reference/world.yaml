@@ -5,15 +5,12 @@ metadata:
   author: "StoryTangl Team"
   version: "1.0.0"
   description: >
-    A reference world demonstrating StoryTangl features including
-    multiple scenes, character interactions, state management,
-    and media integration.
-  
+    A small author-facing baseline for an ordinary StoryTangl world:
+    scenes, blocks, choices, one actor, and optional media.
   tags:
     - reference
     - tutorial
-    - complete-example
-  
+    - baseline
   ir_schema: "3.7"
   license: "MIT"
 

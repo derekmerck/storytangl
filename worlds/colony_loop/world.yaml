@@ -2,5 +2,5 @@ label: colony_loop
 scripts: script.yaml
 domain_module: colony_loop.domain
 metadata:
-  title: "Colony Loop"
-  description: "An incremental shell that spikes into a Bag-RPS colony raid."
+  title: "Hungry Colony"
+  description: "An incremental shell that converts production into force, risks it in a raid, and feeds the aftermath back into the loop."

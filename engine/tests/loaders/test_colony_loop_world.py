@@ -33,7 +33,7 @@ class TestColonyLoopWorld:
         assert "colony_loop" in registry.bundles
         bundle = registry.bundles["colony_loop"]
         assert bundle.manifest.label == "colony_loop"
-        assert bundle.manifest.metadata["title"] == "Colony Loop"
+        assert bundle.manifest.metadata["title"] == "Hungry Colony"
 
     def test_colony_loop_compiles_and_writes_back_contest_victory(self) -> None:
         bundle = WorldBundle.load(_colony_root())

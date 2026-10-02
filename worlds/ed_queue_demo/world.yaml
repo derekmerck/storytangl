@@ -2,5 +2,5 @@ label: ed_queue_demo
 scripts: script.yaml
 domain_module: ed_queue_demo.domain
 metadata:
-  title: "ED Queue Demo"
-  description: "A deterministic queueing simulation proof."
+  title: "Night Shift"
+  description: "A deterministic queueing simulation rendered through ordinary StoryTangl journal fragments."

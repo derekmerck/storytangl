@@ -67,7 +67,7 @@ class TestReparteeLoopWorld:
         assert "repartee_loop" in registry.bundles
         bundle = registry.bundles["repartee_loop"]
         assert bundle.manifest.label == "repartee_loop"
-        assert bundle.manifest.metadata["title"] == "Repartee Loop"
+        assert bundle.manifest.metadata["title"] == "Marmoset Island"
 
     def test_repartee_loop_awards_reply_then_prize_and_reaches_salon(self) -> None:
         bundle = WorldBundle.load(_repartee_root())

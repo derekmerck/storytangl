@@ -2,5 +2,5 @@ label: incremental_yard
 scripts: script.yaml
 domain_module: incremental_yard.domain
 metadata:
-  title: "Incremental Yard"
+  title: "The Salvage Yard"
   description: "A small planning loop that proves repeated re-entry and cycle resolution."

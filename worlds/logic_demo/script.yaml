@@ -1,7 +1,7 @@
 label: logic_demo
 
 metadata:
-  title: "Logic Demo"
+  title: "Loomworks"
   description: "Parity, half-adder, and full-adder machines authored directly in StoryTangl YAML."
   start_at: demo.choose_machine
 

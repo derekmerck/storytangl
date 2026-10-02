@@ -317,7 +317,7 @@ Current proof:
 
 - location, fixture, asset, mob, schedule, visibility, time, and story-info
   surfaces compose through ordinary Story/VM traversal;
-- *Adventure Sandbox Slice* proves dynamic movement, carried assets, hazards,
+- *Grand Grotto* proves dynamic movement, carried assets, hazards,
   magic words, treasure custody/scoring, and projected map/status information.
 
 Current gap:
@@ -678,7 +678,7 @@ specificity belongs.
 
 These records describe the current proofs, not promised parity.
 
-#### Hall Monitor and Credential Gate — one credential grammar, distinct worlds
+#### Hall Monitor and The Checkpoint — one credential grammar, distinct worlds
 
 - **Source inspiration:** checkpoint inspection in *Papers, Please*, reskinned as
   school hall enforcement with passes, uniforms, medicine, and records.
@@ -705,7 +705,7 @@ These records describe the current proofs, not promised parity.
   additionally prove identical precommit availability for compliant and refusing
   ID responses.
 
-#### RPS Tavern and Bag-RPS Pit — small kernels as resolution grammars
+#### Three Hands at the Tavern and The Contest Pit — small kernels as resolution grammars
 
 - **Source inspiration:** ordinary rock-paper-scissors and an aggregate-force
   variant where a player commits a bounded reserve rather than one symbol.
@@ -726,7 +726,7 @@ These records describe the current proofs, not promised parity.
 - **Parity status:** both worlds compile and play through their focused loader
   tests, proving one facade can host distinct kernels without erasing them.
 
-#### Adventure Sandbox Slice — spatial state as opportunity fan-out
+#### Grand Grotto — spatial state as opportunity fan-out
 
 - **Source inspiration:** the non-parser mechanical core of *Colossal Cave
   Adventure*: rooms, inventory, fixtures, magic words, hazards, treasure, and

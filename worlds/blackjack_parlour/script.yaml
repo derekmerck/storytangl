@@ -1,13 +1,13 @@
 label: blackjack_parlour
 
 metadata:
-  title: "Blackjack Parlour"
+  title: "The Back-Room Table"
   description: "A crooked croupier offers a single dramatic hand."
   start_at: parlour.entrance
 
 scenes:
   parlour:
-    title: "Blackjack Parlour"
+    title: "The Back-Room Table"
     blocks:
       entrance:
         content: |

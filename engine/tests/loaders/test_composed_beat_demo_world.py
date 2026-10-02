@@ -72,7 +72,7 @@ class TestComposedBeatDemoWorld:
 
         assert "composed_beat_demo" in registry.bundles
         bundle = registry.bundles["composed_beat_demo"]
-        assert bundle.manifest.metadata["title"] == "Composed Beat Demo"
+        assert bundle.manifest.metadata["title"] == "Fogbound Manifest"
 
     def test_domain_module_registers_beat_block(self) -> None:
         bundle = WorldBundle.load(_repo_worlds_dir() / "composed_beat_demo")

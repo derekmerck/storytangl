@@ -2,5 +2,5 @@ label: blackjack_parlour
 scripts: script.yaml
 domain_module: blackjack_parlour.domain
 metadata:
-  title: "Blackjack Parlour"
+  title: "The Back-Room Table"
   description: "Take one narratively loaded hand of blackjack."

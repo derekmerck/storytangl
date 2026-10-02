@@ -40,7 +40,7 @@ class TestRpsTavernWorld:
         assert "rps_tavern" in registry.bundles
         bundle = registry.bundles["rps_tavern"]
         assert bundle.manifest.label == "rps_tavern"
-        assert bundle.manifest.metadata["title"] == "RPS Tavern"
+        assert bundle.manifest.metadata["title"] == "Three Hands at the Tavern"
 
     def test_rps_tavern_compiles_and_routes_game_to_victory(self) -> None:
         bundle = WorldBundle.load(_rps_root())

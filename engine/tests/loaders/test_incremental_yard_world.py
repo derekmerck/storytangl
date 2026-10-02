@@ -33,7 +33,7 @@ class TestIncrementalYardWorld:
         assert "incremental_yard" in registry.bundles
         bundle = registry.bundles["incremental_yard"]
         assert bundle.manifest.label == "incremental_yard"
-        assert bundle.manifest.metadata["title"] == "Incremental Yard"
+        assert bundle.manifest.metadata["title"] == "The Salvage Yard"
 
     def test_incremental_yard_compiles_and_routes_to_victory(self) -> None:
         bundle = WorldBundle.load(_yard_root())

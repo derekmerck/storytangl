@@ -78,7 +78,7 @@ are using it systematically.
 
 - **Games**: the clearest current integrated family. It spans kernel, runtime,
   projection, and limited writeback via VM hooks and the `HasGame` facade.
-- **Credentials**: the worked convergence capstone. Credential Gate and Hall
+- **Credentials**: the worked convergence capstone. The Checkpoint and Hall
   Monitor compose assembly, games, transactions, Presence, text/media
   projection, custody, recurrence, response, and durable consequence.
 
@@ -90,7 +90,7 @@ are using it systematically.
   rendering, and renderer-neutral portrait requests. Rich paperdoll composition
   remains a media/presence follow-up.
 - **Sandbox**: location, fixture, asset, mob, schedule, visibility, story-info,
-  and dynamic affordance surfaces exercised by *Adventure Sandbox Slice*. It
+  and dynamic affordance surfaces exercised by *Grand Grotto*. It
   remains ordinary Story/VM traversal, not a parallel subsystem.
 
 ### Foundation

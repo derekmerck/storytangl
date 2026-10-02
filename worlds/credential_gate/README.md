@@ -1,6 +1,6 @@
-# Credential Gate
+# The Checkpoint
 
-`credential_gate` is the checkpoint skin for the reusable credentials mechanic.
+**The Checkpoint** (`credential_gate`) is the checkpoint skin for the reusable credentials mechanic.
 The live demo defines its restriction map and roster in `credential_gate/domain.py`,
 and compiles its credential definitions from `credential_types.reference.yaml` through
 the generic `assets` manifest declaration.
