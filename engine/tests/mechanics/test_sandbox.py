@@ -399,6 +399,8 @@ def test_ledger_round_trip_preserves_run_day_and_scheduled_offer() -> None:
     graph.add(road)
     scope.add_child(road)
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    (established_event,) = _dynamic_sandbox_actions_with_tag(road, "event")
 
     restored = Ledger.structure(ledger.unstructure())
     restored_road = restored.graph.find_one(
@@ -413,6 +415,7 @@ def test_ledger_round_trip_preserves_run_day_and_scheduled_offer() -> None:
     )
     events = _dynamic_sandbox_actions_with_tag(restored_road, "event")
     assert [event.text for event in events] == ["Attend the afternoon meeting"]
+    assert events[0].uid == established_event.uid
 
 
 def test_scheduled_mob_presence_follows_world_time() -> None:
