@@ -245,7 +245,6 @@ class Token(Node, Generic[WST]):
             raise AttributeError(f"{self.__class__.__name__} is missing attribute '{name}'")
         if hasattr(self.reference_singleton, name):
             attr = getattr(self.reference_singleton, name)
-            # logger.debug(f"Delegating {name} attribute to {attr}")
             if callable(attr):
                 # If it's a method, bind it to the reference_entity
                 # This only works with instance methods that take 'self' 1st param, see Wearable
