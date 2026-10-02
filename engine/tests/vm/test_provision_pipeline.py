@@ -249,6 +249,39 @@ class TestResolveFrontierNode:
         monkeypatch.setattr(Resolver, "from_ctx", classmethod(unexpected))
         provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
 
+    def test_repeated_bound_destinations_construct_no_resolvers(self, monkeypatch) -> None:
+        """A deterministic hub witness counts the avoided generic constructions.
+
+        This is intentionally a construction-count witness, not a claim about a
+        downstream world's wall-clock performance or sandbox projector churn.
+        """
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        provider = TraversableNode(label="bound-provider", registry=graph)
+        destinations = [TraversableNode(label=f"destination-{index}", registry=graph) for index in range(32)]
+        for destination in destinations:
+            dependency = Dependency(
+                registry=graph,
+                predecessor_id=destination.uid,
+                requirement=Requirement.from_identifier("bound-provider"),
+            )
+            dependency.set_provider(provider)
+        constructions = 0
+
+        def counted(cls, ctx):
+            nonlocal constructions
+            constructions += 1
+            raise AssertionError("bound destination constructed a Resolver")
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(counted))
+        for _visit in range(3):
+            for destination in destinations:
+                provision_node(destination, ctx=PhaseCtx(graph=graph, cursor_id=destination.uid))
+
+        assert constructions == 0
+
     def test_generic_provision_constructs_resolver_for_open_dependency(self, monkeypatch) -> None:
         from tangl.vm.provision.resolver import provision_node
         from tangl.vm.runtime.frame import PhaseCtx
