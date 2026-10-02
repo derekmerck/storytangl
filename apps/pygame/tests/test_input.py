@@ -29,6 +29,7 @@ from tangl.pygame_client.models import (  # noqa: E402
     PendingSelection,
     Piece,
     PickPiece,
+    StageImage,
     Turn,
     Zone,
 )
@@ -529,3 +530,23 @@ def test_advance_does_not_blame_an_unavailable_choice(
                  "--screenshot", str(tmp_path / "frame.png")])
 
     assert "Inspect a document" not in capsys.readouterr().err
+
+
+def test_a_turn_that_stages_the_room_replaces_the_figures_before_it() -> None:
+    """A batch that walks through two rooms shows only the second one's figures.
+
+    The batch is merged into one frame, so the first room's figures used to be
+    drawn in the second room alongside its own.
+    """
+
+    def turn(step: int, *images: tuple[str, str]) -> Turn:
+        return Turn(step=step, images=[StageImage(role=role, source=source)
+                                       for role, source in images])
+
+    frame = client._merge([
+        turn(1, ("narrative_im", "station.png"), ("staged_im", "guide@station.png")),
+        turn(2, ("narrative_im", "clinic.png"), ("staged_im", "nurse@clinic.png")),
+        turn(3),
+    ])
+
+    assert [image.source for image in frame.images] == ["clinic.png", "nurse@clinic.png"]

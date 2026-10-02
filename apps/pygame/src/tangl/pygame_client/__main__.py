@@ -53,6 +53,7 @@ from .stage import (
     CONFIRM_KEY,
     MAP_ROLES,
     PAGE_KEY,
+    STAGED_ROLES,
     Stage,
     choice_action,
     position_for_key,
@@ -82,6 +83,13 @@ def _merge(turns: list[Turn]) -> Turn:
     slot, so two genuinely distinct portraits both survive while a restatement
     of the same one does not. Later values replace earlier ones in place, which
     keeps first-appearance order stable for default slot assignment.
+
+    A turn that stages the room -- a backdrop or any staged figure -- states it
+    whole, so figures an earlier turn staged leave with the room they stood in;
+    a turn that stages nothing keeps the room as it was. Which figures a
+    statement holds is the backend's to resolve, as it resolves any scoped
+    value: a scene's figures are restated by each block that restates the room,
+    and a block's own exist only on that block.
     """
 
     merged = Turn(step=turns[-1].step if turns else 0)
@@ -99,6 +107,9 @@ def _merge(turns: list[Turn]) -> Turn:
             zones[zone.uid] = zone
         for finding in turn.findings:
             findings[finding.key] = finding
+        if any(image.role in BACKGROUND_ROLES + STAGED_ROLES for image in turn.images):
+            staged = {key: image for key, image in staged.items()
+                      if image.role not in STAGED_ROLES}
         for image in turn.images:
             # A plate is stage state like a background: a batch that crosses
             # between two maps must not keep the old one and pair it with the
