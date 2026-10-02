@@ -31,7 +31,7 @@ class VerbixApi:
         url = VerbixApi.query_url + VerbixApi.api_key + "/1/20/120/" + verb
         r = requests.get(url)
         if not r.status_code == 200:
-            logger.error(f"Verbix API error")
+            logger.error("Verbix API error")
             logger.error( r )
             raise requests.RequestException
         return r.content

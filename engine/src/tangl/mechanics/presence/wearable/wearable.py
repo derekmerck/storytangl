@@ -35,7 +35,7 @@ class WearableHandler:
     def can_transition(cls, wearable: Wearable, to_state: WearableState):
         if to_state in wearable.disallowed_states:
             # Not allowed to use wearable that way
-            logger.debug(f"{wearable.text} {to_state} is disallowed")
+            logger.debug("%s %s is disallowed", wearable.text, to_state)
             return False
         return to_state in cls.state_transitions[wearable.state]
 
@@ -80,7 +80,7 @@ class WearableType(AssetType):
     @field_validator('plural', mode="before")
     @classmethod
     def _set_default_plural(cls, data: bool, info: ValidationInfo):
-        logger.debug(f'checking plural, data={data}')
+        logger.debug("checking plural, data=%s", data)
         if data is None:
             noun = info.data['noun']
             return is_plural(noun)

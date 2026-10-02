@@ -280,7 +280,7 @@ class Token(Node, Generic[WST]):
         instance_vars = cls._instance_vars(wrapped_cls)
         generic_metadata = {'origin': cls, 'args': (wrapped_cls,), 'parameters': ()}
 
-        logger.debug(f"Creating new wrapper class {name} for {wrapped_cls.__name__}")
+        logger.debug("Creating new wrapper class %s for %s", name, wrapped_cls.__name__)
 
         new_cls = pydantic.create_model(name,
                                         __base__=cls,
