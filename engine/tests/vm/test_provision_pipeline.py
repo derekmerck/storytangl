@@ -283,6 +283,22 @@ class TestResolveFrontierNode:
         provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
         assert calls == [node]
 
+    def test_generic_provision_skips_frozen_fanout(self, monkeypatch) -> None:
+        from tangl.story import StoryGraph
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = StoryGraph(frozen_shape=True)
+        node = TraversableNode(label="frozen", registry=graph)
+        Fanout(registry=graph, predecessor_id=node.uid, requirement=Requirement(has_kind=TraversableNode))
+
+        monkeypatch.setattr(
+            Resolver,
+            "from_ctx",
+            classmethod(lambda cls, ctx: (_ for _ in ()).throw(AssertionError("unexpected Resolver"))),
+        )
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+
     def test_satisfied_dep_not_re_resolved(self) -> None:
         """Already-satisfied deps are skipped by resolve_frontier_node."""
         g = Graph()
