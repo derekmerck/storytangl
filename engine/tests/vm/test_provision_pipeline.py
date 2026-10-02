@@ -413,6 +413,33 @@ class TestDispatchIntegration:
                 (successor, successor.uid, ResolutionPhase.PLANNING),
             ]
 
+    def test_closed_generic_frontier_keeps_other_provision_handlers(self, clean_vm_dispatch, monkeypatch) -> None:
+        """The generic fast path never short-circuits the phase dispatch chain."""
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="closed", registry=graph)
+        called = []
+
+        @on_provision
+        def world_projection(caller, *, ctx, **kwargs):
+            called.append(caller)
+            return None
+
+        monkeypatch.setattr(
+            Resolver,
+            "from_ctx",
+            classmethod(lambda cls, ctx: (_ for _ in ()).throw(AssertionError("unexpected Resolver"))),
+        )
+        on_provision(provision_node)
+        try:
+            do_provision(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        finally:
+            vm_dispatch.remove(world_projection._behavior.uid)
+            vm_dispatch.remove(provision_node._behavior.uid)
+        assert called == [node]
+
     def test_provision_handler_can_add_entity_to_graph(
         self, clean_vm_dispatch
     ) -> None:
