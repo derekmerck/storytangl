@@ -249,6 +249,40 @@ class TestResolveFrontierNode:
         monkeypatch.setattr(Resolver, "from_ctx", classmethod(unexpected))
         provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
 
+    def test_generic_provision_constructs_resolver_for_open_dependency(self, monkeypatch) -> None:
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="open", registry=graph)
+        Dependency(registry=graph, predecessor_id=node.uid, requirement=Requirement(has_identifier="missing"))
+        calls = []
+
+        class StubResolver:
+            def resolve_frontier_node(self, **kwargs):
+                calls.append(kwargs["node"])
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(lambda cls, ctx: StubResolver()))
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        assert calls == [node]
+
+    def test_generic_provision_keeps_unfrozen_fanout_work(self, monkeypatch) -> None:
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="fanout", registry=graph)
+        Fanout(registry=graph, predecessor_id=node.uid, requirement=Requirement(has_kind=TraversableNode))
+        calls = []
+
+        class StubResolver:
+            def resolve_frontier_node(self, **kwargs):
+                calls.append(kwargs["node"])
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(lambda cls, ctx: StubResolver()))
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        assert calls == [node]
+
     def test_satisfied_dep_not_re_resolved(self) -> None:
         """Already-satisfied deps are skipped by resolve_frontier_node."""
         g = Graph()
