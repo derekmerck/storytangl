@@ -17,6 +17,9 @@ from tangl.pygame_client.models import (  # noqa: E402
     Line,
     PendingSelection,
     Piece,
+    PreferenceControl,
+    PagePreferences,
+    TogglePreference,
     Turn,
     Zone,
 )
@@ -67,6 +70,22 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
     for rect, _action in stage.hitboxes:
         assert rect.bottom <= stage.logical_size[1]
         assert rect.top >= 0
+
+
+def test_preference_overflow_cycles_to_every_clickable_control(stage: Stage) -> None:
+    stage.preference_controls = tuple(
+        PreferenceControl(f"p{index}", f"Preference {index}", None, True, None)
+        for index in range(3)
+    )
+    turn = Turn(step=1)
+
+    stage.draw(turn)
+    assert {action.preference_id for _rect, action in stage.hitboxes if isinstance(action, TogglePreference)} == {"p0", "p1"}
+    assert any(isinstance(action, PagePreferences) for _rect, action in stage.hitboxes)
+
+    stage.preference_page += 1
+    stage.draw(turn)
+    assert {action.preference_id for _rect, action in stage.hitboxes if isinstance(action, TogglePreference)} == {"p2"}
 
 
 def test_a_refused_row_shows_no_number_to_press(stage: Stage) -> None:
