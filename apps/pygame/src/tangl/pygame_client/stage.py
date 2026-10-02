@@ -150,7 +150,9 @@ def key_for_position(index: int) -> str | None:
 def position_for_key(key: str) -> int | None:
     """Return the one-based choice position a key selects, if any."""
 
-    found = CHOICE_KEYS.find(key)
+    # A key that types nothing (a function key, a modifier) arrives as "", and
+    # every string contains "": `find` would answer 0, the first choice.
+    found = CHOICE_KEYS.find(key) if len(key) == 1 else -1
     return found + 1 if found >= 0 else None
 
 

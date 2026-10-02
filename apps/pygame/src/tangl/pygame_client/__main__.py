@@ -53,6 +53,7 @@ from .stage import (
     CONFIRM_KEY,
     MAP_ROLES,
     PAGE_KEY,
+    STAGED_ROLES,
     Stage,
     choice_action,
     position_for_key,
@@ -63,6 +64,10 @@ logger = logging.getLogger(__name__)
 
 def _turns(bridge: PygameSessionBridge, envelope) -> list[Turn]:
     return bridge.build_turns(list(getattr(envelope, "fragments", []) or []))
+
+
+ROOM_ROLES = ("narrative_im", *STAGED_ROLES)
+"""What states the room. A cover is persistent chrome, not a room, so it does not."""
 
 
 def _merge(turns: list[Turn]) -> Turn:
@@ -82,6 +87,12 @@ def _merge(turns: list[Turn]) -> Turn:
     slot, so two genuinely distinct portraits both survive while a restatement
     of the same one does not. Later values replace earlier ones in place, which
     keeps first-appearance order stable for default slot assignment.
+
+    A turn that states the room -- a backdrop or any staged figure -- replaces
+    the figures before it, which leave with the room they stood in; a turn that
+    states nothing keeps the room, and a cover is chrome and replaces none. This
+    is how this client collapses a stream into frames, not a stream contract:
+    which figures a statement holds is the backend's to say.
     """
 
     merged = Turn(step=turns[-1].step if turns else 0)
@@ -99,17 +110,11 @@ def _merge(turns: list[Turn]) -> Turn:
             zones[zone.uid] = zone
         for finding in turn.findings:
             findings[finding.key] = finding
+        if any(image.role in ROOM_ROLES for image in turn.images):
+            staged = {key: image for key, image in staged.items()
+                      if image.role not in STAGED_ROLES}
         for image in turn.images:
-            # A plate is stage state like a background: a batch that crosses
-            # between two maps must not keep the old one and pair it with the
-            # new geometry. Both collapse to one slot, last one wins.
-            if image.role in BACKGROUND_ROLES:
-                key: tuple[str, ...] = ("background",)
-            elif image.role in MAP_ROLES:
-                key = ("map",)
-            else:
-                key = (image.role, image.source, image.x_slot or "")
-            staged[key] = image
+            staged[_slot(image)] = image
         merged.lines.extend(turn.lines)
     merged.images.extend(staged.values())
     merged.pieces.extend(pieces.values())
@@ -119,14 +124,37 @@ def _merge(turns: list[Turn]) -> Turn:
     return merged
 
 
-def _frame(bridge: PygameSessionBridge, envelope) -> Turn:
-    """Merge a batch into one actionable frame and attach its disclosed geometry.
+def _slot(image: StageImage) -> tuple[str, ...]:
+    """Where a merged image lives: one backdrop, one map, else by role, source, slot.
 
-    Both the map plate and the surface are reference state fetched by name, so
-    they are attached here rather than accumulated out of the fragment stream.
+    A plate is stage state like a background: a batch that crosses between two
+    maps must not keep the old one and pair it with the new geometry. Both
+    collapse to one slot, last one wins.
     """
 
-    frame = _merge(_turns(bridge, envelope))
+    if image.role in BACKGROUND_ROLES:
+        return ("background",)
+    if image.role in MAP_ROLES:
+        return ("map",)
+    return (image.role, image.source, image.x_slot or "")
+
+
+def _frame(bridge: PygameSessionBridge, envelope, previous: Turn | None = None) -> Turn:
+    """Merge a batch into one actionable frame and attach its disclosed geometry.
+
+    The ``previous`` frame's room opens the batch as a turn of its own, so a
+    response that stages nothing keeps it just as a turn inside a batch would:
+    what the player sees does not depend on how the turns were batched. Both
+    the map plate and the surface are reference state fetched by name, so they
+    are attached here rather than accumulated out of the fragment stream.
+    """
+
+    turns = _turns(bridge, envelope)
+    if previous is not None:
+        room = [image for image in previous.images
+                if image.role in BACKGROUND_ROLES + STAGED_ROLES]
+        turns = [Turn(step=previous.step, images=room), *turns]
+    frame = _merge(turns)
     frame.plate = bridge.map_plate()
     frame.surface = bridge.surface()
     return frame
@@ -325,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             break
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
-        frame = _frame(bridge, envelope)
+        frame = _frame(bridge, envelope, frame)
 
     stage.draw(frame, media_visibility=bridge.media_visibility())
 
@@ -382,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
             if isinstance(action, TogglePreference):
                 stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
-                frame = _frame(bridge, envelope)
+                frame = _frame(bridge, envelope, frame)
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze

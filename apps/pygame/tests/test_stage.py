@@ -136,6 +136,16 @@ def test_a_printed_key_is_one_the_client_accepts(stage: Stage) -> None:
     assert "x" not in CHOICE_KEYS
 
 
+def test_a_key_that_types_nothing_selects_nothing(stage: Stage) -> None:
+    """A function key or a modifier arrives with no text: it picks no choice.
+
+    Every string contains the empty one, so a bare `find` read F1 as the first
+    choice and advanced the story.
+    """
+
+    assert position_for_key("") is None
+
+
 def test_a_choice_past_the_alphabet_prints_no_key(stage: Stage) -> None:
     """Past the last key a row prints nothing rather than an ordinal.
 

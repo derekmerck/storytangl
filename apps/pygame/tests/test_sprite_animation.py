@@ -323,17 +323,20 @@ def test_reduced_motion_holds_the_clips_first_frame_not_the_still(art, clock) ->
 # ── clip state ───────────────────────────────────────────────────────────
 
 
-def test_restating_a_clip_carries_on_but_switching_restarts_it(stage, art, clock) -> None:
+@pytest.mark.parametrize("role", ["dialog_im", "staged_im"])
+def test_restating_a_clip_carries_on_but_switching_restarts_it(stage, art, clock, role) -> None:
+    """A figure restated where it stands is the one already showing: its clip runs on."""
+
     still, sheet = art
-    stage.draw(_turn(still))
+    stage.draw(_turn(still, role=role))
     still_only = _pixels(stage)
 
-    stage.draw(_turn(still, sheet, clip="idle", timing="loop"))
+    stage.draw(_turn(still, sheet, clip="idle", timing="loop", role=role))
     clock.ms = 1850
-    stage.draw(_turn(still, sheet, clip="idle", timing="loop"))    # a new turn restating the same clip
+    stage.draw(_turn(still, sheet, clip="idle", timing="loop", role=role))   # a new turn restating it
     assert _probe(stage, still_only, left=True) == BLINK_L
 
-    stage.draw(_turn(still, sheet, clip="call"))                   # switching starts the new clip at its top
+    stage.draw(_turn(still, sheet, clip="call", role=role))   # switching starts the new clip at its top
     assert _probe(stage, still_only, left=True) == CALL_L
 
 

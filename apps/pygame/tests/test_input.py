@@ -29,6 +29,7 @@ from tangl.pygame_client.models import (  # noqa: E402
     PendingSelection,
     Piece,
     PickPiece,
+    StageImage,
     Turn,
     Zone,
 )
@@ -529,3 +530,81 @@ def test_advance_does_not_blame_an_unavailable_choice(
                  "--screenshot", str(tmp_path / "frame.png")])
 
     assert "Inspect a document" not in capsys.readouterr().err
+
+
+def _staging(step: int, *images: tuple[str, str]) -> Turn:
+    return Turn(step=step, images=[StageImage(role=role, source=source) for role, source in images])
+
+
+def test_a_turn_that_stages_the_room_replaces_the_figures_before_it() -> None:
+    """A batch that walks through two rooms shows only the second one's figures.
+
+    The batch is merged into one frame, so the first room's figures used to be
+    drawn in the second room alongside its own.
+    """
+
+    frame = client._merge([
+        _staging(1, ("narrative_im", "station.png"), ("staged_im", "guide@station.png")),
+        _staging(2, ("narrative_im", "clinic.png"), ("staged_im", "nurse@clinic.png")),
+        _staging(3),
+    ])
+
+    assert [image.source for image in frame.images] == ["clinic.png", "nurse@clinic.png"]
+
+
+def test_a_figure_restated_where_it_stands_is_drawn_once() -> None:
+    """Restating the room keeps one copy of a figure that has not moved."""
+
+    room = (("narrative_im", "room.png"), ("staged_im", "guide.png"))
+    frame = client._merge([_staging(1, *room), _staging(2, *room)])
+
+    assert [image.source for image in frame.images] == ["room.png", "guide.png"]
+
+
+def test_a_cover_is_chrome_and_keeps_the_room_figures() -> None:
+    """A cover or logo is persistent chrome, not a room: figures stay."""
+
+    frame = client._merge([
+        _staging(1, ("narrative_im", "room.png"), ("staged_im", "guide.png")),
+        _staging(2, ("cover_im", "logo.png")),
+    ])
+
+    assert [image.source for image in frame.images] == ["logo.png", "guide.png"]
+
+
+class _Replies:
+    """A bridge that answers a response with prepared turns and no geometry."""
+
+    def __init__(self, *turns: Turn) -> None:
+        self.turns = list(turns)
+
+    def build_turns(self, _fragments) -> list[Turn]:
+        return self.turns
+
+    def map_plate(self) -> None:
+        return None
+
+    def surface(self) -> None:
+        return None
+
+
+def test_the_room_carries_into_a_response_that_stages_nothing() -> None:
+    """The next response keeps the room as a turn inside one batch would.
+
+    The frame was rebuilt from the latest response alone, so the same text-only
+    turn kept the art inside a batch and lost it in the next response.
+    """
+
+    first = client._frame(_Replies(_staging(1, ("narrative_im", "room.png"),
+                                              ("staged_im", "guide.png"))), None)
+    then = client._frame(_Replies(_staging(2)), None, first)
+
+    assert [image.source for image in then.images] == ["room.png", "guide.png"]
+
+
+def test_a_response_that_restates_the_room_retires_the_figures_it_omits() -> None:
+    first = client._frame(_Replies(_staging(1, ("narrative_im", "station.png"),
+                                              ("staged_im", "guide.png"))), None)
+    then = client._frame(_Replies(_staging(2, ("narrative_im", "clinic.png"))), None, first)
+
+    assert [image.source for image in then.images] == ["clinic.png"]
