@@ -13,11 +13,23 @@ them. Backend state remains authoritative for every action.
 
 ## Status
 
-Slice 4 adds declarative client preferences: worlds may publish typed boolean
-declarations through exact `ui-preferences` world-info. Clients retain values
-locally per world and only explicit staged-media visibility delegations read
-them. This first slice does not add dynamic disclosure/status, enum variants,
-server persistence, or a new dispatch/widget surface.
+Slice 2 adds declarative client preferences: worlds may publish typed boolean
+or finite ordered enum declarations through exact `ui-preferences` world-info.
+Clients retain values locally per world. Explicit `media_visibility` and
+`media_clip_binding` tables are checked against those domains while compiling a
+world; a client only realizes the prepared values locally. A visibility binding
+states the preference values that show an occurrence. A clip binding names one
+or two preference axes and maps full value rows to clip names; a missing row
+falls back to the authored clip or still. These values are presentation-only:
+they neither contact Service nor mutate story state, and client preference
+changes preserve resident occurrence slots and elapsed playback.
+
+Slice 3 remains design-only: it asks how a turn may advertise a local cycle over
+the alternatives its own staging declares. Such controls appear only while those
+alternatives are present, reset on a genuine new turn, and compose with these
+world-static viewer preferences. Its schema and reset boundary remain open; it
+does not add server persistence, dynamic disclosure/status, or a new dispatch/
+widget surface.
 
 The pygame reference port binds only `F1` through `F12`; every declaration is
 also a clickable local control, and two-row control pages cycle locally when

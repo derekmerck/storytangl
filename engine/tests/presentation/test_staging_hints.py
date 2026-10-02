@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from tangl.presentation.hints import StagingHints
+from tangl.presentation.hints import ClipBinding, StagingHints, VisibilityBinding
 
 
 @pytest.mark.parametrize(
@@ -36,3 +36,15 @@ def test_unset_axes_stay_none_for_ports_to_default() -> None:
     hints = StagingHints(media_flip_h=True)
 
     assert hints.media_x is None and hints.media_y is None
+
+
+def test_preference_bindings_require_full_distinct_rows_and_real_values() -> None:
+    with pytest.raises(ValidationError, match="row values must match axes"):
+        ClipBinding(axes=["look", "motion"], rows=[{"values": ["calm"], "clip": "idle"}])
+    with pytest.raises(ValidationError, match="rows must be unique"):
+        ClipBinding(
+            axes=["look"],
+            rows=[{"values": ["calm"], "clip": "idle"}, {"values": ["calm"], "clip": "call"}],
+        )
+    with pytest.raises(ValidationError):
+        VisibilityBinding(preference_id="look", values=[1])

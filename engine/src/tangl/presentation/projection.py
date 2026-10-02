@@ -124,16 +124,44 @@ class BooleanPreference(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     preference_id: str = Field(min_length=1, alias="id")
     label: str = Field(min_length=1)
-    default: bool
+    kind: Literal["boolean"] = "boolean"
+    default: bool = Field(strict=True)
     help: str | None = None
     shortcut: str | None = None
+
+
+class EnumPreference(BaseModel):
+    """One finite, ordered viewer-local preference declaration."""
+
+    model_config = ConfigDict(populate_by_name=True)
+    preference_id: str = Field(min_length=1, alias="id")
+    kind: Literal["enum"] = "enum"
+    values: list[str] = Field(min_length=1)
+    default: str
+    label: str = Field(min_length=1)
+    help: str | None = None
+    shortcut: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_domain(self) -> Self:
+        if any(not value for value in self.values) or len(self.values) != len(set(self.values)):
+            raise ValueError("enum preference values must be nonempty and unique")
+        if self.default not in self.values:
+            raise ValueError("enum preference default must be one of its values")
+        return self
+
+
+PreferenceDeclaration: TypeAlias = Annotated[
+    BooleanPreference | EnumPreference,
+    Field(discriminator="kind"),
+]
 
 
 class UiPreferencesValue(BaseModel):
     """Exact world-info payload for declarative client preferences."""
 
     value_type: Literal["ui_preferences"] = "ui_preferences"
-    preferences: list[BooleanPreference]
+    preferences: list[PreferenceDeclaration]
 
     @model_validator(mode="after")
     def _validate_unique_ids(self) -> Self:
@@ -201,6 +229,8 @@ __all__ = [
     "SectionValue",
     "StageExtentValue",
     "BooleanPreference",
+    "EnumPreference",
+    "PreferenceDeclaration",
     "UiPreferencesValue",
     "ProjectionRequest",
     "TableValue",

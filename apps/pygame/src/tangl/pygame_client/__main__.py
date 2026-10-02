@@ -139,7 +139,7 @@ def _preference_controls(bridge: PygameSessionBridge, preferences) -> tuple[Pref
             preference_id=preference.preference_id,
             label=preference.label,
             help=preference.help,
-            enabled=bridge.preferences[preference.preference_id],
+            value=bridge.preferences[preference.preference_id],
             shortcut=(
                 preference.shortcut
                 if preference.shortcut is not None
@@ -197,7 +197,7 @@ def _apply(
             stage.preference_page += 1
             return pending, None
         case TogglePreference(preference_id=preference_id):
-            bridge.toggle_preference(preference_id)
+            bridge.cycle_preference(preference_id)
             return pending, None
         case CancelSelection():
             return None, None
@@ -327,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         frame = _frame(bridge, envelope)
 
-    stage.draw(frame, media_visibility=bridge.media_visibility(frame))
+    stage.draw(frame, media_visibility=bridge.media_visibility())
 
     if args.screenshot is not None:
         pygame.image.save(stage.window, str(args.screenshot))
@@ -346,26 +346,26 @@ def main(argv: list[str] | None = None) -> int:
                 action = stage.hit(event.pos)
             elif event.type == pygame.KEYDOWN:
                 if pending is None and event.key in preference_keys:
-                    bridge.toggle_preference(preference_keys[event.key])
+                    bridge.cycle_preference(preference_keys[event.key])
                     stage.preference_controls = _preference_controls(bridge, preferences)
-                    stage.draw(frame, media_visibility=bridge.media_visibility(frame))
+                    stage.draw(frame, media_visibility=bridge.media_visibility())
                     continue
                 if event.key == pygame.K_ESCAPE:
                     # Escape leaves a selection before it leaves the game: a
                     # player who opened one by mistake should not have to quit.
                     if pending is not None:
                         pending = None
-                        stage.draw(frame, media_visibility=bridge.media_visibility(frame))
+                        stage.draw(frame, media_visibility=bridge.media_visibility())
                     else:
                         running = False
                 elif event.key == pygame.K_TAB:
                     action = PagePanel()
                 elif event.key in (pygame.K_UP, pygame.K_PAGEUP):
                     stage.scroll_by(-1 if event.key == pygame.K_UP else -4)
-                    stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
+                    stage.draw(frame, pending, media_visibility=bridge.media_visibility())
                 elif event.key in (pygame.K_DOWN, pygame.K_PAGEDOWN):
                     stage.scroll_by(1 if event.key == pygame.K_DOWN else 4)
-                    stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
+                    stage.draw(frame, pending, media_visibility=bridge.media_visibility())
                 elif pygame.K_0 <= event.key <= pygame.K_9:
                     action = _keyed(stage, frame, pending, event.key - pygame.K_0)
                 elif pending is None and (
@@ -383,12 +383,12 @@ def main(argv: list[str] | None = None) -> int:
                 stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
                 frame = _frame(bridge, envelope)
-            stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
+            stage.draw(frame, pending, media_visibility=bridge.media_visibility())
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze
         # every clip for as long as the pointer moved.
         if stage.animating and stage.since_drawn_ms() >= FRAME_MS:
-            stage.draw(frame, pending, media_visibility=bridge.media_visibility(frame))
+            stage.draw(frame, pending, media_visibility=bridge.media_visibility())
     pygame.quit()
     return 0
 

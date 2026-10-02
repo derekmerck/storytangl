@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Any
 
 from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 from tangl.story.fabula.compiler import StoryTemplateBundle
+from tangl.story.episode import Block
+from tangl.presentation.hints import StagingHints
+from tangl.presentation.projection import BooleanPreference, EnumPreference, UiPreferencesValue
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult, EncodeResult, StoryCodec
@@ -132,6 +135,7 @@ class WorldCompiler:
                 domain_adjuncts.class_registry if domain_adjuncts is not None else None
             ),
         )
+        self._validate_preference_bindings(story_bundle, resources_facet)
         world = WorldBuilder().build(
             label=bundle.manifest.story_label(story_key),
             bundle=story_bundle,
@@ -199,6 +203,7 @@ class WorldCompiler:
                     else None
                 ),
             )
+            self._validate_preference_bindings(story_bundle, world_resources_facet)
             world = WorldBuilder().build(
                 label=bundle.manifest.story_label(story_key),
                 bundle=story_bundle,
@@ -224,6 +229,87 @@ class WorldCompiler:
             worlds[story_key] = world
 
         return worlds
+
+    @staticmethod
+    def _validate_preference_bindings(
+        bundle: StoryTemplateBundle,
+        resources: ResourceManager | None,
+    ) -> None:
+        """Check explicit staged-media delegation against world-static declarations."""
+        declared = UiPreferencesValue.model_validate(
+            {"preferences": bundle.metadata.get("ui_preferences", [])}
+        )
+        domains: dict[str, set[bool | str]] = {}
+        for preference in declared.preferences:
+            if isinstance(preference, BooleanPreference):
+                domains[preference.preference_id] = {True, False}
+            elif isinstance(preference, EnumPreference):
+                domains[preference.preference_id] = set(preference.values)
+
+        for template in bundle.template_registry.values():
+            block = template.payload if isinstance(template.payload, Block) else None
+            if block is None:
+                continue
+            for media in block.media:
+                hints = StagingHints.model_validate(media.get("staging_hints") or {})
+                if hints.media_visibility is not None:
+                    WorldCompiler._validate_binding_values(
+                        hints.media_visibility.preference_id,
+                        hints.media_visibility.values,
+                        domains,
+                    )
+                if hints.media_clip_binding is not None:
+                    for axis in hints.media_clip_binding.axes:
+                        if axis not in domains:
+                            raise ValueError(f"Unknown ui preference {axis!r} in media clip binding")
+                    for row in hints.media_clip_binding.rows:
+                        for axis, value in zip(hints.media_clip_binding.axes, row.values, strict=True):
+                            WorldCompiler._validate_binding_values(axis, [value], domains)
+                WorldCompiler._validate_media_clips(media, hints, resources)
+
+    @staticmethod
+    def _validate_media_clips(
+        media: dict[str, Any],
+        hints: StagingHints,
+        resources: ResourceManager | None,
+    ) -> None:
+        """Refuse authored clip names absent from a locally indexed still's sheets."""
+        if resources is None:
+            return
+        clips = [clip for clip in [hints.media_clip] if clip is not None]
+        if hints.media_clip_binding is not None:
+            clips.extend(row.clip for row in hints.media_clip_binding.rows)
+        if not clips:
+            return
+        name = media.get("name")
+        if not isinstance(name, str):
+            return
+        resource = resources.get_rit(name)
+        if resource is None:
+            return
+        available = {
+            clip.name
+            for sheet in resource.sprite_sheets
+            for clip in sheet.manifest.clips
+        }
+        if not available:
+            return
+        unknown = sorted(set(clips) - available)
+        if unknown:
+            raise ValueError(f"Media {name!r} has no sprite-sheet clips: {', '.join(unknown)}")
+
+    @staticmethod
+    def _validate_binding_values(
+        preference_id: str,
+        values: list[bool | str],
+        domains: dict[str, set[bool | str]],
+    ) -> None:
+        domain = domains.get(preference_id)
+        if domain is None:
+            raise ValueError(f"Unknown ui preference {preference_id!r} in media binding")
+        for value in values:
+            if value not in domain or (isinstance(value, bool) != all(isinstance(item, bool) for item in domain)):
+                raise ValueError(f"Value {value!r} is outside ui preference {preference_id!r}'s domain")
 
     def encode(
         self,

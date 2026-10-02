@@ -12,6 +12,7 @@ from uuid import UUID
 
 from tangl.presentation.intent import Accepts
 from tangl.presentation.hints import TimingName
+from tangl.presentation.hints import ClipBinding, VisibilityBinding
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.response import JsonValue
 
@@ -87,7 +88,9 @@ class StageImage:
     sheets: tuple["SheetSource", ...] = ()
     """Sprite sheets delivered beside the still. The still stays the floor."""
 
-    visibility_preference: str | None = None
+    visibility: VisibilityBinding | None = None
+    clip_binding: ClipBinding | None = None
+    client_selected_clip: bool = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -267,7 +270,7 @@ class PreferenceControl:
     preference_id: str
     label: str
     help: str | None
-    enabled: bool
+    value: bool | str
     shortcut: str | None
 
 

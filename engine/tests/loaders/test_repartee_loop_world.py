@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
+import pytest
+import yaml
 from tangl.core import Selector
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.loaders import WorldBundle
@@ -23,6 +26,14 @@ def _repo_worlds_dir() -> Path:
 
 def _repartee_root() -> Path:
     return _repo_worlds_dir() / "repartee_loop"
+
+
+def _preference_world(tmp_path: Path) -> tuple[Path, dict, dict]:
+    root = tmp_path / "repartee_loop"
+    shutil.copytree(_repartee_root(), root)
+    world = yaml.safe_load((root / "world.yaml").read_text())
+    script = yaml.safe_load((root / "script.yaml").read_text())
+    return root, world, script
 
 
 def _action(ledger: Ledger, text: str) -> Action:
@@ -68,6 +79,53 @@ class TestReparteeLoopWorld:
         bundle = registry.bundles["repartee_loop"]
         assert bundle.manifest.label == "repartee_loop"
         assert bundle.manifest.metadata["title"] == "Marmoset Island"
+
+    @pytest.mark.parametrize(
+        ("mutate", "match"),
+        [
+            (
+                lambda world, hints: hints.update(
+                    media_visibility={"preference_id": "unknown", "values": [True]}
+                ),
+                "Unknown ui preference",
+            ),
+            (
+                lambda world, hints: hints.update(
+                    media_visibility={"preference_id": "sprites-visible", "values": ["true"]}
+                ),
+                "outside ui preference",
+            ),
+            (
+                lambda world, hints: hints.update(
+                    media_clip_binding={"axes": ["clerk-motion", "clerk-motion"], "rows": []}
+                ),
+                "clip binding",
+            ),
+            (
+                lambda world, hints: world["metadata"]["ui_preferences"].__setitem__(1, {
+                    "id": "clerk-motion", "kind": "enum", "label": "Clerk motion",
+                    "values": ["idle"], "default": "missing",
+                }),
+                "default must be one",
+            ),
+            (
+                lambda world, hints: (
+                    world.__setitem__("media_dir", "media_spaceport"),
+                    hints.__setitem__("media_clip", "missing"),
+                ),
+                "has no sprite-sheet clips",
+            ),
+        ],
+    )
+    def test_compiler_refuses_malformed_preference_bindings(self, tmp_path: Path, mutate, match: str) -> None:
+        root, world, script = _preference_world(tmp_path)
+        hints = script["scenes"]["quay"]["blocks"]["setup"]["media"][1]["staging_hints"]
+        mutate(world, hints)
+        (root / "world.yaml").write_text(yaml.safe_dump(world, sort_keys=False))
+        (root / "script.yaml").write_text(yaml.safe_dump(script, sort_keys=False))
+
+        with pytest.raises(ValueError, match=match):
+            WorldCompiler().compile(WorldBundle.load(root))
 
     def test_repartee_loop_awards_reply_then_prize_and_reaches_salon(self) -> None:
         bundle = WorldBundle.load(_repartee_root())
