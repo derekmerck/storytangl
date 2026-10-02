@@ -747,7 +747,6 @@ def _project_sandbox_interaction(
             interaction=interaction.label,
             target=target.get_label(),
             return_to_location=interaction.return_to_location,
-            event_contribution_key=event_contribution_key,
             **hints,
         ),
     )
@@ -2437,14 +2436,29 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
     if graph is None or _graph_frozen_shape(graph):
         return None
 
+    contributions = _scheduled_event_contributions(caller, ctx)
+    retained_labels = {
+        _sandbox_interaction_action_label(
+            caller,
+            source=contribution.source,
+            sponsor_label=contribution.source_label,
+            interaction_label=(contribution.event.label or contribution.event.target)
+            + f"_{_scheduled_event_contribution_key(contribution)[:12]}",
+        )
+        for contribution in contributions
+        if contribution.source_kind in {"location", "scope"}
+    }
     for action in list(caller.edges_out(Selector(has_kind=Action))):
         if not _has_tags(action, "dynamic", "sandbox", "event"):
             continue
         hints = action.ui_hints.model_dump() if action.ui_hints is not None else {}
-        if hints.get("source_kind") not in {"location", "scope"}:
+        if (
+            hints.get("source_kind") not in {"location", "scope"}
+            or action.get_label() not in retained_labels
+        ):
             graph.remove(action.uid, _ctx=ctx)
 
-    for contribution in _scheduled_event_contributions(caller, ctx):
+    for contribution in contributions:
         event = contribution.event
         contribution_key = _scheduled_event_contribution_key(contribution)
         event_label = event.label or event.target
