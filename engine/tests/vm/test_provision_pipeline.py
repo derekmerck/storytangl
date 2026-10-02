@@ -235,6 +235,20 @@ class TestResolveFrontierNode:
         success = resolver.resolve_frontier_node(frontier)
         assert success is True
 
+    def test_generic_provision_skips_resolver_for_a_closed_frontier(self, monkeypatch) -> None:
+        """The dispatch hook avoids construction only when no generic work remains."""
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        node = TraversableNode(label="closed", registry=graph)
+
+        def unexpected(cls, ctx):
+            raise AssertionError("closed frontier constructed a Resolver")
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(unexpected))
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+
     def test_satisfied_dep_not_re_resolved(self) -> None:
         """Already-satisfied deps are skipped by resolve_frontier_node."""
         g = Graph()

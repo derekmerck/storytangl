@@ -1767,6 +1767,14 @@ class Resolver:
 # Register the resolution process with dispatch so it will be invoked from the phase bus
 @on_provision
 def provision_node(caller: Node, *, ctx, allow_stubs: bool = False):
+    """Resolve only a frontier that still has generic binding work."""
+    if next(caller.edges_out(Selector(has_kind=Dependency, provider=None)), None) is None:
+        graph = caller.graph
+        if graph is not None and (
+            bool(getattr(graph, "frozen_shape", False))
+            or next(caller.edges_out(Selector(has_kind=Fanout)), None) is None
+        ):
+            return None
     Resolver.from_ctx(ctx).resolve_frontier_node(
         node=caller,
         allow_stubs=allow_stubs,
