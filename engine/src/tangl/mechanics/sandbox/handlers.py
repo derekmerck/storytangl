@@ -8,6 +8,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
+from uuid import UUID
 
 from tangl.core import Graph, Selector, Token
 from tangl.core.behavior import Priority
@@ -108,6 +109,8 @@ class ScheduledEventContribution:
     source: str
     source_label: str
     source_kind: str
+    sponsor_id: UUID | None = None
+    event_index: int | None = None
     hints: dict[str, Any] = field(default_factory=dict)
 
 
@@ -463,8 +466,10 @@ def _scheduled_event_contributions(
                 source="sandbox_schedule",
                 source_label=scope_label,
                 source_kind="scope",
+                sponsor_id=scope.uid,
+                event_index=event_index,
             )
-            for event in scope.scheduled_events
+            for event_index, event in enumerate(scope.scheduled_events)
         )
     location_label = location.get_label()
     contributions.extend(
@@ -473,8 +478,10 @@ def _scheduled_event_contributions(
             source="sandbox_schedule",
             source_label=location_label,
             source_kind="location",
+            sponsor_id=location.uid,
+            event_index=event_index,
         )
-        for event in location.scheduled_events
+        for event_index, event in enumerate(location.scheduled_events)
     )
     projection_state = _projection_state(location, ctx)
     if not projection_state.suppress_fixture_affordances:
@@ -562,10 +569,41 @@ def _scheduled_event_contribution_key(contribution: ScheduledEventContribution) 
         "source": contribution.source,
         "source_kind": contribution.source_kind,
         "source_label": contribution.source_label,
+        "sponsor_id": str(contribution.sponsor_id) if contribution.sponsor_id else None,
+        "event_index": contribution.event_index,
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def _static_scheduled_event_is_live(
+    location: SandboxLocation,
+    *,
+    ctx: VmPhaseCtx,
+    sponsor_id: UUID,
+    event_index: int,
+    declaration: Mapping[str, Any],
+    target_id: UUID,
+) -> bool:
+    """Evaluate one retained event through its original sponsor and declaration."""
+    sponsor = location.graph.get(sponsor_id) if location.graph is not None else None
+    if not isinstance(sponsor, (SandboxLocation, SandboxScope)):
+        return False
+    if event_index >= len(sponsor.scheduled_events):
+        return False
+    event = sponsor.scheduled_events[event_index]
+    if event.model_dump(mode="json") != declaration:
+        return False
+    if event.once:
+        target = location.graph.get(target_id) if location.graph is not None else None
+        if not isinstance(target, TraversableNode) or has_visited(target, ctx=ctx):
+            return False
+    return event.matches(
+        current_world_time(location),
+        location=location.get_label(),
+        actors_present=_actors_present(location),
+    )
 
 
 def _scheduled_event_is_live(
@@ -687,7 +725,8 @@ def _project_sandbox_interaction(
     contribution_kind: str = "interaction",
     event_contribution_key: str | None = None,
     projection_label: str | None = None,
-    retain_once: bool = False,
+    reuse_retained_binding: bool = False,
+    static_event_binding: tuple[UUID, int, dict[str, Any]] | None = None,
     **hints: Any,
 ) -> Action | None:
     tag = _interaction_tag(interaction.label)
@@ -703,7 +742,7 @@ def _project_sandbox_interaction(
             interaction.target,
         )
         return None
-    if interaction.once and not retain_once and has_visited(target, ctx=ctx):
+    if interaction.once and not reuse_retained_binding and has_visited(target, ctx=ctx):
         return None
     action_label = _sandbox_interaction_action_label(
         location,
@@ -711,20 +750,26 @@ def _project_sandbox_interaction(
         sponsor_label=sponsor_label,
         interaction_label=projection_label or interaction.label,
     )
-    if retain_once:
-        existing = graph.find_one(Selector(has_kind=Action, label=action_label))
-        if isinstance(existing, Action) and existing.predecessor_id == location.uid:
-            return existing
+    if reuse_retained_binding:
+        existing = location.edges_out(Selector(has_kind=Action, label=action_label))
+        if (action := next(existing, None)) is not None:
+            return cast(Action, action)
     availability = list(interaction.availability)
-    if contribution_kind == "event":
-        assert event_contribution_key is not None
+    if static_event_binding is not None:
+        sponsor_id, event_index, declaration = static_event_binding
         availability.append(
             Predicate(
                 expr=(
-                    "sandbox_scheduled_event_available("
-                    f"{event_contribution_key!r})"
+                    "sandbox_static_scheduled_event_available("
+                    f"{str(sponsor_id)!r}, {event_index!r}, {declaration!r}, "
+                    f"{str(target.uid)!r})"
                 )
             )
+        )
+    elif contribution_kind == "event":
+        assert event_contribution_key is not None
+        availability.append(
+            Predicate(expr=f"sandbox_scheduled_event_available({event_contribution_key!r})")
         )
     return Action(
         registry=graph,
@@ -1324,6 +1369,16 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
                 caller,
                 ctx=ctx,
                 contribution_key=str(contribution_key),
+            )
+        ),
+        "sandbox_static_scheduled_event_available": (
+            lambda sponsor_id, event_index, declaration, target_id: _static_scheduled_event_is_live(
+                caller,
+                ctx=ctx,
+                sponsor_id=UUID(str(sponsor_id)),
+                event_index=int(event_index),
+                declaration=cast(Mapping[str, Any], declaration),
+                target_id=UUID(str(target_id)),
             )
         ),
         "sandbox_fixture_can_receive_asset": (
@@ -2463,6 +2518,15 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
         contribution_key = _scheduled_event_contribution_key(contribution)
         event_label = event.label or event.target
         retained = contribution.source_kind in {"location", "scope"}
+        static_binding = None
+        if retained:
+            assert contribution.sponsor_id is not None
+            assert contribution.event_index is not None
+            static_binding = (
+                contribution.sponsor_id,
+                contribution.event_index,
+                event.model_dump(mode="json"),
+            )
         _project_sandbox_interaction(
             caller,
             graph=graph,
@@ -2476,7 +2540,8 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             event_contribution_key=contribution_key,
             projection_label=f"{event_label}_{contribution_key[:12]}",
             event=event.label or event.target,
-            retain_once=retained,
+            reuse_retained_binding=retained,
+            static_event_binding=static_binding,
             **contribution.hints,
         )
     return None
