@@ -310,7 +310,7 @@ for node in members: ...  # works
 
 # Debug logging: materialize to avoid exhaustion
 members = list(subgraph.members)
-logger.debug(f"Found {len(members)} members: {members}")
+logger.debug("Found %d members: %s", len(members), members)
 ```
 
 **Type hints**:

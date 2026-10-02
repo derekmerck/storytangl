@@ -54,7 +54,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
             # Initial record creation
             record = mrt_cls.from_source(item)
 
-            logger.debug(f"initial mrit {record!r}")
+            logger.debug("initial mrit %r", record)
 
             # Check for duplicates by content
             if record in self:
@@ -80,7 +80,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
                 record = indexed_record
 
             # Add to registry
-            logger.debug(f"indexed {record!r}")
+            logger.debug("indexed %r", record)
             self.add(record)
             results.append(record)
 
@@ -98,7 +98,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
 
         tic = datetime.now()
         import tangl.utils.shelved2 as shelved
-        logger.debug(f"initial shelf hits: {shelved.hit_count}/misses: {shelved.miss_count}")
+        logger.debug("initial shelf hits: %s/misses: %s", shelved.hit_count, shelved.miss_count)
 
         import re
         ignored = []
@@ -110,7 +110,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
             self.index(items_)
 
         toc = datetime.now()
-        logger.debug(f"loaded im path in {toc-tic} secs")
-        logger.debug(f"ignored: {ignored}")
-        logger.debug(f"final shelf hits: {shelved.hit_count}/misses: {shelved.miss_count}")
+        logger.debug("loaded im path in %s secs", toc-tic)
+        logger.debug("ignored: %s", ignored)
+        logger.debug("final shelf hits: %s/misses: %s", shelved.hit_count, shelved.miss_count)
 

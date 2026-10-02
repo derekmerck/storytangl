@@ -474,7 +474,6 @@ class EntityGroup(RegistryAware):
     def has_member(self, item: RT) -> bool:
         """Return membership by UID (delegates to ``__contains__``)."""
         # for selection criteria, uses __contains__ compare-by-uid
-        logger.debug(f"{self!r}: checking has_member({item!r}) = {item in self}")
         return item in self
 
     def __iter__(self) -> Iterator[RegistryAware]:
@@ -527,7 +526,7 @@ class HierarchicalGroup(EntityGroup):
     def add_member(self, item: RT) -> None:
         """Add child membership with automatic reparenting."""
         # forces re-parenting, or could throw an exception instead
-        logger.debug(f"{self!r}: adding member({item!r})")
+        logger.debug("%r: adding member %r", self, item)
         if item.parent is not None:
             # Remove also invalidates item's parent
             item.parent.remove_child(item)
@@ -539,7 +538,7 @@ class HierarchicalGroup(EntityGroup):
     def remove_member(self, item: RT) -> None:
         """Remove child membership and invalidate cached parent."""
         if item is not None and item.uid in self.member_ids:
-            logger.debug(f"{self!r}: removing member {item!r} from parent {item.parent!r}")
+            logger.debug("%r: removing member %r", self, item)
             item._invalidate_parent_attr()
         super().remove_member(item)
 

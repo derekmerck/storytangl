@@ -124,7 +124,7 @@ def unshelf(fn, *args):
 
 def clear_shelf(fn: str):
 
-    logger.warning(f'clearing shelf {fn}')
+    logger.warning("clearing shelf %s", fn)
     if str(fn) in opened_shelves:
         opened_shelves[str(fn)].clear()
         opened_shelves[str(fn)].close()
@@ -135,6 +135,6 @@ def clear_shelf(fn: str):
     for fp in matches:
         if not fp.exists():
             continue
-        logger.warning( f'removing {fp}')
+        logger.warning( "removing %s", fp)
         os.remove(fp)
     # raise RuntimeError(f"No such shelf {fn}")

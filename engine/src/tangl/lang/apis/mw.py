@@ -32,7 +32,7 @@ class MeriamWebsterApi:
         url = MeriamWebsterApi.query_url + f"{ref}/json/{word}"
         r = requests.get( url, params={'key': MeriamWebsterApi.api_keys[ref]})
         if not r.status_code == 200:
-            logger.error(f"MW API error")
+            logger.error("MW API error")
             logger.error( url )
             logger.error( r.request )
             logger.error( r )

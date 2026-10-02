@@ -36,9 +36,9 @@ class PersonalName(BaseModel):
             try:
                 gender = Gender(gender)
             except ValueError:
-                logger.error(f"Invalid gender: {gender}")
+                logger.error("Invalid gender: %s", gender)
                 raise
-        logger.debug(f"is_xx: {(gender or self.gender).is_xx}")
+        logger.debug("is_xx: %s", (gender or self.gender).is_xx)
         return (gender or self.gender).is_xx
 
     @classmethod

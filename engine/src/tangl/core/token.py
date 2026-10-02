@@ -245,7 +245,6 @@ class Token(Node, Generic[WST]):
             raise AttributeError(f"{self.__class__.__name__} is missing attribute '{name}'")
         if hasattr(self.reference_singleton, name):
             attr = getattr(self.reference_singleton, name)
-            # logger.debug(f"Delegating {name} attribute to {attr}")
             if callable(attr):
                 # If it's a method, bind it to the reference_entity
                 # This only works with instance methods that take 'self' 1st param, see Wearable
@@ -280,7 +279,7 @@ class Token(Node, Generic[WST]):
         instance_vars = cls._instance_vars(wrapped_cls)
         generic_metadata = {'origin': cls, 'args': (wrapped_cls,), 'parameters': ()}
 
-        logger.debug(f"Creating new wrapper class {name} for {wrapped_cls.__name__}")
+        logger.debug("Creating new wrapper class %s for %s", name, wrapped_cls.__name__)
 
         new_cls = pydantic.create_model(name,
                                         __base__=cls,

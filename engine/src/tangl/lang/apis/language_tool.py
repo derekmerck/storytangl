@@ -31,7 +31,7 @@ class LanguageToolApi:
         except requests.exceptions.ConnectTimeout:  # pragma: no cover
             raise RemoteApiUnavailable
         except:   # pragma: no cover
-            logger.error(f"LanguageTool API error")
+            logger.error("LanguageTool API error")
             logger.error(url)
             logger.error(r.text)
             logger.error(r.content)

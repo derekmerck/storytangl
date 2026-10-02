@@ -40,7 +40,7 @@ class RedisStorage:
             # db not in url, use 0
             nominal_db = 0
         db = db or nominal_db
-        logger.debug( f"url={url}, token={token}, db={db}" )
+        logger.debug( "url=%s, token=%s, db=%s", url, token, db )
         self.redis = Redis.from_url(url, password=token, db=db)  # type: Redis
 
         try:

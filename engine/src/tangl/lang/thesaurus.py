@@ -116,7 +116,7 @@ class Thesaurus(Singleton):
                     syn = Synset(label=k, pos=pos, synonyms=v)
                     res.append( syn )
                 else:
-                    logger.warning(f"redeclared a synset {k}")
+                    logger.warning("redeclared a synset %s", k)
                     logger.warning(pformat( v ))
 
         return res

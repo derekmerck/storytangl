@@ -16,7 +16,7 @@ except (ImportError, AttributeError):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-logger.debug( f"Hashing with salt: {HASHING_SALT}" )
+logger.debug( "Hashing with salt: %s", HASHING_SALT )
 
 # JSON mapping keys are sorted, but nested sets and fallback Python objects are
 # not canonical across processes. Durable callers must pass explicitly encoded

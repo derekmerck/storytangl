@@ -128,7 +128,7 @@ try:
         return RedirectResponse(url="/docs/")
 
 except (AssertionError, RuntimeError):
-    logger.warning(f"Could not find sphinx docs at {docs_dir}")
+    logger.warning("Could not find sphinx docs at %s", docs_dir)
 
 # This _must_ be mounted last b/c it shadows the root path
 client_dist_dir = settings.service.paths.client_dist  # type: Path
@@ -136,7 +136,7 @@ try:
     client_dist_files = StaticFiles(directory=client_dist_dir, html=True)
     app.mount("/", client_dist_files, name="client")
 except (AssertionError, RuntimeError):
-    logger.warning(f"Could not find client dist at {client_dist_dir}")
+    logger.warning("Could not find client dist at %s", client_dist_dir)
 
 # logger.debug( app.routes )
 # logger.debug( api_server.routes )

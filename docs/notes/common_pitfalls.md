@@ -34,20 +34,34 @@ for m in members:
 - `registry.find_all(Selector(...))` → `Iterator[Entity]`
 - `node.ancestors()` → `Iterator[Subgraph]`
 
-**Debug logging trap**:
+**Debug logging trap**: a log call's arguments run whether or not the level is
+enabled, so materializing inside one exhausts the iterator even in production.
 ```python
 # ❌ Bug: logging exhausts iterator
 edges = node.edges_out()
-logger.debug(f"Edges: {list(edges)}")  # Exhausts iterator!
+logger.debug("Edges: %s", list(edges))  # Exhausts iterator, debug on or off!
 for e in edges:
     process(e)  # Never runs
 
 # ✅ Correct: materialize once
 edges = list(node.edges_out())
-logger.debug(f"Edges: {edges}")
+logger.debug("Edges: %s", edges)
 for e in edges:
     process(e)  # Works
 ```
+
+**f-strings in log calls**: an f-string is built before the logger decides to
+discard it. Pass `%`-style arguments so the message is only formatted when the
+level is on, and keep expensive work out of the arguments too.
+```python
+# ❌ Builds two reprs on every call, debug on or off
+logger.debug(f"{self!r}: checking has_member({item!r})")
+
+# ✅ Formatted only when debug is enabled
+logger.debug("%r: checking has_member(%r)", self, item)
+```
+`Registry.has_member` once did the first. It sits under every parent lookup, so a
+large graph paid for millions of discarded strings per step.
 
 ---
 

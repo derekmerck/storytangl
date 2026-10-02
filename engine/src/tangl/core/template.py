@@ -348,7 +348,7 @@ class TemplateRegistry(Registry[EntityTemplate]):
             has_template_kind=TemplateGroup,
             parent=None))
         for item in top_level:
-            logger.debug(f"Decomposing tl item: {item!r} {item.parent!r}")
+            logger.debug("Decomposing tl item: %r %r", item, item.parent)
             data.append(item.decompile(generify=generify))
         return data
 

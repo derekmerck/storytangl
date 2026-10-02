@@ -73,7 +73,7 @@ class VectorForge:
                 el = copy.deepcopy( el )
                 group_root.add( el )
             except KeyError:
-                logger.warning(f"couldn't find group_id {group_id}")
+                logger.warning("couldn't find group_id %s", group_id)
                 continue
         return group_root
 
