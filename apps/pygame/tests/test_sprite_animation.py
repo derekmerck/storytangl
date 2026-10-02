@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -113,7 +114,7 @@ def stage(clock: Clock):
 
 
 def _image(still: str, sheet: SheetSource | None = None, **fields) -> StageImage:
-    return StageImage(role="dialog_im", source=still, sheets=(sheet,) if sheet else (), **fields)
+    return StageImage(role=fields.pop("role", "dialog_im"), source=still, sheets=(sheet,) if sheet else (), **fields)
 
 
 def _turn(still: str, sheet: SheetSource | None = None, **fields) -> Turn:
@@ -412,6 +413,61 @@ def test_client_selected_clip_preserves_elapsed_time(stage, art, clock) -> None:
     clock.ms = 2000
     stage.draw(turn, media_visibility={"look": False})
     assert _probe(stage, still_only, left=True) == HOLD_L
+
+
+def test_staged_binding_uses_the_product_row_or_its_authored_still(stage, art, clock) -> None:
+    still, sheet = art
+    image = _image(
+        still,
+        sheet,
+        role="staged_im",
+        x_frac=0.25,
+        y_frac=1.0,
+        clip_binding=ClipBinding(
+            axes=["look", "motion"],
+            rows=[
+                ClipBindingRow(values=["calm", True], clip="idle"),
+                ClipBindingRow(values=["alert", True], clip="call"),
+            ],
+        ),
+        timing="loop",
+        flip_h=True,
+    )
+    still_turn = Turn(step=1, images=[replace(image, sheets=())])
+    stage.draw(still_turn, media_visibility={"look": "missing", "motion": False})
+    still_only = _pixels(stage)
+    box = _box(still_only, stage)
+
+    turn = Turn(step=1, images=[image])
+    stage.draw(turn, media_visibility={"look": "alert", "motion": True})
+    assert _probe(stage, still_only, left=True) == CALL_R
+    selected_box = _box(_pixels(stage), stage)
+    assert (selected_box.x, selected_box.bottom) == (box.x, box.bottom)
+
+    clock.ms = 500
+    stage.draw(turn, media_visibility={"look": "missing", "motion": False})
+    assert _pixels(stage) == still_only
+
+
+def test_binding_residents_keep_time_when_hidden_or_showing_a_still(stage, art, clock) -> None:
+    still, sheet = art
+    image = _image(
+        still,
+        sheet,
+        clip_binding=ClipBinding(axes=["look"], rows=[ClipBindingRow(values=[True], clip="idle")]),
+        visibility=VisibilityBinding(preference_id="shown", values=[True]),
+        timing="loop",
+    )
+    turn = Turn(step=1, images=[image])
+    stage.draw(turn, media_visibility={"look": False, "shown": False})
+    assert stage.animating is False
+    assert len(stage._clips) == 1
+
+    clock.ms = 1900
+    stage.draw(turn, media_visibility={"look": True, "shown": True})
+    still_only = _pixels(stage)
+    assert _probe(stage, still_only, left=True) == BLINK_L
+    assert stage.animating is True
 
 
 def test_pause_holds_the_frame_and_the_next_play_resumes_from_it(stage, art, clock) -> None:

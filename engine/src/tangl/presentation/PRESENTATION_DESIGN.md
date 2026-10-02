@@ -24,9 +24,12 @@ falls back to the authored clip or still. These values are presentation-only:
 they neither contact Service nor mutate story state, and client preference
 changes preserve resident occurrence slots and elapsed playback.
 
-Slice 3 remains design-only: it may consider client-local preference persistence
-and richer controls only after a second consumer requires them. It does not add
-server persistence, dynamic disclosure/status, or a new dispatch/widget surface.
+Slice 3 remains design-only: it asks how a turn may advertise a local cycle over
+the alternatives its own staging declares. Such controls appear only while those
+alternatives are present, reset on a genuine new turn, and compose with these
+world-static viewer preferences. Its schema and reset boundary remain open; it
+does not add server persistence, dynamic disclosure/status, or a new dispatch/
+widget surface.
 
 The pygame reference port binds only `F1` through `F12`; every declaration is
 also a clickable local control, and two-row control pages cycle locally when

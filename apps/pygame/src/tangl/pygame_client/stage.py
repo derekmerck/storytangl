@@ -248,7 +248,7 @@ _ClipKey = tuple[str, str, str, int]
 class _ClipPlay:
     """Where one staged occurrence is in its clip."""
 
-    clip: str
+    clip: str | None
     started_ms: float
     held_ms: float | None = None
     """Elapsed time frozen by ``pause`` or ``stop``; ``None`` while playing."""
@@ -334,6 +334,7 @@ class Stage:
         self.animating = False
         """True when the last draw showed a clip that has more frames to play."""
         self._clips: dict[_ClipKey, _ClipPlay] = {}
+        self._resident_keys: set[_ClipKey] = set()
         self._staged_turn: Turn | None = None
         """The turn whose portraits were last drawn: a different one is a new statement."""
         self._drawn_at = self._now()
@@ -476,8 +477,12 @@ class Stage:
         # Scenery before faces: an ornament stands in the room, a portrait
         # speaks over it. Both stand on the stage, not on the text: the
         # choice list is drawn over them rather than holding them up.
-        self._draw_staged(loaded)
-        self._draw_portraits(turn, visibility)
+        fresh = turn is not self._staged_turn
+        self._staged_turn = turn
+        self._resident_keys = set()
+        self._draw_staged(turn, visibility, fresh=fresh)
+        self._draw_portraits(turn, visibility, fresh=fresh)
+        self._clips = {key: play for key, play in self._clips.items() if key in self._resident_keys}
         panelled = self._has_state(turn, placed=placed)
         width = self.logical_size[0] - (self.panel_width if panelled else 0)
         stage_rect = pygame.Rect(
@@ -939,7 +944,9 @@ class Stage:
         else:
             self.surface.fill(TEAL)
 
-    def _draw_staged(self, loaded: list[tuple[StageImage, pygame.Surface]]) -> None:
+    def _draw_staged(
+        self, turn: Turn, preferences: Mapping[str, bool | str], *, fresh: bool
+    ) -> None:
         """Draw placed images at their fractions, nearest last.
 
         Drawn at natural size: a staged image was conformed to this stage by
@@ -959,7 +966,7 @@ class Stage:
         after.
         """
 
-        staged = self._pick(loaded, STAGED_ROLES)
+        staged = [image for image in turn.images if image.role in STAGED_ROLES]
         if not staged:
             return
         # Bound first, then order. Sorting before the cap would spend the
@@ -967,7 +974,24 @@ class Stage:
         # figures nearest the viewer, which is the opposite of what a limit on
         # a crowded room should drop.
         placed: list[tuple[int, int, int, pygame.Surface]] = []
-        for image, surface in staged[:STAGED_LIMIT]:
+        occurrences: Counter[tuple[str, str, str]] = Counter()
+        for index, image in enumerate(staged[:STAGED_LIMIT]):
+            clip, selected = self._selected_clip(image, preferences)
+            image = replace(image, clip=clip, client_selected_clip=selected)
+            placement = (
+                f"x={image.x_frac:.4f}" if image.x_frac is not None else (image.x_slot or "mid")
+            )
+            identity = (image.role, image.source, placement)
+            key = (*identity, occurrences[identity])
+            occurrences[identity] += 1
+            visible = image.visibility is None or preferences[image.visibility.preference_id] in image.visibility.values
+            if image.clip is not None or image.clip_binding is not None:
+                self._resident_keys.add(key)
+            surface = self._load(image.source)
+            if surface is None:
+                continue
+            if image.flip_h:
+                surface = pygame.transform.flip(surface, True, False)
             width, height = surface.get_size()
             # An unplaced staged image centres on the floor: it asked to be in
             # the room without saying where, and the middle is the honest
@@ -987,7 +1011,15 @@ class Stage:
                 if image.y_frac is None
                 else self._frac_y(image.y_frac, height)
             )
-            placed.append((box_y + height, box_x, box_y, surface))
+            frame, offset = self._clip_frame(
+                image, surface.get_size(), key, fresh=fresh, schedule=visible
+            )
+            if frame is not None:
+                surface = frame
+                box_x += offset[0]
+                box_y += offset[1]
+            if visible:
+                placed.append((box_y + height, box_x, box_y, surface))
         # Stable, so figures sharing a baseline -- the common case, a room of
         # people on one floor -- keep arrival order rather than shuffling.
         placed.sort(key=lambda entry: entry[0])
@@ -1000,6 +1032,8 @@ class Stage:
         self,
         turn: Turn,
         preferences: Mapping[str, bool | str],
+        *,
+        fresh: bool,
     ) -> None:
         """Place up to three sprites on a shared baseline, preserving aspect.
 
@@ -1016,10 +1050,7 @@ class Stage:
         the room; the room does not rest on it.
         """
 
-        fresh = turn is not self._staged_turn
-        self._staged_turn = turn
         staged = [image for image in turn.images if image.role in PORTRAIT_ROLES][:3]
-        seen: set[_ClipKey] = set()
         occurrences: Counter[tuple[str, str, str]] = Counter()
         floor = self.logical_size[1]
         # Natural size, capped. A pack already decided how big a face is for
@@ -1045,6 +1076,8 @@ class Stage:
             placed = (image.role, image.source, placement)
             key = (*placed, occurrences[placed])
             occurrences[placed] += 1
+            if image.clip is not None or image.clip_binding is not None:
+                self._resident_keys.add(key)
 
             portrait = self._load(image.source)
             if portrait is None:
@@ -1064,15 +1097,15 @@ class Stage:
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
 
-            drawn, (at_x, at_y) = self._clip_frame(image, portrait.get_size(), key, fresh=fresh)
-            if drawn is None:
-                drawn, at_x, at_y = portrait, 0, 0
-            else:
-                seen.add(key)
             visible = (
                 image.visibility is None
                 or preferences[image.visibility.preference_id] in image.visibility.values
             )
+            drawn, (at_x, at_y) = self._clip_frame(
+                image, portrait.get_size(), key, fresh=fresh, schedule=visible
+            )
+            if drawn is None:
+                drawn, at_x, at_y = portrait, 0, 0
             if not visible:
                 continue
             scaled = pygame.transform.scale(
@@ -1083,10 +1116,6 @@ class Stage:
                 ),
             )
             self.surface.blit(scaled, (box_x + round(at_x * factor), box_y + round(at_y * factor)))
-        # Staging is established before a local visibility preference filters
-        # pixels. Hidden portraits therefore retain their slot and clock; only a
-        # portrait absent from this turn loses playback state.
-        self._clips = {key: play for key, play in self._clips.items() if key in seen}
 
     def _clip_frame(
         self,
@@ -1095,6 +1124,7 @@ class Stage:
         key: _ClipKey,
         *,
         fresh: bool,
+        schedule: bool,
     ) -> tuple[pygame.Surface | None, tuple[int, int]]:
         """The frame this image's clip shows now, and where it goes relative to the still.
 
@@ -1103,6 +1133,8 @@ class Stage:
         """
 
         if image.clip is None:
+            if image.clip_binding is not None:
+                self._play(key, image, fresh=fresh)
             return None, (0, 0)
         sheet = next((s for s in image.sheets if s.manifest.has_clip(image.clip)), None)
         if sheet is None:
@@ -1128,7 +1160,7 @@ class Stage:
             frame = pygame.transform.flip(frame, True, False)
         at = manifest.placement(index, still_size, flip_h=image.flip_h)
 
-        if self.animate and play.held_ms is None:
+        if schedule and self.animate and play.held_ms is None:
             settles = manifest.settles_at_ms(image.clip, loop=loop)
             if settles is None or elapsed < settles:
                 self.animating = True
