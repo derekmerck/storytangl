@@ -9,6 +9,7 @@ from tangl.vm.ctx import VmPhaseCtx
 from .episode import Action
 
 if TYPE_CHECKING:
+    from tangl.vm import TraversableNode
     from .fabula.types import InitMode
     from .story_graph import StoryGraph
 
@@ -23,6 +24,26 @@ def on_story_ready(func=None, **kwargs):
     if func is None:
         return lambda f: story_dispatch.register(func=f, task="story_ready", **kwargs)
     return story_dispatch.register(func=func, task="story_ready", **kwargs)
+
+
+def on_story_materialized(func=None, **kwargs):
+    """Register domain bindings after a runtime node's story topology is wired."""
+    if func is None:
+        return lambda f: story_dispatch.register(func=f, task="story_materialized", **kwargs)
+    return story_dispatch.register(func=func, task="story_materialized", **kwargs)
+
+
+def do_story_materialized(caller: TraversableNode, *, ctx: VmPhaseCtx) -> None:
+    """Finish domain bindings through the graph's existing authority chain."""
+    receipts = story_dispatch.execute_all(
+        task="story_materialized",
+        call_kwargs={"caller": caller},
+        ctx=ctx,
+        selector=Selector(caller_kind=type(caller)),
+    )
+    for result in CallReceipt.iter_results(*receipts):
+        if result is not None:
+            raise TypeError("story_materialized handlers must return None")
 
 
 def do_story_ready(
@@ -141,6 +162,8 @@ def do_find_edges(
 
 
 __all__ = [
+    "do_story_materialized",
+    "on_story_materialized",
     "do_story_ready",
     "on_story_ready",
     "do_find_edges",

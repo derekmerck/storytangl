@@ -30,6 +30,7 @@ from tangl.vm.provision import MaterializeRole, attach_child, materialize_templa
 from tangl.vm.provision.provisioner import _next_provision_uid
 
 from ..concepts import Actor, Location, Role, Setting
+from ..dispatch import do_story_materialized
 from ..episode import Action, Block, MenuBlock, Scene
 from ..story_graph import StoryGraph
 from .types import (
@@ -136,7 +137,11 @@ class StoryMaterializer:
             graph.wired_node_ids.add(entity.uid)
             return
 
-        if isinstance(template, EntityTemplate) and self._template_is_container(template):
+        if (
+            isinstance(entity, Scene)
+            and isinstance(template, EntityTemplate)
+            and self._template_is_container(template)
+        ):
             self._ensure_runtime_container_entry(
                 graph=graph,
                 template=template,
@@ -146,6 +151,12 @@ class StoryMaterializer:
 
         state = self._runtime_state(graph=graph)
         self._run_runtime_topology_passes(nodes=[entity], state=state)
+        ctx = (
+            _ctx.derive(cursor_id=entity.uid)
+            if _ctx is not None
+            else PhaseCtx(graph=graph, cursor_id=entity.uid)
+        )
+        do_story_materialized(entity, ctx=ctx)
 
     def preview_requirement_contract(
         self,
@@ -433,7 +444,7 @@ class StoryMaterializer:
         self,
         *,
         graph: StoryGraph,
-        container: TraversableNode,
+        container: Scene,
         template: EntityTemplate,
     ) -> TraversableNode | None:
         children = getattr(container, "children", None)
@@ -455,7 +466,7 @@ class StoryMaterializer:
         *,
         graph: StoryGraph,
         template: EntityTemplate,
-        container: TraversableNode,
+        container: Scene,
         _ctx: VmPhaseCtx | None = None,
     ) -> TraversableNode | None:
         entry_template = self._entry_template_for_container(template)
