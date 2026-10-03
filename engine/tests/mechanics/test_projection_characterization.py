@@ -476,15 +476,11 @@ def test_sandbox_scheduled_event_action_shape() -> None:
     }
     assert dawn.payload is None
     assert dawn.accepts is None
-    # Schedule admission is re-evaluated against the projected contribution,
-    # not its label or its current position among contributions.
+    # Static bindings point directly at their sponsor and declaration position;
+    # the fingerprint rejects replacement or reordering without catalog lookup.
     [availability] = _availability_exprs(dawn)
-    prefix = "sandbox_scheduled_event_available('"
-    assert availability.startswith(prefix)
-    assert availability.endswith("')")
-    contribution_key = availability.removeprefix(prefix).removesuffix("')")
-    assert len(contribution_key) == 64
-    assert all(character in "0123456789abcdef" for character in contribution_key)
+    assert availability.startswith("sandbox_static_scheduled_event_available(")
+    assert f"{str(compiled.scope.uid)!r}, 0," in availability
     assert dawn.trigger_phase is None
     assert dawn.return_phase is None
     assert dawn.successor is road
