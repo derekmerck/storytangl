@@ -271,6 +271,28 @@ def test_removing_a_pending_static_offer_also_removes_its_destination_dependency
     assert "Later" in _offers(start)
 
 
+def test_pending_once_offer_reuses_a_target_realized_by_another_offer() -> None:
+    script = _script("lazy_shared_target")
+    script["scenes"]["hub"]["scheduled_events"][0].pop("period")
+    script["scenes"]["hub"]["scheduled_events"][0]["once"] = True
+    script["scenes"]["hub"]["blocks"]["start"]["scheduled_events"][0]["return_to_location"] = True
+    ledger = Ledger.from_graph(World.from_script_data(script_data=script).create_story(
+        "run", init_mode=InitMode.LAZY,
+    ).graph)
+    offers = _offers(ledger.cursor)
+    later_id = offers["Later"].uid
+    (dependency,) = ledger.graph.find_edges(
+        Selector(has_kind=Dependency, predecessor_id=later_id, label="destination"),
+    )
+    ledger.resolve_choice(offers["Now"].uid)
+    assert ledger.cursor.get_label() == "start"
+    later = _offers(ledger.cursor)["Later"]
+    assert later.uid == later_id
+    assert later.successor is _offers(ledger.cursor)["Now"].successor
+    assert dependency.successor is later.successor
+    assert not later.available(ctx=ledger._make_phase_ctx())
+
+
 @pytest.mark.parametrize(
     "reference, destination", [("target", "hub.target"), ("other", "other.target")],
 )
