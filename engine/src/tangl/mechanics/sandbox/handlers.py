@@ -781,8 +781,11 @@ def _project_sandbox_interaction(
                 ),
                 None,
             )
-    if target is None and destination is None:
+    if target is None:
         target = _interaction_target(location, interaction)
+    if destination is not None and target is not None:
+        existing.set_successor(target)
+        destination.set_successor(target)
     requirement = destination.requirement if destination is not None else None
     if (
         target is None

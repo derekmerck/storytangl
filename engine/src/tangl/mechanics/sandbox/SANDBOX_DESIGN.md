@@ -219,7 +219,11 @@ carries an ordinary ``destination`` Dependency. Schedule, actor, and authored
 gates do not decide whether that path exists. Choice preview does not realize
 the target; selection uses normal lazy destination resolution. An unresolved
 binding is reused on subsequent visits; removing or replacing the declaration
-also removes its owned destination dependency. Constructor-form restore and
+also removes its owned destination dependency. An offer whose target was
+realized by another route binds that live target on
+the receiver's next provision, preserving both Action and Dependency ids; this
+also lets ordinary ``once`` correctly suppress the visited target.
+Constructor-form restore and
 delta replay retain the recorded receiver, sponsor, Action, and Dependency ids.
 This does not introduce a separate target loader, a graph-wide reference cache,
 or a new guarantee about re-executing abandoned choices after rollback.
