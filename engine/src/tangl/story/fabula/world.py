@@ -12,7 +12,9 @@ from tangl.media.media_resource import MediaInventory
 from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import TraversableEdge, TraversableGraphFactory, TraversableNode
 from tangl.vm.ctx import VmPhaseCtx
+from tangl.vm.runtime.frame import PhaseCtx
 
+from ..dispatch import do_story_ready
 from ..episode import Action
 from ..story_graph import StoryGraph
 from .compiler import StoryCompiler
@@ -666,8 +668,6 @@ class World(TraversableGraphFactory):
         materializer._run_topology_passes(state=state)
         if init_mode is InitMode.EAGER:
             materializer._run_prelink_passes(state=state)
-        materializer._recount_materialized(state=state)
-
         self._apply_story_entry_ids(
             graph=graph,
             entry_templates=explicit_entry_templates or seed_entry_templates,
@@ -680,6 +680,13 @@ class World(TraversableGraphFactory):
                 result.graph.initial_cursor_id = override_uid
                 result.graph.initial_cursor_ids[:] = [override_uid]
 
+        do_story_ready(
+            result.graph,
+            ctx=PhaseCtx(graph=result.graph, cursor_id=result.graph.initial_cursor_id),
+            namespace=namespace or {},
+            init_mode=init_mode,
+        )
+        materializer._recount_materialized(state=state)
         return result
 
     def _resolve_entry_override(
