@@ -1,17 +1,47 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Selector
 from tangl.vm.ctx import VmPhaseCtx
 
 from .episode import Action
 
+if TYPE_CHECKING:
+    from .fabula.types import InitMode
+    from .story_graph import StoryGraph
+
 story_dispatch = BehaviorRegistry(
     label="story_dispatch",
     default_dispatch_layer=DispatchLayer.APPLICATION,
 )
+
+
+def on_story_ready(func=None, **kwargs):
+    """Register construction-only work after topology and entry selection."""
+    if func is None:
+        return lambda f: story_dispatch.register(func=f, task="story_ready", **kwargs)
+    return story_dispatch.register(func=func, task="story_ready", **kwargs)
+
+
+def do_story_ready(
+    caller: StoryGraph,
+    *,
+    ctx: VmPhaseCtx,
+    namespace: Mapping[str, Any],
+    init_mode: InitMode,
+) -> None:
+    """Finish per-graph construction without running traversal or arrival effects."""
+    receipts = story_dispatch.execute_all(
+        task="story_ready",
+        call_kwargs={"caller": caller, "namespace": namespace, "init_mode": init_mode},
+        ctx=ctx,
+        selector=Selector(caller_kind=type(caller)),
+    )
+    for result in CallReceipt.iter_results(*receipts):
+        if result is not None:
+            raise TypeError("story_ready handlers must return None")
 
 
 def on_journal(func=None, **kwargs):
@@ -111,6 +141,8 @@ def do_find_edges(
 
 
 __all__ = [
+    "do_story_ready",
+    "on_story_ready",
     "do_find_edges",
     "do_render_text",
     "on_find_edges",

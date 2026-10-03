@@ -71,6 +71,31 @@ World/factory authority is the canonical story runtime model.
 The old provider-collection layer and domain-view compatibility wrappers are no
 longer part of the runtime design.
 
+### Construction-ready domain work
+
+``World.create_story`` runs ``story.dispatch.on_story_ready`` handlers after
+materialization, topology/prelink passes, and the namespace-dependent entry
+override. The caller is the new ``StoryGraph``; its ``PhaseCtx`` points at the
+selected entry. Handlers receive ``init_mode`` and the supplied initialization
+``namespace`` and must return ``None``. They may finish construction of ordinary
+graph bindings; they do not run the traversal pipeline, arrival effects, clocks,
+or JOURNAL. Materialization counts include their additions.
+
+This boundary is before Service primes the initial arrival. It is **not** a
+post-arrival or per-playthrough seal. World-specific shape-changing startup work
+must finish before bindings that depend on it are established. A later startup
+that needs additional recruitment is not proven shape-complete merely because
+``story_ready`` ran.
+
+``freeze_shape`` remains an EAGER construction-time promise on an individual
+graph, not a mutation ban during construction and not a cached graph on the
+World. Prelinking and construction-ready extensions may establish known paths
+under that policy; runtime provisioning must not invent new paths. Entry and
+player preferences may gate existing paths without changing their existence.
+Each new start constructs its own graph and selects its own entry/context. A
+future post-setup seal would apply only to that playthrough after its arrival
+recruitment, not to another player's start or NG+ run.
+
 ## StoryGraph
 
 `StoryGraph` is the runtime graph specialization for story execution.

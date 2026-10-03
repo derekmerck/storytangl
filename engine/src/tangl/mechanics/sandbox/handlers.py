@@ -15,7 +15,8 @@ from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
 from tangl.journal.fragments import ContentFragment
-from tangl.story import Action, Block, Scene, StoryGraph
+from tangl.story import Action, Block, InitMode, Scene, StoryGraph
+from tangl.story.dispatch import on_story_ready
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import (
     ResolutionPhase,
@@ -453,9 +454,8 @@ def _coerce_time_cost(value: Any) -> SandboxTimeCost | None:
     )
 
 
-def _scheduled_event_contributions(
+def _static_scheduled_event_contributions(
     location: SandboxLocation,
-    ctx: VmPhaseCtx,
 ) -> list[ScheduledEventContribution]:
     contributions: list[ScheduledEventContribution] = []
     for scope in reversed(_sandbox_scopes(location)):
@@ -483,6 +483,14 @@ def _scheduled_event_contributions(
         )
         for event_index, event in enumerate(location.scheduled_events)
     )
+    return contributions
+
+
+def _scheduled_event_contributions(
+    location: SandboxLocation,
+    ctx: VmPhaseCtx,
+) -> list[ScheduledEventContribution]:
+    contributions = _static_scheduled_event_contributions(location)
     projection_state = _projection_state(location, ctx)
     if not projection_state.suppress_fixture_affordances:
         for fixture in location.fixtures:
@@ -2532,41 +2540,74 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             graph.remove(action.uid, _ctx=ctx)
 
     for contribution in contributions:
-        event = contribution.event
-        contribution_key = _scheduled_event_contribution_key(contribution)
-        event_label = event.label or event.target
-        retained = contribution.source_kind in {"location", "scope"}
-        binding_key = _scheduled_event_contribution_key(
-            contribution,
-            include_event_index=not retained,
-        )
-        static_binding = None
-        if retained:
-            assert contribution.sponsor_id is not None
-            assert contribution.event_index is not None
-            static_binding = (
-                contribution.sponsor_id,
-                contribution.event_index,
-                event.model_dump(mode="json"),
-            )
-        _project_sandbox_interaction(
-            caller,
-            graph=graph,
-            ctx=ctx,
-            interaction=event.as_interaction(event_label),
-            source=contribution.source,
-            sponsor_label=contribution.source_label,
-            sponsor_kind=contribution.source_kind,
-            tags={"event"},
-            contribution_kind="event",
-            event_contribution_key=contribution_key,
-            projection_label=f"{event_label}_{binding_key[:12]}",
-            event=event.label or event.target,
-            reuse_retained_binding=retained,
-            static_event_binding=static_binding,
-            **contribution.hints,
-        )
+        _bind_scheduled_event(caller, contribution=contribution, ctx=ctx)
     return None
+
+
+def _bind_scheduled_event(
+    location: SandboxLocation,
+    *,
+    contribution: ScheduledEventContribution,
+    ctx: VmPhaseCtx,
+) -> Action | None:
+    event = contribution.event
+    contribution_key = _scheduled_event_contribution_key(contribution)
+    event_label = event.label or event.target
+    retained = contribution.source_kind in {"location", "scope"}
+    binding_key = _scheduled_event_contribution_key(
+        contribution,
+        include_event_index=not retained,
+    )
+    static_binding = None
+    if retained:
+        assert contribution.sponsor_id is not None
+        assert contribution.event_index is not None
+        static_binding = (
+            contribution.sponsor_id,
+            contribution.event_index,
+            event.model_dump(mode="json"),
+        )
+    return _project_sandbox_interaction(
+        location,
+        graph=ctx.graph,
+        ctx=ctx,
+        interaction=event.as_interaction(event_label),
+        source=contribution.source,
+        sponsor_label=contribution.source_label,
+        sponsor_kind=contribution.source_kind,
+        tags={"event"},
+        contribution_kind="event",
+        event_contribution_key=contribution_key,
+        projection_label=f"{event_label}_{binding_key[:12]}",
+        event=event.label or event.target,
+        reuse_retained_binding=retained,
+        static_event_binding=static_binding,
+        **contribution.hints,
+    )
+
+
+@on_story_ready(wants_caller_kind=StoryGraph, wants_exact_kind=False)
+def establish_sandbox_scheduled_events(
+    *,
+    caller: StoryGraph,
+    ctx: VmPhaseCtx,
+    init_mode: InitMode,
+    **_kw,
+) -> None:
+    """Construct static offers, including frozen graphs, without evaluating live gates."""
+    if init_mode is not InitMode.EAGER:
+        return
+    for location in list(caller.find_all(Selector(has_kind=SandboxLocation))):
+        if not location.auto_provision:
+            continue
+        location_ctx = ctx.derive(cursor_id=location.uid)
+        for contribution in _static_scheduled_event_contributions(location):
+            action = _bind_scheduled_event(location, contribution=contribution, ctx=location_ctx)
+            if action is None and caller.frozen_shape:
+                raise ValueError(
+                    f"Frozen story cannot bind scheduled event {contribution.event.label!r} "
+                    f"at {location.get_label()!r} to {contribution.event.target!r}"
+                )
 
 
 @on_update(
