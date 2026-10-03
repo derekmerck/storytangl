@@ -183,7 +183,7 @@ position and rebinds it when its bound successor is missing. A repeat provision
 reuses a still-live bound successor rather than resolving the declaration's target
 again; new or missing bindings resolve normally. This is binding-local reuse, not
 a graph-wide reference cache or topology invalidation policy. Use-time availability
-uses the already-bound successor for a once-after-visit check and does not re-gather
+uses ordinary ``Action.once`` for the successor visit check and does not re-gather
 the event catalog.
 Mobs, fixtures, assets, provider events, and game moves still refresh their
 generated actions on each visit. This keeps the retained binding narrow without
@@ -207,9 +207,23 @@ The construction flag is not moved or temporarily cleared. A new start receives
 fresh bindings against its own graph, not a sealed graph reused from a previous
 start. Setup that recruits additional concepts during the first live arrival
 still needs a distinct playthrough-completeness contract before it can be sealed.
-Lazy materialization hooks and mobile sponsor lifetime reconciliation remain
-follow-ups under #527; the construction-ready handler does not force lazy targets
-eager or change the existing lazy provisioning path.
+LAZY construction establishes offers for the realized seed locations without
+forcing their targets eager. Later materialized locations establish their own
+scope/location offers through ``on_story_materialized`` after story topology
+wiring. Ancestor sponsors are already attached on the normal template build
+chain, so their contributions are visible at this boundary without a graph-wide
+rescan. Both paths respect automatic provisioning opt-outs.
+
+If a retained offer's target is absent but has an eligible template, the Action
+carries an ordinary ``destination`` Dependency. Schedule, actor, and authored
+gates do not decide whether that path exists. Choice preview does not realize
+the target; selection uses normal lazy destination resolution. An unresolved
+binding is reused on subsequent visits; removing or replacing the declaration
+also removes its owned destination dependency. Constructor-form restore and
+delta replay retain the recorded receiver, sponsor, Action, and Dependency ids.
+This does not introduce a separate target loader, a graph-wide reference cache,
+or a new guarantee about re-executing abandoned choices after rollback.
+Mobile sponsor lifetime reconciliation remains a follow-up under #527.
 
 ### Architectural Legitimacy Guardrail
 

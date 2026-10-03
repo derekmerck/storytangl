@@ -15,10 +15,14 @@ from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
 from tangl.journal.fragments import ContentFragment
-from tangl.story import Action, Block, InitMode, Scene, StoryGraph
-from tangl.story.dispatch import on_story_ready
+from tangl.story import Action, Block, Scene, StoryGraph
+from tangl.story.dispatch import on_story_materialized, on_story_ready
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import (
+    Dependency,
+    ProvisionPolicy,
+    Requirement,
+    Resolver,
     ResolutionPhase,
     TraversableNode,
     VmPhaseCtx,
@@ -597,7 +601,6 @@ def _static_scheduled_event_is_live(
     sponsor_id: UUID,
     event_index: int,
     declaration: Mapping[str, Any],
-    target_id: UUID,
 ) -> bool:
     """Evaluate one retained event through its original sponsor and declaration."""
     sponsor = location.graph.get(sponsor_id) if location.graph is not None else None
@@ -608,10 +611,6 @@ def _static_scheduled_event_is_live(
     event = sponsor.scheduled_events[event_index]
     if event.model_dump(mode="json") != declaration:
         return False
-    if event.once:
-        target = location.graph.get(target_id) if location.graph is not None else None
-        if not isinstance(target, TraversableNode) or has_visited(target, ctx=ctx):
-            return False
     return event.matches(
         current_world_time(location),
         location=location.get_label(),
@@ -725,6 +724,15 @@ def _interaction_target(
     return _resolve_traversable_ref(location, interaction.target)
 
 
+def _remove_scheduled_binding(action: Action, *, ctx: VmPhaseCtx) -> None:
+    dependencies = ctx.graph.find_edges(
+        Selector(has_kind=Dependency, predecessor_id=action.uid, label="destination"),
+    )
+    for dependency in list(dependencies):
+        ctx.graph.remove(dependency.uid, _ctx=ctx)
+    ctx.graph.remove(action.uid, _ctx=ctx)
+
+
 def _project_sandbox_interaction(
     location: SandboxLocation,
     *,
@@ -753,6 +761,7 @@ def _project_sandbox_interaction(
     )
     existing = None
     target = None
+    destination = None
     if reuse_retained_binding:
         existing = next(
             location.edges_out(Selector(has_kind=Action, label=action_label)),
@@ -760,9 +769,49 @@ def _project_sandbox_interaction(
         )
         if isinstance(existing, Action) and isinstance(existing.successor, TraversableNode):
             target = existing.successor
-    if target is None:
+        elif isinstance(existing, Action):
+            destination = next(
+                graph.find_edges(
+                    Selector(
+                        has_kind=Dependency,
+                        predecessor_id=existing.uid,
+                        label="destination",
+                        satisfied=False,
+                    ),
+                ),
+                None,
+            )
+    if target is None and destination is None:
         target = _interaction_target(location, interaction)
-    if target is None:
+    requirement = destination.requirement if destination is not None else None
+    if (
+        target is None
+        and requirement is None
+        and reuse_retained_binding
+        and not _graph_frozen_shape(graph)
+    ):
+        reference = interaction.target
+        is_absolute = False
+        if "." not in reference and isinstance(graph, StoryGraph) and graph.world is not None:
+            template = graph.world.find_template(reference)
+            is_absolute = template is not None and template.get_label() == reference
+        if "." not in reference and not is_absolute and location.parent is not None:
+            reference = f"{location.parent.path}.{reference}"
+        requirement = Requirement(
+            has_kind=TraversableNode,
+            has_identifier=reference,
+            authored_path=interaction.target,
+            is_qualified="." in reference,
+            is_absolute=is_absolute,
+            provision_policy=ProvisionPolicy.ANY,
+            hard_requirement=True,
+        )
+        if not Resolver.from_ctx(ctx).inspect_template_dependency_offers(
+            requirement,
+            _ctx=ctx,
+        ):
+            requirement = None
+    if target is None and requirement is None:
         logger.warning(
             "Sandbox %s %r at %r has unresolved target %r; leaving it inert.",
             contribution_kind,
@@ -780,8 +829,7 @@ def _project_sandbox_interaction(
             Predicate(
                 expr=(
                     "sandbox_static_scheduled_event_available("
-                    f"{str(sponsor_id)!r}, {event_index!r}, {declaration!r}, "
-                    f"{str(target.uid)!r})"
+                    f"{str(sponsor_id)!r}, {event_index!r}, {declaration!r})"
                 )
             )
         )
@@ -793,15 +841,17 @@ def _project_sandbox_interaction(
     if reuse_retained_binding:
         if isinstance(existing, Action):
             action = existing
-            if action.successor_id == target.uid:
+            if action.successor_id == (target.uid if target is not None else None):
                 action.availability = availability
                 return action
-            graph.remove(action.uid, _ctx=ctx)
-    return Action(
+            _remove_scheduled_binding(action, ctx=ctx)
+    action = Action(
         registry=graph,
         label=action_label,
         predecessor_id=location.uid,
-        successor_id=target.uid,
+        successor_id=target.uid if target is not None else None,
+        successor_ref=interaction.target,
+        once=interaction.once if reuse_retained_binding else False,
         text=interaction.text,
         trigger_phase=Action.trigger_phase_from_activation(interaction.activation),
         return_phase=ResolutionPhase.PLANNING if interaction.return_to_location else None,
@@ -816,11 +866,19 @@ def _project_sandbox_interaction(
             source_label=sponsor_label,
             source_kind=sponsor_kind,
             interaction=interaction.label,
-            target=target.get_label(),
+            target=target.get_label() if target is not None else interaction.target,
             return_to_location=interaction.return_to_location,
             **hints,
         ),
     )
+    if requirement is not None:
+        Dependency(
+            registry=graph,
+            label="destination",
+            predecessor_id=action.uid,
+            requirement=requirement,
+        )
+    return action
 
 
 def _time_owner(location: SandboxLocation) -> Any:
@@ -1398,13 +1456,12 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
             )
         ),
         "sandbox_static_scheduled_event_available": (
-            lambda sponsor_id, event_index, declaration, target_id: _static_scheduled_event_is_live(
+            lambda sponsor_id, event_index, declaration: _static_scheduled_event_is_live(
                 caller,
                 ctx=ctx,
                 sponsor_id=UUID(str(sponsor_id)),
                 event_index=int(event_index),
                 declaration=cast(Mapping[str, Any], declaration),
-                target_id=UUID(str(target_id)),
             )
         ),
         "sandbox_fixture_can_receive_asset": (
@@ -2537,7 +2594,7 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             hints.get("source_kind") not in {"location", "scope"}
             or action.get_label() not in retained_labels
         ):
-            graph.remove(action.uid, _ctx=ctx)
+            _remove_scheduled_binding(action, ctx=ctx)
 
     for contribution in contributions:
         _bind_scheduled_event(caller, contribution=contribution, ctx=ctx)
@@ -2596,12 +2653,9 @@ def establish_sandbox_scheduled_events(
     *,
     caller: StoryGraph,
     ctx: VmPhaseCtx,
-    init_mode: InitMode,
     **_kw,
 ) -> None:
     """Construct static offers, including frozen graphs, without evaluating live gates."""
-    if init_mode is not InitMode.EAGER:
-        return
     for location in list(caller.find_all(Selector(has_kind=SandboxLocation))):
         if not location.auto_provision:
             continue
@@ -2613,6 +2667,20 @@ def establish_sandbox_scheduled_events(
                     f"Frozen story cannot bind scheduled event {contribution.event.label!r} "
                     f"at {location.get_label()!r} to {contribution.event.target!r}"
                 )
+
+
+@on_story_materialized(wants_caller_kind=SandboxLocation, wants_exact_kind=False)
+def establish_materialized_sandbox_events(
+    *,
+    caller: SandboxLocation,
+    ctx: VmPhaseCtx,
+    **_kw,
+) -> None:
+    """Bind the new receiver's static offers without realizing its event targets."""
+    if not caller.auto_provision:
+        return
+    for contribution in _static_scheduled_event_contributions(caller):
+        _bind_scheduled_event(caller, contribution=contribution, ctx=ctx)
 
 
 @on_update(
