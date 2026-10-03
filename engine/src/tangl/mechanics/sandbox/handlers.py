@@ -737,7 +737,23 @@ def _project_sandbox_interaction(
     tag = _interaction_tag(interaction.label)
     if tag is None:
         return None
-    target = _interaction_target(location, interaction)
+    action_label = _sandbox_interaction_action_label(
+        location,
+        source=source,
+        sponsor_label=sponsor_label,
+        interaction_label=projection_label or interaction.label,
+    )
+    existing = None
+    target = None
+    if reuse_retained_binding:
+        existing = next(
+            location.edges_out(Selector(has_kind=Action, label=action_label)),
+            None,
+        )
+        if isinstance(existing, Action) and isinstance(existing.successor, TraversableNode):
+            target = existing.successor
+    if target is None:
+        target = _interaction_target(location, interaction)
     if target is None:
         logger.warning(
             "Sandbox %s %r at %r has unresolved target %r; leaving it inert.",
@@ -749,12 +765,6 @@ def _project_sandbox_interaction(
         return None
     if interaction.once and not reuse_retained_binding and has_visited(target, ctx=ctx):
         return None
-    action_label = _sandbox_interaction_action_label(
-        location,
-        source=source,
-        sponsor_label=sponsor_label,
-        interaction_label=projection_label or interaction.label,
-    )
     availability = list(interaction.availability)
     if static_event_binding is not None:
         sponsor_id, event_index, declaration = static_event_binding
@@ -773,9 +783,8 @@ def _project_sandbox_interaction(
             Predicate(expr=f"sandbox_scheduled_event_available({event_contribution_key!r})")
         )
     if reuse_retained_binding:
-        existing = location.edges_out(Selector(has_kind=Action, label=action_label))
-        if (action := next(existing, None)) is not None:
-            action = cast(Action, action)
+        if isinstance(existing, Action):
+            action = existing
             if action.successor_id == target.uid:
                 action.availability = availability
                 return action

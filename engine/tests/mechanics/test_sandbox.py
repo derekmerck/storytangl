@@ -1254,6 +1254,30 @@ def test_scheduled_event_candidate_becomes_available_without_reprovisioning() ->
     assert _dynamic_sandbox_actions_with_tag(road, "event")[0].uid == event.uid
 
 
+def test_retained_event_reuses_its_bound_target_without_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph = Graph(label="retained_target_reuse")
+    road = SandboxLocation(label="road")
+    target = Block(label="target", content="Target")
+    graph.add(road)
+    graph.add(target)
+    road.scheduled_events = [ScheduledEvent(label="event", target="target", text="Attend")]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+    (event,) = _dynamic_sandbox_actions_with_tag(road, "event")
+
+    def unexpected_lookup(*_args, **_kw):
+        raise AssertionError("retained binding resolved its already-bound target")
+
+    monkeypatch.setattr(sandbox_handlers, "_interaction_target", unexpected_lookup)
+    do_provision(road, ctx=ctx)
+
+    (revisited,) = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert revisited.uid == event.uid
+    assert revisited.successor is target
+
+
 def test_retained_events_are_scoped_to_same_label_receivers_and_survive_restore() -> None:
     graph = Graph(label="same_label_receivers")
     target = Block(label="target", content="Target")
