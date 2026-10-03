@@ -179,9 +179,12 @@ Action per receiving location and sponsor/declaration identity; schedule, actor,
 predicate, disclosure, and once eligibility remain live availability questions.
 Each retained binding carries the sponsoring node plus a declaration fingerprint
 through ordinary constructor-form data. Provisioning refreshes its current list
-position and rebinds it when its target changes; use-time availability uses its
-already-bound successor for a once-after-visit check and does not re-gather the
-event catalog.
+position and rebinds it when its bound successor is missing. A repeat provision
+reuses a still-live bound successor rather than resolving the declaration's target
+again; new or missing bindings resolve normally. This is binding-local reuse, not
+a graph-wide reference cache or topology invalidation policy. Use-time availability
+uses the already-bound successor for a once-after-visit check and does not re-gather
+the event catalog.
 Mobs, fixtures, assets, provider events, and game moves still refresh their
 generated actions on each visit. This keeps the retained binding narrow without
 turning general sandbox projection into a cache.
