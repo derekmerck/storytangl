@@ -853,7 +853,7 @@ def _project_sandbox_interaction(
         label=action_label,
         predecessor_id=location.uid,
         successor_id=target.uid if target is not None else None,
-        successor_ref=interaction.target,
+        successor_ref=interaction.target if reuse_retained_binding else None,
         once=interaction.once if reuse_retained_binding else False,
         text=interaction.text,
         trigger_phase=Action.trigger_phase_from_activation(interaction.activation),
@@ -2597,7 +2597,10 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             hints.get("source_kind") not in {"location", "scope"}
             or action.get_label() not in retained_labels
         ):
-            _remove_scheduled_binding(action, ctx=ctx)
+            if hints.get("source_kind") in {"location", "scope"}:
+                _remove_scheduled_binding(action, ctx=ctx)
+            else:
+                graph.remove(action.uid, _ctx=ctx)
 
     for contribution in contributions:
         _bind_scheduled_event(caller, contribution=contribution, ctx=ctx)
