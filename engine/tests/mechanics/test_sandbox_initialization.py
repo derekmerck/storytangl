@@ -7,7 +7,8 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core import Selector
+from tangl.core import DispatchLayer, Selector
+from tangl.core.behavior import Priority
 from tangl.journal.fragments import ChoiceFragment
 from tangl.mechanics.sandbox import SandboxLocation, SandboxScope, ScheduledEvent
 from tangl.story import Action, InitMode, StoryGraph, World
@@ -94,6 +95,38 @@ class EntryPreferenceWorld(World):
             ScheduledEvent(label="arrival", target="hub.target", text=namespace["look"])
         )
         return location.uid
+
+
+@pytest.mark.parametrize("layer", [DispatchLayer.APPLICATION, DispatchLayer.AUTHOR])
+def test_static_binding_runs_after_world_ready_setup(layer: DispatchLayer) -> None:
+    world = World.from_script_data(script_data=_script(f"ready_setup_{layer.name}"))
+
+    @world.dispatch.register(
+        task="story_ready",
+        wants_caller_kind=StoryGraph,
+        dispatch_layer=layer,
+        priority=Priority.LAST,
+    )
+    def setup(*, caller: StoryGraph, **kwargs) -> None:
+        start = caller.find_one(Selector(has_kind=SandboxLocation, label="start"))
+        scope = caller.find_one(Selector(has_kind=SandboxScope))
+        start.scheduled_events[0] = ScheduledEvent(
+            label="now", target="hub.target", text="Rewritten",
+        )
+        scope.scheduled_events.append(
+            ScheduledEvent(label="added", target="hub.target", text="Added"),
+        )
+
+    result = world.create_story("run", freeze_shape=True)
+    graph = result.graph
+    start = graph.get(graph.initial_cursor_id)
+    alternate = graph.find_one(Selector(has_kind=SandboxLocation, label="alternate"))
+    assert set(_offers(start)) == {"Rewritten", "Added", "Later"}
+    assert set(_offers(alternate)) == {"Added", "Later"}
+    assert result.report.materialized_counts["Action"] == 5
+    assert graph.locals["arrivals"] == 0
+    do_provision(start, ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
+    assert _offers(start)["Rewritten"].available(ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
 
 
 def test_ready_hook_observes_each_selected_start_without_reusing_another_run() -> None:

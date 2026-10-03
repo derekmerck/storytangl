@@ -198,6 +198,11 @@ bindings. A frozen graph with an unresolved static offer fails construction:
 there would be no runtime opportunity to create its missing path. No arrival
 effect, time payment, journal entry, or visit history is produced by this work.
 
+The binding handler runs at LOCAL/LAST, after world-owned APPLICATION/AUTHOR
+story-ready setup handlers have finished adding or rewriting declarations. This
+ordering is explicit rather than depending on caller-kind specificity or
+registration order; frozen stories cannot repair missed declarations later.
+
 The construction flag is not moved or temporarily cleared. A new start receives
 fresh bindings against its own graph, not a sealed graph reused from a previous
 start. Setup that recruits additional concepts during the first live arrival

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
 from uuid import UUID
 
-from tangl.core import Graph, Selector, Token
+from tangl.core import DispatchLayer, Graph, Selector, Token
 from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
@@ -2649,7 +2649,12 @@ def _bind_scheduled_event(
     )
 
 
-@on_story_ready(wants_caller_kind=StoryGraph, wants_exact_kind=False)
+@on_story_ready(
+    wants_caller_kind=StoryGraph,
+    wants_exact_kind=False,
+    dispatch_layer=DispatchLayer.LOCAL,
+    priority=Priority.LAST,
+)
 def establish_sandbox_scheduled_events(
     *,
     caller: StoryGraph,
