@@ -81,6 +81,12 @@ selected entry. Handlers receive ``init_mode`` and the supplied initialization
 graph bindings; they do not run the traversal pipeline, arrival effects, clocks,
 or JOURNAL. Materialization counts include their additions.
 
+World-owned declaration/setup handlers run in the normal APPLICATION or AUTHOR
+layers. Domain binding finalizers use LOCAL/LAST to consume the completed
+declarations after those layers, including their LAST-priority handlers. Do not
+add or rewrite declarations in that finalization slot: an earlier binding pass
+cannot account for a later mutation, especially under frozen-shape policy.
+
 This boundary is before Service primes the initial arrival. It is **not** a
 post-arrival or per-playthrough seal. World-specific shape-changing startup work
 must finish before bindings that depend on it are established. A later startup
