@@ -9,10 +9,12 @@ import pytest
 
 from tangl.core import DispatchLayer, Selector
 from tangl.core.behavior import Priority
+from tangl.journal.fragments import ChoiceFragment
 from tangl.mechanics.sandbox import SandboxLocation, SandboxScope, ScheduledEvent
 from tangl.story import Action, InitMode, StoryGraph, World
-from tangl.vm import Ledger
-from tangl.vm.dispatch import do_provision
+from tangl.story.dispatch import do_story_materialized
+from tangl.vm import Dependency, Ledger
+from tangl.vm.dispatch import do_journal, do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -184,7 +186,172 @@ def test_lazy_initialization_does_not_force_static_event_targets_eager() -> None
     world = World.from_script_data(script_data=_script("lazy_setup"))
     graph = world.create_story("run", init_mode=InitMode.LAZY).graph
     assert graph.find_one(Selector(label="target")) is None
-    assert not list(graph.find_all(Selector(has_kind=Action, has_tags={"event"})))
+    start = graph.get(graph.initial_cursor_id)
+    assert isinstance(start, SandboxLocation)
+    assert set(_offers(start)) == {"Now", "Later"}
+    ctx = PhaseCtx(graph=graph, cursor_id=start.uid)
+    ids = {text: action.uid for text, action in _offers(start).items()}
+    dependencies = list(graph.find_all(Selector(has_kind=Dependency, label="destination")))
+    assert len(dependencies) == 2
+    assert all(action.successor is None for action in _offers(start).values())
+    fragments = do_journal(start, ctx=ctx)
+    choices = {
+        fragment.text: fragment
+        for fragment in fragments
+        if isinstance(fragment, ChoiceFragment)
+    }
+    assert choices["Now"].available
+    assert not choices["Later"].available
+    do_provision(start, ctx=ctx)
+    assert {text: action.uid for text, action in _offers(start).items()} == ids
+    assert list(graph.find_all(Selector(has_kind=Dependency, label="destination"))) == dependencies
+    assert graph.find_one(Selector(label="target")) is None
+
+
+def test_materialized_receiver_respects_automatic_provisioning_opt_out() -> None:
+    script = _script("lazy_receiver")
+    script["scenes"]["hub"]["blocks"]["start"]["actions"] = [
+        {"text": "Move", "successor": "hub.alternate"},
+    ]
+    script["scenes"]["hub"]["blocks"]["alternate"]["auto_provision"] = False
+    # The topology hook must honor the opt-out, not rely on a later PLANNING pass.
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("run", init_mode=InitMode.LAZY).graph
+    ledger = Ledger.from_graph(graph)
+    (move,) = ledger.cursor.edges_out(Selector(has_kind=Action, text="Move"))
+    ledger.resolve_choice(move.uid)
+    assert ledger.cursor.get_label() == "alternate"
+    assert not _offers(ledger.cursor)
+
+
+def test_lazy_nested_scope_and_receiver_bind_before_their_first_planning_pass() -> None:
+    script = _script("lazy_nested_scope")
+    script["scenes"]["hub"]["blocks"]["start"]["actions"] = [
+        {"text": "Move", "successor": "annex.entry"},
+    ]
+    script["scenes"]["annex"] = {
+        "kind": SandboxScope,
+        "scheduled_events": [{"label": "scope", "target": "annex.target", "text": "Scope"}],
+        "blocks": {
+            "entry": {
+                "kind": SandboxLocation,
+                "scheduled_events": [{"label": "local", "target": "current", "text": "Local"}],
+            },
+            "target": {"content": "Annex target"},
+        },
+    }
+    world = World.from_script_data(script_data=script)
+    seen = []
+
+    @world.dispatch.register(task="story_materialized", wants_caller_kind=SandboxLocation)
+    def observe(*, caller: SandboxLocation, **kwargs) -> None:
+        seen.append((caller.get_label(), set(_offers(caller))))
+
+    graph = world.create_story("run", init_mode=InitMode.LAZY).graph
+    assert graph.find_one(Selector(label="annex")) is None
+    ledger = Ledger.from_graph(graph)
+    ledger.save_snapshot()
+    (move,) = ledger.cursor.edges_out(Selector(has_kind=Action, text="Move"))
+    ledger.resolve_choice(move.uid)
+    assert ("entry", {"Scope", "Local"}) in seen
+    assert set(_offers(ledger.cursor)) == {"Scope", "Local"}
+    assert graph.find_one(Selector(has_path="annex.target")) is None
+    ids = {text: action.uid for text, action in _offers(ledger.cursor).items()}
+    receiver_step = ledger.cursor_steps
+    restored = Ledger.structure(ledger.unstructure())
+    assert {text: action.uid for text, action in _offers(restored.cursor).items()} == ids
+    restored.resolve_choice(ids["Scope"])
+    assert restored.cursor.path == "annex.target"
+    restored.rollback_to_step(receiver_step, reason="replay lazy receiver")
+    assert {text: action.uid for text, action in _offers(restored.cursor).items()} == ids
+    assert restored.graph.find_one(Selector(has_path="annex.target")) is None
+
+
+def test_lazy_offer_target_selection_and_once_gate_survive_restore_and_replay() -> None:
+    script = _script("lazy_once_replay")
+    script["scenes"]["hub"]["blocks"]["start"]["scheduled_events"][0]["once"] = True
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("run", init_mode=InitMode.LAZY).graph
+    ledger = Ledger.from_graph(graph)
+    ledger.save_snapshot()
+    action = _offers(ledger.cursor)["Now"]
+    assert action.once and action.successor is None
+    restored = Ledger.structure(ledger.unstructure())
+    restored.resolve_choice(action.uid)
+    assert restored.cursor.get_label() == "target"
+    restored_action = restored.graph.get(action.uid)
+    assert restored_action.successor is restored.cursor
+    assert not restored_action.available(ctx=restored._make_phase_ctx())
+    restored.rollback_to_step(0, reason="repeat lazy offer")
+    assert restored.graph.get(action.uid).successor is None
+    restored.resolve_choice(action.uid)
+    assert restored.cursor.get_label() == "target"
+
+
+def test_removing_a_pending_static_offer_also_removes_its_destination_dependency() -> None:
+    graph = World.from_script_data(script_data=_script("lazy_prune")).create_story(
+        "run", init_mode=InitMode.LAZY,
+    ).graph
+    start = graph.get(graph.initial_cursor_id)
+    action = _offers(start)["Now"]
+    (dependency,) = graph.find_edges(
+        Selector(has_kind=Dependency, predecessor_id=action.uid, label="destination"),
+    )
+    start.scheduled_events.clear()
+    do_provision(start, ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
+    assert graph.get(action.uid) is None
+    assert graph.get(dependency.uid) is None
+    assert "Later" in _offers(start)
+
+
+def test_pending_once_offer_reuses_a_target_realized_by_another_offer() -> None:
+    script = _script("lazy_shared_target")
+    script["scenes"]["hub"]["scheduled_events"][0].pop("period")
+    script["scenes"]["hub"]["scheduled_events"][0]["once"] = True
+    script["scenes"]["hub"]["blocks"]["start"]["scheduled_events"][0]["return_to_location"] = True
+    ledger = Ledger.from_graph(World.from_script_data(script_data=script).create_story(
+        "run", init_mode=InitMode.LAZY,
+    ).graph)
+    offers = _offers(ledger.cursor)
+    later_id = offers["Later"].uid
+    (dependency,) = ledger.graph.find_edges(
+        Selector(has_kind=Dependency, predecessor_id=later_id, label="destination"),
+    )
+    ledger.resolve_choice(offers["Now"].uid)
+    assert ledger.cursor.get_label() == "start"
+    later = _offers(ledger.cursor)["Later"]
+    assert later.uid == later_id
+    assert later.successor is _offers(ledger.cursor)["Now"].successor
+    assert dependency.successor is later.successor
+    assert not later.available(ctx=ledger._make_phase_ctx())
+
+
+@pytest.mark.parametrize(
+    "reference, destination", [("target", "hub.target"), ("other", "other.target")],
+)
+def test_lazy_short_target_uses_normal_scoped_destination_resolution(
+    reference: str, destination: str,
+) -> None:
+    script = _script(f"lazy_scoped_{reference}")
+    script["scenes"]["hub"]["blocks"]["start"]["scheduled_events"][0]["target"] = reference
+    script["scenes"]["other"] = {"blocks": {"target": {"content": "Wrong target"}}}
+    graph = World.from_script_data(script_data=script).create_story(
+        "run", init_mode=InitMode.LAZY,
+    ).graph
+    ledger = Ledger.from_graph(graph)
+    ledger.resolve_choice(_offers(ledger.cursor)["Now"].uid)
+    assert ledger.cursor.path == destination
+    absent = "other.target" if reference == "target" else "hub.target"
+    assert graph.find_one(Selector(has_path=absent)) is None
+
+
+def test_materialized_handlers_cannot_return_narrative_output() -> None:
+    script = _script("materialized_output")
+    world = World.from_script_data(script_data=script)
+    world.dispatch.register(task="story_materialized", func=lambda **kwargs: "Not a journal")
+    ledger = Ledger.from_graph(world.create_story("run", init_mode=InitMode.LAZY).graph)
+    with pytest.raises(TypeError, match="story_materialized handlers must return None"):
+        do_story_materialized(ledger.cursor, ctx=ledger._make_phase_ctx())
 
 
 def test_setup_respects_locations_that_disable_automatic_provisioning() -> None:
