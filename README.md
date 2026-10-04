@@ -261,9 +261,6 @@ current repository rather than the full design vocabulary.
   ([#400](https://github.com/derekmerck/storytangl/issues/400)), plus real-browser
   acceptance over the REST/web stack
   ([#73](https://github.com/derekmerck/storytangl/issues/73)).
-- World-scoped token dereferencing: catalogs are bounded, but `Token` can still
-  fall through to a process-global singleton registry
-  ([#404](https://github.com/derekmerck/storytangl/issues/404)).
 - Media contract convergence: authored URL/data media bypasses the normal
   inventory path ([#407](https://github.com/derekmerck/storytangl/issues/407)),
   and staged visual elements still need one addressable piece/update/delete
