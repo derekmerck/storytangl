@@ -189,6 +189,28 @@ Mobs, fixtures, assets, provider events, and game moves still refresh their
 generated actions on each visit. This keeps the retained binding narrow without
 turning general sandbox projection into a cache.
 
+EAGER story construction establishes all scope/location scheduled offers through
+``on_story_ready``, after topology and entry selection but before initial
+traversal. It does not sample schedule, actor presence, authored availability, or
+disclosure to decide which paths exist. Non-entry hubs are included, automatic
+provisioning opt-outs are respected, and frozen graphs receive the same known
+bindings. A frozen graph with an unresolved static offer fails construction:
+there would be no runtime opportunity to create its missing path. No arrival
+effect, time payment, journal entry, or visit history is produced by this work.
+
+The binding handler runs at LOCAL/LAST, after world-owned APPLICATION/AUTHOR
+story-ready setup handlers have finished adding or rewriting declarations. This
+ordering is explicit rather than depending on caller-kind specificity or
+registration order; frozen stories cannot repair missed declarations later.
+
+The construction flag is not moved or temporarily cleared. A new start receives
+fresh bindings against its own graph, not a sealed graph reused from a previous
+start. Setup that recruits additional concepts during the first live arrival
+still needs a distinct playthrough-completeness contract before it can be sealed.
+Lazy materialization hooks and mobile sponsor lifetime reconciliation remain
+follow-ups under #527; the construction-ready handler does not force lazy targets
+eager or change the existing lazy provisioning path.
+
 ### Architectural Legitimacy Guardrail
 
 The small size of the first sandbox implementation is a useful pressure-test of
