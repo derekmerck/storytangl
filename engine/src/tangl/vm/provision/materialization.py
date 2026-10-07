@@ -9,6 +9,10 @@ from ..ctx import VmPhaseCtx
 from .provisioner import _next_provision_uid, _template_hash_value
 
 
+class MaterializationError(Exception):
+    """Fatal post-materialization hook failure; discard the partially built graph."""
+
+
 class MaterializeRole(StrEnum):
     """Canonical roles for shared template materialization flows."""
 

@@ -15,6 +15,7 @@ from tangl.story import Action, InitMode, StoryGraph, World
 from tangl.story.dispatch import do_story_materialized
 from tangl.vm import Dependency, Ledger
 from tangl.vm.dispatch import do_journal, do_provision
+from tangl.vm.provision.materialization import MaterializationError
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -352,6 +353,31 @@ def test_materialized_handlers_cannot_return_narrative_output() -> None:
     ledger = Ledger.from_graph(world.create_story("run", init_mode=InitMode.LAZY).graph)
     with pytest.raises(TypeError, match="story_materialized handlers must return None"):
         do_story_materialized(ledger.cursor, ctx=ledger._make_phase_ctx())
+
+
+@pytest.mark.parametrize("failure", [None, TypeError, ValueError, RuntimeError])
+def test_lazy_resolution_propagates_materialization_hook_failures(
+    failure: type[Exception] | None,
+) -> None:
+    name = failure.__name__ if failure is not None else "return"
+    world = World.from_script_data(script_data=_script(f"hook_failure_{name}"))
+    ledger = Ledger.from_graph(world.create_story("run", init_mode=InitMode.LAZY).graph)
+
+    def invalid_hook(**kwargs: Any) -> str:
+        if failure is not None:
+            raise failure("Broken materialization hook")
+        return "Not a journal"
+
+    world.dispatch.register(task="story_materialized", func=invalid_hook)
+    action = _offers(ledger.cursor)["Now"]
+    with pytest.raises(MaterializationError) as caught:
+        ledger.resolve_choice(action.uid)
+    assert isinstance(caught.value.__cause__, failure or TypeError)
+    assert action.successor_id is None
+    dependency = ledger.graph.find_one(
+        Selector(has_kind=Dependency, predecessor_id=action.uid),
+    )
+    assert dependency.requirement.resolution_reason != "provider_rejected"
 
 
 def test_setup_respects_locations_that_disable_automatic_provisioning() -> None:

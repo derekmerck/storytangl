@@ -703,6 +703,12 @@ Story owns the domain-specific postconditions for authored topology and
 container-entry behavior; VM owns the offer-selection, chain execution, and
 validation order that makes those postconditions hold at commit time.
 
+Post-materialization hook failures are fatal ``MaterializationError`` exceptions,
+with the original error preserved as their cause. They are not ordinary candidate
+rejections and must propagate to the caller. Materialization is not transactional:
+the failing graph may already contain attached or wired entities and must be
+discarded, not retried. This does not change normal runtime-validation rejection.
+
 #### Causality Modes (Debug/Preview Traversal)
 
 Runtime context carries a monotonic causality mode:

@@ -19,6 +19,7 @@ from ..ctx import VmPhaseCtx
 from ..runtime.causality import CausalityMode
 from ..traversable import TraversableEdge, TraversableNode
 from .materialization import (
+    MaterializationError,
     MaterializeRole,
     attach_child,
     materialize_template_entity,
@@ -1074,12 +1075,17 @@ class Resolver:
     ) -> None:
         story_post_materialize = resolve_story_post_materialize_hook(_ctx)
         if callable(story_post_materialize):
-            story_post_materialize(
-                template=template,
-                entity=entity,
-                role=role,
-                _ctx=_ctx,
-            )
+            try:
+                story_post_materialize(
+                    template=template,
+                    entity=entity,
+                    role=role,
+                    _ctx=_ctx,
+                )
+            except Exception as exc:
+                raise MaterializationError(
+                    f"Post-materialization hook failed for {entity.uid}; discard the graph"
+                ) from exc
 
     def _validate_runtime_entity(
         self,
