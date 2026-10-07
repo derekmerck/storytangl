@@ -1,8 +1,11 @@
-import json
-from hashlib import sha224, blake2b
-from pathlib import Path
+from __future__ import annotations
+
 import io
+import json
 import logging
+from hashlib import blake2b, sha224
+from pathlib import Path
+from typing import Any
 
 from tangl.type_hints import Hash   # bytes
 
@@ -18,11 +21,24 @@ logger.setLevel(logging.WARNING)
 
 logger.debug( "Hashing with salt: %s", HASHING_SALT )
 
-# JSON mapping keys are sorted, but nested sets and fallback Python objects are
-# not canonical across processes. Durable callers must pass explicitly encoded
-# values.
+# Sets and JSON mapping keys are ordered for hashing. Arbitrary fallback Python
+# objects still use str(); durable callers must explicitly encode those values.
 
-def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
+
+def _hash_json_default(value: Any) -> str | list[Any]:
+    """Order unordered collections, including mixed and nested member types."""
+    if isinstance(value, (set, frozenset)):
+        return sorted(
+            value,
+            key=lambda member: json.dumps(member, default=_hash_json_default, sort_keys=True),
+        )
+    return str(value)
+
+
+def hashing_func(
+    *data: Any, salt: bytes = HASHING_SALT, digest_size: int | None = None,
+) -> Hash:
+    """Hash values with stable unordered collection encoding, preserving sequence order."""
 
     if digest_size is None:
         # legacy, slightly more secure but can probably replace with blake
@@ -45,8 +61,10 @@ def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
             item_bytes = item.to_bytes(8, byteorder="big", signed=True)
         elif isinstance(item, str):
             item_bytes = item.encode('utf-8')
-        elif isinstance(item, dict):
-            item_bytes = json.dumps(item, default=str, sort_keys=True).encode('utf-8')
+        elif isinstance(item, (dict, set, frozenset)):
+            item_bytes = json.dumps(
+                item, default=_hash_json_default, sort_keys=True,
+            ).encode("utf-8")
         else:
             item_bytes = hash(item).to_bytes(8, byteorder="big", signed=True)
         hasher.update(item_bytes)
