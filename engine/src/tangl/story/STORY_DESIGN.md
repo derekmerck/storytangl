@@ -102,6 +102,32 @@ Each new start constructs its own graph and selects its own entry/context. A
 future post-setup seal would apply only to that playthrough after its arrival
 recruitment, not to another player's start or NG+ run.
 
+### Runtime materialization domain work
+
+``StoryMaterializer.story_post_materialize`` invokes
+``story.dispatch.on_story_materialized`` after a newly attached traversable
+node has provenance and story topology. The caller is that node; its derived
+``PhaseCtx`` preserves the materialization context and points at the new node.
+Handlers run through the existing authority chain, return ``None``, and may
+establish ordinary domain bindings. This is not an arrival, journal, or a new
+VM phase. Already-wired nodes do not rerun the hook; restored graphs retain
+their persisted bindings rather than rebuilding them during structuring.
+
+A failing runtime hook propagates through lazy resolution as
+``MaterializationError``, preserving its original cause. A non-``None`` return is
+a contract failure, not a rejected provider. The partially materialized graph
+must be discarded; retry and rollback are not promised at this boundary.
+
+Authored children do not by themselves make a runtime node an episodic
+container. Automatic entry creation/finalization applies to ``Scene``;
+hierarchical sponsors such as sandbox scopes remain grouping nodes.
+
+An Action whose target is not realized can carry the ordinary ``destination``
+Dependency, just like an authored lazy choice. Preview is non-mutating, and
+selection recruits its target through the normal resolver. Triggered actions
+use the VM's existing destination provisioning at PLANNING. Domain handlers do
+not implement their own target materialization path.
+
 ## StoryGraph
 
 `StoryGraph` is the runtime graph specialization for story execution.

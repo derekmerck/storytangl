@@ -29,6 +29,14 @@ why single-phase patches are sufficient for MVP.
 validates the final hash.  This provides built-in determinism verification:
 if the hash doesn't match, something went wrong.
 
+``hashing_func`` sorts mapping keys and encodes sets/frozensets as ordered
+JSON arrays, recursively, so equivalent unordered values retain their hash
+through constructor-form restoration. Nested lists and tuples preserve their
+order. Arbitrary Python-object string fallbacks are not a portable hash contract.
+This corrects the former order-dependent set string encoding: stored checkpoints
+and patches containing those old hashes must be regenerated, not accepted by
+disabling integrity checks or by a legacy hash fallback.
+
 ### RegistryObserver (vm/replay/observer.py)
 
 `RegistryObserver` captures `initial_value_hash` at construction, collects
