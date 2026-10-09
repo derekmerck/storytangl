@@ -31,7 +31,9 @@ link generators,
 [INTERACTION_VOCABULARY.md](../story/INTERACTION_VOCABULARY.md) for the
 client-facing rendering of projected links, and
 [MU_AFFORDANCES.md](../../notes/MU_AFFORDANCES.md) for relationship-bound
-microconcepts that ride on bound providers.
+microconcepts that ride on bound providers, and
+[NARRATIVE_CONTROL.md](../story/NARRATIVE_CONTROL.md) for when a variation
+should be an affordance at all rather than prose or explicit structure.
 
 ---
 
