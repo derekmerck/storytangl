@@ -501,6 +501,8 @@ research-direction summary in the root README.
 - **How** the phase pipeline works → see `engine/src/tangl/vm/VM_DESIGN.md`
 - **How** the graph primitives work → see `engine/src/tangl/core/CORE_DESIGN.md`
 - **How** story concepts are modeled → see `engine/src/tangl/story/`
+- **Where** a narrative distinction should live (prose, structure, or a
+  contributed affordance) → see [NARRATIVE_CONTROL.md](NARRATIVE_CONTROL.md)
 - **How** the service layer transforms fragments → see `engine/src/tangl/service/`
 - **What** research directions follow from this → see the root `README.md`
   and package-level design notes

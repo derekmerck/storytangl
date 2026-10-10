@@ -14,6 +14,7 @@ See also
    glossary
 
    story/philosophy
+   story/NARRATIVE_CONTROL
    SIMPLIFICATION_SPEC
    CANON_AND_REALIZATION
 
