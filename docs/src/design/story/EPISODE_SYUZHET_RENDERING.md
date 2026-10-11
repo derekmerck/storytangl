@@ -225,6 +225,89 @@ dialog intent
 Media adapters should independently visit the same semantic objects; they
 should not parse flattened narrative prose to reconstruct them.
 
+## Presentation roles, literal treatment, and attributed prose
+
+Presentation indirection and explicit treatment are both valid authorial tools.
+
+A **presentation role** says that an occurrence participates in a reusable
+presentation category such as `primary`, `metallic`, `speaker:bob`, or
+`tone:warning`. The role is resolved later through world/client presentation
+policy. This is what permits a global palette change to restyle every
+role-bound occurrence without changing the underlying authored object or
+journal history.
+
+A **bounded literal treatment** says that a particular occurrence intentionally
+requests a concrete presentation value. A `metallic` accessory may explicitly
+request gold while the world's ordinary `metallic` binding changes from
+silver to titanium; one word in prose may explicitly request blue while the
+surrounding utterance inherits its treatment from the speaker role.
+
+These are complementary, not competing, mechanisms. Their target model is:
+
+```text
+semantic narrative facts
+    -> optional presentation roles
+    -> optional bounded literal presentation values
+    -> adapter/client realization
+```
+
+Roles and literal values should resolve through one typed presentation
+coordinate vocabulary rather than through parallel systems. The portable value
+may contain only bounded coordinates justified by real consumers; it must not
+be arbitrary CSS, HTML attributes, ANSI escapes, or renderer objects.
+
+For prose, author syntax is separate from the neutral representation. A
+Markdown/Pandoc-like codec may accept forms such as:
+
+```markdown
+[Stop]{.warning}
+[blue]{style.color=blue}
+[Don't touch it]{.warning style.color=red}
+```
+
+The first supplies a symbolic role, the second a literal presentation request,
+and the third both. Equivalent HTML-like source may be accepted by a codec only
+if it is normalized before transport. Raw HTML/CSS is not journal authority.
+
+The preferred neutral inline shape is **ordered attributed text runs**: each run
+owns its text plus zero or more symbolic roles and optional bounded literal
+presentation values. Complete plain text is derived by concatenating the runs.
+This avoids maintaining duplicate text authority and avoids a cross-language
+numeric-offset contract between Python Unicode scalar indexing and JavaScript
+UTF-16 indexing. Whole-fragment meaning remains on the fragment; runs are only
+needed when a subrange carries distinct presentation treatment.
+
+Conceptually:
+
+```text
+AttributedFragment
+    speaker = bob
+    content =
+        run("Pick the ")
+        run("blue", literal color=blue)
+        run(" one.")
+```
+
+A plain client concatenates the runs. A themed client may additionally map
+`speaker:bob` to a speech-bubble treatment. A client with accessibility or
+medium constraints may override or discard presentation treatment while
+preserving text and semantic speaker identity.
+
+The intended treatment precedence is:
+
+```text
+world/theme role bindings
+    -> entity/character defaults
+    -> fragment-level explicit values
+    -> inline explicit values
+    -> client accessibility / medium constraints
+```
+
+Presentation roles and literal treatment therefore remain advisory even when
+explicit: they are stronger authorial requests than theme defaults, but they do
+not outrank the client's obligation to remain legible or the limitations of a
+plain-text, audio, or otherwise different medium.
+
 ## Mechanics versus presentation
 
 Mechanics supply semantic truth:
