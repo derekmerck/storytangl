@@ -37,19 +37,41 @@ class MediaResourceRegistry(Registry[MediaRIT]):
 
     # This is derived from ``members`` rather than persisted state. Slots keep it
     # out of Pydantic's value equality as well as constructor-form persistence.
-    __slots__ = ("_content_hash_members", "_dynamic_member_count")
+    __slots__ = (
+        "_content_hash_members",
+        "_dynamic_member_count",
+        "_member_content_hashes",
+    )
 
     def model_post_init(self, context: Any) -> None:
         """Build the static content index for directly initialized members."""
         super().model_post_init(context)
-        self._content_hash_members: dict[bytes, MediaRIT] = {}
-        self._dynamic_member_count = 0
-        for record in self.members.values():
-            self._track_member(record)
+        self._rebuild_content_hash_index()
+
+    def __copy__(self):
+        """Copy members through Pydantic, then rebuild derived state."""
+        clone = super().__copy__()
+        clone._rebuild_content_hash_index()
+        return clone
+
+    def __deepcopy__(self, memo=None):
+        """Deep-copy members through Pydantic, then rebuild derived state."""
+        clone = super().__deepcopy__(memo)
+        # A RegistryAware member can deep-copy its registry back-pointer while
+        # this clone is only partially populated. The outer registry copy is the
+        # one that owns the completed members mapping and rebuilds the index.
+        if "members" in clone.__dict__:
+            clone._rebuild_content_hash_index()
+        return clone
+
+    def __setstate__(self, state) -> None:
+        """Restore derived state after Pydantic unpickles registry members."""
+        super().__setstate__(state)
+        self._rebuild_content_hash_index()
 
     @staticmethod
     def _stored_content_hash(record: MediaRIT) -> bytes | None:
-        """Return the immutable digest carried by a static resolved record."""
+        """Return the stored digest eligible for static inventory indexing."""
         if (
             record.status is MediaRITStatus.RESOLVED
             and record.preset_content_hash is not None
@@ -57,25 +79,62 @@ class MediaResourceRegistry(Registry[MediaRIT]):
             return record.preset_content_hash
         return None
 
-    def _track_member(self, record: MediaRIT) -> None:
-        digest = self._stored_content_hash(record)
-        if digest is None:
-            self._dynamic_member_count += 1
-            return
-        self._content_hash_members.setdefault(digest, record)
+    def _rebuild_content_hash_index(self) -> None:
+        """Rebuild the derived view from current member state."""
+        self._content_hash_members: dict[bytes, MediaRIT] = {}
+        self._member_content_hashes: dict[UUID, bytes | None] = {}
+        self._dynamic_member_count = 0
+        for record in self.members.values():
+            digest = self._stored_content_hash(record)
+            self._member_content_hashes[record.uid] = digest
+            if digest is None:
+                self._dynamic_member_count += 1
+            else:
+                self._content_hash_members.setdefault(digest, record)
 
-    def _untrack_member(self, record: MediaRIT) -> None:
-        digest = self._stored_content_hash(record)
-        if digest is None:
-            self._dynamic_member_count -= 1
-            return
-        if self._content_hash_members.get(digest) is not record:
-            return
-        self._content_hash_members.pop(digest)
+    def _refresh_content_hash_member(self, digest: bytes) -> None:
+        """Restore the first registry member recorded under ``digest``."""
+        self._content_hash_members.pop(digest, None)
         for candidate in self.members.values():
-            if self._stored_content_hash(candidate) == digest:
+            if self._member_content_hashes.get(candidate.uid) == digest:
                 self._content_hash_members[digest] = candidate
                 break
+
+    def _sync_member_content_hash(self, record: MediaRIT) -> None:
+        """Apply one normal add/overwrite operation to the derived view."""
+        current = self._stored_content_hash(record)
+        if record.uid not in self._member_content_hashes:
+            self._member_content_hashes[record.uid] = current
+            if current is None:
+                self._dynamic_member_count += 1
+            else:
+                self._content_hash_members.setdefault(current, record)
+            return
+
+        previous = self._member_content_hashes[record.uid]
+        if previous == current:
+            return
+        if previous is None:
+            self._dynamic_member_count -= 1
+        self._member_content_hashes[record.uid] = current
+        if previous is not None:
+            self._refresh_content_hash_member(previous)
+        if current is None:
+            self._dynamic_member_count += 1
+        else:
+            # An overwrite retains its dict position, so it can become the first
+            # selector match for a digest already owned by a later member.
+            self._refresh_content_hash_member(current)
+
+    def _remove_member_content_hash(self, key: UUID) -> None:
+        """Remove one normal registry member from the derived view."""
+        if key not in self._member_content_hashes:
+            return
+        previous = self._member_content_hashes.pop(key)
+        if previous is None:
+            self._dynamic_member_count -= 1
+        else:
+            self._refresh_content_hash_member(previous)
 
     def _find_by_stored_content_hash(self, record: MediaRIT) -> MediaRIT | None:
         """Return the first content match without scanning static inventory."""
@@ -85,32 +144,34 @@ class MediaResourceRegistry(Registry[MediaRIT]):
         if self._dynamic_member_count:
             return self.find_one(Selector.from_identifier(digest))
         cached = self._content_hash_members.get(digest)
-        if cached is not None and self._stored_content_hash(cached) == digest:
+        if (
+            cached is not None
+            and self._member_content_hashes.get(cached.uid) == digest
+            and self._stored_content_hash(cached) == digest
+        ):
             return cached
         return None
 
     def add(self, value: MediaRIT, _ctx=None) -> None:
         """Add a record and maintain the derived static content index."""
-        previous = self.members.get(value.uid)
+        if resolve_ctx(_ctx) is not None:
+            super().add(value, _ctx=_ctx)
+            self._rebuild_content_hash_index()
+            return
         super().add(value, _ctx=_ctx)
         stored = self.members[value.uid]
-        if previous is stored:
-            return
-        if previous is not None and previous is not stored:
-            self._untrack_member(previous)
-        self._track_member(stored)
+        self._sync_member_content_hash(stored)
 
     def remove(self, key: UUID, _ctx=None) -> None:
         """Remove a record and maintain the derived static content index."""
-        previous = self.members.get(key)
         super().remove(key, _ctx=_ctx)
-        if previous is not None:
-            self._untrack_member(previous)
+        self._remove_member_content_hash(key)
 
     def clear(self) -> None:
         """Clear members and their derived content index."""
         super().clear()
         self._content_hash_members.clear()
+        self._member_content_hashes.clear()
         self._dynamic_member_count = 0
 
     def on_index(self, func: Callable[..., Any] | None = None, **kwargs):
@@ -126,6 +187,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
         and running through the indexing pipeline.
         """
         mrt_cls = mrt_cls or self.mrt_cls
+        self._rebuild_content_hash_index()
 
         results = []
         for item in items:
@@ -169,7 +231,15 @@ class MediaResourceRegistry(Registry[MediaRIT]):
         if isinstance(item, MediaRIT):
             if self._stored_content_hash(item) is None:
                 return bool(self.find_one(Selector.from_identifier(item.content_hash())))
-            return self._find_by_stored_content_hash(item) is not None
+            if self._find_by_stored_content_hash(item) is not None:
+                return True
+            # Direct field mutation remains supported. Repair the derived view
+            # after observing a selector match that the recorded view missed.
+            found = self.find_one(Selector.from_identifier(item.content_hash()))
+            if found is not None:
+                self._rebuild_content_hash_index()
+                return True
+            return False
         return super().__contains__(item)
 
     def index_paths(self, paths: list[Path]):

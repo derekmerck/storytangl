@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
 from uuid import uuid4
 
 from tangl.core import Ctx, Selector, on_add_item
@@ -83,18 +85,110 @@ def test_static_digest_index_handles_overwrite_remove_clear_and_restore() -> Non
     assert _static_rit("cleared", b"second") not in registry
 
 
-def test_add_tracks_the_dispatch_replacement_not_the_input() -> None:
-    """A registry add hook may replace a record before it enters the side-map."""
-    original = _static_rit("original", b"original")
-    replacement = _static_rit("replacement", b"replacement", uid=original.uid)
+def test_readding_mutated_record_repairs_its_registered_digest() -> None:
+    """Re-adding a mutated record moves the derived digest entry."""
+    record = _static_rit("record", b"old")
+    registry = MediaResourceRegistry(label="mutated")
+    registry.add(record)
+
+    record.preset_content_hash = b"new"
+    registry.add(record)
+    assert _static_rit("old", b"old") not in registry
+    assert registry._find_by_stored_content_hash(_static_rit("new", b"new")) is record
+
+    record.preset_content_hash = b"observed"
+    assert _static_rit("observed", b"observed") in registry
+
+
+def test_status_transition_then_removal_does_not_leave_dynamic_state() -> None:
+    """Removal uses the registration-time state, not mutable current fields."""
+    record = MediaRIT(label="pending", status=MediaRITStatus.PENDING)
+    registry = MediaResourceRegistry(label="transition")
+    registry.add(record)
+
+    record.status = MediaRITStatus.RESOLVED
+    record.preset_content_hash = b"resolved"
+    registry.remove(record.uid)
+
+    assert registry._dynamic_member_count == 0
+    record = MediaRIT(label="readded", status=MediaRITStatus.PENDING)
+    registry.add(record)
+    record.status = MediaRITStatus.RESOLVED
+    record.preset_content_hash = b"readded"
+    registry.add(record)
+    assert _static_rit("readded", b"readded") in registry
+    registry.remove(record.uid)
+    assert registry._dynamic_member_count == 0
+    registry.add(_static_rit("static", b"static"))
+    assert _static_rit("static", b"static") in registry
+
+
+def test_copies_and_pickle_rebuild_derived_state() -> None:
+    """All supported copy paths leave a usable, independent derived view."""
+    first = _static_rit("first", b"first")
+    second = _static_rit("second", b"second")
+    registry = MediaResourceRegistry(label="copied")
+    registry.add(first)
+    registry.add(second)
+
+    copies = [
+        copy.copy(registry),
+        copy.deepcopy(registry),
+        registry.model_copy(),
+        registry.model_copy(deep=True),
+        pickle.loads(pickle.dumps(registry)),
+    ]
+    deep_copy = copies[1]
+    assert deep_copy.members[first.uid] is not first
+    assert deep_copy._content_hash_members[b"first"] is deep_copy.members[first.uid]
+    for clone in copies:
+        assert _static_rit("probe", b"first") in clone
+        added = _static_rit("added", b"added")
+        clone.add(added)
+        clone.remove(added.uid)
+        clone.clear()
+        assert not clone
+
+
+def test_add_hook_tracks_a_different_uid_replacement() -> None:
+    """A registry add hook may replace an item without preserving its UID."""
+    replacement = _static_rit("replacement", b"replacement")
     on_add_item(func=lambda **_: replacement)
-    registry = MediaResourceRegistry(label="hooked")
 
-    registry.add(original, _ctx=Ctx())
+    for preexisting in (False, True):
+        original = _static_rit("original", b"original")
+        registry = MediaResourceRegistry(label="hooked")
+        if preexisting:
+            registry.add(_static_rit("existing", b"original", uid=original.uid))
+        registry.add(original, _ctx=Ctx())
 
-    assert registry.get(original.uid) is replacement
-    assert original not in registry
-    assert replacement in registry
+        assert registry.get(replacement.uid) is replacement
+        assert replacement in registry
+        if preexisting:
+            assert registry.get(original.uid) is not original
+            assert _static_rit("existing", b"original") in registry
+        else:
+            assert registry.get(original.uid) is None
+
+
+def test_overwrite_keeps_selector_first_match_order_for_shared_digest() -> None:
+    """A same-UID overwrite retains its original dict position."""
+    first = _static_rit("first", b"a")
+    second = _static_rit("second", b"b")
+    replacement = _static_rit("replacement", b"b", uid=first.uid)
+    registry = MediaResourceRegistry(label="order")
+    registry.add(first)
+    registry.add(second)
+    registry.add(replacement)
+    probe = _static_rit("probe", b"b")
+
+    assert registry.find_one(Selector.from_identifier(b"b")) is replacement
+    assert registry._find_by_stored_content_hash(probe) is replacement
+    restored = MediaResourceRegistry.structure(registry.unstructure())
+    assert restored._find_by_stored_content_hash(probe).uid == replacement.uid
+
+    registry.remove(replacement.uid)
+    assert registry._find_by_stored_content_hash(probe) is second
 
 
 def test_dynamic_records_keep_selector_fallback_and_never_share_empty_digest() -> None:
