@@ -11,6 +11,58 @@ persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
 
+## Presentation roles and explicit overrides
+
+Presentation has two complementary author-facing modes.
+
+A **symbolic presentation role** introduces indirection. Names such as
+`primary`, `secondary`, `accent`, `metallic`, `leather`,
+`speaker:bob`, or `tone:warning` are not renderer instructions. They are
+resolved through the current world/client presentation profile. Changing the
+profile can therefore restyle every occurrence without changing story state or
+authored content. A costume catalog may, for example, bind `metallic` to
+silver in one world presentation and titanium in another; all role-bound parts
+follow automatically.
+
+A **bounded explicit presentation value** is the escape hatch for an intentional
+exception. One heirloom hairpin may request gold even though its ordinary role
+is `metallic`; one word in a paragraph may explicitly request blue even though
+the surrounding speaker treatment comes from `speaker:bob`. The local explicit
+value wins for that presentation coordinate.
+
+Roles and literal values must converge on the same small typed presentation
+coordinate system. The portable contract may eventually carry coordinates such
+as color, background, weight, text style, or decoration, but it must not carry
+arbitrary CSS properties, HTML attributes, ANSI escapes, renderer objects, or
+an open-ended style dictionary. Add a coordinate only when a real cross-client
+consumer requires it.
+
+The intended resolution order is conceptually:
+
+```text
+world/theme role bindings
+    -> entity or character presentation defaults
+    -> fragment-level explicit overrides
+    -> inline explicit overrides
+    -> client accessibility / medium constraints
+```
+
+The final client remains authoritative over legibility and what its medium can
+express. Unsupported roles or literal values must degrade without losing
+content or interaction meaning.
+
+This distinction is presentation-level and independent of semantic narrative
+facts. A fragment can semantically identify Bob as the speaker while carrying a
+`speaker:bob` presentation role; the speaker identity remains true even on a
+plain client that ignores the role. Likewise a literal request for blue does
+not make “blue” a new story fact unless some mechanic separately models it.
+
+Author markup, where supported, is an input syntax rather than the transport
+contract. A bounded Markdown/Pandoc-like form may express either mode, for
+example `[Stop]{.warning}` or `[blue]{style.color=blue}`, but codecs must
+normalize such syntax into typed presentation values before fragments cross the
+service boundary.
+
 ## Status
 
 Slice 2 adds declarative client preferences: worlds may publish typed boolean
