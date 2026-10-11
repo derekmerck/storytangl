@@ -198,6 +198,22 @@ are the same resource regardless of filename. Actors and locations are identifie
 by `uid`; two actors with identical fields are still different entities.
 Content-addressing enables deduplication and caching across stories and sessions.
 
+### Static Inventory Digest Index
+
+`MediaResourceRegistry` keeps a derived, in-memory map from content digest to
+the first static record carrying that digest. A record is eligible only when it
+is `RESOLVED` and already has `preset_content_hash`; normal file indexing meets
+that condition because `MediaRIT.from_source()` records the digest once. The map
+is rebuilt from `members` at initialization and maintained through normal add,
+overwrite, remove, clear, and constructor-form restore operations. It is not a
+persisted field or part of registry value equality.
+
+Pending, running, failed, and other dynamic records remain on ordinary selector
+lookup. They never enter an empty digest bucket, and their lifecycle mutations
+do not create a new registry mutation contract. This keeps static bulk indexing
+linear while preserving the existing flexible selector semantics for generated
+media.
+
 ---
 
 ## Component Design
