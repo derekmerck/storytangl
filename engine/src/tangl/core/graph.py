@@ -18,7 +18,7 @@ from __future__ import annotations
 import itertools
 from functools import cached_property
 from fnmatch import fnmatch
-from typing import Any, Iterable, Iterator, Optional, Protocol, runtime_checkable
+from typing import Any, Iterable, Iterator, Mapping, Optional, Protocol, Self, runtime_checkable
 from uuid import UUID
 
 from pydantic import Field
@@ -181,6 +181,120 @@ class Graph(Registry[GraphItem]):
 
     factory: Any | None = Field(default=None, exclude=True)
 
+    # These maps are a derived view of ``members``. They deliberately store
+    # identifiers rather than edge pointers, so copying or pickling a graph
+    # cannot retain references into an earlier graph instance.
+    __slots__ = (
+        "_edges_by_predecessor",
+        "_edges_by_successor",
+        "_edge_endpoints",
+        "_edge_orders",
+    )
+
+    def model_post_init(self, context: Any) -> None:
+        """Build endpoint lookup maps for directly initialized members."""
+        super().model_post_init(context)
+        self._rebuild_endpoint_index()
+
+    def __copy__(self):
+        """Copy members through Pydantic, then rebuild endpoint lookup maps."""
+        clone = super().__copy__()
+        clone._rebuild_endpoint_index()
+        return clone
+
+    def __deepcopy__(self, memo=None):
+        """Deep-copy members through Pydantic, then rebuild endpoint lookup maps."""
+        clone = super().__deepcopy__(memo)
+        if "members" in clone.__dict__:
+            clone._rebuild_endpoint_index()
+        return clone
+
+    def model_copy(
+        self,
+        *,
+        update: Mapping[str, Any] | None = None,
+        deep: bool = False,
+    ) -> Self:
+        """Copy through Pydantic, then rebuild the derived endpoint maps."""
+        clone = super().model_copy(update=update, deep=deep)
+        clone._rebuild_endpoint_index()
+        return clone
+
+    def __setstate__(self, state) -> None:
+        """Restore derived endpoint lookup maps after unpickling members."""
+        super().__setstate__(state)
+        self._rebuild_endpoint_index()
+
+    def _rebuild_endpoint_index(self) -> None:
+        """Rebuild the derived endpoint maps from graph membership order."""
+        self._edges_by_predecessor: dict[UUID, dict[UUID, None]] = {}
+        self._edges_by_successor: dict[UUID, dict[UUID, None]] = {}
+        self._edge_endpoints: dict[UUID, tuple[UUID | None, UUID | None]] = {}
+        self._edge_orders: dict[UUID, int] = {}
+        for order, item in enumerate(self.members.values()):
+            if isinstance(item, Edge):
+                self._edge_orders[item.uid] = order
+                self._edge_endpoints[item.uid] = (item.predecessor_id, item.successor_id)
+                self._add_endpoint_candidate(self._edges_by_predecessor, item.predecessor_id, item.uid)
+                self._add_endpoint_candidate(self._edges_by_successor, item.successor_id, item.uid)
+
+    @staticmethod
+    def _add_endpoint_candidate(
+        index: dict[UUID, dict[UUID, None]],
+        endpoint_id: UUID | None,
+        edge_id: UUID,
+    ) -> None:
+        if endpoint_id is not None:
+            index.setdefault(endpoint_id, {})[edge_id] = None
+
+    @staticmethod
+    def _remove_endpoint_candidate(
+        index: dict[UUID, dict[UUID, None]],
+        endpoint_id: UUID | None,
+        edge_id: UUID,
+    ) -> None:
+        if endpoint_id is None or (candidates := index.get(endpoint_id)) is None:
+            return
+        candidates.pop(edge_id, None)
+        if not candidates:
+            index.pop(endpoint_id, None)
+
+    def _sync_edge_endpoint_index(self, edge: Edge) -> None:
+        """Synchronize one added or rewired edge with the derived maps."""
+        predecessor_id, successor_id = edge.predecessor_id, edge.successor_id
+        previous = self._edge_endpoints.get(edge.uid)
+        if previous is not None:
+            self._remove_endpoint_candidate(self._edges_by_predecessor, previous[0], edge.uid)
+            self._remove_endpoint_candidate(self._edges_by_successor, previous[1], edge.uid)
+        self._edge_endpoints[edge.uid] = (predecessor_id, successor_id)
+        self._edge_orders.setdefault(edge.uid, len(self._edge_orders))
+        self._add_endpoint_candidate(self._edges_by_predecessor, predecessor_id, edge.uid)
+        self._add_endpoint_candidate(self._edges_by_successor, successor_id, edge.uid)
+
+    def _remove_edge_endpoint_index(self, edge_id: UUID) -> None:
+        """Remove one graph edge from the derived maps."""
+        previous = self._edge_endpoints.pop(edge_id, None)
+        if previous is None:
+            return
+        self._remove_endpoint_candidate(self._edges_by_predecessor, previous[0], edge_id)
+        self._remove_endpoint_candidate(self._edges_by_successor, previous[1], edge_id)
+        self._edge_orders.pop(edge_id, None)
+
+    def _find_endpoint_edges(
+        self,
+        endpoint_id: UUID,
+        index: dict[UUID, dict[UUID, None]],
+        selector: Selector | None = None,
+    ) -> Iterator[Edge]:
+        """Filter selector-compatible endpoint candidates in graph insertion order."""
+        candidate_ids = index.get(endpoint_id, {})
+        candidates = (
+            self.members[edge_id]
+            for edge_id in sorted(candidate_ids, key=self._edge_orders.__getitem__)
+            if isinstance(self.members.get(edge_id), Edge)
+        )
+        return self._filter_and_sort(candidates, selector=self._typed_selector(Edge, selector))
+
     def get_authorities(self) -> list[object]:
         """Return application-level behavior registries for dispatch bootstrapping.
 
@@ -321,7 +435,26 @@ class Graph(Registry[GraphItem]):
                 value.graph = self
             except Exception:
                 pass
+        from .ctx import resolve_ctx
+
+        if resolve_ctx(_ctx) is not None:
+            super().add(value, _ctx=_ctx)
+            self._rebuild_endpoint_index()
+            return
         super().add(value, _ctx=_ctx)
+        stored = self.members[value.uid]
+        if isinstance(stored, Edge):
+            self._sync_edge_endpoint_index(stored)
+
+    def remove(self, key: UUID, _ctx=None) -> None:
+        """Remove an item and its endpoint candidates when it is an edge."""
+        super().remove(key, _ctx=_ctx)
+        self._remove_edge_endpoint_index(key)
+
+    def clear(self) -> None:
+        """Clear graph membership and the derived endpoint maps."""
+        super().clear()
+        self._rebuild_endpoint_index()
 
     def add_node(self, *, kind=None, **attrs) -> Node:
         """Create and add a node-like graph item."""
@@ -411,6 +544,22 @@ class Graph(Registry[GraphItem]):
         selector: Selector | None = None,
     ) -> Iterator[Edge]:
         return self._find_typed_all(Edge, selector)
+
+    def find_edges_from(
+        self,
+        node: Node,
+        selector: Selector | None = None,
+    ) -> Iterator[Edge]:
+        """Return outgoing edges from one node without scanning unrelated members."""
+        return self._find_endpoint_edges(node.uid, self._edges_by_predecessor, selector)
+
+    def find_edges_to(
+        self,
+        node: Node,
+        selector: Selector | None = None,
+    ) -> Iterator[Edge]:
+        """Return incoming edges to one node without scanning unrelated members."""
+        return self._find_endpoint_edges(node.uid, self._edges_by_successor, selector)
 
     @property
     def edges(self) -> list[Edge]:
@@ -509,44 +658,67 @@ class Edge(GraphItem):
     def predecessor(self) -> Optional[Node]:
         return self.graph.get(self.predecessor_id)
 
-    def set_predecessor(self, value: Node, _ctx=None) -> None:
+    def _sync_endpoint_index(self) -> None:
+        """Refresh graph-owned endpoint maps when this edge belongs to a graph."""
+        if isinstance(self.registry, Graph):
+            self.registry._sync_edge_endpoint_index(self)
+
+    def set_predecessor(self, value: Node | UUID | None, _ctx=None) -> None:
         from .ctx import resolve_ctx
 
         _ctx = resolve_ctx(_ctx)
-        if value is not None:
-            self.graph._validate_linkable(value)
+        if isinstance(value, UUID):
+            endpoint_id = value
+            node = self.graph.get(value)
+        else:
+            endpoint_id = value.uid if value is not None else None
+            node = value
+        if value is not None and node is None:
+            self.predecessor_id = endpoint_id
+        elif node is not None:
+            self.graph._validate_linkable(node)
             if _ctx is not None:
-                self.graph._do_link(self, value, _ctx)
-            self.predecessor_id = value.uid
+                self.graph._do_link(self, node, _ctx)
+            self.predecessor_id = endpoint_id
         else:
             if _ctx is not None and self.predecessor is not None:
                 self.graph._do_unlink(self, self.predecessor, _ctx)
-            self.predecessor_id = None
+            self.predecessor_id = endpoint_id
+        self._sync_endpoint_index()
 
     @predecessor.setter
-    def predecessor(self, value: Node) -> None:
+    def predecessor(self, value: Node | UUID | None) -> None:
         self.set_predecessor(value)
 
     @property
     def successor(self) -> Optional[Node]:
         return self.graph.get(self.successor_id)
 
-    def set_successor(self, value: Node, _ctx=None) -> None:
+    def set_successor(self, value: Node | UUID | None, _ctx=None) -> None:
         from .ctx import resolve_ctx
 
         _ctx = resolve_ctx(_ctx)
-        if value is not None:
-            self.graph._validate_linkable(value)
+        if isinstance(value, UUID):
+            endpoint_id = value
+            node = self.graph.get(value)
+        else:
+            endpoint_id = value.uid if value is not None else None
+            node = value
+        if value is not None and node is None:
+            self.successor_id = endpoint_id
+        elif node is not None:
+            self.graph._validate_linkable(node)
             if _ctx is not None:
-                self.graph._do_link(self, value, _ctx)
-            self.successor_id = value.uid
+                self.graph._do_link(self, node, _ctx)
+            self.successor_id = endpoint_id
         else:
             if _ctx is not None and self.successor is not None:
                 self.graph._do_unlink(self, self.successor, _ctx)
-            self.successor_id = None
+            self.successor_id = endpoint_id
+        self._sync_endpoint_index()
 
     @successor.setter
-    def successor(self, value: Node) -> None:
+    def successor(self, value: Node | UUID | None) -> None:
         self.set_successor(value)
 
     def __repr__(self) -> str:
@@ -563,7 +735,7 @@ class Node(GraphItem):
         selector: Selector | None = None,
     ) -> Iterator[Edge]:
         selector = (self.graph._ensure_selector(selector) or Selector()).with_criteria(successor=self)
-        return self.graph.find_edges(selector=selector)
+        return self.graph.find_edges_to(self, selector=selector)
 
     def predecessors(
         self,
@@ -581,7 +753,7 @@ class Node(GraphItem):
         selector: Selector | None = None,
     ) -> Iterator[Edge]:
         selector = (self.graph._ensure_selector(selector) or Selector()).with_criteria(predecessor=self)
-        return self.graph.find_edges(selector=selector)
+        return self.graph.find_edges_from(self, selector=selector)
 
     def successors(
         self,

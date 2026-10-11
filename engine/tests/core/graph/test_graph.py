@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import pickle
 
 import pytest
@@ -106,6 +107,65 @@ class TestEdgeAndNode:
         assert list(a.edges_out()) == [ab]
         assert set(x.uid for x in b.predecessors()) == {a.uid, c.uid}
 
+    def test_endpoint_navigation_preserves_order_loops_and_selectors(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        c = graph.add_node(label="c")
+        ab_first = graph.add_edge(a, b, label="ab-first")
+        cb = graph.add_edge(c, b, label="cb")
+        loop = graph.add_edge(a, a, label="loop")
+        ab_second = graph.add_edge(a, b, label="ab-second")
+
+        assert list(a.edges_out()) == [ab_first, loop, ab_second]
+        assert list(b.edges_in()) == [ab_first, cb, ab_second]
+        assert list(a.edges_out(Selector(successor=b))) == [ab_first, ab_second]
+
+    def test_endpoint_properties_route_uuid_and_none_through_helpers(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        c = graph.add_node(label="c")
+        edge = graph.add_edge(a, b)
+
+        edge.predecessor = c.uid
+        edge.successor = None
+
+        assert list(a.edges_out()) == []
+        assert list(c.edges_out()) == [edge]
+        assert list(b.edges_in()) == []
+        assert edge.successor is None
+
+    def test_endpoint_lookup_excludes_unrelated_graph_members(self) -> None:
+        graph = Graph()
+        hub = graph.add_node(label="hub")
+        destination = graph.add_node(label="destination")
+        chosen = graph.add_edge(hub, destination)
+        for index in range(32):
+            source = graph.add_node(label=f"source-{index}")
+            target = graph.add_node(label=f"target-{index}")
+            graph.add_edge(source, target)
+
+        assert list(graph._edges_by_predecessor[hub.uid]) == [chosen.uid]
+        assert list(hub.edges_out()) == [chosen]
+
+    def test_endpoint_index_tracks_overwrite_remove_and_clear(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        c = graph.add_node(label="c")
+        edge = graph.add_edge(a, b)
+        replacement = Edge(uid=edge.uid, predecessor_id=c.uid, successor_id=b.uid)
+
+        graph.add(replacement)
+        assert list(a.edges_out()) == []
+        assert list(c.edges_out()) == [replacement]
+        graph.remove(replacement.uid)
+        assert list(c.edges_out()) == []
+        graph.add_edge(a, b)
+        graph.clear()
+        assert list(a.edges_out()) == []
+
     def test_remove_edge_helpers(self) -> None:
         graph = Graph()
         a = graph.add_node(label="a")
@@ -175,6 +235,23 @@ class TestGraphItemHierarchyAndSerialization:
         graph.add_edge(a, b)
         restored = pickle.loads(pickle.dumps(graph))
         assert restored == graph
+
+    def test_graph_copies_rebuild_endpoint_indexes(self) -> None:
+        graph = Graph(label="g")
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        graph.add_edge(a, b)
+
+        copies = [
+            copy.copy(graph),
+            copy.deepcopy(graph),
+            graph.model_copy(),
+            graph.model_copy(deep=True),
+            pickle.loads(pickle.dumps(graph)),
+        ]
+        for clone in copies:
+            clone_a = clone.find_node(Selector(label="a"))
+            assert len(list(clone.find_edges_from(clone_a))) == 1
 
     def test_graph_roundtrip_restores_factory_from_json_serialization(self) -> None:
         FactorySingleton.clear_instances()
