@@ -191,6 +191,30 @@ def test_overwrite_keeps_selector_first_match_order_for_shared_digest() -> None:
     assert registry._find_by_stored_content_hash(probe) is second
 
 
+def test_same_digest_overwrite_refreshes_only_its_cached_winner() -> None:
+    """Same-digest replacement preserves both identity and first-match order."""
+    first = _static_rit("first", b"shared")
+    replacement = _static_rit("replacement", b"shared", uid=first.uid)
+    registry = MediaResourceRegistry(label="same-digest")
+    registry.add(first)
+    registry.add(replacement)
+    probe = _static_rit("probe", b"shared")
+
+    assert registry._find_by_stored_content_hash(probe) is replacement
+
+    earlier = _static_rit("earlier", b"shared")
+    later = _static_rit("later", b"shared")
+    later_replacement = _static_rit("later-replacement", b"shared", uid=later.uid)
+    registry = MediaResourceRegistry(label="same-digest-order")
+    registry.add(earlier)
+    registry.add(later)
+    registry.add(later_replacement)
+
+    assert registry._find_by_stored_content_hash(probe) is earlier
+    registry.remove(earlier.uid)
+    assert registry._find_by_stored_content_hash(probe) is later_replacement
+
+
 def test_dynamic_records_keep_selector_fallback_and_never_share_empty_digest() -> None:
     """Pending media remains outside the static index until its lifecycle resolves."""
     pending = MediaRIT(label="pending", status=MediaRITStatus.PENDING)

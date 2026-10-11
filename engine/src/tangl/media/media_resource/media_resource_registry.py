@@ -113,6 +113,12 @@ class MediaResourceRegistry(Registry[MediaRIT]):
 
         previous = self._member_content_hashes[record.uid]
         if previous == current:
+            if (
+                current is not None
+                and (winner := self._content_hash_members.get(current)) is not None
+                and winner.uid == record.uid
+            ):
+                self._content_hash_members[current] = record
             return
         if previous is None:
             self._dynamic_member_count -= 1
