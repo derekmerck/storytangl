@@ -71,6 +71,10 @@ class HasNarratorKnowledge:
 
     narrator_knowledge: dict[str, EntityKnowledge] = Field(default_factory=dict)
 
+    def peek_knowledge(self, key: str = "_") -> EntityKnowledge | None:
+        """Read an existing narrator record without creating unknown knowledge."""
+        return self.narrator_knowledge.get(key or "_")
+
     def get_knowledge(self, key: str = "_") -> EntityKnowledge:
         """Return narrator-specific knowledge, creating the default record lazily."""
         narrator_key = str(key or "_")

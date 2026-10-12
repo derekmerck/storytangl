@@ -7,9 +7,11 @@
 :related: observation, lang, roles, journal, compiler
 ```
 
-> **Status:** DESIGN — opt-in concept linking for authored prose, with a
-> template-neutral linked-text model and journal-time revoicing. This is not a
-> migration plan and does not change the current raw-text floor.
+> **Status:** #534 slice 1 implements explicit concept references and naming in
+> optional `tangl.prose.naming`, with the executable `concept_naming_demo` world.
+> Exact-reference lexical linking remains slice 2. The broader linguistic
+> adoption/revoicing discussion below is future design, not shipped behavior.
+> The live #534 contract and its exception-recovery scope comment govern this note.
 >
 > **Scope:** how an author may write ordinary prose against a convenient
 > reference cast while the compiler links references to scene-local semantic
@@ -106,6 +108,11 @@ linked form L = link(S, E)
 render(L, E) == normalize(S)
 ```
 
+That reference environment must include matching naming policy and narrator
+knowledge. An anonymous runtime need not reproduce proper names in the source;
+ordinary linked names use automatic policy selection rather than forced proper
+wording.
+
 `normalize` may remove compiler-only authoring hints such as `/r`, `her_`,
 or `#intro`, but it must not change the ordinary prose they annotate.
 
@@ -193,7 +200,7 @@ Those strings do not all mean the same realization. They link to the same role
 with different **reference intent**:
 
 ```text
-Rin               → Ref(rin, PROPER)
+Rin               → Ref(rin, AUTO)
 the blonde girl   → Ref(rin, NOMINAL, DEFINITE)
 a blonde girl     → Ref(rin, NOMINAL, INDEFINITE)
 Ms. Northstar     → Ref(rin, ALIAS=gamer, HONORIFIC)
@@ -427,12 +434,11 @@ or, in a Jinja backend:
 I'm {{ rin.nominal(intro=True) }}.
 ```
 
-The exact runtime mechanism is an implementation choice: the render session may
-stage the disclosure and commit it at the normal Story phase boundary, or a
-journal-time semantic primitive may mutate patch-tracked narrator knowledge
-directly. The important design requirement is that the compiler can **see the
-semantic disclosure** rather than discovering it only from opaque arbitrary
-code.
+The shipped semantic introduction immediately identifies the actual provider
+for the active narrator during JOURNAL. Forced proper wording alone does not
+identify it. There is no staged receipt or deferred FINALIZE disclosure.
+The explicit reference vocabulary preserves referent, intent, and introduction
+independently of template syntax. Lexical `#intro` recognition is still deferred.
 
 Repeated introductions are idempotent:
 
@@ -448,15 +454,9 @@ optional: "Catch it, Rin #intro!"
 required: "I'm Rin #intro and this is Tisato #intro."
 ```
 
-Internal paths may therefore temporarily disagree about knowledge state. The
-scene-level invariant is stronger and more useful:
-
-> **For each relevant concept, all exits from a scene must agree on the
-> epistemic state the scene guarantees.**
-
-If one complete path exits with Rin identified and another exits with Rin still
-unknown, that is a compile-time story inconsistency unless the scene explicitly
-models divergent epistemic outcomes.
+Different paths and exits may legitimately leave different narrator knowledge.
+There is no mandatory equal-knowledge-at-every-exit check. Guaranteed-introduction
+postconditions and bounded scene analysis require a separate consumer/contract.
 
 The same mechanism can later express disclosure of aliases, relationships,
 locations, object identities, or other knowledge without inventing a separate
@@ -573,7 +573,49 @@ runtime presentation mechanisms.
 
 ---
 
-## First implementation slice
+## Delivered first implementation slice
+
+World domains import `tangl.prose.naming` and expose its `get_authorities()`
+before normal compilation. `NamingActor` / `NamingLocation` add optional anonymous
+wording and concept policy overrides. `ProseBlock` contains ordered segments and
+explicit concept-linked `choice_labels`, keyed by stable action label.
+
+The shared `NamingOperations.reference()` resolves a Role/Setting to its current
+provider and reads its narrator record without creating one. `introduce()` owns
+creation/writes during actual JOURNAL realization. Named text aspects
+`reference_auto`, `reference_proper`, and `reference_anonymous` use existing Story
+dispatch, permitting world authorities to replace wording through that seam.
+
+Precedence is explicit concept override (including `off`), then the closest
+matching kind in the provider's MRO in world `naming_defaults`, then `off`.
+`concealed` selects anonymous wording until identified; `proper` selects proper
+wording without disclosure on read. Missing anonymous wording raises an error
+identifying the provider and source block. No Presence dependency is required.
+
+Each segment resolves its speaker display name before realizing its body.
+References in the body run left to right; later segments and choices observe
+immediate introductions. Speaker/action IDs remain unchanged. Literal segments
+remain opaque; a segment's explicit Jinja `template` evaluates once against the
+same `reference` / `introduce` operations. Generated wording is not recursively
+re-evaluated. Arbitrary Jinja is a Python-native escape hatch, not portable IR.
+
+Successful constructor-form and JSON service restoration, patch replay, explicit
+rollback, narrator isolation, provider recasting, and historical wording are
+covered by `engine/tests/prose/test_naming.py`. Raw worlds need no adoption.
+
+### Existing failure seam
+
+A real compiled-world probe introduced Rin during JOURNAL and raised in FINALIZE.
+It left Rin identified, emitted no introduction output or failed-hop patch, and
+constructor restore preserved that identification. UPDATE and other mutations
+can likewise remain partially applied. Automatic failed-traversal recovery is
+outside this slice by the human design decision recorded on #534. Unexpected
+exceptions propagate; safe continuation/retry of a partially executed live
+story is not promised. No Frame callback, prose undo accumulator, transaction
+framework, or deferred disclosure is installed. Existing explicit rollback is
+distinct from automatic exception recovery.
+
+## Deferred exact-reference linking slice
 
 The first issue should prove the concept with the smallest useful consumer:
 **epistemic naming of scene roles**.
@@ -598,8 +640,8 @@ Suggested slice:
 6. At JOURNAL realization, resolve the scene role to its current provider and
    render against narrator knowledge.
 7. Make identity disclosure idempotent and patch/replay-safe.
-8. Validate the scene's guaranteed identification state across all exits when
-   introduction markers participate in optional paths.
+8. Permit divergent knowledge at exits; optional guaranteed-introduction
+   analysis is a separate future contract.
 9. Round-trip every linked fixture under the reference cast.
 10. Fail compilation on ambiguity rather than guessing.
 

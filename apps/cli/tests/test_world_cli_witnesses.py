@@ -88,3 +88,13 @@ def test_adventure_sandbox_cli_witness_remains_open_and_coherent() -> None:
     assert "Choices:" in final_road
     assert "5. Wait" in final_road
     assert "Time:" in final_road
+
+
+def test_concept_naming_cli_witness_introduces_and_remembers_provider() -> None:
+    transcript = _run_world_script("concept_naming_demo")
+    before = transcript.index("the blonde girl approaches at Market Square.")
+    intro = transcript.index("Hi, I am Rin.")
+    after = transcript.index("Rin smiles.")
+    choice = transcript.index("Say hi to Rin")
+    later = transcript.index("Hello again, Rin.")
+    assert before < intro < after < choice < later

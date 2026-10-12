@@ -85,7 +85,8 @@ class TextRenderSession:
     Why
     ---
     A renderer needs the phase-assembled namespace and a short-lived place for
-    consecutive prose segments to retain focus without mutating graph state.
+    consecutive prose segments to retain focus. Ordinary rendering is read-only;
+    optional concept naming owns explicit JOURNAL-time identity disclosure.
 
     Key Features
     ------------
