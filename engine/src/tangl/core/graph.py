@@ -261,13 +261,15 @@ class Graph(Registry[GraphItem]):
 
     def _sync_edge_endpoint_index(self, edge: Edge) -> None:
         """Synchronize one added or rewired edge with the derived maps."""
+        if self.members.get(edge.uid) is not edge:
+            return
         predecessor_id, successor_id = edge.predecessor_id, edge.successor_id
         previous = self._edge_endpoints.get(edge.uid)
         if previous is not None:
             self._remove_endpoint_candidate(self._edges_by_predecessor, previous[0], edge.uid)
             self._remove_endpoint_candidate(self._edges_by_successor, previous[1], edge.uid)
         self._edge_endpoints[edge.uid] = (predecessor_id, successor_id)
-        self._edge_orders.setdefault(edge.uid, len(self._edge_orders))
+        self._edge_orders.setdefault(edge.uid, len(self.members) - 1)
         self._add_endpoint_candidate(self._edges_by_predecessor, predecessor_id, edge.uid)
         self._add_endpoint_candidate(self._edges_by_successor, successor_id, edge.uid)
 

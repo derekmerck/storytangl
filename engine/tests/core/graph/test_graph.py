@@ -166,6 +166,38 @@ class TestEdgeAndNode:
         graph.clear()
         assert list(a.edges_out()) == []
 
+    def test_endpoint_index_preserves_graph_order_after_rebuild_and_mutation(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        first = graph.add_edge(a, b, label="first")
+        restored = pickle.loads(pickle.dumps(graph))
+        restored_a = restored.find_node(Selector(label="a"))
+        restored_b = restored.find_node(Selector(label="b"))
+        second = restored.add_edge(restored_a, restored_b, label="second")
+
+        assert list(restored_a.edges_out()) == [
+            restored.find_edge(Selector(label="first")),
+            second,
+        ]
+        restored.remove(second.uid)
+        third = restored.add_edge(restored_a, restored_b, label="third")
+        assert list(restored_a.edges_out()) == [restored.find_edge(Selector(label="first")), third]
+
+    def test_stale_replaced_edge_cannot_rewrite_endpoint_index(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        original = graph.add_edge(a, b)
+        replacement = Edge(uid=original.uid, predecessor_id=a.uid, successor_id=b.uid)
+        graph.add(replacement)
+
+        original.set_predecessor(b)
+        original.set_successor(a)
+
+        assert list(a.edges_out()) == [replacement]
+        assert list(b.edges_in()) == [replacement]
+
     def test_remove_edge_helpers(self) -> None:
         graph = Graph()
         a = graph.add_node(label="a")
