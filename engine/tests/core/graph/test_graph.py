@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import copy
 import pickle
+from collections.abc import Callable
 
 import pytest
 
 from tangl.core.graph import Edge, Graph, GraphItem, HierarchicalNode, Node, Subgraph
+from tangl.core.ctx import Ctx
 from tangl.core.selector import Selector
 from tangl.core.singleton import Singleton
 from tangl.persistence.serializers import JsonSerializationHandler
@@ -106,6 +109,153 @@ class TestEdgeAndNode:
         assert list(a.edges_out()) == [ab]
         assert set(x.uid for x in b.predecessors()) == {a.uid, c.uid}
 
+    def test_endpoint_navigation_preserves_order_loops_and_selectors(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        c = graph.add_node(label="c")
+        ab_first = graph.add_edge(a, b, label="ab-first")
+        cb = graph.add_edge(c, b, label="cb")
+        loop = graph.add_edge(a, a, label="loop")
+        ab_second = graph.add_edge(a, b, label="ab-second")
+
+        assert list(a.edges_out()) == [ab_first, loop, ab_second]
+        assert list(b.edges_in()) == [ab_first, cb, ab_second]
+        assert list(a.edges_out(Selector(successor=b))) == [ab_first, ab_second]
+
+    def test_endpoint_properties_route_uuid_and_none_through_helpers(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        c = graph.add_node(label="c")
+        edge = graph.add_edge(a, b)
+
+        edge.predecessor = c.uid
+        edge.successor = None
+
+        assert list(a.edges_out()) == []
+        assert list(c.edges_out()) == [edge]
+        assert list(b.edges_in()) == []
+        assert edge.successor is None
+
+    def test_endpoint_lookup_excludes_unrelated_graph_members(self) -> None:
+        graph = Graph()
+        hub = graph.add_node(label="hub")
+        destination = graph.add_node(label="destination")
+        chosen = graph.add_edge(hub, destination)
+        for index in range(32):
+            source = graph.add_node(label=f"source-{index}")
+            target = graph.add_node(label=f"target-{index}")
+            graph.add_edge(source, target)
+
+        visited = []
+        selector = Selector(predicate=lambda edge: visited.append(edge.uid) or True)
+        assert list(hub.edges_out(selector)) == [chosen]
+        assert visited == [chosen.uid]
+
+    def test_endpoint_index_tracks_overwrite_remove_and_clear(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        c = graph.add_node(label="c")
+        edge = graph.add_edge(a, b)
+        replacement = Edge(uid=edge.uid, predecessor_id=c.uid, successor_id=b.uid)
+
+        graph.add(replacement)
+        assert list(a.edges_out()) == []
+        assert list(c.edges_out()) == [replacement]
+        graph.remove(replacement.uid)
+        assert list(c.edges_out()) == []
+        graph.add_edge(a, b)
+        graph.clear()
+        assert list(a.edges_out()) == []
+
+    def test_endpoint_index_preserves_graph_order_after_rebuild_and_mutation(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        first = graph.add_edge(a, b, label="first")
+        restored = pickle.loads(pickle.dumps(graph))
+        restored_a = restored.find_node(Selector(label="a"))
+        restored_b = restored.find_node(Selector(label="b"))
+        second = restored.add_edge(restored_a, restored_b, label="second")
+
+        assert list(restored_a.edges_out()) == [
+            restored.find_edge(Selector(label="first")),
+            second,
+        ]
+        restored.remove(second.uid)
+        third = restored.add_edge(restored_a, restored_b, label="third")
+        assert list(restored_a.edges_out()) == [restored.find_edge(Selector(label="first")), third]
+
+    def test_stale_replaced_edge_cannot_rewrite_endpoint_index(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        original = graph.add_edge(a, b)
+        replacement = Edge(uid=original.uid, predecessor_id=a.uid, successor_id=b.uid)
+        graph.add(replacement)
+
+        original.set_predecessor(b)
+        original.set_successor(a)
+
+        assert list(a.edges_out()) == [replacement]
+        assert list(b.edges_in()) == [replacement]
+
+    def test_remove_earlier_edge_then_append_and_rewire_preserves_order(self) -> None:
+        graph = Graph()
+        a = graph.add_node()
+        b = graph.add_node()
+        first = graph.add_edge(a, b)
+        second = graph.add_edge(a, b)
+        graph.remove(first.uid)
+        third = graph.add_edge(a, b)
+        second.set_predecessor(a)
+        indexed = list(a.edges_out())
+        scanned = list(graph.find_edges(Selector(predecessor=a)))
+        assert [id(edge) for edge in indexed] == [id(second), id(third)]
+        assert [id(edge) for edge in indexed] == [id(edge) for edge in scanned]
+
+    @pytest.mark.parametrize("make_copy", [copy.copy, lambda graph: graph.model_copy()])
+    def test_shallow_copy_tracks_shared_edge_mutation(
+        self, make_copy: Callable[[Graph], Graph],
+    ) -> None:
+        graph = Graph()
+        a = graph.add_node()
+        b = graph.add_node()
+        edge = graph.add_edge(a, b)
+        clone = make_copy(graph)
+        edge.set_predecessor(b)
+        assert list(clone.find_edges_from(a)) == []
+        assert list(clone.find_edges_from(b)) == [edge]
+        graph.clear()
+        assert list(clone.find_edges_from(b)) == []
+
+    def test_context_add_maintains_index_without_rebuild(self, monkeypatch) -> None:
+        graph = Graph()
+        a = graph.add_node()
+        b = graph.add_node()
+        rebuilds = []
+        monkeypatch.setattr(Graph, "_rebuild_endpoint_index", lambda self: rebuilds.append(self))
+        edges = [Edge(predecessor_id=a.uid, successor_id=b.uid) for _ in range(20)]
+        for edge in edges:
+            graph.add(edge, _ctx=Ctx())
+        assert rebuilds == []
+        assert [id(edge) for edge in a.edges_out()] == [id(edge) for edge in edges]
+
+    def test_deep_copy_owns_members_and_supports_navigation_and_new_edges(self) -> None:
+        graph = Graph()
+        a = graph.add_node()
+        b = graph.add_node()
+        edge = graph.add_edge(a, b)
+        for clone in (copy.deepcopy(graph), graph.model_copy(deep=True)):
+            clone_a = clone.members[a.uid]
+            clone_b = clone.members[b.uid]
+            assert clone_a.graph is clone
+            assert list(clone_a.edges_out()) == [clone.members[edge.uid]]
+            clone.add_edge(clone_a, clone_b)
+            assert len(list(clone_a.edges_out())) == 2
+
     def test_remove_edge_helpers(self) -> None:
         graph = Graph()
         a = graph.add_node(label="a")
@@ -175,6 +325,23 @@ class TestGraphItemHierarchyAndSerialization:
         graph.add_edge(a, b)
         restored = pickle.loads(pickle.dumps(graph))
         assert restored == graph
+
+    def test_graph_copies_rebuild_endpoint_indexes(self) -> None:
+        graph = Graph(label="g")
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        graph.add_edge(a, b)
+
+        copies = [
+            copy.copy(graph),
+            copy.deepcopy(graph),
+            graph.model_copy(),
+            graph.model_copy(deep=True),
+            pickle.loads(pickle.dumps(graph)),
+        ]
+        for clone in copies:
+            clone_a = clone.find_node(Selector(label="a"))
+            assert len(list(clone.find_edges_from(clone_a))) == 1
 
     def test_graph_roundtrip_restores_factory_from_json_serialization(self) -> None:
         FactorySingleton.clear_instances()

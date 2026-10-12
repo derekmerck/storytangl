@@ -260,7 +260,7 @@ class TestPredicateGating:
         """
 
         _graph, start, _end, action = _graph_with_choice()
-        action.successor_id = None
+        action.set_successor(None)
         action.blockers = [Blocker(code="authored", message="Authored explanation.")]
         ctx = _simple_ctx()
 
