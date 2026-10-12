@@ -16,6 +16,7 @@ See Also
 from __future__ import annotations
 
 import itertools
+from copy import deepcopy
 from functools import cached_property
 from fnmatch import fnmatch
 from typing import Any, Iterable, Iterator, Mapping, Optional, Protocol, Self, runtime_checkable
@@ -189,6 +190,7 @@ class Graph(Registry[GraphItem]):
         "_edges_by_successor",
         "_edge_endpoints",
         "_edge_orders",
+        "_next_edge_order",
     )
 
     def model_post_init(self, context: Any) -> None:
@@ -197,16 +199,21 @@ class Graph(Registry[GraphItem]):
         self._rebuild_endpoint_index()
 
     def __copy__(self):
-        """Copy members through Pydantic, then rebuild endpoint lookup maps."""
+        """Share endpoint lookup state with the shallow-copied members mapping."""
         clone = super().__copy__()
-        clone._rebuild_endpoint_index()
+        for name in Graph.__slots__:
+            object.__setattr__(clone, name, object.__getattribute__(self, name))
         return clone
 
     def __deepcopy__(self, memo=None):
         """Deep-copy members through Pydantic, then rebuild endpoint lookup maps."""
-        clone = super().__deepcopy__(memo)
-        if "members" in clone.__dict__:
-            clone._rebuild_endpoint_index()
+        memo = {} if memo is None else memo
+        clone = super().__copy__()
+        memo[id(self)] = clone
+        object.__setattr__(clone, "__dict__", deepcopy(self.__dict__, memo))
+        object.__setattr__(clone, "__pydantic_extra__", deepcopy(self.__pydantic_extra__, memo))
+        object.__setattr__(clone, "__pydantic_private__", deepcopy(self.__pydantic_private__, memo))
+        clone._rebuild_endpoint_index()
         return clone
 
     def model_copy(
@@ -215,9 +222,10 @@ class Graph(Registry[GraphItem]):
         update: Mapping[str, Any] | None = None,
         deep: bool = False,
     ) -> Self:
-        """Copy through Pydantic, then rebuild the derived endpoint maps."""
+        """Preserve shared shallow-copy state or rebuild for replacement members."""
         clone = super().model_copy(update=update, deep=deep)
-        clone._rebuild_endpoint_index()
+        if update is not None and "members" in update:
+            clone._rebuild_endpoint_index()
         return clone
 
     def __setstate__(self, state) -> None:
@@ -231,6 +239,7 @@ class Graph(Registry[GraphItem]):
         self._edges_by_successor: dict[UUID, dict[UUID, None]] = {}
         self._edge_endpoints: dict[UUID, tuple[UUID | None, UUID | None]] = {}
         self._edge_orders: dict[UUID, int] = {}
+        self._next_edge_order = itertools.count(len(self.members))
         for order, item in enumerate(self.members.values()):
             if isinstance(item, Edge):
                 self._edge_orders[item.uid] = order
@@ -269,7 +278,8 @@ class Graph(Registry[GraphItem]):
             self._remove_endpoint_candidate(self._edges_by_predecessor, previous[0], edge.uid)
             self._remove_endpoint_candidate(self._edges_by_successor, previous[1], edge.uid)
         self._edge_endpoints[edge.uid] = (predecessor_id, successor_id)
-        self._edge_orders.setdefault(edge.uid, len(self.members) - 1)
+        if edge.uid not in self._edge_orders:
+            self._edge_orders[edge.uid] = next(self._next_edge_order)
         self._add_endpoint_candidate(self._edges_by_predecessor, predecessor_id, edge.uid)
         self._add_endpoint_candidate(self._edges_by_successor, successor_id, edge.uid)
 
@@ -431,22 +441,21 @@ class Graph(Registry[GraphItem]):
         return disconnected_penalty + len(a_chain) + len(b_chain)
 
     def add(self, value: GraphItem, _ctx=None) -> None:
-        """Add and bind legacy ``graph`` pointers when present."""
-        if hasattr(value, "graph"):
-            try:
-                value.graph = self
-            except Exception:
-                pass
+        """Dispatch addition, store the resulting member, and index its endpoints."""
         from .ctx import resolve_ctx
 
-        if resolve_ctx(_ctx) is not None:
-            super().add(value, _ctx=_ctx)
-            self._rebuild_endpoint_index()
-            return
-        super().add(value, _ctx=_ctx)
-        stored = self.members[value.uid]
-        if isinstance(stored, Edge):
-            self._sync_edge_endpoint_index(stored)
+        if isinstance(value, RegistryAware):
+            value.bind_registry(self)
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is not None:
+            from .dispatch import do_add_item
+
+            value = do_add_item(registry=self, item=value, ctx=_ctx)
+        self.members[value.uid] = value
+        if isinstance(value, Edge):
+            self._sync_edge_endpoint_index(value)
+        else:
+            self._remove_edge_endpoint_index(value.uid)
 
     def remove(self, key: UUID, _ctx=None) -> None:
         """Remove an item and its endpoint candidates when it is an edge."""
@@ -456,7 +465,10 @@ class Graph(Registry[GraphItem]):
     def clear(self) -> None:
         """Clear graph membership and the derived endpoint maps."""
         super().clear()
-        self._rebuild_endpoint_index()
+        self._edges_by_predecessor.clear()
+        self._edges_by_successor.clear()
+        self._edge_endpoints.clear()
+        self._edge_orders.clear()
 
     def add_node(self, *, kind=None, **attrs) -> Node:
         """Create and add a node-like graph item."""

@@ -287,9 +287,17 @@ edges are created before their targets exist.
 **Directional edge lookup.** Graph keeps derived, in-memory maps from predecessor and successor
 UUIDs to edge UUID candidates. `Node.edges_out()` and `Node.edges_in()` use the appropriate map,
 then apply their ordinary typed selector to those candidates in graph insertion order. The maps are
-rebuilt after construction, copy, and pickle restoration, and maintained by normal graph
+rebuilt after construction, deep copy, and pickle restoration, and maintained by normal graph
 add/remove/clear operations and explicit endpoint setters. They are not persisted or part of graph
-value equality.
+value equality. Insertion order uses a monotonic counter; removing an edge never reuses its
+position, and overwriting or rewiring an edge retains its position. Context-aware additions
+update the maps incrementally after add dispatch. Only the current member object may update
+its endpoint candidates.
+
+Shallow graph copies share membership and its derived endpoint maps. Mutating a shared edge
+therefore updates queries on both graphs without rebinding that edge. Deep copies memoize the
+graph before copying members so each copied member points back to the copied graph; those
+copies and restored graphs rebuild independent endpoint maps.
 
 **`get_authorities()` is the dispatch bootstrapping extension point.** Application-layer
 graph subclasses override this to expose domain-specific behavior registries to the VM's
