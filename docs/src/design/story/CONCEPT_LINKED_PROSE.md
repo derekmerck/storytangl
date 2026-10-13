@@ -476,10 +476,14 @@ may call it during explicit ordered realization. Previewing or resolving an
 ordinary reference/label never calls it implicitly. Keep normal phase mutation
 rules and diagnostics; this is not blanket permission for implicit render effects.
 
-A speaker label resolves before its utterance. If an explicit template call
+An ordered ProseSegment speaker label resolves before its utterance. If an explicit template call
 introduces Rin inside that utterance, that label stays anonymous and later labels
 may use Rin. The explicit call does not authorize rewriting other literal names
-in the speech. Generated output must not be recursively executed as template code.
+in the speech. The ordered adapter does not re-execute generated wording as template code.
+Ordinary raw/Jinja whole-block templates retain their existing evaluation and
+composition order: labels bind afterward and see current/end-of-block knowledge.
+Explicit calls there remain allowed, but per-utterance pre-body naming is not
+promised. Authors needing that timing use ordered ProseSegment values.
 
 Successful persistence, replay, and existing explicit rollback must retain
 introductions. Unexpected traversal exceptions follow the existing non-atomic
@@ -679,22 +683,24 @@ Successful constructor-form and JSON service restoration, patch replay, explicit
 rollback, narrator isolation, provider recasting, and historical wording are
 covered by `engine/tests/prose/test_naming.py`. Raw worlds need no adoption.
 
-### Ordinary dialog ordering checkpoint (PR #555 revision)
+### Ordinary dialog ordering: resolved bounded scope
 
 The existing raw/Jinja pipeline evaluates an entire block through
 `story.system_handlers._render_text()` before `compose_dialog_markup()` calls
 `DialogHandler.parse()` and binds speakers. A compiled-world probe starts with
 unknown Rin, introduces her through a non-printing template call in the first
 utterance, and then emits a second utterance. At composition time both labels
-see `IDENTIFIED`, producing `[Rin, Rin]`; the approved order requires
+see `IDENTIFIED`, producing `[Rin, Rin]`. This is the approved ordinary
+whole-block limitation; ordered ProseSegments instead produce
 `[the blonde girl, Rin]`. The literal body `This is my sister, Nanae.` remains
 unchanged throughout. Introducing Nanae never implicitly identifies Rin.
 
-`ProseSegment` already supplies the required bind-before-body ordering. Extending
-that to ordinary raw/Jinja dialog requires either an approved earlier
-parse/bind/realize contract or a deliberate scope restriction on stateful raw
-templates. No retrospective knowledge snapshot, lexical body rewrite, or
-multiple-narrator inference is installed to hide this ordering mismatch.
+The human resolved the checkpoint by retaining ordinary realization order and
+using ProseSegment when precise timing matters. Resolved ordinary labels now
+use the adopted `reference_auto` text-aspect policy as a non-disclosing read at
+the existing composition point; absent an adapter, vanilla display-name fallback
+is unchanged. No early parsing, template splitting, retrospective snapshot,
+lexical body rewrite, or multiple-narrator inference is installed.
 
 ### Existing failure seam
 

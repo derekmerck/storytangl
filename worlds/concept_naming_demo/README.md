@@ -30,6 +30,11 @@ speaker before evaluating the utterance, preserving that utterance's earlier
 display label. Names such as Nanae in literal speech are not rewritten or
 treated as introductions.
 
+Ordinary raw/Jinja dialog labels also read the adopted naming policy, but bind
+at composition after the whole block has evaluated. A raw mid-body introduction
+can therefore name both labels in that block. Use ordered ProseSegments when
+the current label must stay anonymous and only subsequent labels become named.
+
 Fresh-process JSON service restore must bootstrap the world normally with
 `manager.open_world("concept_naming_demo")` before opening the saved session.
 Reopening a manager within the same process is not a World/authority reset.

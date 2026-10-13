@@ -41,7 +41,7 @@ from tangl.journal.fragments import (
     client_visible_tags,
 )
 
-from .dispatch import on_compose_journal, on_find_edges, on_gather_ns, on_journal
+from .dispatch import do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
 from .presentation import render_text_as
 
@@ -892,6 +892,11 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
     if ctx is not None and hasattr(ctx, "get_ns"):
         ns = dict(ctx.get_ns(caller))
 
+    def speaker_name(subject: object) -> str | None:
+        # The optional naming authority supplies a pure read. Without it,
+        # None preserves DialogMuBlock's ordinary display-name fallback.
+        return do_render_text(subject, aspect="reference_auto", ctx=ctx)
+
     composed: list[Record] = []
     changed = False
     for fragment in fragments:
@@ -906,6 +911,7 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
                 source_id=getattr(fragment, "source_id", None),
                 ns=ns,
                 ctx=ctx,
+                name_resolver=speaker_name if ctx is not None else None,
             )
             rendered = DialogHandler.render(mu_blocks)
             for rendered_fragment in rendered:

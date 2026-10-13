@@ -34,10 +34,13 @@ Reopening a JSON manager in the same process retains live World/type/authority
 registration. The true subprocess witness calls normal `open_world()` bootstrap
 before opening the saved session. Soft reset/hot reload is separate work.
 
-Ordinary raw/Jinja dialog currently renders the entire block before composition
-parses and binds speakers. Mid-utterance introduction therefore leaves no
-pre-body knowledge available at label-binding time. Ordered ProseSegment
-templates already bind labels before evaluating their bodies once; extending
-that guarantee to the ordinary pipeline is an unresolved realization-ordering
-checkpoint, not permission to derive earlier labels from end-of-batch knowledge.
+Ordinary raw/Jinja dialog retains whole-block evaluation before composition
+parses and binds speakers. Adopted naming policies supply a non-disclosing
+`reference_auto` text-aspect read through the injected label resolver at that
+composition point, so labels see current/end-of-block knowledge. Absent a naming
+adapter, vanilla fallback is unchanged. Explicit raw template calls remain
+allowed, but they do not promise per-utterance pre-body labels. The checkpoint
+is resolved under this bounded scope: use ProseSegment for label-before-body
+ordering and once-only body evaluation. No spoken-name rewriting or narrator
+inference is added.
 Attributed dialog tone/avatar and presentation-class work remains #454/#457.

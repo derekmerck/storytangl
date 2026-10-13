@@ -225,6 +225,63 @@ def test_literal_spoken_name_does_not_introduce_speaker_or_sister(ledger: Ledger
     assert nanae.peek_knowledge().state == "IDENTIFIED"
 
 
+@pytest.mark.parametrize("identified", [False, True])
+def test_ordinary_dialog_labels_share_policy_without_disclosing(
+    ledger: Ledger, identified: bool,
+) -> None:
+    from tangl.vm.dispatch import do_journal
+
+    block = ledger.cursor
+    block.content = "> [!dialog] host\n> This is my sister, Nanae."
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid, current_phase=ResolutionPhase.JOURNAL)
+    actor = ctx.get_ns(block)["host"]
+    if identified:
+        NamingOperations(ctx).introduce(actor)
+    before = ledger.graph.value_hash()
+    fragments = do_journal(block, ctx=ctx)
+    speaker = next(f for f in fragments if isinstance(f, AttributedFragment))
+    assert speaker.speaker_name == ("Rin" if identified else "the blonde girl")
+    assert speaker.speaker_id == str(actor.uid)
+    assert speaker.content == "This is my sister, Nanae."
+    assert ledger.graph.value_hash() == before
+    nanae = ledger.graph.find_one(Selector(has_kind=Actor, label="nanae"))
+    assert nanae.narrator_knowledge == {}
+
+
+def test_ordinary_whole_block_jinja_keeps_late_label_binding(ledger: Ledger) -> None:
+    from tangl.vm.dispatch import do_journal
+
+    ledger.graph.locals["text_template"] = "jinja"
+    block = ledger.cursor
+    block.content = (
+        "> [!dialog] host\n> This is my sister, Nanae. {% set _ = introduce(host) %}"
+        "\n\n> [!dialog] host\n> Hello again."
+    )
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid, current_phase=ResolutionPhase.JOURNAL)
+    speakers = [f for f in do_journal(block, ctx=ctx) if isinstance(f, AttributedFragment)]
+    assert [f.speaker_name for f in speakers] == ["Rin", "Rin"]
+    assert speakers[0].content == "This is my sister, Nanae."
+
+
+def test_vanilla_ordinary_dialog_keeps_name_fallback() -> None:
+    from tangl.story import Block, StoryGraph
+    from tangl.story.system_handlers import compose_dialog_markup
+
+    graph = StoryGraph()
+    actor = Actor(label="rin", name="Rin", registry=graph)
+    block = Block(content="> [!dialog] rin\n> This is my sister, Nanae.", registry=graph)
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    ctx._ns_cache[block.uid] = {"rin": actor}
+    before = graph.value_hash()
+    fragments = compose_dialog_markup(
+        caller=block, ctx=ctx, fragments=[ContentFragment(content=block.content)],
+    )
+    speaker = next(f for f in fragments if isinstance(f, AttributedFragment))
+    assert speaker.speaker_name == "Rin"
+    assert speaker.content == "This is my sister, Nanae."
+    assert graph.value_hash() == before
+
+
 @pytest.mark.parametrize("phase", [ResolutionPhase.PLANNING, ResolutionPhase.PREREQS, ResolutionPhase.POSTREQS])
 def test_introduction_rejected_in_read_only_phases(ledger: Ledger, phase: ResolutionPhase) -> None:
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id, current_phase=phase)
