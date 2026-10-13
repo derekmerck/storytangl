@@ -1,7 +1,8 @@
 # Optional prose extensions
 
 Status: explicit concept naming/reference (#534 slice 1) and conservative exact
-role/setting name/nominal/#intro linking (slice 2) implemented.
+role/setting proper-name/#intro linking (slice 2) implemented. Automatic naming
+is one-way: authored descriptions remain literal.
 
 Rendering sessions and dialog micro-blocks are existing realization helpers.
 `naming` is an optional Story extension adopted by world domains before
@@ -68,16 +69,26 @@ normal constructor/JSON structuring and patch replay need no new restoration
 hook or serializer. Renaming/reparenting an owner does not silently retarget a
 compiled reference: its scope check fails.
 
-Exact proper spellings and role symbols use AUTO policy. The one declared full
-anonymous nominal uses ANONYMOUS intent, including its determiner. Its
-initial-capital variant records capitalization; other grammar is not inferred.
-`link_forms: {host: {proper: Rin, anonymous: the blonde girl}}` supplies explicit
-reference spellings when prototype wording is insufficient. Distinct roles
+Exact proper spellings and role symbols use AUTO policy. Authors seeking
+adaptive naming write the reference cast's proper name; runtime wording may be
+proper or anonymous according to the current provider/narrator. Descriptive
+phrases such as `the blonde girl` and `The blonde girl` remain literal, even if
+one or several providers have that anonymous description. The compiler neither
+adopts nor disambiguates descriptions, and never bakes runtime wording into
+binding identity. Explicit `ConceptReference(intent="anonymous")` and template
+`reference(host, "anonymous")` still select a referent and request its current,
+replaceable anonymous wording. Actor `anonymous_name` remains runtime vocabulary.
+`link_forms: {host: {proper: Rin}}` supplies a proper reference spelling when
+prototype wording is insufficient; no `anonymous` spelling option is supported.
+Distinct roles
 adopting the same spelling are ambiguous, even if their reference cast uses the
 same Actor. Longest exact spelling wins; word boundaries prevent Rin/Ringo
 matches. Ambiguity and unmatched introductions report source path, block,
 segment, and eligible forms/bindings. Narrative `Rin #intro` or `Rin#intro`
-lowers to an introduction at that position.
+lowers to an introduction at that position. Recognition and unmatched-marker
+diagnostics share the complete `#intro\b` boundary: `#introduction` and
+`#introvert` remain literal. An actual `#intro` following only a descriptive
+phrase has no linked referent and is diagnosed, not inferred.
 
 The grammar is deliberately limited to narrative `content` or ordered `prose`
 segments whose `text` is a string. Speaker segments adopt only their label;

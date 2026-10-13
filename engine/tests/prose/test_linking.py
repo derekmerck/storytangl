@@ -13,8 +13,10 @@ from tangl.core import Selector
 from tangl.journal.fragments import AttributedFragment, ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
-from tangl.prose.linking import lower_linked_prose
-from tangl.prose.naming import BindingReference, NamingOperations, NamingPolicy, ProseBlock
+from tangl.prose.linking import link_text, lower_linked_prose
+from tangl.prose.naming import (
+    BindingReference, ConceptReference, NamingOperations, NamingPolicy, ProseBlock,
+)
 from tangl.story import Actor, InitMode, World
 from tangl.vm import Ledger, Requirement
 from tangl.vm.replay import CheckpointRecord, Patch, get_replay_engine
@@ -49,6 +51,7 @@ def test_world_links_roles_and_orders_provider_knowledge(ledger: Ledger) -> None
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid)
     assert NamingOperations(ctx).realize(block.prose[0].text) == "the blonde girl approaches at Market Square."
     assert ledger.graph.value_hash() == before
+    assert block.prose[4].text == ["The blonde girl waits; the blonde girl watches Ringo."]
     choose(ledger)
     texts = contents(ledger)
     assert "the blonde girl approaches at Market Square." in texts
@@ -57,6 +60,7 @@ def test_world_links_roles_and_orders_provider_knowledge(ledger: Ledger) -> None
     assert "The blonde girl waits; the blonde girl watches Ringo." in texts
     assert "Rin #intro stays literal here." in texts
     assert "Explicit template: Rin." in texts
+    assert "An #introvert joins the #introduction." in texts
     speakers = [f.speaker_name for f in ledger.get_journal() if isinstance(f, AttributedFragment)]
     assert speakers == ["the blonde girl", "Rin"]
     assert ledger.graph.find_one(Selector(label="nanae", has_kind=Actor)).peek_knowledge() is None
@@ -74,6 +78,9 @@ def test_same_compiled_link_follows_recast_and_never_inherits_knowledge(ledger: 
     role.set_provider(nanae)
     assert NamingOperations(ctx).realize(block.prose[0].text) == "the brunette girl approaches at Market Square."
     assert nanae.peek_knowledge() is None
+    assert NamingOperations(ctx).realize(block.prose[4].text) == (
+        "The blonde girl waits; the blonde girl watches Ringo."
+    )
     restored = Ledger.structure(ledger.unstructure())
     restored_ctx = PhaseCtx(graph=restored.graph, cursor_id=restored.cursor_id)
     assert NamingOperations(restored_ctx).realize(restored.cursor.prose[0].text) == "the brunette girl approaches at Market Square."
@@ -83,6 +90,7 @@ def test_same_compiled_link_follows_recast_and_never_inherits_knowledge(ledger: 
     assert "Nanae smiles. Nanae waves." in contents(ledger)
     assert nanae.peek_knowledge().state == "IDENTIFIED"
     assert ledger.cursor.prose == compiled
+    assert contents(ledger).count("The blonde girl waits; the blonde girl watches Ringo.") == 2
 
 
 def test_unbound_nearer_role_does_not_fall_through_to_outer_provider(ledger: Ledger) -> None:
@@ -99,7 +107,7 @@ def test_unbound_nearer_role_does_not_fall_through_to_outer_provider(ledger: Led
         NamingOperations(ctx).resolve(BindingReference(scope="meeting", label="host"))
 
 
-def test_reference_environment_roundtrip_preserves_full_nominal_and_whitespace(ledger: Ledger) -> None:
+def test_reference_environment_roundtrip_keeps_descriptions_literal(ledger: Ledger) -> None:
     block = ledger.graph.find_one(Selector(label="introduction", has_kind=ProseBlock))
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid)
     rin = ctx.get_ns(block)["host"]
@@ -132,8 +140,8 @@ def test_scope_shadowing_source_preservation_and_distinct_scene_links() -> None:
     assert data == original
     parts = result["scenes"]["scene"]["blocks"]["start"]["prose"][0]["text"]
     assert parts[0] == ""
-    assert ", Ringo; " in parts
-    assert parts[3]["intent"] == "anonymous"
+    assert parts[1]["intent"] == "auto"
+    assert parts[2] == ", Ringo; the girl."
     near = result["scenes"]["scene"]["blocks"]["near"]["prose"][0]["text"]
     assert near[1]["ref"]["scope"] == "scene.near"
     assert " Rin " in near
@@ -147,7 +155,7 @@ def test_ambiguity_is_source_attributed_and_longest_spelling_wins() -> None:
     scene["roles"]["second"] = {"actor_ref": "rin"}
     with pytest.raises(ValueError, match=r"script:scene.start.prose\[0\]:0: ambiguous.*scene:host.*scene:second"):
         lower_linked_prose(data)
-    scene["link_forms"] = {"second": {"proper": "Rin Senior", "anonymous": "the elder"}}
+    scene["link_forms"] = {"second": {"proper": "Rin Senior"}}
     scene["blocks"]["start"]["content"] = "Rin Senior\tmet Rin."
     result = lower_linked_prose(data)
     parts = result["scenes"]["scene"]["blocks"]["start"]["prose"][0]["text"]
@@ -238,7 +246,94 @@ def test_scoped_template_supplies_spelling_without_becoming_the_durable_link() -
     scene["blocks"]["start"]["content"] = "Guest and a guest."
     parts = lower_linked_prose(data)["scenes"]["scene"]["blocks"]["start"]["prose"][0]["text"]
     assert parts[1]["ref"] == {"scope": "scene", "label": "host", "collection": "role_edges"}
-    assert parts[3]["intent"] == "anonymous"
+    assert parts[2] == " and a guest."
+
+
+def test_shared_descriptions_are_literal_and_not_ambiguous() -> None:
+    data = source()
+    data["actors"]["rin"]["anonymous_name"] = "the blonde girl"
+    data["actors"]["nanae"]["anonymous_name"] = "the blonde girl"
+    scene = data["scenes"]["scene"]
+    scene["roles"]["sister"] = {"actor_ref": "nanae"}
+    text = "The blonde girl\twatches the blonde girl. Rin passes Nanae."
+    scene["blocks"]["start"]["content"] = text
+    parts = lower_linked_prose(data)["scenes"]["scene"]["blocks"]["start"]["prose"][0]["text"]
+    assert parts[0] == "The blonde girl\twatches the blonde girl. "
+    assert [part["ref"]["label"] for part in parts if isinstance(part, dict)] == ["host", "sister"]
+    scene["link_forms"] = {"host": {"anonymous": "the girl"}}
+    with pytest.raises(ValueError, match="unsupported link_forms.*anonymous"):
+        lower_linked_prose(data)
+
+
+def test_explicit_anonymous_reference_reads_replaceable_runtime_wording(ledger: Ledger) -> None:
+    from tangl.core import BehaviorRegistry, DispatchLayer, Priority
+
+    block = ledger.graph.find_one(Selector(label="introduction", has_kind=ProseBlock))
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid)
+    parts = [ConceptReference(ref=BindingReference(scope="meeting", label="host"),
+                              intent="anonymous")]
+    assert NamingOperations(ctx).realize(parts) == "the blonde girl"
+    choose(ledger)
+    assert NamingOperations(ctx).realize(parts) == "the blonde girl"
+    role = ctx.get_ns(block)["host_role"]
+    role.requirement = Requirement(has_kind=Actor)
+    role.set_provider(ledger.graph.find_one(Selector(label="nanae", has_kind=Actor)))
+    assert NamingOperations(ctx).realize(parts) == "the brunette girl"
+    authority = BehaviorRegistry(default_dispatch_layer=DispatchLayer.AUTHOR)
+
+    @authority.register(task="render_text", priority=Priority.LATE)
+    def richer_wording(*, caller: Actor, aspect: str, **_kwargs: object) -> str | None:
+        return "a visitor in a rain-soaked coat" if aspect == "reference_anonymous" else None
+
+    ctx.local_authorities.append(authority)
+    before = ledger.graph.value_hash()
+    assert NamingOperations(ctx).realize(parts) == "a visitor in a rain-soaked coat"
+    assert NamingOperations(ctx).realize(block.prose[4].text) == (
+        "The blonde girl waits; the blonde girl watches Ringo."
+    )
+    assert ledger.graph.value_hash() == before
+
+
+@pytest.mark.parametrize("forms", [{}, {"Rin": [ConceptReference(ref="host")]}])
+@pytest.mark.parametrize("text", [
+    "#introduction #introvert",
+    "#introduction Rin #introvert Rin #introduction",
+    "Rin #introvert, Rin #introduction.",
+])
+def test_marker_prefix_words_remain_literal(
+    forms: dict[str, list[ConceptReference]], text: str,
+) -> None:
+    parts = link_text(text, forms, source="test")
+    assert "".join(part if isinstance(part, str) else "Rin" for part in parts) == text
+    assert all(not part.introduce for part in parts if isinstance(part, ConceptReference))
+
+
+@pytest.mark.parametrize("text", [
+    "Unknown #intro", "Unknown#intro!", "#intro, Rin", "Rin; #intro; Rin",
+    "Rin. the blonde girl #intro",
+])
+@pytest.mark.parametrize("forms", [{}, {"Rin": [ConceptReference(ref="host")]}])
+def test_unmatched_complete_markers_still_fail(
+    forms: dict[str, list[ConceptReference]], text: str,
+) -> None:
+    with pytest.raises(ValueError, match="intro"):
+        link_text(text, forms, source="test")
+
+
+@pytest.mark.parametrize("text", ["Rin #intro!", "Rin#intro,", "Rin\t#intro."])
+def test_complete_marker_recognition_and_name_escape(text: str) -> None:
+    forms = {"Rin": [ConceptReference(ref="host")]}
+    linked = link_text(text, forms, source="test")
+    assert linked[1].introduce is True
+    escaped = link_text("\\" + text, forms, source="test")
+    assert "".join(escaped) == text
+
+
+def test_descriptive_phrase_cannot_supply_an_introduction_referent() -> None:
+    data = source()
+    data["scenes"]["scene"]["blocks"]["start"]["content"] = "the girl #intro"
+    with pytest.raises(ValueError, match="unmatched #intro"):
+        lower_linked_prose(data)
 
 
 def test_constructor_restore_replay_and_actual_internal_return(ledger: Ledger) -> None:

@@ -67,7 +67,6 @@ class ConceptReference(BaseModelPlus):
     ref: str | BindingReference
     intent: ReferenceIntent = ReferenceIntent.AUTO
     introduce: bool = False
-    capitalize: bool = False
 
 
 class ProseSegment(BaseModelPlus):
@@ -175,7 +174,7 @@ class NamingOperations:
                 wording = self.introduce(target)
             else:
                 wording = self.reference(target, part.intent)
-            output.append(wording[:1].upper() + wording[1:] if part.capitalize else wording)
+            output.append(wording)
         return "".join(output)
 
 

@@ -109,3 +109,5 @@ def test_concept_linking_cli_witness_keeps_speech_literal_and_returns() -> None:
     returning = transcript.index("Rin approaches at Market Square.")
     assert before < speech < intro < later < returning
     assert transcript.count("Rin smiles. Rin waves.") == 2
+    assert transcript.count("The blonde girl waits; the blonde girl watches Ringo.") == 2
+    assert "An #introvert joins the #introduction." in transcript

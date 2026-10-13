@@ -18,9 +18,11 @@ from tangl.story.fabula import StoryCompiler
 
 from .dialog import DialogHandler
 from .naming import (
-    BindingReference, ConceptReference, HasNaming, NamingActor, NamingLocation,
-    ProseBlock, ReferenceIntent,
+    BindingReference, ConceptReference, NamingActor, NamingLocation, ProseBlock,
 )
+
+
+_INTRO_MARKER = re.compile(r"#intro\b")
 
 
 def _items(
@@ -76,22 +78,19 @@ def _catalog(
                 prototype = templates.find_one(Selector(label=qualified))
                 current = current.parent
         explicit = overrides.get(binding.label, {})
+        unsupported = set(explicit) - {"proper"}
+        if unsupported:
+            raise ValueError(
+                f"{binding.scope}:{binding.label}: unsupported link_forms {sorted(unsupported)}"
+            )
         proper = explicit.get("proper")
-        nominal = explicit.get("anonymous")
         if prototype is not None and isinstance(prototype.payload, (Actor, Location)):
             proper = proper or prototype.payload.name
-            if isinstance(prototype.payload, HasNaming):
-                nominal = nominal or prototype.payload.anonymous_name
-        adopted = [(binding.label, ReferenceIntent.AUTO, False)]
+        adopted = [binding.label]
         if proper:
-            adopted.append((proper, ReferenceIntent.AUTO, False))
-        if nominal:
-            adopted.append((nominal, ReferenceIntent.ANONYMOUS, False))
-            capitalized = nominal[:1].upper() + nominal[1:]
-            if capitalized != nominal:
-                adopted.append((capitalized, ReferenceIntent.ANONYMOUS, True))
-        for spelling, intent, capitalize in adopted:
-            reference = ConceptReference(ref=binding, intent=intent, capitalize=capitalize)
+            adopted.append(proper)
+        for spelling in adopted:
+            reference = ConceptReference(ref=binding)
             bucket = forms.setdefault(spelling, [])
             if reference not in bucket:
                 bucket.append(reference)
@@ -103,18 +102,18 @@ def link_text(
 ) -> list[str | ConceptReference]:
     """Exact boundaries and longest match; a backslash escapes one adopted form."""
     if not forms:
-        if "#intro" in text:
+        if _INTRO_MARKER.search(text):
             raise ValueError(f"{source}: introduction has no eligible binding")
         return [text]
     spellings = sorted(forms, key=lambda value: (-len(value), value))
     pattern = re.compile(r"(?P<escape>\\)?(?<!\w)(?P<form>" + "|".join(
         re.escape(value) for value in spellings
-    ) + r")(?!\w)(?P<intro>[ \t]*#intro\b)?")
+    ) + rf")(?!\w)(?P<intro>[ \t]*{_INTRO_MARKER.pattern})?")
     parts: list[str | ConceptReference] = []
     offset = 0
     for match in pattern.finditer(text):
         literal = text[offset:match.start()]
-        if "#intro" in literal:
+        if _INTRO_MARKER.search(literal):
             raise ValueError(f"{source}:{offset}: unmatched #intro; eligible={spellings}")
         parts.append(literal)
         if match["escape"]:
@@ -130,7 +129,7 @@ def link_text(
         offset = match.end()
     tail = text[offset:]
     parts.append(tail)
-    if "#intro" in tail:
+    if _INTRO_MARKER.search(tail):
         raise ValueError(f"{source}: unmatched #intro; eligible={spellings}")
     return parts
 

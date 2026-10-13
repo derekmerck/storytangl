@@ -33,11 +33,20 @@
 The implementation boundary is documented in
 `engine/src/tangl/prose/PROSE_DESIGN.md` and the executable world's README.
 It adopts only exact scoped binding symbols, unambiguous proper reference-cast
-spellings, and one full anonymous nominal. Ordinary proper spellings lower to
+spellings. Automatic naming is one-way: authors write proper reference-cast
+names for adaptive naming; descriptive text such as `the blonde girl` remains
+literal before/after introduction or recasting. No anonymous-phrase adoption,
+initial-capital variant adoption, or `link_forms.anonymous` route is supported.
+This approved narrowing supersedes the earlier anonymous-adoption proposal
+throughout this note. Explicit anonymous semantic references/template APIs and
+replaceable runtime anonymous wording remain supported. Ordinary proper spellings lower to
 AUTO, not forced PROPER. Narrative `#intro` is an explicit ordered disclosure;
 dialog names and markers remain literal. Actor/Location templates supply
 spellings, while durable links address Role/Setting declarations by owner path
-and edge label, and dereference current providers at realization.
+and edge label, and dereference current providers at realization. Complete-marker
+recognition and diagnostics use the same `#intro\b` boundary: `#introduction`
+and `#introvert` are literal. A descriptive phrase followed by actual `#intro`
+is an unmatched instruction, not a guessed referent.
 
 The source frontend is world-local and separately opted in via the existing
 codec contribution seam, plus `link_prose` at world/scene/block scope. Raw
@@ -214,7 +223,12 @@ of the local symbol.
 The compiler needs a policy for deciding which clumps of text "belong" to a
 role. Call that policy an **adoption plan**.
 
-Under a reference cast, role `rin` may adopt forms such as:
+The following broader adoption plan is historical/future exploration, not the
+approved exact grammar. Anonymous descriptive adoption in particular has been
+superseded by the one-way naming rule above; it would require a separate explicit
+adoption contract, not inference from runtime descriptions.
+
+Under such a broader reference cast, role `rin` might adopt forms such as:
 
 ```text
 Rin
@@ -757,13 +771,12 @@ Suggested slice:
    world/scene.
 2. Build a reference-cast adoption table for scene roles from:
    - proper name;
-   - one anonymous nominal;
+   - exact role symbol;
    - explicit `#intro` marker.
 3. Link only exact, unambiguous references. No generic NLP or broad coreference.
 4. Preserve realization intent:
-   - proper;
-   - indefinite nominal;
-   - definite nominal;
+   - automatic policy-aware naming;
+   - explicit forced anonymous/proper semantic references (not lexical descriptions);
    - identity disclosure.
 5. Lower linked references through one initial backend, probably Jinja because
    the runtime already supports `TextRenderSession`, while keeping the

@@ -31,21 +31,33 @@ without recompiling and does not inherit Rin's knowledge. Earlier fragments
 remain historical output. The tests recast, restore, replay, roll back, and
 follow an actual return edge.
 
+Automatic naming is one-way. Write the reference cast's proper name for adaptive
+naming: `Rin` may render anonymously before introduction and follow a recast
+provider afterward. Authored `the blonde girl` and `The blonde girl` are literal
+descriptions, not inferred identities; they remain unchanged across introduction
+and recasting, even with multiple blonde people. Explicit semantic references
+with `intent: anonymous` and `reference(host, 'anonymous')` still select a
+referent and use its current replaceable runtime wording. Actor `anonymous_name`
+remains available for concealed proper-name AUTO references.
+
 Only visible Role/Setting declarations are eligible. Templates supply proper
-and anonymous reference spellings, not frozen actor identities. Nearer bindings
+reference spellings, not runtime descriptions or frozen actor identities. Nearer bindings
 shadow outer ones; two roles adopting the same spelling are ambiguous. Use an
 exact role symbol or an explicit mapping when spelling differs from the
 reference prototype:
 
 ```yaml
 link_forms:
-  host: {proper: Rin, anonymous: the blonde girl}
+  host: {proper: Rin}
 ```
 
 Matching preserves punctuation and whitespace, uses exact word boundaries and
-longest spellings, and adopts the entire anonymous nominal with its determiner.
-Its initial-capital spelling is supported; arbitrary case/determiner changes
-are not. `Rin#intro` and `Rin #intro` are equivalent. `\Rin #intro` escapes
+longest proper spellings. Descriptions are never adopted, including initial-capital
+variants, and `link_forms.anonymous` is not supported.
+`Rin#intro` and `Rin #intro` are equivalent. Only complete `#intro` markers count;
+`#introduction` and `#introvert` remain literal. A descriptive phrase followed by
+actual `#intro` lacks a linked referent and fails rather than identifying anyone.
+`\Rin #intro` escapes
 that mention and its marker, producing literal `Rin #intro`. `link_prose: false`
 leaves a block's raw content untouched.
 

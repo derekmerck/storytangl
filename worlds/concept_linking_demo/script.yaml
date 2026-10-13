@@ -32,6 +32,7 @@ scenes:
           - raw: true
             text: "Rin #intro stays literal here."
           - template: "Explicit template: {{ reference(host, 'proper') }}."
+          - text: "An #introvert joins the #introduction."
         actions:
           - {text: Later, successor: later.start}
       shadow:
