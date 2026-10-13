@@ -414,6 +414,81 @@ downstream presentation concerns.
 
 ## Inline disclosure and introductions
 
+### Approved naming and dialog boundary (#534)
+
+This clarification governs the naming slice and supersedes broader introductory
+examples below where they imply automatic processing of spoken dialog. It is an
+approved contract, not a claim that every authoring adapter is implemented.
+
+Three operations must remain distinct:
+
+| Operation | Uses current naming policy | Changes narrator knowledge |
+| --- | --- | --- |
+| Literal authored dialog body | No | No |
+| Explicit concept reference or resolved speaker display label | Yes | No |
+| Explicit introduction | As required for its authored output | Yes |
+
+"Read-only" references are non-disclosing reads of concept/narrator state; they
+may produce different output as that state changes. They neither create unknown
+knowledge records nor mark a concept identified. Rendering a different speaker
+label changes the output, not the concept's name, graph label, or knowledge.
+Previously emitted journal text remains historical output, not a live view.
+
+Spoken text instead preserves what the author says the character uttered. For
+example, when neither Rin nor Nanae has been identified to the active narrator:
+
+```text
+[Rin] This is my sister, Nanae.
+Nanae #intro smiles at you.
+```
+
+The intended output is:
+
+```text
+[the blonde girl] This is my sister, Nanae.
+Nanae smiles at you.
+```
+
+The name in the speech stays literal; it is not substituted with Nanae's
+anonymous nominal. The following explicit narrative introduction identifies
+Nanae, not Rin. Neither a proper name appearing in speech nor a resolved speaker
+label implies disclosure. Do not parse introduction markers or adopt concept
+references automatically inside dialog bodies in this slice. Recognizing a
+speaking role does not select a different narrator or infer the speaker's own
+epistemic state.
+
+An author may intentionally override that literal floor through an explicit
+semantic instruction. Effects, template calls, and compiler-lowered macros are
+three authoring forms of the same idempotent introduction transition on the
+actual provider for the selected narrator:
+
+- An UPDATE effect introduces before the turn's prose and labels are realized.
+- An explicit template call introduces at its evaluation position, including
+  mid-dialog if deliberately authored. A non-printing Jinja form is
+  `{% set _ = introduce(rin) %}`; exact public helper spelling is adapter-specific.
+- An opted-in compiler may lower narrative `#intro` into a position-preserving,
+  template-neutral semantic introduction. Lexical lowering remains #534 slice 2;
+  the marker is an instruction, not evidence inferred from a name or quotation.
+
+Introduction is therefore not intrinsically a JOURNAL-only operation. Authored
+effects may call it at a normal mutation boundary, while the journal adapter
+may call it during explicit ordered realization. Previewing or resolving an
+ordinary reference/label never calls it implicitly. Keep normal phase mutation
+rules and diagnostics; this is not blanket permission for implicit render effects.
+
+A speaker label resolves before its utterance. If an explicit template call
+introduces Rin inside that utterance, that label stays anonymous and later labels
+may use Rin. The explicit call does not authorize rewriting other literal names
+in the speech. Generated output must not be recursively executed as template code.
+
+Successful persistence, replay, and existing explicit rollback must retain
+introductions. Unexpected traversal exceptions follow the existing non-atomic
+failure contract; automatic recovery and safe retry are separate VM design work,
+not prerequisites for this slice. Likewise, constructing another ServiceManager
+does not reset World singletons, domain classes, or dispatch authorities. A
+fresh-process restoration witness must perform normal world bootstrap before
+opening the saved session. Soft reset/hot reload is a separate future feature.
+
 Anonymous-until-met is one narrow application of linked prose.
 
 An author-friendly marker such as:
