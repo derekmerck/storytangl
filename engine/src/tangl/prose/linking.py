@@ -107,7 +107,7 @@ def link_text(
             raise ValueError(f"{source}: introduction has no eligible binding")
         return [text]
     spellings = sorted(forms, key=lambda value: (-len(value), value))
-    pattern = re.compile(r"(?<!\w)(?P<escape>\\)?(?P<form>" + "|".join(
+    pattern = re.compile(r"(?P<escape>\\)?(?<!\w)(?P<form>" + "|".join(
         re.escape(value) for value in spellings
     ) + r")(?!\w)(?P<intro>[ \t]*#intro\b)?")
     parts: list[str | ConceptReference] = []

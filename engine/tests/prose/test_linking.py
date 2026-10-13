@@ -156,16 +156,18 @@ def test_ambiguity_is_source_attributed_and_longest_spelling_wins() -> None:
     assert parts[3]["ref"]["label"] == "host"
 
 
-def test_raw_optout_templates_and_escapes_are_not_lexically_interpreted() -> None:
+@pytest.mark.parametrize("prefix", ["", "word"])
+def test_raw_optout_templates_and_escapes_are_not_lexically_interpreted(prefix: str) -> None:
     data = source()
     blocks = data["scenes"]["scene"]["blocks"]
     blocks["start"]["link_prose"] = False
     blocks["jinja"] = {"content": "Rin {{ 'Rin #intro' }} {% set Rin = 1 %}"}
-    blocks["escaped"] = {"content": r"\Rin #intro meets Rin."}
+    blocks["escaped"] = {"content": prefix + r"\Rin #intro meets Rin."}
     result = lower_linked_prose(data)
     assert result["scenes"]["scene"]["blocks"]["start"]["content"] == "Rin, Ringo; the girl."
     assert result["scenes"]["scene"]["blocks"]["jinja"] == blocks["jinja"]
     parts = result["scenes"]["scene"]["blocks"]["escaped"]["prose"][0]["text"]
+    assert parts[0] == prefix
     assert "Rin #intro" in parts
     assert parts[3]["introduce"] is False
     blocks["bad"] = {"content": "Unknown #intro"}
