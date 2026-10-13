@@ -82,10 +82,39 @@ The worked example for the full gather → enrich → compose pipeline is the
 
 - client-format shaping such as HTML policy or transport DTO construction
 - media dereference or client capability negotiation
-- mutation of runtime, world, or graph state
+- arbitrary mutation of runtime, world, or graph state
 - silent erasure of provenance metadata when an equivalent replacement trail is possible
 
 ## Metadata Preservation
+
+### Explicit concept disclosure exception
+
+Optional `tangl.prose.naming` owns one narrow JOURNAL-time state change:
+`introduce()` identifies the current actor/place provider for the active
+narrator immediately at its explicit ordered reference position. Ordinary
+auto/proper/anonymous references, speaker/choice display reads, previews, and
+namespace gathering do not create or change knowledge records. Introduction
+is not inferred from quoting or requesting proper wording.
+The same explicit operation is supported from authored UPDATE/FINALIZE effects
+at normal mutation boundaries; a template call such as
+`{% set _ = introduce(rin) %}` executes intentionally at its ordered position.
+Literal spoken bodies are not automatically linked or interpreted as disclosure.
+Ordinary dialog speaker labels use the optional `reference_auto` text-aspect
+read at composition, preserving vanilla fallback when no adapter participates.
+Whole-block templates bind these labels after evaluation; ProseSegments are the
+ordered adapter for a label that must resolve before its body.
+
+The successful traversal's normal graph patch records identification. Stored
+fragments retain their original wording. This exception does not authorize
+other render helpers to perform gameplay effects, and VM mutation diagnostics
+remain enabled.
+
+Failure atomicity is not supplied by the current runtime. An exception in a
+later JOURNAL/compose handler, FINALIZE, or POSTREQS can leave partially applied
+state, including introductions, without corresponding committed output.
+Exceptions propagate; no safe retry/continuation guarantee is added. General
+failed-traversal recovery is out of scope for #534 slice 1. Successful replay
+and existing explicit rollback remain required and are separate from recovery.
 
 When a fragment carries `step`, `source_id`, `origin_id`, `tags`, or hint models,
 a transform must preserve those fields unless the replacement fragment explicitly

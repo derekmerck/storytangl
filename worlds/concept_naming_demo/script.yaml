@@ -1,0 +1,73 @@
+label: concept_naming_demo
+globals:
+  naming_defaults:
+    Actor: concealed
+    Location: proper
+actors:
+  rin:
+    kind: NamingActor
+    name: Rin
+    anonymous_name: the blonde girl
+  beth:
+    kind: NamingActor
+    name: Beth
+    anonymous_name: the dark-haired girl
+  nanae:
+    kind: NamingActor
+    name: Nanae
+    anonymous_name: the brunette girl
+locations:
+  square:
+    kind: NamingLocation
+    name: Market Square
+  hideout:
+    kind: NamingLocation
+    name: Rin's Hideout
+    anonymous_name: a hidden room
+    naming_policy: concealed
+scenes:
+  meeting:
+    roles:
+      host: {actor_ref: rin}
+      sister: {actor_ref: nanae}
+    settings:
+      place: {location_ref: square}
+    blocks:
+      start:
+        content: You arrive.
+        actions:
+          - {text: Meet the girl, successor: introduction}
+          - {text: Introduce before prose, successor: effect_introduction}
+      effect_introduction:
+        kind: ProseBlock
+        pre_effects: ["introduce(host)"]
+        prose:
+          - speaker: host
+            text: ["This is my sister, Nanae."]
+        actions:
+          - {text: Continue, successor: later.start}
+      introduction:
+        kind: ProseBlock
+        prose:
+          - text: [{ref: host}, " approaches at ", {ref: place}, "."]
+          - speaker: host
+            text: ["Hi, I am ", {ref: host, introduce: true}, "."]
+          - text: [{ref: host}, " smiles."]
+          - speaker: host
+            template: "{{ reference(host, 'anonymous') }} is still an available description."
+        actions:
+          - label: greet_host
+            text: Greet the host
+            successor: later.start
+        choice_labels:
+          greet_host: ["Say hi to ", {ref: host}]
+  later:
+    roles:
+      host: {actor_ref: rin}
+    blocks:
+      start:
+        kind: ProseBlock
+        prose:
+          - template: "Hello again, {{ reference(host) }}."
+        actions:
+          - {text: Return, successor: meeting.introduction}

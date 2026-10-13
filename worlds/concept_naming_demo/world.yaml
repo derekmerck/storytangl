@@ -1,0 +1,7 @@
+label: concept_naming_demo
+scripts: script.yaml
+domain_module: concept_naming_demo.domain
+metadata:
+  title: Meeting Rin
+  author: StoryTangl
+  start_at: meeting.start

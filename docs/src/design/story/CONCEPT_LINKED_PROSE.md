@@ -7,9 +7,11 @@
 :related: observation, lang, roles, journal, compiler
 ```
 
-> **Status:** DESIGN — opt-in concept linking for authored prose, with a
-> template-neutral linked-text model and journal-time revoicing. This is not a
-> migration plan and does not change the current raw-text floor.
+> **Status:** #534 slice 1 implements explicit concept references and naming in
+> optional `tangl.prose.naming`, with the executable `concept_naming_demo` world.
+> Exact-reference lexical linking remains slice 2. The broader linguistic
+> adoption/revoicing discussion below is future design, not shipped behavior.
+> The live #534 contract and its exception-recovery scope comment govern this note.
 >
 > **Scope:** how an author may write ordinary prose against a convenient
 > reference cast while the compiler links references to scene-local semantic
@@ -106,6 +108,11 @@ linked form L = link(S, E)
 render(L, E) == normalize(S)
 ```
 
+That reference environment must include matching naming policy and narrator
+knowledge. An anonymous runtime need not reproduce proper names in the source;
+ordinary linked names use automatic policy selection rather than forced proper
+wording.
+
 `normalize` may remove compiler-only authoring hints such as `/r`, `her_`,
 or `#intro`, but it must not change the ordinary prose they annotate.
 
@@ -193,7 +200,7 @@ Those strings do not all mean the same realization. They link to the same role
 with different **reference intent**:
 
 ```text
-Rin               → Ref(rin, PROPER)
+Rin               → Ref(rin, AUTO)
 the blonde girl   → Ref(rin, NOMINAL, DEFINITE)
 a blonde girl     → Ref(rin, NOMINAL, INDEFINITE)
 Ms. Northstar     → Ref(rin, ALIAS=gamer, HONORIFIC)
@@ -407,6 +414,85 @@ downstream presentation concerns.
 
 ## Inline disclosure and introductions
 
+### Approved naming and dialog boundary (#534)
+
+This clarification governs the naming slice and supersedes broader introductory
+examples below where they imply automatic processing of spoken dialog. It is an
+approved contract, not a claim that every authoring adapter is implemented.
+
+Three operations must remain distinct:
+
+| Operation | Uses current naming policy | Changes narrator knowledge |
+| --- | --- | --- |
+| Literal authored dialog body | No | No |
+| Explicit concept reference or resolved speaker display label | Yes | No |
+| Explicit introduction | As required for its authored output | Yes |
+
+"Read-only" references are non-disclosing reads of concept/narrator state; they
+may produce different output as that state changes. They neither create unknown
+knowledge records nor mark a concept identified. Rendering a different speaker
+label changes the output, not the concept's name, graph label, or knowledge.
+Previously emitted journal text remains historical output, not a live view.
+
+Spoken text instead preserves what the author says the character uttered. For
+example, when neither Rin nor Nanae has been identified to the active narrator:
+
+```text
+[Rin] This is my sister, Nanae.
+Nanae #intro smiles at you.
+```
+
+The intended output is:
+
+```text
+[the blonde girl] This is my sister, Nanae.
+Nanae smiles at you.
+```
+
+The name in the speech stays literal; it is not substituted with Nanae's
+anonymous nominal. The following explicit narrative introduction identifies
+Nanae, not Rin. Neither a proper name appearing in speech nor a resolved speaker
+label implies disclosure. Do not parse introduction markers or adopt concept
+references automatically inside dialog bodies in this slice. Recognizing a
+speaking role does not select a different narrator or infer the speaker's own
+epistemic state.
+
+An author may intentionally override that literal floor through an explicit
+semantic instruction. Effects, template calls, and compiler-lowered macros are
+three authoring forms of the same idempotent introduction transition on the
+actual provider for the selected narrator:
+
+- An UPDATE effect introduces before the turn's prose and labels are realized.
+- An explicit template call introduces at its evaluation position, including
+  mid-dialog if deliberately authored. A non-printing Jinja form is
+  `{% set _ = introduce(rin) %}`; exact public helper spelling is adapter-specific.
+- An opted-in compiler may lower narrative `#intro` into a position-preserving,
+  template-neutral semantic introduction. Lexical lowering remains #534 slice 2;
+  the marker is an instruction, not evidence inferred from a name or quotation.
+
+Introduction is therefore not intrinsically a JOURNAL-only operation. Authored
+effects may call it at a normal mutation boundary, while the journal adapter
+may call it during explicit ordered realization. Previewing or resolving an
+ordinary reference/label never calls it implicitly. Keep normal phase mutation
+rules and diagnostics; this is not blanket permission for implicit render effects.
+
+An ordered ProseSegment speaker label resolves before its utterance. If an explicit template call
+introduces Rin inside that utterance, that label stays anonymous and later labels
+may use Rin. The explicit call does not authorize rewriting other literal names
+in the speech. The ordered adapter does not re-execute generated wording as template code.
+Ordinary raw/Jinja whole-block templates retain their existing evaluation and
+composition order: labels bind afterward and see current/end-of-block knowledge.
+Explicit calls there remain allowed, but per-utterance pre-body naming is not
+promised. Authors needing that timing use ordered ProseSegment values.
+
+Successful persistence, replay, and existing explicit rollback must retain
+introductions. Unexpected traversal exceptions follow the existing non-atomic
+failure contract; automatic recovery and safe retry are separate VM design work,
+not prerequisites for this slice. Likewise, constructing another ServiceManager
+does not reset World singletons, domain classes, or dispatch authorities. A
+fresh-process restoration witness must perform normal world bootstrap before
+opening the saved session. Soft reset/hot reload is a separate future feature.
+
 Anonymous-until-met is one narrow application of linked prose.
 
 An author-friendly marker such as:
@@ -427,12 +513,12 @@ or, in a Jinja backend:
 I'm {{ rin.nominal(intro=True) }}.
 ```
 
-The exact runtime mechanism is an implementation choice: the render session may
-stage the disclosure and commit it at the normal Story phase boundary, or a
-journal-time semantic primitive may mutate patch-tracked narrator knowledge
-directly. The important design requirement is that the compiler can **see the
-semantic disclosure** rather than discovering it only from opaque arbitrary
-code.
+The shipped semantic introduction immediately identifies the actual provider
+for the active narrator during explicit ordered JOURNAL realization or normal
+UPDATE/FINALIZE effects. Forced proper wording alone does not
+identify it. There is no staged receipt or deferred FINALIZE disclosure.
+The explicit reference vocabulary preserves referent, intent, and introduction
+independently of template syntax. Lexical `#intro` recognition is still deferred.
 
 Repeated introductions are idempotent:
 
@@ -448,15 +534,9 @@ optional: "Catch it, Rin #intro!"
 required: "I'm Rin #intro and this is Tisato #intro."
 ```
 
-Internal paths may therefore temporarily disagree about knowledge state. The
-scene-level invariant is stronger and more useful:
-
-> **For each relevant concept, all exits from a scene must agree on the
-> epistemic state the scene guarantees.**
-
-If one complete path exits with Rin identified and another exits with Rin still
-unknown, that is a compile-time story inconsistency unless the scene explicitly
-models divergent epistemic outcomes.
+Different paths and exits may legitimately leave different narrator knowledge.
+There is no mandatory equal-knowledge-at-every-exit check. Guaranteed-introduction
+postconditions and bounded scene analysis require a separate consumer/contract.
 
 The same mechanism can later express disclosure of aliases, relationships,
 locations, object identities, or other knowledge without inventing a separate
@@ -573,7 +653,68 @@ runtime presentation mechanisms.
 
 ---
 
-## First implementation slice
+## Delivered first implementation slice
+
+World domains import `tangl.prose.naming` and expose its `get_authorities()`
+before normal compilation. `NamingActor` / `NamingLocation` add optional anonymous
+wording and concept policy overrides. `ProseBlock` contains ordered segments and
+explicit concept-linked `choice_labels`, keyed by stable action label.
+
+The shared `NamingOperations.reference()` resolves a Role/Setting to its current
+provider and reads its narrator record without creating one. `introduce()` owns
+creation/writes during UPDATE/FINALIZE effects or actual JOURNAL realization. Named text aspects
+`reference_auto`, `reference_proper`, and `reference_anonymous` use existing Story
+dispatch, permitting world authorities to replace wording through that seam.
+
+Precedence is explicit concept override (including `off`), then the closest
+matching kind in the provider's MRO in world `naming_defaults`, then `off`.
+`concealed` selects anonymous wording until identified; `proper` selects proper
+wording without disclosure on read. Missing anonymous wording raises an error
+identifying the provider and source block. No Presence dependency is required.
+
+Each segment resolves its speaker display name before realizing its body.
+References in the body run left to right; later segments and choices observe
+immediate introductions. Speaker/action IDs remain unchanged. Literal segments
+remain opaque; a segment's explicit Jinja `template` evaluates once against the
+same `reference` / `introduce` operations. Generated wording is not recursively
+re-evaluated. Arbitrary Jinja is a Python-native escape hatch, not portable IR.
+
+Successful constructor-form and JSON service restoration, patch replay, explicit
+rollback, narrator isolation, provider recasting, and historical wording are
+covered by `engine/tests/prose/test_naming.py`. Raw worlds need no adoption.
+
+### Ordinary dialog ordering: resolved bounded scope
+
+The existing raw/Jinja pipeline evaluates an entire block through
+`story.system_handlers._render_text()` before `compose_dialog_markup()` calls
+`DialogHandler.parse()` and binds speakers. A compiled-world probe starts with
+unknown Rin, introduces her through a non-printing template call in the first
+utterance, and then emits a second utterance. At composition time both labels
+see `IDENTIFIED`, producing `[Rin, Rin]`. This is the approved ordinary
+whole-block limitation; ordered ProseSegments instead produce
+`[the blonde girl, Rin]`. The literal body `This is my sister, Nanae.` remains
+unchanged throughout. Introducing Nanae never implicitly identifies Rin.
+
+The human resolved the checkpoint by retaining ordinary realization order and
+using ProseSegment when precise timing matters. Resolved ordinary labels now
+use the adopted `reference_auto` text-aspect policy as a non-disclosing read at
+the existing composition point; absent an adapter, vanilla display-name fallback
+is unchanged. No early parsing, template splitting, retrospective snapshot,
+lexical body rewrite, or multiple-narrator inference is installed.
+
+### Existing failure seam
+
+A real compiled-world probe introduced Rin during JOURNAL and raised in FINALIZE.
+It left Rin identified, emitted no introduction output or failed-hop patch, and
+constructor restore preserved that identification. UPDATE and other mutations
+can likewise remain partially applied. Automatic failed-traversal recovery is
+outside this slice by the human design decision recorded on #534. Unexpected
+exceptions propagate; safe continuation/retry of a partially executed live
+story is not promised. No Frame callback, prose undo accumulator, transaction
+framework, or deferred disclosure is installed. Existing explicit rollback is
+distinct from automatic exception recovery.
+
+## Deferred exact-reference linking slice
 
 The first issue should prove the concept with the smallest useful consumer:
 **epistemic naming of scene roles**.
@@ -598,8 +739,8 @@ Suggested slice:
 6. At JOURNAL realization, resolve the scene role to its current provider and
    render against narrator knowledge.
 7. Make identity disclosure idempotent and patch/replay-safe.
-8. Validate the scene's guaranteed identification state across all exits when
-   introduction markers participate in optional paths.
+8. Permit divergent knowledge at exits; optional guaranteed-introduction
+   analysis is a separate future contract.
 9. Round-trip every linked fixture under the reference cast.
 10. Fail compilation on ambiguity rather than guessing.
 

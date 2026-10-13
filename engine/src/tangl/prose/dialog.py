@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from uuid import UUID
 
 from tangl.journal.fragments import AttributedFragment, ContentFragment
@@ -174,7 +174,10 @@ class DialogMuBlock(MuBlock):
     presentation_hints: PresentationHints | None = None
     media_payload: Any = None
 
-    def bind(self, *, ns: Mapping[str, Any] | None = None, ctx: Any = None) -> "DialogMuBlock":
+    def bind(
+        self, *, ns: Mapping[str, Any] | None = None, ctx: Any = None,
+        name_resolver: Callable[[object], str | None] | None = None,
+    ) -> "DialogMuBlock":
         """Resolve speaker metadata against the current render namespace."""
         self.speaker_key = None
         self.speaker_id = None
@@ -192,7 +195,11 @@ class DialogMuBlock(MuBlock):
         if binding is not None:
             subject = binding.subject
             self.speaker_key = binding.key
-            self.speaker_name = _speaker_display_name(subject, self.label)
+            resolved_name = name_resolver(subject) if name_resolver is not None else None
+            self.speaker_name = (
+                resolved_name if resolved_name is not None
+                else _speaker_display_name(subject, self.label)
+            )
             self.media_payload = _speaker_media_payload(
                 subject,
                 dialog_class=self.dialog_class,
@@ -322,7 +329,8 @@ class DialogHandler(MuBlockHandler):
 
     @classmethod
     def parse(
-        cls, text: str, *, source_id: UUID | None = None, **_: object
+        cls, text: str, *, source_id: UUID | None = None,
+        name_resolver: Callable[[object], str | None] | None = None, **_: object,
     ) -> list[DialogMuBlock]:
         mu_blocks: list[DialogMuBlock] = []
 
@@ -345,7 +353,10 @@ class DialogHandler(MuBlockHandler):
 
         ns = _.get("ns")
         render_ctx = _.get("ctx")
-        return [mu_block.bind(ns=ns, ctx=render_ctx) for mu_block in mu_blocks]
+        return [
+            mu_block.bind(ns=ns, ctx=render_ctx, name_resolver=name_resolver)
+            for mu_block in mu_blocks
+        ]
 
     @classmethod
     def _parse_dialog_paragraph(
