@@ -1,0 +1,50 @@
+label: concept_linking_demo
+link_prose: true
+globals:
+  naming_defaults: {Actor: concealed, Location: proper}
+actors:
+  rin: {kind: NamingActor, name: Rin, anonymous_name: the blonde girl}
+  nanae: {kind: NamingActor, name: Nanae, anonymous_name: the brunette girl}
+locations:
+  square: {kind: NamingLocation, name: Market Square}
+scenes:
+  meeting:
+    roles:
+      host: {actor_ref: rin}
+      sister: {actor_ref: nanae}
+    settings:
+      place: {location_ref: square}
+    blocks:
+      start:
+        link_prose: false
+        content: Rin waits. No lexical consent here.
+        actions:
+          - {text: Meet, successor: introduction}
+      introduction:
+        prose:
+          - text: "Rin approaches at Market Square."
+          - speaker: host
+            text: "This is my sister, Nanae. Rin #intro."
+          - text: "Rin #intro smiles. Rin waves."
+          - speaker: host
+            text: "Nanae is still a literal spoken name."
+          - text: "The blonde girl waits; the blonde girl watches Ringo."
+          - raw: true
+            text: "Rin #intro stays literal here."
+          - template: "Explicit template: {{ reference(host, 'proper') }}."
+        actions:
+          - {text: Later, successor: later.start}
+      shadow:
+        roles:
+          host: {actor_ref: nanae}
+        content: "host waits."
+        actions:
+          - {text: Return, successor: introduction}
+  later:
+    roles:
+      host: {actor_ref: nanae}
+    blocks:
+      start:
+        content: "Nanae greets you."
+        actions:
+          - {text: Return, successor: meeting.introduction}

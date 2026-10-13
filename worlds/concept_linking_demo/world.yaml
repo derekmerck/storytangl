@@ -1,0 +1,8 @@
+label: concept_linking_demo
+scripts: script.yaml
+codec: linked_prose_yaml
+domain_module: concept_linking_demo.domain
+metadata:
+  title: Recasting Rin
+  author: StoryTangl
+  start_at: meeting.start

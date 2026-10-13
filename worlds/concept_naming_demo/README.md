@@ -21,7 +21,8 @@ Block `choice_labels` maps explicit action labels to the same references but
 forbids introductions.
 
 Ordinary raw `content` and `text` remain unchanged. Exact-name/phrase linking
-and `#intro` lexical syntax belong to #534 slice 2.
+and `#intro` lexical syntax are separately adopted in the slice-2
+[`concept_linking_demo`](../concept_linking_demo/) world.
 
 The alternate start choice demonstrates the explicit authored mutation form:
 `pre_effects: ["introduce(host)"]` identifies before turn prose. Non-printing

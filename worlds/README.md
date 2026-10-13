@@ -44,6 +44,7 @@ shape stays visible.
 | **Night Shift** (`ed_queue_demo`) | A deterministic discrete-event queue simulation that reports through normal journal fragments. | You want simulation state to participate in a story without a second runtime. |
 | **[Fogbound Manifest](composed_beat_demo/)** (`composed_beat_demo`) | Journal gather → enrich → compose, including cross-phase contribution and post-merge assembly. | You want to control how several semantic contributions become one narrated beat. |
 | **[Meeting Rin](concept_naming_demo/)** (`concept_naming_demo`) | Explicit actor/place naming and narrator-local introductions, with linked speaker and choice labels. | You want anonymous-before/known-after prose without world-specific knowledge checks. |
+| **[Recasting Rin](concept_linking_demo/)** (`concept_linking_demo`) | Opt-in exact narrative linking through scoped roles/settings, with literal speech and ordered introductions. | You want compiled prose to follow a role's current provider without rewriting passages. |
 
 Meeting Rin remembers the person across scenes, preserves literal spoken names,
 and proves recognition through JSON service restoration, replay, and a CLI witness.

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from enum import Enum
+from typing import Literal
 
 from pydantic import Field
 
@@ -52,12 +53,21 @@ class NamingLocation(HasNaming, Location):
     """Location adopting the same prose naming vocabulary as actors."""
 
 
+class BindingReference(BaseModelPlus):
+    """Symbolic declaration identity, not the reference cast's provider identity."""
+
+    scope: str
+    label: str
+    collection: Literal["role_edges", "setting_edges"] = "role_edges"
+
+
 class ConceptReference(BaseModelPlus):
     """A namespace referent and wording intent, independent of template syntax."""
 
-    ref: str
+    ref: str | BindingReference
     intent: ReferenceIntent = ReferenceIntent.AUTO
     introduce: bool = False
+    capitalize: bool = False
 
 
 class ProseSegment(BaseModelPlus):
@@ -65,7 +75,7 @@ class ProseSegment(BaseModelPlus):
 
     text: list[str | ConceptReference] = Field(default_factory=list)
     template: str | None = None
-    speaker: str | None = None
+    speaker: str | BindingReference | None = None
 
 
 class ProseBlock(Block):
@@ -90,6 +100,15 @@ class NamingOperations:
         if not isinstance(concept, (Actor, Location)):
             raise TypeError(f"Naming requires a bound actor/place provider at {target!r}")
         return concept
+
+    def resolve(self, ref: str | BindingReference) -> Referent:
+        ns = self.ctx.get_ns(self.ctx.cursor)
+        if isinstance(ref, str):
+            return ns[ref]
+        edge = ns[ref.collection][ref.label]
+        if edge.predecessor.path != ref.scope:
+            raise LookupError(f"Binding {ref.scope}:{ref.label} is outside the current scope")
+        return edge
 
     def policy(self, concept: Concept) -> NamingPolicy:
         if isinstance(concept, HasNaming) and concept.naming_policy is not None:
@@ -144,19 +163,19 @@ class NamingOperations:
         return wording
 
     def realize(self, parts: list[str | ConceptReference], *, disclose: bool = False) -> str:
-        ns = self.ctx.get_ns(self.ctx.cursor)
         output: list[str] = []
         for part in parts:
             if isinstance(part, str):
                 output.append(part)
                 continue
-            target = ns[part.ref]
+            target = self.resolve(part.ref)
             if part.introduce:
                 if not disclose:
                     raise ValueError(f"Introduction forbidden in display label: {part.ref!r}")
-                output.append(self.introduce(target))
+                wording = self.introduce(target)
             else:
-                output.append(self.reference(target, part.intent))
+                wording = self.reference(target, part.intent)
+            output.append(wording[:1].upper() + wording[1:] if part.capitalize else wording)
         return "".join(output)
 
 
@@ -195,9 +214,11 @@ def render_linked_prose(
     for segment in caller.prose:
         dialog = None
         if segment.speaker is not None:
-            target = operations.provider(ns[segment.speaker])
-            dialog = DialogMuBlock(label=segment.speaker, dialog_class="dialog", source_id=caller.uid)
-            dialog.bind(ns={segment.speaker: target}, ctx=ctx)
+            target = operations.provider(operations.resolve(segment.speaker))
+            label = (segment.speaker if isinstance(segment.speaker, str)
+                     else segment.speaker.label)
+            dialog = DialogMuBlock(label=label, dialog_class="dialog", source_id=caller.uid)
+            dialog.bind(ns={label: target}, ctx=ctx)
             dialog.speaker_name = operations.reference(target)
         if segment.template is not None:
             # Explicit Jinja instructions execute once. Generated wording is

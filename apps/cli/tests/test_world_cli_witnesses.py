@@ -98,3 +98,14 @@ def test_concept_naming_cli_witness_introduces_and_remembers_provider() -> None:
     choice = transcript.index("Say hi to Rin")
     later = transcript.index("Hello again, Rin.")
     assert before < intro < after < choice < later
+
+
+def test_concept_linking_cli_witness_keeps_speech_literal_and_returns() -> None:
+    transcript = _run_world_script("concept_linking_demo")
+    before = transcript.index("the blonde girl approaches at Market Square.")
+    speech = transcript.index("This is my sister, Nanae. Rin #intro.")
+    intro = transcript.index("Rin smiles. Rin waves.")
+    later = transcript.index("the brunette girl greets you.")
+    returning = transcript.index("Rin approaches at Market Square.")
+    assert before < speech < intro < later < returning
+    assert transcript.count("Rin smiles. Rin waves.") == 2

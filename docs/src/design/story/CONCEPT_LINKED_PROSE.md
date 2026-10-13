@@ -9,7 +9,9 @@
 
 > **Status:** #534 slice 1 implements explicit concept references and naming in
 > optional `tangl.prose.naming`, with the executable `concept_naming_demo` world.
-> Exact-reference lexical linking remains slice 2. The broader linguistic
+> Slice 2 adds exact scoped Role/Setting lexical linking in optional
+> `tangl.prose.linking`, with the executable `concept_linking_demo` world.
+> The broader linguistic
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
 >
@@ -23,6 +25,35 @@
 > composition contract; `engine/src/tangl/story/OBSERVATION_DESIGN.md` owns the
 > proposed vantage/observation boundary. This note fills the missing middle:
 > **referent linking and re-realization of authored prose**.
+
+---
+
+## Shipped exact-linking grammar (#534 slice 2)
+
+The implementation boundary is documented in
+`engine/src/tangl/prose/PROSE_DESIGN.md` and the executable world's README.
+It adopts only exact scoped binding symbols, unambiguous proper reference-cast
+spellings, and one full anonymous nominal. Ordinary proper spellings lower to
+AUTO, not forced PROPER. Narrative `#intro` is an explicit ordered disclosure;
+dialog names and markers remain literal. Actor/Location templates supply
+spellings, while durable links address Role/Setting declarations by owner path
+and edge label, and dereference current providers at realization.
+
+The source frontend is world-local and separately opted in via the existing
+codec contribution seam, plus `link_prose` at world/scene/block scope. Raw
+segments and escaped adopted forms bypass linking. Explicit template segments
+are opaque to the linker; ordinary whole-block Jinja retains its old path.
+Interleaving templates, lexical narrative, and literal dialog requires ordered
+segments. Opted-in dialog callout content is rejected with an instruction to
+use speaker segments. No arbitrary Markdown/template AST, NLP, pronoun,
+determiner, alias, or spoken-name inference is implemented.
+
+Catalog compilation does not create a runtime graph or mutate knowledge. Normal
+constructor-form/JSON restoration, patch replay, and explicit rollback retain
+symbolic links and historical output. Fresh-process restore still requires
+normal world bootstrap. No custom persistence serializer or failure-recovery
+mechanism is introduced. The broader examples below are design direction, not
+additional syntax supported by this exact frontend.
 
 ---
 
@@ -466,8 +497,8 @@ actual provider for the selected narrator:
 - An explicit template call introduces at its evaluation position, including
   mid-dialog if deliberately authored. A non-printing Jinja form is
   `{% set _ = introduce(rin) %}`; exact public helper spelling is adapter-specific.
-- An opted-in compiler may lower narrative `#intro` into a position-preserving,
-  template-neutral semantic introduction. Lexical lowering remains #534 slice 2;
+- The opted-in exact frontend lowers narrative `#intro` into a position-preserving,
+  template-neutral semantic introduction in #534 slice 2;
   the marker is an instruction, not evidence inferred from a name or quotation.
 
 Introduction is therefore not intrinsically a JOURNAL-only operation. Authored
@@ -518,7 +549,8 @@ for the active narrator during explicit ordered JOURNAL realization or normal
 UPDATE/FINALIZE effects. Forced proper wording alone does not
 identify it. There is no staged receipt or deferred FINALIZE disclosure.
 The explicit reference vocabulary preserves referent, intent, and introduction
-independently of template syntax. Lexical `#intro` recognition is still deferred.
+independently of template syntax. Exact narrative `#intro` recognition is shipped;
+spoken introduction inference is not.
 
 Repeated introductions are idempotent:
 
