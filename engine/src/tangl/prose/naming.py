@@ -1,4 +1,4 @@
-"""Opt-in, provider-local naming and immediate journal introductions.
+"""Opt-in provider naming and explicit authored introductions.
 
 World domains import this extension before compilation and expose
 ``get_authorities()``. Raw prose remains opaque. ``ProseBlock`` segments carry
@@ -130,8 +130,10 @@ class NamingOperations:
         return concept.name or concept.get_label()
 
     def introduce(self, target: Referent) -> str:
-        if self.ctx.current_phase is not ResolutionPhase.JOURNAL:
-            raise RuntimeError("Introductions require actual JOURNAL realization")
+        if self.ctx.current_phase not in {
+            ResolutionPhase.UPDATE, ResolutionPhase.JOURNAL, ResolutionPhase.FINALIZE,
+        }:
+            raise RuntimeError("Introductions require UPDATE/FINALIZE or committed JOURNAL realization")
         concept = self.provider(target)
         wording = self.reference(concept, ReferenceIntent.PROPER)
         if self.policy(concept) is not NamingPolicy.OFF:

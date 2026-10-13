@@ -22,3 +22,14 @@ forbids introductions.
 
 Ordinary raw `content` and `text` remain unchanged. Exact-name/phrase linking
 and `#intro` lexical syntax belong to #534 slice 2.
+
+The alternate start choice demonstrates the explicit authored mutation form:
+`pre_effects: ["introduce(host)"]` identifies before turn prose. Non-printing
+template calls use `{% set _ = introduce(host) %}`; ProseSegment binds its
+speaker before evaluating the utterance, preserving that utterance's earlier
+display label. Names such as Nanae in literal speech are not rewritten or
+treated as introductions.
+
+Fresh-process JSON service restore must bootstrap the world normally with
+`manager.open_world("concept_naming_demo")` before opening the saved session.
+Reopening a manager within the same process is not a World/authority reset.

@@ -95,6 +95,10 @@ narrator immediately at its explicit ordered reference position. Ordinary
 auto/proper/anonymous references, speaker/choice display reads, previews, and
 namespace gathering do not create or change knowledge records. Introduction
 is not inferred from quoting or requesting proper wording.
+The same explicit operation is supported from authored UPDATE/FINALIZE effects
+at normal mutation boundaries; a template call such as
+`{% set _ = introduce(rin) %}` executes intentionally at its ordered position.
+Literal spoken bodies are not automatically linked or interpreted as disclosure.
 
 The successful traversal's normal graph patch records identification. Stored
 fragments retain their original wording. This exception does not authorize

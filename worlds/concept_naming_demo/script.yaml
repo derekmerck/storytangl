@@ -12,6 +12,10 @@ actors:
     kind: NamingActor
     name: Beth
     anonymous_name: the dark-haired girl
+  nanae:
+    kind: NamingActor
+    name: Nanae
+    anonymous_name: the brunette girl
 locations:
   square:
     kind: NamingLocation
@@ -25,6 +29,7 @@ scenes:
   meeting:
     roles:
       host: {actor_ref: rin}
+      sister: {actor_ref: nanae}
     settings:
       place: {location_ref: square}
     blocks:
@@ -32,6 +37,15 @@ scenes:
         content: You arrive.
         actions:
           - {text: Meet the girl, successor: introduction}
+          - {text: Introduce before prose, successor: effect_introduction}
+      effect_introduction:
+        kind: ProseBlock
+        pre_effects: ["introduce(host)"]
+        prose:
+          - speaker: host
+            text: ["This is my sister, Nanae."]
+        actions:
+          - {text: Continue, successor: later.start}
       introduction:
         kind: ProseBlock
         prose:

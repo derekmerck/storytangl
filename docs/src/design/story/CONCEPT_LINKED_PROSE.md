@@ -510,7 +510,8 @@ I'm {{ rin.nominal(intro=True) }}.
 ```
 
 The shipped semantic introduction immediately identifies the actual provider
-for the active narrator during JOURNAL. Forced proper wording alone does not
+for the active narrator during explicit ordered JOURNAL realization or normal
+UPDATE/FINALIZE effects. Forced proper wording alone does not
 identify it. There is no staged receipt or deferred FINALIZE disclosure.
 The explicit reference vocabulary preserves referent, intent, and introduction
 independently of template syntax. Lexical `#intro` recognition is still deferred.
@@ -657,7 +658,7 @@ explicit concept-linked `choice_labels`, keyed by stable action label.
 
 The shared `NamingOperations.reference()` resolves a Role/Setting to its current
 provider and reads its narrator record without creating one. `introduce()` owns
-creation/writes during actual JOURNAL realization. Named text aspects
+creation/writes during UPDATE/FINALIZE effects or actual JOURNAL realization. Named text aspects
 `reference_auto`, `reference_proper`, and `reference_anonymous` use existing Story
 dispatch, permitting world authorities to replace wording through that seam.
 
@@ -677,6 +678,23 @@ re-evaluated. Arbitrary Jinja is a Python-native escape hatch, not portable IR.
 Successful constructor-form and JSON service restoration, patch replay, explicit
 rollback, narrator isolation, provider recasting, and historical wording are
 covered by `engine/tests/prose/test_naming.py`. Raw worlds need no adoption.
+
+### Ordinary dialog ordering checkpoint (PR #555 revision)
+
+The existing raw/Jinja pipeline evaluates an entire block through
+`story.system_handlers._render_text()` before `compose_dialog_markup()` calls
+`DialogHandler.parse()` and binds speakers. A compiled-world probe starts with
+unknown Rin, introduces her through a non-printing template call in the first
+utterance, and then emits a second utterance. At composition time both labels
+see `IDENTIFIED`, producing `[Rin, Rin]`; the approved order requires
+`[the blonde girl, Rin]`. The literal body `This is my sister, Nanae.` remains
+unchanged throughout. Introducing Nanae never implicitly identifies Rin.
+
+`ProseSegment` already supplies the required bind-before-body ordering. Extending
+that to ordinary raw/Jinja dialog requires either an approved earlier
+parse/bind/realize contract or a deliberate scope restriction on stateful raw
+templates. No retrospective knowledge snapshot, lexical body rewrite, or
+multiple-narrator inference is installed to hide this ordering mismatch.
 
 ### Existing failure seam
 

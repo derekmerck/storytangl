@@ -1,6 +1,8 @@
 """Naming through world compilation, binding, JOURNAL, and stored output."""
 from collections.abc import Iterator
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -147,12 +149,90 @@ def test_json_service_roundtrip_retains_identification_and_output(
     result = manager.resolve_choice(user_id=user.uid, request=DirectEdgeRequest(edge_id=edge_id))
     assert any(isinstance(fragment, ChoiceFragment) and fragment.text == "Say hi to Rin"
                for fragment in result.fragments)
-    restarted = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path))
-    with restarted.open_session(user_id=user.uid) as session:
+    reopened = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path))
+    with reopened.open_session(user_id=user.uid) as session:
         actor = session.ledger.graph.find_one(Selector(has_kind=Actor, label="rin"))
         assert actor.peek_knowledge().state == "IDENTIFIED"
         assert any(getattr(fragment, "content", "") == "Hi, I am Rin."
                    for fragment in session.ledger.get_journal())
+    code = """
+from pathlib import Path
+import sys
+from uuid import UUID
+from tangl.core import Selector
+from tangl.persistence import PersistenceManagerFactory
+from tangl.service import ServiceManager
+from tangl.service.response import DirectEdgeRequest
+from tangl.story import Actor, World
+
+assert World.get_instance('concept_naming_demo') is None
+manager = ServiceManager(PersistenceManagerFactory.json_file(base_path=Path(sys.argv[1])))
+manager.open_world('concept_naming_demo')
+with manager.open_session(user_id=UUID(sys.argv[2])) as session:
+    actor = session.ledger.graph.find_one(Selector(has_kind=Actor, label='rin'))
+    assert actor.peek_knowledge().state == 'IDENTIFIED'
+    assert any(getattr(f, 'content', '') == 'Hi, I am Rin.' for f in session.ledger.get_journal())
+    assert any(getattr(f, 'text', '') == 'Say hi to Rin' for f in session.ledger.get_journal())
+    edge = next(session.ledger.cursor.edges_out())
+result = manager.resolve_choice(user_id=UUID(sys.argv[2]), request=DirectEdgeRequest(edge_id=edge.uid))
+assert any(getattr(f, 'content', '') == 'Hello again, Rin.' for f in result.fragments)
+print('bootstrapped cold restore and subsequent reference passed')
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path), str(user.uid)],
+        capture_output=True, text=True, check=True,
+    )
+    assert "bootstrapped cold restore" in completed.stdout
+
+
+def test_authored_update_introduction_precedes_prose_and_labels(ledger: Ledger) -> None:
+    edge = next(edge for edge in ledger.cursor.edges_out() if edge.text == "Introduce before prose")
+    ledger.resolve_choice(edge.uid)
+    speakers = [f for f in ledger.get_journal() if isinstance(f, AttributedFragment)]
+    assert speakers[0].speaker_name == "Rin"
+    assert speakers[0].content == "This is my sister, Nanae."
+
+
+def test_nonprinting_introduction_preserves_current_label_and_literal_names(ledger: Ledger) -> None:
+    from tangl.prose.naming import ProseBlock, ProseSegment
+
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
+    block.prose = [
+        ProseSegment(speaker="host", template="This is my sister, Nanae.{% set _ = introduce(host) %}"),
+        ProseSegment(speaker="host", text=["Hello again."]),
+    ]
+    meet(ledger)
+    speakers = [f for f in ledger.get_journal() if isinstance(f, AttributedFragment)]
+    assert [f.speaker_name for f in speakers] == ["the blonde girl", "Rin"]
+    assert speakers[0].content == "This is my sister, Nanae."
+
+
+def test_literal_spoken_name_does_not_introduce_speaker_or_sister(ledger: Ledger) -> None:
+    from tangl.prose.naming import ConceptReference, ProseBlock, ProseSegment
+
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
+    block.prose = [
+        ProseSegment(speaker="host", text=["This is my sister, Nanae."]),
+        ProseSegment(text=[ConceptReference(ref="sister", introduce=True), " smiles at you."]),
+    ]
+    meet(ledger)
+    speaker = next(f for f in ledger.get_journal() if isinstance(f, AttributedFragment))
+    assert speaker.speaker_name == "the blonde girl"
+    assert speaker.content == "This is my sister, Nanae."
+    rin = ledger.graph.find_one(Selector(has_kind=Actor, label="rin"))
+    nanae = ledger.graph.find_one(Selector(has_kind=Actor, label="nanae"))
+    assert rin.narrator_knowledge == {}
+    assert nanae.peek_knowledge().state == "IDENTIFIED"
+
+
+@pytest.mark.parametrize("phase", [ResolutionPhase.PLANNING, ResolutionPhase.PREREQS, ResolutionPhase.POSTREQS])
+def test_introduction_rejected_in_read_only_phases(ledger: Ledger, phase: ResolutionPhase) -> None:
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id, current_phase=phase)
+    actor = ctx.get_ns(ctx.cursor)["host"]
+    before = ledger.graph.value_hash()
+    with pytest.raises(RuntimeError, match="UPDATE/FINALIZE"):
+        NamingOperations(ctx).introduce(actor)
+    assert ledger.graph.value_hash() == before
 
 
 def test_jinja_and_semantic_references_share_policy_and_generated_text_is_literal(
@@ -160,7 +240,7 @@ def test_jinja_and_semantic_references_share_policy_and_generated_text_is_litera
 ) -> None:
     from tangl.prose.naming import ConceptReference, ProseBlock, ProseSegment
 
-    block = ledger.graph.find_one(Selector(has_kind=ProseBlock))
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [
         ProseSegment(template="{{ reference(host) }} / {{ introduce(host) }} / {{ reference(host) }}"),
         ProseSegment(text=[ConceptReference(ref="host", intent="anonymous"), " / ",
@@ -187,7 +267,7 @@ def test_template_generated_wording_is_not_executed_again(ledger: Ledger) -> Non
 
     actor = ledger.graph.find_one(Selector(has_kind=Actor, label="rin"))
     actor.name = "{{ introduce(host) }}"
-    block = ledger.graph.find_one(Selector(has_kind=ProseBlock))
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [ProseSegment(template="{{ reference(host, 'proper') }}")]
     meet(ledger)
     assert actor.narrator_knowledge == {}
