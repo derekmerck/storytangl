@@ -564,12 +564,12 @@ def test_dialog_mu_block_projection_is_fresh_and_sanitizes_tags() -> None:
     )
 
     before = mu_block.unstructure()
-    fragment = mu_block.to_fragment(ns={"Guide Actor": guide})
+    fragment = mu_block.prepare_fragment(ns={"Guide Actor": guide})
     assert "dialog_class:npc_annoyed" in fragment.presentation_hints.style_tags
     assert "speaker_key:guide_actor" in fragment.presentation_hints.style_tags
     assert fragment.speaker_id == str(guide.uid)
     assert fragment.media_payload is not None
-    unbound = mu_block.to_fragment(ns={})
+    unbound = mu_block.prepare_fragment(ns={})
     assert unbound.speaker_id is None
     assert unbound.speaker_key is None
     assert unbound.speaker_label is None

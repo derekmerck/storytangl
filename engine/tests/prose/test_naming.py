@@ -32,6 +32,89 @@ def meet(ledger: Ledger) -> None:
     ledger.resolve_choice(next(ledger.cursor.edges_out()).uid)
 
 
+def test_symbolic_role_speakers_resolve_provider_per_unit_before_metadata(
+    ledger: Ledger, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tangl.prose import DialogMuBlock
+    from tangl.prose.naming import ProseBlock, render_linked_prose
+
+    monkeypatch.setattr(NamingActor, "get_dialog_style",
+                        lambda self, dialog_class: {"speaker": self.label}, raising=False)
+    monkeypatch.setattr(NamingActor, "get_dialog_image",
+                        lambda self, dialog_class: f"{self.label}.svg", raising=False)
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid,
+                   current_phase=ResolutionPhase.JOURNAL)
+    ns = ctx.get_ns(block)
+    role = ns["host_role"]
+    rin = role.provider
+    role.requirement = Requirement(has_kind=Actor)
+    role.set_provider(rin)
+    beth = ledger.graph.find_one(Selector(label="beth", has_kind=Actor))
+    ns["replacement"] = beth
+    block.prose = [
+        DialogMuBlock(label="host_role", dialog_class="NPC.happy",
+                      template="{% set _ = host_role.set_provider(replacement) %}Hello."),
+        DialogMuBlock(label="host_role", dialog_class="NPC.happy", text="Again."),
+    ]
+    authored = [unit.unstructure() for unit in block.prose]
+    first, second = render_linked_prose(caller=block, ctx=ctx)
+    assert [first.speaker_key, second.speaker_key] == ["host_role", "host_role"]
+    assert [first.speaker_id, second.speaker_id] == [str(rin.uid), str(beth.uid)]
+    assert [first.speaker_label, second.speaker_label] == ["rin", "beth"]
+    assert [first.speaker_name, second.speaker_name] == ["the blonde girl", "the dark-haired girl"]
+    assert first.presentation_hints.style_dict == {"speaker": "rin"}
+    assert second.presentation_hints.style_dict == {"speaker": "beth"}
+    assert first.media_payload["ref"] == "rin.svg"
+    assert second.media_payload["ref"] == "beth.svg"
+    assert rin.peek_knowledge() is None and beth.peek_knowledge() is None
+    assert [unit.unstructure() for unit in block.prose] == authored
+    before = ledger.graph.value_hash()
+    assert render_linked_prose(caller=block, ctx=ctx)[0].speaker_id == str(beth.uid)
+    assert ledger.graph.value_hash() == before
+
+
+@pytest.mark.parametrize("unbound", [False, True])
+def test_explicit_speaker_missing_or_unbound_fails_before_body(
+    ledger: Ledger, unbound: bool,
+) -> None:
+    from tangl.prose import DialogMuBlock
+    from tangl.prose.naming import ProseBlock, render_linked_prose
+
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid,
+                   current_phase=ResolutionPhase.JOURNAL)
+    if unbound:
+        ctx.get_ns(block)["host_role"].set_provider(None)
+    block.prose = [DialogMuBlock(
+        label="host_role" if unbound else "unbound_role", dialog_class="dialog",
+        template="{{ introduce(sister) }}",
+    )]
+    before = ledger.graph.value_hash()
+    with pytest.raises(TypeError if unbound else KeyError):
+        render_linked_prose(caller=block, ctx=ctx)
+    assert ledger.graph.value_hash() == before
+    assert ctx.get_ns(block)["sister"].peek_knowledge() is None
+
+
+def test_symbolic_setting_speaker_projects_location_not_setting(ledger: Ledger) -> None:
+    from tangl.prose import DialogMuBlock
+    from tangl.prose.naming import ProseBlock, render_linked_prose
+
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid,
+                   current_phase=ResolutionPhase.JOURNAL)
+    setting = ctx.get_ns(block)["place_setting"]
+    block.prose = [DialogMuBlock(label="place_setting", dialog_class="aside", text="Welcome.")]
+    before = ledger.graph.value_hash()
+    fragment = render_linked_prose(caller=block, ctx=ctx)[0]
+    assert fragment.speaker_key == "place_setting"
+    assert fragment.speaker_id == str(setting.provider.uid)
+    assert fragment.speaker_label == "square"
+    assert fragment.speaker_name == "Market Square"
+    assert ledger.graph.value_hash() == before
+
+
 def test_ordered_introduction_and_shared_speaker_choice_names(ledger: Ledger) -> None:
     meet(ledger)
     journal = ledger.get_journal()

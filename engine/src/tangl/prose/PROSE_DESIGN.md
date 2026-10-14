@@ -14,6 +14,13 @@ or fragment hierarchy; its behaviors use normal Story/VM dispatch tasks.
 `ConceptReference` is a small value describing a namespace referent, wording
 intent, and introduction. `MuBlock` and its existing `DialogMuBlock` specialization
 are the shared authored vocabulary for ordered bodies and symbolic speakers.
+The authoritative ownership boundary is
+[Registry-owned entities and owner-local embedded values](../../../../ARCHITECTURE.md#registry-owned-entities-and-owner-local-embedded-values).
+Mu-blocks are non-graph authored values, not Entities or graph children. They have
+no UID; `source_id` names a donating entity. The block is their owner, not a
+hierarchical parent. Render context supplies access without stored owner fields
+or an additional manager. Reused embedded values do not promise shared identity
+after restoration; actual entity references resolve through the registry.
 They contain no live graph pointers. Embedded ownership opts into the existing
 constructor-form field recursion; transient parsing uses the very same values.
 Concepts store proper
@@ -72,8 +79,15 @@ Naming defaults do not automatically migrate raw worlds to this adapter.
 `DialogHandler.parse` uses the existing callout grammar and returns authored
 structure only. It accepts no namespace and never fetches names, styles/media,
 or knowledge. `DialogHandler.render` is the shared ordered path for parsed and
-stored input; the naming adapter supplies only its name/part resolvers. Speaker
-metadata is projected into a fresh existing fragment before its body evaluates.
+stored input. `prepare_fragment` prepares fresh metadata before the handler fills
+the body; it is not complete realization. The naming adapter supplies its
+speaker/name/part resolvers. Explicit symbolic speakers require an exact current
+namespace binding; Role/Setting values dereference their current provider before
+name, ID, style and media projection, per unit rather than frozen for a block.
+The original symbolic key remains attribution, while all provider metadata belongs
+to the actor/location. Missing or unbound semantic speakers fail before their
+bodies run. Ordinary callout display-label fallback remains unchanged without
+the strict resolver. Speaker metadata is projected before its body evaluates.
 Explicit templates execute once, with generated wording treated as output.
 Literal body names and #intro markers are never inferred disclosures.
 
@@ -85,6 +99,17 @@ recursion markers, not custom serializers. Constructor and actual JSON-backed
 restore retain authored classes/parts and reproject bindings using the normally
 bootstrapped world authorities. No new foundational persistence decision was
 needed. #555 recast, replay, rollback, and cold-restore witnesses remain required.
+
+Flat JSON recovery uses the concrete supported variants declared in the owning
+field. A custom DialogMuBlock subtype is supported when the owner's `prose`
+annotation explicitly includes it and retains `include=True` and
+`unstructurable=True`. The former retains nondefault in-place edits; the latter
+requests constructor-form recursion. The positive custom owner-graph JSON witness
+retains the subtype, its authored fields, and its preparation behavior. No global
+embedded-class registry, Entity-based embedding inference, broad coercion, or
+pickle-style alias memoization is provided. Owner back-pointers/caches, if used
+by other embedded types, stay excluded and are rebound normally; mu-blocks do
+not need them.
 
 Slice 1 deliberately does not implement NamedConcept, automatic runtime adoption,
 inherited-name catalogs, binding-owned spelling aliases, lexical #intro parsing,

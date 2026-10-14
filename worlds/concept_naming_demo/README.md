@@ -47,3 +47,12 @@ without fetching names/media. Rendering returns fresh fragments and never binds
 back onto graph-owned source values. Stored units use the existing constructor-
 form embedding path, not a prose-specific serializer. Automatic lexical linking
 is not part of this foundation slice; explicit references and effects already work.
+
+The shared `prepare_fragment` seam resolves metadata before body evaluation;
+MuBlockHandler.render completes ordered realization. Structured speaker labels
+are strict namespace symbols: `host_role` resolves to its current Actor before
+name, identity, style or media are read, while attribution retains `host_role`.
+Missing/unbound symbols fail before the body. Ordinary callout display labels
+keep their existing fallback. Custom stored variants must appear explicitly in
+the owning prose-field annotation with both persistence markers; a global type
+registry or owner pointer on each mu-block is unnecessary.

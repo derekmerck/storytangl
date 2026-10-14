@@ -38,6 +38,7 @@ class ConceptReference(Unstructurable):
 
 PartResolver = Callable[[list[str | ConceptReference]], str]
 NameResolver = Callable[[object], str | None]
+SpeakerResolver = Callable[[str], object]
 
 
 class MuBlock(Unstructurable):
@@ -58,10 +59,12 @@ class MuBlock(Unstructurable):
             raise ValueError("A micro-block accepts text or template, not both")
         return self
 
-    def to_fragment(
+    def prepare_fragment(
         self, *, source_id: UUID | None = None, ns: Mapping[str, object] | None = None,
         ctx: VmPhaseCtx | None = None, name_resolver: NameResolver | None = None,
+        speaker_resolver: SpeakerResolver | None = None,
     ) -> ContentFragment:
+        """Prepare fresh metadata before the handler realizes the body."""
         hints = None
         if self.style_cls or self.style_dict:
             hints = PresentationHints(style_name=self.style_cls, style_dict=dict(self.style_dict))
@@ -86,12 +89,14 @@ class MuBlockHandler(ABC):
         cls, mu_blocks: Sequence[MuBlock], *, ns: Mapping[str, object] | None = None,
         ctx: VmPhaseCtx | None = None, source_id: UUID | None = None,
         name_resolver: NameResolver | None = None, parts_resolver: PartResolver | None = None,
+        speaker_resolver: SpeakerResolver | None = None,
     ) -> list[ContentFragment]:
         fragments: list[ContentFragment] = []
         for authored in mu_blocks:
             # Bind the label before realizing its body, without touching the source.
-            fragment = authored.to_fragment(
+            fragment = authored.prepare_fragment(
                 ns=ns, ctx=ctx, source_id=source_id, name_resolver=name_resolver,
+                speaker_resolver=speaker_resolver,
             )
             if authored.template is not None:
                 if ctx is None:

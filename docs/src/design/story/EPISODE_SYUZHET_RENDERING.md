@@ -100,6 +100,10 @@ constructor-form path. No separate persistent segment schema remains.
 
 The shared ordered render path resolves speaker metadata before body realization
 into fresh journal fragments; it never mutates authored values with binding data.
+`prepare_fragment` is the metadata-only preparation seam; MuBlockHandler.render
+is complete ordered realization. Strict authored symbolic speakers resolve the
+current Role/Setting provider before all name/ID/style/media projection, preserving
+the original symbolic attribution key. Ordinary display-label fallback is separate.
 Explicit template bodies execute once. Existing naming operations supply pure
 reads and explicit introductions through that path, not another parser/binder/
 emitter. Ordinary whole-block raw/Jinja evaluation and late composition remain

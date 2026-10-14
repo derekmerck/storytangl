@@ -70,6 +70,10 @@ class NamingOperations:
             raise TypeError(f"Naming requires a bound actor/place provider at {target!r}")
         return concept
 
+    def speaker(self, symbol: str) -> Concept:
+        """Validate an authored symbol and dereference its current provider."""
+        return self.provider(self.ctx.get_ns(self.ctx.cursor)[symbol])
+
     def policy(self, concept: Concept) -> NamingPolicy:
         if isinstance(concept, HasNaming) and concept.naming_policy is not None:
             return concept.naming_policy
@@ -172,6 +176,7 @@ def render_linked_prose(
     fragments = DialogHandler.render(
         caller.prose, ns=ctx.get_ns(caller), ctx=ctx, source_id=caller.uid,
         name_resolver=operations.reference,
+        speaker_resolver=operations.speaker,
         parts_resolver=lambda parts: operations.realize(parts, disclose=True),
     )
     return fragments or None

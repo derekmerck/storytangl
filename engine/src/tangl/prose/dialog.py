@@ -27,7 +27,7 @@ from tangl.presentation.hints import PresentationHints
 from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.ctx import VmPhaseCtx
 
-from .mu_block import MuBlock, MuBlockHandler, NameResolver
+from .mu_block import MuBlock, MuBlockHandler, NameResolver, SpeakerResolver
 
 
 @dataclass(slots=True)
@@ -174,14 +174,18 @@ class DialogMuBlock(MuBlock):
     def attitude(self) -> str | None:
         return _split_dialog_class(self.dialog_class)[1]
 
-    def to_fragment(
+    def prepare_fragment(
         self, *, source_id: UUID | None = None, ns: Mapping[str, object] | None = None,
         ctx: VmPhaseCtx | None = None, name_resolver: NameResolver | None = None,
+        speaker_resolver: SpeakerResolver | None = None,
     ) -> AttributedFragment:
-        """Project binding into a fresh fragment; never write it onto authored data."""
+        """Resolve provider metadata into a fresh fragment before body realization."""
         speaker_key = speaker_id = speaker_label = speaker_name = None
         media_payload = None
-        binding = _speaker_binding(self.label, ns)
+        if self.label is not None and speaker_resolver is not None:
+            binding = DialogSpeakerBinding(key=self.label, subject=speaker_resolver(self.label))
+        else:
+            binding = _speaker_binding(self.label, ns)
         style_dict: dict[str, str] = {}
         if binding is not None:
             subject = binding.subject
