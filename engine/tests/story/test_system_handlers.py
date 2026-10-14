@@ -555,7 +555,7 @@ def test_dispatch_journal_dialog_composition_enriches_speaker_formatting() -> No
     assert fragment.media_payload["attitude"] == "annoyed"
 
 
-def test_dialog_mu_block_rebinding_resets_stale_speaker_state_and_sanitizes_tags() -> None:
+def test_dialog_mu_block_projection_is_fresh_and_sanitizes_tags() -> None:
     _graph, _block, guide = _presence_story()
     mu_block = DialogMuBlock(
         text="Welcome.",
@@ -563,23 +563,50 @@ def test_dialog_mu_block_rebinding_resets_stale_speaker_state_and_sanitizes_tags
         dialog_class="NPC.annoyed",
     )
 
-    mu_block.bind(ns={"Guide Actor": guide}, ctx=None)
+    before = mu_block.unstructure()
+    fragment = mu_block.to_fragment(ns={"Guide Actor": guide})
+    assert "dialog_class:npc_annoyed" in fragment.presentation_hints.style_tags
+    assert "speaker_key:guide_actor" in fragment.presentation_hints.style_tags
+    assert fragment.speaker_id == str(guide.uid)
+    assert fragment.media_payload is not None
+    unbound = mu_block.to_fragment(ns={})
+    assert unbound.speaker_id is None
+    assert unbound.speaker_key is None
+    assert unbound.speaker_label is None
+    assert unbound.media_payload is None
+    assert "speaker:guide_actor" in unbound.presentation_hints.style_tags
+    assert "speaker:guide_actor" in unbound.tags
+    assert mu_block.unstructure() == before
 
-    assert "dialog_class:npc_annoyed" in mu_block.presentation_hints.style_tags
-    assert "speaker_key:guide_actor" in mu_block.presentation_hints.style_tags
-    assert mu_block.speaker_id == str(guide.uid)
-    assert mu_block.media_payload is not None
 
-    mu_block.label = "Unknown Person"
-    mu_block.bind(ns={}, ctx=None)
-    fragment = mu_block.to_fragment()
+def test_parsed_and_stored_dialog_use_the_same_projection_metadata() -> None:
+    from tangl.prose import DialogHandler
+    from tangl.prose.naming import ProseBlock
 
-    assert mu_block.speaker_id is None
-    assert mu_block.speaker_key is None
-    assert mu_block.speaker_label is None
-    assert mu_block.media_payload is None
-    assert "speaker:unknown_person" in mu_block.presentation_hints.style_tags
-    assert "speaker:unknown_person" in fragment.tags
+    graph, block, guide = _presence_story()
+    parsed = DialogHandler.parse(
+        "> [!NPC.annoyed]+ guide\n> Welcome.", source_id=block.uid,
+    )
+    parsed[0].style_cls = "custom"
+    parsed[0].style_dict = {"font-weight": "800"}
+    owner = ProseBlock(label="stored", prose=parsed, registry=graph)
+    restored = StoryGraph.structure(graph.unstructure())
+    stored = restored.get(owner.uid).prose
+    before = [unit.unstructure() for unit in stored]
+    actual = DialogHandler.render(parsed, ns={"guide": guide})[0]
+    equivalent = DialogHandler.render(stored, ns={"guide": guide})[0]
+    for field in ("content", "who", "how", "source_id", "speaker_key", "speaker_id",
+                  "speaker_label", "speaker_name", "speaker_attitude", "dialog_mode",
+                  "media_payload", "tags", "presentation_hints"):
+        assert getattr(actual, field) == getattr(equivalent, field)
+    assert equivalent.source_id == block.uid
+    assert equivalent.how == "NPC.annoyed"
+    assert equivalent.presentation_hints.style_name == "custom"
+    assert equivalent.presentation_hints.style_dict == {
+        "font-weight": "800", "letter-spacing": "0.02em",
+    }
+    assert equivalent.media_payload["attitude"] == "annoyed"
+    assert [unit.unstructure() for unit in stored] == before
 
 
 def test_render_block_facade_uses_compose_journal_with_phase_ctx() -> None:

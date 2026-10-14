@@ -9,9 +9,17 @@
 
 > **Status:** #534 slice 1 implements explicit concept references and naming in
 > optional `tangl.prose.naming`, with the executable `concept_naming_demo` world.
-> Exact-reference lexical linking remains slice 2. The broader linguistic
+> The approved replacement foundation consolidates authored mu-blocks. Generic
+> NamedConcept and runtime scoped exact adoption are subsequent bounded slices.
+> The broader linguistic
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
+
+> **Approved replacement direction (2026-10-13):** #557 remains open and unmerged
+> as a salvage reference. Its compile-time-only authorization gate is superseded
+> by mu-block-centered projection, not merged into this replacement. The former
+> separate segment model is removed in favor of MuBlock/DialogMuBlock. #555's
+> optional naming, pure reads, explicit introductions and choice naming remain.
 >
 > **Scope:** how an author may write ordinary prose against a convenient
 > reference cast while the compiler links references to scene-local semantic
@@ -23,6 +31,43 @@
 > composition contract; `engine/src/tangl/story/OBSERVATION_DESIGN.md` owns the
 > proposed vantage/observation boundary. This note fills the missing middle:
 > **referent linking and re-realization of authored prose**.
+
+---
+
+## Approved mu-block projection pipeline
+
+Authored content -> authored mu-blocks -> scoped symbolic references -> ordered
+realization -> existing journal fragments -> existing composition/transport.
+These stages admit parsing, optional preprocessing, exact-reference linking and
+custom realization tools, with identity/no-op paths where no adapter is adopted.
+A compiler may lint or pre-parse; runtime tools may discover references against
+their current scope. No compile-time catalog is required to authorize runtime
+references. Whole-catalog lint remains advisory/separate.
+
+The foundation slice ships one authored vocabulary for parsed and stored input:
+MuBlock owns literal text/ordered ConceptReference parts OR an explicit template;
+DialogMuBlock adds the symbolic speaker label and full callout class. Text and
+template are mutually exclusive. Mode/attitude derive from the full class. The
+existing DialogHandler grammar parses structure without name/media/knowledge
+access, and its shared ordered render path projects into fresh existing fragments.
+Speaker labels resolve before bodies; intentional template introductions execute
+once. Literal speech, including ordinary names and #intro text, is not adopted.
+
+Graph-owned authored values never receive mutating bind calls or retain bound
+names, styles, media or rendered text. Transient parsing and persistent embedded
+ownership use the same types; ordinary include/constructor-recursion markers
+retain stored classes and parts. Normal JSON service bootstrap reconstructs the
+world authority before reprojecting bindings. No new serializer, renderer-result
+union, dispatch mechanism, VM phase or fragment hierarchy is introduced.
+Later composition can filter, combine, layer or ignore projected fragments.
+
+Generic optional NamedConcept is slice 2; runtime scoped exact adoption is slice 3.
+Future adoption may retain #557's useful longest-match/complete-marker/escape,
+ambiguity/source and one-way description tests, not its compile-time gate.
+Default adoption remains one-way: proper forms can adapt, anonymous descriptions
+remain literal absent deliberate custom adoption. Namespace-only/inherited
+concepts and binding-owned stable aliases belong to that later slice. They are
+not prerequisites for explicit references/effects already available to Cedar.
 
 ---
 
@@ -476,14 +521,14 @@ may call it during explicit ordered realization. Previewing or resolving an
 ordinary reference/label never calls it implicitly. Keep normal phase mutation
 rules and diagnostics; this is not blanket permission for implicit render effects.
 
-An ordered ProseSegment speaker label resolves before its utterance. If an explicit template call
+An ordered authored mu-block speaker label resolves before its utterance. If an explicit template call
 introduces Rin inside that utterance, that label stays anonymous and later labels
 may use Rin. The explicit call does not authorize rewriting other literal names
 in the speech. The ordered adapter does not re-execute generated wording as template code.
 Ordinary raw/Jinja whole-block templates retain their existing evaluation and
 composition order: labels bind afterward and see current/end-of-block knowledge.
 Explicit calls there remain allowed, but per-utterance pre-body naming is not
-promised. Authors needing that timing use ordered ProseSegment values.
+promised. Authors needing that timing use ordered mu-block values.
 
 Successful persistence, replay, and existing explicit rollback must retain
 introductions. Unexpected traversal exceptions follow the existing non-atomic
@@ -657,7 +702,7 @@ runtime presentation mechanisms.
 
 World domains import `tangl.prose.naming` and expose its `get_authorities()`
 before normal compilation. `NamingActor` / `NamingLocation` add optional anonymous
-wording and concept policy overrides. `ProseBlock` contains ordered segments and
+wording and concept policy overrides. `ProseBlock` contains ordered authored mu-blocks and
 explicit concept-linked `choice_labels`, keyed by stable action label.
 
 The shared `NamingOperations.reference()` resolves a Role/Setting to its current
@@ -691,12 +736,12 @@ The existing raw/Jinja pipeline evaluates an entire block through
 unknown Rin, introduces her through a non-printing template call in the first
 utterance, and then emits a second utterance. At composition time both labels
 see `IDENTIFIED`, producing `[Rin, Rin]`. This is the approved ordinary
-whole-block limitation; ordered ProseSegments instead produce
+whole-block limitation; ordered mu-blocks instead produce
 `[the blonde girl, Rin]`. The literal body `This is my sister, Nanae.` remains
 unchanged throughout. Introducing Nanae never implicitly identifies Rin.
 
 The human resolved the checkpoint by retaining ordinary realization order and
-using ProseSegment when precise timing matters. Resolved ordinary labels now
+using authored mu-blocks when precise timing matters. Resolved ordinary labels now
 use the adopted `reference_auto` text-aspect policy as a non-disclosing read at
 the existing composition point; absent an adapter, vanilla display-name fallback
 is unchanged. No early parsing, template splitting, retrospective snapshot,

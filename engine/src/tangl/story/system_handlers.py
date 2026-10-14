@@ -909,12 +909,16 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
             mu_blocks = DialogHandler.parse(
                 fragment.content,
                 source_id=getattr(fragment, "source_id", None),
+            )
+            rendered = DialogHandler.render(
+                mu_blocks,
                 ns=ns,
                 ctx=ctx,
                 name_resolver=speaker_name if ctx is not None else None,
             )
-            rendered = DialogHandler.render(mu_blocks)
             for rendered_fragment in rendered:
+                if not rendered_fragment.content:
+                    continue
                 updated_tags = set(rendered_fragment.tags or set())
                 if getattr(fragment, "tags", None):
                     updated_tags |= set(fragment.tags)

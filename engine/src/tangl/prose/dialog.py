@@ -19,14 +19,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.journal.fragments import AttributedFragment, ContentFragment
 from tangl.presentation.hints import PresentationHints
 from tangl.utils.sanitize_str import sanitize_str
+from tangl.vm.ctx import VmPhaseCtx
 
-from .mu_block import MuBlock, MuBlockHandler
+from .mu_block import MuBlock, MuBlockHandler, NameResolver
 
 
 @dataclass(slots=True)
@@ -160,115 +161,90 @@ def _speaker_binding(label: str | None, ns: Mapping[str, Any] | None) -> DialogS
     return None
 
 
-@dataclass(slots=True)
 class DialogMuBlock(MuBlock):
-    """Dialog utterance with optional speaker metadata."""
+    """Authored callout; symbolic label and full class survive until projection."""
 
     dialog_class: str = "narration"
-    dialog_mode: str | None = None
-    attitude: str | None = None
-    speaker_key: str | None = None
-    speaker_id: str | None = None
-    speaker_label: str | None = None
-    speaker_name: str | None = None
-    presentation_hints: PresentationHints | None = None
-    media_payload: Any = None
 
-    def bind(
-        self, *, ns: Mapping[str, Any] | None = None, ctx: Any = None,
-        name_resolver: Callable[[object], str | None] | None = None,
-    ) -> "DialogMuBlock":
-        """Resolve speaker metadata against the current render namespace."""
-        self.speaker_key = None
-        self.speaker_id = None
-        self.speaker_label = None
-        self.speaker_name = None
-        self.presentation_hints = None
-        self.media_payload = None
+    @property
+    def dialog_mode(self) -> str:
+        return _split_dialog_class(self.dialog_class)[0]
 
-        dialog_mode, attitude = _split_dialog_class(self.dialog_class)
-        self.dialog_mode = dialog_mode
-        self.attitude = attitude
+    @property
+    def attitude(self) -> str | None:
+        return _split_dialog_class(self.dialog_class)[1]
 
+    def to_fragment(
+        self, *, source_id: UUID | None = None, ns: Mapping[str, object] | None = None,
+        ctx: VmPhaseCtx | None = None, name_resolver: NameResolver | None = None,
+    ) -> AttributedFragment:
+        """Project binding into a fresh fragment; never write it onto authored data."""
+        speaker_key = speaker_id = speaker_label = speaker_name = None
+        media_payload = None
         binding = _speaker_binding(self.label, ns)
         style_dict: dict[str, str] = {}
         if binding is not None:
             subject = binding.subject
-            self.speaker_key = binding.key
+            speaker_key = binding.key
             resolved_name = name_resolver(subject) if name_resolver is not None else None
-            self.speaker_name = (
+            speaker_name = (
                 resolved_name if resolved_name is not None
                 else _speaker_display_name(subject, self.label)
             )
-            self.media_payload = _speaker_media_payload(
+            media_payload = _speaker_media_payload(
                 subject,
                 dialog_class=self.dialog_class,
-                attitude=attitude,
+                attitude=self.attitude,
                 ctx=ctx,
             )
 
             uid = getattr(subject, "uid", None)
             if uid is not None:
-                self.speaker_id = str(uid)
+                speaker_id = str(uid)
 
             get_label = getattr(subject, "get_label", None)
             if callable(get_label):
                 label = get_label()
                 if isinstance(label, str) and label.strip():
-                    self.speaker_label = label.strip()
+                    speaker_label = label.strip()
 
             style_dict = _speaker_style_dict(subject, dialog_class=self.dialog_class)
 
-        if not self.speaker_name:
-            self.speaker_name = _normalized_text(self.label) or "narrator"
+        if not speaker_name:
+            speaker_name = _normalized_text(self.label) or "narrator"
 
         style_tags = ["dialog"]
         if dialog_class_tag := _tag_value(self.dialog_class):
             style_tags.append(f"dialog_class:{dialog_class_tag}")
-        if dialog_mode_tag := _tag_value(self.dialog_mode or "narration"):
+        if dialog_mode_tag := _tag_value(self.dialog_mode):
             style_tags.append(f"dialog_mode:{dialog_mode_tag}")
-        if speaker_tag := _tag_value(self.speaker_label or self.label):
+        if speaker_tag := _tag_value(speaker_label or self.label):
             style_tags.append(f"speaker:{speaker_tag}")
-        if speaker_key_tag := _tag_value(self.speaker_key):
+        if speaker_key_tag := _tag_value(speaker_key):
             style_tags.append(f"speaker_key:{speaker_key_tag}")
         if attitude_tag := _tag_value(self.attitude):
             style_tags.append(f"attitude:{attitude_tag}")
 
-        self.presentation_hints = PresentationHints(
-            style_name=(self.dialog_mode or "narration").lower(),
+        hints = PresentationHints(
+            style_name=self.style_cls or self.dialog_mode.lower(),
             style_tags=style_tags,
-            style_dict=style_dict,
+            style_dict=style_dict | self.style_dict,
         )
-        return self
-
-    def to_fragment(self) -> AttributedFragment:
-        tags: set[str] = set()
-        if dialog_class_tag := _tag_value(self.dialog_class):
-            tags.add(f"dialog_class:{dialog_class_tag}")
-        if dialog_mode_tag := _tag_value(self.dialog_mode or "narration"):
-            tags.add(f"dialog_mode:{dialog_mode_tag}")
-        if speaker_tag := _tag_value(self.speaker_label or self.label):
-            tags.add(f"speaker:{speaker_tag}")
-        if speaker_key_tag := _tag_value(self.speaker_key):
-            tags.add(f"speaker_key:{speaker_key_tag}")
-        if attitude_tag := _tag_value(self.attitude):
-            tags.add(f"attitude:{attitude_tag}")
-
         return AttributedFragment(
-            content=self.text,
-            who=self.speaker_name or self.label or "narrator",
+            content="",
+            who=speaker_name,
             how=self.dialog_class,
-            media="dialog_im" if self.media_payload else "",
-            source_id=self.source_id,
-            tags=tags,
-            hints=self.presentation_hints,
-            speaker_key=self.speaker_key,
-            speaker_id=self.speaker_id,
-            speaker_label=self.speaker_label,
-            speaker_name=self.speaker_name or self.label or "narrator",
+            media="dialog_im" if media_payload else "",
+            source_id=self.source_id or source_id,
+            tags=set(style_tags[1:]),
+            hints=hints,
+            speaker_key=speaker_key,
+            speaker_id=speaker_id,
+            speaker_label=speaker_label,
+            speaker_name=speaker_name,
             speaker_attitude=self.attitude,
-            dialog_mode=self.dialog_mode or "narration",
-            media_payload=self.media_payload,
+            dialog_mode=self.dialog_mode,
+            media_payload=media_payload,
         )
 
 
@@ -330,7 +306,6 @@ class DialogHandler(MuBlockHandler):
     @classmethod
     def parse(
         cls, text: str, *, source_id: UUID | None = None,
-        name_resolver: Callable[[object], str | None] | None = None, **_: object,
     ) -> list[DialogMuBlock]:
         mu_blocks: list[DialogMuBlock] = []
 
@@ -351,12 +326,7 @@ class DialogHandler(MuBlockHandler):
                     )
                 )
 
-        ns = _.get("ns")
-        render_ctx = _.get("ctx")
-        return [
-            mu_block.bind(ns=ns, ctx=render_ctx, name_resolver=name_resolver)
-            for mu_block in mu_blocks
-        ]
+        return mu_blocks
 
     @classmethod
     def _parse_dialog_paragraph(
@@ -380,8 +350,3 @@ class DialogHandler(MuBlockHandler):
     @staticmethod
     def _strip_dialog_prefix(line: str) -> str:
         return re.sub(r"^>\s*", "", line).strip()
-
-    @classmethod
-    def render(cls, mu_blocks: list[MuBlock]) -> list[ContentFragment]:
-        fragments = super().render(mu_blocks)
-        return [fragment for fragment in fragments if fragment.content]

@@ -164,11 +164,19 @@ from tangl.persistence import PersistenceManagerFactory
 from tangl.service import ServiceManager
 from tangl.service.response import DirectEdgeRequest
 from tangl.story import Actor, World
+from tangl.prose import DialogMuBlock, MuBlock
+from tangl.prose.mu_block import ConceptReference
 
 assert World.get_instance('concept_naming_demo') is None
 manager = ServiceManager(PersistenceManagerFactory.json_file(base_path=Path(sys.argv[1])))
 manager.open_world('concept_naming_demo')
 with manager.open_session(user_id=UUID(sys.argv[2])) as session:
+    units = session.ledger.cursor.prose
+    assert [type(unit) for unit in units] == [MuBlock, DialogMuBlock, MuBlock, DialogMuBlock]
+    assert isinstance(units[0].text[0], ConceptReference)
+    assert units[1].dialog_class == 'dialog'
+    assert units[1].label == 'host'
+    assert 'speaker_name' not in units[1].unstructure()
     actor = session.ledger.graph.find_one(Selector(has_kind=Actor, label='rin'))
     assert actor.peek_knowledge().state == 'IDENTIFIED'
     assert any(getattr(f, 'content', '') == 'Hi, I am Rin.' for f in session.ledger.get_journal())
@@ -194,12 +202,14 @@ def test_authored_update_introduction_precedes_prose_and_labels(ledger: Ledger) 
 
 
 def test_nonprinting_introduction_preserves_current_label_and_literal_names(ledger: Ledger) -> None:
-    from tangl.prose.naming import ProseBlock, ProseSegment
+    from tangl.prose import DialogMuBlock
+    from tangl.prose.naming import ProseBlock
 
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [
-        ProseSegment(speaker="host", template="This is my sister, Nanae.{% set _ = introduce(host) %}"),
-        ProseSegment(speaker="host", text=["Hello again."]),
+        DialogMuBlock(label="host", dialog_class="dialog",
+                      template="This is my sister, Nanae.{% set _ = introduce(host) %}"),
+        DialogMuBlock(label="host", dialog_class="dialog", text=["Hello again."]),
     ]
     meet(ledger)
     speakers = [f for f in ledger.get_journal() if isinstance(f, AttributedFragment)]
@@ -208,21 +218,36 @@ def test_nonprinting_introduction_preserves_current_label_and_literal_names(ledg
 
 
 def test_literal_spoken_name_does_not_introduce_speaker_or_sister(ledger: Ledger) -> None:
-    from tangl.prose.naming import ConceptReference, ProseBlock, ProseSegment
+    from tangl.prose import DialogMuBlock, MuBlock
+    from tangl.prose.mu_block import ConceptReference
+    from tangl.prose.naming import ProseBlock
 
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [
-        ProseSegment(speaker="host", text=["This is my sister, Nanae."]),
-        ProseSegment(text=[ConceptReference(ref="sister", introduce=True), " smiles at you."]),
+        MuBlock(text="Narrative before the speaker."),
+        DialogMuBlock(label="host", dialog_class="dialog", text=["This is my sister, Nanae."]),
+        MuBlock(text=[ConceptReference(ref="sister", introduce=True), " smiles at you."]),
+        DialogMuBlock(label="sister", dialog_class="NPC.happy", text="Rin #intro stays literal."),
     ]
+    authored = [unit.unstructure() for unit in block.prose]
     meet(ledger)
-    speaker = next(f for f in ledger.get_journal() if isinstance(f, AttributedFragment))
+    journal = [f for f in ledger.get_journal() if isinstance(f, ContentFragment)]
+    assert [f.content for f in journal] == [
+        "Narrative before the speaker.", "This is my sister, Nanae.",
+        "Nanae smiles at you.", "Rin #intro stays literal.",
+    ]
+    speakers = [f for f in journal if isinstance(f, AttributedFragment)]
+    speaker = speakers[0]
     assert speaker.speaker_name == "the blonde girl"
     assert speaker.content == "This is my sister, Nanae."
     rin = ledger.graph.find_one(Selector(has_kind=Actor, label="rin"))
     nanae = ledger.graph.find_one(Selector(has_kind=Actor, label="nanae"))
     assert rin.narrator_knowledge == {}
     assert nanae.peek_knowledge().state == "IDENTIFIED"
+    assert speakers[1].speaker_name == "Nanae"
+    assert speakers[1].how == "NPC.happy"
+    assert speakers[1].speaker_attitude == "happy"
+    assert [unit.unstructure() for unit in block.prose] == authored
 
 
 @pytest.mark.parametrize("identified", [False, True])
@@ -295,12 +320,14 @@ def test_introduction_rejected_in_read_only_phases(ledger: Ledger, phase: Resolu
 def test_jinja_and_semantic_references_share_policy_and_generated_text_is_literal(
     ledger: Ledger,
 ) -> None:
-    from tangl.prose.naming import ConceptReference, ProseBlock, ProseSegment
+    from tangl.prose import MuBlock
+    from tangl.prose.mu_block import ConceptReference
+    from tangl.prose.naming import ProseBlock
 
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [
-        ProseSegment(template="{{ reference(host) }} / {{ introduce(host) }} / {{ reference(host) }}"),
-        ProseSegment(text=[ConceptReference(ref="host", intent="anonymous"), " / ",
+        MuBlock(template="{{ reference(host) }} / {{ introduce(host) }} / {{ reference(host) }}"),
+        MuBlock(text=[ConceptReference(ref="host", intent="anonymous"), " / ",
                           ConceptReference(ref="host")]),
     ]
     meet(ledger)
@@ -310,7 +337,7 @@ def test_jinja_and_semantic_references_share_policy_and_generated_text_is_litera
 
 
 def test_linked_labels_reject_introductions_without_disclosure(ledger: Ledger) -> None:
-    from tangl.prose.naming import ConceptReference
+    from tangl.prose.mu_block import ConceptReference
 
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id)
     actor = ctx.get_ns(ctx.cursor)["host"]
@@ -320,12 +347,13 @@ def test_linked_labels_reject_introductions_without_disclosure(ledger: Ledger) -
 
 
 def test_template_generated_wording_is_not_executed_again(ledger: Ledger) -> None:
-    from tangl.prose.naming import ProseBlock, ProseSegment
+    from tangl.prose import MuBlock
+    from tangl.prose.naming import ProseBlock
 
     actor = ledger.graph.find_one(Selector(has_kind=Actor, label="rin"))
     actor.name = "{{ introduce(host) }}"
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
-    block.prose = [ProseSegment(template="{{ reference(host, 'proper') }}")]
+    block.prose = [MuBlock(template="{{ reference(host, 'proper') }}")]
     meet(ledger)
     assert actor.narrator_knowledge == {}
     assert any(getattr(fragment, "content", "") == "{{ introduce(host) }}"

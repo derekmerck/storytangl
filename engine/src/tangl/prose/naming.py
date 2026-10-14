@@ -13,28 +13,21 @@ from enum import Enum
 from pydantic import Field
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Priority, Record
-from tangl.core.bases import BaseModelPlus
-from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.journal.fragments import ChoiceFragment
 from tangl.story import Actor, Block, Location, Role, Setting, get_narrator_key
 from tangl.story.dispatch import do_render_text
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.vm import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 
-from .dialog import DialogMuBlock
-from .rendering import TextRenderSession
+from .dialog import DialogHandler, DialogMuBlock
+from .mu_block import ConceptReference, MuBlock, ReferenceIntent
 
 
 class NamingPolicy(EnumPlusMixin, str, Enum):
     CONCEALED = "concealed"
     PROPER = "proper"
     OFF = "off"
-
-
-class ReferenceIntent(EnumPlusMixin, str, Enum):
-    AUTO = "auto"
-    ANONYMOUS = "anonymous"
-    PROPER = "proper"
 
 
 class HasNaming:
@@ -52,26 +45,12 @@ class NamingLocation(HasNaming, Location):
     """Location adopting the same prose naming vocabulary as actors."""
 
 
-class ConceptReference(BaseModelPlus):
-    """A namespace referent and wording intent, independent of template syntax."""
-
-    ref: str
-    intent: ReferenceIntent = ReferenceIntent.AUTO
-    introduce: bool = False
-
-
-class ProseSegment(BaseModelPlus):
-    """One ordered passage; speaker naming precedes its body realization."""
-
-    text: list[str | ConceptReference] = Field(default_factory=list)
-    template: str | None = None
-    speaker: str | None = None
-
-
 class ProseBlock(Block):
     """Block carrying explicit ordered prose in addition to ordinary raw content."""
 
-    prose: list[ProseSegment] = Field(default_factory=list)
+    prose: list[MuBlock | DialogMuBlock] = Field(
+        default_factory=list, json_schema_extra={"include": True, "unstructurable": True},
+    )
     choice_labels: dict[str, list[str | ConceptReference]] = Field(default_factory=dict)
 
 
@@ -190,27 +169,11 @@ def render_linked_prose(
     if not isinstance(caller, ProseBlock):
         return None
     operations = NamingOperations(ctx)
-    ns = ctx.get_ns(caller)
-    fragments: list[Record] = []
-    for segment in caller.prose:
-        dialog = None
-        if segment.speaker is not None:
-            target = operations.provider(ns[segment.speaker])
-            dialog = DialogMuBlock(label=segment.speaker, dialog_class="dialog", source_id=caller.uid)
-            dialog.bind(ns={segment.speaker: target}, ctx=ctx)
-            dialog.speaker_name = operations.reference(target)
-        if segment.template is not None:
-            # Explicit Jinja instructions execute once. Generated wording is
-            # output, not another template to evaluate for hidden effects.
-            session = TextRenderSession(ctx=ctx)
-            content = session.environment.from_string(segment.template).render(ns)
-        else:
-            content = operations.realize(segment.text, disclose=True)
-        if dialog is not None:
-            dialog.text = content
-            fragments.append(dialog.to_fragment())
-        else:
-            fragments.append(ContentFragment(content=content, source_id=caller.uid))
+    fragments = DialogHandler.render(
+        caller.prose, ns=ctx.get_ns(caller), ctx=ctx, source_id=caller.uid,
+        name_resolver=operations.reference,
+        parts_resolver=lambda parts: operations.realize(parts, disclose=True),
+    )
     return fragments or None
 
 

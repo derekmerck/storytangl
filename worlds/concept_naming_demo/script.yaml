@@ -42,7 +42,8 @@ scenes:
         kind: ProseBlock
         pre_effects: ["introduce(host)"]
         prose:
-          - speaker: host
+          - label: host
+            dialog_class: dialog
             text: ["This is my sister, Nanae."]
         actions:
           - {text: Continue, successor: later.start}
@@ -50,10 +51,12 @@ scenes:
         kind: ProseBlock
         prose:
           - text: [{ref: host}, " approaches at ", {ref: place}, "."]
-          - speaker: host
+          - label: host
+            dialog_class: dialog
             text: ["Hi, I am ", {ref: host, introduce: true}, "."]
           - text: [{ref: host}, " smiles."]
-          - speaker: host
+          - label: host
+            dialog_class: dialog
             template: "{{ reference(host, 'anonymous') }} is still an available description."
         actions:
           - label: greet_host

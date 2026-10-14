@@ -274,8 +274,10 @@ present" to **bound ∧ relevant (`when`) ∧ influence-check-passes**.
 ### MuBlock (discourse parsing)
 
 `MuBlock` (`engine/src/tangl/prose/mu_block.py`) is a render-oriented
-microconcept: smaller than a block, never in the graph, promoted to a fragment
-via `to_fragment()`. It is the clearest proof StoryTangl already benefits from
+microconcept: smaller than a block and not a graph entity. The #534 projection
+foundation uses the same authored value for transient parsing or graph-owned
+embedded/pre-parsed input; only fresh projected fragments carry binding output.
+It is the clearest proof StoryTangl already benefits from
 managed non-entity intermediates, and a candidate to share a base with facets
 later (Phase 4).
 
