@@ -81,6 +81,13 @@ def test_missing_names():
     with pytest.raises(ValueError):
         name.formal_name()
 
+
+def test_empty_and_aliases_only_form_discovery_does_not_require_a_personal_name():
+    assert PersonalName().forms() == {}
+    aliases_only = PersonalName(aliases={"Nickname"})
+    assert aliases_only.forms() == {"alias:Nickname": "Nickname"}
+    assert aliases_only.akas() == {"Nickname"}
+
 def test_normalize_gn():
     name = PersonalName(title="king", gender=Gender.XX)
     assert name.get_title() == "Queen"

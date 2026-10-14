@@ -66,10 +66,9 @@ class NamedConcept(HasNarratorKnowledge):
         return result
 
     def _proper_nominal(self, *, form: str | None = None, **_params: RealizationValue) -> str:
-        forms = self._proper_forms()
-        if form is None or (form == "proper" and form not in forms):
-            return self.name or self.get_label()
-        return forms[form]
+        # Form requests are extensible intent, not an enum or a dispatch gate.
+        nominal = self.name or self.get_label()
+        return self._proper_forms().get(form, nominal) if form is not None else nominal
 
     def get_nominal(
         self, narrator_key: str = "_", *, policy: NamingPolicy | None = None,

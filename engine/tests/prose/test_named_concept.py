@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from tangl.core import Node, Selector
+from tangl.core import BehaviorRegistry, DispatchLayer, Node, Priority, Selector
 from tangl.lang.personal_name import PersonalName
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.prose import DialogMuBlock, MuBlock
@@ -253,3 +253,50 @@ def test_intentionally_non_adopted_actor_floor_uses_existing_name_and_knowledge(
     assert actor.narrator_knowledge == {}
     assert operations.introduce(actor) == "Ordinary"
     assert actor.peek_knowledge().state == "IDENTIFIED"
+
+
+@pytest.mark.parametrize("aliases", [set(), {"Alias"}])
+def test_empty_or_aliases_only_personal_name_retains_display_floor(aliases: set[str]) -> None:
+    actor = PersonalNamedActor(
+        name="Display", anonymous_name="a stranger", naming_policy=NamingPolicy.CONCEALED,
+        personal_name=PersonalName(aliases=aliases),
+    )
+    before = actor.unstructure()
+    assert actor.get_nominal(intent="proper") == "Display"
+    assert actor.get_nominal() == "a stranger"
+    assert actor.adopts()["Display"] == {}
+    for alias in aliases:
+        assert actor.adopts()[alias] == {"form": f"alias:{alias}"}
+        assert actor.get_nominal(intent="proper", form=f"alias:{alias}") == alias
+    assert actor.unstructure() == before
+
+
+def test_later_text_handler_can_realize_an_undeclared_form() -> None:
+    graph = StoryGraph()
+    owner = ProseBlock(registry=graph)
+    item = NamedItem(name="Dawn", anonymous_name="an old sword", registry=graph)
+    ctx = context(graph, owner)
+    authority = BehaviorRegistry(default_dispatch_layer=DispatchLayer.AUTHOR)
+
+    @authority.register(task="render_text", priority=Priority.LATE)
+    def epithet(
+        *, caller: object, aspect: str, form: str | None = None, **_kwargs: object,
+    ) -> str | None:
+        if caller is item and form == "epithet" and aspect in {
+            "reference_auto", "reference_proper",
+        }:
+            if aspect == "reference_proper" or item.peek_knowledge() is not None:
+                return "the blade of dawn"
+            return item.anonymous_name
+        return None
+
+    ctx.local_authorities.append(authority)
+    operations = NamingOperations(ctx)
+    before = graph.value_hash()
+    assert operations.reference(item, form="epithet") == "an old sword"
+    assert operations.reference(item, "proper", form="epithet") == "the blade of dawn"
+    assert graph.value_hash() == before
+    assert operations.introduce(item, form="epithet") == "the blade of dawn"
+    before = graph.value_hash()
+    assert operations.reference(item, form="epithet") == "the blade of dawn"
+    assert graph.value_hash() == before

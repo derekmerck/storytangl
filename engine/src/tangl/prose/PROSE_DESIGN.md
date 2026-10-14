@@ -139,6 +139,8 @@ The public concept operations separate spelling, wording, and knowledge:
   immediately. Requesting `form="proper"` or `form="formal"` does not force
   knowledge: AUTO still conceals. Forced `intent=PROPER` bypasses concealment but
   creates no record. Forced ANONYMOUS stays anonymous even after introduction.
+  Undeclared form requests use the display-name floor, allowing later applicable
+  world text handlers to realize them; forms are not a closed enum/dispatch gate.
 - `introduce(narrator_key, policy=..., source=..., **params)` explicitly identifies
   once and returns authored proper wording; `off` retains the non-adopted floor.
   Normal authored calls use phase-aware `NamingOperations.introduce`, not ambient
@@ -169,6 +171,8 @@ alias parameter overrides remain available. No universal form ranking or
 relationship/formality simulation is implied. Lang imports no Story/prose code.
 PersonalName uses ordinary `Unstructurable` constructor form, with the explicit
 include/recursion markers on the owning actor field and include on mutable aliases.
+Empty/aliases-only personal names discover only their available aliases; they do
+not require given/family/nickname data or block the actor's display-name fallback.
 MuBlock's existing marked text field retains reference parameters, including
 in-place edits. Owner graph constructor/flat JSON and normally bootstrapped
 fresh-process service witnesses retain declared types, state and knowledge with

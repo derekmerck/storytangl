@@ -60,8 +60,9 @@ class PersonalName(Unstructurable):
         full, familiar_full, formal_full, given, family, then nickname. Explicit
         aliases follow as named forms; author overrides belong to the consumer.
         """
-        return {
-            key: value for key, value in {
+        generated = {}
+        if self.given_name or self.family_name or self.nickname:
+            generated = {
                 "proper": self.name(),
                 "familiar": self.familiar_name(),
                 "formal": self.formal_name(),
@@ -71,8 +72,9 @@ class PersonalName(Unstructurable):
                 "given": self.given_name,
                 "family": self.family_name,
                 "nickname": self.nickname,
-                **{f"alias:{alias}": alias for alias in sorted(self.aliases)},
-            }.items() if value
+            }
+        return {key: value for key, value in generated.items() if value} | {
+            f"alias:{alias}": alias for alias in sorted(self.aliases)
         }
 
     def akas(self) -> set[str]:
