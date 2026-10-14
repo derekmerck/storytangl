@@ -3,25 +3,36 @@ globals:
   naming_defaults:
     Actor: concealed
     Location: proper
+    NamedSword: concealed
+  sword_spec:
+    label: sword
+    name: Dawnblade
+    anonymous_name: an old sword
+    proper_forms: {inscription: Dawnblade of the East}
 actors:
   rin:
-    kind: NamingActor
+    kind: PersonalNamedActor
     name: Rin
     anonymous_name: the blonde girl
+    personal_name:
+      given_name: Rin
+      family_name: Northstar
+      nickname: Rinnie
+      title: Ms.
   beth:
-    kind: NamingActor
+    kind: NamedActor
     name: Beth
     anonymous_name: the dark-haired girl
   nanae:
-    kind: NamingActor
+    kind: NamedActor
     name: Nanae
     anonymous_name: the brunette girl
 locations:
   square:
-    kind: NamingLocation
+    kind: NamedLocation
     name: Market Square
   hideout:
-    kind: NamingLocation
+    kind: NamedLocation
     name: Rin's Hideout
     anonymous_name: a hidden room
     naming_policy: concealed
@@ -72,5 +83,8 @@ scenes:
         kind: ProseBlock
         prose:
           - template: "Hello again, {{ reference(host) }}."
+          - text: ["You find ", {ref: sword, params: {form: inscription}}, "."]
+          - text: ["Its inscription reads ", {ref: sword, introduce: true, params: {form: inscription}}, "."]
+          - template: "You carry {{ reference(sword) }}."
         actions:
           - {text: Return, successor: meeting.introduction}

@@ -10,7 +10,8 @@
 > **Status:** #534 slice 1 implements explicit concept references and naming in
 > optional `tangl.prose.naming`, with the executable `concept_naming_demo` world.
 > The approved replacement foundation consolidates authored mu-blocks. Generic
-> NamedConcept and runtime scoped exact adoption are subsequent bounded slices.
+> NamedConcept is implemented in bounded slice 2; runtime scoped exact adoption
+> remains slice 3.
 > The broader linguistic
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
@@ -61,7 +62,8 @@ world authority before reprojecting bindings. No new serializer, renderer-result
 union, dispatch mechanism, VM phase or fragment hierarchy is introduced.
 Later composition can filter, combine, layer or ignore projected fragments.
 
-Generic optional NamedConcept is slice 2; runtime scoped exact adoption is slice 3.
+Generic optional NamedConcept is delivered in slice 2; runtime scoped exact
+adoption is slice 3.
 Future adoption may retain #557's useful longest-match/complete-marker/escape,
 ambiguity/source and one-way description tests, not its compile-time gate.
 Default adoption remains one-way: proper forms can adapt, anonymous descriptions
@@ -512,7 +514,7 @@ actual provider for the selected narrator:
   mid-dialog if deliberately authored. A non-printing Jinja form is
   `{% set _ = introduce(rin) %}`; exact public helper spelling is adapter-specific.
 - An opted-in compiler may lower narrative `#intro` into a position-preserving,
-  template-neutral semantic introduction. Lexical lowering remains #534 slice 2;
+  template-neutral semantic introduction. Lexical lowering remains #534 slice 3;
   the marker is an instruction, not evidence inferred from a name or quotation.
 
 Introduction is therefore not intrinsically a JOURNAL-only operation. Authored
@@ -701,7 +703,7 @@ runtime presentation mechanisms.
 ## Delivered first implementation slice
 
 World domains import `tangl.prose.naming` and expose its `get_authorities()`
-before normal compilation. `NamingActor` / `NamingLocation` add optional anonymous
+before normal compilation. `NamedActor` / `NamedLocation` add optional anonymous
 wording and concept policy overrides. `ProseBlock` contains ordered authored mu-blocks and
 explicit concept-linked `choice_labels`, keyed by stable action label.
 
@@ -727,6 +729,33 @@ re-evaluated. Arbitrary Jinja is a Python-native escape hatch, not portable IR.
 Successful constructor-form and JSON service restoration, patch replay, explicit
 rollback, narrator isolation, provider recasting, and historical wording are
 covered by `engine/tests/prose/test_naming.py`. Raw worlds need no adoption.
+
+### Delivered generic concept contract (slice 2)
+
+`NamedConcept` composes existing narrator knowledge with minimal optional wording
+and pure `adopts()`/`get_nominal()` plus explicit `introduce()`. Named actors,
+locations, and graph-owned non-person items use this one contract. The canonical
+`engine/src/tangl/prose/PROSE_DESIGN.md` section "Generic named concepts (slice 2)"
+defines signatures, dispatch, ownership and duplicate-form precedence.
+
+Adoption is data-only: spelling maps to serializable realization parameters, not
+callbacks, live pointers, pre-rendered wording or knowledge. A requested proper,
+formal, familiar or custom form is authorial mention intent, not forced disclosure.
+AUTO can still conceal a formal spelling from an unknown narrator. Forced PROPER
+bypasses concealment without changing knowledge; only explicit introduction
+identifies. The default never adopts anonymous descriptions such as "the blonde
+girl". Worlds can deliberately supply other spellings or choose different output
+after identification through subclass/ordinary text-aspect policy.
+
+`ConceptReference.params` and Python helper keywords carry the same scalar data
+through the landed mu-block renderer. `PersonalNamedActor` optionally enriches
+the contract with existing `PersonalName` forms, retaining generated provenance
+and deterministic duplicate precedence; ordinary named actors/items do not need
+personal-name fields. The named sword in the actual demo/CLI proves world
+activation, explicit nomination, knowledge, constructor/JSON restore and replay.
+No lexical scanner, source #intro lowering, automatic callout linking or global
+concept namespace is shipped here. Those belong to runtime slice 3; #557 remains
+unchanged salvage, and #558 destination-owned choice projection remains separate.
 
 ### Ordinary dialog ordering: resolved bounded scope
 
@@ -761,39 +790,22 @@ distinct from automatic exception recovery.
 
 ## Deferred exact-reference linking slice
 
-The first issue should prove the concept with the smallest useful consumer:
-**epistemic naming of scene roles**.
-
-Suggested slice:
-
-1. Add an opt-in concept-linking flag at an authoring scope no broader than
-   world/scene.
-2. Build a reference-cast adoption table for scene roles from:
-   - proper name;
-   - one anonymous nominal;
-   - explicit `#intro` marker.
-3. Link only exact, unambiguous references. No generic NLP or broad coreference.
-4. Preserve realization intent:
-   - proper;
-   - indefinite nominal;
-   - definite nominal;
-   - identity disclosure.
-5. Lower linked references through one initial backend, probably Jinja because
-   the runtime already supports `TextRenderSession`, while keeping the
-   semantic contract backend-neutral.
-6. At JOURNAL realization, resolve the scene role to its current provider and
-   render against narrator knowledge.
-7. Make identity disclosure idempotent and patch/replay-safe.
-8. Permit divergent knowledge at exits; optional guaranteed-introduction
-   analysis is a separate future contract.
-9. Round-trip every linked fixture under the reference cast.
-10. Fail compilation on ambiguity rather than guessing.
+Runtime slice 3 will consume the data-only concept adoption vocabulary against
+the current afforded namespace, not a compile-time catalog. Default adoption is
+one-way from explicit proper spellings; anonymous nominals remain literal unless
+a world deliberately supplies a custom adoption. Link into existing
+ConceptReference parts, retaining form parameters separately from forced wording
+and explicit introduction. No Jinja lowering is required for the portable path.
+Keep exact-boundary, complete-marker, escape, ambiguity and source diagnostics as
+bounded witnesses. This note does not approve automatic dialog rewriting or
+compile-time authorization. Stable binding-owned spellings and #558's destination
+scope require their own follow-up implementation contract.
 
 Explicitly deferred:
 
 - automatic pronoun adoption;
 - `she/r` / `her_/t` prefix hints;
-- aliases and gamer handles;
+- stable binding-owned aliases and richer gamer-handle policy;
 - generalized belief models;
 - NLP parsing, NER, coreference, tense, or PoV rewriting;
 - LLM realization;

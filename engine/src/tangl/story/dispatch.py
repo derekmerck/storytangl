@@ -109,12 +109,13 @@ def do_render_text(
     *,
     aspect: str,
     ctx: VmPhaseCtx,
+    **kwargs: object,
 ) -> str | None:
     """Select the last applicable textual source for a presentation aspect."""
     receipts = list(
         story_dispatch.execute_all(
             task="render_text",
-            call_kwargs={"caller": caller, "aspect": aspect},
+            call_kwargs={"caller": caller, "aspect": aspect, **kwargs},
             ctx=ctx,
             selector=Selector(caller_kind=type(caller)),
         )

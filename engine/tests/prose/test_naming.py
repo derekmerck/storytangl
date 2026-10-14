@@ -10,7 +10,7 @@ from tangl.core import Selector
 from tangl.journal.fragments import AttributedFragment, ChoiceFragment, ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
-from tangl.prose.naming import NamingActor, NamingOperations, NamingPolicy
+from tangl.prose.naming import NamedActor, NamingOperations, NamingPolicy
 from tangl.story import Actor, InitMode, Role, World
 from tangl.vm import Ledger, Requirement, ResolutionPhase
 from tangl.vm.replay import CheckpointRecord, Patch, get_replay_engine
@@ -38,9 +38,9 @@ def test_symbolic_role_speakers_resolve_provider_per_unit_before_metadata(
     from tangl.prose import DialogMuBlock
     from tangl.prose.naming import ProseBlock, render_linked_prose
 
-    monkeypatch.setattr(NamingActor, "get_dialog_style",
+    monkeypatch.setattr(NamedActor, "get_dialog_style",
                         lambda self, dialog_class: {"speaker": self.label}, raising=False)
-    monkeypatch.setattr(NamingActor, "get_dialog_image",
+    monkeypatch.setattr(NamedActor, "get_dialog_image",
                         lambda self, dialog_class: f"{self.label}.svg", raising=False)
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid,
@@ -162,7 +162,7 @@ def test_override_opt_out_and_missing_nominal(ledger: Ledger) -> None:
     ctx.current_phase = ResolutionPhase.JOURNAL
     assert operations.introduce(hidden) == "Rin's Hideout"
     assert operations.reference(hidden) == "Rin's Hideout"
-    actor = NamingActor(name="Named", naming_policy=NamingPolicy.OFF, registry=ledger.graph)
+    actor = NamedActor(name="Named", naming_policy=NamingPolicy.OFF, registry=ledger.graph)
     assert operations.reference(actor) == "Named"
     assert operations.introduce(actor) == "Named"
     assert actor.narrator_knowledge == {}
@@ -249,6 +249,8 @@ from tangl.service.response import DirectEdgeRequest
 from tangl.story import Actor, World
 from tangl.prose import DialogMuBlock, MuBlock
 from tangl.prose.mu_block import ConceptReference
+from tangl.lang.personal_name import PersonalName
+from tangl.prose.naming import NamedConcept, PersonalNamedActor
 
 assert World.get_instance('concept_naming_demo') is None
 manager = ServiceManager(PersistenceManagerFactory.json_file(base_path=Path(sys.argv[1])))
@@ -261,12 +263,23 @@ with manager.open_session(user_id=UUID(sys.argv[2])) as session:
     assert units[1].label == 'host'
     assert 'speaker_name' not in units[1].unstructure()
     actor = session.ledger.graph.find_one(Selector(has_kind=Actor, label='rin'))
+    assert type(actor) is PersonalNamedActor
+    assert type(actor.personal_name) is PersonalName
+    assert actor.adopts()['Ms. Northstar'] == {'form': 'formal'}
     assert actor.peek_knowledge().state == 'IDENTIFIED'
     assert any(getattr(f, 'content', '') == 'Hi, I am Rin.' for f in session.ledger.get_journal())
     assert any(getattr(f, 'text', '') == 'Say hi to Rin' for f in session.ledger.get_journal())
     edge = next(session.ledger.cursor.edges_out())
 result = manager.resolve_choice(user_id=UUID(sys.argv[2]), request=DirectEdgeRequest(edge_id=edge.uid))
 assert any(getattr(f, 'content', '') == 'Hello again, Rin.' for f in result.fragments)
+assert any(getattr(f, 'content', '') == 'You find an old sword.' for f in result.fragments)
+assert any(getattr(f, 'content', '') == 'You carry Dawnblade.' for f in result.fragments)
+with manager.open_session(user_id=UUID(sys.argv[2])) as session:
+    sword = session.ledger.graph.find_one(Selector(has_kind=NamedConcept, label='sword'))
+    assert sword.peek_knowledge().state == 'IDENTIFIED'
+    assert sword.proper_forms == {'inscription': 'Dawnblade of the East'}
+    assert session.ledger.cursor.prose[1].text[1].params == {'form': 'inscription'}
+    assert sum(n.uid == sword.uid for n in session.ledger.graph.values()) == 1
 print('bootstrapped cold restore and subsequent reference passed')
 """
     completed = subprocess.run(
@@ -274,6 +287,34 @@ print('bootstrapped cold restore and subsequent reference passed')
         capture_output=True, text=True, check=True,
     )
     assert "bootstrapped cold restore" in completed.stdout
+
+
+def test_world_item_introduction_replay_restore_and_rollback(ledger: Ledger) -> None:
+    from tangl.prose.naming import NamedConcept
+
+    meet(ledger)
+    ledger.resolve_choice(next(ledger.cursor.edges_out()).uid)
+    sword = ledger.graph.find_one(Selector(has_kind=NamedConcept, label="sword"))
+    assert sword.peek_knowledge().state == "IDENTIFIED"
+    historical = [f.unstructure() for f in ledger.get_journal()]
+    restored = Ledger.structure(ledger.unstructure())
+    assert [f.unstructure() for f in restored.get_journal()] == historical
+    engine = get_replay_engine(restored.replay_algorithm_id)
+    checkpoint = next(Selector(has_kind=CheckpointRecord).filter(restored.output_stream))
+    replayed = engine.restore_checkpoint(checkpoint)
+    for patch in Selector(has_kind=Patch).filter(restored.output_stream):
+        replayed = engine.apply_delta(graph=replayed, delta=patch)
+    assert replayed.get(sword.uid).peek_knowledge().state == "IDENTIFIED"
+    assert replayed.get(sword.uid).proper_forms == sword.proper_forms
+    restored.rollback_to_step(1)
+    assert restored.graph.get(sword.uid).peek_knowledge() is None
+    ledger_sword_hash = restored.graph.value_hash()
+    ctx = PhaseCtx(graph=restored.graph, cursor_id=restored.cursor_id)
+    assert NamingOperations(ctx).reference(restored.graph.get(sword.uid)) == "an old sword"
+    assert restored.graph.value_hash() == ledger_sword_hash
+    restored.resolve_choice(next(restored.cursor.edges_out()).uid)
+    contents = [f.content for f in restored.get_journal() if isinstance(f, ContentFragment)]
+    assert contents.count("Its inscription reads Dawnblade of the East.") == 1
 
 
 def test_authored_update_introduction_precedes_prose_and_labels(ledger: Ledger) -> None:
@@ -449,7 +490,7 @@ def test_nearest_kind_default_and_world_text_aspect_override(ledger: Ledger) -> 
     actor = ledger.graph.find_one(Selector(has_kind=Actor, label="rin"))
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id)
     ns = ctx.get_ns(ctx.cursor)
-    ns["naming_defaults"] = {"NamingActor": "proper", "Actor": "concealed"}
+    ns["naming_defaults"] = {"NamedActor": "proper", "Actor": "concealed"}
     assert NamingOperations(ctx).reference(actor) == "Rin"
     actor.naming_policy = NamingPolicy.CONCEALED
     assert NamingOperations(ctx).reference(actor) == "the blonde girl"
@@ -483,3 +524,20 @@ def test_vanilla_world_has_no_naming_operations_or_text_rewriting() -> None:
                    for fragment in ledger.get_journal())
     finally:
         World.clear_instances()
+
+
+def test_fresh_vanilla_story_does_not_import_optional_naming() -> None:
+    code = """
+import sys
+from tangl.story import Actor, Location, World
+world = World.from_script_data(script_data={
+    'label': 'vanilla_import_control',
+    'metadata': {'start_at': 's.start'},
+    'scenes': {'s': {'blocks': {'start': {'content': 'Rin #intro stays literal.'}}}},
+})
+world.create_story('vanilla_import_control')
+assert 'tangl.prose.naming' not in sys.modules
+assert 'personal_name' not in Actor.model_fields
+assert 'anonymous_name' not in Location.model_fields
+"""
+    subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)

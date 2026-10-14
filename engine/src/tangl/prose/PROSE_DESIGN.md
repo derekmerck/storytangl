@@ -1,8 +1,8 @@
 # Optional prose extensions
 
 Status: #555 naming behavior retained; the approved #534 mu-block projection
-replacement's foundation slice is implemented. Generic NamedConcept and runtime
-scoped exact adoption are subsequent slices. #557's compile-time-only linker
+replacement's foundation and generic NamedConcept slices are implemented. Runtime
+scoped exact adoption remains the subsequent slice. #557's compile-time-only linker
 remains an open, unmerged salvage reference, not the runtime authority.
 
 Rendering sessions and dialog micro-blocks are existing realization helpers.
@@ -111,8 +111,77 @@ pickle-style alias memoization is provided. Owner back-pointers/caches, if used
 by other embedded types, stay excluded and are rebound normally; mu-blocks do
 not need them.
 
-Slice 1 deliberately does not implement NamedConcept, automatic runtime adoption,
+The delivered slices deliberately do not implement automatic runtime adoption,
 inherited-name catalogs, binding-owned spelling aliases, lexical #intro parsing,
 NLP, hot reload, or failure recovery. Slice 3 may salvage #557's exact-boundary,
 complete-marker, escape, ambiguity, and one-way literal-description witnesses;
 its compile-time catalog gate and separate authored segment model are replaced.
+
+## Generic named concepts (slice 2)
+
+`NamedConcept` composes the existing `HasNarratorKnowledge` with a minimal name,
+anonymous wording, explicit proper forms/aliases and a policy override. Compose
+it with a graph-owned Entity/Node; it is not an embedded manager. `NamedActor` and
+`NamedLocation` compose the same contract with Story's existing types. A named
+sword/landmark needs no Actor/Location schema, Presence, demographics or person
+parsing. `Selector(has_kind=NamedConcept)` identifies adopted graph members.
+Ordinary Story types never import/adopt this optional package implicitly.
+
+The public concept operations separate spelling, wording, and knowledge:
+
+- `adopts()` returns detached, scalar parameter dictionaries for authored proper
+  spellings. It performs no rendering or disclosure and returns no providers or
+  callbacks. The display spelling wins generated duplicates, then the first
+  declared form; explicit `proper_aliases` parameter overrides win last.
+- `get_nominal(narrator_key, policy=..., intent=..., **params)` is a pure read.
+  AUTO under concealed policy uses required anonymous wording until identified,
+  then the requested proper form. Proper-display policy uses the requested form
+  immediately. Requesting `form="proper"` or `form="formal"` does not force
+  knowledge: AUTO still conceals. Forced `intent=PROPER` bypasses concealment but
+  creates no record. Forced ANONYMOUS stays anonymous even after introduction.
+  Undeclared form requests use the display-name floor, allowing later applicable
+  world text handlers to realize them; forms are not a closed enum/dispatch gate.
+- `introduce(narrator_key, policy=..., source=..., **params)` explicitly identifies
+  once and returns authored proper wording; `off` retains the non-adopted floor.
+  Normal authored calls use phase-aware `NamingOperations.introduce`, not ambient
+  narrator state. Direct deliberate calls do not promise exception recovery.
+
+`NamingOperations` is the single scoped policy/provider boundary for helpers,
+explicit references, labels and named-text dispatch. Concept override precedes
+nearest MRO kind default, then off. Role/Setting knowledge remains on the actual
+provider. General named objects can be referenced/introduced, but are not
+automatically speakers; the existing Actor/Location attribution boundary remains.
+The ordinary Actor/Location floor in adopted worlds is retained, not another
+concept contract. World subclasses may override `get_nominal` or normal
+named-text handlers; identification does not prescribe their wording choice.
+
+`ConceptReference.params` carries small serializable scalar realization data,
+forwarded by both semantic parts and Python `reference`/`introduce` helpers.
+No second linked-text IR or automatic matching is added. Generated wording is
+output, never re-executed. Default adoption includes only explicit proper/display
+names and deliberate proper forms/aliases; `anonymous_name` is not inferred as an
+adoption phrase. Ordinary speech and literal names/`#intro` remain opaque.
+
+`PersonalNamedActor` optionally embeds the existing `tangl.lang.PersonalName`.
+Basic named actors, places and items do not need one. `PersonalName.forms()`
+preserves the provenance that `akas()` flattens: proper, familiar, formal, full,
+familiar_full, formal_full, given, family, nickname, then sorted explicit aliases.
+This local order decides duplicate spelling precedence; explicit proper-form and
+alias parameter overrides remain available. No universal form ranking or
+relationship/formality simulation is implied. Lang imports no Story/prose code.
+PersonalName uses ordinary `Unstructurable` constructor form, with the explicit
+include/recursion markers on the owning actor field and include on mutable aliases.
+Empty/aliases-only personal names discover only their available aliases; they do
+not require given/family/nickname data or block the actor's display-name fallback.
+MuBlock's existing marked text field retains reference parameters, including
+in-place edits. Owner graph constructor/flat JSON and normally bootstrapped
+fresh-process service witnesses retain declared types, state and knowledge with
+no extra components, class registry, owner pointers or custom serializers.
+
+The demo's domain explicitly materializes/nominates one `NamedSword` at the
+existing story-ready/namespace boundaries through EntityTemplate. It does not
+publish every graph entity. Its CLI path reads an anonymous object, explicitly
+introduces its inscription, then remembers the object. Replay/rollback retain
+knowledge and historical output. Runtime lexical discovery/linking, stable
+binding-owned aliases, source `#intro` lowering and #558 destination-choice scope
+remain separate work; #534 is not automatically closed.

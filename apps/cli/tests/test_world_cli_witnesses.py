@@ -98,3 +98,6 @@ def test_concept_naming_cli_witness_introduces_and_remembers_provider() -> None:
     choice = transcript.index("Say hi to Rin")
     later = transcript.index("Hello again, Rin.")
     assert before < intro < after < choice < later
+    assert "You find an old sword." in transcript
+    assert "Its inscription reads Dawnblade of the East." in transcript
+    assert "You carry Dawnblade." in transcript

@@ -28,12 +28,19 @@ class ReferenceIntent(EnumPlusMixin, str, Enum):
     PROPER = "proper"
 
 
+type RealizationValue = str | int | float | bool | None
+type RealizationParams = dict[str, RealizationValue]
+
+
 class ConceptReference(Unstructurable):
     """A namespace referent and wording intent, independent of template syntax."""
 
     ref: str
     intent: ReferenceIntent = ReferenceIntent.AUTO
     introduce: bool = False
+    params: RealizationParams = Field(
+        default_factory=dict, json_schema_extra={"include": True},
+    )
 
 
 PartResolver = Callable[[list[str | ConceptReference]], str]
