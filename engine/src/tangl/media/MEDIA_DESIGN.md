@@ -584,8 +584,9 @@ Media and prose now each have one concrete example of a broader pattern:
 
 `assembled namespace + request-specific context -> transient microconcept -> materialized output`
 
-- **Dialog / prose** currently uses `DialogMuBlock` during post-merge
-  `compose_journal` rewriting.
+- **Dialog / prose** uses authored `DialogMuBlock` values for ordinary post-merge
+  `compose_journal` rewriting and optionally stored/pre-parsed ordered input.
+  Bound names/media live in fresh projected fragments, not on authored values.
 - **Media** currently uses `MediaShotPlan` during pre-provision `adapt_spec()`
   before a `MediaRIT` is created or a worker job is dispatched.
 
@@ -599,8 +600,8 @@ story/journal work and media/provisioning work.
 The design commitment for now is therefore narrower:
 
 - keep the namespace as the raw scoped input surface,
-- keep transient microconcepts such as `DialogMuBlock` and `MediaShotPlan`
-  local to the subsystem and phase that owns them,
+- keep bound projection state local to the subsystem and phase that owns it;
+  authored mu-block ownership can independently opt into embedded persistence,
 - and defer any shared "request-scoped contributor" or nested/DAG dispatch
   abstraction until at least one more concrete workflow proves the common
   pressure.

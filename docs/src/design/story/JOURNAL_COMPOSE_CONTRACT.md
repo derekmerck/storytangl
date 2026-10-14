@@ -101,7 +101,7 @@ at normal mutation boundaries; a template call such as
 Literal spoken bodies are not automatically linked or interpreted as disclosure.
 Ordinary dialog speaker labels use the optional `reference_auto` text-aspect
 read at composition, preserving vanilla fallback when no adapter participates.
-Whole-block templates bind these labels after evaluation; ProseSegments are the
+Whole-block templates bind these labels after evaluation; authored mu-blocks are the
 ordered adapter for a label that must resolve before its body.
 
 The successful traversal's normal graph patch records identification. Stored

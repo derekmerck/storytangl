@@ -82,6 +82,34 @@ not. Runtime parsing retains a defensive error for malformed claimed syntax,
 but valid compiled content should not first discover it during JOURNAL
 composition.
 
+### Shared authored micro-block foundation (#534 replacement slice 1)
+
+Authored content, optional preprocessing, scoped symbolic references, ordered
+realization, and fragment composition are separate projection stages. Compilation
+may lint/pre-parse, but a compile-time catalog is not runtime authorization.
+Runtime tools can operate on the current namespace; unadopted stages remain
+identity/no-op paths. This is not a new VM phase or universal renderer framework.
+
+`DialogHandler.parse` now returns authored structure only, using the same callout
+grammar without fetching names, styles/media or knowledge. `MuBlock` and its
+`DialogMuBlock` specialization carry literal/reference parts or an explicit
+template, source provenance, symbolic label, full class, and existing styles.
+Text/template are exclusive. Parsed transient and stored/pre-parsed values share
+this vocabulary; ownership determines persistence through the existing embedded
+constructor-form path. No separate persistent segment schema remains.
+
+The shared ordered render path resolves speaker metadata before body realization
+into fresh journal fragments; it never mutates authored values with binding data.
+`prepare_fragment` is the metadata-only preparation seam; MuBlockHandler.render
+is complete ordered realization. Strict authored symbolic speakers resolve the
+current Role/Setting provider before all name/ID/style/media projection, preserving
+the original symbolic attribution key. Ordinary display-label fallback is separate.
+Explicit template bodies execute once. Existing naming operations supply pure
+reads and explicit introductions through that path, not another parser/binder/
+emitter. Ordinary whole-block raw/Jinja evaluation and late composition remain
+unchanged for vanilla callers. Generic NamedConcept and runtime exact adoption
+are later slices; no automatic spoken-name or #intro inference is shipped here.
+
 ## The rendering namespace
 
 Before rendering, the phase pipeline assembles the namespace valid for this

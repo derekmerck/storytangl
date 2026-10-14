@@ -32,6 +32,18 @@ order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with
 
 ## Implementation Status: Owner-Bound Managers
 
+The authoritative ownership contract is
+[Registry-owned entities and owner-local embedded values](../../../../../ARCHITECTURE.md#registry-owned-entities-and-owner-local-embedded-values).
+An embedded manager is an owner-local Unstructurable value, not a registry-owned
+Entity or graph child. Use `owner` for embedding and reserve `parent`/`children`
+for graph hierarchy. Concrete supported embedded variants must be declared at
+the owning field for flat JSON recovery, with separate `include=True` (in-place
+state retention) and `unstructurable=True` (constructor recursion) markers.
+Excluded owner pointers/caches are rebound normally. Component entities remain
+registry-owned and are persisted once through assignment_ids, not inline copies.
+Embedding carries value semantics, not a shared Python-alias identity guarantee;
+do not infer embedding from Entity type or add pickle-style memoization.
+
 The assembly layer now has two storage identities that share the same slot,
 validation, budget, and facet-discovery APIs:
 
@@ -39,7 +51,7 @@ validation, budget, and facet-discovery APIs:
   non-graph consumers. It stores component objects in its slots.
 - `ComponentManager[CT]` is the owner-bound graph-aware specialization. It is embedded
   on a full graph member, persists with that owner, stores slot membership as component
-  UUIDs, and dereferences those UUIDs through the owner's registry. Its `owner` pointer
+  UUIDs, and dereferences those UUIDs through the owner's registry. Its `owner` pointer,
   live `assignments` view, and transient construction cache are not constructor-form
   data. Manager subclasses use the normal constructor-form path for local value fields;
   graph-member component relationships are the `assignment_ids` reference map.
@@ -129,8 +141,8 @@ a blurry semantic one**, as with most StoryTangl distinctions:
 - A **graph-level open-link** (`Dependency` / `Affordance`) donates an entire **concept**
   that joins the namespace as a graph entity — a role donates an `Actor`, a setting a
   `Location`. Full graph identity; a first-class namespace participant.
-- A **facet** donates a behaviour **signal** *through* its holder/parent concept —
-  entity-like but **not a graph item** — conditionally giving / hiding / changing a
+- A **facet** donates a behaviour **signal** *through* its owner concept —
+  an authored value, **not an Entity or graph item** — conditionally giving / hiding / changing a
   specific behaviour when an active handler chooses to gather it. Context identity, no
   graph registration.
 
