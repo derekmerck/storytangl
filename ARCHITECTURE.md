@@ -152,6 +152,72 @@ def get_authorities(self):
 That means a bare core graph inherits its authority chain from its bound
 factory without needing graph-subclass-specific hook discovery.
 
+### Registry-owned entities and owner-local embedded values
+
+```{storytangl-topic}
+:topics: entity, graph, assembly, prose
+:facets: design
+:relation: defines
+```
+
+A graph/registry-owned entity, commonly a `Node`, may contain a non-graph
+manager or authored value. This is **embedded ownership**, not another graph
+hierarchy. Use `owner` for this relationship; `parent` and `children` already
+describe hierarchical membership among graph nodes. A constructible value can
+inherit `Unstructurable` without being an `Entity` or having a UID.
+
+The owner supplies graph access, authority, and scoped context. An embedded
+manager may use an excluded owner back-pointer, rebound during normal
+construction/restoration. A mu-block can instead receive the owner's render
+context when invoked. Do not add a stored pointer or manager abstraction where
+the existing context already supplies that access. Reachability of the graph
+does not make every graph member an afforded name in the rendering namespace.
+
+Assembly and prose share this ownership pattern, but own different data:
+
+- `ComponentManager` is embedded on its graph owner. It persists its local
+  manager state and slot-to-component `assignment_ids`; the components themselves
+  remain registry-owned entities. It resolves those UUIDs through the owner's
+  registry. Live-object caches and the owner pointer are not persisted.
+- Authored `MuBlock`/`DialogMuBlock` values are embedded on a block in the shared
+  prose foundation. They persist their authored parts, symbolic references,
+  classes, and style hints with that owner. They are not graph entities;
+  `source_id` identifies a donating entity, not the mu-block. Resolved names,
+  media, and final text belong to transient projection results, not authored
+  values. Transiently parsed units use the same vocabulary without persistence.
+
+**Serialization hygiene is explicit at the owning field.** For a concrete
+embedded value type or collection, use the existing field markers:
+
+```python
+manager: SpecificManager = Field(
+    default_factory=SpecificManager,
+    json_schema_extra={"include": True, "unstructurable": True},
+)
+```
+
+`include` retains non-default state changed in place; `unstructurable` requests
+recursive constructor-form `unstructure()` / `structure()` for that field.
+These are separate decisions. Declare the concrete embedded kinds the owner
+supports, including custom variants where needed for flat JSON restoration.
+Field-type inference alone does not recover arbitrary subtype specificity.
+Do not infer embedded ownership merely because a field contains an `Entity`:
+ordinary entity relationships store UUIDs or symbolic references and let the
+registry serialize each entity once. Raw `model_dump()` snapshots do not prove
+this ownership contract.
+
+Embedded values preserve value, not shared Python object identity. Reusing one
+mutable mu-block instance on two owners does not promise that aliasing survives
+restore; each owned occurrence may become an independent value. If shared
+identity is required, use a registry-owned entity and references. Do not add a
+UID to an embedded value or rebuild pickle-style object memoization implicitly.
+
+Tests must exercise the owner graph's constructor-form round-trip and actual
+JSON flattening/restoration, retain declared embedded kinds and in-place state,
+restore any owner binding, and verify entity references resolve to the restored
+registry members without duplicate UIDs. Runtime binding and projection must
+not overwrite authored values with transient output.
+
 ### GraphFactory (`core/factory.py`)
 
 A singleton graph authority and deterministic eager materializer.
