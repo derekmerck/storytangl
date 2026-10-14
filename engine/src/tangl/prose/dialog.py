@@ -269,7 +269,7 @@ class DialogHandler(MuBlockHandler):
         protected = list(code_regions(text))
         start = 0
         for separator in re.finditer(r"\n(?:[ \t]*\n)+", text):
-            if any(a <= separator.start() < b for a, b in protected):
+            if any(a <= separator.start() and separator.end() <= b for a, b in protected):
                 continue
             if text[start:separator.start()].strip():
                 yield start, separator.start()
@@ -278,10 +278,8 @@ class DialogHandler(MuBlockHandler):
             yield start, len(text)
 
     @classmethod
-    def _paragraphs(cls, text: str, *, literal_code: bool = False) -> list[str]:
-        if literal_code:
-            return [text[start:end].strip() for start, end in cls.paragraph_spans(text)]
-        return re.split(r"\n(?:[ \t]*\n)+", text.strip()) if text.strip() else []
+    def _paragraphs(cls, text: str) -> list[str]:
+        return [text[start:end].strip() for start, end in cls.paragraph_spans(text)]
 
     @staticmethod
     def _paragraph_lines(paragraph: str) -> list[str]:
@@ -300,8 +298,8 @@ class DialogHandler(MuBlockHandler):
         )
 
     @classmethod
-    def has_mu_blocks(cls, text: str, *, literal_code: bool = False) -> bool:
-        for paragraph in cls._paragraphs(text, literal_code=literal_code):
+    def has_mu_blocks(cls, text: str) -> bool:
+        for paragraph in cls._paragraphs(text):
             lines = cls._paragraph_lines(paragraph)
             if not lines:
                 continue
@@ -327,11 +325,11 @@ class DialogHandler(MuBlockHandler):
 
     @classmethod
     def parse(
-        cls, text: str, *, source_id: UUID | None = None, literal_code: bool = False,
+        cls, text: str, *, source_id: UUID | None = None,
     ) -> list[DialogMuBlock]:
         mu_blocks: list[DialogMuBlock] = []
 
-        for paragraph in cls._paragraphs(text, literal_code=literal_code):
+        for paragraph in cls._paragraphs(text):
             lines = cls._paragraph_lines(paragraph)
             header = cls._parse_dialog_header(lines[0]) if lines else None
             if header is not None:

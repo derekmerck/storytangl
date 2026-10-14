@@ -118,7 +118,7 @@ def prepare_prose(
             if authored.dialog_mode != "narration" or authored.label is not None:
                 prepared.append(authored)
                 continue
-        elif DialogHandler.has_mu_blocks(text, literal_code=True):
+        elif DialogHandler.has_mu_blocks(text):
             if type(authored) is not MuBlock:
                 # Custom raw syntax belongs to that type; structured custom units
                 # retain their normal preparation behavior without flattening.
@@ -127,7 +127,7 @@ def prepare_prose(
             for start, end in DialogHandler.paragraph_spans(text):
                 paragraph = text[start:end]
                 parsed = DialogHandler.parse(
-                    paragraph, source_id=authored.source_id, literal_code=True,
+                    paragraph, source_id=authored.source_id,
                 )[0]
                 if DialogHandler.DIALOG_CLAIM_PATTERN.match(paragraph.lstrip()):
                     prepared.append(parsed.model_copy(update={

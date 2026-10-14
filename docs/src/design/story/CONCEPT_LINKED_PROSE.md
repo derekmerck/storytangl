@@ -841,7 +841,14 @@ knowledge and historical output. No custom serializer, new phase, graph mutation
 during preparation or second rendering pipeline is added. Current-provider
 spellings are rediscovered each projection; previously lowered symbolic references
 follow recast providers, but old actor spellings are not retained as role aliases.
-Ordinary Block.content and non-adopted/opted-out paths stay unchanged. These
+Ordinary Block.content and non-adopted/opted-out paths are not lexically migrated.
+Code protection is canonical across all worlds: shared DialogHandler detection,
+parsing and malformed-header checks honor the same code_regions scanner, including
+the later journal compositor. An internal blank line and callout-looking text
+inside fenced/inline code stay literal; genuine outside callouts still project
+normally. The former reparse-inside-code behavior was a bug, not a compatibility
+contract. This resolves the composition checkpoint without new fragment kinds,
+bypass flags/tags, another parser or persistence/lifecycle changes. These
 decisions supersede the older compiler-only and anonymous-phrase assumptions in
 #534; general failure recovery remains out of scope.
 

@@ -135,7 +135,7 @@ def test_code_regions_are_literal_and_fences_do_not_create_dialog(
     assert surface(link_text(code, forms, source="owner")) == code
     assert not any(p.introduce for p in link_text(code, forms, source="owner")
                    if isinstance(p, ConceptReference))
-    assert not DialogHandler.has_mu_blocks(code, literal_code=True)
+    assert not DialogHandler.has_mu_blocks(code)
 
 
 def test_longest_case_sensitive_boundaries_punctuation_and_detached_params(

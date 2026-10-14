@@ -190,7 +190,8 @@ destination-choice scope remain separate work; #534 is not automatically closed.
 `link_prose` is a scoped namespace boolean, false by default and independent of
 naming policy. World globals and nearer scene/block locals use existing namespace
 precedence. Only `ProseBlock.prose` string text opts into this frontend; ordinary
-`Block.content`, display/choice/media strings and non-adopted worlds are unchanged.
+`Block.content` and display/choice/media strings are not lexically migrated.
+Markdown code-region protection is canonical for all worlds, as described below.
 Explicit semantic parts/templates work with linking off.
 
 `discover_adoptions(ns)` reads only current top-level NamedConcept bindings and
@@ -209,7 +210,11 @@ scalar `adopts()` parameters, not provider IDs/pointers or callbacks.
 Neither discovery/preparation creates knowledge, changes graph/source, or stores
 prepared units. Plain MuBlock raw strings may contain narration and the existing
 callouts; DialogHandler.parse supplies that grammar and full mode/attitude. Its
-`literal_code` option is enabled only here, preserving ordinary parser behavior.
+Code-region protection is unconditional in that shared parser, including detection,
+actual parsing, malformed-header checks and later canonical journal composition.
+Callout-looking text inside code is literal whether naming is adopted or not;
+the earlier reparse behavior was a bug, not a compatibility contract. Normal
+callouts outside protected code retain their existing projection behavior.
 Paragraph source spans retain original offsets for diagnostics; normal callout
 body/paragraph normalization remains the existing parser's responsibility. Styles
 and source provenance survive. Already-structured custom units retain their type
@@ -258,3 +263,10 @@ actor's spelling as a stable role alias. Stable reference-cast/binding-owned
 spellings, #558 destination labels, broader Block.content adoption, compile-time
 authorization, NLP and failure-atomic recovery are still separate work. These
 runtime decisions supersede #534's older compiler-only/adopt-anonymous wording.
+
+The composition checkpoint is resolved by this shared parsing correction, not
+raw-versus-rendered fragment types, a bypass flag/tag or a second rendering path.
+Full `do_journal` witnesses cover vanilla Block content and opted-in ProseBlock
+source with fenced/inline code, internal blank lines, malformed-looking headers,
+and real callouts mixed outside the protected region. Source/graph state stays
+unchanged, while outside speaker/class/style/media projection remains standard.
