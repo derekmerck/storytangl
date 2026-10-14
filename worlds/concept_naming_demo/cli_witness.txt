@@ -1,3 +1,6 @@
 create_story concept_naming_demo
 do 1
 do 1
+create_story concept_naming_demo
+do 3
+do 1

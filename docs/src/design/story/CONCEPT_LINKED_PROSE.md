@@ -10,8 +10,8 @@
 > **Status:** #534 slice 1 implements explicit concept references and naming in
 > optional `tangl.prose.naming`, with the executable `concept_naming_demo` world.
 > The approved replacement foundation consolidates authored mu-blocks. Generic
-> NamedConcept is implemented in bounded slice 2; runtime scoped exact adoption
-> remains slice 3.
+> NamedConcept is implemented in bounded slice 2, and runtime scoped exact
+> adoption ships in slice 3 for opted-in ProseBlock source only.
 > The broader linguistic
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
@@ -62,14 +62,14 @@ world authority before reprojecting bindings. No new serializer, renderer-result
 union, dispatch mechanism, VM phase or fragment hierarchy is introduced.
 Later composition can filter, combine, layer or ignore projected fragments.
 
-Generic optional NamedConcept is delivered in slice 2; runtime scoped exact
-adoption is slice 3.
-Future adoption may retain #557's useful longest-match/complete-marker/escape,
+Generic optional NamedConcept is delivered in slice 2; bounded runtime scoped
+exact adoption is delivered in slice 3. It retains #557's useful lexical ideas:
+longest-match/complete-marker/escape,
 ambiguity/source and one-way description tests, not its compile-time gate.
 Default adoption remains one-way: proper forms can adapt, anonymous descriptions
 remain literal absent deliberate custom adoption. Namespace-only/inherited
-concepts and binding-owned stable aliases belong to that later slice. They are
-not prerequisites for explicit references/effects already available to Cedar.
+concepts are discovered from current gathered scope; binding-owned stable aliases
+remain later work. No graph/catalog membership itself affords a narrative name.
 
 ---
 
@@ -513,8 +513,8 @@ actual provider for the selected narrator:
 - An explicit template call introduces at its evaluation position, including
   mid-dialog if deliberately authored. A non-printing Jinja form is
   `{% set _ = introduce(rin) %}`; exact public helper spelling is adapter-specific.
-- An opted-in compiler may lower narrative `#intro` into a position-preserving,
-  template-neutral semantic introduction. Lexical lowering remains #534 slice 3;
+- The opted-in runtime frontend lowers narrative `#intro` into a position-preserving,
+  template-neutral semantic introduction in ProseBlock source (slice 3);
   the marker is an instruction, not evidence inferred from a name or quotation.
 
 Introduction is therefore not intrinsically a JOURNAL-only operation. Authored
@@ -565,7 +565,8 @@ for the active narrator during explicit ordered JOURNAL realization or normal
 UPDATE/FINALIZE effects. Forced proper wording alone does not
 identify it. There is no staged receipt or deferred FINALIZE disclosure.
 The explicit reference vocabulary preserves referent, intent, and introduction
-independently of template syntax. Lexical `#intro` recognition is still deferred.
+independently of template syntax. Complete narrative `#intro` recognition now ships
+in the bounded opted-in runtime source path, not ordinary speech or Block.content.
 
 Repeated introductions are idempotent:
 
@@ -753,9 +754,9 @@ the contract with existing `PersonalName` forms, retaining generated provenance
 and deterministic duplicate precedence; ordinary named actors/items do not need
 personal-name fields. The named sword in the actual demo/CLI proves world
 activation, explicit nomination, knowledge, constructor/JSON restore and replay.
-No lexical scanner, source #intro lowering, automatic callout linking or global
-concept namespace is shipped here. Those belong to runtime slice 3; #557 remains
-unchanged salvage, and #558 destination-owned choice projection remains separate.
+The generic slice adds no scanner or global concept namespace. Bounded runtime
+source linking follows below; #557 remains unchanged salvage, and #558
+destination-owned choice projection remains separate.
 
 ### Ordinary dialog ordering: resolved bounded scope
 
@@ -788,18 +789,61 @@ story is not promised. No Frame callback, prose undo accumulator, transaction
 framework, or deferred disclosure is installed. Existing explicit rollback is
 distinct from automatic exception recovery.
 
-## Deferred exact-reference linking slice
+## Delivered bounded runtime exact-reference linking (slice 3)
 
-Runtime slice 3 will consume the data-only concept adoption vocabulary against
+Runtime slice 3 consumes the data-only concept adoption vocabulary against
 the current afforded namespace, not a compile-time catalog. Default adoption is
 one-way from explicit proper spellings; anonymous nominals remain literal unless
 a world deliberately supplies a custom adoption. Link into existing
 ConceptReference parts, retaining form parameters separately from forced wording
 and explicit introduction. No Jinja lowering is required for the portable path.
-Keep exact-boundary, complete-marker, escape, ambiguity and source diagnostics as
-bounded witnesses. This note does not approve automatic dialog rewriting or
+Exact-boundary, complete-marker, escape, ambiguity and source diagnostics are
+covered by runtime witnesses. This note does not approve automatic speech rewriting or
 compile-time authorization. Stable binding-owned spellings and #558's destination
 scope require their own follow-up implementation contract.
+
+The first consumer is `ProseBlock.prose`, enabled by scoped namespace boolean
+`link_prose` (default false, independent of naming defaults). Existing globals,
+ancestor contributions and nearer locals provide scope/shadowing. Only current
+named bindings are discovered; corresponding Role/Setting wrapper/provider
+duplicates collapse, but independent bindings remain ambiguous even if they
+currently share a provider. Links retain usable namespace symbols and detached
+scalar form data, not graph IDs, pointers or a compile-time gate.
+
+A plain MuBlock text string may contain narration and existing Obsidian callouts:
+
+```yaml
+locals: {link_prose: true}
+prose:
+  - text: |
+      Rin waits at Market Square.
+
+      > [!npc.excited] host_role
+      > This is my sister, Nanae. Rin #intro stays literal.
+
+      Nanae #intro smiles. Nanae waves.
+```
+
+Discovery/preparation are pure; the shared renderer resolves labels before their
+bodies and applies intentional introductions in JOURNAL. Speech/labels are not
+lexically scanned. Complete markers attach only directly or across spaces/tabs,
+never newlines or punctuation. Prefix words such as #introvert remain literal.
+Odd name/marker escape slashes suppress linking; pairs emit one slash. Inline/
+fenced code is literal. Units containing Jinja delimiters and explicit templates
+are opaque, and generated output is never rescanned. Diagnostics retain owner,
+source, unit index and original offset. The nearest prose design note gives the
+precise parser/escape/form contract and custom-unit boundaries.
+
+The real demo/CLI covers actor/place/object references, speech, introductions,
+later labels/choices and remembered state. Constructor/JSON cold bootstrap,
+successful replay, actual internal returns and rollback preserve authored source,
+knowledge and historical output. No custom serializer, new phase, graph mutation
+during preparation or second rendering pipeline is added. Current-provider
+spellings are rediscovered each projection; previously lowered symbolic references
+follow recast providers, but old actor spellings are not retained as role aliases.
+Ordinary Block.content and non-adopted/opted-out paths stay unchanged. These
+decisions supersede the older compiler-only and anonymous-phrase assumptions in
+#534; general failure recovery remains out of scope.
 
 Explicitly deferred:
 

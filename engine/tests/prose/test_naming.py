@@ -541,3 +541,188 @@ assert 'personal_name' not in Actor.model_fields
 assert 'anonymous_name' not in Location.model_fields
 """
     subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+
+
+def enter_linked(ledger: Ledger) -> None:
+    edge = next(e for e in ledger.cursor.edges_out() if e.text == "Read linked narration")
+    ledger.resolve_choice(edge.uid)
+
+
+def test_runtime_namespace_linking_is_pure_then_journal_orders_disclosure(ledger: Ledger) -> None:
+    from tangl.prose.linking import prepare_prose
+    from tangl.prose.naming import ProseBlock, discover_adoptions
+
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, path="linked.start"))
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid)
+    authored = [unit.unstructure() for unit in block.prose]
+    before = ledger.graph.value_hash()
+    ns = ctx.get_ns(block)
+    assert ns["link_prose"] is True
+    prepared = prepare_prose(block.prose, discover_adoptions(ns), source="linked.start")
+    assert NamingOperations(ctx).realize(prepared[0].text).strip() == (
+        "the blonde girl waits at Market Square beside an old sword."
+    )
+    with pytest.raises(ValueError, match="display label"):
+        NamingOperations(ctx).realize(prepared[2].text)
+    assert ledger.graph.value_hash() == before
+    assert [unit.unstructure() for unit in block.prose] == authored
+    enter_linked(ledger)
+    contents = [f.content.strip() for f in ledger.get_journal() if isinstance(f, ContentFragment)]
+    assert "the blonde girl waits at Market Square beside an old sword." in contents
+    assert "Nanae smiles. Nanae waves. Rin nods." in contents
+    assert "Dawnblade of the East gleams. Dawnblade rests here." in contents
+    speakers = [f for f in ledger.get_journal() if isinstance(f, AttributedFragment)]
+    assert [f.speaker_name for f in speakers] == ["the blonde girl", "Rin"]
+    assert [f.speaker_attitude for f in speakers] == ["excited", "happy"]
+    assert [f.speaker_key for f in speakers] == ["host_role", "host_role"]
+    assert speakers[0].content == "This is my sister, Nanae. Rin #intro stays spoken."
+    assert speakers[1].content == "Nanae #intro remains literal speech."
+    assert speakers[0].speaker_id == speakers[1].speaker_id == str(ns["host"].uid)
+    assert [f.text for f in ledger.get_journal() if isinstance(f, ChoiceFragment)] == ["Say hi to Rin"]
+    assert [unit.unstructure() for unit in block.prose] == authored
+    assert ns["place"].peek_knowledge() is None
+    other = ctx.derive(meta={"narrator_key": "other"})
+    assert NamingOperations(other).realize(prepared[0].text).strip().startswith("the blonde girl")
+    assert ns["host"].peek_knowledge("other") is None
+
+
+def test_linking_flag_inherits_and_nearest_scope_shadowing_excludes_eager_graph_names(
+    ledger: Ledger,
+) -> None:
+    from tangl.prose.naming import ProseBlock, discover_adoptions, render_linked_prose
+
+    shadow = ledger.graph.find_one(Selector(has_kind=ProseBlock, path="linked.shadow"))
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=shadow.uid, current_phase=ResolutionPhase.JOURNAL)
+    ns = ctx.get_ns(shadow)
+    before = ledger.graph.value_hash()
+    assert ns["link_prose"] is True
+    assert "Beth" in discover_adoptions(ns) and "Rin" not in discover_adoptions(ns)
+    assert "Dawnblade" in discover_adoptions(ns)  # Actual world nomination, not a scene declaration.
+    assert render_linked_prose(caller=shadow, ctx=ctx)[0].content == (
+        "the dark-haired girl waits. Rin remains source-literal."
+    )
+    assert ledger.graph.value_hash() == before
+    opted_out = ledger.graph.find_one(Selector(has_kind=ProseBlock, path="linked.opted_out"))
+    other = ctx.derive(cursor_id=opted_out.uid)
+    assert other.get_ns(opted_out)["link_prose"] is False
+    assert [f.content for f in render_linked_prose(caller=opted_out, ctx=other)] == [
+        "Rin #intro remains literal.", "Rin",
+    ]
+    assert other.get_ns(opted_out)["host"].peek_knowledge() is None
+    # A world enablement can be overridden by the nearer block using the same
+    # existing scoped namespace mechanism, independently of naming defaults.
+    ledger.graph.locals["link_prose"] = True
+    fresh = PhaseCtx(graph=ledger.graph, cursor_id=opted_out.uid)
+    assert fresh.get_ns(opted_out)["link_prose"] is False
+
+
+def test_optout_keeps_explicit_semantic_introduction_and_ordinary_content_untouched(
+    ledger: Ledger,
+) -> None:
+    from tangl.prose import MuBlock
+    from tangl.prose.mu_block import ConceptReference
+    from tangl.prose.naming import ProseBlock, render_linked_prose
+    from tangl.vm.dispatch import do_journal
+
+    ledger.graph.locals["link_prose"] = True
+    ordinary = ledger.cursor
+    ordinary.content = "Rin #intro is still ordinary raw content."
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=ordinary.uid, current_phase=ResolutionPhase.JOURNAL)
+    before = ledger.graph.value_hash()
+    assert any(f.content == ordinary.content for f in do_journal(ordinary, ctx=ctx)
+               if isinstance(f, ContentFragment))
+    assert ledger.graph.value_hash() == before
+    block = ledger.graph.find_one(Selector(has_kind=ProseBlock, path="linked.opted_out"))
+    block.prose = [MuBlock(text="Rin#intro"),
+                   MuBlock(text=[ConceptReference(ref="host_role", introduce=True)])]
+    ctx = ctx.derive(cursor_id=block.uid, current_phase=ResolutionPhase.JOURNAL)
+    assert [f.content for f in render_linked_prose(caller=block, ctx=ctx)] == ["Rin#intro", "Rin"]
+    assert ctx.get_ns(block)["host"].peek_knowledge().state == "IDENTIFIED"
+
+
+def test_linked_journal_restore_replay_and_actual_internal_return_remain_historical(
+    ledger: Ledger,
+) -> None:
+    enter_linked(ledger)
+    source = ledger.cursor.prose[0].text
+    historical = [f.unstructure() for f in ledger.get_journal()]
+    restored = Ledger.structure(ledger.unstructure())
+    assert restored.cursor.prose[0].text == source
+    assert isinstance(source, str) and "Nanae #intro" in source
+    assert [f.unstructure() for f in restored.get_journal()] == historical
+    engine = get_replay_engine(restored.replay_algorithm_id)
+    checkpoint = next(Selector(has_kind=CheckpointRecord).filter(restored.output_stream))
+    replayed = engine.restore_checkpoint(checkpoint)
+    for patch in Selector(has_kind=Patch).filter(restored.output_stream):
+        replayed = engine.apply_delta(graph=replayed, delta=patch)
+    assert replayed.get(restored.cursor_id).prose[0].text == source
+    assert replayed.find_one(Selector(label="nanae", has_kind=Actor)).peek_knowledge().state == "IDENTIFIED"
+    knowledge = restored.graph.find_one(Selector(label="rin", has_kind=Actor)).peek_knowledge().model_dump()
+    restored.resolve_choice(next(restored.cursor.edges_out()).uid)
+    restored.resolve_choice(next(restored.cursor.edges_out()).uid)
+    contents = [f.content.strip() for f in restored.get_journal() if isinstance(f, ContentFragment)]
+    assert contents.count("Nanae smiles. Nanae waves. Rin nods.") == 2
+    assert "Rin waits at Market Square beside Dawnblade." in contents
+    assert [f.unstructure() for f in restored.get_journal()][:len(historical)] == historical
+    assert restored.graph.find_one(Selector(label="rin", has_kind=Actor)).peek_knowledge().model_dump() == knowledge
+    restored.rollback_to_step(0)
+    enter_linked(restored)
+    contents = [f.content.strip() for f in restored.get_journal() if isinstance(f, ContentFragment)]
+    assert contents.count("Nanae smiles. Nanae waves. Rin nods.") == 1
+    assert contents.count("the blonde girl waits at Market Square beside an old sword.") == 1
+
+
+def test_linked_source_json_cold_bootstrap_and_resume(ledger: Ledger, tmp_path: Path) -> None:
+    from tangl.persistence import PersistenceManagerFactory
+    from tangl.service import ServiceManager
+    from tangl.service.response import DirectEdgeRequest
+    from tangl.service.user.user import User
+
+    persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    manager = ServiceManager(persistence)
+    user = User(label="runtime-link-reader")
+    persistence.save(user)
+    manager.create_story(user_id=user.uid, world_id=ledger.graph.world.label,
+                         world=ledger.graph.world, init_mode=InitMode.EAGER.value)
+    with manager.open_session(user_id=user.uid) as session:
+        edge = next(e for e in session.ledger.cursor.edges_out() if e.text == "Read linked narration")
+    manager.resolve_choice(user_id=user.uid, request=DirectEdgeRequest(edge_id=edge.uid))
+    code = """
+from pathlib import Path
+import sys
+from uuid import UUID
+from tangl.core import Selector
+from tangl.persistence import PersistenceManagerFactory
+from tangl.service import ServiceManager
+from tangl.service.response import DirectEdgeRequest
+from tangl.prose.linking import prepare_prose
+from tangl.prose.naming import NamedConcept, discover_adoptions
+from tangl.story import World
+from tangl.vm.runtime.frame import PhaseCtx
+assert World.get_instance('concept_naming_demo') is None
+manager = ServiceManager(PersistenceManagerFactory.json_file(base_path=Path(sys.argv[1])))
+manager.open_world('concept_naming_demo')
+with manager.open_session(user_id=UUID(sys.argv[2])) as session:
+    ledger = session.ledger
+    source = ledger.cursor.prose[0].text
+    assert isinstance(source, str) and 'Nanae #intro' in source
+    historical = [f.unstructure() for f in ledger.get_journal()]
+    before = ledger.graph.value_hash()
+    ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id)
+    prepare_prose(ledger.cursor.prose, discover_adoptions(ctx.get_ns(ctx.cursor)), source='cold')
+    assert ledger.graph.value_hash() == before
+    sword = ledger.graph.find_one(Selector(has_kind=NamedConcept, label='sword'))
+    assert sword.peek_knowledge().state == 'IDENTIFIED'
+    assert len(ledger.graph) == len(set(ledger.graph.members))
+    edge = next(ledger.cursor.edges_out())
+result = manager.resolve_choice(user_id=UUID(sys.argv[2]), request=DirectEdgeRequest(edge_id=edge.uid))
+assert any(getattr(f, 'content', '') == 'Rin and Nanae remember Market Square and Dawnblade.'
+           for f in result.fragments)
+with manager.open_session(user_id=UUID(sys.argv[2])) as session:
+    assert [f.unstructure() for f in session.ledger.get_journal()][:len(historical)] == historical
+    assert session.ledger.graph.get(edge.predecessor_id).prose[0].text == source
+print('cold runtime source restore passed')
+"""
+    result = subprocess.run([sys.executable, "-c", code, str(tmp_path), str(user.uid)],
+                            capture_output=True, text=True, check=True)
+    assert "cold runtime source restore passed" in result.stdout

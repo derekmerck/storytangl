@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -28,6 +29,7 @@ from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.ctx import VmPhaseCtx
 
 from .mu_block import MuBlock, MuBlockHandler, NameResolver, SpeakerResolver
+from .literals import code_regions
 
 
 @dataclass(slots=True)
@@ -262,7 +264,23 @@ class DialogHandler(MuBlockHandler):
     )
 
     @staticmethod
-    def _paragraphs(text: str) -> list[str]:
+    def paragraph_spans(text: str) -> Iterator[tuple[int, int]]:
+        """Locate the existing paragraphs without splitting literal code regions."""
+        protected = list(code_regions(text))
+        start = 0
+        for separator in re.finditer(r"\n(?:[ \t]*\n)+", text):
+            if any(a <= separator.start() < b for a, b in protected):
+                continue
+            if text[start:separator.start()].strip():
+                yield start, separator.start()
+            start = separator.end()
+        if text[start:].strip():
+            yield start, len(text)
+
+    @classmethod
+    def _paragraphs(cls, text: str, *, literal_code: bool = False) -> list[str]:
+        if literal_code:
+            return [text[start:end].strip() for start, end in cls.paragraph_spans(text)]
         return re.split(r"\n(?:[ \t]*\n)+", text.strip()) if text.strip() else []
 
     @staticmethod
@@ -282,8 +300,8 @@ class DialogHandler(MuBlockHandler):
         )
 
     @classmethod
-    def has_mu_blocks(cls, text: str) -> bool:
-        for paragraph in cls._paragraphs(text):
+    def has_mu_blocks(cls, text: str, *, literal_code: bool = False) -> bool:
+        for paragraph in cls._paragraphs(text, literal_code=literal_code):
             lines = cls._paragraph_lines(paragraph)
             if not lines:
                 continue
@@ -309,11 +327,11 @@ class DialogHandler(MuBlockHandler):
 
     @classmethod
     def parse(
-        cls, text: str, *, source_id: UUID | None = None,
+        cls, text: str, *, source_id: UUID | None = None, literal_code: bool = False,
     ) -> list[DialogMuBlock]:
         mu_blocks: list[DialogMuBlock] = []
 
-        for paragraph in cls._paragraphs(text):
+        for paragraph in cls._paragraphs(text, literal_code=literal_code):
             lines = cls._paragraph_lines(paragraph)
             header = cls._parse_dialog_header(lines[0]) if lines else None
             if header is not None:
