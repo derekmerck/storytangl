@@ -14,14 +14,18 @@ from pydantic import Field
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Priority, Record
 from tangl.journal.fragments import ChoiceFragment
+from tangl.lang.personal_name import PersonalName
 from tangl.story import Actor, Block, Location, Role, Setting, get_narrator_key
+from tangl.story.concepts.narrator_knowledge import HasNarratorKnowledge
 from tangl.story.dispatch import do_render_text
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.vm import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 
 from .dialog import DialogHandler, DialogMuBlock
-from .mu_block import ConceptReference, MuBlock, ReferenceIntent
+from .mu_block import (
+    ConceptReference, MuBlock, RealizationParams, RealizationValue, ReferenceIntent,
+)
 
 
 class NamingPolicy(EnumPlusMixin, str, Enum):
@@ -30,19 +34,95 @@ class NamingPolicy(EnumPlusMixin, str, Enum):
     OFF = "off"
 
 
-class HasNaming:
-    """Optional authored wording and policy override on the provider itself."""
+class NamedConcept(HasNarratorKnowledge):
+    """Optional concept-local wording, adoption data, and explicit identification.
 
+    Compose with an Entity/Node, not an embedded manager. Forms request wording;
+    only introduction changes knowledge. Worlds may override nominal selection
+    here or through normal named-text dispatch.
+    """
+
+    name: str = ""
     anonymous_name: str = ""
     naming_policy: NamingPolicy | None = None
+    proper_forms: dict[str, str] = Field(default_factory=dict, json_schema_extra={"include": True})
+    proper_aliases: dict[str, RealizationParams] = Field(
+        default_factory=dict, json_schema_extra={"include": True},
+    )
+
+    def _proper_forms(self) -> dict[str, str]:
+        return self.proper_forms
+
+    def adopts(self) -> dict[str, RealizationParams]:
+        """Discover data-only proper spellings, never anonymous descriptions.
+
+        The display name wins generated duplicates, then the first declared
+        form. Explicit alias parameters override both; returned data is detached.
+        """
+        result = {self.name: {}} if self.name else {}
+        for form, spelling in self._proper_forms().items():
+            result.setdefault(spelling, {"form": form})
+        result.update({spelling: dict(params) for spelling, params in self.proper_aliases.items()})
+        return result
+
+    def _proper_nominal(self, *, form: str | None = None, **_params: RealizationValue) -> str:
+        forms = self._proper_forms()
+        if form is None or (form == "proper" and form not in forms):
+            return self.name or self.get_label()
+        return forms[form]
+
+    def get_nominal(
+        self, narrator_key: str = "_", *, policy: NamingPolicy | None = None,
+        intent: ReferenceIntent | str = ReferenceIntent.AUTO, **params: RealizationValue,
+    ) -> str:
+        """Select wording without creating a narrator record or disclosing identity."""
+        intent = ReferenceIntent(intent)
+        policy = policy if policy is not None else self.naming_policy or NamingPolicy.OFF
+        knowledge = self.peek_knowledge(narrator_key)
+        anonymous = intent is ReferenceIntent.ANONYMOUS or (
+            intent is ReferenceIntent.AUTO and policy is NamingPolicy.CONCEALED
+            and (knowledge is None or knowledge.state != "IDENTIFIED")
+        )
+        if anonymous:
+            if not self.anonymous_name.strip():
+                raise ValueError(f"Missing anonymous_name for {self.get_label()!r}")
+            return self.anonymous_name
+        return self._proper_nominal(**params)
+
+    def introduce(
+        self, narrator_key: str = "_", *, policy: NamingPolicy | None = None,
+        source: str | None = None, **params: RealizationValue,
+    ) -> str:
+        """Explicit idempotent identification; phase-aware authors use the helper."""
+        wording = self.get_nominal(narrator_key, policy=policy, intent=ReferenceIntent.PROPER,
+                                   **params)
+        policy = policy if policy is not None else self.naming_policy or NamingPolicy.OFF
+        if policy is not NamingPolicy.OFF:
+            knowledge = self.get_knowledge(narrator_key)
+            if knowledge.state != "IDENTIFIED":
+                knowledge.state = "IDENTIFIED"
+                knowledge.identification_source = source
+        return wording
 
 
-class NamingActor(HasNaming, Actor):
+class NamedActor(NamedConcept, Actor):
     """Actor adopting explicit prose naming vocabulary."""
 
 
-class NamingLocation(HasNaming, Location):
+class NamedLocation(NamedConcept, Location):
     """Location adopting the same prose naming vocabulary as actors."""
+
+
+class PersonalNamedActor(NamedActor):
+    """Optional personal-name enrichment; basic actors/items need no name parsing."""
+
+    personal_name: PersonalName | None = Field(
+        default=None, json_schema_extra={"include": True, "unstructurable": True},
+    )
+
+    def _proper_forms(self) -> dict[str, str]:
+        generated = self.personal_name.forms() if self.personal_name is not None else {}
+        return generated | self.proper_forms
 
 
 class ProseBlock(Block):
@@ -54,7 +134,7 @@ class ProseBlock(Block):
     choice_labels: dict[str, list[str | ConceptReference]] = Field(default_factory=dict)
 
 
-Concept = Actor | Location
+Concept = NamedConcept | Actor | Location
 Referent = Concept | Role | Setting
 
 
@@ -66,16 +146,19 @@ class NamingOperations:
 
     def provider(self, target: Referent) -> Concept:
         concept = target.provider if isinstance(target, (Role, Setting)) else target
-        if not isinstance(concept, (Actor, Location)):
-            raise TypeError(f"Naming requires a bound actor/place provider at {target!r}")
+        if not isinstance(concept, (NamedConcept, Actor, Location)):
+            raise TypeError(f"Naming requires a bound concept provider at {target!r}")
         return concept
 
     def speaker(self, symbol: str) -> Concept:
         """Validate an authored symbol and dereference its current provider."""
-        return self.provider(self.ctx.get_ns(self.ctx.cursor)[symbol])
+        concept = self.provider(self.ctx.get_ns(self.ctx.cursor)[symbol])
+        if not isinstance(concept, (Actor, Location)):
+            raise TypeError(f"Not a speaker provider: {symbol!r}")
+        return concept
 
     def policy(self, concept: Concept) -> NamingPolicy:
-        if isinstance(concept, HasNaming) and concept.naming_policy is not None:
+        if isinstance(concept, NamedConcept) and concept.naming_policy is not None:
             return concept.naming_policy
         defaults = self.ctx.get_ns(self.ctx.cursor).get("naming_defaults", {})
         if not isinstance(defaults, Mapping):
@@ -87,38 +170,43 @@ class NamingOperations:
 
     def reference(
         self, target: Referent, intent: ReferenceIntent | str = ReferenceIntent.AUTO,
+        **params: RealizationValue,
     ) -> str:
         concept = self.provider(target)
         intent = ReferenceIntent(intent)
-        wording = do_render_text(concept, aspect=f"reference_{intent.value}", ctx=self.ctx)
+        wording = do_render_text(concept, aspect=f"reference_{intent.value}", ctx=self.ctx,
+                                 **params)
         if wording is None:
             raise LookupError(f"No naming adapter for {concept.get_label()!r}")
         return wording
 
-    def _reference(self, concept: Concept, intent: ReferenceIntent) -> str:
+    def _reference(
+        self, concept: Concept, intent: ReferenceIntent, **params: RealizationValue,
+    ) -> str:
         """Realize the shipped minimal policy behind named text dispatch."""
         policy = self.policy(concept)
+        if isinstance(concept, NamedConcept):
+            return concept.get_nominal(get_narrator_key(self.ctx), policy=policy,
+                                       intent=intent, **params)
         knowledge = concept.peek_knowledge(get_narrator_key(self.ctx))
-        anonymous = intent is ReferenceIntent.ANONYMOUS or (
+        if intent is ReferenceIntent.ANONYMOUS or (
             intent is ReferenceIntent.AUTO and policy is NamingPolicy.CONCEALED
             and (knowledge is None or knowledge.state != "IDENTIFIED")
-        )
-        if anonymous:
-            if not isinstance(concept, HasNaming) or not concept.anonymous_name.strip():
-                raise ValueError(
-                    f"Missing anonymous_name for {concept.get_label()!r} "
-                    f"while naming {self.ctx.cursor.get_label()!r}"
-                )
-            return concept.anonymous_name
+        ):
+            raise ValueError(f"Missing anonymous_name for {concept.get_label()!r}")
         return concept.name or concept.get_label()
 
-    def introduce(self, target: Referent) -> str:
+    def introduce(self, target: Referent, **params: RealizationValue) -> str:
         if self.ctx.current_phase not in {
             ResolutionPhase.UPDATE, ResolutionPhase.JOURNAL, ResolutionPhase.FINALIZE,
         }:
             raise RuntimeError("Introductions require UPDATE/FINALIZE or committed JOURNAL realization")
         concept = self.provider(target)
-        wording = self.reference(concept, ReferenceIntent.PROPER)
+        wording = self.reference(concept, ReferenceIntent.PROPER, **params)
+        if isinstance(concept, NamedConcept):
+            concept.introduce(get_narrator_key(self.ctx), policy=self.policy(concept),
+                              source=f"prose:{self.ctx.cursor.uid}", **params)
+            return wording
         if self.policy(concept) is not NamingPolicy.OFF:
             knowledge = concept.get_knowledge(get_narrator_key(self.ctx))
             if knowledge.state != "IDENTIFIED":
@@ -137,9 +225,9 @@ class NamingOperations:
             if part.introduce:
                 if not disclose:
                     raise ValueError(f"Introduction forbidden in display label: {part.ref!r}")
-                output.append(self.introduce(target))
+                output.append(self.introduce(target, **part.params))
             else:
-                output.append(self.reference(target, part.intent))
+                output.append(self.reference(target, part.intent, **part.params))
         return "".join(output)
 
 
@@ -150,13 +238,14 @@ naming_dispatch = BehaviorRegistry(
 
 @naming_dispatch.register(task="render_text")
 def naming_text_aspect(
-    *, caller: object, aspect: str, ctx: PhaseCtx, **_kwargs: object,
+    *, caller: object, aspect: str, ctx: PhaseCtx,
+    **params: RealizationValue,
 ) -> str | None:
-    if isinstance(caller, (Actor, Location)) and aspect in {
+    if isinstance(caller, (NamedConcept, Actor, Location)) and aspect in {
         "reference_auto", "reference_anonymous", "reference_proper",
     }:
         intent = ReferenceIntent(aspect.removeprefix("reference_"))
-        return NamingOperations(ctx)._reference(caller, intent)
+        return NamingOperations(ctx)._reference(caller, intent, **params)
     return None
 
 

@@ -1,4 +1,4 @@
-# Meeting Rin
+# Meeting Rin and finding Dawnblade
 
 This executable world adopts `tangl.prose.naming` in its domain before normal
 compilation. Actor defaults conceal names, location defaults display proper
@@ -24,7 +24,7 @@ Block `choice_labels` maps explicit action labels to the same references but
 forbids introductions.
 
 Ordinary raw `content` and `text` remain unchanged. Exact-name/phrase linking
-and `#intro` lexical syntax belong to #534 slice 2.
+and `#intro` lexical syntax belong to #534 slice 3.
 
 The alternate start choice demonstrates the explicit authored mutation form:
 `pre_effects: ["introduce(host)"]` identifies before turn prose. Non-printing
@@ -56,3 +56,21 @@ Missing/unbound symbols fail before the body. Ordinary callout display labels
 keep their existing fallback. Custom stored variants must appear explicitly in
 the owning prose-field annotation with both persistence markers; a global type
 registry or owner pointer on each mu-block is unnecessary.
+
+The optional vocabulary now uses `NamedConcept`, `NamedActor`, and
+`NamedLocation`. Rin is a `PersonalNamedActor` with an optional embedded
+`PersonalName`; basic named actors do not require name parsing. `adopts()` returns
+plain spelling-to-parameter data. `reference(host, form="formal")` requests
+"Ms. Northstar", but AUTO still says "the blonde girl" while she is unknown.
+`reference(host, "proper", form="formal")` forces that wording without disclosure.
+Only `introduce(host)` changes knowledge. Proper aliases/forms can override the
+generated data; anonymous descriptions are not automatically adopted.
+
+The later scene uses the same contract on a plain graph-owned `NamedSword`:
+"You find an old sword", then an explicit inscription introduction, then
+"You carry Dawnblade". The domain creates it from an EntityTemplate at story-ready
+and nominates only `sword` into scope, not all graph objects. A named object is
+eligible for references/introductions, not automatically a dialog speaker.
+Portable references accept `params: {form: inscription}` without Jinja; the
+Python helpers accept the same keyword data. Normal JSON world bootstrap restores
+personal names, reference parameters, object knowledge and historical output.

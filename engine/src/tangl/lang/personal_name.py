@@ -2,17 +2,18 @@ from typing import Self, Literal, Any
 from enum import Enum
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from nameparser import HumanName
 
 from tangl.utils.enum_plus import EnumPlusMixin
+from tangl.core.bases import Unstructurable
 from .gens import Gens as Gender
 from .gendered_nominals import normalize_gn
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class PersonalName(BaseModel):
+class PersonalName(Unstructurable):
     """
     Provides methods:
     - `name`, `familiar_name`, `formal_name`: short address
@@ -25,7 +26,7 @@ class PersonalName(BaseModel):
     title: str = Field(default="mr.")   # this is treated like a gendered nominal
     suffix: str = None
     nickname: str = None  # preferred nick
-    aliases: set[str] = Field(default_factory=set)
+    aliases: set[str] = Field(default_factory=set, json_schema_extra={"include": True})
 
     gender: Gender = Gender.XX
     family_name_first: bool = False      # False (default) is common western naming order
@@ -52,17 +53,30 @@ class PersonalName(BaseModel):
                   nickname=hn.nickname)
         return res
 
-    def akas(self):
-        return { x for x in
-                 [ self.given_name,
-                   self.family_name,
-                   self.nickname,
-                   self.name(),
-                   self.familiar_name(),
-                   self.formal_name(),
-                   self.full_name(),
-                   self.familiar_full_name(),
-                   self.formal_full_name() ] if x is not None }.union(self.aliases)
+    def forms(self) -> dict[str, str]:
+        """Preserve generated spelling provenance in a stable local order.
+
+        Consumers resolving duplicate spellings prefer proper, familiar, formal,
+        full, familiar_full, formal_full, given, family, then nickname. Explicit
+        aliases follow as named forms; author overrides belong to the consumer.
+        """
+        return {
+            key: value for key, value in {
+                "proper": self.name(),
+                "familiar": self.familiar_name(),
+                "formal": self.formal_name(),
+                "full": self.full_name(),
+                "familiar_full": self.familiar_full_name(),
+                "formal_full": self.formal_full_name(),
+                "given": self.given_name,
+                "family": self.family_name,
+                "nickname": self.nickname,
+                **{f"alias:{alias}": alias for alias in sorted(self.aliases)},
+            }.items() if value
+        }
+
+    def akas(self) -> set[str]:
+        return set(self.forms().values())
 
     def goes_by(self, alias: str) -> bool:
         return alias in self.akas()

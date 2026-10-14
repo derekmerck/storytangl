@@ -57,6 +57,19 @@ def test_akas(full_name):
     expected_akas = {"Jonathan", "Smith", "Jack", "Jack Smith", "Jonathan Smith", "Mr. Smith", "Mr. Jonathan Smith Jr."}
     assert full_name.akas() == expected_akas
 
+
+def test_forms_preserve_spelling_provenance_and_stable_duplicate_order(full_name):
+    forms = full_name.forms()
+    assert forms["proper"] == "Jonathan"
+    assert forms["formal"] == "Mr. Smith"
+    assert forms["familiar"] == "Jack"
+    assert forms["full"] == "Jonathan Smith"
+    assert forms["familiar_full"] == "Jack Smith"
+    full_name.aliases.update({"Johnny", "JS"})
+    assert list(full_name.forms())[-2:] == ["alias:JS", "alias:Johnny"]
+    assert full_name.forms()["alias:Johnny"] == "Johnny"
+    assert set(full_name.forms().values()) == full_name.akas()
+
 def test_goes_by(full_name):
     assert full_name.goes_by("Jack") is True
     assert full_name.goes_by("Johnny") is False
