@@ -257,6 +257,16 @@ def test_destination_language_overrides_source_language() -> None:
     assert _texts(ctx)[_events(ctx)["Explicit"].uid] == "Beth invites you"
 
 
+def test_destination_choice_can_explicitly_uppercase_reference_without_disclosure() -> None:
+    graph = _world().create_story("run").graph
+    ctx = _ctx(graph)
+    edge = _events(ctx)["Watch the performance"]
+    edge.successor.locals["action_text"] = "{{ reference(host) | upper_first }} is performing"
+    before = graph.value_hash()
+    assert _texts(ctx)[edge.uid] == "The blonde girl is performing"
+    assert graph.value_hash() == before
+
+
 def test_lazy_unrealized_event_uses_static_fallback_without_provisioning() -> None:
     graph = _world().create_story("run", init_mode=InitMode.LAZY).graph
     ctx = _ctx(graph)

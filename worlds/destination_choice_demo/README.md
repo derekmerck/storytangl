@@ -21,6 +21,32 @@ role is an authoring/provisioning error. Standard `introduce()` calls in choice
 templates fail before changing knowledge. Explicit semantic labels remain
 supported; choice strings are not automatically lexically linked.
 
+The destination's scoped `text_template` chooses its suggestion's dialect;
+`fstring` is the default. Opt into `jinja` for `reference(host)` and other helper
+calls. This demo inherits `text_template: jinja` from its globals. Explicit
+edge/event text instead uses its source scope's dialect, not the destination's.
+
+For explicit capitalization, author a suggestion such as:
+
+```yaml
+locals:
+  text_template: jinja
+  action_text: "{{ reference(host) | upper_first }} is performing in the square"
+```
+
+`upper_first` uppercases only the first character of the completed phrase,
+preserving everything else without trimming: “the blonde girl” becomes “The
+blonde girl”, “Rin and Nanae” stays unchanged, and “the NASA lab” becomes “The
+NASA lab”. Jinja's built-in `capitalize` lowercases the remainder, so it would
+change “Rin and Nanae” to “Rin and nanae”. This example is optional; the demo's
+unfiltered suggestion/CLI output remains lowercase before identification.
+The same filter is available in explicit `MuBlock.template` single-pass Jinja;
+ordinary text retains its existing recursive rendering semantics.
+
+Commands share menu disclosure: hidden unavailable offers are not evaluated or
+exposed as ambiguity candidates. A visible suggestion's missing bindings or
+forbidden introduction remain errors, not silently swallowed failures.
+
 `Action.text` retains explicit source; `fallback_text` stores the generated
 binding's public label separately from its synthetic identity. Neither stores a
 rendered destination suggestion. Both persist through ordinary constructor-form

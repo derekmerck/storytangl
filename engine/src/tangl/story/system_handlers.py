@@ -76,7 +76,7 @@ def find_edges_by_command(*, caller: Block, ctx, query, **_kw):
     key = _command_key(query["command"])
     return [
         edge
-        for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None))
+        for edge, _reason in _disclosed_choices(caller, ctx=ctx)
         if key in {
             _command_key(edge.text or ""),
             _command_key(edge.get_label()),
@@ -810,17 +810,9 @@ def render_choice_text(edge: Action, *, ctx: PhaseCtx) -> str:
     return _render_text(text, source=source, ctx=display_ctx)
 
 
-@on_journal(priority=Priority.LATE)
-def render_block_choices(*, caller, ctx, **_kw):
-    """Render block outbound actions into choice fragments.
-
-    Called blocks publish ordinary choices when the frame yields there. A called
-    block with no selectable actions immediately returns, so it does not publish
-    stale client controls.
-    """
-    if not isinstance(caller, Block):
-        return None
-    choices = []
+def _disclosed_choices(caller: Block, *, ctx: PhaseCtx) -> list[tuple[Action, str | None]]:
+    """Share menu disclosure with command lookup before evaluating choice wording."""
+    choices: list[tuple[Action, str | None]] = []
     for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
         # A hidden choice needs no reason, so ask whether it is available before
         # the costlier look at its destination; a guard that refuses it stops
@@ -836,23 +828,30 @@ def render_block_choices(*, caller, ctx, **_kw):
             available = edge.available(ctx=ctx)
             if not available:
                 continue
-        choices.append(
-            (edge, _choice_unavailable_reason(edge=edge, ctx=ctx, available=available))
-        )
-    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
-        reason is None for _, reason in choices
-    ):
-        return None
-
-    fragments: list[ChoiceFragment] = []
-    for edge, reason in choices:
-        available = reason is None
+        reason = _choice_unavailable_reason(edge=edge, ctx=ctx, available=available)
         if (
-            not available
+            reason is not None
             and _unavailable_choice_disclosure(edge=edge, caller=caller, ctx=ctx)
             is UnavailableChoiceDisclosure.HIDE
         ):
             continue
+        choices.append((edge, reason))
+    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
+        reason is None for _, reason in choices
+    ):
+        return []
+    return choices
+
+
+@on_journal(priority=Priority.LATE)
+def render_block_choices(*, caller, ctx, **_kw):
+    """Render disclosed outbound actions, omitting controls at an immediate return."""
+    if not isinstance(caller, Block):
+        return None
+
+    fragments: list[ChoiceFragment] = []
+    for edge, reason in _disclosed_choices(caller, ctx=ctx):
+        available = reason is None
         blockers = [] if available else _choice_blockers(edge=edge, ctx=ctx)
         fragments.append(
             ChoiceFragment(

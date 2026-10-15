@@ -9,6 +9,7 @@ import sys
 from uuid import UUID
 
 import pytest
+from jinja2 import UndefinedError
 
 from tangl.core import BaseFragment, Selector
 from tangl.journal.fragments import BlockFragment, ChoiceFragment, ContentFragment
@@ -35,7 +36,7 @@ from tangl.service.service_method import (
     ServiceWriteback,
 )
 from tangl.service.user.user import User
-from tangl.story import InitMode, World
+from tangl.story import InitMode, MenuBlock, World
 from tangl.story.episode import Action
 from tangl.vm.runtime.ledger import Ledger
 
@@ -377,6 +378,92 @@ def test_ambiguous_deferred_choices_return_live_wording_without_story_mutation(
         ))
     assert ledger.value_hash() == before
     assert actor.narrator_knowledge == {}
+
+
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_command_lookup_never_evaluates_or_exposes_hidden_unavailable_choices(
+    manager: ServiceManager, persistence, user: User, ambiguous: bool,
+) -> None:
+    actions = [
+        {"label": "go_alias", "text": "Go", "successor": "good"},
+        {"conditions": ["False"], "successor": "bad"},
+        {"label": "hidden_explicit", "text": "Go", "conditions": ["False"],
+         "successor": "bad"},
+    ]
+    world = World.from_script_data(script_data={
+        "label": "hidden_choice_command",
+        "metadata": {"start_at": "s.hub"},
+        "globals": {"text_template": "jinja", "unavailable_choice_disclosure": "hide"},
+        "scenes": {"s": {"blocks": {
+            "hub": {"kind": MenuBlock, "actions": actions,
+                    "menu_items": {"has_tags": ["offered"]}},
+            "good": {"content": "You went."},
+            "other": {"locals": {"action_text": "Go"},
+                      "tags": ["offered"] if ambiguous else []},
+            "bad": {"locals": {"action_text": "{{ missing_host.name }}"}},
+        }}},
+    })
+    created = manager.create_story(user_id=user.uid, world_id=world.label, world=world)
+    visible_ids = {str(f.edge_id) for f in created.fragments if isinstance(f, ChoiceFragment)}
+    assert len(visible_ids) == (2 if ambiguous else 1)
+    ledger = persistence[user.current_ledger_id]
+    all_ids = set(ledger.graph.members)
+    before = ledger.value_hash()
+    hidden = ledger.graph.find_one(Selector(has_kind=Action, text=""))
+    assert hidden.successor.label == "bad"
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        manager.resolve_choice(user_id=user.uid, request=DirectEdgeRequest(edge_id=hidden.uid))
+    assert ledger.value_hash() == before
+    for command in ["unknown", hidden.get_label(), "hidden_explicit"]:
+        result = manager.resolve_choice(user_id=user.uid, request=FindEdgeRequest(
+            find_edge=CommandEdgeQuery(command=command),
+        ))
+        assert result.ux_events[0].event_type == "edge_not_found"
+        assert ledger.value_hash() == before and set(ledger.graph.members) == all_ids
+    result = manager.resolve_choice(user_id=user.uid, request=FindEdgeRequest(
+        find_edge=CommandEdgeQuery(command="Go"),
+    ))
+    if ambiguous:
+        (event,) = result.ux_events
+        assert event.event_type == "edge_ambiguous"
+        assert {item["edge_id"] for item in event.details["candidates"]} == visible_ids
+        assert {item["text"] for item in event.details["candidates"]} == {"Go"}
+        assert ledger.value_hash() == before
+    else:
+        assert result.ux_events == []
+        assert ledger.cursor.label == "good"
+    assert set(ledger.graph.members) == all_ids
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_command_lookup_preserves_diagnostics_for_visible_broken_wording(
+    manager: ServiceManager, persistence, user: User, available: bool,
+) -> None:
+    world = World.from_script_data(script_data={
+        "label": "visible_choice_error",
+        "metadata": {"start_at": "s.hub"},
+        "globals": {"text_template": "jinja", "unavailable_choice_disclosure": "hide"},
+        "scenes": {"s": {"blocks": {
+            "hub": {"actions": [
+                {"text": "Go", "successor": "good"},
+                {"conditions": ["False"], "successor": "bad"},
+            ]},
+            "good": {},
+            "bad": {"locals": {"action_text": "{{ missing_host.name }}"}},
+        }}},
+    })
+    manager.create_story(user_id=user.uid, world_id=world.label, world=world)
+    ledger = persistence[user.current_ledger_id]
+    if available:
+        ledger.graph.find_one(Selector(has_kind=Action, text="")).availability = []
+    else:
+        ledger.graph.locals["unavailable_choice_disclosure"] = "disclose"
+    before = ledger.value_hash()
+    with pytest.raises(UndefinedError, match="missing_host"):
+        manager.resolve_choice(user_id=user.uid, request=FindEdgeRequest(
+            find_edge=CommandEdgeQuery(command="Go"),
+        ))
+    assert ledger.value_hash() == before
 
 
 def test_story_envelope_keeps_fragments_independent_from_actions(
