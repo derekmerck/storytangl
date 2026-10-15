@@ -34,6 +34,7 @@ class Scene(TraversableNode):
     """
 
     title: str = ""
+    action_name: str = ""
     roles: list[dict[str, Any]] = Field(default_factory=list)
     settings: list[dict[str, Any]] = Field(default_factory=list)
 

@@ -123,6 +123,7 @@ from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 
 # Register story-level journal handlers.
 from . import system_handlers  # noqa: F401
+from .system_handlers import render_choice_text
 
 __all__ = [
     "Action",
@@ -183,6 +184,7 @@ __all__ = [
     "project_world_graph",
     "projected_graph_to_dict",
     "render_basic_svg",
+    "render_choice_text",
     "render_dot",
     "report_to_dict",
     "resolve_source_nodes",

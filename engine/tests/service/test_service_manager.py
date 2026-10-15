@@ -316,6 +316,69 @@ def test_find_edge_request_resolves_command_or_returns_transient_guidance(
     assert resolved.ux_events == []
 
 
+def test_ambiguous_deferred_choices_return_live_wording_without_story_mutation(
+    manager: ServiceManager, persistence, user: User,
+) -> None:
+    from tangl.prose.naming import NamedActor, NamingOperations, get_authorities
+    from tangl.story import MenuBlock
+    from tangl.vm import ResolutionPhase
+    from tangl.vm.runtime.frame import PhaseCtx
+
+    suggestion = "{{ reference(host) }} is performing"
+    world = World.from_script_data(script_data={
+        "label": "ambiguous_deferred_choices",
+        "metadata": {"start_at": "s.hub"},
+        "globals": {"text_template": "jinja", "naming_defaults": {"Actor": "concealed"}},
+        "actors": {"rin": {"kind": NamedActor, "name": "Rin",
+                           "anonymous_name": "the blonde girl"}},
+        "scenes": {"s": {"blocks": {
+            "hub": {"kind": MenuBlock, "menu_items": {"has_tags": ["activity"]}},
+            "first": {"tags": ["activity"], "locals": {"action_text": suggestion},
+                      "roles": {"host": {"actor_ref": "rin"}}},
+            "second": {"tags": ["activity"], "locals": {"action_text": suggestion},
+                       "roles": {"host": {"actor_ref": "rin"}}},
+        }}},
+    })
+    world.extra_authorities.extend(get_authorities())
+    created = manager.create_story(user_id=user.uid, world_id=world.label, world=world)
+    edge_ids = {str(fragment.edge_id) for fragment in created.fragments
+                if isinstance(fragment, ChoiceFragment)}
+    assert len(edge_ids) == 2
+    ledger = persistence[user.current_ledger_id]
+    actor = ledger.graph.find_one(Selector(has_kind=NamedActor, label="rin"))
+    assert actor.narrator_knowledge == {}
+
+    for text in ["the blonde girl is performing", "Rin is performing"]:
+        before = ledger.value_hash()
+        result = manager.resolve_choice(user_id=user.uid, request=FindEdgeRequest(
+            find_edge=CommandEdgeQuery(command=text),
+        ))
+        (event,) = result.ux_events
+        assert event.event_type == "edge_ambiguous"
+        assert result.fragments == [] and result.step == created.step
+        assert {candidate["text"] for candidate in event.details["candidates"]} == {text}
+        assert {candidate["edge_id"] for candidate in event.details["candidates"]} == edge_ids
+        assert ledger.value_hash() == before
+        if actor.peek_knowledge() is None:
+            ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id,
+                           current_phase=ResolutionPhase.JOURNAL)
+            NamingOperations(ctx).introduce(actor)
+
+    for edge_id in edge_ids:
+        edge = ledger.graph.get(UUID(edge_id))
+        assert edge.text == "" and edge.successor.locals["action_text"] == suggestion
+
+    edge.successor.locals["action_text"] = "{{ introduce(host) }}"
+    actor.narrator_knowledge.clear()
+    before = ledger.value_hash()
+    with pytest.raises(RuntimeError, match="Introductions require"):
+        manager.resolve_choice(user_id=user.uid, request=FindEdgeRequest(
+            find_edge=CommandEdgeQuery(command="Rin"),
+        ))
+    assert ledger.value_hash() == before
+    assert actor.narrator_knowledge == {}
+
+
 def test_story_envelope_keeps_fragments_independent_from_actions(
     manager: ServiceManager,
     persistence,

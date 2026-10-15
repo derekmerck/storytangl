@@ -66,6 +66,14 @@ Absent a suggestion, the static public `Action.fallback_text` wins over the
 ordinary edge-label fallback. Generated menu and sandbox edge labels remain
 stable binding identities, not player-facing fallback wording.
 
+`presentation.choice_text_source` shares this raw selection policy with static
+graph/report inspection; static labels retain authored template source without
+evaluating it or requiring a live narrator. The public `render_choice_text`
+helper realizes that selection for choices, command matching and Service's
+ambiguity candidates. `do_find_edges` continues to return ordinary Actions.
+Block and Scene both expose the typed `action_name` vocabulary, including custom
+subclass defaults and instance overrides.
+
 Both menu projection paths and scheduled-event binding preserve this distinction.
 `fallback_text` is one ordinary persisted string, separate from explicit text;
 no cached wording, generic provenance framework or custom serializer is needed.

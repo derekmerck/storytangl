@@ -24,6 +24,7 @@ from .concepts import Actor, Location, Role, Setting
 from .episode import Action, Block, Scene
 from .fabula import InitMode, World, WorldBuilder
 from .fabula.compiler import StoryTemplateBundle
+from .presentation import choice_text_source
 from .story_graph import StoryGraph
 
 
@@ -1481,7 +1482,7 @@ def _path_for_entity(entity: Any) -> str | None:
 
 def _edge_label(edge: Edge) -> str:
     if isinstance(edge, Action):
-        return edge.text or edge.get_label() or ""
+        return choice_text_source(edge)[0]
     return edge.get_label() if hasattr(edge, "get_label") else ""
 
 

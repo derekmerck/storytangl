@@ -45,7 +45,7 @@ from tangl.vm.runtime.frame import PhaseCtx
 
 from .dispatch import do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
-from .presentation import render_text_as
+from .presentation import choice_text_source, render_text_as
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def find_edges_by_command(*, caller: Block, ctx, query, **_kw):
         if key in {
             _command_key(edge.text or ""),
             _command_key(edge.get_label()),
-            _command_key(_render_choice_text(edge, ctx=ctx)),
+            _command_key(render_choice_text(edge, ctx=ctx)),
         }
     ] or None
 
@@ -801,16 +801,11 @@ def render_block_media(*, caller, ctx, **_kw):
     return fragments or None
 
 
-def _render_choice_text(edge: Action, *, ctx: PhaseCtx) -> str:
+def render_choice_text(edge: Action, *, ctx: PhaseCtx) -> str:
     """Realize authored wording in its owning scope without authorizing disclosure."""
-    source = edge.predecessor
-    text = edge.text
-    if not text and isinstance(edge.successor, TraversableNode):
-        suggestion = MenuBlock.action_text_for(edge.successor)
-        if suggestion:
-            source, text = edge.successor, suggestion
-    if not text:
-        return edge.fallback_text or edge.get_label()
+    text, source = choice_text_source(edge)
+    if source is None:
+        return text
     display_ctx = ctx.derive(cursor_id=source.uid, current_phase=ResolutionPhase.INIT)
     return _render_text(text, source=source, ctx=display_ctx)
 
@@ -862,7 +857,7 @@ def render_block_choices(*, caller, ctx, **_kw):
         fragments.append(
             ChoiceFragment(
                 edge_id=edge.uid,
-                text=_render_choice_text(edge, ctx=ctx),
+                text=render_choice_text(edge, ctx=ctx),
                 available=available,
                 unavailable_reason=(None if available else reason),
                 blockers=blockers or None,

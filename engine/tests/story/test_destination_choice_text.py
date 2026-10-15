@@ -13,11 +13,98 @@ from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.sandbox import SandboxLocation, SandboxScope
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.prose.naming import NamedActor, NamingOperations, get_authorities
-from tangl.story import Action, Block, InitMode, MenuBlock, StoryGraph, World
+from tangl.story import (
+    Action, Block, InitMode, MenuBlock, Scene, StoryGraph, World,
+    build_script_report, project_world_graph,
+)
 from tangl.story.system_handlers import find_edges_by_command, render_block_choices
 from tangl.vm import Dependency, Ledger, ResolutionPhase
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
+
+
+class PracticeScene(Scene):
+    action_name: str = "Watch the girls practicing"
+
+
+class PracticeBlock(Block):
+    action_name: str = "Watch the girls practicing"
+
+
+@pytest.mark.parametrize("target_kind", [PracticeScene, PracticeBlock])
+def test_scene_and_block_choices_preserve_authored_suggestion_precedence(
+    target_kind: type[Scene] | type[Block],
+) -> None:
+    graph = StoryGraph()
+    hub = MenuBlock(registry=graph, label="hub")
+    target = target_kind(registry=graph, label="practice", locals={"menu_text": "Menu wording"})
+    graph.initial_cursor_id = hub.uid
+    edge = Action(registry=graph, predecessor_id=hub.uid, successor_id=target.uid,
+                  label="generated_identity", fallback_text="Public fallback")
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid)
+    assert _texts(ctx)[edge.uid] == "Watch the girls practicing"
+    target.action_name = "Instance suggestion"
+    assert _texts(ctx)[edge.uid] == "Instance suggestion"
+    target.locals["action_text"] = "Local suggestion"
+    assert _texts(ctx)[edge.uid] == "Local suggestion"
+    edge.text = "Explicit text"
+    assert _texts(ctx)[edge.uid] == "Explicit text"
+    edge.text = target.action_name = target.locals["action_text"] = ""
+    assert _texts(ctx)[edge.uid] == "Menu wording"
+    target.locals["menu_text"] = ""
+    assert _texts(ctx)[edge.uid] == "Public fallback"
+
+
+def test_compiled_scene_target_keeps_custom_class_action_name() -> None:
+    world = World.from_script_data(script_data={
+        "label": "scene_choice_suggestion",
+        "metadata": {"start_at": "town.hub"},
+        "scenes": {
+            "town": {"blocks": {"hub": {"actions": [{"successor": "practice"}]}}},
+            "practice": {"kind": PracticeScene, "blocks": {"entry": {"content": "Practice"}}},
+        },
+    })
+    graph = world.create_story("run").graph
+    ledger = Ledger.from_graph(graph)
+    (edge,) = ledger.cursor.edges_out(Selector(has_kind=Action))
+    assert isinstance(edge.successor, PracticeScene)
+    assert _texts(_ctx(graph))[edge.uid] == "Watch the girls practicing"
+    ledger.resolve_choice(edge.uid)
+    assert ledger.cursor.path == "practice.entry"
+
+
+@pytest.mark.parametrize("report", [False, True])
+def test_static_world_inspection_selects_public_raw_text_without_template_execution(
+    report: bool,
+) -> None:
+    world = World.from_script_data(script_data={
+        "label": "static_choice_labels",
+        "metadata": {"start_at": "s.hub"},
+        "globals": {"text_template": "jinja"},
+        "scenes": {"s": {"blocks": {
+            "hub": {"kind": MenuBlock, "menu_items": {"has_tags": ["activity"]},
+                    "actions": [{"successor": "archive", "text": "{{ unsafe() }}"}]},
+            "first": {"tags": ["activity"], "locals": {"action_text": "Watch the show"},
+                      "action_name": "Ignored name"},
+            "second": {"tags": ["activity"], "action_name": "Brew tea",
+                       "locals": {"menu_text": "Ignored menu"}},
+            "third": {"tags": ["activity"], "locals": {"menu_text": "Read the notes"}},
+            "archive": {"tags": ["activity"]},
+            "template": {"tags": ["activity"],
+                         "locals": {"action_text": "{{ introduce(missing_host) }}"}},
+        }}},
+    })
+    if report:
+        labels = [edge.label for edge in build_script_report(world).edges]
+    else:
+        projection = project_world_graph(world)
+        labels = [edge.label for edge in projection.edges if edge.edge_role == "choice"]
+        assert all(edge.graph.frozen_shape for edge in projection._source_edges_by_id.values()
+                   if isinstance(edge, Action))
+    assert sorted(labels) == sorted([
+        "Watch the show", "Brew tea", "Read the notes", "archive",
+        "{{ introduce(missing_host) }}", "{{ unsafe() }}",
+    ])
 
 
 def _world(*, menu: bool = False) -> World:

@@ -24,7 +24,7 @@ from tangl.presentation.projection import (
     ProjectedState,
 )
 from tangl.presentation.values import KvRow
-from tangl.story import InitMode, World, do_find_edges
+from tangl.story import InitMode, World, do_find_edges, render_choice_text
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.get_code_name import get_code_name
 from tangl.utils.hash_secret import key_for_secret
@@ -494,9 +494,10 @@ class ServiceManager:
             user_auth=user_auth,
         ) as session:
             if isinstance(request, FindEdgeRequest):
+                ctx = self._make_story_info_ctx(session.ledger)
                 matches = do_find_edges(
                     session.ledger.cursor,
-                    ctx=self._make_story_info_ctx(session.ledger),
+                    ctx=ctx,
                     query=request.find_edge.model_dump(mode="python"),
                 )
                 if len(matches) != 1:
@@ -518,7 +519,7 @@ class ServiceManager:
                                 "candidates": [
                                     {
                                         "edge_id": str(candidate.uid),
-                                        "text": candidate.text or candidate.get_label(),
+                                        "text": render_choice_text(candidate, ctx=ctx),
                                     }
                                     for candidate in matches
                                 ],

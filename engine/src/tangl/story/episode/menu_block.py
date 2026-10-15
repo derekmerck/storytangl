@@ -8,6 +8,7 @@ from pydantic import Field
 from tangl.vm import TraversableNode
 
 from .block import Block
+from .scene import Scene
 
 
 class MenuBlock(Block):
@@ -62,7 +63,7 @@ class MenuBlock(Block):
         value = provider.locals.get("action_text")
         if isinstance(value, str) and value:
             return value
-        if isinstance(provider, Block) and provider.action_name:
+        if isinstance(provider, (Block, Scene)) and provider.action_name:
             return provider.action_name
         value = provider.locals.get("menu_text")
         return value if isinstance(value, str) else ""
