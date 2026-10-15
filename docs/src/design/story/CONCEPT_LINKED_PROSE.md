@@ -16,6 +16,11 @@
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
 
+For current activation examples, voice/environment customization, and one-off
+authoring escape hatches, start with the [prose authoring guide](PROSE_AUTHORING.md).
+The replacement is shipped; #557 was closed unmerged after its runtime successor
+landed. The dated checkpoint below records the earlier salvage decision.
+
 > **Approved replacement direction (2026-10-13):** #557 remains open and unmerged
 > as a salvage reference. Its compile-time-only authorization gate is superseded
 > by mu-block-centered projection, not merged into this replacement. The former
@@ -755,7 +760,7 @@ and deterministic duplicate precedence; ordinary named actors/items do not need
 personal-name fields. The named sword in the actual demo/CLI proves world
 activation, explicit nomination, knowledge, constructor/JSON restore and replay.
 The generic slice adds no scanner or global concept namespace. Bounded runtime
-source linking follows below; #557 remains unchanged salvage, and #558
+source linking follows below; #557 is closed, unmerged historical reference, and #558
 destination-owned choice projection remains separate.
 
 ### Ordinary dialog ordering: resolved bounded scope
