@@ -84,3 +84,30 @@ def test_ordinary_block_quote_is_not_dialog_markup() -> None:
 
     assert not DialogHandler.has_mu_blocks(text)
     assert DialogHandler.find_malformed_header(text) is None
+
+
+@pytest.mark.parametrize("wrapper", ["fence", "tilde", "inline", "unclosed"])
+@pytest.mark.parametrize("header", ["> [!npc] guide", "> [!npc guide"])
+def test_all_dialog_entry_points_preserve_code_regions(wrapper: str, header: str) -> None:
+    body = f"Rin #intro\n\n{header}\n> literal"
+    if wrapper == "fence":
+        text = f"```python\n{body}\n```"
+    elif wrapper == "tilde":
+        text = f"~~~\n{body}\n~~~"
+    elif wrapper == "inline":
+        text = f"``{body}``"
+    else:
+        text = f"```\n{body}"
+    assert not DialogHandler.has_mu_blocks(text)
+    assert DialogHandler.find_malformed_header(text) is None
+    [unit] = DialogHandler.parse(text)
+    assert unit.dialog_class == "narration"
+    assert unit.text == text
+
+
+def test_protected_malformed_header_does_not_hide_a_real_header_outside_code() -> None:
+    text = "```\n\n> [!npc missing\n```\n\n> [!npc outside\n> invalid"
+    assert DialogHandler.has_mu_blocks(text)
+    assert DialogHandler.find_malformed_header(text) == "> [!npc outside"
+    with pytest.raises(ValueError, match="npc outside"):
+        DialogHandler.parse(text)

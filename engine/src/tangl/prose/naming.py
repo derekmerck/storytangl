@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from enum import Enum
+from uuid import UUID
 
 from pydantic import Field
 
@@ -23,6 +24,7 @@ from tangl.vm import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 
 from .dialog import DialogHandler, DialogMuBlock
+from .linking import AdoptionTable, prepare_prose
 from .mu_block import (
     ConceptReference, MuBlock, RealizationParams, RealizationValue, ReferenceIntent,
 )
@@ -122,6 +124,39 @@ class PersonalNamedActor(NamedActor):
     def _proper_forms(self) -> dict[str, str]:
         generated = self.personal_name.forms() if self.personal_name is not None else {}
         return generated | self.proper_forms
+
+
+def discover_adoptions(ns: Mapping[str, object]) -> AdoptionTable:
+    """Discover only afforded bindings, collapsing their corresponding wrappers.
+
+    Direct symbols remain distinct unless a wrapper with that label actually
+    provides their value. Aliases of the same wrapper are equivalent; different
+    wrappers sharing a provider are not. Canonical equivalent symbols are sorted.
+    """
+    wrappers: dict[UUID, tuple[str, Role | Setting]] = {}
+    for symbol, value in sorted(ns.items()):
+        if isinstance(value, (Role, Setting)) and isinstance(value.provider, NamedConcept):
+            wrappers.setdefault(value.uid, (symbol, value))
+    bindings: dict[str, NamedConcept] = {
+        symbol: wrapper.provider for symbol, wrapper in wrappers.values()
+    }
+    for symbol, value in sorted(ns.items()):
+        if not isinstance(value, NamedConcept):
+            continue
+        corresponding = [
+            key for key, wrapper in wrappers.values()
+            if wrapper.get_label() == symbol and wrapper.provider is value
+        ]
+        if len(corresponding) != 1:
+            bindings[symbol] = value
+    adoptions: AdoptionTable = {}
+    for symbol, concept in sorted(bindings.items()):
+        for spelling, params in concept.adopts().items():
+            if spelling:
+                adoptions.setdefault(spelling, []).append(
+                    ConceptReference(ref=symbol, params=dict(params)),
+                )
+    return adoptions
 
 
 class ProseBlock(Block):
@@ -261,8 +296,13 @@ def render_linked_prose(
     if not isinstance(caller, ProseBlock):
         return None
     operations = NamingOperations(ctx)
+    ns = ctx.get_ns(caller)
+    units = caller.prose
+    if ns.get("link_prose", False) is True:
+        units = prepare_prose(units, discover_adoptions(ns),
+                              source=f"owner {caller.get_label()} ({caller.uid})")
     fragments = DialogHandler.render(
-        caller.prose, ns=ctx.get_ns(caller), ctx=ctx, source_id=caller.uid,
+        units, ns=ns, ctx=ctx, source_id=caller.uid,
         name_resolver=operations.reference,
         speaker_resolver=operations.speaker,
         parts_resolver=lambda parts: operations.realize(parts, disclose=True),

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -28,6 +29,7 @@ from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.ctx import VmPhaseCtx
 
 from .mu_block import MuBlock, MuBlockHandler, NameResolver, SpeakerResolver
+from .literals import code_regions
 
 
 @dataclass(slots=True)
@@ -262,8 +264,22 @@ class DialogHandler(MuBlockHandler):
     )
 
     @staticmethod
-    def _paragraphs(text: str) -> list[str]:
-        return re.split(r"\n(?:[ \t]*\n)+", text.strip()) if text.strip() else []
+    def paragraph_spans(text: str) -> Iterator[tuple[int, int]]:
+        """Locate the existing paragraphs without splitting literal code regions."""
+        protected = list(code_regions(text))
+        start = 0
+        for separator in re.finditer(r"\n(?:[ \t]*\n)+", text):
+            if any(a <= separator.start() and separator.end() <= b for a, b in protected):
+                continue
+            if text[start:separator.start()].strip():
+                yield start, separator.start()
+            start = separator.end()
+        if text[start:].strip():
+            yield start, len(text)
+
+    @classmethod
+    def _paragraphs(cls, text: str) -> list[str]:
+        return [text[start:end].strip() for start, end in cls.paragraph_spans(text)]
 
     @staticmethod
     def _paragraph_lines(paragraph: str) -> list[str]:

@@ -1,8 +1,8 @@
 # Optional prose extensions
 
 Status: #555 naming behavior retained; the approved #534 mu-block projection
-replacement's foundation and generic NamedConcept slices are implemented. Runtime
-scoped exact adoption remains the subsequent slice. #557's compile-time-only linker
+replacement's foundation, generic NamedConcept and bounded runtime scoped exact
+adoption slices are implemented. #557's compile-time-only linker
 remains an open, unmerged salvage reference, not the runtime authority.
 
 Rendering sessions and dialog micro-blocks are existing realization helpers.
@@ -111,11 +111,10 @@ pickle-style alias memoization is provided. Owner back-pointers/caches, if used
 by other embedded types, stay excluded and are rebound normally; mu-blocks do
 not need them.
 
-The delivered slices deliberately do not implement automatic runtime adoption,
-inherited-name catalogs, binding-owned spelling aliases, lexical #intro parsing,
-NLP, hot reload, or failure recovery. Slice 3 may salvage #557's exact-boundary,
-complete-marker, escape, ambiguity, and one-way literal-description witnesses;
-its compile-time catalog gate and separate authored segment model are replaced.
+Runtime adoption is limited to opted-in ProseBlock source as detailed below.
+Binding-owned stable spellings, catalogs, NLP, hot reload and failure recovery
+remain deferred. #557's lexical witnesses informed this bounded scanner, not its
+compile-time catalog gate, separate segment type or persistence machinery.
 
 ## Generic named concepts (slice 2)
 
@@ -157,10 +156,11 @@ named-text handlers; identification does not prescribe their wording choice.
 
 `ConceptReference.params` carries small serializable scalar realization data,
 forwarded by both semantic parts and Python `reference`/`introduce` helpers.
-No second linked-text IR or automatic matching is added. Generated wording is
+No second linked-text IR is added. Generated wording is
 output, never re-executed. Default adoption includes only explicit proper/display
 names and deliberate proper forms/aliases; `anonymous_name` is not inferred as an
-adoption phrase. Ordinary speech and literal names/`#intro` remain opaque.
+adoption phrase. Ordinary speech remains opaque; narration only links with the
+separate scoped consent below.
 
 `PersonalNamedActor` optionally embeds the existing `tangl.lang.PersonalName`.
 Basic named actors, places and items do not need one. `PersonalName.forms()`
@@ -182,6 +182,91 @@ The demo's domain explicitly materializes/nominates one `NamedSword` at the
 existing story-ready/namespace boundaries through EntityTemplate. It does not
 publish every graph entity. Its CLI path reads an anonymous object, explicitly
 introduces its inscription, then remembers the object. Replay/rollback retain
-knowledge and historical output. Runtime lexical discovery/linking, stable
-binding-owned aliases, source `#intro` lowering and #558 destination-choice scope
-remain separate work; #534 is not automatically closed.
+knowledge and historical output. Stable binding-owned aliases and #558
+destination-choice scope remain separate work; #534 is not automatically closed.
+
+## Runtime scoped exact adoption (slice 3)
+
+`link_prose` is a scoped namespace boolean, false by default and independent of
+naming policy. World globals and nearer scene/block locals use existing namespace
+precedence. Only `ProseBlock.prose` string text opts into this frontend; ordinary
+`Block.content` and display/choice/media strings are not lexically migrated.
+Markdown code-region protection is canonical for all worlds, as described below.
+Explicit semantic parts/templates work with linking off.
+
+`discover_adoptions(ns)` reads only current top-level NamedConcept bindings and
+bound Role/Setting providers in the already gathered namespace. Ancestor and
+world/mechanic contributions are eligible on equal terms. No graph/template scan
+or provisioning authorizes names. Unbound wrappers contribute nothing. A provider
+symbol corresponding to a wrapper with that label/current provider is one
+candidate, retaining the usable wrapper symbol; aliases of that same wrapper
+collapse deterministically. Distinct wrappers or independently nominated symbols
+remain distinct even if they share an actor. Encountered ambiguity lists symbols
+instead of choosing dictionary order. References contain only symbols and detached
+scalar `adopts()` parameters, not provider IDs/pointers or callbacks.
+
+`link_text` is pure lowering to the existing literal/ConceptReference parts;
+`prepare_prose` makes ephemeral units for the same ordered DialogHandler renderer.
+Neither discovery/preparation creates knowledge, changes graph/source, or stores
+prepared units. Plain MuBlock raw strings may contain narration and the existing
+callouts; DialogHandler.parse supplies that grammar and full mode/attitude. Its
+Code-region protection is unconditional in that shared parser, including detection,
+actual parsing, malformed-header checks and later canonical journal composition.
+Callout-looking text inside code is literal whether naming is adopted or not;
+the earlier reparse behavior was a bug, not a compatibility contract. Normal
+callouts outside protected code retain their existing projection behavior.
+Paragraph source spans retain original offsets for diagnostics; normal callout
+body/paragraph normalization remains the existing parser's responsibility. Styles
+and source provenance survive. Already-structured custom units retain their type
+and preparation methods; custom raw callout syntax stays opaque rather than being
+flattened or given a new parser.
+
+The lexical contract is conservative:
+
+- Exact case-sensitive proper spellings, longest eligible match at a position,
+  escaped regex punctuation and complete word boundaries. Anonymous descriptions
+  are literal unless a custom adopter deliberately supplies one. No automatic
+  capitalization, pronouns or article handling.
+- `NAME#intro` or `NAME` plus spaces/tabs and complete `#intro` lowers at that
+  position to an AUTO reference with `introduce=True`. A requested form is never
+  forced PROPER. `#introvert`/`#introduction` are literal suffixes; punctuation
+  after a complete marker remains. Newlines/punctuation cannot attach a marker.
+  An unescaped complete unmatched marker is an error, with owner/source, authored
+  unit index and original character offset; unrelated ordinary words are literal.
+- Odd backslash runs before a known name or complete marker escape it and emit
+  its spelling/adjacent marker literally. Each preceding slash pair emits one
+  slash; unrelated slash runs remain unchanged. For example `\Rin #intro` is
+  literal `Rin #intro`; `\\Rin #intro` emits one slash plus an introduction.
+- Matched Markdown backtick spans and backtick/tilde fences are literal, including
+  their markers. An unclosed fence protects the remainder. This is a small shared
+  scanner, not a Markdown AST/backend. Matches cannot cross a literal code region.
+- Explicit templates and authored units containing `{{`, `{%` or `{#` are wholly
+  opaque to lexical processing. Split mixed source/template authoring into ordered
+  units. Generated nominal/template output is never rescanned or re-executed.
+- Callout speech bodies/labels are not lexically linked. Labels still use strict,
+  pure current-provider resolution before bodies; literal spoken names/markers
+  do not disclose. Explicit semantic parts or templates can intentionally introduce
+  inside structured speech, using the same existing operations.
+
+Actual JOURNAL realization applies explicit introductions left-to-right. Later
+references/labels and already-supported semantic choice labels see the resulting
+state; historical fragments do not change. Read-only label realization rejects
+introductions at the existing boundary. Constructor/flat JSON/cold bootstrap retain
+raw source and knowledge, while later projections link again from current scope.
+Patch replay and actual internal-return/rollback witnesses retain historical output
+without duplicate restoration output or graph identities. No custom serializer,
+new phase, second rendering path, index/cache or recovery contract is introduced.
+
+Current-provider spellings are the only discovered vocabulary. Previously lowered
+symbolic parts follow a recast binding, but rediscovery does not retain the old
+actor's spelling as a stable role alias. Stable reference-cast/binding-owned
+spellings, #558 destination labels, broader Block.content adoption, compile-time
+authorization, NLP and failure-atomic recovery are still separate work. These
+runtime decisions supersede #534's older compiler-only/adopt-anonymous wording.
+
+The composition checkpoint is resolved by this shared parsing correction, not
+raw-versus-rendered fragment types, a bypass flag/tag or a second rendering path.
+Full `do_journal` witnesses cover vanilla Block content and opted-in ProseBlock
+source with fenced/inline code, internal blank lines, malformed-looking headers,
+and real callouts mixed outside the protected region. Source/graph state stays
+unchanged, while outside speaker/class/style/media projection remains standard.

@@ -101,3 +101,8 @@ def test_concept_naming_cli_witness_introduces_and_remembers_provider() -> None:
     assert "You find an old sword." in transcript
     assert "Its inscription reads Dawnblade of the East." in transcript
     assert "You carry Dawnblade." in transcript
+    assert "the blonde girl waits at Market Square beside an old sword." in transcript
+    assert "This is my sister, Nanae. Rin #intro stays spoken." in transcript
+    assert "Nanae smiles. Nanae waves. Rin nods." in transcript
+    assert "Dawnblade of the East gleams. Dawnblade rests here." in transcript
+    assert "Rin and Nanae remember Market Square and Dawnblade." in transcript

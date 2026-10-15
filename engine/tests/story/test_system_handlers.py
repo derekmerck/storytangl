@@ -45,6 +45,80 @@ def _ctx_with_ns(ns: dict[str, object] | None = None) -> SimpleNamespace:
     return SimpleNamespace(get_meta=lambda: {}, get_ns=lambda _caller: dict(ns or {}))
 
 
+@pytest.mark.parametrize("adopted", [False, True])
+@pytest.mark.parametrize("wrapper", ["fence", "tilde", "inline", "unclosed"])
+@pytest.mark.parametrize("malformed", [False, True])
+def test_complete_journal_keeps_callout_looking_code_literal(
+    adopted: bool, wrapper: str, malformed: bool,
+) -> None:
+    from tangl.prose import MuBlock
+    from tangl.prose.naming import ProseBlock, naming_dispatch
+
+    header = "> [!npc host" if malformed else "> [!npc] host"
+    body = f"Rin #intro\n\n{header}\n> spoken code"
+    if wrapper == "fence":
+        text = f"```python\n{body}\n```"
+    elif wrapper == "tilde":
+        text = f"~~~\n{body}\n~~~"
+    elif wrapper == "inline":
+        text = f"``{body}``"
+    else:
+        text = f"```\n{body}"
+    graph = StoryGraph()
+    block = ProseBlock(prose=[MuBlock(text=text)], registry=graph) if adopted else Block(
+        content=text, registry=graph,
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    if adopted:
+        ctx.local_authorities.append(naming_dispatch)
+    ctx._ns_cache[block.uid] = {"link_prose": adopted}
+    before = graph.value_hash()
+    result = do_journal(block, ctx=ctx)
+    fragments = [result] if isinstance(result, ContentFragment) else result
+    assert len(fragments) == 1
+    assert fragments[0].content == text
+    assert not isinstance(fragments[0], AttributedFragment)
+    assert fragments[0].source_id == block.uid
+    assert graph.value_hash() == before
+    assert (block.prose[0].text if adopted else block.content) == text
+
+
+@pytest.mark.parametrize("adopted", [False, True])
+def test_complete_journal_protects_code_while_projecting_callouts_outside_it(
+    adopted: bool,
+) -> None:
+    from tangl.prose import MuBlock
+    from tangl.prose.naming import ProseBlock, naming_dispatch
+
+    code = "```\nRin #intro\n\n> [!npc malformed\n> literal\n```"
+    inline = "``> [!npc] host`` stays code."
+    text = f"{code}\n\n> [!npc.happy]+ host\n> Welcome.\n\n{inline}"
+    graph = StoryGraph()
+    actor = DemoGuide(label="guide", name="Guide", registry=graph,
+                      look=Look(hair_color=HairColor.AUBURN))
+    block = ProseBlock(prose=[MuBlock(text=text)], registry=graph) if adopted else Block(
+        content=text, registry=graph,
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    if adopted:
+        ctx.local_authorities.append(naming_dispatch)
+    ctx._ns_cache[block.uid] = {"host": actor, "link_prose": adopted}
+    before = graph.value_hash()
+    result = do_journal(block, ctx=ctx)
+    fragments = [result] if isinstance(result, ContentFragment) else result
+    assert [f.content for f in fragments] == [code, "Welcome.", inline]
+    speaker = fragments[1]
+    assert isinstance(speaker, AttributedFragment)
+    assert speaker.speaker_id == str(actor.uid)
+    assert speaker.speaker_name == "Guide"
+    assert speaker.how == "npc.happy" and speaker.speaker_attitude == "happy"
+    assert speaker.presentation_hints.style_dict == {"font-weight": "600"}
+    assert speaker.media == "dialog_im"
+    assert speaker.media_payload["media_role"] == "dialog_im"
+    assert speaker.media_payload["attitude"] == "happy"
+    assert graph.value_hash() == before
+
+
 class DemoGuide(Actor, HasLook):
     """Story actor with visual presence used by JOURNAL handler tests."""
 

@@ -1,5 +1,6 @@
 label: concept_naming_demo
 globals:
+  link_prose: false
   naming_defaults:
     Actor: concealed
     Location: proper
@@ -49,6 +50,7 @@ scenes:
         actions:
           - {text: Meet the girl, successor: introduction}
           - {text: Introduce before prose, successor: effect_introduction}
+          - {text: Read linked narration, successor: linked.start}
       effect_introduction:
         kind: ProseBlock
         pre_effects: ["introduce(host)"]
@@ -88,3 +90,48 @@ scenes:
           - template: "You carry {{ reference(sword) }}."
         actions:
           - {text: Return, successor: meeting.introduction}
+  linked:
+    locals: {link_prose: true}
+    roles:
+      host: {actor_ref: rin}
+      sister: {actor_ref: nanae}
+    settings:
+      place: {location_ref: square}
+    blocks:
+      start:
+        kind: ProseBlock
+        prose:
+          - text: |
+              Rin waits at Market Square beside Dawnblade.
+
+              > [!npc.excited] host_role
+              > This is my sister, Nanae. Rin #intro stays spoken.
+
+              Nanae #intro smiles. Nanae waves. Rin#intro nods.
+
+              > [!npc.happy] host_role
+              > Nanae #intro remains literal speech.
+
+              Dawnblade of the East #intro gleams. Dawnblade rests here.
+        actions:
+          - {label: greet_host, text: Continue, successor: after}
+        choice_labels:
+          greet_host: ["Say hi to ", {ref: host}]
+      after:
+        kind: ProseBlock
+        prose:
+          - text: "Rin and Nanae remember Market Square and Dawnblade."
+        actions:
+          - {text: Return to linked narration, successor: start}
+      opted_out:
+        kind: ProseBlock
+        locals: {link_prose: false}
+        prose:
+          - text: "Rin #intro remains literal."
+          - template: "{{ reference(host, 'proper') }}"
+      shadow:
+        kind: ProseBlock
+        roles:
+          host: {actor_ref: beth}
+        prose:
+          - text: "Beth waits. Rin remains source-literal."

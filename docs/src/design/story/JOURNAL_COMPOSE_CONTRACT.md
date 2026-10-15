@@ -51,6 +51,12 @@ and composition operates only on that ordered fragment batch.
 - It is order-preserving except for the local replacement of those eligible
   fragments.
 - Non-eligible fragments pass through unchanged.
+- Markdown inline/fenced code is literal for every world. Dialog detection,
+  parsing and malformed-header checks use the same code-region scanner, so
+  callout-looking syntax inside code is not eligible even across internal blank
+  lines. Actual callouts outside protected code still project normally. This
+  corrects the former reparse-inside-code bug without raw-versus-rendered fragment
+  types, bypass tags/flags or another parser.
 - Richer peer fragments may continue to later service and client layers, which
   remain responsible for capability-specific handling.
 
