@@ -101,6 +101,13 @@ narrator immediately at its explicit ordered reference position. Ordinary
 auto/proper/anonymous references, speaker/choice display reads, previews, and
 namespace gathering do not create or change knowledge records. Introduction
 is not inferred from quoting or requesting proper wording.
+Choice templates, including destination-owned suggestions, use the normal text
+evaluator in a fresh derived owner context at a non-committed phase. They cannot
+inherit JOURNAL's introduction permission merely because the menu is emitted
+during JOURNAL. Source-owned explicit text keeps its source scope; deferred text
+uses the destination's current cast/settings, state and narrator. Display does
+not traverse, provision or run destination lifecycle hooks. Existing semantic
+choice labels continue to prohibit introduction reference parts.
 The same explicit operation is supported from authored UPDATE/FINALIZE effects
 at normal mutation boundaries; a template call such as
 `{% set _ = introduce(rin) %}` executes intentionally at its ordered position.

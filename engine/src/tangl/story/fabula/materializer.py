@@ -1205,7 +1205,7 @@ class StoryMaterializer:
                 label=f"menu_{menu.get_label()}_{index}",
                 predecessor_id=menu.uid,
                 successor_id=provider.uid,
-                text=MenuBlock.action_text_for(provider),
+                fallback_text=provider.get_label(),
                 tags={"dynamic", "fanout", "menu"},
                 # Same minimal cleanup-attribution token as the lazy
                 # project_menu_affordances path (synthesis item D), so menu

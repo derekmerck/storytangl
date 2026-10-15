@@ -1,0 +1,27 @@
+# Destination-owned choice text
+
+Run `run_script worlds/destination_choice_demo/cli_witness.txt` in the CLI.
+The retained scheduled offer first reads “the blonde girl is performing in the
+square”. Selecting it introduces Rin during actual JOURNAL execution, returns
+through the ordinary sandbox call, and shows “Rin is performing in the square”.
+The same Action ID survives; display does not introduce her or pay arrival time.
+
+The destination authors `locals.action_text` and binds `host` to Rin. The hub
+binds `host` to Beth and overrides naming policy to proper: the explicit event
+text always says “Beth invites you”, proving that explicit text keeps its source
+scope. The bench has no suggestion and keeps its public event label.
+
+Wording precedence at display is explicit edge/event text, destination
+`locals.action_text`, destination `action_name`, destination `locals.menu_text`,
+then the static public fallback. MenuBlock fanout follows the same policy.
+Destination templates use a fresh derived context, current state, narrator and
+destination settings. They never simulate arrival or provision missing bindings.
+An unrealized lazy target keeps its fallback; a realized but unbound required
+role is an authoring/provisioning error. Standard `introduce()` calls in choice
+templates fail before changing knowledge. Explicit semantic labels remain
+supported; choice strings are not automatically lexically linked.
+
+`Action.text` retains explicit source; `fallback_text` stores the generated
+binding's public label separately from its synthetic identity. Neither stores a
+rendered destination suggestion. Both persist through ordinary constructor-form
+and JSON restore, with no custom serializer.

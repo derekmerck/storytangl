@@ -1,0 +1,45 @@
+label: destination_choice_demo
+globals:
+  text_template: jinja
+  naming_defaults: {Actor: concealed}
+actors:
+  rin:
+    kind: NamedActor
+    name: Rin
+    anonymous_name: the blonde girl
+  beth:
+    kind: NamedActor
+    name: Beth
+    anonymous_name: the dark-haired girl
+scenes:
+  town:
+    kind: SandboxScope
+    locals: {world_turn: 0}
+    blocks:
+      hub:
+        kind: SandboxLocation
+        content: You pause by the square.
+        wait_enabled: false
+        roles:
+          host: {actor_ref: beth}
+        locals:
+          naming_defaults: {Actor: proper}
+        scheduled_events:
+          - label: Watch the show
+            target: performance
+            return_to_location: true
+          - label: Invitation
+            text: "{{ reference(host) }} invites you"
+            target: performance
+            return_to_location: true
+          - label: Rest on the bench
+            target: bench
+            return_to_location: true
+      performance:
+        roles:
+          host: {actor_ref: rin}
+        locals:
+          action_text: "{{ reference(host) }} is performing in the square"
+        content: "The performer says, 'I am {{ introduce(host) }}.'"
+      bench:
+        content: You rest for a moment.

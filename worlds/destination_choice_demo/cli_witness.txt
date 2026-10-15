@@ -1,0 +1,2 @@
+create_story destination_choice_demo
+do 1

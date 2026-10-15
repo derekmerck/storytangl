@@ -755,8 +755,9 @@ and deterministic duplicate precedence; ordinary named actors/items do not need
 personal-name fields. The named sword in the actual demo/CLI proves world
 activation, explicit nomination, knowledge, constructor/JSON restore and replay.
 The generic slice adds no scanner or global concept namespace. Bounded runtime
-source linking follows below; #557 remains unchanged salvage, and #558
-destination-owned choice projection remains separate.
+source linking follows below; #557 was closed unmerged. #558's separate
+destination-owned render-time choice policy is now implemented at Story's choice
+renderer (see `worlds/destination_choice_demo`), without lexical choice linking.
 
 ### Ordinary dialog ordering: resolved bounded scope
 
@@ -799,8 +800,9 @@ ConceptReference parts, retaining form parameters separately from forced wording
 and explicit introduction. No Jinja lowering is required for the portable path.
 Exact-boundary, complete-marker, escape, ambiguity and source diagnostics are
 covered by runtime witnesses. This note does not approve automatic speech rewriting or
-compile-time authorization. Stable binding-owned spellings and #558's destination
-scope require their own follow-up implementation contract.
+compile-time authorization. Stable binding-owned spellings remain separate.
+#558's destination scope is implemented independently through normal templates
+and derived display contexts, not automatic lexical linking of choice strings.
 
 The first consumer is `ProseBlock.prose`, enabled by scoped namespace boolean
 `link_prose` (default false, independent of naming defaults). Existing globals,

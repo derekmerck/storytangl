@@ -7,7 +7,8 @@
 :related: open_link, traversal, journal, games
 ```
 
-**Status:** IMPLEMENTED FIRST-SPIKE; scheduled-event binding/disclosure slice +
+**Status:** IMPLEMENTED FIRST-SPIKE; scheduled-event binding/disclosure and
+destination-owned render-time choice text (#558) shipped +
 ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,
@@ -228,6 +229,25 @@ delta replay retain the recorded receiver, sponsor, Action, and Dependency ids.
 This does not introduce a separate target loader, a graph-wide reference cache,
 or a new guarantee about re-executing abandoned choices after rollback.
 Mobile sponsor lifetime reconciliation remains a follow-up under #527.
+
+Scheduled events retain explicit declaration `text` separately from their public
+label (or target when unlabeled). `as_interaction` does not fill `text` with that
+fallback. Projection stores explicit text on `Action.text` and the public label
+on `Action.fallback_text`, never on the generated Action's identity label and
+never as rendered destination wording. Story's shared choice renderer asks an
+already-realized destination for authored `locals.action_text`, `action_name`,
+or `locals.menu_text` only when explicit text is absent, then uses the public
+fallback. The destination's bare label cannot mask a scheduled event's fallback.
+
+Destination suggestions are evaluated at display time in a fresh derived
+destination context, not the hub's namespace or captured helper closures.
+Explicit event wording keeps its source context. Standard naming introductions
+are rejected in both display contexts; no knowledge, arrival, time or visit state
+changes. Lazy absent targets keep the static fallback without materialization;
+realized missing bindings are diagnostic. Retained IDs and declaration sources
+survive constructor/JSON restore; no new serializer, phase, transaction or
+projection refresh is required for names to change. MenuBlock fanout shares the
+same Story policy. See `worlds/destination_choice_demo` for an executable example.
 
 ### Architectural Legitimacy Guardrail
 

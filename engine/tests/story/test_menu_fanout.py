@@ -6,6 +6,7 @@ from tangl.core import Selector
 from tangl.story import InitMode, World
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment
+from tangl.story.system_handlers import render_block_choices
 from tangl.vm import Fanout, Ledger
 from tangl.vm.dispatch import do_journal, do_provision
 from tangl.vm.runtime.frame import PhaseCtx
@@ -99,6 +100,11 @@ def _enter_hub(result):
     return ledger, hub
 
 
+def _choice_texts(hub: Block) -> set[str]:
+    ctx = PhaseCtx(graph=hub.graph, cursor_id=hub.uid)
+    return {choice.text for choice in render_block_choices(caller=hub, ctx=ctx)}
+
+
 def test_materialized_menu_block_wires_fanout_edges() -> None:
     result = _create_story()
     hub = _block(result.graph, "hub")
@@ -117,7 +123,8 @@ def test_entering_menu_block_projects_dynamic_actions_during_planning() -> None:
 
     assert len(actions) == 5
     assert all(action.return_phase is None for action in actions)
-    assert {action.text for action in actions} >= {
+    assert all(action.text == "" for action in actions)
+    assert _choice_texts(hub) >= {
         "Listen to Aria",
         "Brew tea",
         "Read the notes",
@@ -148,7 +155,10 @@ def test_anonymous_activity_block_can_be_gathered_as_menu_choice() -> None:
     result = _create_story()
     _, hub = _enter_hub(result)
 
-    secret_action = next(action for action in _dynamic_menu_actions(hub) if action.text == "Secret project")
+    secret_action = next(
+        action for action in _dynamic_menu_actions(hub)
+        if action.successor.action_name == "Secret project"
+    )
 
     assert secret_action.successor is not None
     assert getattr(secret_action.successor, "is_anonymous", False) is True
@@ -158,7 +168,7 @@ def test_menu_action_text_precedence_uses_provider_metadata() -> None:
     result = _create_story()
     _, hub = _enter_hub(result)
 
-    texts = {action.text for action in _dynamic_menu_actions(hub)}
+    texts = _choice_texts(hub)
 
     assert "Listen to Aria" in texts
     assert "Brew tea" in texts
@@ -179,7 +189,7 @@ def test_menu_refresh_rebuilds_actions_and_removes_stale_choices() -> None:
     do_provision(hub, ctx=ctx)
     refreshed_actions = _dynamic_menu_actions(hub)
 
-    assert "Brew tea" not in {action.text for action in refreshed_actions}
+    assert "Brew tea" not in _choice_texts(hub)
     assert initial_ids.isdisjoint({action.uid for action in refreshed_actions})
     assert len(refreshed_actions) == 4
 
@@ -192,7 +202,8 @@ def test_frozen_shape_eager_init_prebuilds_menu_actions() -> None:
 
     assert result.graph.frozen_shape is True
     assert len(actions) == 5
-    assert {action.text for action in actions} >= {
+    assert all(action.text == "" for action in actions)
+    assert _choice_texts(hub) >= {
         "Listen to Aria",
         "Brew tea",
         "Read the notes",
@@ -222,4 +233,4 @@ def test_frozen_shape_menu_does_not_refresh_during_planning() -> None:
     refreshed_actions = _dynamic_menu_actions(hub)
 
     assert {action.uid for action in refreshed_actions} == initial_ids
-    assert "Brew tea" in {action.text for action in refreshed_actions}
+    assert "Brew tea" in _choice_texts(hub)

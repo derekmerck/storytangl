@@ -856,6 +856,7 @@ def _project_sandbox_interaction(
         successor_ref=interaction.target if reuse_retained_binding else None,
         once=interaction.once if reuse_retained_binding else False,
         text=interaction.text,
+        fallback_text=interaction.label,
         trigger_phase=Action.trigger_phase_from_activation(interaction.activation),
         return_phase=ResolutionPhase.PLANNING if interaction.return_to_location else None,
         availability=availability,

@@ -27,6 +27,7 @@ from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    ResolutionPhase,
     TraversableNode,
     ViabilityResult,
     do_compose_journal,
@@ -40,6 +41,7 @@ from tangl.journal.fragments import (
     MediaFragment,
     client_visible_tags,
 )
+from tangl.vm.runtime.frame import PhaseCtx
 
 from .dispatch import do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
@@ -75,7 +77,11 @@ def find_edges_by_command(*, caller: Block, ctx, query, **_kw):
     return [
         edge
         for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None))
-        if key in {_command_key(edge.text or ""), _command_key(edge.get_label())}
+        if key in {
+            _command_key(edge.text or ""),
+            _command_key(edge.get_label()),
+            _command_key(_render_choice_text(edge, ctx=ctx)),
+        }
     ] or None
 
 
@@ -175,7 +181,7 @@ def project_menu_affordances(*, caller, ctx, **_kw):
             label=f"menu_{caller.get_label()}_{index}",
             predecessor_id=caller.uid,
             successor_id=provider.uid,
-            text=MenuBlock.action_text_for(provider),
+            fallback_text=provider.get_label(),
             tags={"dynamic", "fanout", "menu"},
             # Minimal cleanup-attribution token (synthesis item D): names the
             # projecting family in the same channel sandbox already uses, so
@@ -795,6 +801,20 @@ def render_block_media(*, caller, ctx, **_kw):
     return fragments or None
 
 
+def _render_choice_text(edge: Action, *, ctx: PhaseCtx) -> str:
+    """Realize authored wording in its owning scope without authorizing disclosure."""
+    source = edge.predecessor
+    text = edge.text
+    if not text and isinstance(edge.successor, TraversableNode):
+        suggestion = MenuBlock.action_text_for(edge.successor)
+        if suggestion:
+            source, text = edge.successor, suggestion
+    if not text:
+        return edge.fallback_text or edge.get_label()
+    display_ctx = ctx.derive(cursor_id=source.uid, current_phase=ResolutionPhase.INIT)
+    return _render_text(text, source=source, ctx=display_ctx)
+
+
 @on_journal(priority=Priority.LATE)
 def render_block_choices(*, caller, ctx, **_kw):
     """Render block outbound actions into choice fragments.
@@ -842,7 +862,7 @@ def render_block_choices(*, caller, ctx, **_kw):
         fragments.append(
             ChoiceFragment(
                 edge_id=edge.uid,
-                text=edge.text or edge.get_label(),
+                text=_render_choice_text(edge, ctx=ctx),
                 available=available,
                 unavailable_reason=(None if available else reason),
                 blockers=blockers or None,

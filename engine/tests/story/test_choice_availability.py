@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core import EntityTemplate, Graph, Selector, TemplateRegistry
+from tangl.core import BehaviorRegistry, EntityTemplate, Graph, Selector, TemplateRegistry
 from tangl.core.runtime_op import Predicate
 from tangl.presentation.intent import Blocker
 from tangl.story.concepts import Actor, Location, Role, Setting
@@ -42,10 +42,15 @@ import tangl.story  # noqa: F401 – register story handlers
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _simple_ctx(ns: dict | None = None):
-    """Minimal ctx stub sufficient for availability checks."""
-    from types import SimpleNamespace
-    return SimpleNamespace(get_meta=lambda: {}, get_ns=lambda _caller: dict(ns or {}))
+def _simple_ctx(ns: dict | None = None) -> PhaseCtx:
+    """Use the real context so display children inherit namespace contributions."""
+    authority = BehaviorRegistry()
+
+    @authority.register(task="gather_ns")
+    def gather(**_kw):
+        return dict(ns or {})
+
+    return PhaseCtx(graph=Graph(), cursor_id=None, local_authorities=[authority])
 
 
 def _full_ctx(graph: StoryGraph, cursor: Block, ns: dict | None = None):

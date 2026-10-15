@@ -61,6 +61,7 @@ from tangl.mechanics.sandbox.handlers import (
 )
 from tangl.mechanics.sandbox.time import SandboxTimeCost
 from tangl.story import Action, Block, InitMode, World
+from tangl.story.system_handlers import render_block_choices
 from tangl.vm import Ledger, ResolutionPhase
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
@@ -259,7 +260,11 @@ def test_menu_fanout_action_shape() -> None:
     actions = _dynamic_actions(hub, "dynamic", "fanout", "menu")
 
     assert sorted(action.label for action in actions) == ["menu_hub_0", "menu_hub_1"]
-    assert {action.text for action in actions} == {"Listen to Aria", "Brew tea"}
+    assert {action.text for action in actions} == {""}
+    assert {action.fallback_text for action in actions} == {"aria", "brew"}
+    assert {choice.text for choice in render_block_choices(
+        caller=hub, ctx=PhaseCtx(graph=hub.graph, cursor_id=hub.uid),
+    )} == {"Listen to Aria", "Brew tea"}
     for action in actions:
         assert action.tags == {"dynamic", "fanout", "menu"}
         # Item D minimal attribution: one lifecycle token, in the same channel
@@ -292,7 +297,10 @@ def test_menu_fanout_reprojection_and_provider_removal_cleanup() -> None:
     refreshed = _dynamic_actions(hub, "dynamic", "fanout", "menu")
 
     assert len(refreshed) == len(initial) == 2
-    assert {action.text for action in refreshed} == {"Listen to Aria", "Brew tea"}
+    assert {action.text for action in refreshed} == {""}
+    assert {choice.text for choice in render_block_choices(
+        caller=hub, ctx=PhaseCtx(graph=graph, cursor_id=hub.uid),
+    )} == {"Listen to Aria", "Brew tea"}
     # Wholesale replacement is the current contract: stale uids are gone.
     assert initial_ids.isdisjoint({action.uid for action in refreshed})
 
@@ -301,7 +309,11 @@ def test_menu_fanout_reprojection_and_provider_removal_cleanup() -> None:
     _provision(hub, graph)
     remaining = _dynamic_actions(hub, "dynamic", "fanout", "menu")
 
-    assert [action.text for action in remaining] == ["Listen to Aria"]
+    assert [action.text for action in remaining] == [""]
+    assert [action.fallback_text for action in remaining] == ["aria"]
+    assert [choice.text for choice in render_block_choices(
+        caller=hub, ctx=PhaseCtx(graph=graph, cursor_id=hub.uid),
+    )] == ["Listen to Aria"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

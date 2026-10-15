@@ -1,0 +1,7 @@
+label: destination_choice_demo
+scripts: script.yaml
+domain_module: destination_choice_demo.domain
+metadata:
+  title: The performance in the square
+  start_at: town.hub
+  proof_class: open-ended
