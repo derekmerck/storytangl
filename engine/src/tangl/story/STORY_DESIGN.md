@@ -67,15 +67,22 @@ ordinary edge-label fallback. Generated menu and sandbox edge labels remain
 stable binding identities, not player-facing fallback wording.
 
 This is navigation's current selection/default policy, not a universal semantic
-ownership rule for operations. Generic game moves preserve the handler's
-`get_move_label` wording as explicit source-owned `Action.text`, computed once
-and reused with the unchanged label. Distinct moves therefore do not inherit a
-game block's entry suggestion; navigation into that same block still can.
-The hosted sandbox incremental projector already uses explicit move text too.
-Future named operation overrides and source/sponsor-aware selection remain #553;
-typed move restoration and input authority remain #551. Neither edge endpoint
-alone is a universal semantic text owner. No shared-renderer tag/self-loop rule
-or Story import of games is needed for this guardrail.
+ownership rule for operations. This bounded regression repair stores the
+handler's generated `get_move_label` default in `Action.text`, computed once and
+reused with the unchanged label. Generated defaults are not explicit author
+overrides merely because they currently occupy that field. Distinct moves keep
+their wording while navigation into the same block can use its entry suggestion.
+
+Operation identity/authority, text selection (expression, evaluation scope and
+explicit bindings), and shared read-only realization are separate concerns.
+#553 will replace baking defaults into `Action.text` in both generic and hosted
+game projection with late default/world-override selection and appropriate scope
+and move bindings. Genuinely authored `Action.text` remains an override. A text
+donor need not own the evaluation scope; endpoints alone do not establish either.
+#551 retains semantic move/host information independently of displayed labels
+for reconstruction/input authority, without undoing this presentation repair.
+This slice establishes no permanent operation owner, new dispatcher, persistent
+source-selection type, self-loop special case or hidden namespace state.
 
 `presentation.choice_text_source` shares this raw selection policy with static
 graph/report inspection; static labels retain authored template source without

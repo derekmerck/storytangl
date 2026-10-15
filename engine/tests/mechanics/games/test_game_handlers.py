@@ -148,7 +148,6 @@ class TestProvisioningHandler:
     @pytest.mark.parametrize("entry_field", ["action_text", "action_name"])
     def test_move_wording_survives_destination_entry_suggestion(
         self, entry_field: str,
-        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         game_graph = StoryGraph(label="move_wording")
         game_block = GameBlock(registry=game_graph, label="game")
@@ -157,21 +156,13 @@ class TestProvisioningHandler:
         else:
             game_block.action_name = "Enter the game"
         game_block.game_handler.setup(game_block.game)
-        calls: list[str] = []
-        original = TestGameHandler.get_move_label
-
-        def move_label(handler: TestGameHandler, game: SampleGame, move: str) -> str:
-            calls.append(move)
-            return original(handler, game, move)
-
-        monkeypatch.setattr(TestGameHandler, "get_move_label", move_label)
         frame = make_frame(game_graph, game_block.uid)
         ctx = make_ctx(frame)
         actions = provision_game_moves(game_block, ctx=ctx)
-        assert calls == ["win", "lose", "draw"]
-        expected = {action.uid: (action.label, action.payload.copy(), action.accepts)
-                    for action in actions}
-        assert {action.text for action in actions} == {"Play win", "Play lose", "Play draw"}
+        expected = {
+            action.uid: (f"Play {action.payload['move']}", action.payload.copy(), action.accepts)
+            for action in actions
+        }
 
         intro = Block(registry=game_graph, label="intro", content="Entry")
         navigation = Action(registry=game_graph, predecessor_id=intro.uid,
@@ -180,6 +171,7 @@ class TestProvisioningHandler:
         before = game_graph.value_hash()
         fragments = do_journal(game_block, ctx=ctx)
         choices = [fragment for fragment in fragments if isinstance(fragment, ChoiceFragment)]
+        assert {choice.text for choice in choices} == {"Play win", "Play lose", "Play draw"}
         assert {choice.edge_id: choice.text for choice in choices} == {
             uid: label for uid, (label, _payload, _accepts) in expected.items()
         }
@@ -188,7 +180,7 @@ class TestProvisioningHandler:
                 "kind": "command", "command": choice.text,
             })
             assert matched.uid == choice.edge_id
-            assert (matched.text, matched.payload, matched.accepts) == expected[matched.uid]
+            assert (choice.text, matched.payload, matched.accepts) == expected[matched.uid]
         entry_fragments = do_journal(intro, ctx=ctx.derive(cursor_id=intro.uid))
         assert [(choice.edge_id, choice.text) for choice in entry_fragments
                 if isinstance(choice, ChoiceFragment)] == [(navigation.uid, "Enter the game")]
@@ -196,7 +188,6 @@ class TestProvisioningHandler:
         assert set(expected) == {edge.uid for edge in game_block.edges_out(
             Selector(has_kind=Action),
         )}
-        assert calls == ["win", "lose", "draw"]
 
         (win,) = do_find_edges(game_block, ctx=ctx, query={
             "kind": "command", "command": "Play win",

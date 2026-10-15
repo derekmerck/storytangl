@@ -14,10 +14,13 @@ scope. The bench has no suggestion and keeps its public event label.
 Navigation wording precedence at display is explicit edge/event text, destination
 `locals.action_text`, destination `action_name`, destination `locals.menu_text`,
 then the static public fallback. MenuBlock fanout follows the same policy.
-This is not a universal ownership law for operations: game move projectors keep
-their per-move handler wording as explicit source-owned text, so entry suggestions
-cannot rename all moves. Navigation into a game still uses its entry suggestion.
-Future named source/sponsor-owned operation overrides belong to #553, not this demo.
+This is not a universal ownership law for operations. As a bounded repair, game
+projectors currently store generated handler defaults in `Action.text`, so entry
+suggestions cannot rename all moves. That storage does not turn a generated
+default into an authored override. #553 will replace baking defaults in generic
+and hosted games with late default/world-override selection and appropriate
+evaluation scope/move bindings; authored text remains an override. Navigation
+into a game still uses its entry suggestion.
 Destination templates use a fresh derived context, current state, narrator and
 destination settings. They never simulate arrival or provision missing bindings.
 An unrealized lazy target keeps its fallback; a realized but unbound required
