@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core import Graph
-from tangl.journal.fragments import ContentFragment
+from tangl.core import Graph, Selector
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.presentation.intent import PieceConstraints, PiecesAccepts
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
-from tangl.story import Action, Block
+from tangl.story import Action, Block, StoryGraph
 from tangl.mechanics.games.handlers import (
     generate_game_journal,
     inject_game_context,
@@ -16,6 +16,9 @@ from tangl.mechanics.games.handlers import (
     provision_game_moves,
 )
 from tangl.vm import Frame, ResolutionPhase, TraversableEdge, VmPhaseCtx
+from tangl.story.dispatch import do_find_edges
+from tangl.vm.dispatch import do_journal
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 class SampleGame(Game):
@@ -142,6 +145,66 @@ def make_ctx(frame: Frame):
 
 
 class TestProvisioningHandler:
+    @pytest.mark.parametrize("entry_field", ["action_text", "action_name"])
+    def test_move_wording_survives_destination_entry_suggestion(
+        self, entry_field: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        game_graph = StoryGraph(label="move_wording")
+        game_block = GameBlock(registry=game_graph, label="game")
+        if entry_field == "action_text":
+            game_block.locals[entry_field] = "Enter the game"
+        else:
+            game_block.action_name = "Enter the game"
+        game_block.game_handler.setup(game_block.game)
+        calls: list[str] = []
+        original = TestGameHandler.get_move_label
+
+        def move_label(handler: TestGameHandler, game: SampleGame, move: str) -> str:
+            calls.append(move)
+            return original(handler, game, move)
+
+        monkeypatch.setattr(TestGameHandler, "get_move_label", move_label)
+        frame = make_frame(game_graph, game_block.uid)
+        ctx = make_ctx(frame)
+        actions = provision_game_moves(game_block, ctx=ctx)
+        assert calls == ["win", "lose", "draw"]
+        expected = {action.uid: (action.label, action.payload.copy(), action.accepts)
+                    for action in actions}
+        assert {action.text for action in actions} == {"Play win", "Play lose", "Play draw"}
+
+        intro = Block(registry=game_graph, label="intro", content="Entry")
+        navigation = Action(registry=game_graph, predecessor_id=intro.uid,
+                            successor_id=game_block.uid, label="entry")
+        ctx.current_phase = ResolutionPhase.JOURNAL
+        before = game_graph.value_hash()
+        fragments = do_journal(game_block, ctx=ctx)
+        choices = [fragment for fragment in fragments if isinstance(fragment, ChoiceFragment)]
+        assert {choice.edge_id: choice.text for choice in choices} == {
+            uid: label for uid, (label, _payload, _accepts) in expected.items()
+        }
+        for choice in choices:
+            (matched,) = do_find_edges(game_block, ctx=ctx, query={
+                "kind": "command", "command": choice.text,
+            })
+            assert matched.uid == choice.edge_id
+            assert (matched.text, matched.payload, matched.accepts) == expected[matched.uid]
+        entry_fragments = do_journal(intro, ctx=ctx.derive(cursor_id=intro.uid))
+        assert [(choice.edge_id, choice.text) for choice in entry_fragments
+                if isinstance(choice, ChoiceFragment)] == [(navigation.uid, "Enter the game")]
+        assert game_graph.value_hash() == before
+        assert set(expected) == {edge.uid for edge in game_block.edges_out(
+            Selector(has_kind=Action),
+        )}
+        assert calls == ["win", "lose", "draw"]
+
+        (win,) = do_find_edges(game_block, ctx=ctx, query={
+            "kind": "command", "command": "Play win",
+        })
+        frame.resolve_choice(win, choice_payload=win.payload)
+        assert game_block.game.history[-1].player_move == "win"
+        assert game_block.game.result == GameResult.WIN
+
     def test_moves_provisioned_when_ready(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
         ctx = make_ctx(frame)

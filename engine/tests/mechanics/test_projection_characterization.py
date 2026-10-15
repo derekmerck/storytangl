@@ -34,6 +34,7 @@ from typing import Any
 import pytest
 
 from tangl.core import Graph, Selector
+from tangl.journal.fragments import ChoiceFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.games import (
@@ -61,9 +62,10 @@ from tangl.mechanics.sandbox.handlers import (
 )
 from tangl.mechanics.sandbox.time import SandboxTimeCost
 from tangl.story import Action, Block, InitMode, World
+from tangl.story.dispatch import do_find_edges, story_dispatch
 from tangl.story.system_handlers import render_block_choices
 from tangl.vm import Ledger, ResolutionPhase
-from tangl.vm.dispatch import do_provision
+from tangl.vm.dispatch import do_journal, do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -568,9 +570,9 @@ def test_game_self_loop_move_action_shape() -> None:
 
     Recorded, not fixed: these actions wear the ``fanout`` tag without ever
     touching ``Resolver.resolve_fanout`` — the tag vocabulary lies (see the
-    audit table's drift column). Also recorded: the display text lives in
-    ``label`` (``text`` stays empty), inverting the sandbox families' machine
-    label + display ``text`` split. Since synthesis item D the only ``ui_hints``
+    audit table's drift column). Handler wording is now explicit ``text`` as
+    well as the unchanged ``label``, so a destination entry suggestion cannot
+    replace individual moves. Since synthesis item D the only ``ui_hints``
     is the single ``source`` lifecycle token (``game_self_loop``, deliberately
     not ``game_fanout`` so it does not echo the fanout-tag lie).
     """
@@ -584,7 +586,7 @@ def test_game_self_loop_move_action_shape() -> None:
         "Play scissors",
     ]
     for action in actions:
-        assert action.text == ""
+        assert action.text == action.label
         assert action.tags == {"dynamic", "fanout", "game"}
         assert _hints(action) == {"source": "game_self_loop"}
         assert action.accepts is None  # RPS declares no client input contract
@@ -695,6 +697,34 @@ def test_incremental_move_action_shape() -> None:
     assert end_cycle.label == "sandbox_incremental_colony_shell_end_cycle_cycle"
     assert end_cycle.payload["sandbox_time_cost"].kind == "resource_cycle"
     assert end_cycle.payload["sandbox_time_cost"].duration == 1
+
+
+@pytest.mark.parametrize("entry_field", ["action_text", "action_name"])
+def test_hosted_incremental_wording_survives_location_entry_suggestion(entry_field: str) -> None:
+    graph, hub, colony = _colony_sandbox()
+    if entry_field == "action_text":
+        hub.locals[entry_field] = "Enter the colony"
+    else:
+        hub.action_name = "Enter the colony"
+    _provision(hub, graph)
+    actions = _dynamic_actions(hub, "dynamic", "sandbox", "incremental")
+    expected = {action.uid: (action.text, action.label, action.payload.copy()) for action in actions}
+    ctx = PhaseCtx(graph=graph, cursor_id=hub.uid, current_phase=ResolutionPhase.JOURNAL,
+                   local_authorities=[story_dispatch])
+    before = graph.value_hash()
+    choices = {fragment.edge_id: fragment.text for fragment in do_journal(hub, ctx=ctx)
+               if isinstance(fragment, ChoiceFragment) and fragment.edge_id in expected}
+    assert choices == {uid: text for uid, (text, _label, _payload) in expected.items()}
+    assert set(choices.values()) == {"Assign 1 worker to forage", "End cycle"}
+    for uid, text in choices.items():
+        (action,) = do_find_edges(hub, ctx=ctx, query={"kind": "command", "command": text})
+        assert action.uid == uid
+        assert (action.text, action.label, action.payload) == expected[uid]
+        assert action.payload["sandbox_incremental_game"] == colony.uid
+    assert {
+        action.uid for action in _dynamic_actions(hub, "dynamic", "sandbox", "incremental")
+    } == set(expected)
+    assert graph.value_hash() == before
 
 
 def test_incremental_cleanup_is_scoped_to_owning_family() -> None:

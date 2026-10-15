@@ -13,6 +13,14 @@ future game shapes still worth preserving as design intent
 **Canonical runtime surface:** `Game`, `GameHandler`, `HasGame`, package handlers,
 and `create_game_block()`
 
+Current wording guardrail (#564): generic projection computes `get_move_label`
+once per move and reuses it as explicit `Action.text` and the unchanged label.
+Move operations retain their source-owned wording instead of inheriting a block's
+navigation-entry suggestion. Labels/IDs, payload, accepts and gameplay lifecycle
+are unchanged. Hosted sandbox incremental moves already use explicit text.
+Named operation overrides/sponsor-aware selection remain #553; typed move
+restoration/input authority remain #551.
+
 ---
 
 ## Core Idea

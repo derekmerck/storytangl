@@ -11,9 +11,13 @@ binds `host` to Beth and overrides naming policy to proper: the explicit event
 text always says “Beth invites you”, proving that explicit text keeps its source
 scope. The bench has no suggestion and keeps its public event label.
 
-Wording precedence at display is explicit edge/event text, destination
+Navigation wording precedence at display is explicit edge/event text, destination
 `locals.action_text`, destination `action_name`, destination `locals.menu_text`,
 then the static public fallback. MenuBlock fanout follows the same policy.
+This is not a universal ownership law for operations: game move projectors keep
+their per-move handler wording as explicit source-owned text, so entry suggestions
+cannot rename all moves. Navigation into a game still uses its entry suggestion.
+Future named source/sponsor-owned operation overrides belong to #553, not this demo.
 Destination templates use a fresh derived context, current state, narrator and
 destination settings. They never simulate arrival or provision missing bindings.
 An unrealized lazy target keeps its fallback; a realized but unbound required
