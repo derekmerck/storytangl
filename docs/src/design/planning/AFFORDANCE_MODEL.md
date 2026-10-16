@@ -3,10 +3,14 @@
 *(formerly "The Affordance Model" — affordance is one direction of the primitive
 defined here, not the whole of it; see the naming note at the end.)*
 
-**Document Version:** 2.2
+**Document Version:** 2.3
 **Status:** CANONICAL — defines the **open link** as StoryTangl's planning
 primitive and frames `Dependency`, `Affordance`, and `Fanout` against it via a
-feature matrix. v2.2 fills in the #255 audit table (issues #255/#268). Several domain layers (menu fanout, sandbox interactions,
+feature matrix. v2.2 filled in the #255 audit table (issues #255/#268); v2.3
+records the concept-donation/source-binding distinction, the proposed `When` /
+`Time` Story vocabulary, and explicit owner-directed sub-story mutation. Those
+extensions are **design direction, not claims of implemented runtime behavior**.
+Several domain layers (menu fanout, sandbox interactions,
 scheduled events) are *coordinates* in this matrix; some have drifted into
 bespoke vocabularies and are noted as convergence debt rather than separate
 concepts. The `OpenLink` base object near the end is a **mental model, not an
@@ -44,8 +48,8 @@ should be an affordance at all rather than prose or explicit structure.
 > Planning attaches cheap existing affordances first, then satisfies remaining
 > dependencies through materialized or latent provisioners, ranks candidates by
 > scope distance and materialization cost, and only then projects bound
-> traversable links into choices. **Availability and suppression are use-time
-> filters, not binding.**
+> traversable links into choices. **Source admission is binding; live
+> availability and choice disclosure apply only after projection.**
 
 The rest of this document expands that paragraph.
 
@@ -190,7 +194,8 @@ so no new classes are needed:
 | **Direction** | dependency / affordance | Fixed source requests provider vs fixed provider offers to source |
 | **Provider state** | existing / latent | Materialized scoped entity vs template/token/provisionable offer |
 | **Target kind** | concept / episode | Bound link resolves to a semantic provider vs a traversable node/action |
-| **Use state** | available / unavailable | Binding may exist, but predicates can still block use |
+| **Source attachment** | unbound / bound (or provisionable) | A donated relationship persists independently of which receiver currently satisfies its source requirements |
+| **Use state** | available / unavailable | A projected bound Action may exist, but predicates can still block its use |
 | **Cardinality** | one / many | Single best binding vs fanout/all admissible bindings |
 | **Arbitration** | scope distance / cost / specificity / priority | Ranking when multiple candidates satisfy the requirement |
 
@@ -286,6 +291,50 @@ concrete second implementation forces one.
 
 ---
 
+
+## Story concept bindings: who, where, what, and when
+
+The **indirection is the feature**: a Scene declares its needs independently of
+the particular concepts used to realize it. Existing Story examples are
+`Role` → `Actor` and `Setting` → `Location`; an abstract prop → concrete
+asset would be analogous if a real consumer requires that extra indirection.
+The proposed temporal peer is **`When` → `Time`**: a Story-level requirement
+edge and a provisionable temporal concept, using the existing
+`Dependency`/`Requirement` resolver rather than a new scheduling subsystem.
+
+A `When` may bind the implicit **`now`** supplied by the cursor and its scoped
+time, provided that provider satisfies its requirements. Otherwise ordinary
+provisioning policy may select/create another eligible temporal concept or
+leave the requirement unsatisfied. `Time` names an *identifiable narrative
+referent*, not necessarily a date or closed interval. “Someday,” “historically,”
+“some future evening,” and “the evening of the wedding” can all be concrete
+providers with different degrees of determination. Temporal descriptions and
+relations are evaluated against an explicit scoped/cursor reference; **future
+and past are relative to that anchor**, not permanent properties of a provider.
+Binding a future occasion neither advances the clock nor fixes its calendar
+coordinates.
+
+A wedding scene may keep its authored `When(wedding)` while an existing
+wedding occasion is refined (autumn evening; weekday deduced from a ten-day
+offset), viewed in a flashback, or rebound to another `Time`. The same
+narrative structure can likewise recast a `Role` or relocate a `Setting`.
+Adding a consistent fact is not the same as a deliberate retcon that revises
+a previously established fact; the initial Story type need not implement a
+temporal constraint solver or belief-revision engine to preserve that
+distinction. Stable occasions and their relationships belong to the fabula;
+the cursor and journal govern discourse order.
+
+This vocabulary is **optional**. Worlds that need only `period="evening"`
+in a namespace, or a dataclass for an actor, can keep that lighter
+representation. The reason to provision first-class concepts is identity,
+witnesses, binding provenance, interrogation, and rebinding—not compulsory
+conversion of every scalar into a graph entity. Sandbox `WorldTime` and
+`ScheduleEntry` remain valid domain facilities; no universal Story clock or
+host-clock default is implied. See #255 (concept convergence) and #556
+(temporal/contextual consumer).
+
+---
+
 ## Availability is after binding
 
 Keep two questions separate:
@@ -301,16 +350,99 @@ A guide may bind as an interjection source, yet be unavailable because an atomic
     sequence suppresses inner voices.
 ```
 
-Consequently, **planning should preserve unavailable-but-known links** when the
-client wants to show disabled options, and filter them when the client profile
-wants only executable actions. Availability and admission are use-time filters
-applied *after* binding and projection — never folded into binding.
+Consequently, **planning should preserve unavailable-but-known *bound*
+Actions** when a client wants disabled options, and filter them when a client
+wants only executable actions. **Source admission**—a receiver satisfying a
+donation's source/context requirements—belongs to binding, *before*
+projection. **Live availability**, historical suppression, and client
+disclosure are subsequent use-time decisions.
 
-(The durable authored rule persists regardless. Location- and scope-sponsored
-scheduled events establish durable ordinary Actions, while schedule, actor,
-authored predicates, disclosure, and once eligibility are evaluated at use time.
-Fixture, mob, asset, provider, and game-move contributions remain ephemeral and
-are recomputed during provision.)
+The existing #527 location/scope scheduled-event implementation is a
+**deliberate compatibility case**, not the new source-binding contract:
+it retains static receiver Actions regardless of schedule/presence matches
+and gates them live. Mobile/fixture/asset/game projections presently use
+their own ephemeral refresh paths. Do not silently migrate either family or
+claim the proposed donation model has landed; characterize provenance,
+lifecycle, and restore before any change in behavior.
+
+---
+
+
+## Concept donation: persistent offer, contingent source, live use
+
+A concept can **donate an affordance** with a sponsoring parent (Aria, a
+location, an asset, or an evening), an open/optional receiving **source**, and
+a destination episode or other projected result. The donation remains a graph
+relationship even when no current receiver qualifies. Its sponsor is its
+**origin/owner**, not automatically the traversable Action's
+`predecessor_id`: in today's resolver both `Dependency` and `Affordance`
+still use frontier-first `predecessor = receiver` wiring (see above).
+
+Separate three lifecycles:
+
+| Layer | What persists / changes | Failure / change meaning |
+|---|---|---|
+| **Donation** | Sponsor-owned offered relationship, possibly source-unbound | No eligible receiver does not destroy the offer |
+| **Source binding / Action projection** | Receiver and witnessed contextual requirements; ordinary Action attached here only if satisfied | Missing actor, venue, `When`, or sponsorship scope means **no attached Action here**, not an unavailable one |
+| **Live availability** | Predicates evaluated on an already-bound Action | `foo != bar` disables the attached Action without unbinding it |
+
+For example, Aria can donate `Play Lullaby` requiring a
+`Setting(#venue)` and `When(evening)`. Or an Evening concept can sponsor the
+same interaction requiring `Role(#bard)`. The sponsor/attachment supplies an
+**actual binding witness** where it entails a requirement; it does not
+merely waive a Boolean presence test. The resulting bindings tell narration
+*which* bard, venue, and occasion were selected. A predicate such as
+`someone_has("#bard")` may be evaluable but cannot provide that witness.
+Use-time conditions remain legitimate and separate.
+
+Fan-in (one offered relationship finding qualifying scene entries) and
+fan-out (many compatible receivers or links) are **cardinality/projection
+patterns over the same open links**. An incoming scheduled interaction can
+attach at an ordinary Scene/Block, not only a sandbox hub. The projected
+edge is ordinary VM/Story structure; no scheduler-specific traversal class.
+
+Re-entering a dynamic node should **reconcile the attached frontier** with
+current scoped sponsors and requirement satisfiers: retain unchanged source
+bindings where supported, detach no-longer-valid ones, bind newly eligible
+ones, and reevaluate availability afterward. Aria might have left; the
+`When(now)` provider might no longer satisfy “evening.” Blindly regenerating
+all identities is unnecessary, while keeping a no-longer-qualified source
+binding as merely unavailable loses the distinction between *no relationship*
+and *a forbidden use*. Retention policy is per supported sponsor family;
+#527 is not a blanket guarantee for all donations.
+
+### Writes from a called sub-story: change the owner, then reconcile
+
+A callee may invalidate the context that made its call possible. At the Inn,
+Aria donates “Fire Aria”; the nested conversation commits an employment or
+presence change; returning to the Inn must not resurrect her employment-
+dependent offers. The write needs a `nonlocal`-like **explicit owner target**:
+
+- Employment state belongs to the employer/relationship owner; physical
+  presence belongs to its presence owner; clearing a specific `Role` binding
+  means mutating that *edge*. These operations are not interchangeable.
+- `ctx.get_ns(node)` is a **gathered read view**, not a write-through chain
+  to whichever ancestor contributed a key. Existing effect sync-back to
+  target `locals` is not a general inherited-binding mutation API. Do not
+  infer writes to arbitrary enclosing scopes from namespace shadowing.
+- `_predecessor` / `_p` refers to the current selected edge's predecessor,
+  **not necessarily the originating caller of a nested sub-story**. The
+  call bookmark can locate the origin; the concept/binding graph must
+  identify the authoritative owner. A narrow explicit write target should
+  reuse existing graph and effect APIs, not create a second state store.
+
+The return policy is orthogonal. Today's `return_phase=PLANNING`
+re-enters and re-provisions the caller, but `Frame` skips `VALIDATE` on
+phase-entry returns: it does **not** prove the old caller is still an
+admissible scene. A sandbox hub commonly assumes returnability and
+refreshes; a scene whose required `When` or `Setting` no longer qualifies
+may need a different policy. #560 should characterize caller admission on
+re-entry **without changing legacy sandbox returns by fiat**.
+A **resume** of an interrupted phase is different: it continues the
+established context rather than silently recasting and re-provisioning it.
+#255 owns convergence of source binding and explicit owner-directed
+mutation; #556 is a contextual consumer; #560 owns VM return/disposition
+and any validation/admission seam.
 
 ---
 
@@ -402,7 +534,7 @@ def plan_frontier(ctx):
     # 2. Attach/match affordances immediately compatible with cursor/context.
     attached_affordances = [
         aff for aff in existing_affordances
-        if link_predicates_pass(aff, ctx, ns)
+        if source_requirements_can_bind(aff, cursor, ctx, ns)
         and source_admits_affordance(cursor, aff, ctx, ns)
     ]
 
@@ -434,8 +566,8 @@ def plan_frontier(ctx):
     # 6. Project bound traversable links as Actions; conceptual links as ns/journal/effects.
     project_bound_links(ctx, ns)
 
-    # 7. Use-time filters: availability and suppression/admission.
-    apply_availability_and_admission_policy(ctx, ns)
+    # 7. Use-time filters: availability, historical suppression, disclosure.
+    apply_live_availability_and_disclosure_policy(ctx, ns)
 ```
 
 ---
@@ -686,7 +818,16 @@ issue #255 / CodeRabbit references stable; rename is a pending decision.
   destination materializes.
 - Projection = `function(link kind, bound endpoint kind, phase, predicates, context)`;
   concept-vs-episode is orthogonal to direction; affordance ≠ choice.
-- Availability/suppression are use-time filters applied after binding and projection.
+- Donated relationships can persist with an open receiving source; source admission
+  and witnessed concept dependencies control attachment/projection, while live
+  availability, history, and disclosure are use-time filters.
+- Proposed Story `When` → `Time` extends ordinary dependency/provisioning to
+  context-relative temporal landmarks (`now` or another provided occasion),
+  independent of absolute dates, clock advancement, and discourse order.
+- Sub-stories must mutate the durable owner of an enclosing relationship through
+  explicit scope/binding references rather than by writing an assembled
+  namespace; re-entry re-provisions, but legacy PLANNING returns do not yet
+  revalidate contextual admission.
 - Planning attaches cheap existing affordances first, satisfies dependencies, then
   ranks by scope distance / materialization cost / specificity / policy.
 - Convergence is audit-first: classify mechanisms in the matrix before migrating
