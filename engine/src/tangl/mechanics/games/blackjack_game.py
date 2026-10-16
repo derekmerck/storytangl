@@ -19,7 +19,7 @@ from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import GameResult, RoundResult
-from .game import Game
+from .game import Game, RoundRecord
 from .game_token import GameTokenType, discrete_token_class
 from .handler import GameHandler
 
@@ -135,6 +135,14 @@ class BlackjackGame(Game[BlackjackMove]):
 
     scoring_strategy: str = "single_round"
     opponent_strategy: str | None = None
+    opponent_next_move: BlackjackMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[BlackjackMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
+    )
 
     shuffle_seed: int | None = None
     deal_bias: str = "neutral"

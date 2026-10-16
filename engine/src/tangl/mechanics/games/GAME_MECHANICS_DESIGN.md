@@ -26,6 +26,24 @@ not own the evaluation scope. #551 must retain semantic move/host information
 independently of labels for reconstruction/input authority, without undoing this
 presentation repair. No new ownership schema or lifecycle is added here.
 
+Persistence status (#551, Pass 1): concrete games declare their history as
+``list[RoundRecord[ConcreteMove]]`` and pending opponent move as
+``ConcreteMove | None``. Constructor-form plus JSON restoration must recover
+these types before UPDATE, so history-reading strategies, journal handlers,
+and namespace projection can use them immediately. Scalar CallResponse phrase
+ids remain strings; inherited variants retain their parent's move vocabulary.
+History fields opt into inclusion because rounds append in place. The generic
+base remains generic; restoration is not a handler-side or per-read repair.
+
+Pass 2 remains outstanding and independently reviewable: selected
+``Action.payload`` move reconstruction before ``resolve_move_payload``, offered
+move/host authority and pre-mutation legality (including hosted sandbox
+incremental controls), and actual Service play across a JSON restore before
+another selected move. Pass 1's Service fixtures persist and reopen meaningful
+typed game state, then consume history without selecting another move; they do
+not establish the full play/restore/play contract. Wire key/schema and original
+offered-input availability require a design checkpoint before Pass 2.
+
 ---
 
 ## Core Idea
