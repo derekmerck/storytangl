@@ -13,6 +13,7 @@ pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client r
 
 from tangl.pygame_client.models import (  # noqa: E402
     Choice,
+    Commit,
     Finding,
     Line,
     PendingSelection,
@@ -66,7 +67,7 @@ def test_choices_stay_on_the_logical_surface(stage: Stage, line_count: int) -> N
 
     stage.draw(_turn(line_count, choice_count=3))
 
-    assert len(stage.hitboxes) == 3
+    assert sum(isinstance(action, Commit) for _, action in stage.hitboxes) == 3
     for rect, _action in stage.hitboxes:
         assert rect.bottom <= stage.logical_size[1]
         assert rect.top >= 0
@@ -133,7 +134,10 @@ def test_a_printed_key_is_one_the_client_accepts(stage: Stage) -> None:
 
     # Lowercase x is the mark for a row with no key, so it binds to nothing.
     assert position_for_key("x") is None
+    assert position_for_key("X") is None
     assert "x" not in CHOICE_KEYS
+    assert "X" not in CHOICE_KEYS
+    assert len(CHOICE_KEYS) == 59
 
 
 def test_a_key_that_types_nothing_selects_nothing(stage: Stage) -> None:
@@ -160,13 +164,8 @@ def test_a_choice_past_the_alphabet_prints_no_key(stage: Stage) -> None:
     assert stage._marker(beyond, live).strip() == ""
 
 
-def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> None:
-    """A choice row cannot wrap, so an overlong one has to say it was cut.
-
-    The number a reader presses has to stay on the line with the words it
-    names. Before this, a long row ran off the right edge and took the end of
-    its own sentence with it, with nothing on screen to say so.
-    """
+def test_a_long_choice_wraps_without_losing_its_action(stage: Stage) -> None:
+    """Every continuation retains the original key and payload."""
 
     long_choice = Choice(
         edge_id=uuid4(),
@@ -176,17 +175,24 @@ def test_a_row_too_long_for_the_frame_is_clipped_not_spilled(stage: Stage) -> No
             "have nothing like it to offer."
         ),
     )
-    stage.draw(Turn(step=1, lines=[Line(text="At the strip.")], choices=[long_choice]))
+    turn = Turn(step=1, lines=[Line(text="At the strip.")], choices=[long_choice])
+    stage.draw(turn)
 
-    ((rect, _action),) = stage.hitboxes
-    assert rect.right <= stage.logical_size[0]
-    assert stage._clip(long_choice.text).endswith("…")
+    rows = stage._choice_rows(turn)
+    assert len(rows) > 1
+    assert " ".join(row.text[3:] for row in rows) == long_choice.text
+    for rect, action in stage.hitboxes:
+        assert rect.right <= stage.logical_size[0]
+        assert isinstance(action, Commit)
+        assert action.edge_id == long_choice.edge_id
 
 
 def test_every_available_choice_is_clickable(stage: Stage) -> None:
     stage.draw(_turn(12, choice_count=3))
 
     for rect, action in stage.hitboxes:
+        if not isinstance(action, Commit):
+            continue
         centre = (
             rect.centerx * stage.display_scale,
             rect.centery * stage.display_scale,
