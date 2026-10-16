@@ -65,6 +65,25 @@ rather than merely intended — see the map view below.
 **Unavailable choices render dimmed with their `unavailable_reason`** rather
 than being hidden (§5.1, Decision Legibility).
 
+**Ordinary prose and choices have independent, bounded text windows.** Fresh
+prose opens at its first row; redraws and preference changes retain the current
+position. Up/Down move one prose row, Page Up/Down move one visible page. Hold
+Shift for the same operations on ordinary choices. Overflow headers show the
+visible row range and clickable Previous/Next controls; the mouse wheel scrolls
+the window under the pointer. These controls never submit a story action.
+Choice labels and refusal reasons wrap in full, including unbroken tokens and
+choices taller than a page. Continuations keep the original choice marker and
+payload, and only visible text is clickable. The menu uses at most 40% of the
+available text height by default (`Stage.choice_fraction`, range 0.2–0.6).
+
+Choice shortcuts are global, not page-relative: `1`–`9`, then lowercase letters,
+then uppercase letters, excluding `x` and `X` (reserved for refusals). These 59
+positions do not change as the menu scrolls; later choices remain click-only.
+Pending piece selection keeps its separate seven-candidate / 8-confirm /
+9-more / 0-cancel controls. Maps retain their existing bottom-opened footer.
+This is the first bounded slice of #554; columns, attribution presentation,
+Markdown styling, and compact-layout negotiation remain separate follow-ups.
+
 **A sprite plays a clip only when its staging asks for one.** When a portrait's
 payload carries `sprite_sheets` and its `staging_hints` name a `media_clip`, the
 stage draws that clip's current frame over the still's box, where the manifest's

@@ -29,6 +29,7 @@ from tangl.pygame_client.models import (  # noqa: E402
     PendingSelection,
     Piece,
     PickPiece,
+    ScrollText,
     StageImage,
     Turn,
     Zone,
@@ -160,6 +161,102 @@ def test_scroll_keys_move_the_view_without_committing(
 
     assert seen, "scroll keys never reached the loop"
     assert seen[0] < seen[-1] or len(set(seen)) > 1, "the view never moved"
+    assert committed == []
+
+
+@pytest.mark.parametrize("size", [(320, 200), (640, 400)])
+def test_viewport_events_are_independent_and_never_commit(
+    monkeypatch: pytest.MonkeyPatch,
+    committed: list[tuple[UUID, JsonValue | None]],
+    size: tuple[int, int],
+) -> None:
+    from tangl.pygame_client.stage import Stage
+
+    frame = Turn(
+        step=1,
+        lines=[Line(text=f"row {index}") for index in range(112)],
+        choices=[Choice(edge_id=uuid4(), text=f"choice {index}") for index in range(45)],
+    )
+    monkeypatch.setattr(client, "_merge", lambda _: frame)
+    monkeypatch.setattr(PygameSessionBridge, "stage_extent", lambda *_: size)
+    seen = []
+    original = Stage.scroll_text
+
+    def record(stage, action):
+        before = (stage.scroll, stage.choice_scroll)
+        original(stage, action)
+        seen.append((action, before, (stage.scroll, stage.choice_scroll),
+                     stage.prose_capacity, stage.choice_capacity))
+
+    monkeypatch.setattr(Stage, "scroll_text", record)
+    batches = iter(["line", "page", "shift-line", "shift-page", "wheel", "prose-click", "choice-click", "quit"])
+
+    def events(stage):
+        kind = next(batches)
+        if kind == "quit":
+            return [pygame.event.Event(pygame.QUIT)]
+        if kind == "wheel":
+            point = tuple(v * stage.display_scale for v in stage.choice_rect.center)
+            monkeypatch.setattr(pygame.mouse, "get_pos", lambda: point)
+            return [pygame.event.Event(pygame.MOUSEWHEEL, {"y": -1})]
+        if kind.endswith("click"):
+            region = "prose" if kind == "prose-click" else "choices"
+            box = next(box for box, action in stage.hitboxes
+                       if isinstance(action, ScrollText) and action.region == region and action.delta == 1)
+            point = tuple(v * stage.display_scale for v in box.center)
+            return [pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1, "pos": point})]
+        return [pygame.event.Event(pygame.KEYDOWN, {
+            "key": pygame.K_PAGEDOWN if "page" in kind else pygame.K_DOWN,
+            "mod": pygame.KMOD_SHIFT if kind.startswith("shift") else 0,
+            "unicode": "",
+        })]
+
+    monkeypatch.setattr(client, "_next_events", events)
+    client.main(["--world", WORLD])
+    assert len(seen) == 7
+    for action, before, after, prose_capacity, choice_capacity in seen:
+        target = 0 if action.region == "prose" else 1
+        capacity = prose_capacity if target == 0 else choice_capacity
+        assert after[target] == before[target] + (capacity if action.page else 1)
+        assert after[1 - target] == before[1 - target]
+    assert committed == []
+
+
+@pytest.mark.parametrize("letter", ["a", "A", "Z", "x", "X"])
+def test_global_letter_shortcuts_keep_case_even_off_page(
+    monkeypatch: pytest.MonkeyPatch,
+    committed: list[tuple[UUID, JsonValue | None]],
+    letter: str,
+) -> None:
+    from tangl.pygame_client.stage import position_for_key
+
+    choices = [Choice(edge_id=uuid4(), text=f"Choice {i}") for i in range(65)]
+    frame = Turn(step=1, choices=choices)
+    monkeypatch.setattr(client, "_merge", lambda _: frame)
+    _run([pygame.event.Event(pygame.KEYDOWN, {
+        "key": ord(letter.lower()), "unicode": letter,
+        "mod": pygame.KMOD_SHIFT if letter.isupper() else 0,
+    })])
+    position = position_for_key(letter)
+    assert committed == ([] if position is None else [(choices[position - 1].edge_id, {})])
+
+
+@pytest.mark.parametrize("blocked", ["unavailable", "unsupported"])
+def test_uppercase_shortcut_does_not_bypass_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+    committed: list[tuple[UUID, JsonValue | None]],
+    blocked: str,
+) -> None:
+    choices = [Choice(edge_id=uuid4(), text=f"Choice {i}") for i in range(34)]
+    choices.append(Choice(
+        edge_id=uuid4(), text="Refused uppercase action",
+        available=blocked != "unavailable",
+        accepts=TextAccepts() if blocked == "unsupported" else None,
+    ))
+    monkeypatch.setattr(client, "_merge", lambda _: Turn(step=1, choices=choices))
+    _run([pygame.event.Event(pygame.KEYDOWN, {
+        "key": pygame.K_a, "unicode": "A", "mod": pygame.KMOD_SHIFT,
+    })])
     assert committed == []
 
 

@@ -14,6 +14,7 @@ from collections import Counter
 from dataclasses import replace
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Literal
 from uuid import UUID
 
 import pygame
@@ -43,6 +44,7 @@ from .models import (
     PreferenceControl,
     Piece,
     PickPiece,
+    ScrollText,
     StageImage,
     TogglePreference,
     Surface,
@@ -62,6 +64,13 @@ class _Row:
 
     text: str
     kind: str
+
+
+@dataclass(slots=True, frozen=True)
+class _ChoiceRow:
+    text: str
+    choice: Choice
+
 
 REFUSED_PIN = "X"
 """What a map region pins when no key commits it. See :meth:`Stage._pin`."""
@@ -202,11 +211,11 @@ CANCEL_KEY = 0
 
 _BASE_SURFACE_CONTOUR = 1
 SURFACE_WASH = 140
-CHOICE_KEYS = "123456789abcdefghijklmnopqrstuvwyz"
+CHOICE_KEYS = "123456789abcdefghijklmnopqrstuvwyzABCDEFGHIJKLMNOPQRSTUVWYZ"
 """Keys a choice may be bound to, by position.
 
-Digits first because a reader expects them, then letters. Lowercase `x` is
-missing on purpose: it is this port's mark for a row that has no key, and a
+Digits first because a reader expects them, then lowercase and uppercase letters.
+Both `x` and `X` are missing: they mark a row that has no key, and a
 key that looks like the absence of one is worse than no key at all.
 
 A printed key is a promise, so a choice past the end of this alphabet prints
@@ -272,6 +281,7 @@ class Stage:
         clock: Callable[[], float] | None = None,
         animate: bool = True,
         keep_on_screen: bool = True,
+        choice_fraction: float = 0.4,
     ) -> None:
         try:
             self.density = _SUPPORTED_DENSITIES[logical_size]
@@ -285,6 +295,9 @@ class Stage:
             ) from exc
         if display_scale <= 0:
             raise ValueError("display_scale must be a positive integer")
+        if not 0.2 <= choice_fraction <= 0.6:
+            raise ValueError("choice_fraction must be between 0.2 and 0.6")
+        self.choice_fraction = choice_fraction
         self.logical_size = logical_size
         self.display_scale = display_scale
         self.portrait_headroom = _BASE_PORTRAIT_HEADROOM * self.density
@@ -322,6 +335,12 @@ class Stage:
         """
         self.scroll = 0
         self.max_scroll = 0
+        self.prose_capacity = 1
+        self.prose_rect = pygame.Rect(0, 0, 0, 0)
+        self.choice_scroll = 0
+        self.max_choice_scroll = 0
+        self.choice_capacity = 1
+        self.choice_rect = pygame.Rect(0, 0, 0, 0)
         self.selection_scroll = 0
         self.panel_scroll = 0
         self.prose_floor = self.logical_size[1]
@@ -468,14 +487,21 @@ class Stage:
             }
         )
         self.selection_numbers = numbers
+        choice_rows = self._choice_rows(turn)
         below = (
             self._selection_rows(turn, pending, on_surface=on_surface)
             if pending is not None
-            else len(turn.choices)
+            else len(choice_rows)
         )
-        choices_top = (
-            self.logical_size[1] - 4 * self.density - below * self.choice_pitch
+        bottom = self.logical_size[1] - 4 * self.density
+        choice_limit = max(
+            2 * self.choice_pitch,
+            int((bottom - self.prose_top) * self.choice_fraction),
         )
+        choice_height = below * self.choice_pitch
+        if pending is None:
+            choice_height = min(choice_height, choice_limit)
+        choices_top = bottom - choice_height
         # Scenery before faces: an ornament stands in the room, a portrait
         # speaks over it. Both stand on the stage, not on the text: the
         # choice list is drawn over them rather than holding them up.
@@ -503,12 +529,23 @@ class Stage:
         rows = self._rows(
             turn,
             unloadable,
-            columns=(width - 12 * self.density) // (4 * self.density),
+            pixel_width=width - 18 * self.density,
         )
         capacity = max(1, (prose_floor - self.prose_top) // self.row_height)
+        overflow = len(rows) > capacity
+        if overflow:
+            capacity = max(1, capacity - 1)
+        self.prose_capacity = capacity
+        self.prose_rect = pygame.Rect(
+            0,
+            self.prose_top + (self.row_height if overflow else 0),
+            width,
+            capacity * self.row_height,
+        )
         self.max_scroll = max(0, len(rows) - capacity)
         if turn is not self._last_turn:
-            self.scroll = self.max_scroll  # newest text first on a fresh turn
+            self.scroll = 0
+            self.choice_scroll = 0
             self._last_turn = turn
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
         self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
@@ -520,11 +557,12 @@ class Stage:
                 placed=placed,
             )
         if pending is not None:
+            self.choice_rect = pygame.Rect(0, 0, 0, 0)
             self._draw_selection(
                 turn, pending, top=choices_top, on_surface=on_surface, numbers=numbers
             )
         else:
-            self._draw_choices(turn, top=choices_top)
+            self._draw_choices(choice_rows, top=choices_top, bottom=bottom)
         pygame.transform.scale(self.surface, self.window.get_size(), self.window)
         pygame.display.flip()
 
@@ -693,10 +731,20 @@ class Stage:
             _Row(self._choice_label(index, choice), "choice")
             for index, choice in enumerate(turn.choices, start=1)
         )
+        self.choice_rect = pygame.Rect(0, 0, 0, 0)
         if not rows:
+            self.prose_rect = pygame.Rect(0, 0, 0, 0)
+            self.max_scroll = self.scroll = 0
             return
 
         capacity = min(len(rows), MAP_FOOTER_ROWS)
+        self.prose_capacity = capacity
+        self.prose_rect = pygame.Rect(
+            0,
+            self.logical_size[1] - capacity * self.row_height - 2 * self.density,
+            self.logical_size[0],
+            capacity * self.row_height,
+        )
         self.max_scroll = max(0, len(rows) - capacity)
         if turn is not self._last_turn:
             self.scroll = self.max_scroll
@@ -1289,21 +1337,32 @@ class Stage:
         return y
 
     def _rows(
-        self, turn: Turn, unloadable: list[StageImage], *, columns: int = 74
+        self,
+        turn: Turn,
+        unloadable: list[StageImage],
+        *,
+        columns: int = 74,
+        pixel_width: int | None = None,
     ) -> list[_Row]:
         """Flatten a turn into rendered rows, including media text floors."""
 
         rows: list[_Row] = []
+
+        def wrap(text: str) -> list[str]:
+            if pixel_width is not None:
+                return self._wrap_pixels(text, pixel_width)
+            return self._wrap(text, columns)
+
         for line in turn.lines:
             if line.speaker is not None:
                 heading = f"{line.speaker} ({line.manner})" if line.manner else line.speaker
-                rows.append(_Row(heading, "heading"))
-                rows.extend(_Row(part, "dialog") for part in self._wrap(line.text, columns))
+                rows.extend(_Row(part, "heading") for part in wrap(heading))
+                rows.extend(_Row(part, "dialog") for part in wrap(line.text))
             else:
-                rows.extend(_Row(part, "narration") for part in self._wrap(line.text, columns))
+                rows.extend(_Row(part, "narration") for part in wrap(line.text))
         for image in unloadable:
             text = image.alt_text or f"[{image.role} unavailable]"
-            rows.extend(_Row(part, "alt") for part in self._wrap(text, columns))
+            rows.extend(_Row(part, "alt") for part in wrap(text))
         return rows
 
     def _backing(
@@ -1367,7 +1426,9 @@ class Stage:
     def _draw_rows(self, rows: list[_Row], *, capacity: int, width: int) -> None:
         """Draw one page of rows, bottom-aligned, with a scroll indicator."""
 
-        y = self.prose_top + max(0, capacity - len(rows)) * self.row_height
+        old_clip = self.surface.get_clip()
+        self.surface.set_clip(self.prose_rect)
+        y = self.prose_rect.top + max(0, capacity - len(rows)) * self.row_height
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
             rendered = self.font.render(row.text, False, colour)
@@ -1384,21 +1445,64 @@ class Stage:
             )
             self.surface.blit(rendered, (9 * self.density, y))
             y += self.row_height
+        self.surface.set_clip(old_clip)
         if self.max_scroll:
-            marker = f"{self.scroll + 1}/{self.max_scroll + 1}  \u2191\u2193"
-            surface = self.font.render(marker, False, DIM)
-            self.surface.blit(
-                surface,
-                (
-                    self.logical_size[0] - surface.get_width() - 8 * self.density,
-                    self.prose_top - 10 * self.density,
-                ),
+            self._text_controls(
+                "prose", self.scroll, self.max_scroll, capacity,
+                top=self.prose_top, width=width,
             )
 
     def scroll_by(self, delta: int) -> None:
         """Page through prose. Clamped; a no-op when everything already fits."""
 
         self.scroll = min(max(self.scroll + delta, 0), self.max_scroll)
+
+    def scroll_text(self, action: ScrollText) -> None:
+        if action.region == "choices":
+            if not self.choice_rect.height:
+                return
+            delta = action.delta * (self.choice_capacity if action.page else 1)
+            self.choice_scroll = min(max(self.choice_scroll + delta, 0), self.max_choice_scroll)
+        else:
+            self.scroll_by(action.delta * (self.prose_capacity if action.page else 1))
+
+    def wheel(self, position: tuple[int, int], delta: int) -> ScrollText | None:
+        point = (position[0] // self.display_scale, position[1] // self.display_scale)
+        if self.choice_rect.collidepoint(point):
+            return ScrollText("choices", delta)
+        if self.prose_rect.collidepoint(point):
+            return ScrollText("prose", delta)
+        return None
+
+    def _text_controls(
+        self,
+        region: Literal["prose", "choices"],
+        offset: int,
+        maximum: int,
+        capacity: int,
+        *,
+        top: int,
+        width: int,
+    ) -> None:
+        """Only overflow gets controls; all actions stay local to the client."""
+        total = maximum + capacity
+        label = f"{region} {offset + 1}-{min(offset + capacity, total)}/{total}"
+        surface = self.font.render(label, False, CREAM)
+        self._wash(pygame.Rect(0, top, width, self.row_height), INK)
+        self.surface.blit(surface, (self.row_text_left, top))
+        right = width - self.row_text_left
+        for text, delta, enabled in [
+            ("next >", 1, offset < maximum),
+            ("< prev", -1, offset > 0),
+        ]:
+            rendered = self.font.render(text, False, CREAM if enabled else DIM)
+            rect = pygame.Rect(
+                right - rendered.get_width(), top, rendered.get_width(), self.row_height,
+            )
+            self.surface.blit(rendered, rect.topleft)
+            if enabled:
+                self.hitboxes.append((rect, ScrollText(region, delta, page=True)))
+            right = rect.left - 5 * self.density
 
     def _row(self, marker: str, text: str, *, y: int, colour, action: Action | None) -> None:
         """Draw one numbered row and, when actionable, record its hitbox.
@@ -1431,21 +1535,79 @@ class Stage:
         if action is not None:
             self.hitboxes.append((rect, action))
 
-    def _draw_choices(self, turn: Turn, *, top: int) -> None:
-        y = top
+    def _choice_rows(self, turn: Turn) -> list[_ChoiceRow]:
+        rows: list[_ChoiceRow] = []
         for index, choice in enumerate(turn.choices, start=1):
-            action = choice_action(choice)
+            marker = self._marker(index, choice) + " "
             label = choice.text
             if reason := (choice.unavailable_reason or unsupported_reason(choice)):
                 label = f"{label}  — {reason}"
-            self._row(
-                self._marker(index, choice),
-                label,
-                y=y,
-                colour=CREAM if action is not None else DIM,
-                action=action,
+            width = self.logical_size[0] - 2 * self.row_text_left - self.font.size(marker)[0]
+            rows.extend(
+                _ChoiceRow(marker + part, choice) for part in self._wrap_pixels(label, width)
             )
-            y += self.choice_pitch
+        return rows
+
+    def _draw_choices(self, rows: list[_ChoiceRow], *, top: int, bottom: int) -> None:
+        capacity = max(1, (bottom - top) // self.choice_pitch)
+        overflow = len(rows) > capacity
+        body_top = top + (self.row_height if overflow else 0)
+        if overflow:
+            capacity = max(1, (bottom - body_top) // self.choice_pitch)
+        self.choice_capacity = capacity
+        self.max_choice_scroll = max(0, len(rows) - capacity)
+        self.choice_scroll = min(max(self.choice_scroll, 0), self.max_choice_scroll)
+        self.choice_rect = pygame.Rect(0, body_top, self.logical_size[0], capacity * self.choice_pitch)
+        if not rows:
+            self.choice_rect.height = 0
+            return
+        if overflow:
+            self._text_controls(
+                "choices", self.choice_scroll, self.max_choice_scroll, capacity,
+                top=top, width=self.logical_size[0],
+            )
+        old_clip = self.surface.get_clip()
+        self.surface.set_clip(self.choice_rect)
+        for index, row in enumerate(rows[self.choice_scroll:self.choice_scroll + capacity]):
+            y = body_top + index * self.choice_pitch
+            action = choice_action(row.choice)
+            rendered = self.font.render(row.text, False, CREAM if action is not None else DIM)
+            self._wash(
+                self._backing(
+                    rendered, left=self.row_text_left, y=y, kind="choice",
+                    width=self.logical_size[0], pitch=self.choice_pitch,
+                ),
+                INK,
+            )
+            self.surface.blit(rendered, (self.row_text_left, y))
+            rect = pygame.Rect(self.row_text_left, y, rendered.get_width(), self.choice_pitch)
+            rect = rect.clip(self.choice_rect).clip(self.surface.get_rect())
+            if action is not None and rect.width and rect.height:
+                self.hitboxes.append((rect, action))
+        self.surface.set_clip(old_clip)
+
+    def _wrap_pixels(self, text: str, width: int) -> list[str]:
+        """Wrap by font metrics, splitting oversized tokens without losing characters."""
+        rows: list[str] = []
+        for paragraph in text.split("\n"):
+            if not paragraph:
+                rows.append("")
+            while paragraph:
+                low, high = 1, len(paragraph)
+                while low < high:
+                    mid = (low + high + 1) // 2
+                    if self.font.size(paragraph[:mid])[0] <= width:
+                        low = mid
+                    else:
+                        high = mid - 1
+                end = low
+                if end < len(paragraph) and (space := paragraph.rfind(" ", 0, end + 1)) > 0:
+                    end = space
+                rows.append(paragraph[:end])
+                paragraph = paragraph[end:]
+                if paragraph.startswith(" "):
+                    paragraph = paragraph[1:]
+        return rows or [""]
 
     @staticmethod
     def _shown(placed: list[tuple[SurfaceSlot, Piece]]) -> set[str]:

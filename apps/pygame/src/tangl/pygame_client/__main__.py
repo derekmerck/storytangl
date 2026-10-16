@@ -42,6 +42,7 @@ from .models import (
     Piece,
     PreferenceControl,
     PickPiece,
+    ScrollText,
     StageImage,
     Turn,
     TogglePreference,
@@ -221,6 +222,9 @@ def _apply(
     the action reached the service, the envelope it produced."""
 
     match action:
+        case ScrollText():
+            stage.scroll_text(action)
+            return pending, None
         case PagePreferences():
             stage.preference_page += 1
             return pending, None
@@ -372,6 +376,8 @@ def main(argv: list[str] | None = None) -> int:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 action = stage.hit(event.pos)
+            elif event.type == pygame.MOUSEWHEEL:
+                action = stage.wheel(pygame.mouse.get_pos(), -event.y)
             elif event.type == pygame.KEYDOWN:
                 if pending is None and event.key in preference_keys:
                     bridge.cycle_preference(preference_keys[event.key])
@@ -388,17 +394,23 @@ def main(argv: list[str] | None = None) -> int:
                         running = False
                 elif event.key == pygame.K_TAB:
                     action = PagePanel()
-                elif event.key in (pygame.K_UP, pygame.K_PAGEUP):
-                    stage.scroll_by(-1 if event.key == pygame.K_UP else -4)
-                    stage.draw(frame, pending, media_visibility=bridge.media_visibility())
-                elif event.key in (pygame.K_DOWN, pygame.K_PAGEDOWN):
-                    stage.scroll_by(1 if event.key == pygame.K_DOWN else 4)
-                    stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+                elif event.key in (
+                    pygame.K_UP, pygame.K_PAGEUP, pygame.K_DOWN, pygame.K_PAGEDOWN,
+                ):
+                    shifted = bool(event.mod & pygame.KMOD_SHIFT)
+                    if not shifted or pending is None:
+                        action = ScrollText(
+                            "choices" if shifted else "prose",
+                            -1 if event.key in (pygame.K_UP, pygame.K_PAGEUP) else 1,
+                            page=event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN),
+                        )
                 elif pygame.K_0 <= event.key <= pygame.K_9:
                     action = _keyed(stage, frame, pending, event.key - pygame.K_0)
-                elif pending is None and (
-                    position := position_for_key(event.unicode)
-                ) is not None:
+                elif (
+                    pending is None
+                    and not event.mod & (pygame.KMOD_CTRL | pygame.KMOD_ALT | pygame.KMOD_GUI)
+                    and (position := position_for_key(event.unicode)) is not None
+                ):
                     # Letters reach the choice list only. The selection panel
                     # binds digits to its own controls, so a letter there would
                     # mean two things at once.

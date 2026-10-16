@@ -8,6 +8,7 @@ divergences between them are recorded in ``apps/pygame/README.md``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 from uuid import UUID
 
 from tangl.presentation.intent import Accepts
@@ -326,6 +327,15 @@ class PagePanel:
 
 
 @dataclass(slots=True, frozen=True)
+class ScrollText:
+    """Move one client-local text viewport; never submit an edge."""
+
+    region: Literal["prose", "choices"]
+    delta: int
+    page: bool = False
+
+
+@dataclass(slots=True, frozen=True)
 class CancelSelection:
     """Abandon the pending selection. Client-local.
 
@@ -351,6 +361,7 @@ Action = (
     | ConfirmSelection
     | PageSelection
     | PagePanel
+    | ScrollText
     | CancelSelection
     | TogglePreference
     | PagePreferences

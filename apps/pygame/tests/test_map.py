@@ -294,6 +294,7 @@ def test_a_long_footer_pages_instead_of_covering_the_map(stage, frame):
     stage.draw(frame)
 
     assert stage.max_scroll > 0
+    assert stage.scroll == stage.max_scroll, "fresh maps still open on the final footer rows"
     footer_top = (
         stage.logical_size[1]
         - MAP_FOOTER_ROWS * stage.row_height
