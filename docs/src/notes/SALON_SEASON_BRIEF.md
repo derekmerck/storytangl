@@ -195,16 +195,33 @@ same, the policy table is different.
 
 ### Four years later
 
-These people have lived four or five years without you. **The dossier is how
-the player discovers who they became:**
+These people have lived four or five years without you. The dossier is the
+first account the player gets of who they became, for example:
 
 - the modiste may now supply uniforms, have apprentices, hide old clients, or
   have lost her business;
 - a former revolutionary may be frightened by his colleagues;
 - the rival may have done real good without becoming pleasant.
 
-A few letters and a reunion carry the rest. Assembling a packet is exploration
-as well as a puzzle.
+**The dossier is an interpretive document, like everything else.** It is the
+institution's version of those years, built from what happened to be collected
+and framed by whoever compiled it. "Supplied uniforms to the Army" reads as
+patriotism or profiteering depending on who wrote it up. Victoire never needs
+to lie, only to choose which true facts made the file.
+
+So reading a dossier is the player's first act of judgment, before any
+assembly: is this who she became, or who someone needs her to have become?
+
+- **Other sources test it:** a letter from the accused, a reunion that
+  contradicts the file, a witness the player trusts more.
+- **A discrepancy is evidence.** Where the file is wrong, the gap is something
+  the player can bring to a Challenge.
+- **It cuts both ways at Thermidor.** Someone else's file describes *your*
+  missing years, and you know exactly where it is wrong.
+
+You *want* to know what happened to Hélène. The only account you get comes from
+the people deciding whether she dies. Assembling a packet is exploration as
+well as a puzzle, and the map you explore with is biased.
 
 ### The institution
 
