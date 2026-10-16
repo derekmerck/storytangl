@@ -10,12 +10,18 @@ Organized by functionality:
 
 from __future__ import annotations
 
-import pytest
+from collections import ChainMap
 
+import pytest
+import jinja2
+
+from tangl.core import Node
 from tangl.journal.fragments import ChoiceFragment
 from tangl.story import InitMode
 from tangl.story.fabula.world import World
+from tangl.story.system_handlers import _render_text
 from tangl.vm import Ledger
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _script(*, globals_: dict, content: str, block_locals: dict | None = None,
@@ -70,6 +76,39 @@ class TestTextTemplateDeclaration:
     def test_an_unknown_language_is_refused(self) -> None:
         with pytest.raises(ValueError):
             _rendered(_script(globals_={"text_template": "mustache"}, content="Hello."))
+
+    def test_fstring_substitution_and_escaped_braces_are_unchanged(self) -> None:
+        assert "Mina; {name}; {literal}" in _rendered(_script(
+            globals_={}, content="{name}; {{name}}; {{literal}}",
+        ))
+
+    def test_single_braces_remain_literal_in_jinja(self) -> None:
+        assert "{name}" in _rendered(_script(
+            globals_={"text_template": "jinja"}, content="{name}",
+        ))
+
+    def test_literal_jinja_still_gathers_once_for_story_dialect_validation(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        world = World.from_script_data(script_data=_script(
+            globals_={"text_template": "jinja"}, content="Hello.",
+        ))
+        graph = world.create_story("literal").graph
+        ctx = PhaseCtx(graph=graph, cursor_id=graph.initial_cursor_id)
+        calls: list[Node] = []
+        gather = ctx.get_ns
+
+        def get_ns(source: Node) -> ChainMap[str, object]:
+            calls.append(source)
+            return gather(source)
+
+        def forbidden(*_args: object, **_kw: object) -> None:
+            pytest.fail("Validated literal Jinja must not compile")
+
+        monkeypatch.setattr(ctx, "get_ns", get_ns)
+        monkeypatch.setattr(jinja2.Environment, "from_string", forbidden)
+        assert _render_text("Hello.", source=ctx.cursor, ctx=ctx) == "Hello."
+        assert calls == [ctx.cursor]
 
 
 # ============================================================================

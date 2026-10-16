@@ -15,6 +15,18 @@ preserves names and acronyms in the remainder, unlike Jinja's unchanged built-in
 inference, concept parameter or sentence detection. Explicit mu-block templates
 remain single-pass Jinja; ordinary text's recursive rendering is unchanged.
 
+`TextRenderSession.render` recognizes literal initial input using the same
+environment-aware delimiter predicate that terminates recursive rendering. When
+no Jinja line syntax, extension preprocessing or newline transformation is
+needed, it preserves the requested strip/whitespace policy without gathering a
+namespace or compiling a template. Configured delimiters remain authoritative;
+single braces are not a generic Jinja signal. Templates and conservatively
+excluded environment configurations keep the existing path and diagnostics.
+Story still gathers its owner namespace first to select/validate `text_template`
+(including errors for unknown dialects). This is not an upstream namespace cache
+or settings-resolution change; templated choice contexts remain fresh INIT
+children, with introduction rejected during display.
+
 Rendering sessions and dialog micro-blocks are existing realization helpers.
 `naming` is an optional Story extension adopted by world domains before
 compilation through their existing class registry and authority chain. Story
