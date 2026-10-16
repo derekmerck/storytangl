@@ -12,6 +12,7 @@ state of the codebase without defining the canonical architecture.
    command_payload_widget_review_appendix
    interaction_vocabulary_review_appendix
    MU_AFFORDANCES
+   SALON_SEASON_BRIEF
    SANDBOX_FANOUT_DESIGN
    media_resurrection_plan
    migration/index
