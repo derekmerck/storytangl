@@ -16,6 +16,11 @@
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
 
+For current activation examples, voice/environment customization, and one-off
+authoring escape hatches, start with the [prose authoring guide](PROSE_AUTHORING.md).
+The replacement is shipped; #557 was closed unmerged after its runtime successor
+landed. The dated checkpoint below records the earlier salvage decision.
+
 > **Approved replacement direction (2026-10-13):** #557 remains open and unmerged
 > as a salvage reference. Its compile-time-only authorization gate is superseded
 > by mu-block-centered projection, not merged into this replacement. The former

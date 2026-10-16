@@ -2,8 +2,10 @@
 
 Status: #555 naming behavior retained; the approved #534 mu-block projection
 replacement's foundation, generic NamedConcept and bounded runtime scoped exact
-adoption slices are implemented. #557's compile-time-only linker
-remains an open, unmerged salvage reference, not the runtime authority.
+adoption slices are implemented. #557's compile-time-only linker was closed
+unmerged; its useful lexical witnesses informed the replacement, not its runtime
+authority. Start with the [authoring guide](../../../../docs/src/design/story/PROSE_AUTHORING.md)
+for activation, naming examples, voice/environment policy, and escape hatches.
 
 The shared `TextRenderSession` environment supports explicit `upper_first`:
 `text[:1].upper() + text[1:]`, with empty text unchanged and no trimming. Ordinary
@@ -217,7 +219,7 @@ scalar `adopts()` parameters, not provider IDs/pointers or callbacks.
 `prepare_prose` makes ephemeral units for the same ordered DialogHandler renderer.
 Neither discovery/preparation creates knowledge, changes graph/source, or stores
 prepared units. Plain MuBlock raw strings may contain narration and the existing
-callouts; DialogHandler.parse supplies that grammar and full mode/attitude. Its
+callouts; DialogHandler.parse supplies that grammar and full mode/attitude.
 Code-region protection is unconditional in that shared parser, including detection,
 actual parsing, malformed-header checks and later canonical journal composition.
 Callout-looking text inside code is literal whether naming is adopted or not;
