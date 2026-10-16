@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import jinja2
 import pytest
+from jinja2.ext import Extension
 
 from tangl.prose import DialogHandler, MuBlock, RecursiveRenderError, TextRenderSession, render_text
 
@@ -37,6 +38,131 @@ class _TreeSubject:
 
 def test_render_text_returns_literal_text() -> None:
     assert render_text("A quiet room.", ctx=_Ctx({})) == "A quiet room."
+
+
+@pytest.mark.parametrize("content", ["", "Plain text.", "  {single_braces} \n", "\n  literal\n"])
+@pytest.mark.parametrize("preserve", [False, True])
+@pytest.mark.parametrize("custom", [False, True])
+def test_literal_session_skips_namespace_and_compilation(
+    content: str, preserve: bool, custom: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _Ctx({})
+    environment = jinja2.Environment(
+        variable_start_string="[[", variable_end_string="]]", keep_trailing_newline=True,
+    ) if custom else jinja2.Environment(keep_trailing_newline=True)
+    session = TextRenderSession(ctx=ctx, environment=environment)
+
+    def forbidden(*_args: object, **_kw: object) -> None:
+        pytest.fail("Literal rendering must not gather or compile")
+
+    monkeypatch.setattr(ctx, "get_ns", forbidden)
+    monkeypatch.setattr(environment, "from_string", forbidden)
+    assert session.render(content, preserve_whitespace=preserve) == (
+        content if preserve else content.strip()
+    )
+
+
+@pytest.mark.parametrize("content, expected", [
+    ("{{ name }}", "Mina"),
+    ("{% if name %}Hello{% endif %}", "Hello"),
+    ("{# comment #}Hello", "Hello"),
+])
+@pytest.mark.parametrize("custom", [False, True])
+def test_template_delimiters_still_gather_and_compile_once(
+    content: str, expected: str, custom: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _Ctx({"name": "Mina"})
+    session = TextRenderSession(ctx=ctx)
+    if custom:
+        session.environment = jinja2.Environment(
+            variable_start_string="[[", variable_end_string="]]",
+            block_start_string="<%", block_end_string="%>",
+            comment_start_string="<#", comment_end_string="#>",
+        )
+        for old, new in [("{{", "[["), ("}}", "]]"), ("{%", "<%"),
+                         ("%}", "%>"), ("{#", "<#"), ("#}", "#>")]:
+            content = content.replace(old, new)
+    calls = {"gather": 0, "compile": 0}
+    gather, compile_ = ctx.get_ns, session.environment.from_string
+
+    def get_ns(source: object) -> dict[str, object]:
+        calls["gather"] += 1
+        return gather(source)
+
+    def from_string(*args: object, **kw: object) -> jinja2.Template:
+        calls["compile"] += 1
+        return compile_(*args, **kw)
+
+    monkeypatch.setattr(ctx, "get_ns", get_ns)
+    monkeypatch.setattr(session.environment, "from_string", from_string)
+    assert session.render(content) == expected
+    assert calls == {"gather": 1, "compile": 1}
+
+
+def test_custom_delimiters_can_make_default_variable_braces_literal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _Ctx({})
+    session = TextRenderSession(ctx=ctx, environment=jinja2.Environment(
+        variable_start_string="[[", variable_end_string="]]",
+    ))
+
+    def forbidden(*_args: object, **_kw: object) -> None:
+        pytest.fail("Default variable braces are literal under this environment")
+
+    monkeypatch.setattr(ctx, "get_ns", forbidden)
+    monkeypatch.setattr(session.environment, "from_string", forbidden)
+    assert session.render("{{ missing }}") == "{{ missing }}"
+
+
+class _LiteralPreprocessor(Extension):
+    def preprocess(self, source: str, name: str | None, filename: str | None = None) -> str:
+        return "Prefix: " + source
+
+
+def test_environment_preprocessing_is_not_bypassed_for_literals() -> None:
+    session = TextRenderSession(ctx=_Ctx({}), environment=jinja2.Environment(
+        extensions=[_LiteralPreprocessor],
+    ))
+    assert session.render("Hello") == "Prefix: Hello"
+
+
+@pytest.mark.parametrize("max_depth", [0, -1])
+def test_literal_input_preserves_nonpositive_depth_limit(max_depth: int) -> None:
+    session = TextRenderSession(ctx=_Ctx({}), max_depth=max_depth)
+    with pytest.raises(RecursiveRenderError, match="maximum depth"):
+        session.render("Literal")
+
+
+def test_literal_child_preserves_active_recursive_depth_limit() -> None:
+    session = TextRenderSession(ctx=_Ctx({}), max_depth=1)
+    with pytest.raises(RecursiveRenderError, match="maximum depth"):
+        session.render("{{ render_child('literal', subject) }}", subject=_Child("Mina"))
+
+
+@pytest.mark.parametrize("options, content, expected", [
+    ({"line_statement_prefix": "%"}, "% set name = 'Mina'\nHello", "Hello"),
+    ({"line_comment_prefix": "##"}, "## hidden\nHello", "\nHello"),
+    ({}, "Hello\n", "Hello"),
+    ({"keep_trailing_newline": True}, "Hello\r\n", "Hello\n"),
+    ({"keep_trailing_newline": True, "newline_sequence": "\r\n"}, "Hello\n", "Hello\r\n"),
+])
+def test_environment_line_and_newline_rules_decline_literal_shortcut(
+    options: dict[str, str | bool], content: str, expected: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _Ctx({})
+    session = TextRenderSession(ctx=ctx, environment=jinja2.Environment(**options))
+    calls: list[object] = []
+    gather = ctx.get_ns
+
+    def get_ns(source: object) -> dict[str, object]:
+        calls.append(source)
+        return gather(source)
+
+    monkeypatch.setattr(ctx, "get_ns", get_ns)
+    assert session.render(content, preserve_whitespace=True) == expected
+    assert calls == [ctx.cursor]
 
 
 @pytest.mark.parametrize("text, expected", [

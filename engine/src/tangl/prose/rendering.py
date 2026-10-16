@@ -144,6 +144,21 @@ class TextRenderSession:
         other text. ``preserve_whitespace`` keeps it, for whole text whose
         indentation and newlines are markup -- a block's Markdown.
         """
+        env = self.environment
+        depth = len(self._active_state.frames) if self._active_state is not None else 0
+        # Let Jinja handle line syntax, preprocessing and newline transformations.
+        if (
+            env.line_statement_prefix is None
+            and env.line_comment_prefix is None
+            and not env.extensions
+            and "\r" not in content
+            and (env.newline_sequence == "\n" or "\n" not in content)
+            and (env.keep_trailing_newline or not content.endswith("\n"))
+            and depth < self.max_depth
+            and not _contains_template_syntax(content, env)
+        ):
+            return content if preserve_whitespace else content.strip()
+
         scope_source = source if source is not None else self.ctx.cursor
         scope: Scope = dict(self.ctx.get_ns(scope_source))
         if bindings:
