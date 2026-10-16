@@ -8,6 +8,7 @@ from uuid import UUID
 import pytest
 
 from tangl.core import Selector
+from tangl.journal.fragments import ChoiceFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.mechanics.sandbox import SandboxLocation, SandboxScope
@@ -19,7 +20,7 @@ from tangl.story import (
 )
 from tangl.story.system_handlers import find_edges_by_command, render_block_choices
 from tangl.vm import Dependency, Ledger, ResolutionPhase
-from tangl.vm.dispatch import do_provision
+from tangl.vm.dispatch import do_journal, do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -107,7 +108,7 @@ def test_static_world_inspection_selects_public_raw_text_without_template_execut
     ])
 
 
-def _world(*, menu: bool = False) -> World:
+def _world(*, menu: bool = False, scene_target: bool = False) -> World:
     script = {
         "label": "destination_choice_text",
         "metadata": {"start_at": "town.hub"},
@@ -145,6 +146,17 @@ def _world(*, menu: bool = False) -> World:
             },
         }},
     }
+    if scene_target:
+        blocks = script["scenes"]["town"]["blocks"]
+        performance = blocks.pop("performance")
+        performance["locals"]["action_text"] = "{{ reference(host) | upper_first }} is performing"
+        script["scenes"]["performance"] = {
+            "roles": performance["roles"],
+            "locals": performance["locals"],
+            "blocks": {"entry": {"pre_effects": ["arrivals += 1"]}},
+        }
+        blocks["hub"]["locals"]["text_template"] = "fstring"
+        blocks["hub"]["scheduled_events"][1]["text"] = "{host.name} invites you"
     if menu:
         hub = script["scenes"]["town"]["blocks"]["hub"]
         hub["kind"] = MenuBlock
@@ -223,12 +235,24 @@ def test_standard_introduction_in_display_fails_before_knowledge_mutation(explic
 
 
 @pytest.mark.parametrize("json_wire", [False, True])
+@pytest.mark.parametrize("scene_target", [False, True])
 def test_constructor_restore_preserves_explicit_deferred_and_fallback_distinction(
-    json_wire: bool,
+    json_wire: bool, scene_target: bool,
 ) -> None:
-    graph = _world().create_story("run").graph
+    graph = _world(scene_target=scene_target).create_story("run").graph
     ledger = Ledger.from_graph(graph)
     events = _events(_ctx(graph))
+    destination = events["Watch the performance"].successor
+    assert isinstance(destination, Scene if scene_target else Block)
+    authored = destination.locals["action_text"]
+    anonymous = (
+        "The blonde girl is performing" if scene_target else "the blonde girl is performing (0)"
+    )
+    proper = "Rin is performing" if scene_target else "Rin is performing (0)"
+    before = graph.value_hash()
+    assert _texts(_ctx(graph))[events["Watch the performance"].uid] == anonymous
+    assert _texts(_ctx(graph))[events["Explicit"].uid] == "Beth invites you"
+    assert graph.value_hash() == before
     original = {label: (edge.uid, edge.text, edge.fallback_text) for label, edge in events.items()}
     data = ledger.unstructure()
     if json_wire:
@@ -238,13 +262,21 @@ def test_constructor_restore_preserves_explicit_deferred_and_fallback_distinctio
     assert {label: (edge.uid, edge.text, edge.fallback_text)
             for label, edge in _events(ctx).items()} == original
     edge = _events(ctx)["Watch the performance"]
-    assert _texts(ctx)[edge.uid] == "the blonde girl is performing (0)"
+    before = restored.graph.value_hash()
+    choices = {fragment.edge_id: fragment.text for fragment in do_journal(ctx.cursor, ctx=ctx)
+               if isinstance(fragment, ChoiceFragment)}
+    assert choices[edge.uid] == anonymous
+    assert choices[_events(ctx)["Explicit"].uid] == "Beth invites you"
+    assert restored.graph.value_hash() == before
     rin = restored.graph.find_one(Selector(has_kind=NamedActor, label="rin"))
+    assert rin.narrator_knowledge == {}
     NamingOperations(ctx).introduce(rin)
-    assert _texts(ctx)[edge.uid] == "Rin is performing (0)"
+    assert _texts(ctx)[edge.uid] == proper
+    assert edge.successor.locals["action_text"] == authored
     assert set(restored.graph.members) == set(graph.members)
     destination_ctx = ctx.derive(cursor_id=edge.successor_id)
-    assert destination_ctx.get_ns(edge.successor)["host_role"].provider is rin
+    role = destination_ctx.get_ns(edge.successor)["host_role"]
+    assert role.provider is rin and role.predecessor is edge.successor
 
 
 def test_destination_language_overrides_source_language() -> None:
