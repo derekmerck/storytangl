@@ -106,3 +106,13 @@ def test_concept_naming_cli_witness_introduces_and_remembers_provider() -> None:
     assert "Nanae smiles. Nanae waves. Rin nods." in transcript
     assert "Dawnblade of the East gleams. Dawnblade rests here." in transcript
     assert "Rin and Nanae remember Market Square and Dawnblade." in transcript
+
+
+def test_destination_choice_cli_witness_renders_live_cast_and_source_scope() -> None:
+    transcript = _run_world_script("destination_choice_demo")
+    before = transcript.index("the blonde girl is performing in the square")
+    introduction = transcript.index("The performer says, 'I am Rin.'")
+    after = transcript.index("Rin is performing in the square")
+    assert before < introduction < after
+    assert transcript.count("Beth invites you") == 2
+    assert transcript.count("Rest on the bench") == 2

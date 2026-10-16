@@ -13,6 +13,19 @@ future game shapes still worth preserving as design intent
 **Canonical runtime surface:** `Game`, `GameHandler`, `HasGame`, package handlers,
 and `create_game_block()`
 
+Current wording guardrail (#564): generic projection computes `get_move_label`
+once per move and stores that generated default in `Action.text` alongside the
+unchanged label. This bounded regression repair prevents entry suggestions from
+replacing distinct moves; it does not make the default an authored override or
+establish a permanent semantic owner. Identity/authority, text selection
+(expression, evaluation scope, explicit bindings), and read-only realization
+remain separate. #553 will replace baked defaults in generic and hosted game
+projection with late default/world-override selection and appropriate scope/move
+bindings; genuinely authored `Action.text` remains an override. A text donor need
+not own the evaluation scope. #551 must retain semantic move/host information
+independently of labels for reconstruction/input authority, without undoing this
+presentation repair. No new ownership schema or lifecycle is added here.
+
 ---
 
 ## Core Idea

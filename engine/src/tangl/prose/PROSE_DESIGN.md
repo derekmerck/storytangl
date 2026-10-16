@@ -7,6 +7,14 @@ unmerged; its useful lexical witnesses informed the replacement, not its runtime
 authority. Start with the [authoring guide](../../../../docs/src/design/story/PROSE_AUTHORING.md)
 for activation, naming examples, voice/environment policy, and escape hatches.
 
+The shared `TextRenderSession` environment supports explicit `upper_first`:
+`text[:1].upper() + text[1:]`, with empty text unchanged and no trimming. Ordinary
+text/choice templates and explicit `MuBlock.template` use this one filter. It
+preserves names and acronyms in the remainder, unlike Jinja's unchanged built-in
+`capitalize`. Apply it explicitly to completed phrases; it adds no lexical case
+inference, concept parameter or sentence detection. Explicit mu-block templates
+remain single-pass Jinja; ordinary text's recursive rendering is unchanged.
+
 Rendering sessions and dialog micro-blocks are existing realization helpers.
 `naming` is an optional Story extension adopted by world domains before
 compilation through their existing class registry and authority chain. Story

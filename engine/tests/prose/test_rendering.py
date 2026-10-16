@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import jinja2
 import pytest
 
-from tangl.prose import RecursiveRenderError, TextRenderSession, render_text
+from tangl.prose import DialogHandler, MuBlock, RecursiveRenderError, TextRenderSession, render_text
 
 
 class _Ctx:
@@ -37,6 +37,37 @@ class _TreeSubject:
 
 def test_render_text_returns_literal_text() -> None:
     assert render_text("A quiet room.", ctx=_Ctx({})) == "A quiet room."
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("the blonde girl", "The blonde girl"),
+    ("Rin and Nanae", "Rin and Nanae"),
+    ("the NASA lab", "The NASA lab"),
+    ("", ""),
+    (" rin and NASA  ", " rin and NASA  "),
+    ("\nrin and NASA", "\nrin and NASA"),
+])
+def test_upper_first_is_shared_by_ordinary_and_explicit_mu_block_templates(
+    text: str, expected: str,
+) -> None:
+    ns = {"phrase": text}
+    ctx = _Ctx(ns)
+    template = "{{ phrase | upper_first }}"
+    session = TextRenderSession(ctx=ctx)
+    assert session.render(template, preserve_whitespace=True) == expected
+    assert DialogHandler.render([MuBlock(template=template)], ctx=ctx, ns=ns)[0].content == expected
+    assert session.render("{{ phrase }}", preserve_whitespace=True) == text
+
+
+def test_upper_first_does_not_replace_capitalize_or_change_template_passes() -> None:
+    ns = {"phrase": "Rin and Nanae", "generated": "{{ phrase }}"}
+    ctx = _Ctx(ns)
+    session = TextRenderSession(ctx=ctx)
+    assert session.render("{{ phrase | capitalize }}") == "Rin and nanae"
+    assert session.render("{{ generated | upper_first }}") == "Rin and Nanae"
+    assert DialogHandler.render(
+        [MuBlock(template="{{ generated | upper_first }}")], ctx=ctx, ns=ns,
+    )[0].content == "{{ phrase }}"
 
 
 def test_render_text_uses_gathered_namespace() -> None:

@@ -26,6 +26,8 @@ class Action(TraversableEdge):
     """
 
     text: str = ""
+    # Generated edge labels identify bindings, not player-facing wording.
+    fallback_text: str = ""
     successor_ref: str | None = None
     activation: str | None = None
     payload: Any = None

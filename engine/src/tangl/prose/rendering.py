@@ -52,6 +52,11 @@ def _default_environment() -> jinja2.Environment:
     return jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
 
 
+def _upper_first(text: str) -> str:
+    """Uppercase only the first character, preserving the rest of the phrase."""
+    return text[:1].upper() + text[1:]
+
+
 class RecursiveRenderError(RuntimeError):
     """Terminate an unbounded recursive rendering path.
 
@@ -116,8 +121,9 @@ class TextRenderSession:
     _active_state: _RecursiveRenderState | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Install the documented filter on this session's environment."""
+        """Install the shared filters on this session's environment."""
         self.environment.filters["render_as"] = _render_as_filter
+        self.environment.filters["upper_first"] = _upper_first
 
     def render(
         self,

@@ -55,6 +55,74 @@ provide a default and nested scene/container/block locals override it. An
 that inherits the scoped policy when absent. This is server-side Story policy,
 not advisory `UIHints` and not a new client vocabulary.
 
+## Destination-owned navigation wording (#558)
+
+Choice text is realized at the Story choice-rendering chokepoint, not baked into
+generated edges. Explicit `Action.text` (including scheduled event text) wins
+and is evaluated in its original source scope. Otherwise a realized destination
+may suggest `locals.action_text`, `action_name`, then `locals.menu_text`. These
+are authored suggestions only: the destination-label floor is not a suggestion.
+Absent a suggestion, the static public `Action.fallback_text` wins over the
+ordinary edge-label fallback. Generated menu and sandbox edge labels remain
+stable binding identities, not player-facing fallback wording.
+
+This is navigation's current selection/default policy, not a universal semantic
+ownership rule for operations. This bounded regression repair stores the
+handler's generated `get_move_label` default in `Action.text`, computed once and
+reused with the unchanged label. Generated defaults are not explicit author
+overrides merely because they currently occupy that field. Distinct moves keep
+their wording while navigation into the same block can use its entry suggestion.
+
+Operation identity/authority, text selection (expression, evaluation scope and
+explicit bindings), and shared read-only realization are separate concerns.
+#553 will replace baking defaults into `Action.text` in both generic and hosted
+game projection with late default/world-override selection and appropriate scope
+and move bindings. Genuinely authored `Action.text` remains an override. A text
+donor need not own the evaluation scope; endpoints alone do not establish either.
+#551 retains semantic move/host information independently of displayed labels
+for reconstruction/input authority, without undoing this presentation repair.
+This slice establishes no permanent operation owner, new dispatcher, persistent
+source-selection type, self-loop special case or hidden namespace state.
+
+`presentation.choice_text_source` shares this raw selection policy with static
+graph/report inspection; static labels retain authored template source without
+evaluating it or requiring a live narrator. The public `render_choice_text`
+helper realizes that selection for choices, command matching and Service's
+ambiguity candidates. `do_find_edges` continues to return ordinary Actions.
+Block and Scene both expose the typed `action_name` vocabulary, including custom
+subclass defaults and instance overrides.
+
+Command lookup shares the renderer's disclosure/availability boundary before
+evaluating wording. Hidden unavailable choices are neither evaluated nor returned
+as command or ambiguity candidates. Disclosed wording errors still propagate;
+there is no deferred-error suppression or change to backend selection validation.
+
+Both menu projection paths and scheduled-event binding preserve this distinction.
+`fallback_text` is one ordinary persisted string, separate from explicit text;
+no cached wording, generic provenance framework or custom serializer is needed.
+
+The existing text evaluator receives a `PhaseCtx.derive` child at the text's
+owner, with fresh namespace caches and a non-committed phase (`INIT`). Destination
+cast, language/naming settings, live state and current narrator therefore agree,
+including context-bound helpers. Standard introductions are forbidden in display.
+The owner's scoped `text_template` selects the dialect: `fstring` is the default;
+opt into `jinja` for `reference(host)` or other helper calls. A destination
+suggestion uses the destination's dialect, while explicit edge/event text uses
+the source's dialect. Authors may apply `upper_first` to a completed phrase, e.g.
+`{{ reference(host) | upper_first }}`. It changes only the first character and
+preserves the remainder and whitespace, unlike Jinja's built-in `capitalize`,
+which lowercases the remainder (including names/acronyms). The filter is shared
+with explicit `MuBlock.template` Jinja, which remains single-pass; ordinary text's
+existing recursive template semantics are unchanged. No automatic sentence/case
+inference or concept capitalization parameter is added.
+This does not run arrival, UPDATE, JOURNAL, time payment, visits or provisioning.
+Lazy unrealized targets retain their static public fallback. A realized
+destination's missing binding/template errors propagate rather than being hidden.
+Availability, disclosure, blockers and backend submission validation are unchanged.
+Explicit semantic choice labels remain supported; no automatic lexical adoption
+of ordinary choice strings is added. The compiled/CLI witness is
+`worlds/destination_choice_demo`.
+
 ## Runtime Authority Model
 
 World/factory authority is the canonical story runtime model.

@@ -41,8 +41,14 @@ def reset_wearable_types():
     WearableType.clear_instances()
 
 
-def _ctx_with_ns(ns: dict[str, object] | None = None) -> SimpleNamespace:
-    return SimpleNamespace(get_meta=lambda: {}, get_ns=lambda _caller: dict(ns or {}))
+def _ctx_with_ns(ns: dict[str, object] | None = None) -> PhaseCtx:
+    authority = BehaviorRegistry()
+
+    @authority.register(task="gather_ns")
+    def gather(**_kw):
+        return dict(ns or {})
+
+    return PhaseCtx(graph=Graph(), cursor_id=None, local_authorities=[authority])
 
 
 @pytest.mark.parametrize("adopted", [False, True])

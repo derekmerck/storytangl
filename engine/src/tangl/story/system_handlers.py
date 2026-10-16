@@ -27,6 +27,7 @@ from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    ResolutionPhase,
     TraversableNode,
     ViabilityResult,
     do_compose_journal,
@@ -40,10 +41,11 @@ from tangl.journal.fragments import (
     MediaFragment,
     client_visible_tags,
 )
+from tangl.vm.runtime.frame import PhaseCtx
 
 from .dispatch import do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
-from .presentation import render_text_as
+from .presentation import choice_text_source, render_text_as
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +76,12 @@ def find_edges_by_command(*, caller: Block, ctx, query, **_kw):
     key = _command_key(query["command"])
     return [
         edge
-        for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None))
-        if key in {_command_key(edge.text or ""), _command_key(edge.get_label())}
+        for edge, _reason in _disclosed_choices(caller, ctx=ctx)
+        if key in {
+            _command_key(edge.text or ""),
+            _command_key(edge.get_label()),
+            _command_key(render_choice_text(edge, ctx=ctx)),
+        }
     ] or None
 
 
@@ -175,7 +181,7 @@ def project_menu_affordances(*, caller, ctx, **_kw):
             label=f"menu_{caller.get_label()}_{index}",
             predecessor_id=caller.uid,
             successor_id=provider.uid,
-            text=MenuBlock.action_text_for(provider),
+            fallback_text=provider.get_label(),
             tags={"dynamic", "fanout", "menu"},
             # Minimal cleanup-attribution token (synthesis item D): names the
             # projecting family in the same channel sandbox already uses, so
@@ -795,17 +801,18 @@ def render_block_media(*, caller, ctx, **_kw):
     return fragments or None
 
 
-@on_journal(priority=Priority.LATE)
-def render_block_choices(*, caller, ctx, **_kw):
-    """Render block outbound actions into choice fragments.
+def render_choice_text(edge: Action, *, ctx: PhaseCtx) -> str:
+    """Realize authored wording in its owning scope without authorizing disclosure."""
+    text, source = choice_text_source(edge)
+    if source is None:
+        return text
+    display_ctx = ctx.derive(cursor_id=source.uid, current_phase=ResolutionPhase.INIT)
+    return _render_text(text, source=source, ctx=display_ctx)
 
-    Called blocks publish ordinary choices when the frame yields there. A called
-    block with no selectable actions immediately returns, so it does not publish
-    stale client controls.
-    """
-    if not isinstance(caller, Block):
-        return None
-    choices = []
+
+def _disclosed_choices(caller: Block, *, ctx: PhaseCtx) -> list[tuple[Action, str | None]]:
+    """Share menu disclosure with command lookup before evaluating choice wording."""
+    choices: list[tuple[Action, str | None]] = []
     for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
         # A hidden choice needs no reason, so ask whether it is available before
         # the costlier look at its destination; a guard that refuses it stops
@@ -821,28 +828,35 @@ def render_block_choices(*, caller, ctx, **_kw):
             available = edge.available(ctx=ctx)
             if not available:
                 continue
-        choices.append(
-            (edge, _choice_unavailable_reason(edge=edge, ctx=ctx, available=available))
-        )
-    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
-        reason is None for _, reason in choices
-    ):
-        return None
-
-    fragments: list[ChoiceFragment] = []
-    for edge, reason in choices:
-        available = reason is None
+        reason = _choice_unavailable_reason(edge=edge, ctx=ctx, available=available)
         if (
-            not available
+            reason is not None
             and _unavailable_choice_disclosure(edge=edge, caller=caller, ctx=ctx)
             is UnavailableChoiceDisclosure.HIDE
         ):
             continue
+        choices.append((edge, reason))
+    if in_subroutine(list(ctx.get_meta().get("call_stack_ids") or ())) and not any(
+        reason is None for _, reason in choices
+    ):
+        return []
+    return choices
+
+
+@on_journal(priority=Priority.LATE)
+def render_block_choices(*, caller, ctx, **_kw):
+    """Render disclosed outbound actions, omitting controls at an immediate return."""
+    if not isinstance(caller, Block):
+        return None
+
+    fragments: list[ChoiceFragment] = []
+    for edge, reason in _disclosed_choices(caller, ctx=ctx):
+        available = reason is None
         blockers = [] if available else _choice_blockers(edge=edge, ctx=ctx)
         fragments.append(
             ChoiceFragment(
                 edge_id=edge.uid,
-                text=edge.text or edge.get_label(),
+                text=render_choice_text(edge, ctx=ctx),
                 available=available,
                 unavailable_reason=(None if available else reason),
                 blockers=blockers or None,

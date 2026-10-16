@@ -5,7 +5,10 @@ from typing import Any
 
 from pydantic import Field
 
+from tangl.vm import TraversableNode
+
 from .block import Block
+from .scene import Scene
 
 
 class MenuBlock(Block):
@@ -55,24 +58,12 @@ class MenuBlock(Block):
         return normalized
 
     @staticmethod
-    def action_text_for(provider: Any) -> str:
-        """Project one provider into menu-choice text using story precedence."""
-        locals_ = getattr(provider, "locals", None)
-        if isinstance(locals_, dict):
-            value = locals_.get("action_text")
-            if isinstance(value, str) and value:
-                return value
-
-        action_name = getattr(provider, "action_name", None)
-        if isinstance(action_name, str) and action_name:
-            return action_name
-
-        if isinstance(locals_, dict):
-            value = locals_.get("menu_text")
-            if isinstance(value, str) and value:
-                return value
-
-        label = getattr(provider, "label", None)
-        if isinstance(label, str) and label:
-            return label
-        return ""
+    def action_text_for(provider: TraversableNode) -> str:
+        """Return an authored suggestion, not the destination's label floor."""
+        value = provider.locals.get("action_text")
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(provider, (Block, Scene)) and provider.action_name:
+            return provider.action_name
+        value = provider.locals.get("menu_text")
+        return value if isinstance(value, str) else ""

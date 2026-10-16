@@ -137,15 +137,11 @@ class ScheduledEvent(ScheduleEntry):
     def _normalize_effects(cls, value: object) -> list[Effect]:
         return normalize_runtime_ops(value, Effect)
 
-    def action_text(self) -> str:
-        """Return player-facing text for this scheduled event."""
-        return self.text or self.label or self.target
-
     def as_interaction(self, label: str | None = None) -> SandboxInteraction:
         """Return the sandbox interaction primed by this schedule entry."""
         return SandboxInteraction(
             label=label or self.label or self.target,
-            text=self.action_text(),
+            text=self.text,
             target=self.target,
             journal_text=self.journal_text or self.journal or "",
             activation=self.activation,

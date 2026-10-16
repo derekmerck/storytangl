@@ -218,7 +218,14 @@ blocks:
 
 The compiler assigns synthetic labels (`_anon_0`, `_anon_1`). The
 fanout finds them by tag. The `action_name` field provides the menu
-choice text via `MenuBlock.action_text_for`.
+choice suggestion via `MenuBlock.action_text_for`. The current #558 contract
+realizes it at choice-render time in the destination's gathered namespace,
+not during eager or planning-time projection. Explicit edge/event text wins in
+its source scope; otherwise destination `locals.action_text`, `action_name`,
+then `locals.menu_text` precede the static public fallback. Generated Action
+labels remain binding identities. Unrealized lazy targets keep their fallback
+without provisioning, and display never introduces or simulates arrival. See
+`worlds/destination_choice_demo` and Story's current design note.
 
 ---
 

@@ -4,10 +4,24 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from tangl.core import Node
 from tangl.prose import TextRenderSession
+from tangl.vm import TraversableNode
 from tangl.vm.ctx import VmPhaseCtx
 
 from .dispatch import do_render_text
+from .episode import Action, MenuBlock
+
+
+def choice_text_source(edge: Action) -> tuple[str, Node | None]:
+    """Select raw choice wording and its evaluation owner (None for static fallback)."""
+    if edge.text:
+        return edge.text, edge.predecessor
+    if isinstance(edge.successor, TraversableNode):
+        suggestion = MenuBlock.action_text_for(edge.successor)
+        if suggestion:
+            return suggestion, edge.successor
+    return edge.fallback_text or edge.get_label(), None
 
 
 def render_text_as(
@@ -41,4 +55,4 @@ def render_text_as(
         bindings=dict(bindings or {}),
     )
 
-__all__ = ["render_text_as"]
+__all__ = ["choice_text_source", "render_text_as"]

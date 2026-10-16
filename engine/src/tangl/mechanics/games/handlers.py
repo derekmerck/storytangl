@@ -42,12 +42,14 @@ def _build_game_actions(cursor: HasGame) -> list[Any]:
 
     actions: list[Action] = []
     for move in cursor.game_handler.get_provisioned_moves(cursor.game):
+        label = cursor.game_handler.get_move_label(cursor.game, move)
         actions.append(
             Action(
                 graph=cursor.graph,
                 predecessor_id=cursor.uid,
                 successor_id=cursor.uid,
-                label=cursor.game_handler.get_move_label(cursor.game, move),
+                label=label,
+                text=label,
                 payload={"move": move},
                 accepts=cursor.game_handler.get_move_accepts(cursor.game, move),
                 tags={"dynamic", "fanout", "game"},
