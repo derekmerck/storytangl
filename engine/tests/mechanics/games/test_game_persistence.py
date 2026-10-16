@@ -28,6 +28,17 @@ from tangl.mechanics.games import (
     TrackMove,
 )
 from tangl.mechanics.games.aggregate_force_game import ForceCommitMove
+from tangl.mechanics.games.call_response_game import CallResponseGame
+from tangl.mechanics.games.corridor_game import CorridorGame, CorridorMove, TwentyTwoGame
+from tangl.mechanics.games.credentials_game import CredentialsGame
+from tangl.mechanics.games.game import Game, Move, RoundRecord
+from tangl.mechanics.games.enums import RoundResult
+from tangl.mechanics.games.incremental_game import IncrementalGame, IncrementalMove
+from tangl.mechanics.games.kim_game import KimGame
+from tangl.mechanics.games.picking_game import PickingGame, PickingMove
+from tangl.mechanics.games.rps_game import RpsGame, RpsMove, RpslsGame, RpslsMove
+from tangl.mechanics.games.siege_rps_game import SiegeRpsGame
+from tangl.mechanics.games.trivial_game import TrivialGame, TrivialMove
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.story import Block
 from tangl.story.concepts.asset import AssetWallet
@@ -53,6 +64,66 @@ class BlackjackPersistBlock(HasGame, Block):
     _game_handler_class = BlackjackGameHandler
 
 
+class GameStatePersistBlock(HasGame, Block):
+    """Owner for testing concrete embedded state before another move arrives."""
+
+
+@pytest.mark.parametrize(
+    "game_class,player,opponent,pending",
+    [
+        (RpsGame, RpsMove.PAPER, RpsMove.ROCK, RpsMove.SCISSORS),
+        (RpslsGame, RpslsMove.SPOCK, RpslsMove.LIZARD, RpslsMove.ROCK),
+        (TrivialGame, TrivialMove.WIN, TrivialMove.LOSE, TrivialMove.DRAW),
+        (BlackjackGame, BlackjackMove.HIT, BlackjackMove.STAND, BlackjackMove.HIT),
+        (CorridorGame, CorridorMove.ADVANCE, CorridorMove.HOLD, CorridorMove.ADVANCE),
+        (TwentyTwoGame, CorridorMove.HOLD, CorridorMove.ADVANCE, CorridorMove.HOLD),
+        (CallResponseGame, "opening_call", "answer", "next_call"),
+        (NimGame, NimMove("red", 1), NimMove("blue", 2), NimMove("red", 3)),
+        *[
+            (kind, ForceCommitMove((("rock", 1),)), ForceCommitMove((("paper", 2),)),
+             ForceCommitMove((("scissors", 3),)))
+            for kind in (AggregateForceGame, BagRpsGame, SiegeRpsGame)
+        ],
+        *[
+            (kind, PickingMove("inspect", "seal"), PickingMove("inspect", "stamp"),
+             PickingMove("decide", "allow"))
+            for kind in (PickingGame, KimGame, CredentialsGame)
+        ],
+        (TrackGame, TrackMove(0), TrackMove(1), TrackMove(2)),
+        (IncrementalGame, IncrementalMove("assign", "gather"),
+         IncrementalMove("end_cycle"), IncrementalMove("build", "mill")),
+    ],
+    ids=lambda value: value.__name__ if isinstance(value, type) else None,
+)
+def test_concrete_history_and_pending_types_survive_json_before_update(
+    game_class: type[Game[Move]], player: Move, opponent: Move, pending: Move,
+) -> None:
+    game = game_class()
+    game.history.extend([
+        RoundRecord(1, player, opponent, RoundResult.WIN),
+        RoundRecord(2, opponent, None, RoundResult.CONTINUE),
+    ])
+    game.opponent_next_move = pending
+    graph = Graph(label="typed_game_state")
+    graph.add_node(kind=GameStatePersistBlock, label="game", game_state=game)
+
+    after = _reload(graph, through_json=True)
+
+    assert type(after) is game_class
+    assert isinstance(after.history[0], RoundRecord)
+    assert type(after.history[0].player_move) is type(player)
+    assert type(after.history[0].opponent_move) is type(opponent)
+    assert type(after.opponent_next_move) is type(pending)
+    assert after.history[0].result is RoundResult.WIN
+    assert after.history[0].player_move == player
+    assert after.history[0].opponent_move == opponent
+    assert after.opponent_next_move == pending
+    assert after.history[1].opponent_move is None
+    namespace = after.to_namespace()
+    assert type(namespace["last_player_move"]) is type(opponent)
+    assert namespace["opponent_next_move"] == pending
+
+
 def _played(block_class, moves=(), **game_kwargs):
     """Return a graph with a set-up, partly played game on one block."""
 
@@ -76,9 +147,9 @@ def _reload(graph, *, through_json: bool = False):
 
     data = graph.unstructure()
     if through_json:
-        data = JsonSerializationHandler.deserialize(
-            JsonSerializationHandler.serialize(data)
-        )
+        flat = JsonSerializationHandler.serialize(data)
+        assert isinstance(flat, str)
+        data = JsonSerializationHandler.deserialize(flat)
     restored = Graph.structure(data)
     return next(
         node for node in restored.nodes if getattr(node, "label", None) == "game"

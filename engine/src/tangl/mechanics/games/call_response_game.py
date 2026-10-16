@@ -10,7 +10,7 @@ from tangl.journal.fragments import AttributedFragment, ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
 
 from .enums import RoundResult
-from .game import Game
+from .game import Game, RoundRecord
 from .handler import GameHandler
 
 PhraseRole = Literal["call", "response"]
@@ -119,6 +119,14 @@ class CallResponseGame(Game[str]):
         json_schema_extra={"reset_field": True},
     )
     opponent_strategy: str | None = None
+    opponent_next_move: str | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[str]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
+    )
 
     def to_namespace(self) -> dict[str, Any]:
         """Expose the current role while retaining the base game aliases."""

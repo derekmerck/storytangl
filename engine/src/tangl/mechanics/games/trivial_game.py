@@ -35,6 +35,14 @@ class TrivialGame(Game[TrivialMove]):
     scoring_n: int = 3
     scoring_strategy: str = "best_of_n"
     opponent_strategy: str = "trivial_random"
+    opponent_next_move: TrivialMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[TrivialMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
+    )
 
 
 class TrivialGameHandler(SimpleGameHandler[TrivialGame]):

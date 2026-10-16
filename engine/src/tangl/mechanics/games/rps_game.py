@@ -39,6 +39,14 @@ class RpsGame(Game[RpsMove]):
     scoring_n: int = 3
     scoring_strategy: str = "best_of_n"
     opponent_strategy: str = "rps_random"
+    opponent_next_move: RpsMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[RpsMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
+    )
 
 
 class RpsGameHandler(SimpleGameHandler[RpsGame]):
@@ -200,6 +208,14 @@ class RpslsGame(Game[RpslsMove]):
     scoring_n: int = 5
     scoring_strategy: str = "best_of_n"
     opponent_strategy: str = "rpsls_random"
+    opponent_next_move: RpslsMove | None = Field(
+        default=None,
+        json_schema_extra={"reset_field": True},
+    )
+    history: list[RoundRecord[RpslsMove]] = Field(
+        default=None,
+        json_schema_extra={"reset_field": True, "include": True},
+    )
 
 
 class RpslsGameHandler(SimpleGameHandler[RpslsGame]):
