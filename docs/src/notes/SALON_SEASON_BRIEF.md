@@ -209,6 +209,27 @@ Both are tests of the cast-as-cases design. The people you would have to
 eliminate are the same people the Season made you care about, so the board
 only clears if the player is willing to go through every one of them.
 
+### Prestige gating (New Game Plus)
+
+The stretch endings and some content unlock only after a **vanilla ending**
+(Robespierre, Talleyrand, Émigré, Martyr). A first run teaches the flip. Later
+runs are played by someone who knows what the Season is for.
+
+- **Endings unlock specific content,** so each ending opens a path:
+  - *Émigré* unlocks the **foreign envoy**, the backer the Restoration gambit
+    needs.
+  - *Talleyrand* unlocks the spy's own line, and what they know about your
+    papers.
+  - *Robespierre* or *Martyr* makes **The Incorruptible** reachable.
+- **New factions** come back as prestige content. The Church (the First
+  Estate) and the Army were cut from v1. They re-enter on later runs, which
+  widens the alignment simplex and gives Thermidor a new kind of needle to
+  thread.
+- **New characters** do the same: a fourth suitor, a second rival, or a
+  creditor with a longer memory.
+- **Mechanically,** an unlock is an account-level fact consumed when a fresh
+  run starts. It is never run-local state.
+
 ## 4. Why this is more interesting than the source
 
 The source never contests its frame. Salons are grind, rendezvous are an
@@ -247,6 +268,13 @@ beside the social loop rather than through it.
    real consumer for journal retrieval (#191: journal → slice → selector). It
    needs its own design pass before the coda's last act. It is not needed for
    the first slice.
+4. **Ending-gated unlocks across runs.** #448 (open) defines account-level
+   achievements, with Coronate's NG+ entry option as the first repeated-play
+   consumer. Salon Season would be the second, and it is a different shape:
+   *which* ending you reached unlocks *which* content, not just completion.
+   #208 deliberately waits for exactly that kind of distinct second consumer
+   before promoting broader campaign meta-resources. Build this after #448
+   lands, and after the slice.
 
 ## 6. First slice: thin both ways
 
