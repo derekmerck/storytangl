@@ -122,35 +122,17 @@ now the station's theme is a text render of its own. Running ACE-Step's own
 pipeline, or a commercial generator's reference-track feature, would make the
 cover.
 
-No audio ships yet: playback waits on #571. Both themes regenerate from these
-settings -- instrumental, 90 s, 104 BPM, D minor, the turbo checkpoint at 8
-steps, seed 31:
+Each pack ships its theme as `music/theme.mp3`, the same name in both, so the
+pack decides which plays, as it does for the art, once clients can play audio
+(#571). Each pack's manifest records how its theme was made under `music`: the
+description, settings and seed it renders from again, and its hash.
 
-<details>
-<summary>The descriptions</summary>
+The themes are in Git LFS and are not downloaded by default (the root
+`.lfsconfig`); a clone has small pointer files in their place. Fetch them with:
 
-**Marmoset Island** (`media/`):
-
-> Playful 18th-century Caribbean folk chamber music with tresillo and habanera
-> syncopation. Nylon-string baroque guitar, lively fiddle, wooden flute, cittern,
-> plucked viola da gamba bass, hand drums and shakers. Breezy island port
-> atmosphere, witty melodic exchanges between fiddle and flute, warm D Dorian
-> harmonies, adventurous and mischievous. A small acoustic tavern ensemble with
-> natural wooden resonance, elegant but slightly scruffy musicianship. Bright
-> recurring four-note melody, steady loopable groove. Acoustic instruments only,
-> instrumental game soundtrack.
-
-**Marmoset Orbital Station** (`media_spaceport/`):
-
-> Retro-futuristic tropical jazz electronica with tresillo and habanera
-> syncopation. Playful analog synthesizer lead, warm rubbery synth bass, FM
-> marimba, crystalline electronic steelpan tones, soft Rhodes chords, syncopated
-> electronic percussion and airy space-age pads. Bright D Dorian harmonies,
-> cheerful melodic hooks, light jazz-funk improvisation. Weightless, colorful,
-> eccentric orbital marketplace lounge. Warm vintage electronic production,
-> understated and groovy, steady loopable groove, instrumental game soundtrack.
-
-</details>
+```bash
+git lfs pull -I "worlds/*/media*/music/**" -X ""
+```
 
 ### Capturing a pack
 

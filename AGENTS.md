@@ -331,6 +331,10 @@ bytes fails confusingly rather than skipping.
    not at one. Conformed to target resolution, described by a pack manifest,
    named in that world's README.
 6. **Tests write images to `tmp_path`, never into the repository.**
+7. **Optional media is fetched on request.** Media most checkouts never use,
+   such as a world's soundtrack, is excluded from default LFS fetches by the
+   committed `.lfsconfig`, so a clone holds pointer files for it. Fetch it with
+   `git lfs pull -I "<path>" -X ""`. Audio is in LFS by extension.
 
 ## Miscellaneous
 - No try/except around imports. Declare dependencies in `pyproject.toml`.

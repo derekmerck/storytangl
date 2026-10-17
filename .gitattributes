@@ -4,6 +4,12 @@
 *.jpeg filter=lfs diff=lfs merge=lfs -text export-ignore
 *.webp filter=lfs diff=lfs merge=lfs -text export-ignore
 
+# Audio: LFS, and fetched only on request (see .lfsconfig)
+*.mp3 filter=lfs diff=lfs merge=lfs -text export-ignore
+*.ogg filter=lfs diff=lfs merge=lfs -text export-ignore
+*.wav filter=lfs diff=lfs merge=lfs -text export-ignore
+*.flac filter=lfs diff=lfs merge=lfs -text export-ignore
+
 # Track large "forge-svg" files for svg forge with LFS
 *.forge.svg filter=lfs diff=lfs merge=lfs -text export-ignore
 

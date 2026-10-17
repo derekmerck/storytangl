@@ -394,5 +394,30 @@
       "sprite_height": 112,
       "resample": "nearest"
     }
+  },
+  "music": {
+    "theme": {
+      "file": "music/theme.mp3",
+      "sha256": "20f2fa864f557aea12fc554b6d59387f51ec01871e293e13f3e205552534842f",
+      "duration": 83.98,
+      "rendered_with": {
+        "checkpoint": "ace_step_1.5_turbo_aio.safetensors",
+        "steps": 8,
+        "cfg": 1.0,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "shift": 3,
+        "seed": 31,
+        "bpm": 104,
+        "key": "D minor",
+        "time_signature": 4,
+        "seconds": 90,
+        "lyrics": "[Instrumental]",
+        "style": "Retro-futuristic tropical jazz electronica with tresillo and habanera syncopation. Playful analog synthesizer lead, warm rubbery synth bass, FM marimba, crystalline electronic steelpan tones, soft Rhodes chords, syncopated electronic percussion and airy space-age pads. Bright D Dorian harmonies, cheerful melodic hooks, light jazz-funk improvisation. Weightless, colorful, eccentric orbital marketplace lounge. Warm vintage electronic production, understated and groovy, steady loopable groove, instrumental game soundtrack."
+      },
+      "conformed_from": {
+        "transform": "trim end silence, normalise to -16 LUFS (-1.5 dBTP true peak), mp3 128 kbps"
+      }
+    }
   }
 }
