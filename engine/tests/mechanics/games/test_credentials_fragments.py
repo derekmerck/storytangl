@@ -198,6 +198,7 @@ class TestStructuredEmission:
 
     def test_decision_introduces_exactly_one_next_candidate_after_its_outcome(self) -> None:
         block, handler, ctx = _live_game(_case(), CredentialCase(candidate_name="Tomas Vey"))
+        handler.receive_move(block.game, ("inspect", "passport"))
         handler.receive_move(block.game, ("decide", "deny"))
 
         fragments = handler.get_journal_fragments(block.game, ctx=ctx)
@@ -216,6 +217,7 @@ class TestStructuredEmission:
 
     def test_final_decision_does_not_introduce_a_new_candidate(self) -> None:
         block, handler, ctx = _live_game()
+        handler.receive_move(block.game, ("inspect", "passport"))
         handler.receive_move(block.game, ("decide", "deny"))
 
         content = _by_type(handler.get_journal_fragments(block.game, ctx=ctx), ContentFragment)
@@ -741,7 +743,9 @@ class TestStructuredEmission:
             handler.resolve_move_payload(
                 block.game,
                 CredentialsMove(kind="inspect", target="__document_piece__"),
-                {"piece_ids": [piece.piece_id]},
+                {"move": CredentialsMove("inspect", "__document_piece__"),
+                 "piece_ids": [piece.piece_id]},
+                offered_payload={"move": CredentialsMove("inspect", "__document_piece__")},
             ).target
             for piece in permits
         } == {"travel permit"}

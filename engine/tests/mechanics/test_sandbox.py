@@ -1211,16 +1211,23 @@ def test_sandbox_incremental_update_rejects_unsupported_move_kind() -> None:
     graph.add(colony)
     scope.add_child(hub)
     scope.add_child(colony)
+    do_provision(hub, ctx=PhaseCtx(graph=graph, cursor_id=hub.uid))
+    action = Action(
+        graph=graph, predecessor_id=hub.uid, successor_id=hub.uid,
+        payload={
+            "sandbox_incremental_game": colony.uid,
+            "move": IncrementalMove(kind="resolve_cycle"),
+            "sandbox_time_cost": {"duration": 0},
+        },
+    )
     ctx = PhaseCtx(
         graph=graph,
         cursor_id=hub.uid,
-        incoming_payload={
-            "sandbox_incremental_game": colony.uid,
-            "move": IncrementalMove(kind="resolve_cycle"),
-        },
+        incoming_edge=action,
+        incoming_payload=action.payload,
     )
 
-    with pytest.raises(ValueError, match="Unsupported sandbox incremental move kind"):
+    with pytest.raises(ValueError, match="Invalid move"):
         sandbox_incremental.process_sandbox_incremental_game_move(caller=hub, ctx=ctx)
 
 

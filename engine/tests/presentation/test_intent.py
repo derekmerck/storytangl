@@ -1,10 +1,41 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from tangl.presentation.intent import Accepts, Blocker, CostPreview, UIHints
+from tangl.presentation.intent import (
+    Accepts, Blocker, CostPreview, PieceConstraints, PlaceAccepts, UIHints,
+)
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.persistence.structuring import StructuringHandler
 from tangl.presentation.values import KvRow
+
+
+REFERENCE_UID = UUID("8cd4758d-9aa9-44a7-b757-17e7633e29d1")
+
+
+@pytest.mark.parametrize("reference", [
+    REFERENCE_UID, str(REFERENCE_UID).upper(), REFERENCE_UID.hex,
+    "{" + str(REFERENCE_UID) + "}", REFERENCE_UID.urn, "packet", "Packet",
+])
+@pytest.mark.parametrize("model,fields", [
+    (PieceConstraints, ("source_zone_ref", "target_zone_ref")),
+    (PlaceAccepts, ("source_zone_ref", "target_zone_ref", "edge_ref")),
+])
+def test_entity_references_restore_as_uuid_identities_or_exact_labels(
+    reference: UUID | str, model: type[PieceConstraints | PlaceAccepts], fields: tuple[str, ...],
+) -> None:
+    original = model(**dict.fromkeys(fields, reference))
+    flat = Json.serialize(original.unstructure())
+    assert isinstance(flat, str)
+    restored = StructuringHandler.structure(Json.deserialize(flat), {model.__name__: model})
+    expected = reference if reference in ("packet", "Packet") else REFERENCE_UID
+    for field in fields:
+        assert getattr(original, field) == expected
+        assert getattr(restored, field) == expected
+        assert type(getattr(restored, field)) is type(expected)
 
 
 def test_accepts_union_validates_piece_and_compose_shapes() -> None:

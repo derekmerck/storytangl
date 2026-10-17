@@ -12,6 +12,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any, get_args
 from uuid import UUID
 
+from pydantic import TypeAdapter
+
 from tangl.core import BaseFragment
 from tangl.journal.fragments import (
     AttributedFragment,
@@ -24,6 +26,7 @@ from tangl.journal.fragments import (
 )
 from tangl.persistence import PersistenceManagerFactory
 from tangl.presentation.hints import ClipBinding, STAGING_MAX, STAGING_MIN, TimingName, VisibilityBinding
+from tangl.presentation.intent import EntityRef
 from tangl.presentation.projection import (
     BooleanPreference,
     EnumPreference,
@@ -66,6 +69,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_STAGE_EXTENT = (320, 200)
 _SUPPORTED_STAGE_EXTENTS = {_DEFAULT_STAGE_EXTENT, (640, 400)}
+_ZONE_REFERENCE = TypeAdapter(EntityRef | None)
 
 
 def _text(value: Any) -> str | None:
@@ -217,7 +221,7 @@ def selectable_pieces(turn: Turn, choice: Choice) -> list[Piece]:
     return [
         piece
         for piece in offered
-        if (zone_ref is None or str(piece.zone_ref) == zone_ref)
+        if (zone_ref is None or _ZONE_REFERENCE.validate_python(piece.zone_ref) == zone_ref)
         and (kinds is None or piece.kind in kinds)
     ]
 

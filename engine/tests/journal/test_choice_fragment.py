@@ -3,6 +3,8 @@ from uuid import UUID, uuid4
 import pytest
 
 from tangl.journal.fragments import fragment_to_dto
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.persistence.structuring import StructuringHandler
 from tangl.presentation.intent import (
     ComposeAccepts,
     ComposePart,
@@ -16,6 +18,32 @@ from tangl.presentation.intent import (
     TextAccepts,
 )
 from tangl.journal.prose import ChoiceFragment
+
+
+@pytest.mark.parametrize("accepts", [
+    PiecesAccepts(constraints=PieceConstraints(
+        source_zone_ref=UUID("00000000-0000-4000-8000-000000000001"),
+        target_zone_ref=UUID("00000000-0000-4000-8000-000000000002"),
+    )),
+    PlaceAccepts(
+        source_zone_ref=UUID("00000000-0000-4000-8000-000000000001"),
+        target_zone_ref="symbolic-target", edge_ref=UUID("00000000-0000-4000-8000-000000000002"),
+    ),
+])
+def test_reference_accepts_cross_real_json_and_keep_string_dto_fields(accepts) -> None:
+    fragment = ChoiceFragment(edge_id=uuid4(), text="Select", accepts=accepts)
+    restored = StructuringHandler.structure(
+        Json.deserialize(Json.serialize(fragment.unstructure())), {"ChoiceFragment": ChoiceFragment},
+    )
+    assert restored.accepts == accepts
+    dto = fragment_to_dto(restored)["accepts"]
+    refs = dto["constraints"] if dto["kind"] == "pieces" else dto
+    assert refs["source_zone_ref"] == "00000000-0000-4000-8000-000000000001"
+    if dto["kind"] == "pieces":
+        assert refs["target_zone_ref"] == "00000000-0000-4000-8000-000000000002"
+    else:
+        assert refs["target_zone_ref"] == "symbolic-target"
+        assert refs["edge_ref"] == "00000000-0000-4000-8000-000000000002"
 
 
 def test_choice_fragment_with_unavailable_reason() -> None:

@@ -73,6 +73,7 @@ def _game(
     game = CredentialsGame(roster=[case], restriction_map=RULES, **kw)
     handler = CredentialsGameHandler()
     handler.setup(game)
+    game.current_stage = "packet"  # Override tests start in the legal disposition window.
     return game, handler
 
 

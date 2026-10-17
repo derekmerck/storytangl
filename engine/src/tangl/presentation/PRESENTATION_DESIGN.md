@@ -65,6 +65,16 @@ service boundary.
 
 ## Status
 
+Reference correction (#551): intent zone references and ``PlaceAccepts.edge_ref``
+accept ``EntityRef`` — a UUID identity or an exact symbolic label, not Core's
+broader bytes/hash-capable ``Identifier``. UUID spellings canonicalize through
+normal typed validation; non-UUID labels remain unchanged and case-sensitive.
+Producers holding UUIDs pass them directly. Constructor-form JSON restoration
+keeps the established decoder's UUID/date recovery contract; no serializer
+changes are required. JSON DTOs still expose UUID references as portable strings.
+The pygame selection boundary uses the same reference type to match native or
+JSON-form piece references. Opaque ledger names and predicate ids remain text.
+
 Slice 2 adds declarative client preferences: worlds may publish typed boolean
 or finite ordered enum declarations through exact `ui-preferences` world-info.
 Clients retain values locally per world. Explicit `media_visibility` and

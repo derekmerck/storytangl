@@ -111,6 +111,7 @@ def _game(
     game = CredentialsGame(roster=roster, restriction_map=RULES, **overrides)
     handler = CredentialsGameHandler()
     handler.setup(game)
+    game.current_stage = "packet"  # Scoring tests start in the legal disposition window.
     return game, handler
 
 

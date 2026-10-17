@@ -13,6 +13,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Type, TypeVar
 
+from pydantic import TypeAdapter
+
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord, Move
 from .strategies import opponent_strategies, scoring_strategies
@@ -59,6 +61,7 @@ class GameHandler(ABC, Generic[GameT]):
     
     # Subclasses can set this to bind a handler to a game type
     game_cls: ClassVar[Type[Game]] = Game
+    move_cls: ClassVar[type]
 
     # Re-entrant games normally derive their moves from mutable state. Hosts
     # with authored stable actions can opt out and gate those actions normally.
@@ -129,10 +132,66 @@ class GameHandler(ABC, Generic[GameT]):
         self,
         game: GameT,
         move: Move,
-        payload: dict[str, Any],
+        payload: dict[str, object],
+        *,
+        offered_payload: dict[str, object],
     ) -> Move:
-        """Resolve submitted widget data into the engine move."""
+        """Complete a typed offered seed, enforcing fixed bindings by default."""
+        self.check_move_payload(payload, offered_payload=offered_payload)
+        return move
 
+    def reconstruct_move(self, value: object) -> Move:
+        """Restore a move value through this game's declared schema."""
+        return TypeAdapter(self.move_cls).validate_python(value)
+
+    def check_move_payload(
+        self,
+        payload: dict[str, object],
+        *,
+        offered_payload: dict[str, object],
+        input_fields: frozenset[str] = frozenset(),
+    ) -> None:
+        """Reject unknown input and changes to bindings not exposed as parameters.
+
+        Completion overrides explicitly name their permitted input fields. A
+        parameter may be ``move`` itself; fixed moves compare reconstructed
+        values so unchanged JSON echoes are equivalent to native offers.
+        """
+        unknown = payload.keys() - offered_payload.keys() - input_fields
+        if unknown:
+            raise ValueError(f"Unknown game input fields: {sorted(unknown)}")
+        for key, offered in offered_payload.items():
+            if key in input_fields:
+                continue
+            submitted = payload.get(key)
+            if key == "move":
+                offered = self.reconstruct_move(offered)
+                submitted = self.reconstruct_move(submitted)
+            if submitted != offered:
+                raise ValueError(f"Cannot replace offered game binding: {key}")
+
+    def resolve_selected_move(
+        self,
+        game: GameT,
+        *,
+        offered_payload: dict[str, object],
+        payload: object,
+    ) -> Move:
+        """Pure reconstruction, authorized completion, and current-state legality.
+
+        Both pre-traversal VALIDATE and UPDATE call this method independently.
+        Selector seeds need not be legal completed moves. No setup, randomness,
+        mutation, or cached resolved move belongs in completion/validation.
+        """
+        if game.phase is not GamePhase.READY:
+            raise ValueError("Selected game move requires a READY game")
+        if not isinstance(payload, dict):
+            raise ValueError("Game input must be a payload mapping")
+        seed = self.reconstruct_move(offered_payload["move"])
+        move = self.resolve_move_payload(
+            game, seed, payload, offered_payload=offered_payload,
+        )
+        self.validate_move(game, move)
         return move
 
     def build_round_notes(
@@ -223,6 +282,8 @@ class GameHandler(ABC, Generic[GameT]):
                 f"Call setup() first or wait for READY phase."
             )
         
+        self.validate_move(game, player_move)
+
         # Transition to resolving
         game.phase = GamePhase.RESOLVING
         game.round += 1

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import math
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
@@ -24,6 +24,8 @@ from .handler import GameHandler
 @dataclass(frozen=True)
 class IncrementalMove:
     """Structured move for the incremental shell."""
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     kind: str
     target: str | None = None
@@ -155,6 +157,7 @@ class IncrementalGameHandler(GameHandler[IncrementalGame]):
     """Handler for the incremental shell kernel."""
 
     game_cls: ClassVar[type[Game]] = IncrementalGame
+    move_cls: ClassVar[type] = IncrementalMove
 
     def on_setup(self, game: IncrementalGame) -> None:
         game.resources = dict(game.starting_resources)

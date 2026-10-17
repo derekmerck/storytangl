@@ -65,11 +65,15 @@ class TestNimCore:
         game, handler = _ready(opening_heaps={DEFAULT_HEAP: 2}, max_take=3)
         selector = handler.get_provisioned_moves(game)[0]
 
-        resolved = handler.resolve_move_payload(game, selector, {"quantity": 2})
+        resolved = handler.resolve_selected_move(
+            game, offered_payload={"move": selector}, payload={"move": selector, "quantity": 2},
+        )
         assert resolved == NimMove(pile=DEFAULT_HEAP, count=2)
 
         with pytest.raises(ValueError, match="Invalid take"):
-            handler.resolve_move_payload(game, selector, {"quantity": 3})
+            handler.resolve_selected_move(
+                game, offered_payload={"move": selector}, payload={"move": selector, "quantity": 3},
+            )
 
 
 class TestSingleHeapIsSolved:

@@ -163,6 +163,7 @@ class CallResponseGameHandler(GameHandler[CallResponseGame]):
     """
 
     game_cls: ClassVar[type[Game]] = CallResponseGame
+    move_cls: ClassVar[type] = str
 
     def on_setup(self, game: CallResponseGame) -> None:
         """Validate fixed data and initialize the authored initiative."""

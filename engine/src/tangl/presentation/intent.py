@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal, TypeAlias
+from uuid import UUID
 
 from pydantic import ConfigDict, Field
 
 from tangl.core.bases import Unstructurable
+
+
+EntityRef: TypeAlias = Annotated[UUID | str, Field(union_mode="left_to_right")]
+"""A UUID identity or exact symbolic label; UUID spellings normalize at validation."""
 
 
 class IntentModel(Unstructurable):
@@ -65,8 +70,8 @@ class PieceConstraints(IntentModel):
 
     same_property: list[str] | None = None
     different_property: list[str] | None = None
-    target_zone_ref: str | None = None
-    source_zone_ref: str | None = None
+    target_zone_ref: EntityRef | None = None
+    source_zone_ref: EntityRef | None = None
     target_kind: list[str] | None = None
     predicate_ref: str | None = None
 
@@ -136,9 +141,9 @@ class PiecesAccepts(IntentModel):
 
 class PlaceAccepts(IntentModel):
     kind: Literal["place"] = "place"
-    source_zone_ref: str | None = None
-    target_zone_ref: str | None = None
-    edge_ref: str | None = None
+    source_zone_ref: EntityRef | None = None
+    target_zone_ref: EntityRef | None = None
+    edge_ref: EntityRef | None = None
     predicate_ref: str | None = None
     source_constraints: PieceConstraints | None = None
     required: bool = True
@@ -193,6 +198,7 @@ __all__ = [
     "ComposePart",
     "CostPreview",
     "EnumValidator",
+    "EntityRef",
     "LengthValidator",
     "NonComposeAccepts",
     "PickAccepts",

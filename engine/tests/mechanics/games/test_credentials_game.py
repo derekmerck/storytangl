@@ -37,6 +37,8 @@ from tangl.mechanics.games.credentials_game import (
 )
 from engine.tests.mechanics.games.credentials_helpers import make_credential_case as CredentialCase
 from tangl.mechanics.games.handlers import inject_game_context
+from tangl.mechanics.games.handlers import _build_game_actions
+from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.story import Action, Block
 from tangl.vm import Frame, Ledger, TraversableEdge as ChoiceEdge
 
@@ -83,6 +85,27 @@ class CredentialsBlock(HasGame, Block):
 
     _game_class = CredentialsGame
     _game_handler_class = CredentialsGameHandler
+
+
+def test_document_selector_restores_and_resolves_json_piece_input_before_update() -> None:
+    graph = Graph()
+    host = graph.add_node(
+        kind=CredentialsBlock, game_state=CredentialsGame(roster=_two_case_roster()),
+    )
+    host.game_handler.setup(host.game)
+    edge = next(edge for edge in _build_game_actions(host) if edge.accepts.kind == "pieces")
+    restored = Graph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
+    restored_host = restored.get(host.uid)
+    restored_edge = restored.get(edge.uid)
+    frame = Frame(graph=restored, cursor=restored_host)
+    before = Json.serialize(restored.unstructure())
+    with pytest.raises(ValueError):
+        frame.resolve_choice(restored_edge, choice_payload={"piece_ids": ["not-a-document"]})
+    assert Json.serialize(restored.unstructure()) == before
+    frame.resolve_choice(restored_edge, choice_payload={"piece_ids": ["0:passport"]})
+    assert restored_host.game.history[-1].player_move.kind == "inspect"
+    assert restored_host.game.history[-1].player_move.target == "passport"
+    assert restored_host.game.discovered_findings
 
 
 def test_presentation_requires_text_for_every_invalid_status() -> None:
@@ -231,10 +254,10 @@ class TestCredentialsCore:
             move for move in handler.get_provisioned_moves(game) if move.kind == "inspect"
         )
 
-        resolved = handler.resolve_move_payload(
+        resolved = handler.resolve_selected_move(
             game,
-            selector,
-            {"piece_ids": ["0:passport"]},
+            offered_payload={"move": selector},
+            payload={"move": selector, "piece_ids": ["0:passport"]},
         )
 
         assert resolved.kind == "inspect"
@@ -248,10 +271,10 @@ class TestCredentialsCore:
         handler.receive_move(game, ("inspect", "passport"))
 
         with pytest.raises(ValueError, match="not inspectable"):
-            handler.resolve_move_payload(
+            handler.resolve_selected_move(
                 game,
-                selector,
-                {"piece_ids": ["0:passport"]},
+                offered_payload={"move": selector},
+                payload={"move": selector, "piece_ids": ["0:passport"]},
             )
 
     def test_arrest_move_can_be_disabled(self) -> None:

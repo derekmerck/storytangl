@@ -5,13 +5,17 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from tangl.core import Priority
+
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
+from tangl.story import Action
 from tangl.vm import (
     ResolutionPhase as P,
     on_gather_ns,
     on_journal,
     on_provision,
     on_update,
+    on_validate,
 )
 
 from .has_game import HasGame
@@ -65,10 +69,19 @@ def _build_game_actions(cursor: HasGame) -> list[Any]:
     return actions
 
 
-def _ctx_selected_payload(ctx: Context) -> Any:
-    """Return the selected edge payload for the current VM turn."""
-
-    return ctx.selected_payload
+@on_validate(wants_caller_kind=Action, wants_exact_kind=False, priority=Priority.EARLY)
+def validate_selected_game_move(*, caller: Action, ctx: Context, **_kw) -> bool:
+    """Validate the original offer at the edge, before traversal advances."""
+    offered = caller.payload
+    host = caller.successor
+    if not isinstance(host, HasGame) or not isinstance(offered, dict) or "move" not in offered:
+        return True
+    if host.game_state is None:
+        raise ValueError("Selected game move has no initialized game state")
+    host.game_handler.resolve_selected_move(
+        host.game, offered_payload=offered, payload=ctx.selected_payload,
+    )
+    return True
 
 
 @on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
@@ -174,23 +187,14 @@ def process_game_move(
             _clear_dynamic_game_actions(cursor, ctx=ctx)
             _build_game_actions(cursor)
 
-    payload = _ctx_selected_payload(ctx)
-    if not isinstance(payload, dict):
+    edge = ctx.selected_edge
+    offered = edge.payload if isinstance(edge, Action) else None
+    if not isinstance(offered, dict) or "move" not in offered:
         logger.debug("No selected move payload at %s", cursor.get_label())
         return None
-
-    move = payload.get("move")
-
-    if move is None:
-        logger.warning("Selected edge missing move payload at %s", cursor.get_label())
-        return None
-    move = cursor.game_handler.resolve_move_payload(cursor.game, move, payload)
-
-    if cursor.game.phase != GamePhase.READY:
-        logger.warning(
-            "Cannot process move in phase %s at %s", cursor.game.phase, cursor.get_label()
-        )
-        return None
+    move = cursor.game_handler.resolve_selected_move(
+        cursor.game, offered_payload=offered, payload=ctx.selected_payload,
+    )
 
     round_result = cursor.game_handler.receive_move(cursor.game, move)
 

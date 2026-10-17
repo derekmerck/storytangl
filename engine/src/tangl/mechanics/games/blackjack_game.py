@@ -217,6 +217,7 @@ class BlackjackGameHandler(GameHandler[BlackjackGame]):
     """Narrated blackjack handler with explicit author-tunable pressure knobs."""
 
     game_cls: ClassVar[type[Game]] = BlackjackGame
+    move_cls: ClassVar[type] = BlackjackMove
     OPENING_DEALS: ClassVar[dict[str, list[tuple[int, str]]]] = {
         "neutral": [],
         "player_advantage": [(10, "h"), (6, "c"), (9, "s"), (10, "d")],

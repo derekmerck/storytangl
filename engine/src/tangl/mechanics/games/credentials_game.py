@@ -1595,9 +1595,7 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         if move.kind == "inspect" and move.target == _DOCUMENT_SELECTOR_TARGET:
             return PiecesAccepts(
                 constraints=PieceConstraints(
-                    target_zone_ref=str(
-                        _piece_uid(game.uid, game.case_index, "packet"),
-                    ),
+                    target_zone_ref=_piece_uid(game.uid, game.case_index, "packet"),
                 ),
             )
         return PickAccepts()
@@ -1607,8 +1605,15 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
         game: CredentialsGame,
         move: CredentialsMove,
         payload: dict[str, object],
+        *,
+        offered_payload: dict[str, object],
     ) -> CredentialsMove:
-        move = self._normalize_move(move)
+        self.check_move_payload(
+            payload, offered_payload=offered_payload,
+            input_fields=frozenset({"piece_ids"})
+            if move.kind == "inspect" and move.target == _DOCUMENT_SELECTOR_TARGET
+            else frozenset(),
+        )
         if move.kind != "inspect" or move.target != _DOCUMENT_SELECTOR_TARGET:
             return move
 

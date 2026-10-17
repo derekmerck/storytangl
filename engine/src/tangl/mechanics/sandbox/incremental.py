@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from pydantic import TypeAdapter
+
 from tangl.core import Graph, Priority, Selector
 from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.games import (
@@ -14,7 +16,7 @@ from tangl.mechanics.games import (
     IncrementalMove,
 )
 from tangl.story import Action, StoryGraph
-from tangl.vm import VmPhaseCtx, on_provision, on_update
+from tangl.vm import VmPhaseCtx, on_provision, on_update, on_validate
 
 from .dispatch import on_sandbox_tick
 from .handlers import sandbox_scopes
@@ -73,20 +75,57 @@ def _incremental_action_payload(host: HasGame, move: IncrementalMove) -> dict:
     }
 
 
-def _host_from_payload(location: SandboxLocation, payload: dict) -> HasGame:
+def _host_from_payload(location: SandboxLocation, payload: dict[str, object]) -> HasGame:
     host_id = payload["sandbox_incremental_game"]
-    if not isinstance(host_id, UUID):
-        raise TypeError("sandbox_incremental_game payload must be a UUID")
     host = location.graph.get(host_id)
     if not isinstance(host, HasGame):
         raise TypeError("sandbox_incremental_game payload must reference a HasGame node")
-    if not isinstance(host.game, IncrementalGame):
+    if not isinstance(host.game_state, IncrementalGame):
         raise TypeError("sandbox_incremental_game payload must reference an IncrementalGame")
     if not isinstance(host.game_handler, IncrementalGameHandler):
         raise TypeError(
             "sandbox_incremental_game payload must reference an IncrementalGameHandler"
         )
     return host
+
+
+def _normalized_payload(payload: object) -> dict[str, object]:
+    """Normalize this adapter's stable host and authored cost, not generic VM data."""
+    if not isinstance(payload, dict):
+        raise ValueError("Sandbox incremental input must be a payload mapping")
+    return {
+        **payload,
+        "sandbox_incremental_game": TypeAdapter(UUID).validate_python(
+            payload["sandbox_incremental_game"],
+        ),
+        "sandbox_time_cost": SandboxTimeCost.model_validate(payload["sandbox_time_cost"]),
+    }
+
+
+def _resolve_offered_move(
+    location: SandboxLocation, *, ctx: VmPhaseCtx,
+) -> tuple[HasGame, IncrementalMove]:
+    offered = _normalized_payload(ctx.selected_edge.payload)
+    host = _host_from_payload(location, offered)
+    move = host.game_handler.resolve_selected_move(
+        host.game, offered_payload=offered, payload=_normalized_payload(ctx.selected_payload),
+    )
+    if move.kind != "end_cycle" and move.kind not in ALLOCATION_MOVE_KINDS:
+        raise ValueError(f"Unsupported sandbox incremental move kind: {move.kind!r}")
+    return host, move
+
+
+@on_validate(wants_caller_kind=Action, wants_exact_kind=False, priority=Priority.EARLY)
+def validate_sandbox_incremental_move(*, caller: Action, ctx: VmPhaseCtx, **_kw) -> bool:
+    """Validate the original hosted offer before traversal or clock payment."""
+    offered = caller.payload
+    if not isinstance(offered, dict) or "sandbox_incremental_game" not in offered:
+        return True
+    location = caller.successor
+    if not isinstance(location, SandboxLocation):
+        raise ValueError("Sandbox incremental offer must target a SandboxLocation")
+    _resolve_offered_move(location, ctx=ctx)
+    return True
 
 
 def _latest_fragments(host: HasGame) -> list[ContentFragment]:
@@ -167,20 +206,13 @@ def process_sandbox_incremental_game_move(*, caller, ctx, **_kw):
     """Apply selected zero-duration allocation moves for hosted incremental games."""
     if not isinstance(caller, SandboxLocation):
         return None
-    payload = ctx.selected_payload
-    if not isinstance(payload, dict) or "sandbox_incremental_game" not in payload:
+    edge = ctx.selected_edge
+    offered = edge.payload if isinstance(edge, Action) else None
+    if not isinstance(offered, dict) or "sandbox_incremental_game" not in offered:
         return None
-
-    move = payload["move"]
-    if not isinstance(move, IncrementalMove):
-        raise TypeError("sandbox incremental move payload must be an IncrementalMove")
+    host, move = _resolve_offered_move(caller, ctx=ctx)
     if move.kind == "end_cycle":
         return None
-    if move.kind not in ALLOCATION_MOVE_KINDS:
-        raise ValueError(f"Unsupported sandbox incremental move kind: {move.kind!r}")
-
-    host = _host_from_payload(caller, payload)
-    _ensure_incremental_ready(host)
     host.game_handler.receive_move(host.game, move)
     if host.game.history:
         host.locals["last_round"] = host.game.history[-1]

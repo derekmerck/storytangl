@@ -96,6 +96,7 @@ class CorridorGameHandler(GameHandler[CorridorGame]):
     """Handler for the scalar corridor contest."""
 
     game_cls: ClassVar[type[Game]] = CorridorGame
+    move_cls: ClassVar[type] = CorridorMove
 
     def on_setup(self, game: CorridorGame) -> None:
         game.player_score_value = game.starting_player_score

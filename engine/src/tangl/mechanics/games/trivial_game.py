@@ -60,6 +60,7 @@ class TrivialGameHandler(SimpleGameHandler[TrivialGame]):
     
     moves: ClassVar[list[TrivialMove]] = list(TrivialMove)
     game_cls: ClassVar[Type[Game]] = TrivialGame
+    move_cls: ClassVar[type] = TrivialMove
     
     def resolve_round(
         self,

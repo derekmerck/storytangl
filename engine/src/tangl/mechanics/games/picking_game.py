@@ -11,7 +11,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar, TypeVar
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
@@ -24,6 +24,8 @@ from .handler import GameHandler
 @dataclass(frozen=True)
 class PickingMove:
     """Structured move for inspect-and-commit style picking games."""
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     kind: str
     target: str
@@ -119,6 +121,7 @@ class PickingGameHandler(GameHandler[PickingGameT]):
     """Shared handler for inspect/reveal/decide loops."""
 
     game_cls: ClassVar[type[Game]] = PickingGame
+    move_cls: ClassVar[type] = PickingMove
 
     def receive_move(
         self,
