@@ -10,7 +10,7 @@ from pydantic import Field
 
 from tangl.core import Graph
 from tangl.mechanics.games import (
-    Game, GameHandler, HasGame, NimGame, NimGameHandler, NimMove, RoundRecord, RoundResult,
+    Game, GameHandler, GamePhase, HasGame, NimGame, NimGameHandler, NimMove, RoundRecord, RoundResult,
 )
 from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler, RpsMove
 from tangl.persistence.serializers import JsonSerializationHandler as Json
@@ -166,7 +166,8 @@ def test_native_dataclass_offer_accepts_unchanged_json_echo() -> None:
 def test_one_symbol_offer_accepts_multiple_legal_move_values() -> None:
     frame, edge = _frame(SymbolBlock, {"move": "choose_symbol"})
     for symbol in ("rock", "paper"):
-        frame.resolve_choice(edge, choice_payload=Json.deserialize(Json.serialize({"move": symbol})))
+        wire = Json.deserialize(Json.serialize({"move": symbol}))
+        frame.resolve_choice(edge, choice_payload=wire)
     assert [record.player_move for record in frame.cursor.game.history] == ["rock", "paper"]
     assert list(frame.cursor.edges_out()) == [edge]
     before = _snapshot(frame)
@@ -175,10 +176,14 @@ def test_one_symbol_offer_accepts_multiple_legal_move_values() -> None:
     assert _snapshot(frame) == before
 
 
-def test_validation_does_not_initialize_pending_game() -> None:
+@pytest.mark.parametrize("state_exists", [False, True])
+def test_validation_does_not_initialize_pending_game(state_exists: bool) -> None:
     frame, edge = _frame(BoundRpsBlock, {"move": RpsMove.ROCK}, setup=False)
+    if state_exists:
+        assert frame.cursor.game.phase is GamePhase.PENDING
     before = _snapshot(frame)
-    with pytest.raises(ValueError, match="initialized game state"):
+    reason = "READY game" if state_exists else "initialized game state"
+    with pytest.raises(ValueError, match=reason):
         frame.resolve_choice(edge)
     assert _snapshot(frame) == before
 

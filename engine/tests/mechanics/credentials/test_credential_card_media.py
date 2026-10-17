@@ -483,6 +483,7 @@ def test_lifecycle_provisions_the_next_candidate_during_update(
         roster=[first_case, second_case],
     )
     frame = Frame(graph=story, cursor=block)
+    block.game_handler.receive_move(block.game, CredentialsMove(kind="inspect", target="passport"))
     action = Action(
         graph=story,
         predecessor_id=block.uid,

@@ -82,16 +82,16 @@ def test_service_selected_moves_play_restore_and_play_with_json_wire_input(
             game = session.ledger.cursor.game_state
             assert game.round == round_index
             if round_index:
-                assert type(game.history[0].player_move) is (RpsMove if isinstance(game, RpsGame) else NimMove)
+                move_type = RpsMove if isinstance(game, RpsGame) else NimMove
+                assert type(game.history[0].player_move) is move_type
                 assert type(game.history[0].opponent_move) is type(game.history[0].player_move)
                 assert type(game.opponent_next_move) is type(game.history[0].player_move)
                 namespace = session.frame._make_ctx().get_ns(session.ledger.cursor)
                 assert namespace["last_player_move"] == game.history[0].player_move
                 if isinstance(game, RpsGame):
                     assert opponent_strategies.execute("rps_tit_for_tat", game) is RpsMove.PAPER
-                    assert "You played paper." in [
-                        fragment.content for fragment in session.ledger.cursor.game_handler.get_journal_fragments(game)
-                    ]
+                    fragments = session.ledger.cursor.game_handler.get_journal_fragments(game)
+                    assert "You played paper." in [fragment.content for fragment in fragments]
             moves = [edge for edge in session.ledger.cursor.edges_out() if isinstance(edge, Action)]
             if isinstance(game, RpsGame):
                 edge = next(edge for edge in moves if edge.payload["move"] == "paper")

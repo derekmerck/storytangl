@@ -65,6 +65,10 @@ Game ``on_validate`` handlers target **Action edges**, not destination nodes,
 at the existing pre-traversal VALIDATE seam. They use ``ctx.selected_edge``'s
 original payload and ``ctx.selected_payload``'s effective mapping before cursor
 or step advancement. UPDATE resolves independently through the same boundary.
+Selecting a move against an absent/PENDING game rejects: ordinary accepted entry
+without a move still runs setup in UPDATE and projects the ready frontier. Shape-
+only validation followed by setup and late legality would allow an illegal
+selection to advance traversal, so it is not a supported bypass.
 ``receive_move`` also validates completed move legality before phase, round,
 opponent, resource, or history mutation. Non-game payload merging, VM traversal,
 and Service transport/access policy are unchanged. Unexpected exceptions during
