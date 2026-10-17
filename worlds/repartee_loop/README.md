@@ -128,11 +128,27 @@ pack decides which plays, as it does for the art, once clients can play audio
 description, settings and seed it renders from again, and its hash.
 
 The themes are in Git LFS and are not downloaded by default (the root
-`.lfsconfig`); a clone has small pointer files in their place. Fetch them with:
+`.lfsconfig`); a clone has small pointer files in their place. To fetch them
+once:
 
 ```bash
 git lfs pull -I "worlds/*/media*/music/**" -X ""
 ```
+
+That fetches what is there now; a theme added or changed later arrives as a
+pointer again. To have a checkout always fetch them, clear the exclusion in its
+own config, which takes precedence over `.lfsconfig`, and pull:
+
+```bash
+git config lfs.fetchexclude ""
+```
+
+```bash
+git lfs pull
+```
+
+`git lfs ls-files` shows which you have: `*` for a fetched file, `-` for a
+pointer.
 
 ### Capturing a pack
 

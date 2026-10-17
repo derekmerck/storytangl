@@ -333,8 +333,10 @@ bytes fails confusingly rather than skipping.
 6. **Tests write images to `tmp_path`, never into the repository.**
 7. **Optional media is fetched on request.** Media most checkouts never use,
    such as a world's soundtrack, is excluded from default LFS fetches by the
-   committed `.lfsconfig`, so a clone holds pointer files for it. Fetch it with
-   `git lfs pull -I "<path>" -X ""`. Audio is in LFS by extension.
+   committed `.lfsconfig`, so a clone holds pointer files for it. Fetch it once
+   with `git lfs pull -I "<path>" -X ""`, or always, in one checkout, by
+   clearing the exclusion there: `git config lfs.fetchexclude ""`. Audio is in
+   LFS by extension.
 
 ## Miscellaneous
 - No try/except around imports. Declare dependencies in `pyproject.toml`.
