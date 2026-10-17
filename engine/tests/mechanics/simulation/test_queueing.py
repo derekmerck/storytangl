@@ -10,6 +10,7 @@ from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
 from tangl.mechanics.games import HasGame
 from tangl.mechanics.games.handlers import provision_game_moves
+from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.mechanics.sandbox.time import advance_world_turn_to
 from tangl.mechanics.simulation import (
     EventCalendar,
@@ -34,6 +35,21 @@ class QueueBlock(HasGame, Block):
 
     _game_class = QueueSimulation
     _game_handler_class = QueueSimulationHandler
+
+
+def test_queue_selected_move_schema_accepts_json_echo_and_rejects_substitution() -> None:
+    game = _ed_game()
+    handler = QueueSimulationHandler()
+    handler.setup(game)
+    offered = {"move": QueueMove("run_next")}
+    echo = Json.deserialize(Json.serialize({"move": {"kind": "run_next"}}))
+    assert handler.resolve_selected_move(game, offered_payload=offered, payload=echo) == QueueMove("run_next")
+    with pytest.raises(ValueError, match="Cannot replace offered game binding"):
+        handler.resolve_selected_move(
+            game, offered_payload=offered, payload={"move": {"kind": "run_until_complete"}},
+        )
+    assert game.round == 0
+    assert not game.history
 
 
 def _ed_game(*, projection_mode: str = "log") -> QueueSimulation:

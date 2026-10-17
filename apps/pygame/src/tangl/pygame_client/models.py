@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from uuid import UUID
 
-from tangl.presentation.intent import Accepts
+from tangl.presentation.intent import Accepts, EntityRef
 from tangl.presentation.hints import TimingName
 from tangl.presentation.hints import ClipBinding, VisibilityBinding
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
@@ -150,7 +150,7 @@ class Piece:
     kind: str
     text: str
     label: str | None = None
-    zone_ref: UUID | None = None
+    zone_ref: EntityRef | None = None
     available: bool = True
     unavailable_reason: str | None = None
 

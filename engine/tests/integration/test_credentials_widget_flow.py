@@ -86,7 +86,7 @@ def test_credentials_packet_reaches_service_envelope_as_typed_widgets() -> None:
     assert inspect_choice.accepts is not None
     assert inspect_choice.accepts.kind == "pieces"
     assert inspect_choice.accepts.constraints is not None
-    assert inspect_choice.accepts.constraints.target_zone_ref == str(packet.uid)
+    assert inspect_choice.accepts.constraints.target_zone_ref == packet.uid
     grammar = entered.metadata["grammar"]
     assert "Inspect a document" in grammar.examples
     assert all(

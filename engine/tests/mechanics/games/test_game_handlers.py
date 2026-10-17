@@ -33,6 +33,8 @@ class SampleGame(Game):
 class TestGameHandler(GameHandler[SampleGame]):
     """Simple handler that maps moves directly to outcomes."""
 
+    move_cls = str
+
     def get_available_moves(self, game: SampleGame) -> list[str]:
         return ["win", "lose", "draw"]
 

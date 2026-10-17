@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -25,6 +25,8 @@ from tangl.presentation.intent import (
     QuantityAccepts,
     TextAccepts,
 )
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.persistence.structuring import StructuringHandler
 from tangl.presentation.projection import (
     BooleanPreference,
     EnumPreference,
@@ -42,7 +44,7 @@ from tangl.pygame_client.bridge import (
     remaining_pieces,
     selectable_pieces,
 )
-from tangl.pygame_client.models import Choice, PendingSelection, StageImage, Turn
+from tangl.pygame_client.models import Choice, PendingSelection, Piece, StageImage, Turn
 
 
 @pytest.fixture
@@ -477,6 +479,47 @@ def test_a_zone_constraint_narrows_the_selectable_pieces(
     )
 
     assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["0:passport"]
+
+
+@pytest.mark.parametrize("spelling", ["native", "upper", "hex", "braces", "urn"])
+@pytest.mark.parametrize("restore", [False, True])
+def test_zone_uuid_identity_filters_pieces_before_and_after_json_restore(
+    bridge: PygameSessionBridge, spelling: str, restore: bool,
+) -> None:
+    zone = UUID("8cd4758d-9aa9-44a7-b757-17e7633e29d1")
+    ref = {"native": zone, "upper": str(zone).upper(), "hex": zone.hex,
+           "braces": "{" + str(zone) + "}", "urn": zone.urn}[spelling]
+    fragment = ChoiceFragment(
+        edge_id=uuid4(), text="Inspect",
+        accepts=PiecesAccepts(constraints=PieceConstraints(target_zone_ref=ref)),
+    )
+    if restore:
+        fragment = StructuringHandler.structure(
+            Json.deserialize(Json.serialize(fragment.unstructure())), {"ChoiceFragment": ChoiceFragment},
+        )
+    choice = Choice(edge_id=fragment.edge_id, text=fragment.text, accepts=fragment.accepts)
+    # Client-local pieces may also arrive using different UUID spellings.
+    turn = Turn(step=1, pieces=[
+        Piece("native", "document", "native", zone_ref=zone),
+        Piece("same", "document", "same", zone_ref=zone.hex.upper()),
+        Piece("other", "document", "other", zone_ref=uuid4()),
+    ])
+    assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["native", "same"]
+
+
+@pytest.mark.parametrize("label", ["packet", "Packet", "symbolic-zone"])
+def test_symbolic_zone_labels_remain_exact_after_json_restore(label: str) -> None:
+    constraints = PieceConstraints(target_zone_ref=label)
+    restored = StructuringHandler.structure(
+        Json.deserialize(Json.serialize(constraints.unstructure())), {"PieceConstraints": PieceConstraints},
+    )
+    choice = Choice(edge_id=uuid4(), text="Select", accepts=PiecesAccepts(constraints=restored))
+    turn = Turn(step=1, pieces=[
+        Piece("exact", "document", "exact", zone_ref=label),
+        Piece("case", "document", "case", zone_ref=label.swapcase()),
+    ])
+    assert restored.target_zone_ref == label
+    assert [piece.piece_id for piece in selectable_pieces(turn, choice)] == ["exact"]
 
 
 def test_an_unconstrained_pieces_choice_offers_every_piece(

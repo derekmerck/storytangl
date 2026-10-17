@@ -58,6 +58,7 @@ class RpsGameHandler(SimpleGameHandler[RpsGame]):
     
     moves: ClassVar[list[RpsMove]] = list(RpsMove)
     game_cls: ClassVar[Type[Game]] = RpsGame
+    move_cls: ClassVar[type] = RpsMove
     
     # Dominance mapping: move -> what it beats
     BEATS: ClassVar[dict[RpsMove, RpsMove]] = {
@@ -227,6 +228,7 @@ class RpslsGameHandler(SimpleGameHandler[RpslsGame]):
     
     moves: ClassVar[list[RpslsMove]] = list(RpslsMove)
     game_cls: ClassVar[Type[Game]] = RpslsGame
+    move_cls: ClassVar[type] = RpslsMove
     
     # Each move beats these two
     BEATS: ClassVar[dict[RpslsMove, list[RpslsMove]]] = {

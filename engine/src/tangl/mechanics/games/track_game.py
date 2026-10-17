@@ -47,7 +47,7 @@ from dataclasses import dataclass
 import random
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from tangl.journal.fragments import ContentFragment
 from tangl.vm.ctx import VmPhaseCtx
@@ -65,6 +65,8 @@ FORFEIT_TOKEN = -1
 @dataclass(frozen=True)
 class TrackMove:
     """Assignment of this round's roll to one of the mover's own tokens."""
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     token_id: int
 
@@ -339,6 +341,7 @@ class TrackGameHandler(GameHandler[TrackGame]):
     """Handler for the cyclic-track race."""
 
     game_cls: ClassVar[type[Game]] = TrackGame
+    move_cls: ClassVar[type] = TrackMove
 
     def on_setup(self, game: TrackGame) -> None:
         if game.piece_type == DEFAULT_PIECE_LABEL:

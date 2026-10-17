@@ -6,6 +6,10 @@ queueing proof: future events are pending work in a mutable core `Registry`,
 state changes happen through the existing game UPDATE phase, and observations
 are emitted as normal journal fragments.
 
+As a ``GameHandler`` consumer, the queue handler declares ``move_cls = QueueMove``
+and uses the shared selected-offer reconstruction, authority, and pre-mutation
+legality checks. Its calendar and simulation semantics are unchanged.
+
 The package deliberately does not replace sandbox scheduling. Sandbox schedules
 describe availability against a derived `WorldTime`; the simulation event
 calendar stores exact future events and supports next-event advancement. Both

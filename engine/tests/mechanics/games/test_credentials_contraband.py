@@ -7,6 +7,8 @@ assess as declared); request_search forecloses (concealment stands).
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.mechanics.games import (
     ContrabandItem,
     CredentialDisposition,
@@ -259,6 +261,7 @@ class TestCriminalSelfEvidence:
         )
         handler = CredentialsGameHandler()
         handler.setup(game)
+        game.current_stage = "packet"  # Isolate evidence taxation in a legal response window.
         return game, handler
 
     def test_visible_criminal_is_self_evident_arrest(self) -> None:
@@ -328,14 +331,13 @@ class TestSharedRestrictionLevelEdges:
 
 
 class TestMediationOffMenuSafety:
-    """Mediation moves are menu-gated, but receive_move does not revalidate, so
-    each resolver guards its own precondition (matching _resolve_request_document).
-    """
+    """Off-menu mediation rejects before any evidence or history is recorded."""
 
     def _game(self, case: CredentialCase, **kw):
         game = CredentialsGame(roster=[case], restriction_map=RULES, **kw)
         handler = CredentialsGameHandler()
         handler.setup(game)
+        game.current_stage = "packet"
         return game, handler
 
     @staticmethod
@@ -354,7 +356,9 @@ class TestMediationOffMenuSafety:
             id_card=None,
         )
         game, handler = self._game(case)
-        handler.receive_move(game, ("verify_id", ""))
+        with pytest.raises(ValueError, match="Invalid move"):
+            handler.receive_move(game, ("verify_id", ""))
+        assert not game.history
         assert "id" not in game.finding_status
         assert "matches the bearer" not in self._journal_text(handler, game)
 
@@ -369,7 +373,9 @@ class TestMediationOffMenuSafety:
             possessions=[],
         )
         game, handler = self._game(case, no_evidence_penalty=1)
-        handler.receive_move(game, ("request_relinquish", ""))
+        with pytest.raises(ValueError, match="Invalid move"):
+            handler.receive_move(game, ("request_relinquish", ""))
+        assert not game.history
         assert "relinquish" not in game.finding_status
         assert "hand it over" not in self._journal_text(handler, game)
 

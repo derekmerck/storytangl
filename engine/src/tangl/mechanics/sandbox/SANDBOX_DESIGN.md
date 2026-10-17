@@ -934,6 +934,15 @@ incremental handler to resolve upkeep, production, victory/loss state, and
 journalable cycle notes. Sandbox does not know what "food", "workers",
 "forage", or "upkeep" mean.
 
+Selected controls restore through the game-owned ``move_cls`` /
+``resolve_selected_move`` boundary (#551). An Action-targeted VALIDATE handler
+resolves the original offer's hosted game and checks completion/legality before
+traversal, UPDATE, or time payment. The adapter normalizes its UUID/cost values
+after JSON restoration and rejects submitted host/cost substitutions. It does
+not initialize PENDING state during validation or alter the existing tick and
+zero-duration allocation semantics. See ``GAME_MECHANICS_DESIGN.md`` for the
+supported completion hook and downstream migration contract.
+
 This gives the desired dependency direction:
 
 ```text

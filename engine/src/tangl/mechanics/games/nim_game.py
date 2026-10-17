@@ -33,7 +33,7 @@ from operator import xor
 import random
 from typing import ClassVar
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from tangl.presentation.intent import QuantityAccepts
 from tangl.journal.fragments import ContentFragment
@@ -121,6 +121,8 @@ def is_losing(piles: list[int], max_take: int, last_token_wins: bool) -> bool:
 @dataclass(frozen=True)
 class NimMove:
     """Take ``count`` tokens from the pile named ``pile``."""
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     pile: str
     count: int
@@ -251,6 +253,7 @@ class NimGameHandler(GameHandler[NimGame]):
     """Handler for narrated bounded Nim over token heaps."""
 
     game_cls: ClassVar[type[Game]] = NimGame
+    move_cls: ClassVar[type] = NimMove
 
     def on_setup(self, game: NimGame) -> None:
         game.heaps = AssetWallet()
@@ -293,7 +296,13 @@ class NimGameHandler(GameHandler[NimGame]):
         game: NimGame,
         move: NimMove,
         payload: dict[str, object],
+        *,
+        offered_payload: dict[str, object],
     ) -> NimMove:
+        self.check_move_payload(
+            payload, offered_payload=offered_payload,
+            input_fields=frozenset({"quantity"}) if move.is_selector else frozenset(),
+        )
         if not move.is_selector:
             return move
 

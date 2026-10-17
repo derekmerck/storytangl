@@ -35,14 +35,75 @@ ids remain strings; inherited variants retain their parent's move vocabulary.
 History fields opt into inclusion because rounds append in place. The generic
 base remains generic; restoration is not a handler-side or per-read repair.
 
-Pass 2 remains outstanding and independently reviewable: selected
-``Action.payload`` move reconstruction before ``resolve_move_payload``, offered
-move/host authority and pre-mutation legality (including hosted sandbox
-incremental controls), and actual Service play across a JSON restore before
-another selected move. Pass 1's Service fixtures persist and reopen meaningful
-typed game state, then consume history without selecting another move; they do
-not establish the full play/restore/play contract. Wire key/schema and original
-offered-input availability require a design checkpoint before Pass 2.
+Selected-action status (#551, Pass 2): each handler declares ``move_cls`` beside
+``game_cls``. ``reconstruct_move(value)`` uses that local Pydantic schema for
+enum, dataclass, or scalar values; no import paths or global move vocabulary are
+stored on actions. The existing payload shape remains ``{"move": seed, ...}``.
+Dataclass move schemas forbid unknown fields; ordinary scalar moves stay scalar.
+
+``resolve_selected_move(game, *, offered_payload, payload)`` is the shared pure
+boundary: reconstruct the **original edge's** offered seed, call
+``resolve_move_payload(game, seed, effective_payload, *, offered_payload=...)``,
+then validate the completed move against current state. The completion hook
+receives both original and merged mappings. It must not mutate game/graph/input,
+initialize a pending game, or consume randomness. No resolved move is cached.
+
+The default completion hook calls ``check_move_payload``: unknown input fields
+and changes to fixed bindings reject; unchanged move echoes compare after
+canonical reconstruction, not as native dataclass versus raw dict. Parameterized
+handlers call that same helper with explicit ``input_fields`` before consuming
+them. Nim exposes ``quantity`` only on its zero-count heap selector; credentials
+exposes ``piece_ids`` only on its document selector. A handler may expose
+``move`` itself as a parameter on an operation seed (for example, one
+``choose_symbol`` action completed as rock, paper, or scissors). That seed must
+fit its declared schema, but need not be a legal completed move. One edge need
+not equal one final move; neither extra enum members nor one edge per symbol are
+required. Fixed heap/target/operation/cost bindings remain authoritative unless
+the particular completion hook deliberately exposes them as parameters.
+
+Game ``on_validate`` handlers target **Action edges**, not destination nodes,
+at the existing pre-traversal VALIDATE seam. They use ``ctx.selected_edge``'s
+original payload and ``ctx.selected_payload``'s effective mapping before cursor
+or step advancement. UPDATE resolves independently through the same boundary.
+Selecting a move against an absent/PENDING game rejects: ordinary accepted entry
+without a move still runs setup in UPDATE and projects the ready frontier. Shape-
+only validation followed by setup and late legality would allow an illegal
+selection to advance traversal, so it is not a supported bypass.
+``receive_move`` also validates completed move legality before phase, round,
+opponent, resource, or history mutation. Non-game payload merging, VM traversal,
+and Service transport/access policy are unchanged. Unexpected exceptions during
+a legitimate rule UPDATE are not a generic rollback/failure-atomicity contract.
+
+Hosted sandbox incremental controls use the same handler boundary. The adapter
+resolves the host from the original offer (which may differ from both edge
+endpoints) and normalizes its host UUID and ``SandboxTimeCost`` at that owning
+boundary before comparing echoes. Host/cost substitutions reject before
+traversal or clock payment. Allocation remains zero-duration; ``end_cycle``
+still pays one tick and production is resolved by the existing tick observer.
+
+### Downstream migration: CarWars ``visits.submitted_move``
+
+Declare the concrete move schema on the existing handler and remove the
+downstream read-back/reconstruction workaround once using this contract:
+
+```python
+class VehicleBayHandler(GameHandler[VehicleBayGame]):
+    game_cls = VehicleBayGame
+    move_cls = VehicleBayMove
+```
+
+For fixed bay actions the default completion hook now returns a reconstructed
+``VehicleBayMove`` without a visits-side read-back. An existing completion
+override gains keyword-only ``offered_payload`` and receives that typed seed as
+``move``. For quantity/piece completion, follow ``NimGameHandler`` or
+``CredentialsGameHandler``: call ``check_move_payload`` with the specific offer's
+permitted input fields, then complete the seed from those inputs. Otherwise use
+the base completion hook for fixed actions. Keep the game's concrete typed
+history/pending declarations from Pass 1, and implement/reuse current-state
+``is_valid_move`` rules for the completed value. Do not treat merged
+``payload["move"]`` or a visits-side cache as the authoritative offer. Downstream
+repository migration is separate, not an upstream merge prerequisite. Wording/source-scope work remains
+#553; this contract does not change the #564/#569 presentation behavior.
 
 ---
 

@@ -13,7 +13,7 @@ from enum import Enum
 from itertools import product
 from typing import ClassVar, TypeVar
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from tangl.journal.fragments import ContentFragment
 from tangl.story.concepts.asset import AssetWallet
@@ -62,6 +62,8 @@ class ForceDisposition(str, Enum):
 @dataclass(frozen=True)
 class ForceCommitMove:
     """Structured commitment profile for aggregate-force contests."""
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     profile: ForceProfile
 
@@ -315,6 +317,7 @@ class AggregateForceGameHandler(GameHandler[AggregateForceGameT]):
     """Shared handler for reserve-and-composition contests."""
 
     game_cls: ClassVar[type[Game]] = AggregateForceGame
+    move_cls: ClassVar[type] = ForceCommitMove
 
     def on_setup(self, game: AggregateForceGameT) -> None:
         game.player_reserve = AssetWallet()

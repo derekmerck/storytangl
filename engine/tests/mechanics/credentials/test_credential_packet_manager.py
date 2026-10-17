@@ -264,7 +264,10 @@ def test_facetless_manager_document_cannot_request_reissue() -> None:
     game, handler, moves = staged_request_document_moves(CredentialCase(packet_manager=manager))
 
     assert moves == []
-    handler.receive_move(game, ("request_document", IND.WORK.value))
+    before = deepcopy(game.history)
+    with pytest.raises(ValueError, match="Invalid move"):
+        handler.receive_move(game, ("request_document", IND.WORK.value))
+    assert game.history == before
     assert game.finding_status == {}
 
 

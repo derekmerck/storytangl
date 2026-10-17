@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from statistics import mean
 from typing import Any, ClassVar, Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from tangl.core.bases import BaseModelPlus
 from tangl.journal.fragments import ContentFragment
@@ -21,6 +21,8 @@ from .calendar import EventCalendar, SimulationEvent
 @dataclass(frozen=True)
 class QueueMove:
     """Move requested by the queueing simulation block."""
+
+    __pydantic_config__: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     kind: str
 
@@ -156,6 +158,7 @@ class QueueSimulationHandler(GameHandler[QueueSimulation]):
     """Stateless rules for deterministic queueing simulations."""
 
     game_cls: ClassVar[type[Game]] = QueueSimulation
+    move_cls: ClassVar[type] = QueueMove
 
     def on_setup(self, game: QueueSimulation) -> None:
         self._validate_config(game)
