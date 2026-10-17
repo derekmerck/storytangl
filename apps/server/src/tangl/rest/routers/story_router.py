@@ -99,6 +99,7 @@ def _media_render_profile(render_profile: str | Iterable[str] | None) -> MediaRe
     return MediaRenderProfile(
         pending_policy=pending_policy,
         content_profile=content_profile,
+        include_audio="no_audio" not in tokens,
     )
 
 

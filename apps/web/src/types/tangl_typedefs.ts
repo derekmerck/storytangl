@@ -314,6 +314,10 @@ export interface MediaStoryFragment extends BaseStoryFragment {
    * `url`, `data` or `xml` like any other.
    */
   content_format?: 'url' | 'data' | 'xml' | 'json' | 'path' | string
+  media_type?: string | null
+  /** Declared file format/container and MIME, not codec detection. */
+  media_format?: string | null
+  mime_type?: string | null
   media_role?: MediaRole | string | null
   scope?: string | null
   staging_hints?: Record<string, unknown> | null

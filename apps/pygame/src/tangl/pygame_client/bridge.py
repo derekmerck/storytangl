@@ -299,6 +299,7 @@ class PygameSessionBridge:
         self.media_render_profile = media_render_profile or MediaRenderProfile(
             pending_policy=MediaPendingPolicy.FALLBACK,
             content_profile=MediaContentProfile.PASSTHROUGH,
+            include_audio=False,
         )
 
     # ── session lifecycle ────────────────────────────────────────────────

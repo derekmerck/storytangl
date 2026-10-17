@@ -16,10 +16,6 @@ from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier
 
 _UNSUPPORTED_MEDIA_TYPES = {
-    MediaDataType.AUDIO,
-    MediaDataType.SFX,
-    MediaDataType.VOICE,
-    MediaDataType.MUSIC,
     MediaDataType.VIDEO,
     MediaDataType.ANIMATION,
 }
@@ -48,6 +44,7 @@ class MediaRenderProfile:
     pending_policy: MediaPendingPolicy = MediaPendingPolicy.FALLBACK
     content_profile: MediaContentProfile = MediaContentProfile.MEDIA_SERVER
     static_inventories: tuple[MediaInventory, ...] = field(default_factory=tuple)
+    include_audio: bool = True
 
 
 @dataclass(frozen=True)
@@ -432,28 +429,37 @@ def _resolved_rit_payload(
     world_media_root: Path | None = None,
     story_media_root: Path | None = None,
     system_media_root: Path | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     # ``rit`` is the resource this payload represents, which on a static
     # fallback is not the fragment's own. Identity follows the bytes.
+    if result.data_type == MediaDataType.AUDIO and not profile.include_audio:
+        text = _fallback_text(fragment)
+        return _content_payload_from_text(fragment, text) if text is not None else None
     if profile.content_profile == MediaContentProfile.INLINE_DATA:
-        return _inline_data_payload(
+        payload = _inline_data_payload(
             fragment=fragment, scope=scope, result=result, rit_id=rit.uid
         )
-    if profile.content_profile == MediaContentProfile.PASSTHROUGH:
-        return _passthrough_payload(
+    elif profile.content_profile == MediaContentProfile.PASSTHROUGH:
+        payload = _passthrough_payload(
             fragment=fragment, scope=scope, result=result, rit_id=rit.uid
         )
-    return _media_server_payload(
-        fragment=fragment,
-        rit=rit,
-        scope=scope,
-        result=result,
-        world_id=world_id,
-        story_id=story_id,
-        world_media_root=world_media_root,
-        story_media_root=story_media_root,
-        system_media_root=system_media_root,
-    )
+    else:
+        payload = _media_server_payload(
+            fragment=fragment,
+            rit=rit,
+            scope=scope,
+            result=result,
+            world_id=world_id,
+            story_id=story_id,
+            world_media_root=world_media_root,
+            story_media_root=story_media_root,
+            system_media_root=system_media_root,
+        )
+    if rit.media_format is not None:
+        payload["media_format"] = rit.media_format
+    if rit.mime_type is not None:
+        payload["mime_type"] = rit.mime_type
+    return payload
 
 
 _TRANSPORT_KEYS = ("content_format", "media_type", "url", "path", "data", "rit_id")
@@ -498,7 +504,7 @@ def _sprite_sheet_payloads(
             story_media_root=story_media_root,
             system_media_root=system_media_root,
         )
-        if resolved.get("content_format") is None:
+        if resolved is None or resolved.get("content_format") is None:
             continue
         sheets.append({
             **{key: resolved[key] for key in _TRANSPORT_KEYS if key in resolved},
@@ -520,7 +526,7 @@ def _still_payload(
     world_media_root: Path | None = None,
     story_media_root: Path | None = None,
     system_media_root: Path | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """A resolved still, with its sprite sheets beside it.
 
     The one way a still reaches a client, whether it is the fragment's own resource
@@ -537,7 +543,7 @@ def _still_payload(
     )
     payload = _resolved_rit_payload(rit, fragment=fragment, scope=scope, result=result, profile=profile, **roots)
     sheets = _sprite_sheet_payloads(rit, fragment=fragment, scope=scope, profile=profile, **roots)
-    if sheets and payload.get("content_format") is not None:
+    if sheets and payload is not None and payload.get("content_format") is not None:
         payload["sprite_sheets"] = sheets
     return payload
 
@@ -608,6 +614,9 @@ def media_fragment_to_payload(
     if isinstance(fragment, MediaFragment):
         scope = getattr(fragment, "scope", None) or "world"
         payload_profile = render_profile or MediaRenderProfile()
+        if fragment.content_type == MediaDataType.AUDIO and not payload_profile.include_audio:
+            text = _fallback_text(fragment)
+            return _content_payload_from_text(fragment, text) if text is not None else None
 
         if fragment.content_format == "rit":
             rit = fragment.content

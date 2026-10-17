@@ -4,6 +4,8 @@
 > Authority: The canonical public service surface is `ServiceManager`,
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
+> #571 slice 1 supports file-backed AUDIO URL/path/inline transport; playback
+> and reconnect projection are not implemented.
 
 ## Position in the Architecture
 
@@ -294,6 +296,25 @@ World domain code is the authored composition root. It selects top-level
 mechanics and provides domain policy, catalogs, templates, resources, and
 special handlers. Service discovers and opens the resulting world; it neither
 imports those mechanics nor reconstructs their policy at the transport layer.
+
+## Audio transport and the later reconnect boundary (#571)
+
+`service/media.py` resolves AUDIO through the existing scoped file path/URL
+machinery. RIT identity and declared `media_format`/`mime_type` follow the actual
+represented resource, including a fallback; `content_format` names the actual
+URL/path/data transport. `MediaRenderProfile(include_audio=False)` (REST token
+`no_audio`) omits audio or uses existing fallback text without changing journal
+history or blocking narrative choices. Video/animation exclusions remain.
+
+Service must remain request-stateless for playback. The next slice will invoke
+a presentation-owned read-only journal fold for current desired BGM, including
+history older than the returned window, and resolve its descriptor through the
+same media profile. The attachment point and target DTO spelling are not yet
+settled. This is not a second persisted state store, playback session, clock,
+mixer or acknowledgement protocol. See the canonical
+[media addendum](../media/MEDIA_DESIGN.md#approved-audio-lifecycle-next-slice-checkpoint)
+for policy and worked proposed payloads; none of the proposed controls or
+bootstrap shapes is delivered in slice 1.
 
 ## What Service Does Not Define
 
