@@ -100,6 +100,58 @@ The quayside pack stages the same clips and draws its stills, because it has no
 sheets yet; a pack without sheets is still a complete reskin. See `AGENTS.md`
 for why, and for how the frames were made.
 
+### Music
+
+Each pack has a theme of its own, generated locally with ACE-Step 1.5 on a
+ComfyUI worker: Caribbean chamber-folk for the island, tropical space-jazz
+electronica for the station. They share a key, a tempo and a rhythm -- D minor
+(written as D Dorian in the description, since ACE-Step's key setting has no
+Dorian), 104 BPM, tresillo syncopation -- so they sound like one culture three
+centuries apart.
+
+The station's theme should one day mirror how its art was made. The spaceport
+pack re-renders the quayside backgrounds and figures in space, keeping their
+composition; its music should likewise be a *cover* of the island theme: the
+same tune, with every instrument changed. That needs a generator that separates
+a tune from its sound. ACE-Step does this natively, in its cover task, but
+ComfyUI does not expose it yet, and the substitutes do not work. Re-rendering
+the island theme at partial strength with the station's description keeps some
+of the tune (at 0.65-0.7) but blurs the instruments toward the island's, and
+adding the station theme as a timbre reference pulls the tune away too. So for
+now the station's theme is a text render of its own. Running ACE-Step's own
+pipeline, or a commercial generator's reference-track feature, would make the
+cover.
+
+No audio ships yet: playback waits on #571. Both themes regenerate from these
+settings -- instrumental, 90 s, 104 BPM, D minor, the turbo checkpoint at 8
+steps, seed 31:
+
+<details>
+<summary>The descriptions</summary>
+
+**Marmoset Island** (`media/`):
+
+> Playful 18th-century Caribbean folk chamber music with tresillo and habanera
+> syncopation. Nylon-string baroque guitar, lively fiddle, wooden flute, cittern,
+> plucked viola da gamba bass, hand drums and shakers. Breezy island port
+> atmosphere, witty melodic exchanges between fiddle and flute, warm D Dorian
+> harmonies, adventurous and mischievous. A small acoustic tavern ensemble with
+> natural wooden resonance, elegant but slightly scruffy musicianship. Bright
+> recurring four-note melody, steady loopable groove. Acoustic instruments only,
+> instrumental game soundtrack.
+
+**Marmoset Orbital Station** (`media_spaceport/`):
+
+> Retro-futuristic tropical jazz electronica with tresillo and habanera
+> syncopation. Playful analog synthesizer lead, warm rubbery synth bass, FM
+> marimba, crystalline electronic steelpan tones, soft Rhodes chords, syncopated
+> electronic percussion and airy space-age pads. Bright D Dorian harmonies,
+> cheerful melodic hooks, light jazz-funk improvisation. Weightless, colorful,
+> eccentric orbital marketplace lounge. Warm vintage electronic production,
+> understated and groovy, steady loopable groove, instrumental game soundtrack.
+
+</details>
+
 ### Capturing a pack
 
 [`scripts/capture_world_frames.py`](../../scripts/capture_world_frames.py)
