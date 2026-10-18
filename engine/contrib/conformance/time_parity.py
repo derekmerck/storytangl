@@ -131,12 +131,31 @@ def apply_runtime_envelope(registry: FragmentRegistry, envelope: JsonObject) -> 
                         ):
                             continue
                         updated = {**existing, **payload, "uid": ref_id}
+                        if fragment.get("patch_kind") == "presentation":
+                            for key in ("staging_hints", "hints"):
+                                patch = (
+                                    payload.get("presentation_hints")
+                                    if key == "hints" and "hints" not in payload else payload.get(key)
+                                )
+                                if key == "hints" and (
+                                    "hints" in payload or "presentation_hints" in payload
+                                ):
+                                    updated["hints"] = patch
+                                    updated.pop("presentation_hints", None)
+                                hint_patch = _object(patch)
+                                if hint_patch is not None:
+                                    previous = (
+                                        existing.get("hints", existing.get("presentation_hints"))
+                                        if key == "hints" else existing.get(key)
+                                    )
+                                    updated[key] = {**(_object(previous) or {}), **hint_patch}
                     else:
                         continue
                     old_hints = _object(existing.get("staging_hints")) or {}
                     new_hints = _object(updated.get("staging_hints")) or {}
                     if (
-                        existing.get("fragment_type") == "media"
+                        replacement is not None
+                        and existing.get("fragment_type") == "media"
                         and updated.get("fragment_type") == "media"
                         and existing.get("rit_id") is not None
                         and existing.get("rit_id") == updated.get("rit_id")

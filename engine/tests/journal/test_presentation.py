@@ -207,6 +207,7 @@ def test_media_presentation_and_replacement_survive_json_without_changing_occurr
     assert moved.staging_hints.media_timing == "loop"
     same = ControlFragment(target=move.target, media=cue(a, presentation_handle="character:alice"))
     assert same.apply_to(moved).staging_hints.media_timing == "loop"
+    assert same.apply_to(moved).staging_hints.media_x is None
     replacement = ControlFragment(target=move.target, media=cue(b))
     ledger = Ledger.from_graph(graph, entry_id=start.uid)
     ledger.output_stream.extend([first, move, same, replacement])
@@ -244,3 +245,93 @@ def test_media_replacement_does_not_require_universal_rit_identity() -> None:
         kind_map={"ControlFragment": ControlFragment},
     )
     assert restored.media.content == replacement.content and restored.media.rit_id is None
+
+
+@pytest.mark.parametrize("role", ["music", "avatar_im"])
+@pytest.mark.parametrize("payload", [
+    {"staging_hints": {"media_x": 0.25}},
+    {"staging_hints": {"media_visibility": {"preference_id": "sprites", "values": [False]}}},
+    {"staging_hints": {"media_y": None, "media_timing": None}},
+    {"staging_hints": None},
+    {"staging_hints": {}},
+    {"text": "New caption"},
+])
+def test_presentation_hint_coordinates_merge_and_null_clears_after_json(
+    role: str, payload: dict,
+) -> None:
+    hints = {
+        "media_x": 0.1, "media_y": 0.8, "media_size": 0.5, "media_clip": "idle",
+        "media_visibility": {"preference_id": "sprites", "values": [True]},
+        "media_timing": "loop",
+    }
+    rit = MediaRIT(data=b"media", data_type=MediaDataType.MEDIA)
+    first = cue(
+        rit, media_role=role, source_id=uuid4(), presentation_handle="character:alice",
+        staging_hints=StagingHints(**hints), hints={"style_name": "speaker", "icon": "old"},
+    )
+    before = Json.serialize(first.unstructure())
+    control = ControlFragment(
+        target={"kind": "handle", "handle": "character:alice"},
+        patch_kind="presentation", payload=payload,
+    )
+    restored = StructuringHandler.structure(
+        Json.deserialize(Json.serialize(control.unstructure())),
+        kind_map={"ControlFragment": ControlFragment},
+    )
+    expected = hints
+    if "staging_hints" in payload:
+        expected = (
+            {k: v for k, v in {**hints, **payload["staging_hints"]}.items() if v is not None}
+            if payload["staging_hints"] is not None else None
+        )
+    for patch in (control, restored):
+        updated = patch.apply_to(first)
+        assert updated.uid == first.uid and updated.rit_id == first.rit_id
+        assert updated.source_id == first.source_id and updated.content is rit
+        assert updated.presentation_hints == first.presentation_hints
+        actual = (
+            updated.staging_hints.model_dump(exclude_none=True) if updated.staging_hints else None
+        )
+        assert actual == expected
+        assert fragment_to_dto(patch)["payload"] == payload
+        if role == "music":
+            selected = desired_music([first, patch])
+            assert selected.staging_hints == updated.staging_hints
+    assert Json.serialize(first.unstructure()) == before
+    assert first.staging_hints.model_dump(exclude_none=True) == hints
+
+
+@pytest.mark.parametrize("field", ["hints", "presentation_hints"])
+@pytest.mark.parametrize("media", [False, True])
+def test_named_presentation_hint_container_merges_without_deep_game_patch(
+    field: str, media: bool,
+) -> None:
+    hints = {"style_name": "speaker", "icon": "old"}
+    first = (
+        cue(MediaRIT(data=b"media", data_type=MediaDataType.MEDIA), hints=hints)
+        if media else ContentFragment(content="Text", hints=hints)
+    )
+    control = ControlFragment(
+        target={"kind": "fragment", "fragment_id": first.uid}, patch_kind="presentation",
+        payload={field: {"icon": None}},
+    )
+    updated = control.apply_to(first)
+    assert updated.presentation_hints.style_name == "speaker"
+    assert updated.presentation_hints.icon is None
+    assert first.presentation_hints.icon == "old"
+    assert "presentation_hints" not in fragment_to_dto(updated)
+    assert fragment_to_dto(updated)["hints"]["style_name"] == "speaker"
+    cleared = control.evolve(payload={field: None}).apply_to(first)
+    assert cleared.presentation_hints is None
+    assert "hints" not in fragment_to_dto(cleared)
+    assert "presentation_hints" not in fragment_to_dto(cleared)
+    if media:
+        replacement = ControlFragment(
+            target=control.target, media=first.evolve(hints={"style_name": "new"}),
+        ).apply_to(first)
+        assert replacement.presentation_hints.style_name == "new"
+        assert replacement.presentation_hints.icon is None
+        assert replacement.uid == first.uid and replacement.rit_id == first.rit_id
+    if not media:
+        game = ControlFragment(target=control.target, payload={"content": {"b": 2}})
+        assert game.apply_to(first.evolve(content={"a": 1})).content == {"b": 2}

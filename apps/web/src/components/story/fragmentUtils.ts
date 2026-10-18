@@ -76,10 +76,31 @@ export const applyControlFragment = (
       } else if (isRecord(fragment.payload) && !fragment.media) {
         if (isMediaFragment(existing) && fragment.patch_kind !== 'presentation') continue
         updated = { ...existing, ...fragment.payload, uid: id } as StoryFragment
+        if (fragment.patch_kind === 'presentation') {
+          for (const key of ['staging_hints', 'hints'] as const) {
+            const patch =
+              key === 'hints' && !('hints' in fragment.payload)
+                ? fragment.payload.presentation_hints
+                : fragment.payload[key]
+            if (
+              key === 'hints' &&
+              ('hints' in fragment.payload || 'presentation_hints' in fragment.payload)
+            ) {
+              updated.hints = patch
+              delete updated.presentation_hints
+            }
+            if (isRecord(patch)) {
+              const previous =
+                key === 'hints' ? (existing.hints ?? existing.presentation_hints) : existing[key]
+              updated[key] = { ...(isRecord(previous) ? previous : {}), ...patch }
+            }
+          }
+        }
       }
       if (
         isMediaFragment(existing) &&
         isMediaFragment(updated) &&
+        fragment.media &&
         existing.rit_id &&
         existing.rit_id === updated.rit_id &&
         existing.staging_hints?.media_timing != null &&

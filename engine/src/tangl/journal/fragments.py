@@ -260,8 +260,21 @@ class ControlFragment(BaseFragment, extra="allow"):
         if isinstance(fragment, MediaFragment):
             if self.patch_kind != "presentation":
                 return fragment
-            return fragment.evolve(**{**self.payload, "uid": fragment.uid}).continued_from(fragment)
-        return fragment.evolve(**{**self.payload, "uid": fragment.uid})
+        updates = dict(self.payload)
+        if self.patch_kind == "presentation":
+            if isinstance(fragment, MediaFragment) and updates.get("staging_hints") is not None:
+                previous = fragment.staging_hints.model_dump() if fragment.staging_hints else {}
+                updates["staging_hints"] = {**previous, **updates["staging_hints"]}
+            if isinstance(fragment, ContentFragment):
+                if "presentation_hints" in updates:
+                    updates.setdefault("hints", updates.pop("presentation_hints"))
+                if updates.get("hints") is not None:
+                    previous = (
+                        fragment.presentation_hints.model_dump()
+                        if fragment.presentation_hints else {}
+                    )
+                    updates["hints"] = {**previous, **updates["hints"]}
+        return fragment.evolve(**{**updates, "uid": fragment.uid})
 
 
 ContentFormatType = Literal["url", "path", "data", "xml", "json", "rit"]
@@ -334,6 +347,7 @@ class MediaFragment(ContentFragment, extra="allow"):
         """Copy a live fragment without serializing its graph-owned RIT."""
 
         data = {**self.__dict__, **(self.__pydantic_extra__ or {}), **updates}
+        data["hints"] = updates.get("hints", data.pop("presentation_hints"))
         if "content" in updates and "rit_id" not in updates:
             data["rit_id"] = None
         return type(self).model_validate(data)

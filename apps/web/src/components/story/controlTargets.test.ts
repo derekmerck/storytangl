@@ -21,6 +21,15 @@ const registry = (): Record<string, StoryFragment> => ({
   text: { uid: 'text', fragment_type: 'content', content: 'Hello' },
 })
 
+const initialStaging = {
+  media_x: 0.1,
+  media_y: 0.8,
+  media_size: 0.5,
+  media_clip: 'idle',
+  media_timing: 'loop',
+  media_visibility: { preference_id: 'sprites', values: [true] },
+}
+
 describe('explicit presentation targets', () => {
   it.each<[PresentationTarget, string[]]>([
     [{ kind: 'fragment', fragment_id: 'bob' }, ['alice', 'text']],
@@ -130,7 +139,7 @@ describe('explicit presentation targets', () => {
         fragment_type: 'media',
         rit_id: 'a',
         media_role: 'music',
-        staging_hints: { media_timing: 'loop' },
+        staging_hints: initialStaging,
       },
     }
     applyControlFragment(state, {
@@ -139,6 +148,7 @@ describe('explicit presentation targets', () => {
       target: { kind: 'role', media_role: 'music' },
       media: { uid: 'descriptor', fragment_type: 'media', rit_id: 'a', media_role: 'music' },
     })
+    expect(state.music?.staging_hints).toEqual({ media_timing: 'loop' })
     applyControlFragment(state, {
       uid: 'caption',
       fragment_type: 'update',
@@ -156,5 +166,75 @@ describe('explicit presentation targets', () => {
       target: { kind: 'role', media_role: 'music' },
     })
     expect(state).toEqual({})
+  })
+
+  it.each<[Record<string, unknown>, Record<string, unknown> | null]>([
+    [{ staging_hints: { media_x: 0.25 } }, { ...initialStaging, media_x: 0.25 }],
+    [
+      { staging_hints: { media_visibility: { preference_id: 'sprites', values: [false] } } },
+      { ...initialStaging, media_visibility: { preference_id: 'sprites', values: [false] } },
+    ],
+    [
+      { staging_hints: { media_y: null, media_timing: null } },
+      { ...initialStaging, media_y: null, media_timing: null },
+    ],
+    [{ staging_hints: null }, null],
+    [{ staging_hints: {} }, initialStaging],
+    [{ text: 'A caption' }, initialStaging],
+  ])('preserves omitted hint coordinates and explicit null clears for %j', (payload, expected) => {
+    const original: StoryFragment = {
+      uid: 'alice',
+      fragment_type: 'media',
+      rit_id: 'portrait',
+      source_id: 'source',
+      presentation_handle: 'character:alice',
+      staging_hints: initialStaging,
+    }
+    const before = JSON.stringify(original)
+    const state: Record<string, StoryFragment> = { alice: original }
+    applyControlFragment(state, {
+      uid: 'move',
+      fragment_type: 'update',
+      target: { kind: 'handle', handle: 'character:alice' },
+      patch_kind: 'presentation',
+      payload,
+    })
+    expect(state.alice?.staging_hints).toEqual(expected)
+    expect(state.alice).toMatchObject({ uid: 'alice', rit_id: 'portrait', source_id: 'source' })
+    expect(JSON.stringify(original)).toBe(before)
+  })
+
+  it.each(['hints', 'presentation_hints'])('merges only the named %s container', (field) => {
+    const state: Record<string, StoryFragment> = {
+      text: {
+        uid: 'text',
+        fragment_type: 'content',
+        content: { a: 1 },
+        hints: { style_name: 'speaker', icon: 'old' },
+      },
+    }
+    applyControlFragment(state, {
+      uid: 'icon',
+      fragment_type: 'update',
+      target: { kind: 'fragment', fragment_id: 'text' },
+      patch_kind: 'presentation',
+      payload: { [field]: { icon: null } },
+    })
+    expect(state.text?.hints).toEqual({ style_name: 'speaker', icon: null })
+    applyControlFragment(state, {
+      uid: 'clear',
+      fragment_type: 'update',
+      target: { kind: 'fragment', fragment_id: 'text' },
+      patch_kind: 'presentation',
+      payload: { [field]: null },
+    })
+    expect(state.text?.hints).toBeNull()
+    applyControlFragment(state, {
+      uid: 'game',
+      fragment_type: 'update',
+      target: { kind: 'fragment', fragment_id: 'text' },
+      payload: { content: { b: 2 } },
+    })
+    expect(state.text?.content).toEqual({ b: 2 })
   })
 })

@@ -211,6 +211,15 @@ uses only the target. `patch_kind="presentation"` with `payload` updates caption
 placement, visibility and existing per-use hints on a matched presentation,
 without a descriptor or asset reload. Permitted fields are `text`, `fallback_text`,
 `staging_hints`, `presentation_hints`/`hints`, `media_role` and `presentation_handle`.
+In these named hint containers, a presentation patch merges only the supplied
+coordinates. Omitted coordinates (including repetition) remain unchanged;
+explicit null clears a nullable coordinate. Supplying the whole container as
+null clears it entirely, while omitting it leaves it alone. Nested coordinate
+values, such as a visibility binding or style dictionary, are complete values,
+not recursive patches. The operation copies rather than mutating prior hints,
+and does not run repetition inheritance that could undo an explicit clear.
+This does not change ordinary content/game patches or full typed replacement's
+complete-descriptor and same-RIT repetition rules.
 For example:
 
 ```json

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from tangl.core import Graph
-from tangl.journal.fragments import MediaFragment
+from tangl.journal.fragments import ControlFragment, MediaFragment
 from tangl.journal.presentation import desired_music
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT, MediaRITStatus
@@ -86,3 +86,20 @@ def test_pending_poll_remains_incremental_but_not_in_music_snapshot() -> None:
             remote = RemoteServiceManager(api_url="http://example.invalid")
             assert remote._decode_runtime_envelope(payload).presentation.music is None
     assert Json.serialize(ledger.unstructure()) == before
+
+
+@pytest.mark.parametrize("hints", [{"media_x": 0.25}, {"media_timing": None}, None])
+def test_http_presentation_patch_preserves_supplied_nulls(hints: dict | None) -> None:
+    control = ControlFragment(
+        target={"kind": "handle", "handle": "character:alice"}, patch_kind="presentation",
+        payload={"staging_hints": hints},
+    )
+    app = FastAPI()
+
+    @app.get("/", response_model=RuntimeEnvelopePayload, response_model_exclude_none=True)
+    def response():
+        return _serialize_runtime_envelope(RuntimeEnvelope(fragments=[control]))
+
+    with TestClient(app) as client:
+        payload = client.get("/").json()
+    assert payload["fragments"][0]["payload"] == {"staging_hints": hints}
