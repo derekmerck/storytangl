@@ -5,15 +5,23 @@ from typing import Self
 
 from tangl.utils.enum_plus import EnumPlusMixin
 
+
+# File/container declarations, not codec detection or a playback guarantee.
+AUDIO_MIME_TYPES: dict[str, str] = {
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "ogg": "audio/ogg",
+    "flac": "audio/flac",
+    "m4a": "audio/mp4",
+}
+
+
 class MediaDataType(EnumPlusMixin, Enum):
     MEDIA = "media"  # generic default
     IMAGE = "image"  # a PIL image
     VECTOR = "vector"  # an lxml document
 
-    AUDIO = "audio"  # generic audio default, mp3
-    SFX = "sound_fx"  # sfx audio
-    VOICE = "voice"  # voice over audio
-    MUSIC = "music"  # music audio
+    AUDIO = "audio"  # roles such as music and voice are separate
 
     VIDEO = "video"  # generic video default, mp4
     OTHER = "other"  # unrecognized media type
@@ -25,7 +33,7 @@ class MediaDataType(EnumPlusMixin, Enum):
         return {
             cls.IMAGE: ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
             cls.VECTOR: ["svg", "ai"],
-            cls.AUDIO: ["mp3"],
+            cls.AUDIO: list(AUDIO_MIME_TYPES),
             cls.VIDEO: ["mp4", "mkv", "webm"],
         }
 

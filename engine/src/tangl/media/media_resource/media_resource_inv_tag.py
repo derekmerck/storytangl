@@ -10,12 +10,23 @@ from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_val
 
 from tangl.core import HasContent, RegistryAware
 from tangl.core.bases import Hash, is_identifier
-from tangl.media.media_data_type import MediaDataType
+from tangl.media.media_data_type import AUDIO_MIME_TYPES, MediaDataType
 from tangl.media.sprite_sheets.ref import SpriteSheetRef
 from tangl.media.sprite_sheets.shorthand import SheetDeclaration
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.utils.hashing import compute_data_hash
 from tangl.utils.shelved2 import clear_shelf, shelved
+
+_FILE_CACHE = "rits-v2"  # Derived pickles: rebuild pre-audio-metadata records.
+_LFS_POINTER_MAGIC = b"version https://git-lfs.github.com/spec/v1"
+
+
+def is_materialized_media_file(path: Path) -> bool:
+    """Check local availability and the known LFS pointer prefix, not codecs."""
+    if not path.is_file():
+        return False
+    with path.open("rb") as source:
+        return source.read(len(_LFS_POINTER_MAGIC)) != _LFS_POINTER_MAGIC
 
 # RITs are _technically_ resource-type Nodes when used in a graph,
 # but they can also be used without a graph, so it makes more sense
@@ -111,10 +122,16 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
         if self.data is not None:
             return self.data
         if self.path is not None:
+            if not is_materialized_media_file(self.path):
+                raise ValueError(f"Media source is not materialized: {self.path}")
             return compute_data_hash(self.path)
         raise ValueError("Must specify either media data or a media path")
 
     data_type: MediaDataType = None
+    media_format: str | None = None
+    """Declared file format/container, independent of medium and transport."""
+    mime_type: str | None = None
+    """Declared MIME type; a container alone does not identify its codec."""
 
     @field_validator("preset_content_hash", mode="before")
     @classmethod
@@ -158,6 +175,13 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
                     raise ValueError(f"Unknown data type for fp {self.path}")
             elif self.data is not None:
                 raise ValueError("Must include a data type when passing raw data")
+        if self.data_type == MediaDataType.AUDIO:
+            if self.media_format is None and self.path is not None:
+                extension = self.path.suffix.lstrip(".").lower()
+                if extension in AUDIO_MIME_TYPES:
+                    self.media_format = extension
+            if self.mime_type is None and self.media_format in AUDIO_MIME_TYPES:
+                self.mime_type = AUDIO_MIME_TYPES[self.media_format]
         return self
 
     def _resolve_content_hash(self) -> Hash:
@@ -219,7 +243,7 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
         return expiry is not None and expiry < datetime.now()
 
     # Avoid recomputing hash values for unchanged static inventory files.
-    @shelved(fn="rits")
+    @shelved(fn=_FILE_CACHE)
     @staticmethod
     def _from_path(cls, path: Path) -> MediaResourceInventoryTag:
         record = cls(path=path)
@@ -240,4 +264,4 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
 
     @classmethod
     def clear_from_source_cache(cls):
-        clear_shelf("rits")
+        clear_shelf(_FILE_CACHE)

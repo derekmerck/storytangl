@@ -65,6 +65,15 @@ service boundary.
 
 ## Status
 
+#571 slice 1 adds file-backed audio transport, not playback. The canonical
+[media design addendum](../media/MEDIA_DESIGN.md#file-backed-audio-571-slice-1)
+records the approved identity/lifecycle/ownership policy and proposed
+ControlFragment target and desired-BGM bootstrap examples. Their target spelling
+and bootstrap placement remain the next bounded design checkpoint. Existing
+`media_timing` mixes loop mode with actions; future restart controls must retain
+repetition separately rather than erase it. No target extension, journal-fold
+projection, scheduler or audio state store is implemented by this slice.
+
 Reference correction (#551): intent zone references and ``PlaceAccepts.edge_ref``
 accept ``EntityRef`` — a UUID identity or an exact symbolic label, not Core's
 broader bytes/hash-capable ``Identifier``. UUID spellings canonicalize through

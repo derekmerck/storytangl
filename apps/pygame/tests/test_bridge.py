@@ -354,6 +354,20 @@ def test_blank_content_produces_no_line(bridge: PygameSessionBridge) -> None:
     assert bridge.build_turns([ContentFragment(content="   ", step=1)])[0].lines == []
 
 
+def test_audio_is_omitted_not_sent_to_image_drawing(bridge: PygameSessionBridge) -> None:
+    media = MediaFragment(
+        content="https://example.invalid/tone.wav", content_type="audio", content_format="url",
+        media_role="music", fallback_text="A distant melody.", step=1,
+    )
+    choice = ChoiceFragment(edge_id=uuid4(), text="Continue", step=1)
+    before = media.unstructure()
+    turn = bridge.build_turns([media, choice])[0]
+    assert turn.images == []
+    assert turn.lines[0].text == "A distant melody."
+    assert turn.choices[0].edge_id == choice.edge_id
+    assert media.unstructure() == before
+
+
 def test_choose_without_a_session_is_refused(bridge: PygameSessionBridge) -> None:
     with pytest.raises(RuntimeError, match="active story session"):
         bridge.choose(uuid4())

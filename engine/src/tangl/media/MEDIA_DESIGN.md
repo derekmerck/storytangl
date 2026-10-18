@@ -7,7 +7,9 @@
 :related: journal, widget, prose, presence
 ```
 
-> Status: Current contract
+> Status: Current contract; #571 slice 1 adds file-backed audio transport.
+> Audio playback, control-target extensions and reconnect projection below are
+> approved direction, not implemented capabilities.
 > Authority: Canonical journal fragment types live in `tangl.journal.fragments`;
 > presentation hints live in `tangl.presentation.hints`; `tangl.journal.media`
 > remains a fragment-only compatibility re-export surface.
@@ -21,7 +23,10 @@
 > The static media pipeline (file-based assets through to service-layer payload
 > resolution) is wired and tested. File-backed `MediaRIT` inventory loading can
 > cache the resolved content hash through `utils.shelved2`, keyed by source
-> path plus file stat, so repeat indexing does not reread unchanged files. That
+> path plus file stat in the RIT-local `rits-v2` namespace, so repeat indexing
+> does not reread unchanged files. The namespace discards derived pre-audio-schema
+> pickles without loading or rewriting them; no persistence aliases or import-time
+> cache deletion are needed. That
 > cache is optional and can be disabled globally with
 > `service.caches.shelved = false` for constrained runtimes. The generative
 > creator pipeline now has real sync/async lifecycle infrastructure plus a
@@ -93,7 +98,195 @@ This classification is distinct from the file's encoding or format (`png`,
 `svg`, `mp3`), the narrative `MediaRole`, and the service transport
 representation (URL, inline data, or passthrough path). Existing field names
 remain compatible while those concepts are progressively clarified; this note
-does not introduce a schema migration.
+does not introduce a general schema migration. #571 removes the unused role-like
+`MediaDataType.SFX`, `VOICE` and `MUSIC` members; the repo audit found no persisted
+consumer or authored declarations using those medium values. Audio resources
+use `AUDIO`; their roles remain `music`, `sound_fx`, `character_vox` or
+`narrative_vox`. This is not an alias-based restoration policy for external saves.
+
+### File-backed audio (#571 slice 1)
+
+Audio takes the ordinary declaration → `MediaDep` → provisioning → `MediaRIT`
+→ `MediaFragment`/journal → Service/media-profile → client DTO path. There is
+no audio inventory, separate loader, fragment hierarchy or control transport.
+For example, a block can declare the following using existing authoring syntax:
+
+```yaml
+media:
+  - name: island-theme.wav
+    media_role: music
+    staging_hints:
+      media_timing: loop
+```
+
+Inventory classification normalizes case and a leading dot. `MediaRIT` retains
+optional `media_format` and `mime_type` declarations; for file-backed AUDIO the
+following small extension table supplies absent values. An explicit declaration
+is retained. These are declared formats, not a probe of arbitrary file bytes:
+
+| File extension / `media_format` | `mime_type` |
+|---|---|
+| `mp3` | `audio/mpeg` |
+| `wav` | `audio/wav` |
+| `ogg` | `audio/ogg` |
+| `flac` | `audio/flac` |
+| `m4a` | `audio/mp4` |
+
+OGG and M4A identify containers, not Vorbis/Opus/AAC codecs. Unknown formats
+retain absent metadata rather than guessing. A pack index handler can declare
+more precise known MIME parameters. Container/codec distinctions follow the
+[MDN media-format reference](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Containers).
+No probing, transcoding or audio-generation backend is required. Tests generate
+a tiny mono, 16-bit PCM WAV at 8 kHz in `tmp_path`, persist it through real JSON,
+serve/fetch its bytes and read them with the stdlib WAV reader. That is the
+tested transport/decode floor, **not browser/device playback evidence** or a
+promise that every client decodes every listed container.
+
+The journal retains the graph-owned RIT reference and per-occurrence role/hints.
+Service supplies the represented RIT's `media_format`/`mime_type` beside its
+`rit_id`. `MEDIA_SERVER` now serves AUDIO using the same scope-relative URL
+machinery as images; `PASSTHROUGH` carries a co-located path and `INLINE_DATA`
+carries base64 bytes. `content_format` names that actual representation (`url`,
+`path`, `data`), never `rit` after dereference. Static fallbacks describe the
+actual fallback resource, including its identity and format, without redefining
+`rit_id` to solve alternate encodings. Video/animation exclusions are unchanged.
+This does not generalize external-URL admission (#407).
+
+An unfetched Git LFS pointer is not media content. The shared file-availability
+check reads only the known pointer prefix: directory inventories omit pointers,
+and explicit `from_source`/`register_file` calls reject them before hashing.
+Static graph-local identity continues to require real content; no pointer digest,
+new lifecycle state or fabricated identity is introduced. Service also applies
+this check to held references before any URL/path/inline delivery and uses the
+ordinary unavailable-media omission/text fallback. Neither projection nor a
+failed source load changes journal state. Availability is not negatively cached:
+after materialization, reindexing/source loading and held-reference resolution
+can be retried normally. This is not codec probing or an automatic LFS fetch.
+
+`MediaRenderProfile(include_audio=False)` explicitly omits audio, or returns the
+existing text fallback if supplied. REST accepts `render_profile=raw,no_audio`.
+The current pygame adapter uses this opt-out until it owns audio playback:
+audio must not be loaded as an image. Projection never mutates the journal, and
+prose/choice interaction remains available. This is a bounded opt-out, not a
+general codec/capability-negotiation system. Web's historical media view has a
+role-substring audio branch that misses `sound_fx` and `*_vox`; it is not a
+persistent music owner. Neither Web nor pygame playback is delivered here.
+
+### Approved audio lifecycle; next-slice checkpoint
+
+Resource identity is the existing `rit_id`, not URL equality or a newly minted
+asset id. Fragment `uid` identifies an occurrence (including a one-shot or
+restart control). An ongoing slot is a role/handle, not an identity-bearing
+entity. Initially there is one BGM slot, `music`:
+
+- Same RIT continues across blocks **and directly adjacent scenes** selecting it.
+- Absence of a cue keeps the slot; another RIT replaces it. Stop and deliberate
+  restart are explicit, and duplicate delivery of a restart UID cannot restart
+  twice. Loop/repetition mode and lifecycle action are distinct axes.
+- Local mute/pause/volume survive redraw and authored track changes. Switching
+  story/world or client teardown stops old playback; scene changes alone do not.
+- Backend output suggests desired presentation, never asserts that playback is
+  present or running. Absent targets are harmless; unsupported suggestions must
+  not block story interaction. Removing presentation neither deletes cached
+  bytes nor edits historical journal records.
+
+Reuse/adapt `ControlFragment` for a small explicit target vocabulary. **Current
+gap:** `ControlFragment.reference()` looks in a fragment registry, and Web's
+`StoryFlow` uses `registry[ref_id]`. Neither implements RIT, role or handle targets.
+Do not put a RIT id in `ref_id` and hope consumers interpret it as a fragment UID;
+`origin_id` is provenance, not automatically the media resource id.
+
+The following are **worked proposed DTOs, not accepted schema today**. Final
+target spelling and bootstrap placement are the next bounded design checkpoint.
+UUID placeholders stand for real wire UUID strings. A normal resolved media
+descriptor starts music; another descriptor with a different RIT replaces it:
+
+```json
+{"uid":"cue-1", "fragment_type":"media", "rit_id":"track-A",
+ "media_type":"audio", "media_role":"music", "content_format":"url",
+ "url":"/media/world/island/theme.wav", "media_format":"wav", "mime_type":"audio/wav",
+ "staging_hints":{"media_timing":"loop"}}
+```
+
+Replace: an ordinary new occurrence `cue-2` with `rit_id: track-B` and its
+service-resolved descriptor. Restating `track-A` while it is current continues;
+restating it in a new scene is not an implicit restart. An explicit restart
+retains the repetition suggestion on an ordinary resolved descriptor:
+
+```json
+{"uid":"restart-1", "fragment_type":"update",
+ "target":{"kind":"role", "media_role":"music"},
+ "payload":{"action":"restart", "media":{
+   "rit_id":"track-A", "media_type":"audio", "media_role":"music",
+   "content_format":"url", "url":"/media/world/island/theme.wav",
+   "media_format":"wav", "mime_type":"audio/wav",
+   "staging_hints":{"media_timing":"loop"}}}}
+```
+
+Redelivering `restart-1` is inert after its first application. A resource-only
+target can say what to stop, but start/restart also needs the ordinary resolved
+descriptor; there must be no second control-specific fetching pathway.
+Resource-less stop and other target examples:
+
+```json
+{"uid":"stop-1", "fragment_type":"delete",
+ "target":{"kind":"role", "media_role":"music"}}
+{"uid":"clear-avatars-1", "fragment_type":"delete",
+ "target":{"kind":"role", "media_role":"avatar_im"}}
+{"uid":"stop-resource-1", "fragment_type":"delete",
+ "target":{"kind":"rit", "rit_id":"track-A"}}
+{"uid":"remove-occurrence-1", "fragment_type":"delete",
+ "target":{"kind":"fragment", "fragment_id":"cue-1"}}
+{"uid":"remove-bob-1", "fragment_type":"delete",
+ "target":{"kind":"handle", "handle":"character:bob"}}
+```
+
+A RIT target matches active uses of that resource; a fragment target matches
+one occurrence. Role targets match current instances without backend enumeration
+(for example all current avatars). Handles are stable authored bindings where
+needed, not additional entity identities. This is not a client selector/query
+language or RPC framework, and it is **not implemented in slice 1**.
+
+Reconnect must fold the canonical journal **read-only** through a presentation
+projection invoked by Service, then apply ordinary media-profile resolution.
+Fold history beyond a limited returned journal window: the current track may
+have begun before that window. There is no second persisted audio-state store.
+Proposed bootstrap attachment (placement/name unsettled) distinguishes empty
+desired BGM from the live-stream meaning of no new cue:
+
+```json
+{"desired_presentation":{"music":null}}
+{"desired_presentation":{"music":{
+  "rit_id":"track-A", "media_type":"audio", "media_role":"music",
+  "content_format":"url", "url":"/media/world/island/theme.wav",
+  "media_format":"wav", "mime_type":"audio/wav",
+  "staging_hints":{"media_timing":"loop"}}}}
+```
+
+These are snapshots, not new audible restart events. Reconnect/unlock presents
+only current desired music: no audible historical effects, restarts or backlog
+of track transitions. Exact playback-position restoration is deferred.
+Scene declarations and available service/presentation affordances can advertise
+the same suggestion; world-static availability is distinct from current-story
+desired presentation. Automatic world/scene/block inheritance and an implicit
+return-to-previous-track stack are deferred.
+
+Service stays request-stateless: no playback clocks, timers, mixers, device
+state, acknowledgements or hidden ongoing client session. Bounded hints may
+describe client-local timing relationships (a 100 ms animation frame, dismissing
+an avatar when music starts); clocks and coordination belong to the client.
+No choreography is implemented, and story correctness must not depend on media
+finishing. Tightly synchronized plugin/socket work would be separate.
+
+Later slices deliver the target/bootstrap contract and one persistent owner
+outside Web's historical components and pygame's image drawing. Local pygame
+paths and remote Web URLs are the initial floor; remote pygame audio waits for
+a proper shared loading path. Then one-shot effects deduplicate by occurrence
+UID: two executions of the same authored node produce distinct occurrences,
+whereas refetching one occurrence is silent. Voice comes later. No TTS/Vocals,
+spatial sound, crossfade/ducking specification, playlists, precise seeking,
+seamless-loop editing or general scheduling is included. Packs prepare loopable,
+level-matched files; full soundtrack masters stay outside the repository.
 
 ---
 
