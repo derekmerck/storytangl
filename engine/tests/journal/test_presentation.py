@@ -142,6 +142,105 @@ def test_media_patch_is_derived_without_mutating_journal() -> None:
     first = cue(rit)
     control = ControlFragment(
         target={"kind": "fragment", "fragment_id": first.uid}, payload={"text": "A new caption"},
+        patch_kind="presentation",
     )
     assert desired_music([first, control]).text == "A new caption"
     assert "text" not in fragment_to_dto(first)
+
+
+@pytest.mark.parametrize("payload", [
+    {"content_format": "url", "content": "https://example.invalid/track.wav"},
+    {"content_format": "path", "content": "/server/private/music.wav"},
+    {"url": "https://example.invalid/track.wav"},
+    {"path": "/server/private/music.wav"},
+    {"rit_id": str(uuid4())},
+    {"format": "data", "data": "AA=="},
+    {"fragment_type": "media", "content": "a source"},
+])
+@pytest.mark.parametrize("patch_kind", ["content", "presentation"])
+def test_media_transport_payloads_fail_at_control_boundary(payload: dict, patch_kind: str) -> None:
+    with pytest.raises(ValueError, match="typed media field"):
+        ControlFragment(
+            target={"kind": "fragment", "fragment_id": uuid4()},
+            payload=payload, patch_kind=patch_kind,
+        )
+
+
+def test_text_game_patch_is_not_reinterpreted_as_a_media_source() -> None:
+    first = cue(MediaRIT(data=b"track", data_type=MediaDataType.AUDIO))
+    text = ContentFragment(content="Before")
+    payload = {"content": "https://example.invalid/ordinary-prose", "data": {"score": 4}}
+    text_edit = ControlFragment(
+        target={"kind": "fragment", "fragment_id": text.uid}, payload=payload,
+    )
+    assert text_edit.apply_to(text).content == payload["content"]
+    assert text_edit.apply_to(text).data == {"score": 4}
+    media_edit = text_edit.evolve(target={"kind": "fragment", "fragment_id": first.uid})
+    assert media_edit.apply_to(first) is first
+    assert desired_music([first, media_edit]) is first
+    with pytest.raises(ValueError, match="only captions"):
+        ControlFragment(
+            target=media_edit.target, patch_kind="presentation", payload={"content": "a source"},
+        )
+
+
+def test_media_presentation_and_replacement_survive_json_without_changing_occurrence() -> None:
+    graph = Graph()
+    start = graph.add_node(label="start")
+    a = MediaRIT(data=b"a", data_type=MediaDataType.AUDIO)
+    b = MediaRIT(data=b"b", data_type=MediaDataType.AUDIO)
+    graph.add(a)
+    graph.add(b)
+    first = cue(
+        a, presentation_handle="character:alice", staging_hints=StagingHints(media_timing="loop"),
+    )
+    move = ControlFragment(
+        target={"kind": "handle", "handle": "character:alice"}, patch_kind="presentation",
+        payload={"text": "A caption", "staging_hints": {
+            "media_x": 0.25, "media_visibility": {"preference_id": "shown", "values": [True]},
+        }},
+    )
+    moved = move.apply_to(first)
+    assert moved.uid == first.uid and moved.content is a and moved.rit_id == a.uid
+    assert moved.text == "A caption" and moved.staging_hints.media_x == 0.25
+    assert moved.staging_hints.media_visibility.values == [True]
+    assert moved.staging_hints.media_timing == "loop"
+    same = ControlFragment(target=move.target, media=cue(a, presentation_handle="character:alice"))
+    assert same.apply_to(moved).staging_hints.media_timing == "loop"
+    replacement = ControlFragment(target=move.target, media=cue(b))
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    ledger.output_stream.extend([first, move, same, replacement])
+    serialized = Json.serialize(ledger.unstructure())
+    restored = Ledger.structure(Json.deserialize(serialized))
+    records = list(restored.output_stream.values())
+    restored_replacement = next(f for f in records if f.uid == replacement.uid)
+    restored_move = next(f for f in records if f.uid == move.uid)
+    assert restored_move.patch_kind == "presentation" and restored_move.media is None
+    assert restored_replacement.media.content is restored.graph.get(b.uid)
+    assert restored_replacement.media_action is None
+    before_reads = Json.serialize(restored.unstructure())
+    restored_first = next(f for f in records if f.uid == first.uid)
+    assert restored_move.apply_to(restored_first).content is restored.graph.get(a.uid)
+    selected = desired_music(restored.get_journal())
+    assert selected.uid == first.uid and selected.rit_id == b.uid
+    assert selected.content is restored.graph.get(b.uid)
+    assert desired_music([replacement]) is None
+    assert replacement.apply_to(ContentFragment(content="Not media")) is not None
+    assert len(restored.graph.members) == len(graph.members)
+    assert Json.serialize(restored.unstructure()) == before_reads
+
+
+def test_media_replacement_does_not_require_universal_rit_identity() -> None:
+    first = MediaFragment(content="https://example.invalid/a.svg", content_format="url")
+    replacement = MediaFragment(content="https://example.invalid/b.svg", content_format="url")
+    control = ControlFragment(
+        target={"kind": "fragment", "fragment_id": first.uid}, media=replacement,
+    )
+    updated = control.apply_to(first)
+    assert updated.uid == first.uid and updated.content == replacement.content
+    assert updated.rit_id is None
+    restored = StructuringHandler.structure(
+        Json.deserialize(Json.serialize(control.unstructure())),
+        kind_map={"ControlFragment": ControlFragment},
+    )
+    assert restored.media.content == replacement.content and restored.media.rit_id is None

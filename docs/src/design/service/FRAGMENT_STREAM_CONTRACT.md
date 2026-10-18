@@ -168,8 +168,17 @@ submit the same payload.
 | `role` | `media_role` string | Current matching screen instances/slot, e.g. all avatars or music. |
 | `handle` | `handle` string | Exact authored `MediaFragment.presentation_handle` binding. |
 
-Missing matches are harmless; updates do not upsert. Ordinary content patches
-still use `payload`. A deliberate restart is `fragment_type: update` with
+Missing matches are harmless; updates do not upsert. Ordinary prose/game patches
+use `payload` and default `patch_kind: content`; they never modify media.
+Descriptor-free captions, placement and visibility/hints use
+`patch_kind: presentation` with `payload`, including on media. This patch permits
+`text`, `fallback_text`, `staging_hints`, `presentation_hints`/`hints`, `media_role`
+and `presentation_handle`, not media-source/transport fields.
+An `update` with typed `media` and no action replaces a matching media value,
+preserving the addressed occurrence UID rather than merging stale descriptors.
+The descriptor goes through normal media-profile resolution. Supplying new
+media content is distinct from addressing or moving an existing presentation;
+stop/delete needs only a target. A deliberate restart is `fragment_type: update` with
 `media_action: restart` and a normal resolvable `media` MediaFragment, not an
 opaque media dictionary inside `payload`. An ordinary media cue starts/replaces
 selection; a matching delete stops it without needing an introducing occurrence

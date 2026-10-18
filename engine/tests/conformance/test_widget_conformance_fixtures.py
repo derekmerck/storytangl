@@ -110,7 +110,10 @@ def _registry_after_controls(fragments: list[dict[str, Any]]) -> dict[str, dict[
         if fragment_type == "update":
             ref_id = fragment["target"].get("fragment_id")
             payload = fragment.get("payload")
-            if isinstance(ref_id, str) and isinstance(payload, dict):
+            media = fragment.get("media")
+            if isinstance(ref_id, str) and isinstance(media, dict) and ref_id in registry:
+                registry[ref_id] = {**media, "uid": ref_id}
+            elif isinstance(ref_id, str) and isinstance(payload, dict):
                 if ref_id in registry:
                     registry[ref_id] = {**registry[ref_id], **payload, "uid": ref_id}
             continue
@@ -146,7 +149,7 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
     elif fragment_type in {"update", "delete"}:
         assert isinstance(fragment["target"].get("fragment_id"), str)
         if fragment_type == "update":
-            assert isinstance(fragment.get("payload"), dict)
+            assert isinstance(fragment.get("payload"), dict) or isinstance(fragment.get("media"), dict)
     elif fragment_type == "piece":
         assert isinstance(fragment.get("piece_id"), str)
     else:
@@ -642,7 +645,13 @@ def test_command_hint_fixture_keeps_grammar_advisory() -> None:
 
 
 def test_control_update_and_delete_fixtures_apply_to_registry() -> None:
+    from tangl.journal.fragments import ControlFragment, MediaFragment, fragment_from_dto
+
     update_payload = _load_fixture(FIXTURE_DIR / "pending_media_update.json")
+    control = fragment_from_dto(update_payload["fragments"][-1])
+    pending = fragment_from_dto(update_payload["fragments"][1])
+    assert isinstance(control, ControlFragment) and isinstance(control.media, MediaFragment)
+    assert control.media_action is None and control.apply_to(pending).uid == pending.uid
     update_registry = _registry_after_controls(update_payload["fragments"])
     updated_media = update_registry["00000000-0000-4000-8000-000000000302"]
     assert updated_media["content_format"] == "url"

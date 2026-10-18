@@ -299,6 +299,7 @@ def _apply_fragments(registry: FragmentRegistry, fragments: Sequence[JsonObject]
                 "role": ("media_role", "media_role"), "handle": ("presentation_handle", "handle"),
             }.get(_text(target, "kind"), ("", ""))
             payload = _object(fragment.get("payload"))
+            replacement = _object(fragment.get("media"))
             for ref_id, existing in list(registry.items()):
                 if not field or target.get(key) is None or existing.get(field) != target[key]:
                     continue
@@ -306,8 +307,34 @@ def _apply_fragments(registry: FragmentRegistry, fragments: Sequence[JsonObject]
                     continue
                 if fragment_type == "delete":
                     registry.pop(ref_id, None)
-                elif payload is not None and not fragment.get("media_action"):
-                    registry[ref_id] = {**existing, **payload, "uid": ref_id}
+                elif not fragment.get("media_action"):
+                    if replacement is not None:
+                        if existing.get("fragment_type") != "media":
+                            continue
+                        updated = {**replacement, "uid": ref_id}
+                    elif payload is not None:
+                        if (
+                            existing.get("fragment_type") == "media"
+                            and fragment.get("patch_kind", "content") != "presentation"
+                        ):
+                            continue
+                        updated = {**existing, **payload, "uid": ref_id}
+                    else:
+                        continue
+                    old_hints = _object(existing.get("staging_hints")) or {}
+                    new_hints = _object(updated.get("staging_hints")) or {}
+                    if (
+                        existing.get("fragment_type") == "media"
+                        and updated.get("fragment_type") == "media"
+                        and existing.get("rit_id") is not None
+                        and existing.get("rit_id") == updated.get("rit_id")
+                        and old_hints.get("media_timing") is not None
+                        and new_hints.get("media_timing") is None
+                    ):
+                        updated["staging_hints"] = {
+                            **new_hints, "media_timing": old_hints["media_timing"],
+                        }
+                    registry[ref_id] = updated
             continue
         uid = _text(fragment, "uid")
         if uid:
@@ -413,7 +440,7 @@ def _render_attributed(fragment: JsonObject, indent: int) -> RenderItem:
 def _render_media(fragment: JsonObject) -> str:
     uid = _text(fragment, "uid") or "media"
     content_format = _text(fragment, "content_format") or "unknown"
-    content = _text(fragment, "content") or ""
+    content = _text(fragment, "url", "path", "data", "content") or ""
     status = _text(fragment, "generation_status")
     if content_format == "rit":
         status_text = f" {status}" if status else ""

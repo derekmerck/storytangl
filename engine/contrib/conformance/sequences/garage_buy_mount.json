@@ -124,9 +124,13 @@
         {
           "uid": "00000000-0000-4000-8000-000000021010",
           "fragment_type": "update",
-          "payload": {
+          "media": {
+            "uid": "00000000-0000-4000-8000-000000021023",
+            "fragment_type": "media",
+            "media_type": "vector",
+            "media_role": "narrative_im",
             "content_format": "url",
-            "content": "/media/world/carwars/garage-card.svg",
+            "url": "/media/world/carwars/garage-card.svg",
             "generation_status": "ready"
           },
           "target": {

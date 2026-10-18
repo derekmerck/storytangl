@@ -528,6 +528,7 @@ export interface ControlStoryFragment extends BaseStoryFragment {
   fragment_type: 'update' | 'delete'
   target: PresentationTarget
   payload?: Record<string, unknown> | null
+  patch_kind?: 'content' | 'presentation'
   media_action?: 'restart' | null
   media?: MediaStoryFragment | null
 }

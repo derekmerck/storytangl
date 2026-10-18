@@ -225,11 +225,14 @@ def _serialize_runtime_envelope(
     }
     if envelope.presentation is not None:
         music = envelope.presentation.music
-        payload["presentation"] = {"music": _serialize_fragment(
+        snapshot = _serialize_fragment(
             music, media_profile=media_profile, world_id=world_id, story_id=story_id,
             world_media_root=world_media_root, story_media_root=story_media_root,
             system_media_root=system_media_root,
-        ) if music is not None else None}
+        ) if music is not None else None
+        if snapshot is not None and snapshot.get("fragment_type") not in {"media", "content"}:
+            snapshot = None
+        payload["presentation"] = {"music": snapshot}
     serialized = _serialize(payload)
     if "html" in profile_tokens:
         serialized = _transform_text_fields(serialized)

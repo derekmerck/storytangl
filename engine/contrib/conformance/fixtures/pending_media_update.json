@@ -21,8 +21,12 @@
     {
       "uid": "00000000-0000-4000-8000-000000000303",
       "fragment_type": "update",
-      "payload": {
-        "content": "/media/world/tangl_world/vellum_map_close_up.svg",
+      "media": {
+        "uid": "00000000-0000-4000-8000-000000000304",
+        "fragment_type": "media",
+        "media_type": "vector",
+        "media_role": "dialog_im",
+        "url": "/media/world/tangl_world/vellum_map_close_up.svg",
         "content_format": "url",
         "generation_status": "ready"
       },

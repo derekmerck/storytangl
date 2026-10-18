@@ -67,6 +67,7 @@ def test_control_targets_match_media_only_and_missing_addresses_are_noop(port: M
     ]:
         updated = port.apply_runtime_envelope(registry, {"fragments": [{
             "uid": "update", "fragment_type": "update", "target": target,
+            "patch_kind": "presentation",
             "payload": {"text": "Updated"},
         }]})
         assert updated["avatar"]["text"] == "Updated"
@@ -83,6 +84,38 @@ def _load_sequence(name: str) -> dict[str, Any]:
         payload = json.load(sequence_file)
     assert isinstance(payload, dict)
     return payload
+
+
+@pytest.mark.parametrize("port", [PORT, LEGIBILITY, PARITY, TIME_PARITY])
+def test_media_patch_intent_and_typed_replacement_agree_across_ports(port: ModuleType) -> None:
+    registry = {"music": {
+        "uid": "music", "fragment_type": "media", "rit_id": "a", "media_role": "music",
+        "url": "/old", "staging_hints": {"media_timing": "loop"},
+    }}
+    target = {"kind": "role", "media_role": "music"}
+    for patch in [
+        {"patch_kind": "presentation", "payload": {
+            "text": "A caption", "staging_hints": {"media_x": 0.5},
+        }},
+        {"media": {
+            "uid": "descriptor", "fragment_type": "media", "rit_id": "a",
+            "media_role": "music", "url": "/new",
+        }},
+        {"payload": {"content": {"url": "/not-a-source"}, "data": "not-a-source"}},
+    ]:
+        registry = port.apply_runtime_envelope(registry, {"fragments": [{
+            "uid": "update", "fragment_type": "update", "target": target, **patch,
+        }]})
+    assert registry["music"]["uid"] == "music"
+    assert registry["music"]["url"] == "/new"
+    assert "content" not in registry["music"] and "data" not in registry["music"]
+    assert registry["music"]["staging_hints"]["media_timing"] == "loop"
+    assert "text" not in registry["music"]  # Replacement does not merge stale descriptor fields.
+    absent = port.apply_runtime_envelope({}, {"fragments": [{
+        "uid": "update", "fragment_type": "update", "target": target,
+        "media": {"uid": "descriptor", "fragment_type": "media", "rit_id": "a"},
+    }]})
+    assert absent == {}
 
 
 def _lines(step: Any) -> str:

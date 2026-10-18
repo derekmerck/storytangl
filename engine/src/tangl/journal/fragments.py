@@ -187,22 +187,42 @@ class ControlFragment(BaseFragment, extra="allow"):
     fragment_type: ControlFragmentType = "update"
     target: PresentationTarget = Field(json_schema_extra={"unstructurable": True})
     payload: UnstructuredData | None = None
+    patch_kind: Literal["content", "presentation"] = "content"
     media_action: Literal["restart"] | None = None
     media: MediaFragment | None = Field(None, json_schema_extra={"unstructurable": True})
 
     @model_validator(mode="after")
     def _validate_payload(self) -> "ControlFragment":
-        if self.payload is not None and isinstance(
-            self.payload.get("media"), (dict, MediaFragment, MediaRIT),
-        ):
-            raise ValueError("media descriptors belong in the typed media field, not payload")
-        if self.media_action is not None:
-            if self.fragment_type != "update" or self.media is None or self.payload is not None:
-                raise ValueError("restart requires update + ordinary media, not a patch payload")
-            if self.media.rit_id is None:
+        if self.payload is not None:
+            transport_fields = {
+                "rit_id", "url", "path", "src", "content_type", "media_type",
+                "media_format", "mime_type", "sprite_sheets",
+            }
+            if (
+                transport_fields.intersection(self.payload)
+                or self.payload.get("content_format", self.payload.get("format"))
+                in ("url", "path", "data", "xml", "rit")
+                or self.payload.get("fragment_type", self.payload.get("type")) == "media"
+                or isinstance(self.payload.get("media"), (dict, MediaFragment, MediaRIT))
+            ):
+                raise ValueError("media descriptors belong in the typed media field, not payload")
+            if self.patch_kind == "presentation" and self.payload.keys() - {
+                "text", "fallback_text", "staging_hints", "presentation_hints", "hints",
+                "media_role", "presentation_handle",
+            }:
+                raise ValueError(
+                    "presentation patches contain only captions and presentation hints",
+                )
+        if self.media is not None:
+            if (
+                self.fragment_type != "update" or self.payload is not None
+                or self.patch_kind != "content"
+            ):
+                raise ValueError("media update requires ordinary media, not a patch payload")
+            if self.media_action == "restart" and self.media.rit_id is None:
                 raise ValueError("restart media requires resource identity (rit_id)")
-        elif self.media is not None:
-            raise ValueError("control media requires an explicit media_action")
+        elif self.media_action is not None:
+            raise ValueError("restart requires update + ordinary media, not a patch payload")
         elif self.fragment_type == "update" and self.payload is None:
             raise ValueError("payload cannot be None for an update fragment")
         return self
@@ -221,6 +241,27 @@ class ControlFragment(BaseFragment, extra="allow"):
 
     def references(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
         return list(registry.find_all(Selector(predicate=self.matches)))
+
+    def apply_to(self, fragment: BaseFragment) -> BaseFragment | None:
+        """Apply a matched registry edit without mutating history or upserting.
+
+        Content/game patches never edit a media source. Presentation patches
+        carry only per-use metadata; replacements carry a complete media value.
+        Restart remains a live action for a later playback owner.
+        """
+        if not self.matches(fragment) or self.media_action is not None:
+            return fragment
+        if self.fragment_type == "delete":
+            return None
+        if self.media is not None:
+            if not isinstance(fragment, MediaFragment):
+                return fragment
+            return self.media.evolve(uid=fragment.uid).continued_from(fragment)
+        if isinstance(fragment, MediaFragment):
+            if self.patch_kind != "presentation":
+                return fragment
+            return fragment.evolve(**{**self.payload, "uid": fragment.uid}).continued_from(fragment)
+        return fragment.evolve(**{**self.payload, "uid": fragment.uid})
 
 
 ContentFormatType = Literal["url", "path", "data", "xml", "json", "rit"]
@@ -296,6 +337,19 @@ class MediaFragment(ContentFragment, extra="allow"):
         if "content" in updates and "rit_id" not in updates:
             data["rit_id"] = None
         return type(self).model_validate(data)
+
+    def continued_from(self, previous: MediaFragment | None) -> Self:
+        """Inherit repetition only when restating the same identified resource."""
+        if (
+            previous is not None and self.rit_id is not None and self.rit_id == previous.rit_id
+            and previous.staging_hints is not None
+            and (self.staging_hints is None or self.staging_hints.media_timing is None)
+        ):
+            hints = self.staging_hints or _StagingHints()
+            return self.evolve(staging_hints=hints.model_copy(update={
+                "media_timing": previous.staging_hints.media_timing,
+            }))
+        return self
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:

@@ -201,10 +201,41 @@ replaced, not retained as aliases. Repo callers, fixtures, Web registry handling
 and portable conformance ports now use explicit targets. No runtime persisted
 producer of the old control form was found. `ControlFragment.matches()` and
 `references()` match current presentations; missing matches are no-ops. Ordinary
-`update` patches still use `payload`; `delete` removes matched presentations,
+`update` patches use `payload` plus explicit patch intent; `delete` removes matched presentations,
 not cached asset bytes or historical journal entries. Updates never invent a
 missing target. Web supports these registry operations; pygame playback/staging
 control realization remains separate.
+
+Addressing a presentation does not require supplying a resource. Delete/stop
+uses only the target. `patch_kind="presentation"` with `payload` updates captions,
+placement, visibility and existing per-use hints on a matched presentation,
+without a descriptor or asset reload. Permitted fields are `text`, `fallback_text`,
+`staging_hints`, `presentation_hints`/`hints`, `media_role` and `presentation_handle`.
+For example:
+
+```json
+{"uid":"move-alice", "fragment_type":"update",
+ "target":{"kind":"handle", "handle":"character:alice"},
+ "patch_kind":"presentation",
+ "payload":{"text":"Alice speaks", "staging_hints":{"media_x":0.25}}}
+```
+
+The default `patch_kind="content"` retains ordinary prose/game patches, including
+their `content` and `data` fields, but never applies them to a MediaFragment.
+Text content must not be reinterpreted as a media URL or byte source. Media
+resource/transport fields (`rit_id`, URL/path/source fields, media content formats,
+medium/codec/MIME and sprite-sheet descriptors) are invalid in generic payloads;
+authors supply an ordinary typed `media` value instead. No URL-string guessing,
+client-state lookup or second media resolver is involved.
+
+An `update` with `media` and no `media_action` replaces only existing matching
+media, without upsert. It adopts the complete descriptor rather than merging
+stale source fields, but preserves the addressed occurrence UID and inherits
+an omitted repeat hint when the RIT is unchanged. Roles, handles and other
+per-use fields desired after replacement belong in that descriptor. Already
+supported URL/data media need no universal RIT identity; the persistent music
+slot retains its separate RIT-identity contract. The pending-media conformance
+witness uses this typed replacement shape.
 
 The following are **current DTO shapes**, replacing the earlier proposals.
 UUID placeholders stand for real wire UUID strings. A normal resolved media
@@ -288,6 +319,10 @@ callers receive the canonical fragment and choose their normal media profile;
 only an explicitly requested passthrough profile delivers a local path.
 Path-only descriptors cannot be ported by guessing a URL: incompatible profiles
 omit/fall back normally, while RIT-backed sources use ordinary scoped routing.
+Snapshot values are resolved media, ordinary nonplayable content fallback, or
+explicit null. A pending resource's `poll_media` directive belongs only to the
+incremental fragment stream; the snapshot maps that resolver result to null.
+This does not change polling policy or mutate canonical journal intent.
 
 ```json
 {"presentation":{"music":null}}

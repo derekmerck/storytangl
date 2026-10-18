@@ -53,7 +53,7 @@ export const fragmentText = (value: unknown): string => {
 
 export const applyControlFragment = (
   registry: Record<string, StoryFragment>,
-  fragment: ControlStoryFragment
+  fragment: ControlStoryFragment,
 ): void => {
   if (fragment.media_action) return // Playback owners, not historical views, consume restart.
   for (const [id, existing] of Object.entries(registry)) {
@@ -69,8 +69,31 @@ export const applyControlFragment = (
               : existing.presentation_handle === target.handle)
     if (!matches) continue
     if (fragment.fragment_type === 'delete') delete registry[id]
-    else if (isRecord(fragment.payload)) {
-      registry[id] = { ...existing, ...fragment.payload, uid: id } as StoryFragment
+    else {
+      let updated: StoryFragment = existing
+      if (fragment.media && isMediaFragment(existing)) {
+        updated = { ...fragment.media, uid: id }
+      } else if (isRecord(fragment.payload) && !fragment.media) {
+        if (isMediaFragment(existing) && fragment.patch_kind !== 'presentation') continue
+        updated = { ...existing, ...fragment.payload, uid: id } as StoryFragment
+      }
+      if (
+        isMediaFragment(existing) &&
+        isMediaFragment(updated) &&
+        existing.rit_id &&
+        existing.rit_id === updated.rit_id &&
+        existing.staging_hints?.media_timing != null &&
+        updated.staging_hints?.media_timing == null
+      ) {
+        updated = {
+          ...updated,
+          staging_hints: {
+            ...updated.staging_hints,
+            media_timing: existing.staging_hints.media_timing,
+          },
+        }
+      }
+      registry[id] = updated
     }
   }
 }

@@ -311,12 +311,19 @@ invokes `journal.presentation.desired_music` over canonical full history, not
 the returned window. Every service-built envelope carries typed
 `presentation.music`: the current desired MediaFragment, or explicit empty.
 `RuntimeEnvelopePayload` uses a keyed music map so null survives REST's
-exclude-none policy. REST resolves this fragment, and any restart control's
+exclude-none policy. REST resolves this fragment, and any replacement/restart control's
 ordinary `media` field, through the same media profile as top-level fragments;
 there is no raw RIT/path or opaque nested media bypass. Remote hydration uses
 the normal fragment DTO entry point for both. A normal remote profile serves
 URLs; local paths require an explicit passthrough request. Capability omission,
 fallback and unavailable/LFS sources cannot mutate the journal.
+
+Controls distinguish addressing from supplying media. Presentation-only caption
+and staging patches (`patch_kind="presentation"`) and deletes need no resource.
+Generic content/game patches cannot edit media sources; resource replacement
+uses the same typed `media` field/resolver as restart, without the restart action.
+Pending poll directives remain incremental fragments; a snapshot maps them to
+explicit null rather than treating a polling command as desired music.
 
 The synchronization snapshot is state, not a new cue or a queue of historical
 events. Native attached callers choose their ordinary media resolver/profile.
