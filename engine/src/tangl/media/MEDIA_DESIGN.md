@@ -23,7 +23,10 @@
 > The static media pipeline (file-based assets through to service-layer payload
 > resolution) is wired and tested. File-backed `MediaRIT` inventory loading can
 > cache the resolved content hash through `utils.shelved2`, keyed by source
-> path plus file stat, so repeat indexing does not reread unchanged files. That
+> path plus file stat in the RIT-local `rits-v2` namespace, so repeat indexing
+> does not reread unchanged files. The namespace discards derived pre-audio-schema
+> pickles without loading or rewriting them; no persistence aliases or import-time
+> cache deletion are needed. That
 > cache is optional and can be disabled globally with
 > `service.caches.shelved = false` for constrained runtimes. The generative
 > creator pipeline now has real sync/async lifecycle infrastructure plus a
@@ -142,11 +145,23 @@ promise that every client decodes every listed container.
 The journal retains the graph-owned RIT reference and per-occurrence role/hints.
 Service supplies the represented RIT's `media_format`/`mime_type` beside its
 `rit_id`. `MEDIA_SERVER` now serves AUDIO using the same scope-relative URL
-machinery as images; `PASSTHROUGH` carries a co-located path and `INLINE_DATA`+carries base64 bytes. `content_format` names that actual representation (`url`,
+machinery as images; `PASSTHROUGH` carries a co-located path and `INLINE_DATA`
+carries base64 bytes. `content_format` names that actual representation (`url`,
 `path`, `data`), never `rit` after dereference. Static fallbacks describe the
 actual fallback resource, including its identity and format, without redefining
 `rit_id` to solve alternate encodings. Video/animation exclusions are unchanged.
 This does not generalize external-URL admission (#407).
+
+An unfetched Git LFS pointer is not media content. The shared file-availability
+check reads only the known pointer prefix: directory inventories omit pointers,
+and explicit `from_source`/`register_file` calls reject them before hashing.
+Static graph-local identity continues to require real content; no pointer digest,
+new lifecycle state or fabricated identity is introduced. Service also applies
+this check to held references before any URL/path/inline delivery and uses the
+ordinary unavailable-media omission/text fallback. Neither projection nor a
+failed source load changes journal state. Availability is not negatively cached:
+after materialization, reindexing/source loading and held-reference resolution
+can be retried normally. This is not codec probing or an automatic LFS fetch.
 
 `MediaRenderProfile(include_audio=False)` explicitly omits audio, or returns the
 existing text fallback if supplied. REST accepts `render_profile=raw,no_audio`.

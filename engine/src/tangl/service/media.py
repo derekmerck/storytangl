@@ -13,6 +13,7 @@ from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.media.media_resource.media_resource_inv_tag import is_materialized_media_file
 from tangl.type_hints import Identifier
 
 _UNSUPPORTED_MEDIA_TYPES = {
@@ -159,9 +160,8 @@ def _resolve_media_data(rit: MediaRIT) -> PendingMediaResult | ResolvedMediaResu
             derivation_spec=getattr(rit, "derivation_spec", None),
         )
 
-    path = getattr(rit, "path", None)
-    if isinstance(path, Path) and path.is_file():
-        return ResolvedMediaResult(path=path, data_type=getattr(rit, "data_type", None))
+    if rit.path is not None and is_materialized_media_file(rit.path):
+        return ResolvedMediaResult(path=rit.path, data_type=rit.data_type)
 
     data = getattr(rit, "data", None)
     if data is not None:

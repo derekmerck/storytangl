@@ -9,6 +9,7 @@ import logging
 from tangl.core import Behavior, Selector
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+from tangl.media.media_resource.media_resource_inv_tag import is_materialized_media_file
 from tangl.media.sprite_sheets.index import index_default_sheet_declarations, link_sprite_sheets
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class ResourceManager:
             logger.debug("Resource directory %s does not exist", path)
             return []
 
-        files = sorted(item for item in path.rglob("*") if item.is_file())
+        files = sorted(item for item in path.rglob("*") if is_materialized_media_file(item))
         handlers = [*self.index_handlers, *list(index_handlers)]
         records = self.registry.index(files, extra_handlers=handlers or None)
         for record, source in zip(records, files):

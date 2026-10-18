@@ -17,6 +17,17 @@ from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.utils.hashing import compute_data_hash
 from tangl.utils.shelved2 import clear_shelf, shelved
 
+_FILE_CACHE = "rits-v2"  # Derived pickles: rebuild pre-audio-metadata records.
+_LFS_POINTER_MAGIC = b"version https://git-lfs.github.com/spec/v1"
+
+
+def is_materialized_media_file(path: Path) -> bool:
+    """Check local availability and the known LFS pointer prefix, not codecs."""
+    if not path.is_file():
+        return False
+    with path.open("rb") as source:
+        return source.read(len(_LFS_POINTER_MAGIC)) != _LFS_POINTER_MAGIC
+
 # RITs are _technically_ resource-type Nodes when used in a graph,
 # but they can also be used without a graph, so it makes more sense
 # as an Entity rather than a GraphItem.
@@ -111,6 +122,8 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
         if self.data is not None:
             return self.data
         if self.path is not None:
+            if not is_materialized_media_file(self.path):
+                raise ValueError(f"Media source is not materialized: {self.path}")
             return compute_data_hash(self.path)
         raise ValueError("Must specify either media data or a media path")
 
@@ -230,7 +243,7 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
         return expiry is not None and expiry < datetime.now()
 
     # Avoid recomputing hash values for unchanged static inventory files.
-    @shelved(fn="rits")
+    @shelved(fn=_FILE_CACHE)
     @staticmethod
     def _from_path(cls, path: Path) -> MediaResourceInventoryTag:
         record = cls(path=path)
@@ -251,4 +264,4 @@ class MediaResourceInventoryTag(RegistryAware, HasContent):
 
     @classmethod
     def clear_from_source_cache(cls):
-        clear_shelf("rits")
+        clear_shelf(_FILE_CACHE)

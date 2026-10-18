@@ -216,3 +216,118 @@ def test_non_audio_media_server_exclusions_are_unchanged(
     payload = media_fragment_to_payload(fragment, world_id="world")
     assert payload["content_format"] is None
     assert payload["unsupported_reason"] == "unsupported_media_type"
+
+
+LFS_POINTER = (
+    "version https://git-lfs.github.com/spec/v1\n"
+    f"oid sha256:{'a' * 64}\n"
+    "size 1400000\n"
+)
+
+
+@pytest.mark.parametrize("profile", list(MediaContentProfile))
+@pytest.mark.parametrize("fallback_text", [None, "Music has not been downloaded."])
+def test_authored_lfs_pointer_is_unavailable_without_impairing_choices(
+    tmp_path: Path, profile: MediaContentProfile, fallback_text: str | None,
+) -> None:
+    path = tmp_path / "theme.mp3"
+    path.write_text(LFS_POINTER, encoding="ascii")
+    resources = ResourceManager(tmp_path)
+    resources.index_directory(".")
+    assert resources.get_rit("theme.mp3") is None
+    with pytest.raises(ValueError, match="not materialized"):
+        resources.register_file(path)
+    # A reference retained before a file becomes a pointer must also be safe.
+    rit = MediaRIT(path=path)
+    assert rit.preset_content_hash is None
+    assert rit.get_content_hash() is None
+    world = World.from_script_data(
+        script_data={
+            "label": "unfetched_audio",
+            "scenes": {"intro": {"blocks": {
+                "start": {
+                    "content": "The story remains playable.",
+                    "media": [{"name": "theme.mp3", "media_role": "music",
+                               "fallback_text": fallback_text}],
+                    "actions": [{"text": "Continue", "successor": "after"}],
+                },
+                "after": {"content": "You continued."},
+            }}},
+        },
+        resources=resources,
+    )
+    persistence = PersistenceManagerFactory.create_persistence_manager(
+        manager_name="json_sqlite_in_mem",
+    )
+    user = User(label="offline_reader")
+    persistence.save(user)
+    manager = ServiceManager(persistence)
+    envelope = manager.create_story(user_id=user.uid, world_id=world.label, world=world)
+    with ServiceManager(persistence).open_session(user_id=user.uid) as session:
+        ledger = session.ledger
+        before = Json.serialize(ledger.unstructure())
+        for fragment in ledger.output_stream.values():
+            projected = media_fragment_to_payload(
+                fragment, world_id=world.label, world_media_root=tmp_path,
+                render_profile=MediaRenderProfile(content_profile=profile),
+            )
+            if projected is not None:
+                assert not {"url", "path", "data"} & projected.keys()
+        if fallback_text is not None:
+            assert any(isinstance(f, ContentFragment) and f.content == fallback_text
+                       for f in ledger.output_stream.values())
+        fragment = MediaFragment(
+            content=rit, content_format="rit", content_type=MediaDataType.AUDIO,
+            fallback_text=fallback_text,
+        )
+        fragment_before = fragment.unstructure()
+        payload = media_fragment_to_payload(
+            fragment, world_id=world.label, world_media_root=tmp_path,
+            render_profile=MediaRenderProfile(content_profile=profile),
+        )
+        if fallback_text is None:
+            assert payload is None
+        else:
+            assert payload["fragment_type"] == "content"
+            assert payload["text"] == fallback_text
+            assert not {"url", "path", "data"} & payload.keys()
+        assert fragment.unstructure() == fragment_before
+        assert Json.serialize(ledger.unstructure()) == before
+    choice = next(f for f in envelope.fragments if isinstance(f, ChoiceFragment))
+    result = manager.resolve_choice(
+        user_id=user.uid, request=DirectEdgeRequest(edge_id=choice.edge_id),
+    )
+    assert any(isinstance(f, ContentFragment) and f.content == "You continued."
+               for f in result.fragments)
+
+
+@pytest.mark.parametrize("profile", list(MediaContentProfile))
+def test_unmaterialized_source_is_retryable_after_wav_arrives(
+    audio_session: AudioSession, tmp_path: Path, profile: MediaContentProfile,
+) -> None:
+    _persistence, _manager, _user, _world, _envelope, wav_path, _root = audio_session
+    path = tmp_path / "optional" / "theme.wav"
+    path.parent.mkdir()
+    path.write_text(LFS_POINTER, encoding="ascii")
+    resources = ResourceManager(path.parent)
+    assert resources.index_directory(".") == []
+    with pytest.raises(ValueError, match="not materialized"):
+        resources.register_file(path)
+    rit = MediaRIT(path=path)
+    fragment = MediaFragment(content=rit, content_format="rit", content_type=MediaDataType.AUDIO)
+    render_profile = MediaRenderProfile(content_profile=profile)
+    before = fragment.unstructure()
+    assert media_fragment_to_payload(fragment, render_profile=render_profile, world_id="retry") is None
+    path.write_bytes(wav_path.read_bytes())
+    payload = media_fragment_to_payload(fragment, render_profile=render_profile, world_id="retry")
+    assert payload["content_format"] == {
+        MediaContentProfile.MEDIA_SERVER: "url",
+        MediaContentProfile.PASSTHROUGH: "path",
+        MediaContentProfile.INLINE_DATA: "data",
+    }[profile]
+    assert payload["rit_id"] == str(rit.uid)
+    assert payload["mime_type"] == "audio/wav"
+    assert fragment.unstructure() == before
+    fresh = resources.register_file(path)
+    assert fresh.preset_content_hash is not None
+    assert fresh.get_content_hash() == rit.get_content_hash()
