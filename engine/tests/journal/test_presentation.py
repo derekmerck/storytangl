@@ -12,6 +12,7 @@ from tangl.journal.fragments import (
     ControlFragment,
     GroupFragment,
     MediaFragment,
+    PieceFragment,
     fragment_from_dto,
     fragment_to_dto,
 )
@@ -335,3 +336,55 @@ def test_named_presentation_hint_container_merges_without_deep_game_patch(
     if not media:
         game = ControlFragment(target=control.target, payload={"content": {"b": 2}})
         assert game.apply_to(first.evolve(content={"a": 1})).content == {"b": 2}
+
+
+@pytest.mark.parametrize("kind", ["group", "piece"])
+@pytest.mark.parametrize("field", ["hints", "presentation_hints"])
+@pytest.mark.parametrize("patch", [{"icon": None}, None])
+def test_group_and_piece_hint_edits_survive_constructor_json_and_dto(
+    kind: str, field: str, patch: dict | None,
+) -> None:
+    hints = {"style_name": "inventory", "icon": "old"}
+    first = (
+        GroupFragment(group_type="zone", member_ids=[uuid4()], hints=hints)
+        if kind == "group" else PieceFragment(
+            piece_id="coin", piece_kind="item", properties={"value": 2}, hints=hints,
+        )
+    )
+    control = ControlFragment(
+        target={"kind": "fragment", "fragment_id": first.uid},
+        patch_kind="presentation", payload={field: patch},
+    )
+    before = Json.serialize(first.unstructure())
+    control_before = Json.serialize(control.unstructure())
+    kinds = {
+        "GroupFragment": GroupFragment,
+        "PieceFragment": PieceFragment,
+        "ControlFragment": ControlFragment,
+    }
+    restored_first = StructuringHandler.structure(Json.deserialize(before), kind_map=kinds)
+    restored_control = StructuringHandler.structure(Json.deserialize(control_before), kind_map=kinds)
+    for source, edit in [(first, control), (restored_first, restored_control)]:
+        source_before = Json.serialize(source.unstructure())
+        updated = edit.apply_to(source)
+        assert updated.uid == source.uid
+        result = StructuringHandler.structure(
+            Json.deserialize(Json.serialize(updated.unstructure())), kind_map=kinds,
+        )
+        assert type(result) is type(first) and result.uid == first.uid
+        dto = fragment_to_dto(result)
+        assert dto["uid"] == str(first.uid) and "presentation_hints" not in dto
+        assert {k: v for k, v in dto.items() if k != "hints"} == {
+            k: v for k, v in fragment_to_dto(source).items() if k != "hints"
+        }
+        if patch is None:
+            assert result.presentation_hints is None and "hints" not in dto
+        else:
+            assert result.presentation_hints.style_name == "inventory"
+            assert result.presentation_hints.icon is None
+            assert dto["hints"]["style_name"] == "inventory"
+            assert "icon" not in dto["hints"]
+        assert source.presentation_hints.icon == "old"
+        assert Json.serialize(source.unstructure()) == source_before
+    assert Json.serialize(first.unstructure()) == before
+    assert Json.serialize(control.unstructure()) == control_before

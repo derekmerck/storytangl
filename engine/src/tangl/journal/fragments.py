@@ -265,7 +265,7 @@ class ControlFragment(BaseFragment, extra="allow"):
             if isinstance(fragment, MediaFragment) and updates.get("staging_hints") is not None:
                 previous = fragment.staging_hints.model_dump() if fragment.staging_hints else {}
                 updates["staging_hints"] = {**previous, **updates["staging_hints"]}
-            if isinstance(fragment, ContentFragment):
+            if isinstance(fragment, (ContentFragment, GroupFragment, PieceFragment)):
                 if "presentation_hints" in updates:
                     updates.setdefault("hints", updates.pop("presentation_hints"))
                 if updates.get("hints") is not None:
