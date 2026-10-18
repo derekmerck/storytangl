@@ -319,6 +319,7 @@ export interface MediaStoryFragment extends BaseStoryFragment {
   media_format?: string | null
   mime_type?: string | null
   media_role?: MediaRole | string | null
+  presentation_handle?: string | null
   scope?: string | null
   staging_hints?: Record<string, unknown> | null
   /**
@@ -517,13 +518,18 @@ export interface ChoiceStoryFragment extends BaseStoryFragment {
   payload?: unknown
 }
 
+export type PresentationTarget =
+  | { kind: 'fragment'; fragment_id: FragmentId }
+  | { kind: 'rit'; rit_id: string }
+  | { kind: 'role'; media_role: string }
+  | { kind: 'handle'; handle: string }
+
 export interface ControlStoryFragment extends BaseStoryFragment {
   fragment_type: 'update' | 'delete'
-  ref_type?: string
-  ref_id?: FragmentId
-  reference_type?: string
-  reference_id?: FragmentId
+  target: PresentationTarget
   payload?: Record<string, unknown> | null
+  media_action?: 'restart' | null
+  media?: MediaStoryFragment | null
 }
 
 export interface RollStoryFragment extends BaseStoryFragment {
@@ -591,6 +597,8 @@ export interface RuntimeEnvelope {
   last_redirect?: Record<string, unknown> | null
   redirect_trace?: Array<Record<string, unknown>>
   metadata?: RuntimeMetadata
+  /** Synchronization state, never a new audible event. Explicit null clears music. */
+  presentation?: { music: StoryFragment | null }
 }
 
 export interface StorySceneModel {

@@ -9,6 +9,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import pytest
+
 from tangl.service.response import RuntimeEnvelope
 
 
@@ -43,6 +45,37 @@ PORT = _load_module("reference_port", REFERENCE_PATH)
 LEGIBILITY = _load_module("legibility", LEGIBILITY_PATH)
 PARITY = _load_module("parity", PARITY_PATH)
 TIME_PARITY = _load_module("time_parity", TIME_PARITY_PATH)
+
+
+@pytest.mark.parametrize("port", [PORT, LEGIBILITY, PARITY, TIME_PARITY])
+def test_control_targets_match_media_only_and_missing_addresses_are_noop(port: ModuleType) -> None:
+    registry = {
+        "avatar": {
+            "uid": "avatar", "fragment_type": "media", "rit_id": "portrait",
+            "media_role": "avatar_im", "presentation_handle": "character:bob",
+        },
+        "text": {
+            "uid": "text", "fragment_type": "content", "rit_id": "portrait",
+            "media_role": "avatar_im", "presentation_handle": "character:bob",
+        },
+        "plain": {"uid": "plain", "fragment_type": "content"},
+    }
+    for target in [
+        {"kind": "rit", "rit_id": "portrait"},
+        {"kind": "role", "media_role": "avatar_im"},
+        {"kind": "handle", "handle": "character:bob"},
+    ]:
+        updated = port.apply_runtime_envelope(registry, {"fragments": [{
+            "uid": "update", "fragment_type": "update", "target": target,
+            "payload": {"text": "Updated"},
+        }]})
+        assert updated["avatar"]["text"] == "Updated"
+        assert "text" not in updated["text"]
+    for kind in ["fragment", "rit", "role", "handle"]:
+        unchanged = port.apply_runtime_envelope(registry, {"fragments": [{
+            "uid": "delete", "fragment_type": "delete", "target": {"kind": kind},
+        }]})
+        assert unchanged == registry
 
 
 def _load_sequence(name: str) -> dict[str, Any]:
@@ -160,7 +193,7 @@ def test_sequence_legibility_uses_current_registry_after_updates() -> None:
                     {
                         "uid": "scene-update",
                         "fragment_type": "update",
-                        "ref_id": "scene",
+                        "target": {"kind": "fragment", "fragment_id": "scene"},
                         "payload": {"member_ids": ["choice"]},
                     }
                 ],
@@ -226,7 +259,7 @@ def test_sequence_input_parity_uses_current_registry_after_updates() -> None:
                     {
                         "uid": "source-update",
                         "fragment_type": "update",
-                        "ref_id": "source",
+                        "target": {"kind": "fragment", "fragment_id": "source"},
                         "payload": {"member_ids": []},
                     }
                 ],

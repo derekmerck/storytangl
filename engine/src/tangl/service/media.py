@@ -8,7 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from tangl.core import Selector
-from tangl.journal.fragments import MediaFragment
+from tangl.journal.fragments import ControlFragment, MediaFragment, fragment_to_dto
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaRITStatus
@@ -266,6 +266,8 @@ def _base_payload(
     }
     if rit_id is not None:
         payload["rit_id"] = str(rit_id)
+    if fragment.presentation_handle is not None:
+        payload["presentation_handle"] = fragment.presentation_handle
     # Per-use staging travels with the media it stages. Before this, every media
     # payload dropped it: an in-process client read hints off the fragment and
     # never noticed, while a remote client had no way to place, flip or animate
@@ -611,10 +613,29 @@ def media_fragment_to_payload(
 ) -> dict[str, Any] | None:
     """Flatten canonical media fragments into service-facing payloads."""
 
+    if isinstance(fragment, ControlFragment):
+        payload = fragment_to_dto(fragment)
+        if fragment.media is not None:
+            resolved = media_fragment_to_payload(
+                fragment.media, render_profile=render_profile, world_id=world_id,
+                story_id=story_id, world_media_root=world_media_root,
+                story_media_root=story_media_root, system_media_root=system_media_root,
+            )
+            if resolved is None or resolved.get("fragment_type") != "media":
+                return resolved
+            payload["media"] = resolved
+        return payload
+
     if isinstance(fragment, MediaFragment):
         scope = getattr(fragment, "scope", None) or "world"
         payload_profile = render_profile or MediaRenderProfile()
-        if fragment.content_type == MediaDataType.AUDIO and not payload_profile.include_audio:
+        if not payload_profile.include_audio and (
+            fragment.content_type == MediaDataType.AUDIO
+            or (
+                isinstance(fragment.content, MediaRIT)
+                and fragment.content.data_type == MediaDataType.AUDIO
+            )
+        ):
             text = _fallback_text(fragment)
             return _content_payload_from_text(fragment, text) if text is not None else None
 
@@ -657,9 +678,23 @@ def media_fragment_to_payload(
             content_format=fragment.content_format,
             rit_id=fragment.rit_id,
         )
+        # Resolved wire descriptors retain only their explicit representation metadata.
+        for name in ("media_format", "mime_type"):
+            if name in (fragment.model_extra or {}):
+                payload[name] = fragment.model_extra[name]
 
         if fragment.content_format == "url":
             payload["url"] = str(fragment.content)
+            return payload
+
+        if fragment.content_format == "path":
+            if (
+                payload_profile.content_profile != MediaContentProfile.PASSTHROUGH
+                or not is_materialized_media_file(Path(fragment.content))
+            ):
+                text = _fallback_text(fragment)
+                return _content_payload_from_text(fragment, text) if text is not None else None
+            payload["path"] = str(fragment.content)
             return payload
 
         if fragment.content_format == "data":

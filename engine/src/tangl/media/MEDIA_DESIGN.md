@@ -8,8 +8,8 @@
 ```
 
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
-> Audio playback, control-target extensions and reconnect projection below are
-> approved direction, not implemented capabilities.
+> #571 slice 2a implements explicit control targets and read-only desired-BGM
+> snapshots. Physical playback remains deferred.
 > Authority: Canonical journal fragment types live in `tangl.journal.fragments`;
 > presentation hints live in `tangl.presentation.hints`; `tangl.journal.media`
 > remains a fragment-only compatibility re-export surface.
@@ -172,7 +172,7 @@ general codec/capability-negotiation system. Web's historical media view has a
 role-substring audio branch that misses `sound_fx` and `*_vox`; it is not a
 persistent music owner. Neither Web nor pygame playback is delivered here.
 
-### Approved audio lifecycle; next-slice checkpoint
+### Control targets and desired music (#571 slice 2a)
 
 Resource identity is the existing `rit_id`, not URL equality or a newly minted
 asset id. Fragment `uid` identifies an occurrence (including a one-shot or
@@ -190,14 +190,23 @@ entity. Initially there is one BGM slot, `music`:
   not block story interaction. Removing presentation neither deletes cached
   bytes nor edits historical journal records.
 
-Reuse/adapt `ControlFragment` for a small explicit target vocabulary. **Current
-gap:** `ControlFragment.reference()` looks in a fragment registry, and Web's
-`StoryFlow` uses `registry[ref_id]`. Neither implements RIT, role or handle targets.
-Do not put a RIT id in `ref_id` and hope consumers interpret it as a fragment UID;
-`origin_id` is provenance, not automatically the media resource id.
+`ControlFragment.target` is the discriminated `PresentationTarget` value from
+`tangl.presentation.targets`. `fragment_id` and `rit_id` are UUIDs; roles and
+handles are exact authored strings. `MediaFragment.presentation_handle` carries
+the binding, including through ordinary authored media declarations. A RIT is
+not a character. `origin_id` remains provenance, not a media resource id.
 
-The following are **worked proposed DTOs, not accepted schema today**. Final
-target spelling and bootstrap placement are the next bounded design checkpoint.
+The old `ref_id`/`ref_type` and `reference_id`/`reference_type` control fields are
+replaced, not retained as aliases. Repo callers, fixtures, Web registry handling
+and portable conformance ports now use explicit targets. No runtime persisted
+producer of the old control form was found. `ControlFragment.matches()` and
+`references()` match current presentations; missing matches are no-ops. Ordinary
+`update` patches still use `payload`; `delete` removes matched presentations,
+not cached asset bytes or historical journal entries. Updates never invent a
+missing target. Web supports these registry operations; pygame playback/staging
+control realization remains separate.
+
+The following are **current DTO shapes**, replacing the earlier proposals.
 UUID placeholders stand for real wire UUID strings. A normal resolved media
 descriptor starts music; another descriptor with a different RIT replaces it:
 
@@ -216,16 +225,26 @@ retains the repetition suggestion on an ordinary resolved descriptor:
 ```json
 {"uid":"restart-1", "fragment_type":"update",
  "target":{"kind":"role", "media_role":"music"},
- "payload":{"action":"restart", "media":{
+ "media_action":"restart", "media":{
+   "uid":"restart-descriptor", "fragment_type":"media",
    "rit_id":"track-A", "media_type":"audio", "media_role":"music",
    "content_format":"url", "url":"/media/world/island/theme.wav",
    "media_format":"wav", "mime_type":"audio/wav",
-   "staging_hints":{"media_timing":"loop"}}}}
+   "staging_hints":{"media_timing":"loop"}}}
 ```
 
-Redelivering `restart-1` is inert after its first application. A resource-only
-target can say what to stop, but start/restart also needs the ordinary resolved
-descriptor; there must be no second control-specific fetching pathway.
+An ordinary `MediaFragment` starts/replaces a selection. A restart is an
+`update` with `media_action="restart"` plus an ordinary `media` descriptor, not
+an opaque nested patch. It applies to the matching selected resource; it does
+not choose a different recording or redefine repetition. Repetition remains
+`staging_hints.media_timing="loop"` (or `start` for once). An omitted repeat hint
+on a same-RIT restatement retains the prior declaration. Music lifecycle stop
+and restart use controls, not the sprite-oriented stop/restart timing hints.
+The nested descriptor uses the same resolver as ordinary media. Constructor
+form recursively persists it with the existing marker and graph RIT reference.
+No second control-only fetching path is introduced. Live controls keep their
+UIDs for the later playback owner's restart deduplication; physical application
+and audible deduplication are not implemented in this slice.
 Resource-less stop and other target examples:
 
 ```json
@@ -245,18 +264,35 @@ A RIT target matches active uses of that resource; a fragment target matches
 one occurrence. Role targets match current instances without backend enumeration
 (for example all current avatars). Handles are stable authored bindings where
 needed, not additional entity identities. This is not a client selector/query
-language or RPC framework, and it is **not implemented in slice 1**.
+language or RPC framework. Native and Web tests include avatar/image controls,
+so this vocabulary is not audio-only.
 
-Reconnect must fold the canonical journal **read-only** through a presentation
-projection invoked by Service, then apply ordinary media-profile resolution.
-Fold history beyond a limited returned journal window: the current track may
-have begun before that window. There is no second persisted audio-state store.
-Proposed bootstrap attachment (placement/name unsettled) distinguishes empty
-desired BGM from the live-stream meaning of no new cue:
+`journal.presentation.desired_music()` folds the canonical journal **read-only**.
+It runs in Service's `_build_runtime_envelope`, over full history before the
+requested journal window or any capability omission/fallback. Scene/group
+boundaries do not clear the slot. Resource changes replace; deletes match the
+current occurrence/resource/role/handle; restart events leave selection and
+repetition intact. Current desired media is transient projection, not another
+persisted state store or mutable Service session.
+Only RIT-identified cues bind this persistent slot. Direct locator declarations
+without admitted resource identity are outside this contract (#407); no URL
+comparison or synthetic asset ID is substituted.
+
+Service-built `RuntimeEnvelope.presentation` is an explicit synchronization
+snapshot, including on incremental responses with no new media. Its one key is
+`music`; `null` explicitly means empty or unavailable for that delivery profile.
+REST resolves it through the same ordinary media resolver used for fragments
+and nested control media. The typed payload uses a keyed map, preserving null
+through REST's exclude-none policy without custom serializers. Native attached
+callers receive the canonical fragment and choose their normal media profile;
+only an explicitly requested passthrough profile delivers a local path.
+Path-only descriptors cannot be ported by guessing a URL: incompatible profiles
+omit/fall back normally, while RIT-backed sources use ordinary scoped routing.
 
 ```json
-{"desired_presentation":{"music":null}}
-{"desired_presentation":{"music":{
+{"presentation":{"music":null}}
+{"presentation":{"music":{
+  "uid":"cue-1", "fragment_type":"media",
   "rit_id":"track-A", "media_type":"audio", "media_role":"music",
   "content_format":"url", "url":"/media/world/island/theme.wav",
   "media_format":"wav", "mime_type":"audio/wav",
@@ -266,6 +302,16 @@ desired BGM from the live-stream meaning of no new cue:
 These are snapshots, not new audible restart events. Reconnect/unlock presents
 only current desired music: no audible historical effects, restarts or backlog
 of track transitions. Exact playback-position restoration is deferred.
+Returned journal windows remain historical narrative; their controls/effects
+are not a playback queue. The snapshot contains only the final selection, never
+historical restart actions, effects, voice or transition events. Omission,
+text fallback, missing sources and unmaterialized LFS pointers follow ordinary
+media policy without journal mutation. If a static fallback is represented,
+its actual RIT identity and format are retained; the original RIT is not relabelled.
+On create/get/reconnect, consume the snapshot for music rather than audibly
+executing historical journal fragments. Later playback owners may apply fresh
+occurrence controls from `resolve_choice`'s live incremental delivery; the
+snapshot itself is always synchronization state, never a restart request.
 Scene declarations and available service/presentation affordances can advertise
 the same suggestion; world-static availability is distinct from current-story
 desired presentation. Automatic world/scene/block inheritance and an implicit
@@ -278,7 +324,7 @@ an avatar when music starts); clocks and coordination belong to the client.
 No choreography is implemented, and story correctness must not depend on media
 finishing. Tightly synchronized plugin/socket work would be separate.
 
-Later slices deliver the target/bootstrap contract and one persistent owner
+Later slices deliver one persistent playback owner
 outside Web's historical components and pygame's image drawing. Local pygame
 paths and remote Web URLs are the initial floor; remote pygame audio waits for
 a proper shared loading path. Then one-shot effects deduplicate by occurrence

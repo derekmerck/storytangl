@@ -65,14 +65,19 @@ service boundary.
 
 ## Status
 
-#571 slice 1 adds file-backed audio transport, not playback. The canonical
-[media design addendum](../media/MEDIA_DESIGN.md#file-backed-audio-571-slice-1)
-records the approved identity/lifecycle/ownership policy and proposed
-ControlFragment target and desired-BGM bootstrap examples. Their target spelling
-and bootstrap placement remain the next bounded design checkpoint. Existing
-`media_timing` mixes loop mode with actions; future restart controls must retain
-repetition separately rather than erase it. No target extension, journal-fold
-projection, scheduler or audio state store is implemented by this slice.
+#571 slice 2a implements explicit `PresentationTarget` values (fragment UUID,
+RIT UUID, screen role, authored handle) carried by the existing ControlFragment.
+The target values live here; matching/folding canonical journal intent lives in
+`journal.presentation`, because this dependency-floor package cannot import
+journal models. Service invokes that read-only projection before windowing or
+capability shaping and delivers a `presentation.music` synchronization snapshot.
+Empty is explicit null. Restart is an occurrence-level control action, separate
+from the selected recording's loop mode; no historical action is replayed by
+the snapshot. There are no playback clocks or second persisted state stores.
+The canonical
+[media design addendum](../media/MEDIA_DESIGN.md#control-targets-and-desired-music-571-slice-2a)
+records the shipped wire spelling and lifecycle policy. Physical Web/pygame
+music owners, local controls and audible occurrence deduplication remain deferred.
 
 Reference correction (#551): intent zone references and ``PlaceAccepts.edge_ref``
 accept ``EntityRef`` — a UUID identity or an exact symbolic label, not Core's

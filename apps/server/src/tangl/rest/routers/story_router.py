@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from markdown_it import MarkdownIt
 
 from tangl.config import get_story_media_dir, get_sys_media_dir
-from tangl.journal.fragments import MediaFragment, fragment_to_dto
+from tangl.journal.fragments import ControlFragment, MediaFragment, fragment_to_dto
 from tangl.presentation.projection import ProjectedState
 from tangl.rest.dependencies_gateway import (
     get_service_manager,
@@ -181,7 +181,7 @@ def _serialize_fragment(
     )
     if media_payload is not None:
         return _serialize(media_payload)
-    if isinstance(fragment, MediaFragment):
+    if isinstance(fragment, (MediaFragment, ControlFragment)):
         return None
     if hasattr(fragment, "model_dump"):
         return _serialize(fragment_to_dto(fragment))
@@ -223,6 +223,13 @@ def _serialize_runtime_envelope(
         **envelope_payload,
         "fragments": _normalize_choice_labels_in_fragments(fragments),
     }
+    if envelope.presentation is not None:
+        music = envelope.presentation.music
+        payload["presentation"] = {"music": _serialize_fragment(
+            music, media_profile=media_profile, world_id=world_id, story_id=story_id,
+            world_media_root=world_media_root, story_media_root=story_media_root,
+            system_media_root=system_media_root,
+        ) if music is not None else None}
     serialized = _serialize(payload)
     if "html" in profile_tokens:
         serialized = _transform_text_fields(serialized)

@@ -51,9 +51,28 @@ export const fragmentText = (value: unknown): string => {
   return JSON.stringify(value)
 }
 
-export const fragmentRefId = (fragment: ControlStoryFragment): FragmentId | undefined => {
-  const value = fragment.ref_id ?? fragment.reference_id
-  return typeof value === 'string' && value ? value : undefined
+export const applyControlFragment = (
+  registry: Record<string, StoryFragment>,
+  fragment: ControlStoryFragment
+): void => {
+  if (fragment.media_action) return // Playback owners, not historical views, consume restart.
+  for (const [id, existing] of Object.entries(registry)) {
+    const target = fragment.target
+    const matches =
+      target.kind === 'fragment'
+        ? id === target.fragment_id
+        : isMediaFragment(existing) &&
+          (target.kind === 'rit'
+            ? existing.rit_id === target.rit_id
+            : target.kind === 'role'
+              ? existing.media_role === target.media_role
+              : existing.presentation_handle === target.handle)
+    if (!matches) continue
+    if (fragment.fragment_type === 'delete') delete registry[id]
+    else if (isRecord(fragment.payload)) {
+      registry[id] = { ...existing, ...fragment.payload, uid: id } as StoryFragment
+    }
+  }
 }
 
 export const fragmentUid = (
@@ -114,6 +133,7 @@ export const normalizeEnvelope = (
     last_redirect: payload.last_redirect ?? null,
     redirect_trace: payload.redirect_trace ?? [],
     metadata: payload.metadata ?? {},
+    presentation: payload.presentation,
   }
 }
 

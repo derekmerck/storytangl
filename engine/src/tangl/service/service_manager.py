@@ -13,6 +13,7 @@ import yaml
 
 from tangl.core import BaseFragment, Ctx
 from tangl.journal.fragments import ChoiceFragment, PieceFragment
+from tangl.journal.presentation import desired_music
 from tangl.persistence import PersistenceManager
 from tangl.presentation.events import GrammarHint, GrammarNoun, GrammarVerb, UxEvent
 from tangl.presentation.projection import (
@@ -46,6 +47,7 @@ from .response import (
     EdgeResolutionRequest,
     FindEdgeRequest,
     PreflightReport,
+    PresentationSnapshot,
     RuntimeEnvelope,
     RuntimeInfo,
     SystemInfo,
@@ -387,6 +389,7 @@ class ServiceManager:
             last_redirect=ledger.last_redirect,
             redirect_trace=list(ledger.redirect_trace),
             metadata=merged_metadata,
+            presentation=PresentationSnapshot(music=desired_music(ledger.get_journal())),
         )
 
     @staticmethod

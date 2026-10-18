@@ -178,8 +178,7 @@ describe('StoryFlow', () => {
             {
               uid: 'ctrl',
               fragment_type: 'update',
-              ref_type: 'content',
-              ref_id: 'content',
+              target: { kind: 'fragment', fragment_id: 'content' },
               payload: { content: 'After update' },
             },
           ],

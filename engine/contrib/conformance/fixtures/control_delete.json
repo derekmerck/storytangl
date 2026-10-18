@@ -6,7 +6,9 @@
       "uid": "00000000-0000-4000-8000-000000000701",
       "fragment_type": "group",
       "group_type": "scene",
-      "member_ids": ["00000000-0000-4000-8000-000000000702"]
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000702"
+      ]
     },
     {
       "uid": "00000000-0000-4000-8000-000000000702",
@@ -17,9 +19,13 @@
     {
       "uid": "00000000-0000-4000-8000-000000000703",
       "fragment_type": "delete",
-      "ref_type": "content",
-      "ref_id": "00000000-0000-4000-8000-000000000702"
+      "target": {
+        "kind": "fragment",
+        "fragment_id": "00000000-0000-4000-8000-000000000702"
+      }
     }
   ],
-  "metadata": {"fixture": "control_delete"}
+  "metadata": {
+    "fixture": "control_delete"
+  }
 }

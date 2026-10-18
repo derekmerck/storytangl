@@ -5,6 +5,7 @@ widget tree, own transport, or establish narrative truth.
 """
 
 from .geometry import NormalizedRect
+from .targets import FragmentTarget, RitTarget, RoleTarget, HandleTarget, PresentationTarget
 from .hints import PresentationHints, StagingHints
 from .events import GrammarHint, GrammarNoun, GrammarVerb, UxEvent
 from .intent import (
@@ -46,6 +47,11 @@ from .projection import (
 
 __all__ = [
     "Accepts",
+    "FragmentTarget",
+    "RitTarget",
+    "RoleTarget",
+    "HandleTarget",
+    "PresentationTarget",
     "BadgeListValue",
     "Blocker",
     "BrandingValue",

@@ -28,6 +28,12 @@ from tangl.presentation.intent import Accepts as _Accepts
 from tangl.presentation.intent import Blocker as _Blocker
 from tangl.presentation.intent import UIHints as _UIHints
 from tangl.presentation.values import KvRow as _KvRow
+from tangl.presentation.targets import (
+    FragmentTarget,
+    PresentationTarget,
+    RitTarget,
+    RoleTarget,
+)
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, UnstructuredData
@@ -179,21 +185,45 @@ class ControlFragment(BaseFragment, extra="allow"):
     """Reference-style fragment for update and delete control events."""
 
     fragment_type: ControlFragmentType = "update"
-    reference_type: str | Enum = Field("content", alias="ref_type")
-    reference_id: Identifier = Field(..., alias="ref_id")
+    target: PresentationTarget = Field(json_schema_extra={"unstructurable": True})
     payload: UnstructuredData | None = None
+    media_action: Literal["restart"] | None = None
+    media: MediaFragment | None = Field(None, json_schema_extra={"unstructurable": True})
 
     @model_validator(mode="after")
     def _validate_payload(self) -> "ControlFragment":
-        if self.fragment_type == "update" and self.payload is None:
+        if self.payload is not None and isinstance(
+            self.payload.get("media"), (dict, MediaFragment, MediaRIT),
+        ):
+            raise ValueError("media descriptors belong in the typed media field, not payload")
+        if self.media_action is not None:
+            if self.fragment_type != "update" or self.media is None or self.payload is not None:
+                raise ValueError("restart requires update + ordinary media, not a patch payload")
+            if self.media.rit_id is None:
+                raise ValueError("restart media requires resource identity (rit_id)")
+        elif self.media is not None:
+            raise ValueError("control media requires an explicit media_action")
+        elif self.fragment_type == "update" and self.payload is None:
             raise ValueError("payload cannot be None for an update fragment")
         return self
 
-    def reference(self, registry: Registry[BaseFragment]) -> BaseFragment:
-        return registry.find_one(Selector.from_identifier(self.reference_id))
+    def matches(self, fragment: BaseFragment) -> bool:
+        """Match current presentations, never source entities or cached bytes."""
+        if isinstance(self.target, FragmentTarget):
+            return fragment.uid == self.target.fragment_id
+        if not isinstance(fragment, MediaFragment):
+            return False
+        if isinstance(self.target, RitTarget):
+            return fragment.rit_id == self.target.rit_id
+        if isinstance(self.target, RoleTarget):
+            return fragment.media_role == self.target.media_role
+        return fragment.presentation_handle == self.target.handle
+
+    def references(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
+        return list(registry.find_all(Selector(predicate=self.matches)))
 
 
-ContentFormatType = Literal["url", "data", "xml", "json", "rit"]
+ContentFormatType = Literal["url", "path", "data", "xml", "json", "rit"]
 
 
 class MediaFragment(ContentFragment, extra="allow"):
@@ -205,6 +235,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     rit_id: UUID | None = None
     staging_hints: _StagingHints | None = None
     media_role: str | None = None
+    presentation_handle: str | None = None
     scope: str | None = "world"
     fragment_type: Literal["media"] = "media"
 
@@ -382,6 +413,15 @@ def fragment_from_dto(payload: object) -> BaseFragment:
     fragment_model = _FRAGMENT_DTO_TYPES.get(fragment_type)
     if fragment_model is None:
         return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
+
+    content_format = raw_fragment.get("content_format")
+    if fragment_type == "media" and content_format in {"url", "path", "data", "xml"}:
+        source_key = "data" if content_format == "xml" else content_format
+        raw_fragment.setdefault("content", raw_fragment.get(source_key))
+        if "media_type" in raw_fragment:
+            raw_fragment["content_type"] = raw_fragment.pop("media_type")
+    if fragment_type == "update" and raw_fragment.get("media") is not None:
+        raw_fragment["media"] = fragment_from_dto(raw_fragment["media"])
 
     for field_name in fragment_model._match_fields(dto=True):
         dto_alias = fragment_model.model_fields[field_name].json_schema_extra["dto_alias"]

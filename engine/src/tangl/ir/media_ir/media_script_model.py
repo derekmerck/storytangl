@@ -46,6 +46,7 @@ class MediaItemScript(BaseScriptItem, arbitrary_types_allowed=True):
     spec: Optional[dict] = None         #: spec for procedural/generative creation
 
     media_role: Optional[MediaRole] = None
+    presentation_handle: str | None = None
     text: Optional[str] = None  # title or caption
     staging_hints: Optional[StagingHints] = None  # client-facing presentation hints
 

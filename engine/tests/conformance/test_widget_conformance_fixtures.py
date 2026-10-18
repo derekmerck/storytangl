@@ -103,16 +103,16 @@ def _registry_after_controls(fragments: list[dict[str, Any]]) -> dict[str, dict[
     for fragment in fragments:
         fragment_type = _fragment_type(fragment)
         if fragment_type == "delete":
-            ref_id = fragment.get("ref_id") or fragment.get("reference_id")
+            ref_id = fragment["target"].get("fragment_id")
             if isinstance(ref_id, str):
                 registry.pop(ref_id, None)
             continue
         if fragment_type == "update":
-            ref_id = fragment.get("ref_id") or fragment.get("reference_id")
+            ref_id = fragment["target"].get("fragment_id")
             payload = fragment.get("payload")
             if isinstance(ref_id, str) and isinstance(payload, dict):
-                existing = registry.get(ref_id, {"uid": ref_id})
-                registry[ref_id] = {**existing, **payload, "uid": ref_id}
+                if ref_id in registry:
+                    registry[ref_id] = {**registry[ref_id], **payload, "uid": ref_id}
             continue
         registry[_fragment_uid(fragment)] = fragment
     return registry
@@ -144,7 +144,7 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
         accepts = fragment.get("accepts")
         assert accepts is None or isinstance(accepts, dict)
     elif fragment_type in {"update", "delete"}:
-        assert isinstance(fragment.get("ref_id") or fragment.get("reference_id"), str)
+        assert isinstance(fragment["target"].get("fragment_id"), str)
         if fragment_type == "update":
             assert isinstance(fragment.get("payload"), dict)
     elif fragment_type == "piece":

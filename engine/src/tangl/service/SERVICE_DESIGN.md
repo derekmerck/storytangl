@@ -5,7 +5,7 @@
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
 > #571 slice 1 supports file-backed AUDIO URL/path/inline transport; playback
-> and reconnect projection are not implemented.
+> is deferred; #571 slice 2a implements current desired-music synchronization.
 
 ## Position in the Architecture
 
@@ -297,7 +297,7 @@ mechanics and provides domain policy, catalogs, templates, resources, and
 special handlers. Service discovers and opens the resulting world; it neither
 imports those mechanics nor reconstructs their policy at the transport layer.
 
-## Audio transport and the later reconnect boundary (#571)
+## Audio transport and desired-presentation synchronization (#571)
 
 `service/media.py` resolves AUDIO through the existing scoped file path/URL
 machinery. RIT identity and declared `media_format`/`mime_type` follow the actual
@@ -306,15 +306,24 @@ URL/path/data transport. `MediaRenderProfile(include_audio=False)` (REST token
 `no_audio`) omits audio or uses existing fallback text without changing journal
 history or blocking narrative choices. Video/animation exclusions remain.
 
-Service must remain request-stateless for playback. The next slice will invoke
-a presentation-owned read-only journal fold for current desired BGM, including
-history older than the returned window, and resolve its descriptor through the
-same media profile. The attachment point and target DTO spelling are not yet
-settled. This is not a second persisted state store, playback session, clock,
-mixer or acknowledgement protocol. See the canonical
-[media addendum](../media/MEDIA_DESIGN.md#approved-audio-lifecycle-next-slice-checkpoint)
-for policy and worked proposed payloads; none of the proposed controls or
-bootstrap shapes is delivered in slice 1.
+Service remains request-stateless for playback. `_build_runtime_envelope`
+invokes `journal.presentation.desired_music` over canonical full history, not
+the returned window. Every service-built envelope carries typed
+`presentation.music`: the current desired MediaFragment, or explicit empty.
+`RuntimeEnvelopePayload` uses a keyed music map so null survives REST's
+exclude-none policy. REST resolves this fragment, and any restart control's
+ordinary `media` field, through the same media profile as top-level fragments;
+there is no raw RIT/path or opaque nested media bypass. Remote hydration uses
+the normal fragment DTO entry point for both. A normal remote profile serves
+URLs; local paths require an explicit passthrough request. Capability omission,
+fallback and unavailable/LFS sources cannot mutate the journal.
+
+The synchronization snapshot is state, not a new cue or a queue of historical
+events. Native attached callers choose their ordinary media resolver/profile.
+There is no second persisted state store, playback session, clock, mixer or
+acknowledgement protocol. See the canonical
+[media addendum](../media/MEDIA_DESIGN.md#control-targets-and-desired-music-571-slice-2a)
+for shipped target spelling and examples. Physical playback remains deferred.
 
 ## What Service Does Not Define
 

@@ -4,7 +4,6 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import CommandBar from './CommandBar.vue'
 import StoryBlock from './StoryBlock.vue'
 import type {
-  ControlStoryFragment,
   GroupStoryFragment,
   GrammarHint,
   RuntimeEnvelope,
@@ -15,10 +14,9 @@ import type {
 } from '@/types'
 import { useGlobal } from '@/composables/globals'
 import {
-  fragmentRefId,
+  applyControlFragment,
   isControlFragment,
   isGroupFragment,
-  isRecord,
   normalizeEnvelope,
 } from './fragmentUtils'
 
@@ -49,36 +47,6 @@ const visibleFragmentIds = (fragments: StoryFragment[]): string[] =>
   fragments
     .filter((fragment) => !isControlFragment(fragment))
     .map((fragment) => fragment.uid)
-
-const applyControlFragment = (
-  registry: Record<string, StoryFragment>,
-  fragment: ControlStoryFragment,
-) => {
-  const refId = fragmentRefId(fragment)
-  if (!refId) {
-    return
-  }
-
-  if (fragment.fragment_type === 'delete') {
-    delete registry[refId]
-    return
-  }
-
-  if (!isRecord(fragment.payload)) {
-    return
-  }
-
-  const existing = registry[refId]
-  registry[refId] = {
-    ...(existing ?? { uid: refId, fragment_type: fragment.ref_type ?? fragment.reference_type ?? 'content' }),
-    ...fragment.payload,
-    uid: refId,
-    fragment_type:
-      typeof fragment.payload.fragment_type === 'string'
-        ? fragment.payload.fragment_type
-        : (existing?.fragment_type ?? fragment.ref_type ?? fragment.reference_type ?? 'content'),
-  } as StoryFragment
-}
 
 const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]): StorySceneModel[] => {
   const sceneGroups = renderFragments.filter(isSceneGroup)

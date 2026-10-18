@@ -104,17 +104,22 @@ def apply_runtime_envelope(registry: FragmentRegistry, envelope: JsonObject) -> 
     next_registry = dict(registry)
     for fragment in _object_list(envelope.get("fragments")):
         fragment_type = _text(fragment, "fragment_type")
-        if fragment_type == "delete":
-            ref_id = _text(fragment, "ref_id", "reference_id")
-            if ref_id:
-                next_registry.pop(ref_id, None)
-            continue
-        if fragment_type == "update":
-            ref_id = _text(fragment, "ref_id", "reference_id")
+        if fragment_type in {"delete", "update"}:
+            target = _object(fragment.get("target")) or {}
+            field, key = {
+                "fragment": ("uid", "fragment_id"), "rit": ("rit_id", "rit_id"),
+                "role": ("media_role", "media_role"), "handle": ("presentation_handle", "handle"),
+            }.get(_text(target, "kind"), ("", ""))
             payload = _object(fragment.get("payload"))
-            if ref_id and payload is not None:
-                existing = next_registry.get(ref_id, {"uid": ref_id})
-                next_registry[ref_id] = {**existing, **payload, "uid": ref_id}
+            for ref_id, existing in list(next_registry.items()):
+                if not field or target.get(key) is None or existing.get(field) != target[key]:
+                    continue
+                if field != "uid" and existing.get("fragment_type") != "media":
+                    continue
+                if fragment_type == "delete":
+                    next_registry.pop(ref_id, None)
+                elif payload is not None and not fragment.get("media_action"):
+                    next_registry[ref_id] = {**existing, **payload, "uid": ref_id}
             continue
         uid = _text(fragment, "uid")
         if uid:

@@ -266,6 +266,11 @@ class RemoteServiceManager(ServiceManager):
             "redirect_trace": payload.get("redirect_trace") or [],
             "metadata": dict(payload.get("metadata") or {}),
         }
+        if payload.get("presentation") is not None:
+            music = payload["presentation"]["music"]
+            envelope_payload["presentation"] = {
+                "music": self._decode_fragment(music) if music is not None else None,
+            }
         return self._decode_model(RuntimeEnvelope, envelope_payload, label="runtime envelope")
 
     def _decode_runtime_info(self, payload: object) -> RuntimeInfo:
