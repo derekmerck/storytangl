@@ -1,0 +1,15 @@
+# Optional media, such as soundtracks, is not downloaded by default: a clone
+# gets small LFS pointer files in its place. Nothing in CI may need it (root
+# AGENTS.md). Fetch it once:
+#
+#   git lfs pull -I "worlds/*/media*/music/**" -X ""
+#
+# or have a checkout always fetch it -- its own config overrides this file:
+#
+#   git config lfs.fetchexclude ""
+#   git lfs pull
+#
+# `git lfs ls-files` marks a fetched file `*` and a pointer `-`.
+#
+[lfs]
+	fetchexclude = *.mp3,*.ogg,*.wav,*.flac

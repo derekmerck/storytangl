@@ -128,5 +128,41 @@
   },
   "review_notes": [
     "Generation provenance was not captured for this pack; only the shipped files and the conformance step are recorded."
-  ]
+  ],
+  "music": {
+    "theme": {
+      "file": "music/theme.mp3",
+      "sha256": "9b544c5b24ca828eb382cc4bf78e8db3e40ab90d6c0770ce17885dff8cdacfe2",
+      "duration": 86.94,
+      "rendered_with": {
+        "checkpoint": "ace_step_1.5_turbo_aio.safetensors",
+        "steps": 8,
+        "cfg": 1.0,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "shift": 3,
+        "seed": 31,
+        "bpm": 104,
+        "key": "D minor",
+        "time_signature": 4,
+        "seconds": 90,
+        "lyrics": "[Instrumental]",
+        "style": "Playful 18th-century Caribbean folk chamber music with tresillo and habanera syncopation. Nylon-string baroque guitar, lively fiddle, wooden flute, cittern, plucked viola da gamba bass, hand drums and shakers. Breezy island port atmosphere, witty melodic exchanges between fiddle and flute, warm D Dorian harmonies, adventurous and mischievous. A small acoustic tavern ensemble with natural wooden resonance, elegant but slightly scruffy musicianship. Bright recurring four-note melody, steady loopable groove. Acoustic instruments only, instrumental game soundtrack.",
+        "comfyui_version": "0.34.1",
+        "text_encoder": {
+          "node": "TextEncodeAceStepAudio1.5",
+          "language": "en",
+          "generate_audio_codes": true,
+          "cfg_scale": 2.0,
+          "temperature": 0.85,
+          "top_p": 0.9,
+          "top_k": 0,
+          "min_p": 0.0
+        }
+      },
+      "conformed_from": {
+        "transform": "trim end silence, normalise to -16 LUFS (-1.5 dBTP true peak), mp3 128 kbps"
+      }
+    }
+  }
 }

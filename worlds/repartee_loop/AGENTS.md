@@ -25,6 +25,12 @@ Seventeen images, about 1.1 MB, all at target resolution: two interchangeable
 packs of seven, plus three sprite sheets in the spaceport pack. Each sheet's
 frames and clips live in a small JSON sidecar beside it.
 
+The two themes, `music/theme.mp3` in each pack at about 1.4 MB, are the
+exception: no test reads them, so they are in LFS, and the root `.lfsconfig`
+leaves them out of default fetches until a client can play them (#571). Their
+manifest entries, under `music` rather than `assets`, record how each was made;
+the pack tests read only `assets`.
+
 They are stored as **ordinary git blobs**, not LFS, via the `.gitattributes`
 beside this file. Root rule 3 forbids CI depending on LFS having materialized,
 and `test_repartee_art_packs.py` reads the bytes of every one of them.
