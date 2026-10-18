@@ -113,19 +113,24 @@ The station's theme should one day mirror how its art was made. The spaceport
 pack re-renders the quayside backgrounds and figures in space, keeping their
 composition; its music should likewise be a *cover* of the island theme: the
 same tune, with every instrument changed. That needs a generator that separates
-a tune from its sound. ACE-Step does this natively, in its cover task, but
-ComfyUI does not expose it yet, and the substitutes do not work. Re-rendering
-the island theme at partial strength with the station's description keeps some
-of the tune (at 0.65-0.7) but blurs the instruments toward the island's, and
-adding the station theme as a timbre reference pulls the tune away too. So for
-now the station's theme is a text render of its own. Running ACE-Step's own
-pipeline, or a commercial generator's reference-track feature, would make the
-cover.
+a tune from its sound. ACE-Step does, in its cover task, but ComfyUI's built-in
+ACE-Step nodes, which these themes were made with, do not: re-rendering the
+island theme at partial strength with the station's description keeps some of
+the tune (at 0.65-0.7) but blurs the instruments toward the island's, and adding
+the station theme as a timbre reference pulls the tune away too. So for now the
+station's theme is a text render of its own. The official ACE-Step-ComfyUI
+custom node is the next thing to try: connect a source track to its `src_audio`
+and the task becomes `cover`, with cover and remix strengths, though it hands
+generation to a local ACE-Step 1.5 server. A commercial generator's
+reference-track feature would also do.
 
 Each pack ships its theme as `music/theme.mp3`, the same name in both, so the
 pack decides which plays, as it does for the art, once clients can play audio
 (#571). Each pack's manifest records how its theme was made under `music`: the
-description, settings and seed it renders from again, and its hash.
+description, every sampler and text-encoder setting, the seed, the checkpoint
+and the ComfyUI version it was rendered with, and the shipped file's hash. The
+same record on another ComfyUI or checkpoint version may not give the same
+audio.
 
 The themes are in Git LFS and are not downloaded by default (the root
 `.lfsconfig`); a clone has small pointer files in their place. To fetch them
