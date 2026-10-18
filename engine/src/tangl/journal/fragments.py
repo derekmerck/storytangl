@@ -28,6 +28,12 @@ from tangl.presentation.intent import Accepts as _Accepts
 from tangl.presentation.intent import Blocker as _Blocker
 from tangl.presentation.intent import UIHints as _UIHints
 from tangl.presentation.values import KvRow as _KvRow
+from tangl.presentation.targets import (
+    FragmentTarget,
+    PresentationTarget,
+    RitTarget,
+    RoleTarget,
+)
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, UnstructuredData
@@ -179,21 +185,99 @@ class ControlFragment(BaseFragment, extra="allow"):
     """Reference-style fragment for update and delete control events."""
 
     fragment_type: ControlFragmentType = "update"
-    reference_type: str | Enum = Field("content", alias="ref_type")
-    reference_id: Identifier = Field(..., alias="ref_id")
+    target: PresentationTarget = Field(json_schema_extra={"unstructurable": True})
     payload: UnstructuredData | None = None
+    patch_kind: Literal["content", "presentation"] = "content"
+    media_action: Literal["restart"] | None = None
+    media: MediaFragment | None = Field(None, json_schema_extra={"unstructurable": True})
 
     @model_validator(mode="after")
     def _validate_payload(self) -> "ControlFragment":
-        if self.fragment_type == "update" and self.payload is None:
+        if self.payload is not None:
+            transport_fields = {
+                "rit_id", "url", "path", "src", "content_type", "media_type",
+                "media_format", "mime_type", "sprite_sheets",
+            }
+            if (
+                transport_fields.intersection(self.payload)
+                or self.payload.get("content_format", self.payload.get("format"))
+                in ("url", "path", "data", "xml", "rit")
+                or self.payload.get("fragment_type", self.payload.get("type")) == "media"
+                or isinstance(self.payload.get("media"), (dict, MediaFragment, MediaRIT))
+            ):
+                raise ValueError("media descriptors belong in the typed media field, not payload")
+            if self.patch_kind == "presentation" and self.payload.keys() - {
+                "text", "fallback_text", "staging_hints", "presentation_hints", "hints",
+                "media_role", "presentation_handle",
+            }:
+                raise ValueError(
+                    "presentation patches contain only captions and presentation hints",
+                )
+        if self.media is not None:
+            if (
+                self.fragment_type != "update" or self.payload is not None
+                or self.patch_kind != "content"
+            ):
+                raise ValueError("media update requires ordinary media, not a patch payload")
+            if self.media_action == "restart" and self.media.rit_id is None:
+                raise ValueError("restart media requires resource identity (rit_id)")
+        elif self.media_action is not None:
+            raise ValueError("restart requires update + ordinary media, not a patch payload")
+        elif self.fragment_type == "update" and self.payload is None:
             raise ValueError("payload cannot be None for an update fragment")
         return self
 
-    def reference(self, registry: Registry[BaseFragment]) -> BaseFragment:
-        return registry.find_one(Selector.from_identifier(self.reference_id))
+    def matches(self, fragment: BaseFragment) -> bool:
+        """Match current presentations, never source entities or cached bytes."""
+        if isinstance(self.target, FragmentTarget):
+            return fragment.uid == self.target.fragment_id
+        if not isinstance(fragment, MediaFragment):
+            return False
+        if isinstance(self.target, RitTarget):
+            return fragment.rit_id == self.target.rit_id
+        if isinstance(self.target, RoleTarget):
+            return fragment.media_role == self.target.media_role
+        return fragment.presentation_handle == self.target.handle
+
+    def references(self, registry: Registry[BaseFragment]) -> list[BaseFragment]:
+        return list(registry.find_all(Selector(predicate=self.matches)))
+
+    def apply_to(self, fragment: BaseFragment) -> BaseFragment | None:
+        """Apply a matched registry edit without mutating history or upserting.
+
+        Content/game patches never edit a media source. Presentation patches
+        carry only per-use metadata; replacements carry a complete media value.
+        Restart remains a live action for a later playback owner.
+        """
+        if not self.matches(fragment) or self.media_action is not None:
+            return fragment
+        if self.fragment_type == "delete":
+            return None
+        if self.media is not None:
+            if not isinstance(fragment, MediaFragment):
+                return fragment
+            return self.media.evolve(uid=fragment.uid).continued_from(fragment)
+        if isinstance(fragment, MediaFragment):
+            if self.patch_kind != "presentation":
+                return fragment
+        updates = dict(self.payload)
+        if self.patch_kind == "presentation":
+            if isinstance(fragment, MediaFragment) and updates.get("staging_hints") is not None:
+                previous = fragment.staging_hints.model_dump() if fragment.staging_hints else {}
+                updates["staging_hints"] = {**previous, **updates["staging_hints"]}
+            if isinstance(fragment, (ContentFragment, GroupFragment, PieceFragment)):
+                if "presentation_hints" in updates:
+                    updates.setdefault("hints", updates.pop("presentation_hints"))
+                if updates.get("hints") is not None:
+                    previous = (
+                        fragment.presentation_hints.model_dump()
+                        if fragment.presentation_hints else {}
+                    )
+                    updates["hints"] = {**previous, **updates["hints"]}
+        return fragment.evolve(**{**updates, "uid": fragment.uid})
 
 
-ContentFormatType = Literal["url", "data", "xml", "json", "rit"]
+ContentFormatType = Literal["url", "path", "data", "xml", "json", "rit"]
 
 
 class MediaFragment(ContentFragment, extra="allow"):
@@ -205,6 +289,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     rit_id: UUID | None = None
     staging_hints: _StagingHints | None = None
     media_role: str | None = None
+    presentation_handle: str | None = None
     scope: str | None = "world"
     fragment_type: Literal["media"] = "media"
 
@@ -262,9 +347,23 @@ class MediaFragment(ContentFragment, extra="allow"):
         """Copy a live fragment without serializing its graph-owned RIT."""
 
         data = {**self.__dict__, **(self.__pydantic_extra__ or {}), **updates}
+        data["hints"] = updates.get("hints", data.pop("presentation_hints"))
         if "content" in updates and "rit_id" not in updates:
             data["rit_id"] = None
         return type(self).model_validate(data)
+
+    def continued_from(self, previous: MediaFragment | None) -> Self:
+        """Inherit repetition only when restating the same identified resource."""
+        if (
+            previous is not None and self.rit_id is not None and self.rit_id == previous.rit_id
+            and previous.staging_hints is not None
+            and (self.staging_hints is None or self.staging_hints.media_timing is None)
+        ):
+            hints = self.staging_hints or _StagingHints()
+            return self.evolve(staging_hints=hints.model_copy(update={
+                "media_timing": previous.staging_hints.media_timing,
+            }))
+        return self
 
     @field_serializer("content")
     def _encode_binary_content(self, content: Any) -> str:
@@ -382,6 +481,15 @@ def fragment_from_dto(payload: object) -> BaseFragment:
     fragment_model = _FRAGMENT_DTO_TYPES.get(fragment_type)
     if fragment_model is None:
         return BaseFragment(fragment_type=fragment_type, content=raw_fragment)
+
+    content_format = raw_fragment.get("content_format")
+    if fragment_type == "media" and content_format in {"url", "path", "data", "xml"}:
+        source_key = "data" if content_format == "xml" else content_format
+        raw_fragment.setdefault("content", raw_fragment.get(source_key))
+        if "media_type" in raw_fragment:
+            raw_fragment["content_type"] = raw_fragment.pop("media_type")
+    if fragment_type == "update" and raw_fragment.get("media") is not None:
+        raw_fragment["media"] = fragment_from_dto(raw_fragment["media"])
 
     for field_name in fragment_model._match_fields(dto=True):
         dto_alias = fragment_model.model_fields[field_name].json_schema_extra["dto_alias"]

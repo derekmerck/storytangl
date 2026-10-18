@@ -103,16 +103,19 @@ def _registry_after_controls(fragments: list[dict[str, Any]]) -> dict[str, dict[
     for fragment in fragments:
         fragment_type = _fragment_type(fragment)
         if fragment_type == "delete":
-            ref_id = fragment.get("ref_id") or fragment.get("reference_id")
+            ref_id = fragment["target"].get("fragment_id")
             if isinstance(ref_id, str):
                 registry.pop(ref_id, None)
             continue
         if fragment_type == "update":
-            ref_id = fragment.get("ref_id") or fragment.get("reference_id")
+            ref_id = fragment["target"].get("fragment_id")
             payload = fragment.get("payload")
-            if isinstance(ref_id, str) and isinstance(payload, dict):
-                existing = registry.get(ref_id, {"uid": ref_id})
-                registry[ref_id] = {**existing, **payload, "uid": ref_id}
+            media = fragment.get("media")
+            if isinstance(ref_id, str) and isinstance(media, dict) and ref_id in registry:
+                registry[ref_id] = {**media, "uid": ref_id}
+            elif isinstance(ref_id, str) and isinstance(payload, dict):
+                if ref_id in registry:
+                    registry[ref_id] = {**registry[ref_id], **payload, "uid": ref_id}
             continue
         registry[_fragment_uid(fragment)] = fragment
     return registry
@@ -144,9 +147,9 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
         accepts = fragment.get("accepts")
         assert accepts is None or isinstance(accepts, dict)
     elif fragment_type in {"update", "delete"}:
-        assert isinstance(fragment.get("ref_id") or fragment.get("reference_id"), str)
+        assert isinstance(fragment["target"].get("fragment_id"), str)
         if fragment_type == "update":
-            assert isinstance(fragment.get("payload"), dict)
+            assert isinstance(fragment.get("payload"), dict) or isinstance(fragment.get("media"), dict)
     elif fragment_type == "piece":
         assert isinstance(fragment.get("piece_id"), str)
     else:
@@ -642,7 +645,13 @@ def test_command_hint_fixture_keeps_grammar_advisory() -> None:
 
 
 def test_control_update_and_delete_fixtures_apply_to_registry() -> None:
+    from tangl.journal.fragments import ControlFragment, MediaFragment, fragment_from_dto
+
     update_payload = _load_fixture(FIXTURE_DIR / "pending_media_update.json")
+    control = fragment_from_dto(update_payload["fragments"][-1])
+    pending = fragment_from_dto(update_payload["fragments"][1])
+    assert isinstance(control, ControlFragment) and isinstance(control.media, MediaFragment)
+    assert control.media_action is None and control.apply_to(pending).uid == pending.uid
     update_registry = _registry_after_controls(update_payload["fragments"])
     updated_media = update_registry["00000000-0000-4000-8000-000000000302"]
     assert updated_media["content_format"] == "url"

@@ -9,6 +9,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import pytest
+
 from tangl.service.response import RuntimeEnvelope
 
 
@@ -45,11 +47,137 @@ PARITY = _load_module("parity", PARITY_PATH)
 TIME_PARITY = _load_module("time_parity", TIME_PARITY_PATH)
 
 
+@pytest.mark.parametrize("port", [PORT, LEGIBILITY, PARITY, TIME_PARITY])
+def test_control_targets_match_media_only_and_missing_addresses_are_noop(port: ModuleType) -> None:
+    registry = {
+        "avatar": {
+            "uid": "avatar", "fragment_type": "media", "rit_id": "portrait",
+            "media_role": "avatar_im", "presentation_handle": "character:bob",
+        },
+        "text": {
+            "uid": "text", "fragment_type": "content", "rit_id": "portrait",
+            "media_role": "avatar_im", "presentation_handle": "character:bob",
+        },
+        "plain": {"uid": "plain", "fragment_type": "content"},
+    }
+    for target in [
+        {"kind": "rit", "rit_id": "portrait"},
+        {"kind": "role", "media_role": "avatar_im"},
+        {"kind": "handle", "handle": "character:bob"},
+    ]:
+        updated = port.apply_runtime_envelope(registry, {"fragments": [{
+            "uid": "update", "fragment_type": "update", "target": target,
+            "patch_kind": "presentation",
+            "payload": {"text": "Updated"},
+        }]})
+        assert updated["avatar"]["text"] == "Updated"
+        assert "text" not in updated["text"]
+    for kind in ["fragment", "rit", "role", "handle"]:
+        unchanged = port.apply_runtime_envelope(registry, {"fragments": [{
+            "uid": "delete", "fragment_type": "delete", "target": {"kind": kind},
+        }]})
+        assert unchanged == registry
+
+
 def _load_sequence(name: str) -> dict[str, Any]:
     with (SEQUENCE_DIR / name).open(encoding="utf-8") as sequence_file:
         payload = json.load(sequence_file)
     assert isinstance(payload, dict)
     return payload
+
+
+@pytest.mark.parametrize("port", [PORT, LEGIBILITY, PARITY, TIME_PARITY])
+def test_media_patch_intent_and_typed_replacement_agree_across_ports(port: ModuleType) -> None:
+    registry = {"music": {
+        "uid": "music", "fragment_type": "media", "rit_id": "a", "media_role": "music",
+        "url": "/old", "staging_hints": {"media_timing": "loop"},
+    }}
+    target = {"kind": "role", "media_role": "music"}
+    for patch in [
+        {"patch_kind": "presentation", "payload": {
+            "text": "A caption", "staging_hints": {"media_x": 0.5},
+        }},
+        {"media": {
+            "uid": "descriptor", "fragment_type": "media", "rit_id": "a",
+            "media_role": "music", "url": "/new",
+        }},
+        {"payload": {"content": {"url": "/not-a-source"}, "data": "not-a-source"}},
+    ]:
+        registry = port.apply_runtime_envelope(registry, {"fragments": [{
+            "uid": "update", "fragment_type": "update", "target": target, **patch,
+        }]})
+    assert registry["music"]["uid"] == "music"
+    assert registry["music"]["url"] == "/new"
+    assert "content" not in registry["music"] and "data" not in registry["music"]
+    assert registry["music"]["staging_hints"]["media_timing"] == "loop"
+    assert registry["music"]["staging_hints"] == {"media_timing": "loop"}
+    assert "text" not in registry["music"]  # Replacement does not merge stale descriptor fields.
+    absent = port.apply_runtime_envelope({}, {"fragments": [{
+        "uid": "update", "fragment_type": "update", "target": target,
+        "media": {"uid": "descriptor", "fragment_type": "media", "rit_id": "a"},
+    }]})
+    assert absent == {}
+
+
+@pytest.mark.parametrize("port", [PORT, LEGIBILITY, PARITY, TIME_PARITY])
+@pytest.mark.parametrize("payload", [
+    {"staging_hints": {"media_x": 0.25}},
+    {"staging_hints": {"media_visibility": {"preference_id": "sprites", "values": [False]}}},
+    {"staging_hints": {"media_y": None, "media_timing": None}},
+    {"staging_hints": None},
+    {"staging_hints": {}},
+    {"text": "New caption"},
+])
+def test_ports_merge_staging_coordinates_and_preserve_explicit_null(
+    port: ModuleType, payload: dict,
+) -> None:
+    hints = {
+        "media_x": 0.1, "media_y": 0.8, "media_size": 0.5, "media_clip": "idle",
+        "media_visibility": {"preference_id": "sprites", "values": [True]},
+        "media_timing": "loop",
+    }
+    original = {"alice": {
+        "uid": "alice", "fragment_type": "media", "rit_id": "portrait", "source_id": "source",
+        "presentation_handle": "character:alice", "staging_hints": hints,
+    }}
+    before = json.dumps(original)
+    updated = port.apply_runtime_envelope(original, {"fragments": [{
+        "uid": "move", "fragment_type": "update", "patch_kind": "presentation",
+        "target": {"kind": "handle", "handle": "character:alice"}, "payload": payload,
+    }]})
+    expected = hints
+    if "staging_hints" in payload:
+        expected = (
+            {**hints, **payload["staging_hints"]} if payload["staging_hints"] is not None else None
+        )
+    assert updated["alice"]["staging_hints"] == expected
+    assert updated["alice"]["uid"] == "alice" and updated["alice"]["rit_id"] == "portrait"
+    assert updated["alice"]["source_id"] == "source" and json.dumps(original) == before
+
+
+@pytest.mark.parametrize("port", [PORT, LEGIBILITY, PARITY, TIME_PARITY])
+@pytest.mark.parametrize("field", ["hints", "presentation_hints"])
+def test_ports_merge_only_named_presentation_container(port: ModuleType, field: str) -> None:
+    original = {"text": {
+        "uid": "text", "fragment_type": "content", "content": {"a": 1},
+        "hints": {"style_name": "speaker", "icon": "old"},
+    }}
+    target = {"kind": "fragment", "fragment_id": "text"}
+    updated = port.apply_runtime_envelope(original, {"fragments": [{
+        "uid": "hint", "fragment_type": "update", "target": target,
+        "patch_kind": "presentation", "payload": {field: {"icon": None}},
+    }]})
+    assert updated["text"]["hints"] == {"style_name": "speaker", "icon": None}
+    cleared = port.apply_runtime_envelope(updated, {"fragments": [{
+        "uid": "clear", "fragment_type": "update", "target": target,
+        "patch_kind": "presentation", "payload": {field: None},
+    }]})
+    assert cleared["text"]["hints"] is None
+    game = port.apply_runtime_envelope(original, {"fragments": [{
+        "uid": "game", "fragment_type": "update", "target": target,
+        "payload": {"content": {"b": 2}},
+    }]})
+    assert game["text"]["content"] == {"b": 2} and original["text"]["content"] == {"a": 1}
 
 
 def _lines(step: Any) -> str:
@@ -160,7 +288,7 @@ def test_sequence_legibility_uses_current_registry_after_updates() -> None:
                     {
                         "uid": "scene-update",
                         "fragment_type": "update",
-                        "ref_id": "scene",
+                        "target": {"kind": "fragment", "fragment_id": "scene"},
                         "payload": {"member_ids": ["choice"]},
                     }
                 ],
@@ -226,7 +354,7 @@ def test_sequence_input_parity_uses_current_registry_after_updates() -> None:
                     {
                         "uid": "source-update",
                         "fragment_type": "update",
-                        "ref_id": "source",
+                        "target": {"kind": "fragment", "fragment_id": "source"},
                         "payload": {"member_ids": []},
                     }
                 ],

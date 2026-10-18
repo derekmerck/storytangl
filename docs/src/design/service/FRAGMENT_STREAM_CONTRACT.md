@@ -46,6 +46,7 @@ RuntimeEnvelope
   last_redirect: dict | null
   redirect_trace: list[dict]
   metadata: dict
+  presentation: {music: fragment DTO | null} | absent
 ```
 
 `create_story`, `resolve_choice`, and `get_story_update` return this envelope
@@ -60,6 +61,16 @@ transport discriminator, preserves concrete fields such as
 bookkeeping selected by `dto_exclude` field metadata. A fragment's `uid` is also
 a stable reference target within the envelope and across later update/delete
 control fragments.
+
+Service-built envelopes now include `presentation.music`, a read-only desired-BGM
+synchronization snapshot folded from full canonical history before journal-window
+limits or media policy. No cue in the returned batch means keep, while explicit
+`music: null` means empty/unavailable for that delivery profile. The keyed map
+retains null through REST's exclude-none policy. The snapshot carries no historical
+restart/effect/voice events; it is desired presentation, not proof of playback.
+Its descriptor and a control's nested `media` use ordinary media-profile resolution,
+including URL/path/inline, fallback, no_audio and unavailable/LFS sources. No raw
+backend RIT/path bypass or second persisted music store is introduced.
 
 FastAPI advertises the resulting outer shape as `RuntimeEnvelopePayload`.
 That schema types cursor, UX-event, redirect, and reserved metadata surfaces
@@ -96,7 +107,7 @@ extension types preserve the same `BaseFragment` shape.
 | `group` | Relational overlay tying peer fragments together by id. |
 | `piece` | Targetable piece or object rendered inside a zone. |
 | `kv` | Ordered key-value content for compact state/status surfaces. |
-| `update` / `delete` | Control fragments mutating an earlier registry entry. |
+| `update` / `delete` | Controls addressing current presentations by explicit target. |
 
 Unknown fragment types are valid extension points. A client that cannot render a
 fragment type must keep the stream alive and show or stash a diagnostic fallback
@@ -145,6 +156,37 @@ the first implementation target.
 A rich client may render sliders, steppers, piece chips, autocomplete, or form
 groups. A CLI should be able to ask the same values as sequential prompts and
 submit the same payload.
+
+## Control targets
+
+`ControlFragment.target` replaces `ref_id`/`ref_type` and their long spellings:
+
+| `target.kind` | Required address | Meaning |
+|---|---|---|
+| `fragment` | `fragment_id` UUID | One exact occurrence. |
+| `rit` | `rit_id` UUID | Active uses of that resource, not its donating character. |
+| `role` | `media_role` string | Current matching screen instances/slot, e.g. all avatars or music. |
+| `handle` | `handle` string | Exact authored `MediaFragment.presentation_handle` binding. |
+
+Missing matches are harmless; updates do not upsert. Ordinary prose/game patches
+use `payload` and default `patch_kind: content`; they never modify media.
+Descriptor-free captions, placement and visibility/hints use
+`patch_kind: presentation` with `payload`, including on media. This patch permits
+`text`, `fallback_text`, `staging_hints`, `presentation_hints`/`hints`, `media_role`
+and `presentation_handle`, not media-source/transport fields.
+An `update` with typed `media` and no action replaces a matching media value,
+preserving the addressed occurrence UID rather than merging stale descriptors.
+The descriptor goes through normal media-profile resolution. Supplying new
+media content is distinct from addressing or moving an existing presentation;
+stop/delete needs only a target. A deliberate restart is `fragment_type: update` with
+`media_action: restart` and a normal resolvable `media` MediaFragment, not an
+opaque media dictionary inside `payload`. An ordinary media cue starts/replaces
+selection; a matching delete stops it without needing an introducing occurrence
+id. Restart retains repetition mode, and control UID remains available for later
+client deduplication. The canonical code-adjacent note
+`engine/src/tangl/media/MEDIA_DESIGN.md` records wire examples and the explicit
+physical-playback deferrals; the [media overview](../MEDIA_DESIGN.md) records
+the subsystem boundaries.
 
 ## Media Fragments
 

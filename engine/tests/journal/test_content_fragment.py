@@ -40,11 +40,11 @@ def test_update_fragment():
     update = ControlFragment(
         fragment_type="update",
         payload={'content': "Updated content"},
-        ref_id=original_id
+        target={"kind": "fragment", "fragment_id": original_id},
     )
     assert update.fragment_type == "update"
-    assert update.reference_id == original_id
-    assert update.reference_type == "content"
+    assert update.target.fragment_id == original_id
+    assert update.target.kind == "fragment"
 
 
 def test_text_fragment_creation():

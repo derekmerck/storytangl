@@ -96,6 +96,16 @@ class RuntimeMetadata(InfoModel):
     grammar: _presentation_events.GrammarHint | None = None
 
 
+class PresentationSnapshot(InfoModel):
+    """Current desired selection; empty is explicit, not an incremental no-cue."""
+
+    music: SerializeAsAny[BaseFragment] | None = None
+
+
+PresentationSnapshotPayload: TypeAlias = dict[Literal["music"], dict[str, JsonValue] | None]
+"""Map values retain explicit null under REST's exclude-none policy."""
+
+
 class RuntimeEnvelopePayload(InfoModel):
     """Transport schema for :meth:`RuntimeEnvelope.to_dto` output."""
 
@@ -108,6 +118,7 @@ class RuntimeEnvelopePayload(InfoModel):
     last_redirect: dict[str, JsonValue] | None = None
     redirect_trace: list[dict[str, JsonValue]] = Field(default_factory=list)
     metadata: RuntimeMetadata = Field(default_factory=RuntimeMetadata)
+    presentation: PresentationSnapshotPayload | None = None
 
 
 class RuntimeEnvelope(InfoModel):
@@ -120,6 +131,7 @@ class RuntimeEnvelope(InfoModel):
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    presentation: PresentationSnapshot | None = None
 
     @field_validator("metadata")
     @classmethod
@@ -138,7 +150,7 @@ class RuntimeEnvelope(InfoModel):
             mode="json",
             by_alias=True,
             exclude_none=True,
-            exclude={"fragments"},
+            exclude={"fragments", "presentation"},
         )
         payload: dict[str, Any] = {}
         for field_name in ("cursor_id", "step"):
@@ -146,6 +158,11 @@ class RuntimeEnvelope(InfoModel):
                 payload[field_name] = base_payload.pop(field_name)
         payload["fragments"] = [fragment_to_dto(fragment) for fragment in self.fragments]
         payload.update(base_payload)
+        if self.presentation is not None:
+            music = self.presentation.music
+            payload["presentation"] = {
+                "music": fragment_to_dto(music) if music is not None else None,
+            }
         return payload
 
 
@@ -335,6 +352,8 @@ __all__ = [
     "MediaNative",
     "NativeResponse",
     "PreflightReport",
+    "PresentationSnapshot",
+    "PresentationSnapshotPayload",
     "RuntimeEnvelope",
     "RuntimeEnvelopePayload",
     "RuntimeInfo",

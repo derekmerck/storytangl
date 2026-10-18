@@ -51,9 +51,72 @@ export const fragmentText = (value: unknown): string => {
   return JSON.stringify(value)
 }
 
-export const fragmentRefId = (fragment: ControlStoryFragment): FragmentId | undefined => {
-  const value = fragment.ref_id ?? fragment.reference_id
-  return typeof value === 'string' && value ? value : undefined
+export const applyControlFragment = (
+  registry: Record<string, StoryFragment>,
+  fragment: ControlStoryFragment,
+): void => {
+  if (fragment.media_action) return // Playback owners, not historical views, consume restart.
+  for (const [id, existing] of Object.entries(registry)) {
+    const target = fragment.target
+    const matches =
+      target.kind === 'fragment'
+        ? id === target.fragment_id
+        : isMediaFragment(existing) &&
+          (target.kind === 'rit'
+            ? existing.rit_id === target.rit_id
+            : target.kind === 'role'
+              ? existing.media_role === target.media_role
+              : existing.presentation_handle === target.handle)
+    if (!matches) continue
+    if (fragment.fragment_type === 'delete') delete registry[id]
+    else {
+      let updated: StoryFragment = existing
+      if (fragment.media && isMediaFragment(existing)) {
+        updated = { ...fragment.media, uid: id }
+      } else if (isRecord(fragment.payload) && !fragment.media) {
+        if (isMediaFragment(existing) && fragment.patch_kind !== 'presentation') continue
+        updated = { ...existing, ...fragment.payload, uid: id } as StoryFragment
+        if (fragment.patch_kind === 'presentation') {
+          for (const key of ['staging_hints', 'hints'] as const) {
+            const patch =
+              key === 'hints' && !('hints' in fragment.payload)
+                ? fragment.payload.presentation_hints
+                : fragment.payload[key]
+            if (
+              key === 'hints' &&
+              ('hints' in fragment.payload || 'presentation_hints' in fragment.payload)
+            ) {
+              updated.hints = patch
+              delete updated.presentation_hints
+            }
+            if (isRecord(patch)) {
+              const previous =
+                key === 'hints' ? (existing.hints ?? existing.presentation_hints) : existing[key]
+              updated[key] = { ...(isRecord(previous) ? previous : {}), ...patch }
+            }
+          }
+        }
+      }
+      if (
+        isMediaFragment(existing) &&
+        isMediaFragment(updated) &&
+        fragment.media &&
+        existing.rit_id &&
+        existing.rit_id === updated.rit_id &&
+        existing.staging_hints?.media_timing != null &&
+        updated.staging_hints?.media_timing == null
+      ) {
+        updated = {
+          ...updated,
+          staging_hints: {
+            ...updated.staging_hints,
+            media_timing: existing.staging_hints.media_timing,
+          },
+        }
+      }
+      registry[id] = updated
+    }
+  }
 }
 
 export const fragmentUid = (
@@ -114,6 +177,7 @@ export const normalizeEnvelope = (
     last_redirect: payload.last_redirect ?? null,
     redirect_trace: payload.redirect_trace ?? [],
     metadata: payload.metadata ?? {},
+    presentation: payload.presentation,
   }
 }
 
