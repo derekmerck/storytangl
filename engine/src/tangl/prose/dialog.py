@@ -219,7 +219,10 @@ class DialogMuBlock(MuBlock):
         if binding is not None:
             subject = binding.subject
             speaker_key = binding.key
-            params = binding.title_reference.params if binding.title_reference is not None else {}
+            params = (
+                dict(binding.title_reference.params)
+                if binding.title_reference is not None else {"form": "label"}
+            )
             resolved_name = (
                 name_resolver(subject, **params)
                 if name_resolver is not None and (self.label is None or binding.title_reference)

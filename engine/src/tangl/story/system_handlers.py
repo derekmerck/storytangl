@@ -913,7 +913,6 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
     def speaker_name(subject: object, **params: RealizationValue) -> str | None:
         # The optional naming authority supplies a pure read. Without it,
         # None preserves DialogMuBlock's ordinary display-name fallback.
-        params.setdefault("form", "label")
         return do_render_text(subject, aspect="reference_auto", ctx=ctx, **params)
 
     composed: list[Record] = []

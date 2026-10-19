@@ -222,10 +222,6 @@ class NamingOperations:
             binding.title_reference = reference
         return binding
 
-    def label(self, target: Referent, **params: RealizationValue) -> str:
-        params.setdefault("form", "label")
-        return self.reference(target, **params)
-
     def policy(self, concept: Concept) -> NamingPolicy:
         if isinstance(concept, NamedConcept) and concept.naming_policy is not None:
             return concept.naming_policy
@@ -341,7 +337,7 @@ def render_linked_prose(
                               source=f"owner {caller.get_label()} ({caller.uid})")
     fragments = DialogHandler.render(
         units, ns=ns, ctx=ctx, source_id=caller.uid,
-        name_resolver=operations.label,
+        name_resolver=operations.reference,
         speaker_resolver=operations.speaker,
         parts_resolver=lambda parts: operations.realize(parts, disclose=True),
     )

@@ -137,6 +137,54 @@ def test_adopted_title_preserves_matched_form_and_auto_policy(scene: CalloutScen
     assert journal(owner, ctx)[0].who == "Ms. Northstar"
 
 
+@pytest.mark.parametrize("path", ["ordinary", "ordinary_json", "raw", "parsed", "json"])
+def test_titleless_label_default_does_not_replace_adopted_primary_or_formal_title(
+    scene: CalloutScene, path: str,
+) -> None:
+    graph, owner, ctx = scene
+    rin = ctx.get_ns(owner)["rin"]
+    rin.proper_forms.update({"label": "Guide", "formal": "Ms. Northstar"})
+    source = "\n\n".join(
+        f"> [!rin.angry]{title}\n> Hello."
+        for title in ("", " Rin", " Ms. Northstar", " Disgruntled Girl", r" \Rin")
+    )
+    if path.startswith("ordinary"):
+        owner = Block(label="raw_callouts", content=source, registry=graph)
+        ctx = context(graph, owner)
+    else:
+        owner.prose = [MuBlock(text=source)] if path == "raw" else DialogHandler.parse(source)
+    if "json" in path:
+        graph = StoryGraph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
+        owner = graph.get(owner.uid)
+        ctx = context(graph, owner)
+        rin = ctx.get_ns(owner)["rin"]
+    authored = owner.unstructure()
+    adoptions = discover_adoptions(ctx.get_ns(owner))
+    matched = {title: [ref.unstructure() for ref in refs] for title, refs in adoptions.items()}
+    before = graph.value_hash()
+    first = journal(owner, ctx)
+    assert [fragment.who for fragment in first] == [
+        "the blonde girl", "the blonde girl", "the blonde girl", "Disgruntled Girl", "Rin",
+    ]
+    assert graph.value_hash() == before and rin.narrator_knowledge == {}
+    historical = [fragment_to_dto(fragment) for fragment in first]
+    NamingOperations(ctx).introduce(rin)
+    identified = graph.value_hash()
+    second = journal(owner, ctx)
+    assert [fragment.who for fragment in second] == [
+        "Guide", "Rin", "Ms. Northstar", "Disgruntled Girl", "Rin",
+    ]
+    assert all(fragment.speaker_id == str(rin.uid) and fragment.speaker_key == "rin"
+               and fragment.how == "dialog.angry" for fragment in [*first, *second])
+    assert graph.value_hash() == identified
+    assert [fragment_to_dto(fragment) for fragment in first] == historical
+    assert owner.unstructure() == authored
+    assert {title: [ref.unstructure() for ref in refs]
+            for title, refs in adoptions.items()} == matched
+    assert {title: [ref.unstructure() for ref in refs]
+            for title, refs in discover_adoptions(ctx.get_ns(owner)).items()} == matched
+
+
 def test_naming_label_form_coexists_with_presence_text_dispatch(scene: CalloutScene) -> None:
     import tangl.mechanics.presence.presentation  # noqa: F401
 

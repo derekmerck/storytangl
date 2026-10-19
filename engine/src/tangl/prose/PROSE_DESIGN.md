@@ -320,8 +320,10 @@ Stored `literal_label=True` bypasses title adoption. The raw codec uses leading
 backslash parity: `\Rin` forces literal Rin, each slash pair emits one slash, and
 an odd remainder forces literal intent. These authored fields use ordinary
 constructor-form owner embedding; no serializer or retained provider is added.
-Labels default to `form="label"`, retain AUTO concealment and ordinary proper-name
-fallback, and do not introduce. UPDATE runs before JOURNAL; ordered units prepare
+Titleless labels default to `form="label"`, retaining AUTO concealment and ordinary
+proper-name fallback. Adopted titles preserve their matched parameters, including
+the ordinary/default form when no form was supplied. Neither introduces.
+UPDATE runs before JOURNAL; ordered units prepare
 labels before their own bodies, while raw whole-block Jinja still runs before
 composition. Existing explicit body/reference/introduce operations share one
 provider/narrator knowledge record. No new phase or epistemic snapshot is implied.
