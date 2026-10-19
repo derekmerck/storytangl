@@ -18,7 +18,7 @@ scenes:
         content: |
           {dock_mood} {porter_greeting}
 
-          > [!pov] Old Maro
+          > [!pov|] Old Maro
           > Papers and cargo, friend. In that order.
         actions:
           - text: "Tromp up the gangway, boots still muddy"

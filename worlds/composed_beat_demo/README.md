@@ -18,7 +18,7 @@ for the conformance assertions.
 | `render_porter_reaction` | conditional render-time enrichment, gated on the gathered namespace |
 | `apply_beat_consequences` | UPDATE-phase mutation plus cross-phase enrichment via `ctx.injected_journal_fragments` |
 | `compose_beat` | post-merge composition: slot ordering, fog substitution, beat overlay |
-| the `> [!pov]` dialog lines in `arrival` | interplay with the story-layer dialog transform earlier in the compose fold |
+| the `> [!pov\|]` dialog lines in `arrival` | explicit POV mode through the shared story-layer callout transform |
 
 ## Walkthrough
 

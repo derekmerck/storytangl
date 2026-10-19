@@ -211,9 +211,9 @@ def test_semantic_and_template_forms_share_ordered_policy_and_generated_words_st
                               "introduce": operations.introduce})
     owner.prose = [
         MuBlock(text=[ConceptReference(ref="host", params={"form": "formal"})]),
-        DialogMuBlock(label="host", dialog_class="NPC.happy",
+        DialogMuBlock(dialog_mode="NPC", dialog_class="host.happy",
                       template="{{ introduce(host, form='formal') }}"),
-        DialogMuBlock(label="host", dialog_class="NPC.happy",
+        DialogMuBlock(dialog_mode="NPC", dialog_class="host.happy",
                       template="{{ reference(host, form='formal') }}"),
     ]
     fragments = render_linked_prose(caller=owner, ctx=ctx)
@@ -227,7 +227,7 @@ def test_semantic_and_template_forms_share_ordered_policy_and_generated_words_st
     assert graph.value_hash() == before
 
 
-def test_named_object_is_not_automatically_a_speaker() -> None:
+def test_named_object_can_supply_attribution_without_actor_media() -> None:
     graph = StoryGraph()
     owner = ProseBlock(registry=graph)
     item = NamedItem(name="Dawn", anonymous_name="an old sword", registry=graph)
@@ -235,8 +235,7 @@ def test_named_object_is_not_automatically_a_speaker() -> None:
     ctx.get_ns(owner)["sword"] = item
     before = graph.value_hash()
     assert NamingOperations(ctx).reference(item) == "an old sword"
-    with pytest.raises(TypeError, match="Not a speaker"):
-        NamingOperations(ctx).speaker("sword")
+    assert NamingOperations(ctx).speaker("sword").subject is item
     assert graph.value_hash() == before
 
 

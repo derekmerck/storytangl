@@ -209,7 +209,7 @@ def test_prepared_units_preserve_custom_types_styles_and_opaque_templates(
     forms: dict[str, list[ConceptReference]],
 ) -> None:
     units = [CustomNarration(text="Rin", style_dict={"color": "red"}),
-             DialogMuBlock(label="host_role", dialog_class="npc.happy", text="Rin#intro"),
+             DialogMuBlock(dialog_mode="npc", dialog_class="host_role.happy", text="Rin#intro"),
              MuBlock(template="{{ 'Rin#intro' }}"), MuBlock(text="Rin {{ untouched }} #intro")]
     before = [unit.unstructure() for unit in units]
     prepared = prepare_prose(units, forms, source="owner")
@@ -223,14 +223,15 @@ def test_prepared_units_preserve_custom_types_styles_and_opaque_templates(
 def test_raw_parser_keeps_speech_opaque_and_reports_narration_offset(
     forms: dict[str, list[ConceptReference]],
 ) -> None:
-    text = "Rin waits.\n\n> [!npc.happy] host_role\n> Rin #intro.\n\nUnknown #intro!"
+    text = "Rin waits.\n\n> [!npc|host_role.happy]\n> Rin #intro.\n\nUnknown #intro!"
     with pytest.raises(ValueError, match=rf"offset {text.rindex('#intro')}"):
         prepare_prose([MuBlock(text=text)], forms, source="owner")
     prepared = prepare_prose([MuBlock(text=text.replace("Unknown #intro!", "Rin#intro!"),
                                     style_dict={"color": "blue"})], forms, source="owner")
     assert len(prepared) == 3
     assert prepared[1].text == "Rin #intro."
-    assert prepared[1].dialog_class == "npc.happy"
+    assert prepared[1].dialog_mode == "npc"
+    assert prepared[1].dialog_class == "host_role.happy"
     assert prepared[1].style_dict == {"color": "blue"}
 
 
@@ -291,7 +292,7 @@ def test_eligible_name_cannot_cross_a_literal_code_region(
     assert parts[1] == "`code`"
 
 
-def test_speaker_marker_stays_an_exact_symbol_and_never_discloses() -> None:
+def test_unadopted_title_marker_stays_literal_and_never_discloses() -> None:
     graph = StoryGraph()
     owner = ProseBlock(registry=graph)
     actor = NamedActor(name="Rin", registry=graph)
@@ -299,12 +300,12 @@ def test_speaker_marker_stays_an_exact_symbol_and_never_discloses() -> None:
     ctx._ns_cache[owner.uid] = {"host": actor}
     operations = NamingOperations(ctx)
     before = graph.value_hash()
-    units = prepare_prose([MuBlock(text="> [!npc] host #intro\n> Rin#intro")],
+    units = prepare_prose([MuBlock(text="> [!npc|] host #intro\n> Rin#intro")],
                           discover_adoptions(ctx.get_ns(owner)), source="owner")
     assert units[0].label == "host #intro" and units[0].text == "Rin#intro"
-    with pytest.raises(KeyError, match="host #intro"):
-        DialogHandler.render(units, ns=ctx.get_ns(owner), ctx=ctx,
-                             speaker_resolver=operations.speaker)
+    [fragment] = DialogHandler.render(units, ns=ctx.get_ns(owner), ctx=ctx,
+                                     speaker_resolver=operations.speaker)
+    assert fragment.who == "host #intro" and fragment.speaker_id is None
     assert graph.value_hash() == before
 
 

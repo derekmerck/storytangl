@@ -26,7 +26,8 @@ from tangl.vm.runtime.frame import PhaseCtx
 from .dialog import DialogHandler, DialogMuBlock
 from .linking import AdoptionTable, prepare_prose
 from .mu_block import (
-    ConceptReference, MuBlock, RealizationParams, RealizationValue, ReferenceIntent,
+    ConceptReference, DialogSpeakerBinding, MuBlock, RealizationParams, RealizationValue,
+    ReferenceIntent,
 )
 
 
@@ -63,7 +64,8 @@ class NamedConcept(HasNarratorKnowledge):
         """
         result = {self.name: {}} if self.name else {}
         for form, spelling in self._proper_forms().items():
-            result.setdefault(spelling, {"form": form})
+            if form != "label":
+                result.setdefault(spelling, {"form": form})
         result.update({spelling: dict(params) for spelling, params in self.proper_aliases.items()})
         return result
 
@@ -126,29 +128,30 @@ class PersonalNamedActor(NamedActor):
         return generated | self.proper_forms
 
 
-def discover_adoptions(ns: Mapping[str, object]) -> AdoptionTable:
-    """Discover only afforded bindings, collapsing their corresponding wrappers.
-
-    Direct symbols remain distinct unless a wrapper with that label actually
-    provides their value. Aliases of the same wrapper are equivalent; different
-    wrappers sharing a provider are not. Canonical equivalent symbols are sorted.
-    """
+def _scoped_named_bindings(ns: Mapping[str, object]) -> dict[str, tuple[str, NamedConcept]]:
+    """Share the existing wrapper/alias equivalence for discovery and headers."""
     wrappers: dict[UUID, tuple[str, Role | Setting]] = {}
     for symbol, value in sorted(ns.items()):
         if isinstance(value, (Role, Setting)) and isinstance(value.provider, NamedConcept):
             wrappers.setdefault(value.uid, (symbol, value))
-    bindings: dict[str, NamedConcept] = {
-        symbol: wrapper.provider for symbol, wrapper in wrappers.values()
-    }
+    bindings: dict[str, tuple[str, NamedConcept]] = {}
     for symbol, value in sorted(ns.items()):
+        if isinstance(value, (Role, Setting)) and isinstance(value.provider, NamedConcept):
+            bindings[symbol] = (wrappers[value.uid][0], value.provider)
+            continue
         if not isinstance(value, NamedConcept):
             continue
         corresponding = [
             key for key, wrapper in wrappers.values()
             if wrapper.get_label() == symbol and wrapper.provider is value
         ]
-        if len(corresponding) != 1:
-            bindings[symbol] = value
+        bindings[symbol] = (corresponding[0] if len(corresponding) == 1 else symbol, value)
+    return bindings
+
+
+def discover_adoptions(ns: Mapping[str, object]) -> AdoptionTable:
+    """Discover afforded spellings without collapsing independent roles/providers."""
+    bindings = {symbol: concept for symbol, concept in _scoped_named_bindings(ns).values()}
     adoptions: AdoptionTable = {}
     for symbol, concept in sorted(bindings.items()):
         for spelling, params in concept.adopts().items():
@@ -184,12 +187,40 @@ class NamingOperations:
             raise TypeError(f"Naming requires a bound concept provider at {target!r}")
         return concept
 
-    def speaker(self, symbol: str) -> Concept:
-        """Validate an authored symbol and dereference its current provider."""
-        concept = self.provider(self.ctx.get_ns(self.ctx.cursor)[symbol])
-        if not isinstance(concept, (Actor, Location)):
-            raise TypeError(f"Not a speaker provider: {symbol!r}")
-        return concept
+    def speaker(
+        self, symbol: str | None, title: str | None = None, literal: bool = False,
+    ) -> DialogSpeakerBinding | None:
+        """Reconcile an exact header binding and whole-title scoped adoption, purely."""
+        ns = self.ctx.get_ns(self.ctx.cursor)
+        source = f"owner {self.ctx.cursor.get_label()} ({self.ctx.cursor.uid})"
+        target = ns.get(symbol) if symbol else None
+        binding = None
+        if isinstance(target, (NamedConcept, Actor, Location, Role, Setting)):
+            if isinstance(target, (Role, Setting)) and target.provider is None:
+                raise TypeError(f"{source}: unbound dialog binding {symbol!r}")
+            binding = DialogSpeakerBinding(key=symbol, subject=self.provider(target))
+        references = discover_adoptions(ns).get(title, []) if title and not literal else []
+        if len(references) > 1:
+            raise ValueError(
+                f"{source}: ambiguous dialog title {title!r}; candidates: "
+                + ", ".join(reference.ref for reference in references)
+            )
+        if references:
+            reference = references[0]
+            canonical = _scoped_named_bindings(ns)
+            if binding is not None and (
+                symbol not in canonical or canonical[symbol][0] != reference.ref
+            ):
+                raise ValueError(
+                    f"{source}: conflicting dialog binding {symbol!r} and title {title!r} "
+                    f"({reference.ref!r})"
+                )
+            if binding is None:
+                binding = DialogSpeakerBinding(
+                    key=reference.ref, subject=self.provider(ns[reference.ref]),
+                )
+            binding.title_reference = reference
+        return binding
 
     def policy(self, concept: Concept) -> NamingPolicy:
         if isinstance(concept, NamedConcept) and concept.naming_policy is not None:
@@ -286,7 +317,10 @@ def naming_text_aspect(
 @naming_dispatch.register(task="gather_ns")
 def naming_namespace(*, ctx: PhaseCtx, **_kwargs: object) -> dict[str, object]:
     operations = NamingOperations(ctx)
-    return {"reference": operations.reference, "introduce": operations.introduce}
+    return {
+        "reference": operations.reference, "introduce": operations.introduce,
+        "dialog_speaker_resolver": operations.speaker,
+    }
 
 
 @naming_dispatch.register(task="render_journal", priority=Priority.EARLY)

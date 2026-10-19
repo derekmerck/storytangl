@@ -28,10 +28,10 @@ scenes:
         content: |
           You cross the common room and stop beside the hearth.
 
-          > [!NPC.concerned] guide
+          > [!NPC|guide.concerned]
           > You're right on time. The road north opens at dawn.
 
-          > [!NPC] guide
+          > [!NPC|guide]
           > We can take the lantern road through the pines, or risk the river path and arrive sooner.
         media:
           - name: guide_portrait.svg

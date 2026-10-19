@@ -2,7 +2,8 @@
 
 Status: #555 naming behavior retained; the approved #534 mu-block projection
 replacement's foundation, generic NamedConcept and bounded runtime scoped exact
-adoption slices are implemented. #557's compile-time-only linker was closed
+adoption slices and #576's initial scoped callout grammar/attribution slice are
+implemented. #557's compile-time-only linker was closed
 unmerged; its useful lexical witnesses informed the replacement, not its runtime
 authority. Start with the [authoring guide](../../../../docs/src/design/story/PROSE_AUTHORING.md)
 for activation, naming examples, voice/environment policy, and escape hatches.
@@ -92,8 +93,9 @@ renderer registry, extra VM phase, or alternate fragment hierarchy.
 
 `MuBlock` owns authored literal text or ordered literal/ConceptReference parts,
 or an explicit template. Text and template are mutually exclusive, including
-explicit empty text. `DialogMuBlock` adds the full callout class and symbolic
-speaker `label`; mode and attitude are pure projections of that class. Existing
+explicit empty text. `DialogMuBlock` adds separate authored `dialog_mode`,
+`dialog_class` binding/presentation chain, `label` title source, and `literal_label`
+intent. The leading chain term is a binding candidate, not a mode. Existing
 style fields and source provenance are preserved. `ProseBlock.prose` is only an
 optional graph-owned container of these values, not another micro-block schema.
 Naming defaults do not automatically migrate raw worlds to this adapter.
@@ -108,7 +110,7 @@ namespace binding; Role/Setting values dereference their current provider before
 name, ID, style and media projection, per unit rather than frozen for a block.
 The original symbolic key remains attribution, while all provider metadata belongs
 to the actor/location. Missing or unbound semantic speakers fail before their
-bodies run. Ordinary callout display-label fallback remains unchanged without
+bodies run. Ordinary callout display-label fallback remains available without
 the strict resolver. Speaker metadata is projected before its body evaluates.
 Explicit templates execute once, with generated wording treated as output.
 Literal body names and #intro markers are never inferred disclosures.
@@ -170,8 +172,9 @@ The public concept operations separate spelling, wording, and knowledge:
 `NamingOperations` is the single scoped policy/provider boundary for helpers,
 explicit references, labels and named-text dispatch. Concept override precedes
 nearest MRO kind default, then off. Role/Setting knowledge remains on the actual
-provider. General named objects can be referenced/introduced, but are not
-automatically speakers; the existing Actor/Location attribution boundary remains.
+provider. General NamedConcept objects and opted-in NamedConcept/Player
+compositions can supply attribution without Actor/Location or media APIs. Plain
+Player does not acquire naming implicitly.
 The ordinary Actor/Location floor in adopted worlds is retained, not another
 concept contract. World subclasses may override `get_nominal` or normal
 named-text handlers; identification does not prescribe their wording choice.
@@ -180,7 +183,8 @@ named-text handlers; identification does not prescribe their wording choice.
 forwarded by both semantic parts and Python `reference`/`introduce` helpers.
 No second linked-text IR is added. Generated wording is
 output, never re-executed. Default adoption includes only explicit proper/display
-names and deliberate proper forms/aliases; `anonymous_name` is not inferred as an
+names and deliberate proper forms/aliases, excluding the generated display-only
+`label` form (e.g. You); explicit aliases remain intentional. `anonymous_name` is not inferred as an
 adoption phrase. Ordinary speech remains opaque; narration only links with the
 separate scoped consent below.
 
@@ -231,7 +235,7 @@ scalar `adopts()` parameters, not provider IDs/pointers or callbacks.
 `prepare_prose` makes ephemeral units for the same ordered DialogHandler renderer.
 Neither discovery/preparation creates knowledge, changes graph/source, or stores
 prepared units. Plain MuBlock raw strings may contain narration and the existing
-callouts; DialogHandler.parse supplies that grammar and full mode/attitude.
+callouts; DialogHandler.parse supplies the shared mode/chain/title grammar.
 Code-region protection is unconditional in that shared parser, including detection,
 actual parsing, malformed-header checks and later canonical journal composition.
 Callout-looking text inside code is literal whether naming is adopted or not;
@@ -265,8 +269,9 @@ The lexical contract is conservative:
 - Explicit templates and authored units containing `{{`, `{%` or `{#` are wholly
   opaque to lexical processing. Split mixed source/template authoring into ordered
   units. Generated nominal/template output is never rescanned or re-executed.
-- Callout speech bodies/labels are not lexically linked. Labels still use strict,
-  pure current-provider resolution before bodies; literal spoken names/markers
+- Callout speech bodies are not lexically linked. Complete titles may be adopted
+  at attribution, not scanned for inline markers. Labels use pure scoped
+  current-provider resolution before bodies; literal spoken names/markers
   do not disclose. Explicit semantic parts or templates can intentionally introduce
   inside structured speech, using the same existing operations.
 
@@ -292,3 +297,38 @@ Full `do_journal` witnesses cover vanilla Block content and opted-in ProseBlock
 source with fenced/inline code, internal blank lines, malformed-looking headers,
 and real callouts mixed outside the protected region. Source/graph state stays
 unchanged, while outside speaker/class/style/media projection remains standard.
+
+## Scoped callout attribution (#576 initial slice)
+
+The raw form is `> [!mode|binding.presentation] Title`. A bar is the only explicit
+mode separator; absent it the frontend supplies `DialogHandler.DEFAULT_MODE`
+(normally dialog), never inferred from namespace contents. Only a leading term
+that supplies a binding is consumed; the rest remains presentation. `[!.angry] Rin`
+leaves the candidate empty so whole-title scoped adoption may bind it.
+`[!note|]` emits non-attributed ContentFragment output; bare `[!note]` still means
+default dialog and needs a binding or title. No phantom narrator is created.
+
+Exact handles and whole-title adoption share the existing wrapper/provider alias
+equivalence. Independent symbols/roles remain independent even when sharing a
+provider. An adopted title matching its explicit binding is one AUTO reference
+with the adopted form; a conflicting or ambiguous title fails with owner/source
+diagnostics. Neither lookup mutates knowledge. `[!rin.angry] Rin` is anonymous
+before introduction, proper afterward. Unadopted titles override only display
+wording; identity, style and optional media still come from Rin.
+
+Stored `literal_label=True` bypasses title adoption. The raw codec uses leading
+backslash parity: `\Rin` forces literal Rin, each slash pair emits one slash, and
+an odd remainder forces literal intent. These authored fields use ordinary
+constructor-form owner embedding; no serializer or retained provider is added.
+Titleless labels default to `form="label"`, retaining AUTO concealment and ordinary
+proper-name fallback. Adopted titles preserve their matched parameters, including
+the ordinary/default form when no form was supplied. Neither introduces.
+UPDATE runs before JOURNAL; ordered units prepare
+labels before their own bodies, while raw whole-block Jinja still runs before
+composition. Existing explicit body/reference/introduce operations share one
+provider/narrator knowledge record. No new phase or epistemic snapshot is implied.
+
+Speech linking (#577), silent introductions (#566), portrait selection (#562),
+hint vocabulary (#579), and casting/alias history remain deferred. Existing
+symbolic late binding, historical output, replay and owner-graph JSON restoration
+remain the contract, not automatic rediscovery of former actors' aliases.

@@ -49,14 +49,14 @@ def test_parse_is_authored_structure_only(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(DialogMuBlock, "prepare_fragment", forbidden)
     source_id = uuid4()
     units = DialogHandler.parse(
-        "Narrative.\n\n> [!NPC.happy]+ host\n> Nanae #intro is literal speech.",
+        "Narrative.\n\n> [!NPC|host.happy]+\n> Nanae #intro is literal speech.",
         source_id=source_id,
     )
     assert [unit.text for unit in units] == ["Narrative.", "Nanae #intro is literal speech."]
-    assert units[1].label == "host"
-    assert units[1].dialog_class == "NPC.happy"
+    assert units[1].label is None
+    assert units[1].dialog_class == "host.happy"
     assert units[1].dialog_mode == "NPC"
-    assert units[1].attitude == "happy"
+    assert units[1].presentation_chain == ["happy"]
     assert all(unit.source_id == source_id for unit in units)
     assert "speaker_name" not in units[1].unstructure()
 
@@ -65,7 +65,7 @@ def test_embedded_authored_values_restore_classes_and_in_place_parts() -> None:
     graph = StoryGraph()
     block = ProseBlock(label="start", registry=graph)
     units = DialogHandler.parse(
-        "Narrative.\n\n> [!NPC.happy] host\n> Speech.", source_id=block.uid,
+        "Narrative.\n\n> [!NPC|host.happy]\n> Speech.", source_id=block.uid,
     )
     literal = MuBlock(text=[])
     literal.text.extend(["Meet ", ConceptReference(ref="host"), "."])
@@ -78,8 +78,8 @@ def test_embedded_authored_values_restore_classes_and_in_place_parts() -> None:
     assert isinstance(stored[0].text[1], ConceptReference)
     assert stored[0].text[1].ref == "host"
     assert stored[0].style_dict == {"font-weight": "600"}
-    assert stored[2].dialog_class == "NPC.happy"
-    assert stored[2].label == "host"
+    assert stored[2].dialog_class == "host.happy"
+    assert stored[2].label is None
     assert stored[2].source_id == block.uid
     assert [unit.unstructure() for unit in stored] == [unit.unstructure() for unit in block.prose]
 
@@ -88,7 +88,7 @@ def test_declared_custom_variant_survives_owner_graph_flat_json_and_projection()
     graph = StoryGraph()
     actor = Actor(label="rin", name="Rin", registry=graph)
     owner = CustomProseBlock(label="start", registry=graph)
-    authored = CustomDialog(label="host", dialog_class="NPC.happy", text="Hello.")
+    authored = CustomDialog(dialog_mode="NPC", dialog_class="host.happy", text="Hello.")
     authored.emphasis = "urgent"
     authored.style_dict["font-weight"] = "700"
     owner.prose.append(authored)

@@ -40,7 +40,7 @@ Naming policy and automatic lexical rewriting are separate opt-ins.
 | --- | --- |
 | `ProseBlock` | Optional Story block owning an ordered `prose` list and explicit semantic choice labels. |
 | `MuBlock` | One authored narrative unit: literal/linked `text`, or an explicit `template`. |
-| `DialogMuBlock` | The same unit with a symbolic speaker and full dialog class. |
+| `DialogMuBlock` | The same unit with separate mode, binding/presentation chain, and title source. |
 | `ConceptReference` | A namespace symbol, wording intent, optional introduction, and scalar form parameters. |
 | `NamedConcept` | Optional concept-side names, adoption data, and narrator-specific identification. |
 | `NamingOperations` | Context-bound provider/policy resolution shared by references, introductions, and labels. |
@@ -145,15 +145,16 @@ new narrator automatically.
 ```yaml
 prose:
   - text: [{ref: host}, " waits."]
-  - label: host_role
-    dialog_class: npc.excited
+  - dialog_mode: npc
+    dialog_class: host_role.excited
     text: ["Hi, I am ", {ref: host, introduce: true}, "."]
   - text: [{ref: host}, " smiles."]
 ```
 
 `params: {form: formal}` on a reference carries the same scalar form request as
-the Python helper. Labels are exact current namespace symbols; `host_role`
-resolves its current provider before name, ID, style, or media projection.
+the Python helper. The leading chain candidate `host_role` resolves its exact
+current namespace binding before name, ID, style, or optional media projection.
+`label` is optional title source, not a symbolic binding field.
 
 **Opted-in source linking** uses `link_prose: true` in the gathered namespace.
 World globals can enable it and nearer scene/block locals can override it. It
@@ -193,14 +194,49 @@ mu-block's single-pass `template` or assume `text_template` enables lexical link
 
 ## Dialog and introduction order
 
-Opted-in raw source may use the existing callout parser:
+Raw source uses the shared, namespace-independent callout grammar:
+
+```markdown
+> [!mode|binding.presentation] Title
+```
+
+The bar supplies explicit mode. Without it the frontend supplies its default,
+normally `dialog`; namespace contents never select mode. The leading chain term
+is consumed only if it binds a speaker, otherwise it remains presentation. An
+initial dot leaves that candidate empty. Fold markers `+`/`-` remain accepted.
+
+| Header | Meaning |
+| --- | --- |
+| `[!rin.angry]` | Default dialog, exact `rin` binding, angry presentation. |
+| `[!dialog\|rin.angry] Rin` | Same binding; adopted title uses read-only AUTO naming. |
+| `[!.angry] Rin` | Whole-title adoption supplies the missing binding. |
+| `[!rin.angry] Disgruntled Girl` | Unadopted literal title; identity still Rin. |
+| `[!rin.angry] \Rin` | Forced literal `Rin`, even if that name is adoptable. |
+| `[!note\|]` | Non-attributed note, without an invented narrator. |
+| `[!note]` | Default dialog candidate `note`, not note mode. |
+
+A complete unescaped title adopted in the current scope is a semantic AUTO
+reference with its matched form. `[!rin.angry] Rin` therefore stays anonymous
+until introduction, just like the titleless form. Independent conflicting
+chain/title references or ambiguous adopted titles are errors. Title/adoption
+reads never introduce anyone. Unadopted titles are literal; `literal_label: true`
+expresses forced literal intent in stored units. In raw titles an odd leading
+backslash run forces literal wording, and each slash pair emits one slash.
+
+Named objects and explicitly composed `NamedConcept` + `Player` work like named
+actors without requiring portrait hooks. Plain Player does not opt in implicitly.
+Titleless labels request `form="label"` with normal display-name fallback and
+AUTO concealment. A proper label form such as `You` is display-only, excluded
+from automatic adoption (explicit aliases remain deliberate author choices).
+
+For example, opted-in source linking can combine narration and callouts:
 
 ```yaml
 prose:
   - text: |
       Rin waits.
 
-      > [!npc.excited] host_role
+      > [!npc|host_role.excited]
       > This is my sister, Nanae. Rin #intro stays spoken.
 
       Nanae #intro smiles. Nanae waves.
@@ -208,10 +244,12 @@ prose:
 
 Spoken names and markers in the callout body stay literal/non-disclosing. The
 speaker label is policy-aware but read-only; it does not introduce the speaker.
-The narration afterward explicitly identifies Nanae. The full callout class is
-preserved; the house convention splits mode and attitude at the first dot.
+The narration afterward explicitly identifies Nanae. Stored units retain authored
+`dialog_mode`, `dialog_class` chain, `label` title source and `literal_label` flag;
+rendered fragment classes combine mode with the remaining presentation chain.
 
-Ordered mu-blocks prepare speaker metadata **before their own body** runs. An
+UPDATE introductions precede JOURNAL. Ordered mu-blocks prepare speaker metadata
+**before their own body** runs. An
 intentional `introduce(host)` in that body can affect later units without changing
 the label already prepared for this utterance. Explicit semantic references and
 templates inside structured speech are still intentional author instructions.
