@@ -98,7 +98,7 @@ def test_complete_journal_protects_code_while_projecting_callouts_outside_it(
 
     code = "```\nRin #intro\n\n> [!npc malformed\n> literal\n```"
     inline = "``> [!npc] host`` stays code."
-    text = f"{code}\n\n> [!npc.happy]+ host\n> Welcome.\n\n{inline}"
+    text = f"{code}\n\n> [!npc|host.happy]+\n> Welcome.\n\n{inline}"
     graph = StoryGraph()
     actor = DemoGuide(label="guide", name="Guide", registry=graph,
                       look=Look(hair_color=HairColor.AUBURN))
@@ -558,7 +558,7 @@ def test_dispatch_journal_allows_compose_handler_injection() -> None:
 def test_dispatch_journal_composes_explicit_dialog_markup_into_attributed_fragments() -> None:
     graph, block, _guide = _presence_story(
         content=(
-            "> [!spoken] {guide_name}\n"
+            "> [!spoken|] {guide_name}\n"
             "> Welcome to the room.\n\n"
             "A hush fell over the room."
         ),
@@ -568,12 +568,11 @@ def test_dispatch_journal_composes_explicit_dialog_markup_into_attributed_fragme
     fragments = do_journal(block, ctx=ctx)
     assert isinstance(fragments, list)
 
-    assert all(isinstance(fragment, AttributedFragment) for fragment in fragments)
+    assert isinstance(fragments[0], AttributedFragment)
     assert fragments[0].who == "Guide"
     assert fragments[0].how == "spoken"
     assert fragments[0].content == "Welcome to the room."
-    assert fragments[1].who == "narrator"
-    assert fragments[1].how == "narration"
+    assert not isinstance(fragments[1], AttributedFragment)
     assert fragments[1].content == "A hush fell over the room."
 
 
@@ -590,7 +589,7 @@ def test_dispatch_journal_dialog_composition_leaves_plain_content_unchanged() ->
 
 def test_dispatch_journal_dialog_composition_preserves_media_and_choice_order() -> None:
     graph, block, _guide = _presence_story(
-        content="> [!spoken] {guide_name}\n> Welcome.",
+        content="> [!spoken|] {guide_name}\n> Welcome.",
         media=[{"kind": "image", "src": "a.svg"}],
     )
     end = Block(label="end")
@@ -607,7 +606,7 @@ def test_dispatch_journal_dialog_composition_preserves_media_and_choice_order() 
 
 def test_dispatch_journal_dialog_composition_enriches_speaker_formatting() -> None:
     graph, block, _guide = _presence_story(
-        content="> [!NPC.annoyed] guide\n> Welcome.",
+        content="> [!NPC|guide.annoyed]\n> Welcome.",
     )
     ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
 
@@ -640,7 +639,7 @@ def test_dialog_mu_block_projection_is_fresh_and_sanitizes_tags() -> None:
     mu_block = DialogMuBlock(
         text="Welcome.",
         label="Guide Actor",
-        dialog_class="NPC.annoyed",
+        dialog_mode="NPC", dialog_class=".annoyed",
     )
 
     before = mu_block.unstructure()
@@ -665,7 +664,7 @@ def test_parsed_and_stored_dialog_use_the_same_projection_metadata() -> None:
 
     graph, block, guide = _presence_story()
     parsed = DialogHandler.parse(
-        "> [!NPC.annoyed]+ guide\n> Welcome.", source_id=block.uid,
+        "> [!NPC|guide.annoyed]+\n> Welcome.", source_id=block.uid,
     )
     parsed[0].style_cls = "custom"
     parsed[0].style_dict = {"font-weight": "800"}
@@ -691,7 +690,7 @@ def test_parsed_and_stored_dialog_use_the_same_projection_metadata() -> None:
 
 def test_render_block_facade_uses_compose_journal_with_phase_ctx() -> None:
     graph, block, _guide = _presence_story(
-        content="> [!spoken] {guide_name}\n> Welcome.",
+        content="> [!spoken|] {guide_name}\n> Welcome.",
     )
     ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
 

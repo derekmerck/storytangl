@@ -55,8 +55,7 @@ scenes:
         kind: ProseBlock
         pre_effects: ["introduce(host)"]
         prose:
-          - label: host
-            dialog_class: dialog
+          - dialog_class: host
             text: ["This is my sister, Nanae."]
         actions:
           - {text: Continue, successor: later.start}
@@ -64,12 +63,10 @@ scenes:
         kind: ProseBlock
         prose:
           - text: [{ref: host}, " approaches at ", {ref: place}, "."]
-          - label: host
-            dialog_class: dialog
+          - dialog_class: host
             text: ["Hi, I am ", {ref: host, introduce: true}, "."]
           - text: [{ref: host}, " smiles."]
-          - label: host
-            dialog_class: dialog
+          - dialog_class: host
             template: "{{ reference(host, 'anonymous') }} is still an available description."
         actions:
           - label: greet_host
@@ -104,12 +101,12 @@ scenes:
           - text: |
               Rin waits at Market Square beside Dawnblade.
 
-              > [!npc.excited] host_role
+              > [!npc|host_role.excited]
               > This is my sister, Nanae. Rin #intro stays spoken.
 
               Nanae #intro smiles. Nanae waves. Rin#intro nods.
 
-              > [!npc.happy] host_role
+              > [!npc|host_role.happy]
               > Nanae #intro remains literal speech.
 
               Dawnblade of the East #intro gleams. Dawnblade rests here.

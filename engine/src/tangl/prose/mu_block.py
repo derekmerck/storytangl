@@ -8,7 +8,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
-from typing import Self
+from dataclasses import dataclass
+from typing import Protocol, Self
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -44,8 +45,22 @@ class ConceptReference(Unstructurable):
 
 
 PartResolver = Callable[[list[str | ConceptReference]], str]
-NameResolver = Callable[[object], str | None]
-SpeakerResolver = Callable[[str], object]
+
+
+class NameResolver(Protocol):
+    def __call__(self, subject: object, **params: RealizationValue) -> str | None: ...
+
+
+@dataclass(slots=True)
+class DialogSpeakerBinding:
+    """Transient attribution, with an optional adopted title reference."""
+
+    key: str | None
+    subject: object
+    title_reference: ConceptReference | None = None
+
+
+SpeakerResolver = Callable[[str | None, str | None, bool], DialogSpeakerBinding | None]
 
 
 class MuBlock(Unstructurable):

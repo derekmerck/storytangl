@@ -115,7 +115,7 @@ def prepare_prose(
             continue
         origin = f"{source}; source {authored.source_id or source}"
         if isinstance(authored, DialogMuBlock):
-            if authored.dialog_mode != "narration" or authored.label is not None:
+            if authored.dialog_mode.casefold() != "narration":
                 prepared.append(authored)
                 continue
         elif DialogHandler.has_mu_blocks(text):

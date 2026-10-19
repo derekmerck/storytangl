@@ -12,6 +12,8 @@
 > The approved replacement foundation consolidates authored mu-blocks. Generic
 > NamedConcept is implemented in bounded slice 2, and runtime scoped exact
 > adoption ships in slice 3 for opted-in ProseBlock source only.
+> #576's initial callout slice separates mode, binding, presentation and title;
+> its current codec and policy are documented in the prose authoring guide.
 > The broader linguistic
 > adoption/revoicing discussion below is future design, not shipped behavior.
 > The live #534 contract and its exception-recovery scope comment govern this note.
@@ -52,8 +54,8 @@ references. Whole-catalog lint remains advisory/separate.
 
 The foundation slice ships one authored vocabulary for parsed and stored input:
 MuBlock owns literal text/ordered ConceptReference parts OR an explicit template;
-DialogMuBlock adds the symbolic speaker label and full callout class. Text and
-template are mutually exclusive. Mode/attitude derive from the full class. The
+DialogMuBlock adds authored mode, binding/presentation chain, title source and
+literal-title intent. Text and template are mutually exclusive. The
 existing DialogHandler grammar parses structure without name/media/knowledge
 access, and its shared ordered render path projects into fresh existing fragments.
 Speaker labels resolve before bodies; intentional template introductions execute
@@ -825,7 +827,7 @@ prose:
   - text: |
       Rin waits at Market Square.
 
-      > [!npc.excited] host_role
+      > [!npc|host_role.excited]
       > This is my sister, Nanae. Rin #intro stays literal.
 
       Nanae #intro smiles. Nanae waves.

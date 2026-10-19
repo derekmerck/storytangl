@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import pytest
 from pydantic import Field
 
 from tangl.core import Selector
@@ -228,10 +229,15 @@ class TestCompileDiagnosticsSourceIntegrity:
         assert issue.source_ref is not None
         assert issue.source_ref.authored_path == "metadata.start_at"
 
-    def test_malformed_dialog_callout_is_source_attributed_during_compile(self) -> None:
+    @pytest.mark.parametrize("header", [
+        "> [!NPC.happy Guide", "> [!dialog|rin|angry]", "> [!|rin]",
+    ])
+    def test_malformed_dialog_callout_is_source_attributed_during_compile(
+        self, header: str,
+    ) -> None:
         script = _valid_script()
         script["scenes"]["intro"]["blocks"]["start"]["content"] = (
-            "> [!NPC.happy Guide\n> Missing the closing bracket."
+            f"{header}\n> Malformed header."
         )
 
         bundle = StoryCompiler().compile(
@@ -248,7 +254,7 @@ class TestCompileDiagnosticsSourceIntegrity:
         assert issue.code == "compile:invalid_dialog_callout"
         assert issue.severity is CompileSeverity.ERROR
         assert issue.subject_label == "start"
-        assert issue.details == {"header": "> [!NPC.happy Guide"}
+        assert issue.details == {"header": header}
         assert issue.source_ref is not None
         assert issue.source_ref.path == "scripts/dialog.yaml"
         assert issue.source_ref.story_key == "dialog_story"
@@ -257,7 +263,7 @@ class TestCompileDiagnosticsSourceIntegrity:
     def test_mixed_valid_dialog_and_ordinary_quote_have_no_compile_issue(self) -> None:
         script = _valid_script()
         script["scenes"]["intro"]["blocks"]["start"]["content"] = (
-            "> [!NPC.happy] Guide\n> Welcome.\n\n> An ordinary quotation."
+            "> [!NPC|.happy] Guide\n> Welcome.\n\n> An ordinary quotation."
         )
 
         assert _compile(script).issues == []

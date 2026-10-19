@@ -68,12 +68,16 @@ callout type, the fold marker is syntax only, and the optional title supplies
 StoryTangl's speaker label. Custom types remain valid even when Obsidian has no
 built-in presentation for them.
 
-StoryTangl layers one semantic convention over that syntax: a type written as
-``mode.attitude`` is split once at the first dot for the attributed fragment's
-dialog mode and speaker attitude, while the full type remains its
-``dialog_class``. This dot convention is StoryTangl authoring vocabulary, not
-Obsidian modifier syntax. A colon is an ordinary character in a custom type and
-has no mode/attitude meaning.
+StoryTangl uses ``[!mode|binding.presentation] Title``: the bar supplies explicit
+mode; without it the frontend default is normally dialog, independent of scope.
+The leading chain candidate is consumed only when it supplies an exact scoped
+binding. Otherwise it stays presentation; an initial dot leaves it empty.
+Whole-title adoption may supply the binding and uses read-only AUTO naming;
+unadopted titles remain literal and a leading backslash forces literal wording.
+Stored ``dialog_class`` retains the authored chain separately from ``dialog_mode``
+and ``label`` title source. The fragment class combines mode with remaining
+presentation. See [Prose authoring](PROSE_AUTHORING.md)
+for naming policy, escaping, and timing. A colon has no special meaning.
 
 Header detection, runtime parsing, and compile validation use the same grammar.
 A paragraph whose first line clearly claims ``> [!`` syntax but is malformed is
@@ -93,7 +97,8 @@ identity/no-op paths. This is not a new VM phase or universal renderer framework
 `DialogHandler.parse` now returns authored structure only, using the same callout
 grammar without fetching names, styles/media or knowledge. `MuBlock` and its
 `DialogMuBlock` specialization carry literal/reference parts or an explicit
-template, source provenance, symbolic label, full class, and existing styles.
+template, source provenance, mode, binding/presentation chain, title source,
+literal-title intent, and existing styles.
 Text/template are exclusive. Parsed transient and stored/pre-parsed values share
 this vocabulary; ownership determines persistence through the existing embedded
 constructor-form path. No separate persistent segment schema remains.

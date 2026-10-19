@@ -3,14 +3,15 @@ Dialog parsing and rendering helpers.
 
 Dialog blocks use Obsidian's callout header syntax::
 
-    > [!POV.attentive]+ Speaker Name
+    > [!POV|speaker.attentive]+ Speaker Name
     > I am speaking now.
 
-The bracketed value is the complete Obsidian callout type identifier, the
-optional ``+`` or ``-`` is fold syntax, and the optional title is the speaker
-label. StoryTangl separately interprets its established ``mode.attitude``
-house convention by splitting the type once at the first dot. Obsidian does
-not define that semantic split, and a colon has no special meaning here.
+The bar separates explicit mode from the binding/presentation chain. Without
+it, the frontend supplies the default mode, normally dialog. Parsing never
+consults a namespace. Realization consumes the leading chain candidate only
+when it binds a speaker. The optional title is adopted through the current
+scope or remains literal; a leading backslash forces a literal title. The
+optional ``+`` or ``-`` fold marker is accepted without adding a widget.
 
 Only paragraphs whose first line claims ``> [!`` syntax are dialog callouts.
 Other prose, including ordinary block quotes, is emitted as narration.
@@ -28,22 +29,16 @@ from tangl.presentation.hints import PresentationHints
 from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.ctx import VmPhaseCtx
 
-from .mu_block import MuBlock, MuBlockHandler, NameResolver, SpeakerResolver
+from .mu_block import DialogSpeakerBinding, MuBlock, MuBlockHandler, NameResolver, SpeakerResolver
 from .literals import code_regions
-
-
-@dataclass(slots=True)
-class DialogSpeakerBinding:
-    """Resolved speaker binding for a dialog micro-block."""
-
-    key: str | None
-    subject: Any
 
 
 @dataclass(frozen=True, slots=True)
 class _DialogHeader:
     dialog_class: str
     label: str | None
+    dialog_mode: str
+    literal_label: bool = False
 
 
 def _normalized_text(value: Any) -> str:
@@ -64,14 +59,6 @@ def _model_payload(value: Any) -> Any:
     if isinstance(value, dict):
         return dict(value)
     return value
-
-
-def _split_dialog_class(dialog_class: str) -> tuple[str, str | None]:
-    raw = _normalized_text(dialog_class) or "narration"
-    if "." not in raw:
-        return raw, None
-    mode, attitude = raw.split(".", 1)
-    return mode or "narration", attitude or None
 
 
 def _speaker_display_name(subject: Any, fallback: str | None) -> str:
@@ -164,43 +151,88 @@ def _speaker_binding(label: str | None, ns: Mapping[str, Any] | None) -> DialogS
 
 
 class DialogMuBlock(MuBlock):
-    """Authored callout; symbolic label and full class survive until projection."""
+    """Separate authored mode, binding/presentation chain, and title source."""
 
-    dialog_class: str = "narration"
-
-    @property
-    def dialog_mode(self) -> str:
-        return _split_dialog_class(self.dialog_class)[0]
+    dialog_class: str = ""
+    dialog_mode: str = "dialog"
+    literal_label: bool = False
 
     @property
-    def attitude(self) -> str | None:
-        return _split_dialog_class(self.dialog_class)[1]
+    def binding_candidate(self) -> str | None:
+        return self.dialog_class.split(".", 1)[0] or None
+
+    @property
+    def presentation_chain(self) -> list[str]:
+        return self.dialog_class.split(".")[1:]
 
     def prepare_fragment(
         self, *, source_id: UUID | None = None, ns: Mapping[str, object] | None = None,
         ctx: VmPhaseCtx | None = None, name_resolver: NameResolver | None = None,
         speaker_resolver: SpeakerResolver | None = None,
-    ) -> AttributedFragment:
+    ) -> ContentFragment:
         """Resolve provider metadata into a fresh fragment before body realization."""
         speaker_key = speaker_id = speaker_label = speaker_name = None
         media_payload = None
-        if self.label is not None and speaker_resolver is not None:
-            binding = DialogSpeakerBinding(key=self.label, subject=speaker_resolver(self.label))
+        if speaker_resolver is not None:
+            binding = speaker_resolver(self.binding_candidate, self.label, self.literal_label)
         else:
-            binding = _speaker_binding(self.label, ns)
+            candidate = ns.get(self.binding_candidate) if ns and self.binding_candidate else None
+            binding = (
+                DialogSpeakerBinding(key=self.binding_candidate, subject=candidate)
+                if candidate is not None and not isinstance(
+                    candidate, (str, bytes, int, float, bool, dict, list, tuple, set),
+                )
+                else None
+            )
+            if binding is None and not self.literal_label:
+                binding = _speaker_binding(self.label, ns)
+        presentation = (
+            self.presentation_chain
+            if binding is not None and binding.key == self.binding_candidate
+            else [term for term in self.dialog_class.split(".") if term]
+        )
+        attitude = ".".join(presentation) or None
+        dialog_class = ".".join([self.dialog_mode, *presentation])
+        style_tags = ["dialog"]
+        if dialog_class_tag := _tag_value(dialog_class):
+            style_tags.append(f"dialog_class:{dialog_class_tag}")
+        if dialog_mode_tag := _tag_value(self.dialog_mode):
+            style_tags.append(f"dialog_mode:{dialog_mode_tag}")
+        if attitude_tag := _tag_value(attitude):
+            style_tags.append(f"attitude:{attitude_tag}")
+        if binding is None and self.label is None:
+            if self.dialog_mode.casefold() == "dialog":
+                raise ValueError(
+                    f"source {self.source_id or source_id}: dialog requires a scoped binding: "
+                    f"{self.dialog_class!r}"
+                )
+            return ContentFragment(
+                content="", source_id=self.source_id or source_id,
+                tags=set(style_tags[1:]),
+                hints=PresentationHints(
+                    style_name=self.style_cls or self.dialog_mode,
+                    style_tags=style_tags,
+                    style_dict=dict(self.style_dict),
+                ),
+            )
         style_dict: dict[str, str] = {}
         if binding is not None:
             subject = binding.subject
             speaker_key = binding.key
-            resolved_name = name_resolver(subject) if name_resolver is not None else None
+            params = binding.title_reference.params if binding.title_reference is not None else {}
+            resolved_name = (
+                name_resolver(subject, **params)
+                if name_resolver is not None and (self.label is None or binding.title_reference)
+                else None
+            )
             speaker_name = (
                 resolved_name if resolved_name is not None
                 else _speaker_display_name(subject, self.label)
             )
             media_payload = _speaker_media_payload(
                 subject,
-                dialog_class=self.dialog_class,
-                attitude=self.attitude,
+                dialog_class=dialog_class,
+                attitude=attitude,
                 ctx=ctx,
             )
 
@@ -214,22 +246,20 @@ class DialogMuBlock(MuBlock):
                 if isinstance(label, str) and label.strip():
                     speaker_label = label.strip()
 
-            style_dict = _speaker_style_dict(subject, dialog_class=self.dialog_class)
+            style_dict = _speaker_style_dict(subject, dialog_class=dialog_class)
+
+        if self.label is not None and (
+            binding is None or binding.title_reference is None
+        ):
+            speaker_name = self.label
 
         if not speaker_name:
             speaker_name = _normalized_text(self.label) or "narrator"
 
-        style_tags = ["dialog"]
-        if dialog_class_tag := _tag_value(self.dialog_class):
-            style_tags.append(f"dialog_class:{dialog_class_tag}")
-        if dialog_mode_tag := _tag_value(self.dialog_mode):
-            style_tags.append(f"dialog_mode:{dialog_mode_tag}")
         if speaker_tag := _tag_value(speaker_label or self.label):
             style_tags.append(f"speaker:{speaker_tag}")
         if speaker_key_tag := _tag_value(speaker_key):
             style_tags.append(f"speaker_key:{speaker_key_tag}")
-        if attitude_tag := _tag_value(self.attitude):
-            style_tags.append(f"attitude:{attitude_tag}")
 
         hints = PresentationHints(
             style_name=self.style_cls or self.dialog_mode.lower(),
@@ -239,7 +269,7 @@ class DialogMuBlock(MuBlock):
         return AttributedFragment(
             content="",
             who=speaker_name,
-            how=self.dialog_class,
+            how=dialog_class,
             media="dialog_im" if media_payload else "",
             source_id=self.source_id or source_id,
             tags=set(style_tags[1:]),
@@ -248,7 +278,7 @@ class DialogMuBlock(MuBlock):
             speaker_id=speaker_id,
             speaker_label=speaker_label,
             speaker_name=speaker_name,
-            speaker_attitude=self.attitude,
+            speaker_attitude=attitude,
             dialog_mode=self.dialog_mode,
             media_payload=media_payload,
         )
@@ -258,6 +288,7 @@ class DialogHandler(MuBlockHandler):
     """Parse and render dialog micro-blocks."""
 
     DIALOG_CLAIM_PATTERN = re.compile(r"^>\s*\[!")
+    DEFAULT_MODE = "dialog"
     DIALOG_HEADER_PATTERN = re.compile(
         r"^>\s*\[!(?P<dialog_class>[^\]\s]+)\](?P<fold>[+-])?"
         r"(?:[ \t]+(?P<label>\S(?:.*\S)?))?[ \t]*$"
@@ -292,9 +323,22 @@ class DialogHandler(MuBlockHandler):
         match = cls.DIALOG_HEADER_PATTERN.fullmatch(header)
         if match is None:
             raise ValueError(f"Invalid dialog syntax: {header}")
+        raw_class = match.group("dialog_class")
+        if raw_class.count("|") > 1:
+            raise ValueError(f"Invalid dialog syntax: {header}")
+        mode, separator, chain = raw_class.partition("|")
+        if separator and not mode:
+            raise ValueError(f"Invalid dialog syntax: {header}")
+        title = match.group("label")
+        literal = False
+        if title is not None:
+            slashes = len(title) - len(title.lstrip("\\"))
+            literal = bool(slashes % 2)
+            title = "\\" * (slashes // 2) + title[slashes:]
         return _DialogHeader(
-            dialog_class=match.group("dialog_class"),
-            label=match.group("label"),
+            dialog_class=chain if separator else raw_class,
+            dialog_mode=mode if separator else cls.DEFAULT_MODE,
+            label=title, literal_label=literal,
         )
 
     @classmethod
@@ -341,7 +385,7 @@ class DialogHandler(MuBlockHandler):
                     DialogMuBlock(
                         text=paragraph.strip(),
                         label=None,
-                        dialog_class="narration",
+                        dialog_mode="narration",
                         source_id=source_id,
                     )
                 )
@@ -364,6 +408,8 @@ class DialogHandler(MuBlockHandler):
             text=body_text,
             label=parsed_header.label,
             dialog_class=parsed_header.dialog_class,
+            dialog_mode=parsed_header.dialog_mode,
+            literal_label=parsed_header.literal_label,
             source_id=source_id,
         )
 

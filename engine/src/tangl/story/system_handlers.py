@@ -20,6 +20,7 @@ from tangl.core import Priority, Record, Selector
 from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
 from tangl.ir.story_ir.text_template import TextTemplate
 from tangl.prose import DialogHandler, TextRenderSession
+from tangl.prose.mu_block import RealizationValue
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
 from tangl.presentation.intent import Blocker
@@ -909,10 +910,11 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
     if ctx is not None and hasattr(ctx, "get_ns"):
         ns = dict(ctx.get_ns(caller))
 
-    def speaker_name(subject: object) -> str | None:
+    def speaker_name(subject: object, **params: RealizationValue) -> str | None:
         # The optional naming authority supplies a pure read. Without it,
         # None preserves DialogMuBlock's ordinary display-name fallback.
-        return do_render_text(subject, aspect="reference_auto", ctx=ctx)
+        params.setdefault("form", "label")
+        return do_render_text(subject, aspect="reference_auto", ctx=ctx, **params)
 
     composed: list[Record] = []
     changed = False
@@ -932,6 +934,7 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
                 ns=ns,
                 ctx=ctx,
                 name_resolver=speaker_name if ctx is not None else None,
+                speaker_resolver=ns.get("dialog_speaker_resolver") if ns else None,
             )
             for rendered_fragment in rendered:
                 if not rendered_fragment.content:

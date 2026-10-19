@@ -53,9 +53,9 @@ def test_symbolic_role_speakers_resolve_provider_per_unit_before_metadata(
     beth = ledger.graph.find_one(Selector(label="beth", has_kind=Actor))
     ns["replacement"] = beth
     block.prose = [
-        DialogMuBlock(label="host_role", dialog_class="NPC.happy",
+        DialogMuBlock(dialog_mode="NPC", dialog_class="host_role.happy",
                       template="{% set _ = host_role.set_provider(replacement) %}Hello."),
-        DialogMuBlock(label="host_role", dialog_class="NPC.happy", text="Again."),
+        DialogMuBlock(dialog_mode="NPC", dialog_class="host_role.happy", text="Again."),
     ]
     authored = [unit.unstructure() for unit in block.prose]
     first, second = render_linked_prose(caller=block, ctx=ctx)
@@ -87,11 +87,11 @@ def test_explicit_speaker_missing_or_unbound_fails_before_body(
     if unbound:
         ctx.get_ns(block)["host_role"].set_provider(None)
     block.prose = [DialogMuBlock(
-        label="host_role" if unbound else "unbound_role", dialog_class="dialog",
+        dialog_class="host_role" if unbound else "unbound_role",
         template="{{ introduce(sister) }}",
     )]
     before = ledger.graph.value_hash()
-    with pytest.raises(TypeError if unbound else KeyError):
+    with pytest.raises(TypeError if unbound else ValueError):
         render_linked_prose(caller=block, ctx=ctx)
     assert ledger.graph.value_hash() == before
     assert ctx.get_ns(block)["sister"].peek_knowledge() is None
@@ -105,7 +105,7 @@ def test_symbolic_setting_speaker_projects_location_not_setting(ledger: Ledger) 
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid,
                    current_phase=ResolutionPhase.JOURNAL)
     setting = ctx.get_ns(block)["place_setting"]
-    block.prose = [DialogMuBlock(label="place_setting", dialog_class="aside", text="Welcome.")]
+    block.prose = [DialogMuBlock(dialog_mode="aside", dialog_class="place_setting", text="Welcome.")]
     before = ledger.graph.value_hash()
     fragment = render_linked_prose(caller=block, ctx=ctx)[0]
     assert fragment.speaker_key == "place_setting"
@@ -259,8 +259,8 @@ with manager.open_session(user_id=UUID(sys.argv[2])) as session:
     units = session.ledger.cursor.prose
     assert [type(unit) for unit in units] == [MuBlock, DialogMuBlock, MuBlock, DialogMuBlock]
     assert isinstance(units[0].text[0], ConceptReference)
-    assert units[1].dialog_class == 'dialog'
-    assert units[1].label == 'host'
+    assert units[1].dialog_class == 'host'
+    assert units[1].label is None
     assert 'speaker_name' not in units[1].unstructure()
     actor = session.ledger.graph.find_one(Selector(has_kind=Actor, label='rin'))
     assert type(actor) is PersonalNamedActor
@@ -331,9 +331,9 @@ def test_nonprinting_introduction_preserves_current_label_and_literal_names(ledg
 
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [
-        DialogMuBlock(label="host", dialog_class="dialog",
+        DialogMuBlock(dialog_class="host",
                       template="This is my sister, Nanae.{% set _ = introduce(host) %}"),
-        DialogMuBlock(label="host", dialog_class="dialog", text=["Hello again."]),
+        DialogMuBlock(dialog_class="host", text=["Hello again."]),
     ]
     meet(ledger)
     speakers = [f for f in ledger.get_journal() if isinstance(f, AttributedFragment)]
@@ -349,9 +349,9 @@ def test_literal_spoken_name_does_not_introduce_speaker_or_sister(ledger: Ledger
     block = ledger.graph.find_one(Selector(has_kind=ProseBlock, label="introduction"))
     block.prose = [
         MuBlock(text="Narrative before the speaker."),
-        DialogMuBlock(label="host", dialog_class="dialog", text=["This is my sister, Nanae."]),
+        DialogMuBlock(dialog_class="host", text=["This is my sister, Nanae."]),
         MuBlock(text=[ConceptReference(ref="sister", introduce=True), " smiles at you."]),
-        DialogMuBlock(label="sister", dialog_class="NPC.happy", text="Rin #intro stays literal."),
+        DialogMuBlock(dialog_mode="NPC", dialog_class="sister.happy", text="Rin #intro stays literal."),
     ]
     authored = [unit.unstructure() for unit in block.prose]
     meet(ledger)
@@ -381,7 +381,7 @@ def test_ordinary_dialog_labels_share_policy_without_disclosing(
     from tangl.vm.dispatch import do_journal
 
     block = ledger.cursor
-    block.content = "> [!dialog] host\n> This is my sister, Nanae."
+    block.content = "> [!dialog|host]\n> This is my sister, Nanae."
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid, current_phase=ResolutionPhase.JOURNAL)
     actor = ctx.get_ns(block)["host"]
     if identified:
@@ -403,8 +403,8 @@ def test_ordinary_whole_block_jinja_keeps_late_label_binding(ledger: Ledger) -> 
     ledger.graph.locals["text_template"] = "jinja"
     block = ledger.cursor
     block.content = (
-        "> [!dialog] host\n> This is my sister, Nanae. {% set _ = introduce(host) %}"
-        "\n\n> [!dialog] host\n> Hello again."
+        "> [!dialog|host]\n> This is my sister, Nanae. {% set _ = introduce(host) %}"
+        "\n\n> [!dialog|host]\n> Hello again."
     )
     ctx = PhaseCtx(graph=ledger.graph, cursor_id=block.uid, current_phase=ResolutionPhase.JOURNAL)
     speakers = [f for f in do_journal(block, ctx=ctx) if isinstance(f, AttributedFragment)]
@@ -418,7 +418,7 @@ def test_vanilla_ordinary_dialog_keeps_name_fallback() -> None:
 
     graph = StoryGraph()
     actor = Actor(label="rin", name="Rin", registry=graph)
-    block = Block(content="> [!dialog] rin\n> This is my sister, Nanae.", registry=graph)
+    block = Block(content="> [!dialog|rin]\n> This is my sister, Nanae.", registry=graph)
     ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
     ctx._ns_cache[block.uid] = {"rin": actor}
     before = graph.value_hash()
