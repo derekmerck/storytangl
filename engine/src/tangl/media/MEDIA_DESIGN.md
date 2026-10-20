@@ -10,7 +10,8 @@
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
 > #571 slice 2a implements explicit control targets and read-only desired-BGM
 > snapshots. Slice 2b adds co-located pygame BGM playback and local controls;
-> Web playback, effects/voice and remote pygame audio remain deferred.
+> Pygame also consumes ordered character barks with simple local BGM attenuation.
+> Web playback, generic effects/voice policy and remote pygame audio remain deferred.
 > Authority: Canonical journal fragment types live in `tangl.journal.fragments`;
 > presentation hints live in `tangl.presentation.hints`; `tangl.journal.media`
 > remains a fragment-only compatibility re-export surface.
@@ -383,12 +384,32 @@ opening cue uses ordinary pack-relative inventory lookup; resolved aliases
 normalize to the existing resource identifier at materialization, retaining the
 authored path for diagnostics. No new persisted state or loader is introduced.
 
+Pygame character barks use ordinary AUDIO/`character_vox` fragments and the same
+profile/path resolver, preserving donating source, origin, step, occurrence UID,
+handle and caption. Fresh openings and live choice output enqueue serially in
+emitted order for the immediate presentation batch. New presentation cancels
+unfinished prior dialogue; redraw/preferences do not. Refresh/reconnect/history
+never enqueue playback. Deduplication spans queued, active, consumed and skipped
+UIDs; distinct occurrences of the same recording may play twice. This is a
+client presentation policy, not a new backend lifetime or utterance vocabulary.
+
+A separate voice channel wakes the idle pygame loop with native completion
+events. Stale stop/completion events cannot interrupt newer busy playback.
+Missing/pointer/unsupported or failed clips skip without blocking later cues or
+choices. While voice plays, the music owner multiplies current user gain/mute
+by a local attenuation factor, retaining it across adjacent clips. Drain,
+cancellation/failure and teardown unduck; track changes inherit attenuation,
+and unducking never restarts stopped music. Device initialization/retry policy
+is shared with the music owner. No clocks, acknowledgements or audio queue state
+cross Service/persistence, and no custom serializer is involved.
+
 Web's persistent playback owner remains a later slice. Local pygame
 paths and remote Web URLs are the initial floor; remote pygame audio waits for
 a proper shared loading path. Then one-shot effects deduplicate by occurrence
 UID: two executions of the same authored node produce distinct occurrences,
-whereas refetching one occurrence is silent. Voice comes later. No TTS/Vocals,
-spatial sound, crossfade/ducking specification, playlists, precise seeking,
+whereas refetching one occurrence is silent. Automatic voice selection remains
+later work. No TTS/Vocals, spatial sound, general crossfade/ducking specification,
+playlists, precise seeking,
 seamless-loop editing or general scheduling is included. Packs prepare loopable,
 level-matched files; full soundtrack masters stay outside the repository.
 

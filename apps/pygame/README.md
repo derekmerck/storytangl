@@ -135,8 +135,36 @@ They do not collide with choice letters, numeric selection, or world preference
 F-keys, and persist through redraws and track changes. Missing optional files,
 unsupported delivery, unavailable devices and decoder failures are logged;
 device/decode failures show music as unavailable in the title. Prose and choices
-remain usable. There is no completion-dependent progression, SFX/voice, remote
+remain usable. There is no completion-dependent progression, generic SFX, remote
 pygame audio, crossfade, playlist, or playback-position restoration.
+
+### Character barks
+
+Ordinary block media declarations with `media_type: AUDIO` and
+`media_role: character_vox` play on a separate serial voice channel. A block may
+declare several clips (for example, two characters' call and response); they
+play in emitted order without timestamps. Existing source/step/occurrence and
+authored handle/caption provenance stays on the canonical fragments. There is
+no inference from displayed character names and no new utterance/timing model.
+
+Fresh story openings and choice output enqueue new occurrences once per fragment
+UID, not once per recording: two occurrences of the same clip may play twice.
+Refresh, reconnect, JSON-restored history, redraw and preference changes do not
+replay barks. Advancing to another presentation cancels old active and pending
+dialogue, including when the new presentation is silent. Prose and choices never
+wait for audio. Missing/pointer/unsupported clips and decoder/device failures
+log and skip; remaining playable clips continue. Paths use normal media-profile
+resolution, never filename guessing or a separate downloader.
+
+While voice plays, music gain is 25% of the *current* user music setting (or zero
+if music is muted). Adjacent queued clips retain attenuation. Drain, cancellation
+and teardown restore the current setting; they never restart a stopped track.
+Track changes inherit the active attenuation. Ctrl+M and brackets remain music
+controls, not global voice controls. Native channel completion events wake even
+an idle, non-animated window; obsolete events cannot interrupt a newer busy clip.
+All queue, device and completion state stays local to pygame, not in Service or
+the journal. Web playback, generic SFX/voice selection, TTS and advanced mixing
+remain separate work.
 
 Marmoset Island declares one opening cue, `music/theme.mp3`. Its island and
 orbital packs use the same relative name; the selected pack supplies the bytes.

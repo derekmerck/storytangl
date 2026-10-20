@@ -326,6 +326,84 @@ def test_device_initialized_elsewhere_is_used_despite_an_earlier_failure(
     assert bridge.music_player.error is None and bridge.music_player.status == "50%"
 
 
+def test_mixer_loss_after_load_does_not_claim_playback_and_same_rit_recovers(
+    bridge: PygameSessionBridge, backend: dict[str, Mock], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    initialized = True
+    monkeypatch.setattr(pygame.mixer, "get_init", lambda: (44100, -16, 2) if initialized else None)
+    initialize = Mock()
+    monkeypatch.setattr(pygame.mixer, "init", initialize)
+
+    def lose_device(path: str) -> None:
+        nonlocal initialized
+        initialized = False
+
+    backend["load"].side_effect = lose_device
+    cue = selected(bridge)
+    player = bridge.music_player
+    backend["play"].assert_not_called()
+    assert player._playing_rit is None
+    assert player.error is not None and player.status == "unavailable"
+
+    initialized = True  # Another consumer reinitializes the mixer.
+    backend["load"].side_effect = None
+    player.set_volume(0.6)
+    player.set_ducked(True)
+    deliver(bridge, cue)
+    assert backend["load"].call_count == 2
+    backend["play"].assert_called_once_with(loops=-1)
+    backend["set_volume"].assert_called_with(0.15)
+    assert player._playing_rit == cue.rit_id
+    assert player.error is None and player.status == "60%"
+    initialize.assert_not_called()
+    deliver(bridge, cue)
+    assert backend["play"].call_count == 1
+
+
+def test_mixer_loss_during_live_restart_clears_identity_without_replaying_control(
+    bridge: PygameSessionBridge, backend: dict[str, Mock], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    initialized = True
+    monkeypatch.setattr(pygame.mixer, "get_init", lambda: (44100, -16, 2) if initialized else None)
+    cue = selected(bridge)
+    restart = ControlFragment(target=RoleTarget(media_role="music"),
+                              media_action="restart", media=cue)
+    initialized = False
+    deliver(bridge, cue, [restart])
+    player = bridge.music_player
+    assert player._playing_rit is None
+    assert player.error is not None and player.status == "unavailable"
+    assert backend["play"].call_count == 1
+
+    initialized = True
+    deliver(bridge, cue, [restart])
+    assert backend["load"].call_count == 2
+    assert backend["play"].call_count == 2
+    assert player._playing_rit == cue.rit_id
+    assert player.error is None and player.status == "50%"
+    deliver(bridge, cue, [restart])
+    assert backend["play"].call_count == 2
+
+
+def test_idle_gain_updates_without_device_are_harmless(
+    backend: dict[str, Mock], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pygame.mixer, "get_init", lambda: None)
+    initialize = Mock()
+    monkeypatch.setattr(pygame.mixer, "init", initialize)
+    player = MusicPlayer()
+    player.set_volume(0.6)
+    player.set_ducked(True)
+    player.toggle_mute()
+    player.set_ducked(False)
+    player.toggle_mute()
+    assert player.error is None and player.status == "60%"
+    assert player._playing_rit is None
+    initialize.assert_not_called()
+    backend["set_volume"].assert_not_called()
+    backend["play"].assert_not_called()
+
+
 @pytest.mark.parametrize("profile", [MediaContentProfile.MEDIA_SERVER, MediaContentProfile.INLINE_DATA])
 def test_unsupported_transport_is_not_guessed_into_local_path(
     bridge: PygameSessionBridge, backend: dict[str, Mock], profile: MediaContentProfile,

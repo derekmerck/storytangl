@@ -71,6 +71,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .music import MusicPlayer
+    from .voice import VoicePlayer
 
 _DEFAULT_STAGE_EXTENT = (320, 200)
 _SUPPORTED_STAGE_EXTENTS = {_DEFAULT_STAGE_EXTENT, (640, 400)}
@@ -291,6 +292,7 @@ class PygameSessionBridge:
         user_secret: str | None = None,
         media_render_profile: MediaRenderProfile | None = None,
         music_player: MusicPlayer | None = None,
+        voice_player: VoicePlayer | None = None,
     ) -> None:
         self.service_manager = service_manager or ServiceManager(
             PersistenceManagerFactory.native_in_mem()
@@ -300,13 +302,14 @@ class PygameSessionBridge:
         self.ledger_id: UUID | None = None
         self.world_id: str | None = None
         self.music_player = music_player
+        self.voice_player = voice_player
         self.preferences: dict[str, bool | str] = {}
         self._preference_ids: frozenset[str] = frozenset()
         self._preference_declarations: dict[str, PreferenceDeclaration] = {}
         self.media_render_profile = media_render_profile or MediaRenderProfile(
             pending_policy=MediaPendingPolicy.FALLBACK,
             content_profile=MediaContentProfile.PASSTHROUGH,
-            include_audio=music_player is not None,
+            include_audio=music_player is not None or voice_player is not None,
         )
 
     # ── session lifecycle ────────────────────────────────────────────────
@@ -384,7 +387,7 @@ class PygameSessionBridge:
             user_id=user_id,
             world_id=world_id,
         )
-        self._sync(envelope)
+        self._sync(envelope, opening=True)
         return envelope
 
     def choose(self, edge_id: UUID, payload: JsonValue | None = None) -> RuntimeEnvelope:
@@ -409,6 +412,8 @@ class PygameSessionBridge:
         return envelope
 
     def close(self) -> None:
+        if self.voice_player is not None:
+            self.voice_player.close()
         if self.music_player is not None:
             self.music_player.close()
 
@@ -426,7 +431,9 @@ class PygameSessionBridge:
         self.user_id = raw if isinstance(raw, UUID) else UUID(str(raw))
         return self.user_id
 
-    def _sync(self, envelope: RuntimeEnvelope, *, live: bool = False) -> None:
+    def _sync(
+        self, envelope: RuntimeEnvelope, *, live: bool = False, opening: bool = False,
+    ) -> None:
         """Track the active ledger, which travels in envelope metadata."""
 
         raw = dict(envelope.metadata or {}).get("ledger_id")
@@ -444,6 +451,16 @@ class PygameSessionBridge:
             controls = [fragment for fragment in self._flatten(list(envelope.fragments))
                         if isinstance(fragment, ControlFragment)]
             self.music_player.synchronize(envelope.presentation, payload, controls, live=live)
+        if self.voice_player is not None:
+            cues = [fragment for fragment in self._flatten(list(envelope.fragments))
+                    if isinstance(fragment, MediaFragment)
+                    and fragment.content_type == MediaDataType.AUDIO
+                    and fragment.media_role == "character_vox"]
+            self.voice_player.present([
+                (cue, media_fragment_to_payload(
+                    cue, render_profile=self.media_render_profile, world_id=self.world_id,
+                )) for cue in cues
+            ], fresh=live or opening)
 
     # ── disclosure ───────────────────────────────────────────────────────
 
