@@ -93,21 +93,24 @@ class MusicPlayer:
             return
         try:
             pygame.mixer.music.load(path)
-            self._play()
-            if self.error is None:
+            if self._play():
                 self._playing_rit = rit_id
         except (pygame.error, OSError) as error:
             self._failed(error)
 
-    def _play(self) -> None:
+    def _play(self) -> bool:
         timing = self.current.staging_hints.media_timing if self.current.staging_hints else None
         if not self._apply_gain():
-            return
+            if self.error is None:
+                self._failed(pygame.error("Audio mixer is not initialized"))
+            return False
         try:
             pygame.mixer.music.play(loops=-1 if timing == "loop" else 0)
             self.error = None
+            return True
         except pygame.error as error:
             self._failed(error)
+            return False
 
     def _failed(self, error: pygame.error | OSError) -> None:
         self.error = str(error)
