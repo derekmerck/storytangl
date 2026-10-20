@@ -25,6 +25,7 @@ class MusicPlayer:
         self._playing_rit: UUID | None = None
         self._seen_controls: set[UUID] = set()
         self._device_failed = False
+        self._duck_gain = 1.0
 
     def synchronize(
         self, snapshot: PresentationSnapshot | None, payload: dict[str, JsonValue] | None,
@@ -73,17 +74,23 @@ class MusicPlayer:
             self._device_failed = False
             self.error = None
 
-    def _load(self, path: str, rit_id: UUID) -> None:
+    def ensure_device(self) -> bool:
+        """Share device initialization and retry policy with the voice channel."""
         if self._device_failed and not pygame.mixer.get_init():
-            return
+            return False
         if not pygame.mixer.get_init():
             try:
                 pygame.mixer.init()
             except pygame.error as error:
                 self._device_failed = True
                 self._failed(error)
-                return
+                return False
         self._device_failed = False
+        return True
+
+    def _load(self, path: str, rit_id: UUID) -> None:
+        if not self.ensure_device():
+            return
         try:
             pygame.mixer.music.load(path)
             self._play()
@@ -94,8 +101,9 @@ class MusicPlayer:
 
     def _play(self) -> None:
         timing = self.current.staging_hints.media_timing if self.current.staging_hints else None
+        if not self._apply_gain():
+            return
         try:
-            pygame.mixer.music.set_volume(0.0 if self.muted else self.volume)
             pygame.mixer.music.play(loops=-1 if timing == "loop" else 0)
             self.error = None
         except pygame.error as error:
@@ -116,11 +124,20 @@ class MusicPlayer:
 
     def set_volume(self, volume: float) -> None:
         self.volume = max(0.0, min(1.0, volume))
+        self._apply_gain()
+
+    def set_ducked(self, ducked: bool) -> None:
+        self._duck_gain = 0.25 if ducked else 1.0
+        self._apply_gain()
+
+    def _apply_gain(self) -> bool:
         if pygame.mixer.get_init():
             try:
-                pygame.mixer.music.set_volume(0.0 if self.muted else self.volume)
+                pygame.mixer.music.set_volume(0.0 if self.muted else self.volume * self._duck_gain)
+                return True
             except pygame.error as error:
                 self._failed(error)
+        return False
 
     def toggle_mute(self) -> None:
         self.muted = not self.muted
@@ -133,6 +150,7 @@ class MusicPlayer:
         self.error = None
         self._device_failed = False
         self._seen_controls.clear()
+        self._duck_gain = 1.0
 
     @property
     def status(self) -> str:

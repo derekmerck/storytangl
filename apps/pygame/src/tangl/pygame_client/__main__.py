@@ -60,6 +60,7 @@ from .stage import (
     position_for_key,
 )
 from .music import MusicPlayer
+from .voice import VoicePlayer
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--volume must be between 0 and 1")
 
     music = MusicPlayer(volume=args.volume, muted=args.mute)
-    bridge = PygameSessionBridge(music_player=music)
+    bridge = PygameSessionBridge(music_player=music, voice_player=VoicePlayer(music))
     try:
         return _play(args, bridge, music)
     finally:
@@ -352,7 +353,6 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         and preference.shortcut.casefold() in supported_preference_shortcuts
         and (key := getattr(pygame, f"K_{preference.shortcut.upper()}", None)) is not None
     }
-    envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
         logical_size=logical_size,
@@ -360,6 +360,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
     )
+    envelope = bridge.start(args.world)
     stage.preference_controls = _preference_controls(bridge, preferences)
     frame = _frame(bridge, envelope)
 
@@ -404,6 +405,8 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
     while running:
         for event in _next_events(stage):
             if event.type == pygame.NOEVENT:
+                continue
+            if bridge.voice_player is not None and bridge.voice_player.handle_event(event):
                 continue
             action: Action | None = None
             if event.type == pygame.QUIT:

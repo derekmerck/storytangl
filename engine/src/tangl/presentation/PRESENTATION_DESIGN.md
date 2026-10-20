@@ -80,8 +80,13 @@ records the shipped wire spelling and lifecycle policy. Pygame now owns one
 co-located-path BGM stream with RIT continuity, fresh restart UID deduplication,
 and client-local mute/volume controls, separate from image/history rendering.
 Create/get/reconnect uses only desired state. Optional music/device/decoder
-failures do not block play. Web playback, one-shot effects/voice, remote pygame
-loading and exact-position restoration remain deferred.
+failures do not block play. Pygame now also plays fresh AUDIO/`character_vox`
+occurrences serially per immediate presentation batch, with client-local music
+attenuation. New presentation cancels old voice; redraw/history/restore does not
+enqueue it. Source/occurrence provenance stays on ordinary fragments, and native
+completion wakes an idle client without controlling story progression. Web
+playback, generic effects/voice policy, remote pygame loading and exact-position
+restoration remain deferred.
 
 Reference correction (#551): intent zone references and ``PlaceAccepts.edge_ref``
 accept ``EntityRef`` — a UUID identity or an exact symbolic label, not Core's
