@@ -863,9 +863,10 @@ class StoryMaterializer:
         provider = MediaInventoryProvisioner.graph_local_copy(candidate, _ctx=ctx)
         # ResourceManager owns scoped aliases, including subdirectory names.
         # Validate the resolved resource by identity, not its basename label.
-        dep.requirement.has_identifier = provider.shortcode()
-        if not dep.satisfied_by(provider):
+        resolved = dep.requirement.model_copy(update={"has_identifier": provider.shortcode()})
+        if not resolved.satisfied_by(provider):
             return
+        dep.requirement = resolved
 
         if provider.registry is not state.graph:
             state.graph.add(provider)
