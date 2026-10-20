@@ -25,6 +25,11 @@ scenes:
             media_role: narrative_im
             staging_hints:
               media_shape: landscape
+          - name: music/theme.mp3
+            media_type: AUDIO
+            media_role: music
+            staging_hints:
+              media_timing: loop
         content: "At the quay, every introduction is also a challenge."
         actions:
           - text: "Step into the practice court"

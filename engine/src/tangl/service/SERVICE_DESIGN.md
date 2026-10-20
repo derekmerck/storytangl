@@ -4,8 +4,9 @@
 > Authority: The canonical public service surface is `ServiceManager`,
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
-> #571 slice 1 supports file-backed AUDIO URL/path/inline transport; playback
-> is deferred; #571 slice 2a implements current desired-music synchronization.
+> #571 slice 1 supports file-backed AUDIO URL/path/inline transport; slice 2a
+> implements current desired-music synchronization. Pygame slice 2b consumes
+> that state for local BGM; Service owns no playback clock or device state.
 
 ## Position in the Architecture
 
@@ -330,7 +331,10 @@ events. Native attached callers choose their ordinary media resolver/profile.
 There is no second persisted state store, playback session, clock, mixer or
 acknowledgement protocol. See the canonical
 [media addendum](../media/MEDIA_DESIGN.md#control-targets-and-desired-music-571-slice-2a)
-for shipped target spelling and examples. Physical playback remains deferred.
+for shipped target spelling and examples. Pygame's client-local music owner
+consumes these existing snapshots through PASSTHROUGH resolution; Web playback,
+effects/voice and remote pygame loading remain deferred. No Service playback
+state or acknowledgement is added.
 
 ## What Service Does Not Define
 

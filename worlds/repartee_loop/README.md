@@ -125,8 +125,9 @@ generation to a local ACE-Step 1.5 server. A commercial generator's
 reference-track feature would also do.
 
 Each pack ships its theme as `music/theme.mp3`, the same name in both, so the
-pack decides which plays, as it does for the art, once clients can play audio
-(#571). Each pack's manifest records how its theme was made under `music`: the
+pack decides which plays, as it does for the art. The pygame client now plays
+the single opening music cue through its persistent local BGM owner (#571).
+Web playback remains pending. Each pack's manifest records how its theme was made under `music`: the
 description, every sampler and text-encoder setting, the seed, the checkpoint
 and the ComfyUI version it was rendered with, and the shipped file's hash. The
 same record on another ComfyUI or checkpoint version may not give the same

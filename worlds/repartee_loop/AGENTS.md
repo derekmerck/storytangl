@@ -26,8 +26,10 @@ packs of seven, plus three sprite sheets in the spaceport pack. Each sheet's
 frames and clips live in a small JSON sidecar beside it.
 
 The two themes, `music/theme.mp3` in each pack at about 1.4 MB, are the
-exception: no test reads them, so they are in LFS, and the root `.lfsconfig`
-leaves them out of default fetches until a client can play them (#571). Their
+exception: always-on tests do not require their bytes. Optional pygame music
+tests read and decode them only when materialized, and skip missing/pointer
+files (never xfail genuine decode failures). They stay in LFS; root `.lfsconfig`
+leaves them out of default fetches. The pygame client can play them (#571). Their
 manifest entries, under `music` rather than `assets`, record how each was made;
 the pack tests read only `assets`.
 

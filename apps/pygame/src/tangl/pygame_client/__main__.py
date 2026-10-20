@@ -59,6 +59,7 @@ from .stage import (
     choice_action,
     position_for_key,
 )
+from .music import MusicPlayer
 
 logger = logging.getLogger(__name__)
 
@@ -282,10 +283,31 @@ def _next_events(stage: Stage) -> list[pygame.event.Event]:
     return [first, *pygame.event.get()]
 
 
+def _music_key(event: pygame.event.Event, music: MusicPlayer) -> bool:
+    """Ctrl shortcuts are local and cannot collide with choice letters or F-keys."""
+    if not event.mod & pygame.KMOD_CTRL:
+        return False
+    if event.key == pygame.K_m:
+        music.toggle_mute()
+    elif event.key in (pygame.K_LEFTBRACKET, pygame.K_RIGHTBRACKET):
+        music.set_volume(music.volume + (-0.1 if event.key == pygame.K_LEFTBRACKET else 0.1))
+    else:
+        return False
+    return True
+
+
+def _music_caption(world: str, music: MusicPlayer) -> None:
+    pygame.display.set_caption(
+        f"StoryTangl — {world} | Music: {music.status} | Ctrl+M mute, Ctrl+[/] volume",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--world", default="repartee_loop")
     parser.add_argument("--assets", type=Path, default=None)
+    parser.add_argument("--mute", action="store_true", help="start with music muted")
+    parser.add_argument("--volume", type=float, default=0.5, help="local music volume, 0 to 1")
     parser.add_argument(
         "--scale",
         type=int,
@@ -307,8 +329,19 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.scale <= 0:
         parser.error("--scale must be a positive integer")
+    if not 0 <= args.volume <= 1:
+        parser.error("--volume must be between 0 and 1")
 
-    bridge = PygameSessionBridge()
+    music = MusicPlayer(volume=args.volume, muted=args.mute)
+    bridge = PygameSessionBridge(music_player=music)
+    try:
+        return _play(args, bridge, music)
+    finally:
+        bridge.close()
+        pygame.quit()
+
+
+def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPlayer) -> int:
     logical_size = bridge.stage_extent(args.world)
     preferences = bridge.discover_preferences(args.world)
     supported_preference_shortcuts = {f"f{number}" for number in range(1, 13)}
@@ -360,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
         frame = _frame(bridge, envelope, frame)
 
     stage.draw(frame, media_visibility=bridge.media_visibility())
+    _music_caption(args.world, music)
 
     if args.screenshot is not None:
         pygame.image.save(stage.window, str(args.screenshot))
@@ -379,6 +413,9 @@ def main(argv: list[str] | None = None) -> int:
             elif event.type == pygame.MOUSEWHEEL:
                 action = stage.wheel(pygame.mouse.get_pos(), -event.y)
             elif event.type == pygame.KEYDOWN:
+                if _music_key(event, music):
+                    _music_caption(args.world, music)
+                    continue
                 if pending is None and event.key in preference_keys:
                     bridge.cycle_preference(preference_keys[event.key])
                     stage.preference_controls = _preference_controls(bridge, preferences)
@@ -423,13 +460,13 @@ def main(argv: list[str] | None = None) -> int:
                 stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
                 frame = _frame(bridge, envelope, frame)
+                _music_caption(args.world, music)
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze
         # every clip for as long as the pointer moved.
         if stage.animating and stage.since_drawn_ms() >= FRAME_MS:
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
-    pygame.quit()
     return 0
 
 

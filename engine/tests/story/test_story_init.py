@@ -495,10 +495,14 @@ scenes:
     assert len(result.source_map["__source_files__"]) == 1
 
 
-def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(tmp_path: Path) -> None:
+@pytest.mark.parametrize("asset_name", ["cover.svg", "art/cover.svg"])
+def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
+    tmp_path: Path, asset_name: str,
+) -> None:
     media_root = tmp_path / "media"
     media_root.mkdir()
-    asset = media_root / "cover.svg"
+    asset = media_root / asset_name
+    asset.parent.mkdir(parents=True, exist_ok=True)
     asset.write_text(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"></svg>",
         encoding="utf-8",
@@ -508,7 +512,7 @@ def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
 
     script = _base_script()
     script["scenes"]["intro"]["blocks"]["start"]["media"] = [
-        {"name": "cover.svg", "text": "Cover"},
+        {"name": asset_name, "text": "Cover"},
         {"url": "https://example.com/poster.svg"},
         {"data": "<svg xmlns='http://www.w3.org/2000/svg'></svg>"},
     ]
@@ -526,9 +530,31 @@ def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
     assert media_deps[0].requirement.resolved_cursor_id == start.uid
     assert media_deps[0].requirement.resolved_step == 0
     assert media_deps[0].provider.path == asset
+    assert media_deps[0].requirement.authored_path == asset_name
+    assert media_deps[0].satisfied_by(media_deps[0].provider)
     assert start.media[0].get("dependency_id") == media_deps[0].uid
     assert "dependency_id" not in start.media[1]
     assert "dependency_id" not in start.media[2]
+
+
+def test_named_media_normalization_retains_a_selector_when_scope_does_not_match(
+    tmp_path: Path,
+) -> None:
+    asset = tmp_path / "cover.svg"
+    asset.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
+    resources = ResourceManager(tmp_path, scope="world")
+    resources.index_directory(".")
+    script = _base_script()
+    script["scenes"]["intro"]["blocks"]["start"]["media"] = [
+        {"name": "cover.svg", "scope": "system"},
+    ]
+    world = World.from_script_data(script_data=script, resources=resources)
+    graph = world.create_story("media_story", init_mode=InitMode.EAGER).graph
+    start = graph.find_one(Selector(has_kind=Block, label="start"))
+    dependency = next(start.edges_out(Selector(has_kind=MediaDep)))
+    assert dependency.provider is None
+    assert dependency.requirement.has_identifier == "cover.svg"
+    assert dependency.requirement.authored_path == "cover.svg"
 
 
 def test_story_materializer_allows_inventory_media_without_resource_manager() -> None:
