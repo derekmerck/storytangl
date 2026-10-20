@@ -69,9 +69,12 @@ class MusicPlayer:
                 and self._playing_rit is not None and self._playing_rit == previous_rit
             ):
                 self._play()
+        if self.current is None:
+            self._device_failed = False
+            self.error = None
 
     def _load(self, path: str, rit_id: UUID) -> None:
-        if self._device_failed:
+        if self._device_failed and not pygame.mixer.get_init():
             return
         if not pygame.mixer.get_init():
             try:
@@ -80,6 +83,7 @@ class MusicPlayer:
                 self._device_failed = True
                 self._failed(error)
                 return
+        self._device_failed = False
         try:
             pygame.mixer.music.load(path)
             self._play()
@@ -127,10 +131,11 @@ class MusicPlayer:
         self._stop()
         self.current = None
         self.error = None
+        self._device_failed = False
         self._seen_controls.clear()
 
     @property
     def status(self) -> str:
-        if self.error:
+        if self.error or self._device_failed:
             return "unavailable"
         return "muted" if self.muted else f"{self.volume:.0%}"

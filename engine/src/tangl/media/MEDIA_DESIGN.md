@@ -172,7 +172,8 @@ Projection never mutates the journal, and
 prose/choice interaction remains available. This is a bounded opt-out, not a
 general codec/capability-negotiation system. Web's historical media view has a
 role-substring audio branch that misses `sound_fx` and `*_vox`; it is not a
-persistent music owner. Neither Web nor pygame playback is delivered here.
+persistent music owner. Transport slice #574 did not deliver playback; slice 2b
+now delivers co-located pygame BGM. Web playback remains pending.
 
 ### Control targets and desired music (#571 slice 2a)
 

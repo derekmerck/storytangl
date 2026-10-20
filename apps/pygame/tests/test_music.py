@@ -249,6 +249,83 @@ def test_audio_failure_keeps_real_choices_playable(
     assert bridge.choose(choice.edge_id).fragments
 
 
+@pytest.mark.parametrize("boundary", ["new_story", "empty", "delete"])
+@pytest.mark.parametrize("recovers", [False, True])
+def test_device_failure_retries_at_session_or_empty_slot_boundaries(
+    bridge: PygameSessionBridge, backend: dict[str, Mock], monkeypatch: pytest.MonkeyPatch,
+    boundary: str, recovers: bool,
+) -> None:
+    initialized = False
+    attempts = Mock(side_effect=[
+        pygame.error("no device"), None if recovers else pygame.error("still no device"),
+    ])
+
+    def initialize() -> None:
+        nonlocal initialized
+        attempts()
+        initialized = True
+
+    monkeypatch.setattr(pygame.mixer, "get_init", lambda: (44100, -16, 2) if initialized else None)
+    monkeypatch.setattr(pygame.mixer, "init", initialize)
+    player = bridge.music_player
+    player.set_volume(0.3)
+    player.toggle_mute()
+    cue = selected(bridge)
+    assert player.status == "unavailable" and player.error
+    for _ in range(2):
+        deliver(bridge, cue)
+        assert player.status == "unavailable"
+    assert attempts.call_count == 1
+    backend["load"].assert_not_called()
+
+    if boundary == "new_story":
+        bridge.close()
+        bridge.start("pygame_music_fixture")
+    else:
+        if boundary == "empty":
+            deliver(bridge, None)
+        else:
+            deliver(bridge, None, [ControlFragment(
+                fragment_type="delete", target=RoleTarget(media_role="music"),
+            )], snapshot=False)
+        assert player.current is None
+        deliver(bridge, cue)
+
+    assert attempts.call_count == 2
+    assert player.volume == 0.3 and player.muted
+    if recovers:
+        assert player.error is None and player.status == "muted"
+        backend["load"].assert_called_once()
+        backend["play"].assert_called_once_with(loops=-1)
+        backend["set_volume"].assert_called_with(0.0)
+        player.toggle_mute()
+        backend["set_volume"].assert_called_with(0.3)
+        assert player.status == "30%"
+    else:
+        assert player.error and player.status == "unavailable"
+        backend["load"].assert_not_called()
+        backend["play"].assert_not_called()
+    deliver(bridge, player.current)
+    assert attempts.call_count == 2  # No timer or repeated snapshot retry.
+
+
+def test_device_initialized_elsewhere_is_used_despite_an_earlier_failure(
+    bridge: PygameSessionBridge, backend: dict[str, Mock], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    initialized = False
+    attempts = Mock(side_effect=pygame.error("no device"))
+    monkeypatch.setattr(pygame.mixer, "get_init", lambda: (44100, -16, 2) if initialized else None)
+    monkeypatch.setattr(pygame.mixer, "init", attempts)
+    cue = selected(bridge)
+    assert attempts.call_count == 1 and bridge.music_player.status == "unavailable"
+    initialized = True
+    deliver(bridge, cue)
+    assert attempts.call_count == 1
+    backend["load"].assert_called_once()
+    backend["play"].assert_called_once_with(loops=-1)
+    assert bridge.music_player.error is None and bridge.music_player.status == "50%"
+
+
 @pytest.mark.parametrize("profile", [MediaContentProfile.MEDIA_SERVER, MediaContentProfile.INLINE_DATA])
 def test_unsupported_transport_is_not_guessed_into_local_path(
     bridge: PygameSessionBridge, backend: dict[str, Mock], profile: MediaContentProfile,
