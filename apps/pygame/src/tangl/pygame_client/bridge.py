@@ -779,6 +779,11 @@ class PygameSessionBridge:
         return tuple(sheets)
 
     def _append_media(self, turn: Turn, fragment: MediaFragment) -> None:
+        if (
+            self.music_player is not None and fragment.content_type is MediaDataType.AUDIO
+            and fragment.media_role == "music" and fragment.rit_id is None
+        ):
+            logger.warning("Music cue unavailable: no admitted resource (%s)", fragment.uid)
         payload = media_fragment_to_payload(
             fragment,
             render_profile=self.media_render_profile,

@@ -262,14 +262,26 @@ def test_unsupported_transport_is_not_guessed_into_local_path(
 
 
 def test_disappearing_optional_source_stops_stale_music_without_blocking_choices(
-    bridge: PygameSessionBridge, backend: dict[str, Mock],
+    bridge: PygameSessionBridge, backend: dict[str, Mock], caplog: pytest.LogCaptureFixture,
 ) -> None:
     cue = selected(bridge)
     cue.content.path.unlink()  # Generated temporary WAV, never a shipped asset.
     envelope = bridge.refresh()
     assert bridge.music_player._playing_rit is None
+    assert bridge.music_player.error and "Music unavailable" in caplog.text
     assert backend["load"].call_count == 1
     assert any(turn.choices for turn in bridge.build_turns(list(envelope.fragments)))
+
+
+def test_unadmitted_optional_music_is_logged_without_image_loading_or_lost_choices(
+    bridge: PygameSessionBridge, backend: dict[str, Mock], caplog: pytest.LogCaptureFixture,
+) -> None:
+    unresolved = MediaFragment(content="unresolved optional cue", content_format="json",
+                               content_type=MediaDataType.AUDIO, media_role="music")
+    turn = bridge.build_turns([unresolved, ChoiceFragment(text="Continue", edge_id=uuid4())])[0]
+    assert "Music cue unavailable: no admitted resource" in caplog.text
+    assert turn.choices and not turn.images
+    backend["load"].assert_not_called()
 
 
 def test_create_and_reconnect_never_execute_historical_restarts(

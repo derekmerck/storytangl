@@ -36,7 +36,9 @@ class MusicPlayer:
             self.current = selected if isinstance(selected, MediaFragment) else None
             if self.current is None or payload is None:
                 self._stop()
-                self.error = None
+                self.error = "Music unavailable for this delivery profile" if self.current else None
+                if self.error:
+                    logger.warning("%s", self.error)
             elif (
                 payload.get("fragment_type") != "media"
                 or payload.get("media_type") != "audio"
