@@ -67,7 +67,7 @@ def world(tmp_path: Path) -> Iterator[World]:
 
 @pytest.fixture
 def backend(monkeypatch: pytest.MonkeyPatch) -> dict[str, Mock]:
-    calls = {name: Mock() for name in ("load", "play", "stop", "set_volume")}
+    calls = {name: Mock() for name in ("load", "play", "stop", "set_volume", "reserve")}
     calls["channel"] = Mock()
     channel = calls["channel"]
     channel.get_busy.return_value = False
@@ -79,6 +79,7 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> dict[str, Mock]:
     calls["sound"] = Mock(side_effect=lambda path: path)
     monkeypatch.setattr(pygame.mixer, "get_init", lambda: (44100, -16, 2))
     monkeypatch.setattr(pygame.mixer, "Channel", lambda index: calls["channel"])
+    monkeypatch.setattr(pygame.mixer, "set_reserved", calls["reserve"])
     monkeypatch.setattr(pygame.mixer, "Sound", calls["sound"])
     for name in ("load", "play", "stop", "set_volume"):
         monkeypatch.setattr(pygame.mixer.music, name, calls[name])
@@ -115,6 +116,7 @@ def test_opening_serial_order_provenance_and_no_image_drawing(
     assert cues[0].uid != cues[1].uid
     assert client.voice_player.current.uid == cues[0].uid
     assert backend["channel"].play.call_count == 1
+    backend["reserve"].assert_called_once_with(1)
     assert backend["set_volume"].call_args.args == (0.125,)
     assert all(not turn.images for turn in client.build_turns(list(envelope.fragments)))
     finish(client, backend)
@@ -394,6 +396,10 @@ def test_dummy_channel_completion_wakes_idle_event_loop(
         ]
         assert pygame.mixer.music.get_busy()
         assert pygame.mixer.music.get_volume() == pytest.approx(0.5)
+        # Automatic Sound.play() must not claim even an idle voice channel.
+        other = pygame.mixer.Sound(buffer=b"\0\0" * 800)
+        assert other.play() is not None
+        assert not pygame.mixer.Channel(0).get_busy()
     finally:
         pygame.time.set_timer(timeout, 0)
         client.close()

@@ -65,6 +65,7 @@ class VoicePlayer:
             try:
                 sound = pygame.mixer.Sound(payload["path"])
                 # Channel zero is dedicated to voice; music uses mixer.music.
+                pygame.mixer.set_reserved(1)
                 self._channel = pygame.mixer.Channel(0)
                 self._channel.set_endevent(self._end_event)
                 self._channel.play(sound)
