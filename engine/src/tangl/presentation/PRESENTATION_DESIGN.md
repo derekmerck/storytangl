@@ -76,8 +76,12 @@ from the selected recording's loop mode; no historical action is replayed by
 the snapshot. There are no playback clocks or second persisted state stores.
 The canonical
 [media design addendum](../media/MEDIA_DESIGN.md#control-targets-and-desired-music-571-slice-2a)
-records the shipped wire spelling and lifecycle policy. Physical Web/pygame
-music owners, local controls and audible occurrence deduplication remain deferred.
+records the shipped wire spelling and lifecycle policy. Pygame now owns one
+co-located-path BGM stream with RIT continuity, fresh restart UID deduplication,
+and client-local mute/volume controls, separate from image/history rendering.
+Create/get/reconnect uses only desired state. Optional music/device/decoder
+failures do not block play. Web playback, one-shot effects/voice, remote pygame
+loading and exact-position restoration remain deferred.
 
 Reference correction (#551): intent zone references and ``PlaceAccepts.edge_ref``
 accept ``EntityRef`` — a UUID identity or an exact symbolic label, not Core's

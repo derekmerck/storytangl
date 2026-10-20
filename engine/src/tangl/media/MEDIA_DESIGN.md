@@ -9,7 +9,8 @@
 
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
 > #571 slice 2a implements explicit control targets and read-only desired-BGM
-> snapshots. Physical playback remains deferred.
+> snapshots. Slice 2b adds co-located pygame BGM playback and local controls;
+> Web playback, effects/voice and remote pygame audio remain deferred.
 > Authority: Canonical journal fragment types live in `tangl.journal.fragments`;
 > presentation hints live in `tangl.presentation.hints`; `tangl.journal.media`
 > remains a fragment-only compatibility re-export surface.
@@ -165,8 +166,9 @@ can be retried normally. This is not codec probing or an automatic LFS fetch.
 
 `MediaRenderProfile(include_audio=False)` explicitly omits audio, or returns the
 existing text fallback if supplied. REST accepts `render_profile=raw,no_audio`.
-The current pygame adapter uses this opt-out until it owns audio playback:
-audio must not be loaded as an image. Projection never mutates the journal, and
+Pygame bridges without a music owner use this opt-out; the runnable client opts
+in with its persistent BGM owner. Audio is never loaded as an image.
+Projection never mutates the journal, and
 prose/choice interaction remains available. This is a bounded opt-out, not a
 general codec/capability-negotiation system. Web's historical media view has a
 role-substring audio branch that misses `sound_fx` and `*_vox`; it is not a
@@ -368,8 +370,19 @@ an avatar when music starts); clocks and coordination belong to the client.
 No choreography is implemented, and story correctness must not depend on media
 finishing. Tightly synchronized plugin/socket work would be separate.
 
-Later slices deliver one persistent playback owner
-outside Web's historical components and pygame's image drawing. Local pygame
+Pygame now has one persistent music owner outside image drawing/history. It
+resolves current desired music through the bridge's existing PASSTHROUGH profile,
+loads only local paths, and keys continuity by RIT identity. Fresh live restart
+controls deduplicate by control UID using canonical target matching; snapshots
+never execute historical controls. Local mute/volume survive track changes;
+story switches and teardown stop playback. Device/media failures log and leave
+play usable. Unchanged RITs never restart on snapshot restatement; changed repeat
+suggestions take effect on the next load or explicit restart. The Marmoset
+opening cue uses ordinary pack-relative inventory lookup; resolved aliases
+normalize to the existing resource identifier at materialization, retaining the
+authored path for diagnostics. No new persisted state or loader is introduced.
+
+Web's persistent playback owner remains a later slice. Local pygame
 paths and remote Web URLs are the initial floor; remote pygame audio waits for
 a proper shared loading path. Then one-shot effects deduplicate by occurrence
 UID: two executions of the same authored node produce distinct occurrences,

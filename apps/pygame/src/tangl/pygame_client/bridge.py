@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from collections.abc import Mapping, Sequence
-from typing import Any, get_args
+from typing import Any, TYPE_CHECKING, get_args
 from uuid import UUID
 
 from pydantic import TypeAdapter
@@ -19,12 +19,14 @@ from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
     ContentFragment,
+    ControlFragment,
     GroupFragment,
     KvFragment,
     MediaFragment,
     PieceFragment,
 )
 from tangl.persistence import PersistenceManagerFactory
+from tangl.media import MediaDataType
 from tangl.presentation.hints import ClipBinding, STAGING_MAX, STAGING_MIN, TimingName, VisibilityBinding
 from tangl.presentation.intent import EntityRef
 from tangl.presentation.projection import (
@@ -66,6 +68,9 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .music import MusicPlayer
 
 _DEFAULT_STAGE_EXTENT = (320, 200)
 _SUPPORTED_STAGE_EXTENTS = {_DEFAULT_STAGE_EXTENT, (640, 400)}
@@ -285,6 +290,7 @@ class PygameSessionBridge:
         user_id: UUID | None = None,
         user_secret: str | None = None,
         media_render_profile: MediaRenderProfile | None = None,
+        music_player: MusicPlayer | None = None,
     ) -> None:
         self.service_manager = service_manager or ServiceManager(
             PersistenceManagerFactory.native_in_mem()
@@ -293,13 +299,14 @@ class PygameSessionBridge:
         self.user_secret = user_secret
         self.ledger_id: UUID | None = None
         self.world_id: str | None = None
+        self.music_player = music_player
         self.preferences: dict[str, bool | str] = {}
         self._preference_ids: frozenset[str] = frozenset()
         self._preference_declarations: dict[str, PreferenceDeclaration] = {}
         self.media_render_profile = media_render_profile or MediaRenderProfile(
             pending_policy=MediaPendingPolicy.FALLBACK,
             content_profile=MediaContentProfile.PASSTHROUGH,
-            include_audio=False,
+            include_audio=music_player is not None,
         )
 
     # ── session lifecycle ────────────────────────────────────────────────
@@ -390,8 +397,20 @@ class PygameSessionBridge:
             ledger_id=self.ledger_id,
             request=DirectEdgeRequest(edge_id=edge_id, payload=payload),
         )
+        self._sync(envelope, live=True)
+        return envelope
+
+    def refresh(self) -> RuntimeEnvelope:
+        """Get/restore/reconnect synchronizes selection, never historical controls."""
+        envelope = self.service_manager.get_story_update(
+            user_id=self.user_id, ledger_id=self.ledger_id,
+        )
         self._sync(envelope)
         return envelope
+
+    def close(self) -> None:
+        if self.music_player is not None:
+            self.music_player.close()
 
     def _ensure_user_id(self) -> UUID:
         """Register a session user; the service will not accept an invented id."""
@@ -407,13 +426,24 @@ class PygameSessionBridge:
         self.user_id = raw if isinstance(raw, UUID) else UUID(str(raw))
         return self.user_id
 
-    def _sync(self, envelope: RuntimeEnvelope) -> None:
+    def _sync(self, envelope: RuntimeEnvelope, *, live: bool = False) -> None:
         """Track the active ledger, which travels in envelope metadata."""
 
         raw = dict(envelope.metadata or {}).get("ledger_id")
         if raw is None:
             raise RuntimeError("RuntimeEnvelope metadata did not include ledger_id")
-        self.ledger_id = raw if isinstance(raw, UUID) else UUID(str(raw))
+        ledger_id = raw if isinstance(raw, UUID) else UUID(str(raw))
+        if ledger_id != self.ledger_id:
+            self.close()
+        self.ledger_id = ledger_id
+        if self.music_player is not None:
+            music = envelope.presentation.music if envelope.presentation is not None else None
+            payload = media_fragment_to_payload(
+                music, render_profile=self.media_render_profile, world_id=self.world_id,
+            ) if isinstance(music, MediaFragment) else None
+            controls = [fragment for fragment in self._flatten(list(envelope.fragments))
+                        if isinstance(fragment, ControlFragment)]
+            self.music_player.synchronize(envelope.presentation, payload, controls, live=live)
 
     # ── disclosure ───────────────────────────────────────────────────────
 
@@ -757,6 +787,10 @@ class PygameSessionBridge:
         if payload is None or payload.get("fragment_type") != "media":
             # Media that cannot be dereferenced degrades to its text floor. The
             # service may supply that text itself, so prefer the payload's.
+            self._append_fallback_text(turn, payload, fragment)
+            return
+
+        if fragment.content_type is MediaDataType.AUDIO or payload.get("media_type") == "audio":
             self._append_fallback_text(turn, payload, fragment)
             return
 

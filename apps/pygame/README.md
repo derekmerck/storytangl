@@ -16,6 +16,8 @@ Adapter proof of concept. The bridge and turn model are covered by ordinary
   no pygame, so the whole adaptation layer is testable headlessly.
 - `src/tangl/pygame_client/stage.py` — renders one turn to the disclosed logical
   stage, scaled nearest-neighbour by a client-local factor.
+- `src/tangl/pygame_client/music.py` — one persistent client-local BGM stream,
+  separate from images and historical turn rendering.
 - `src/tangl/pygame_client/__main__.py` — event loop.
 - `tests/` — adapter and live-session tests.
 
@@ -100,6 +102,56 @@ when it changes, and carries on when a turn merely restates it.
 With no clip, no sheet that has it, or a sheet this port cannot load, the still is
 drawn. The event loop sleeps until input, and ticks at about thirty frames a
 second only while a clip is actually playing.
+
+## Background music (#571)
+
+The runnable client opts into AUDIO and resolves `presentation.music` through
+the bridge's ordinary PASSTHROUGH media profile. Only a co-located `path` can be
+loaded by pygame in this slice. URL/inline delivery is reported as unsupported;
+there is no remote downloader or URL-to-path guessing. Bridges without a music
+owner still default to omitting audio. AUDIO never becomes a StageImage.
+
+One music owner uses `pygame.mixer.music`. The same `rit_id` continues across
+redraws, prose, contests, maps, and adjacent scenes. A different RIT replaces it;
+explicit empty/unavailable snapshots and stops clear it. Loop/start repetition
+is honored on load or deliberate restart. Merely restating a snapshot never
+restarts music. A changed repetition suggestion takes effect on the next load
+or explicit restart, not by seeking/restarting an unchanged stream.
+
+Create/get/restore/reconnect synchronizes only the current desired track, not
+historical cues or controls. Live choice responses may restart a matching current
+track once per fresh control UID, using the shared fragment/resource/role/handle
+targets. Final snapshots win over stale controls. Story/world switches and
+teardown stop old playback; changing scenes does not. No playback state is sent
+to Service or stored in the journal.
+
+Local controls, also shown in the window title:
+
+- `Ctrl+M`: mute/unmute.
+- `Ctrl+[` / `Ctrl+]`: volume down/up in 10% steps.
+- `--mute`, `--volume 0.5`: initial local settings (volume range 0–1).
+
+They do not collide with choice letters, numeric selection, or world preference
+F-keys, and persist through redraws and track changes. Missing optional files,
+unsupported delivery, unavailable devices and decoder failures are logged;
+device/decode failures show music as unavailable in the title. Prose and choices
+remain usable. There is no completion-dependent progression, SFX/voice, remote
+pygame audio, crossfade, playlist, or playback-position restoration.
+
+Marmoset Island declares one opening cue, `music/theme.mp3`. Its island and
+orbital packs use the same relative name; the selected pack supplies the bytes.
+Optional themes remain in Git LFS, excluded from default fetches. Fetch just them
+without changing persistent exclusions:
+
+```bash
+git lfs pull -I "worlds/repartee_loop/media/music/theme.mp3,worlds/repartee_loop/media_spaceport/music/theme.mp3" -X ""
+```
+
+No fetch is needed to play silently. Tests always generate tiny WAVs for lifecycle
+and failure coverage. Optional real-theme tests run separately for each pack when
+actual bytes exist, skip absent/LFS-pointer files, and fail real decode/continuity
+errors. SDL dummy audio proves decoding/play invocation, not human-confirmed
+audible output. Tests never fetch media or depend on git-lfs being installed.
 
 ## Typed Choices
 
