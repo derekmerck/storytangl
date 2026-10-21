@@ -481,6 +481,33 @@ def test_main_details_capture_input_without_choices_and_preserve_music_shortcuts
     muted.assert_called_once()
 
 
+def test_status_clicks_keep_identity_when_entries_change_before_redraw(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    stage = Stage(chrome=True, display_scale=1)
+    entries = [ProjectedSection(**section("a", "First")),
+               ProjectedSection(**section("b", "Second"))]
+    brand = BrandingValue(name="Identity witness")
+    try:
+        stage.set_info(brand, entries, None)
+        stage.draw(Turn(step=1))
+        boxes = [box for box, _entry in stage.chrome.hitboxes]
+        stage.set_info(brand, list(reversed(entries)), None)
+        click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=boxes[0].center)
+        assert stage.chrome.handle_event(click, 1)
+        assert stage.chrome.selected_id == "a"
+        stage.set_info(brand, [entries[1]], None)
+        click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=boxes[1].center)
+        assert stage.chrome.handle_event(click, 1)
+        assert stage.chrome.selected_id == "b"
+        stage.set_info(brand, [], None)
+        assert stage.chrome.handle_event(click, 1)
+        assert not stage.chrome.open
+    finally:
+        pygame.quit()
+
+
 @pytest.mark.parametrize("size,scale", [((320, 200), 3), ((640, 400), 1)])
 def test_shell_keeps_world_surface_and_choice_coordinates(
     size: tuple[int, int], scale: int, monkeypatch: pytest.MonkeyPatch,

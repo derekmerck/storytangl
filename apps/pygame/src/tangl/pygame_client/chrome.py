@@ -67,7 +67,7 @@ class Chrome:
         self.open = False
         self.page = 0
         self.detail_page = 0
-        self.hitboxes: list[tuple[pygame.Rect, int]] = []
+        self.hitboxes: list[tuple[pygame.Rect, str]] = []
 
     def set_content(
         self, branding: BrandingValue | None, sections: list[ProjectedSection],
@@ -124,7 +124,7 @@ class Chrome:
             shell.blit(self.font.render(self._clip(text, box.width - inset - 6 * d),
                                         False, (232, 226, 205)),
                        (box.left + inset + 3 * d, box.top + d))
-            self.hitboxes.append((box, self.page * 6 + slot))
+            self.hitboxes.append((box, section.section_id))
         if self.sections:
             total = (len(self.sections) + 5) // 6
             text = f"Status {self.page + 1}/{total}  [click here: next]" if total > 1 else ""
@@ -190,10 +190,11 @@ class Chrome:
                 return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             point = (event.pos[0] // scale, event.pos[1] // scale)
-            for box, index in self.hitboxes:
+            for box, section_id in self.hitboxes:
                 if box.collidepoint(point):
-                    self.selected_id = self.sections[index].section_id
-                    self.open, self.detail_page = True, 0
+                    if any(section.section_id == section_id for section in self.sections):
+                        self.selected_id = section_id
+                        self.open, self.detail_page = True, 0
                     return True
             if point[1] < self.height:
                 self.page = (self.page + 1) % max(1, (len(self.sections) + 5) // 6)
