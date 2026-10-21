@@ -147,6 +147,9 @@ so a called scene under the same `SandboxScope` retains its clock and carried
 items. Nearest `ui_status` locals may replace the default set with ordinary
 projected-section data; `[]` / `None` explicitly remove entries without removing
 chrome. Worlds choose optional `period_labels` / `period_icons` suggestions.
+`period_icons` uses string period identities, for example `{"4": "moon"}`, so
+keys remain unchanged through JSON restoration. Lookup uses the mechanic's
+actual period identity, not its displayed label; integer-key aliases are not supported.
 Non-sandbox worlds can provide the same exact channel through their own ordinary
 projection handlers, without adopting a sandbox clock or inventory.
 

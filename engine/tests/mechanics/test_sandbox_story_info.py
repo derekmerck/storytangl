@@ -46,7 +46,7 @@ def test_opt_in_compact_status_uses_shared_scope_and_nearest_override() -> None:
     from tangl.story import Block, Scene, StoryGraph
 
     graph = StoryGraph()
-    scope = SandboxScope(label="scope", locals={"world_turn": 3, "period_icons": {4: "moon"}})
+    scope = SandboxScope(label="scope", locals={"world_turn": 3, "period_icons": {"4": "moon"}})
     scene = Scene(label="called", title="A called scene")
     block = Block(label="second")
     for node in (scope, scene, block):
@@ -79,6 +79,46 @@ def test_compact_status_does_not_invent_a_sandbox_for_an_unscoped_block() -> Non
     assert not advertise_compact_status(caller=block, ctx=ctx)
     assert not project_compact_status(caller=block, ctx=ctx,
                                        request=ProjectionRequest(channels=["ui-status"]))
+
+
+@pytest.mark.parametrize("turn,icon,period,day", [
+    (3, "moon", "night", "Day 1"),
+    (4, "sun", "morning", "Day 2"),
+])
+def test_compact_period_icon_survives_parent_graph_json_round_trip(
+    turn: int, icon: str, period: str, day: str,
+) -> None:
+    from tangl.mechanics.sandbox.compact_status import project_compact_status
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+    from tangl.story import Block, StoryGraph
+
+    graph = StoryGraph()
+    scope = SandboxScope(label="scope", locals={
+        "world_turn": turn, "period_icons": {"1": "sun", "4": "moon"},
+    })
+    block = Block(label="status")
+    graph.add(scope)
+    graph.add(block)
+    scope.add_child(block)
+    request = ProjectionRequest(channels=["ui-status"])
+    before = _section_by_id(project_compact_status(
+        caller=block, ctx=PhaseCtx(graph=graph, cursor_id=block.uid), request=request,
+    ))
+
+    restored = StoryGraph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
+    restored_scope = restored.get(scope.uid)
+    assert restored is not graph and restored_scope is not scope
+    assert restored.get(block.uid).parent is restored_scope
+    assert set(restored_scope.locals["period_icons"]) == {"1", "4"}
+    after = _section_by_id(project_compact_status(
+        caller=restored.get(block.uid),
+        ctx=PhaseCtx(graph=restored, cursor_id=block.uid), request=request,
+    ))
+
+    assert before["period"].hints.icon == icon
+    assert after["period"].hints.icon == icon
+    assert before["period"].value.value == after["period"].value.value == period
+    assert before["day"].value.value == after["day"].value.value == day
 
 
 class SandboxInfoItemType(AssetType):

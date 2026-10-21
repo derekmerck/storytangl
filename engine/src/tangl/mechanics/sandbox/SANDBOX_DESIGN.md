@@ -1045,6 +1045,10 @@ retains disclosed clock and carried assets without a new remembered origin.
 Nearest `ui_status` locals may replace the whole ordered list with ordinary
 projected-section data; an explicit empty/null list removes entries. The default
 set is scene/location title, existing period/run-day and carried-item state.
+`period_icons` uses canonical string period keys (for example `{"4": "moon"}`),
+which survive constructor-form JSON restoration unchanged. The lookup uses
+`str(world_time.period)`, never a displayed period label; no integer-key alias
+or serializer coercion is provided.
 Period wording/icons are world suggestions, not a client four-daypart/calendar
 assumption. No inventory or clock is synthesized outside the mechanic's scope.
 Queries and local inspection do not provision, mutate the graph, append journal

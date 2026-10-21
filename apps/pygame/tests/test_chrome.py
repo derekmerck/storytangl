@@ -59,7 +59,8 @@ def hud_world(tmp_path: Path) -> Iterator[World]:
                      "branding": {"name": "The Workshop", "logo_media": "logo.svg"}},
         "scenes": {
             "workshop": {"kind": SandboxScope, "locals": {
-                "world_turn": 3, "period_icons": {1: "sun", 2: "sun", 3: "sunset", 4: "moon"},
+                "world_turn": 3,
+                "period_icons": {"1": "sun", "2": "sun", "3": "sunset", "4": "moon"},
             }, "blocks": {"menu": {
                 "kind": HudLocation, "location_name": "Workshop", "content": "Ready to work.",
                 "scheduled_events": [{"label": "Visit the study", "target": "errand",

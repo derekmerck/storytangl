@@ -273,8 +273,8 @@ No exact invalidation, UI persistence, polling or new server state is added.
 
 The envelope's available ids and `get_story_info`'s discovery catalog come from
 the same `_story_info_channels` fold, including exact geometry ids such as
-`ui-map-plate` and `ui-surface`. This consumer can use those ids directly without
-discarding a redundant story-catalog round trip. The public world catalog remains
+`ui-map-plate` and `ui-surface`. This consumer uses those ids directly and skips
+a redundant story-catalog round trip. The public world catalog remains
 separate and is shared by branding, stage extent and preference discovery.
 
 Public branding remains separate. `get_world_media` now resolves its resource

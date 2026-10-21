@@ -43,11 +43,12 @@ def project_compact_status(
         title = caller.location_name or title
     time = current_world_time(scope)
     period = _period_label(time.period, ns.get("period_labels", DEFAULT_PERIOD_LABELS))
+    period_icon = ns.get("period_icons", {}).get(str(time.period))
     sections = [
         ProjectedSection(section_id="scene", title="Scene", value=ScalarValue(value=title),
                          hints=PresentationHints(icon="scene")),
         ProjectedSection(section_id="period", title="Period", value=ScalarValue(value=period),
-                         hints=PresentationHints(icon=ns.get("period_icons", {}).get(time.period))),
+                         hints=PresentationHints(icon=period_icon)),
         ProjectedSection(section_id="day", title="Day",
                          value=ScalarValue(value=f"Day {time.run_day}"),
                          hints=PresentationHints(icon="calendar")),
