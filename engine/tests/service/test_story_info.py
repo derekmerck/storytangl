@@ -16,6 +16,35 @@ from tangl.service.user.user import User
 from tangl.story import InitMode, World
 
 
+def test_public_world_media_uses_inventory_and_normal_delivery_profiles(tmp_path) -> None:
+    from tangl.media.media_resource.resource_manager import ResourceManager
+    from tangl.service.media import MediaContentProfile, MediaRenderProfile
+    from tangl.service.world_registry import pop_manual_world, register_manual_world
+
+    path = tmp_path / "logo.svg"
+    path.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"/>')
+    resources = ResourceManager(tmp_path)
+    resources.index_directory(".")
+    world = World.from_script_data(script_data={**_script(), "label": "public_logo_witness"},
+                                   resources=resources)
+    register_manual_world(world)
+    try:
+        manager = build_service_manager(PersistenceManagerFactory.native_in_mem())
+        local = manager.get_world_media(world_id=world.label, media="logo.svg",
+                                        render_profile=MediaRenderProfile(
+                                            content_profile=MediaContentProfile.PASSTHROUGH))
+        remote = manager.get_world_media(world_id=world.label, media="logo.svg")
+        assert local["content_format"] == "path" and local["path"] == str(path)
+        assert remote["content_format"] == "url"
+        assert remote["url"] == f"/media/world/{world.label}/logo.svg"
+        assert local["rit_id"] == remote["rit_id"] == str(resources.get_rit("logo.svg").uid)
+        assert manager.get_world_media(world_id=world.label, media="absent.svg") is None
+        path.write_text("version https://git-lfs.github.com/spec/v1\n")
+        assert manager.get_world_media(world_id=world.label, media="logo.svg") is None
+    finally:
+        pop_manual_world(world.label)
+
+
 def _script() -> dict[str, object]:
     return {
         "label": "story_info_world",

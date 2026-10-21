@@ -1037,6 +1037,19 @@ suppressed location description with a darkness fragment.
 
 ### Projected State As Disclosure
 
+Status (#581 compact slice): worlds may register the opt-in contributors from
+`compact_status` on their own ordinary authority. They offer exact `ui-status`
+throughout the existing `SandboxScope` namespace, not only while the cursor is a
+`SandboxLocation`. A called multi-block scene under that shared scope therefore
+retains disclosed clock and carried assets without a new remembered origin.
+Nearest `ui_status` locals may replace the whole ordered list with ordinary
+projected-section data; an explicit empty/null list removes entries. The default
+set is scene/location title, existing period/run-day and carried-item state.
+Period wording/icons are world suggestions, not a client four-daypart/calendar
+assumption. No inventory or clock is synthesized outside the mechanic's scope.
+Queries and local inspection do not provision, mutate the graph, append journal
+output or advance time. General multi-channel browsing remains separate.
+
 Sandbox projected state is an optional client convenience, not an authority
 surface. The backend owns world truth, action availability, hidden schedules,
 and mutation. A client receives only the facts the current reader/player is

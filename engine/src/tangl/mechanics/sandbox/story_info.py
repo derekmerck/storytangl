@@ -157,7 +157,7 @@ class _SandboxInfoSections:
             section_id="sandbox_inventory",
             title="Inventory",
             kind="inventory",
-            value=ItemListValue(items=_asset_items(sandbox_player_assets(location))),
+            value=ItemListValue(items=sandbox_asset_items(sandbox_player_assets(location))),
         )
 
     def _local_assets_section(self, location: SandboxLocation) -> ProjectedSection:
@@ -165,7 +165,7 @@ class _SandboxInfoSections:
             section_id="sandbox_local_assets",
             title="Here",
             kind="local_assets",
-            value=ItemListValue(items=_asset_items(location)),
+            value=ItemListValue(items=sandbox_asset_items(location)),
         )
 
     def _fixtures_section(self, location: SandboxLocation) -> ProjectedSection:
@@ -609,7 +609,8 @@ def _section_matches_requested(
     return not labels.isdisjoint(requested)
 
 
-def _asset_items(holder: HasAssets | None) -> list[ProjectedItem]:
+def sandbox_asset_items(holder: HasAssets | None) -> list[ProjectedItem]:
+    """Project carried/local assets using the sandbox disclosure vocabulary."""
     if holder is None:
         return []
     return [

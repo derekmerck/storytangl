@@ -103,6 +103,61 @@ With no clip, no sheet that has it, or a sheet this port cannot load, the still 
 drawn. The event loop sleeps until input, and ticks at about thirty frames a
 second only while a clip is actually playing.
 
+## Compact gameplay chrome (#581)
+
+The runnable client adds a small brand/status strip **outside** the world's
+logical canvas. A 320×200 world remains 320×200; the shell adds 44 logical pixels
+at density one (88 at 640×400), then applies the existing integer window zoom.
+Art, map regions, surfaces, prose, choices and pending selections retain their
+world coordinates. `Stage.window_point()` and the inverse input transform account
+for the shell offset. Standalone Stage users may omit chrome.
+
+Branding comes from public `ui-branding`, cached separately per world. An optional
+logo is resolved by `ServiceManager.get_world_media` through normal inventory and
+media-profile delivery; pygame consumes only supported co-located image/vector
+paths. Missing, unfetched LFS, unsupported or undecodable logos retain the world
+name. There is no alternate filename loader or media downloader.
+
+The optional exact story channel `ui-status` supplies ordered `ProjectedSection`
+values. The backend chooses entries, identities, wording, disclosure and icon
+suggestions; pygame arranges them in six-entry pages. It does not parse English
+field names, inspect a graph, compute inventory rules, assume a calendar/daypart
+count, or read the host clock. Unknown icons keep their readable text floor.
+
+- Click an entry, or press `Ctrl+I`, for its full label/value/details.
+- In details, `Tab` / `Shift+Tab` visits entries (including overflow pages),
+  `PageUp` / `PageDown` or the wheel pages long text, and `Esc` closes.
+- Click the page footer to cycle compact pages. Details never submit a choice.
+- Music controls and native voice completion remain active while inspecting.
+
+Runtime-envelope `InfoState` governs refresh. The bridge discovers availability
+initially and when it changes; it fetches exact status once on first availability
+and on new dirty versions. Equal-version removal/reappearance is handled.
+Redraws, animation, preferences and repeated envelopes do not refetch status.
+Story/world switches reset dynamic freshness, even at equal steps; public branding
+has its own cache. Removed channels/sections clear old contents. None of this is
+persisted in the journal or used as game authority.
+
+Sandbox worlds may opt in by registering
+`advertise_compact_status` / `project_compact_status` from
+`tangl.mechanics.sandbox.compact_status` on their ordinary world dispatch for
+`advertise_story_info_channels` / `get_story_info`, with `Block` and
+`wants_exact_kind=False`. Those contributors use the existing scoped namespace,
+so a called scene under the same `SandboxScope` retains its clock and carried
+items. Nearest `ui_status` locals may replace the default set with ordinary
+projected-section data; `[]` / `None` explicitly remove entries without removing
+chrome. Worlds choose optional `period_labels` / `period_icons` suggestions.
+Non-sandbox worlds can provide the same exact channel through their own ordinary
+projection handlers, without adopting a sandbox clock or inventory.
+
+Always-on Service-backed witnesses cover scoped call/return, time/charge and item
+changes, custom non-sandbox calendar wording, purity, query counts and fallbacks.
+Headless rendering covers both supported extents and long/overflow entries;
+map/surface input regressions also run with and without chrome. Headless images
+are layout evidence, not human-confirmed interactive or audible verification.
+The general info-channel browser/drawer, title screen, universal theme/icon system,
+per-item art and precise dirty tracking remain deferred; #581 stays open.
+
 ## Background music (#571)
 
 The runnable client opts into AUDIO and resolves `presentation.music` through

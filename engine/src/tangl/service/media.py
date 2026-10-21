@@ -14,6 +14,7 @@ from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_resource_inv_tag import is_materialized_media_file
+from tangl.story import World
 from tangl.type_hints import Identifier
 
 _UNSUPPORTED_MEDIA_TYPES = {
@@ -70,23 +71,22 @@ class FailedMediaResult:
 
 def resolve_world_media(
     *,
-    world: Any,
+    world: World,
     media: MediaRIT | Identifier,
-    **kwargs: Any,
-) -> MediaDataType:
-    """Resolve one world media payload through the world's media registry."""
-
-    if isinstance(media, MediaRIT):
-        return media.get_content(**kwargs)
-
-    media_registry = getattr(world, "media_registry", None)
-    if media_registry is None or not hasattr(media_registry, "find_one"):
-        raise ValueError(f"World '{world.label}' does not expose media resources")
-
-    media_obj = media_registry.find_one(Selector(alias=media))
-    if media_obj is None:
-        raise ValueError(f"Media '{media}' not found for world '{world.label}'")
-    return media_obj.get_content(**kwargs)
+    render_profile: MediaRenderProfile | None = None,
+) -> dict[str, Any] | None:
+    """Resolve public world media through the ordinary inventory/profile path."""
+    rit = media if isinstance(media, MediaRIT) else (
+        world.resources.get_rit(str(media)) if world.resources is not None else None
+    )
+    if rit is None:
+        return None
+    return media_fragment_to_payload(
+        MediaFragment(content=rit, content_format="rit",
+                      content_type=rit.data_type or MediaDataType.MEDIA),
+        render_profile=render_profile, world_id=world.label,
+        world_media_root=world.resources.resource_path if world.resources is not None else None,
+    )
 
 
 def _relative_url_path_for_rit(

@@ -41,6 +41,46 @@ from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
 
 
+def test_opt_in_compact_status_uses_shared_scope_and_nearest_override() -> None:
+    from tangl.mechanics.sandbox.compact_status import advertise_compact_status, project_compact_status
+    from tangl.story import Block, Scene, StoryGraph
+
+    graph = StoryGraph()
+    scope = SandboxScope(label="scope", locals={"world_turn": 3, "period_icons": {4: "moon"}})
+    scene = Scene(label="called", title="A called scene")
+    block = Block(label="second")
+    for node in (scope, scene, block):
+        graph.add(node)
+    scope.add_child(scene)
+    scene.add_child(block)
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    before = graph.unstructure()
+    assert [c.channel_id for c in advertise_compact_status(caller=block, ctx=ctx)] == ["ui-status"]
+    sections = project_compact_status(caller=block, ctx=ctx,
+                                      request=ProjectionRequest(channels=["ui-status"]))
+    assert [s.section_id for s in sections] == ["scene", "period", "day"]
+    assert sections[0].value.value == "A called scene"
+    assert sections[1].hints.icon == "moon"
+    assert sections[2].value.value == "Day 1"
+    assert graph.unstructure() == before
+    block.locals["ui_status"] = []
+    assert not project_compact_status(caller=block,
+                                      ctx=PhaseCtx(graph=graph, cursor_id=block.uid),
+                                      request=ProjectionRequest(channels=["ui-status"]))
+
+
+def test_compact_status_does_not_invent_a_sandbox_for_an_unscoped_block() -> None:
+    from tangl.mechanics.sandbox.compact_status import advertise_compact_status, project_compact_status
+    from tangl.story import Block, StoryGraph
+
+    graph = StoryGraph()
+    block = Block(label="plain", registry=graph)
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    assert not advertise_compact_status(caller=block, ctx=ctx)
+    assert not project_compact_status(caller=block, ctx=ctx,
+                                       request=ProjectionRequest(channels=["ui-status"]))
+
+
 class SandboxInfoItemType(AssetType):
     name: str = ""
     traits: set[str] = Field(default_factory=set)
