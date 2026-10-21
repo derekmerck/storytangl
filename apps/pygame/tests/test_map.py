@@ -124,7 +124,10 @@ def test_live_status_allocation_preserves_map_actions_and_wheel_targets(
             stage.draw(frame)
             assert stage.hit(_centre(stage, region)) == expected
             assert stage.wheel(stage.window_point(stage.prose_rect.center), 1).region == "prose"
-            assert stage.wheel(stage.window_point(stage.choice_rect.center), 1).region == "choices"
+            # Map narration and numbered choices share the established footer;
+            # they do not create the ordinary split choice viewport.
+            assert stage.choice_rect.height == 0
+            assert stage.wheel(_centre(stage, region), 1) is None
     finally:
         pygame.quit()
 
