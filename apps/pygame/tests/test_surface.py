@@ -55,9 +55,9 @@ SURFACE = Surface(
 )
 
 
-@pytest.fixture
-def stage(tmp_path):
-    made = Stage(asset_dir=tmp_path, title="surface test")
+@pytest.fixture(params=[False, True], ids=["stage", "chrome"])
+def stage(tmp_path, request):
+    made = Stage(asset_dir=tmp_path, title="surface test", chrome=request.param)
     yield made
     pygame.quit()
 
@@ -111,10 +111,7 @@ def _box(stage, slot_name: str):
 
 
 def _centre(stage: Stage, box) -> tuple[int, int]:
-    return (
-        box.centerx * stage.display_scale,
-        box.centery * stage.display_scale,
-    )
+    return stage.window_point(box.center)
 
 
 # ── the join ─────────────────────────────────────────────────────────────

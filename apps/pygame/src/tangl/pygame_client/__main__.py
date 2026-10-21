@@ -359,6 +359,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         display_scale=args.scale,
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
+        chrome=True,
     )
     envelope = bridge.start(args.world)
     stage.preference_controls = _preference_controls(bridge, preferences)
@@ -393,6 +394,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         frame = _frame(bridge, envelope, frame)
 
+    stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source)
     stage.draw(frame, media_visibility=bridge.media_visibility())
     _music_caption(args.world, music)
 
@@ -408,6 +410,12 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 continue
             if bridge.voice_player is not None and bridge.voice_player.handle_event(event):
                 continue
+            if event.type == pygame.KEYDOWN and _music_key(event, music):
+                _music_caption(args.world, music)
+                continue
+            if stage.chrome is not None and stage.chrome.handle_event(event, stage.display_scale):
+                stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+                continue
             action: Action | None = None
             if event.type == pygame.QUIT:
                 running = False
@@ -416,9 +424,6 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
             elif event.type == pygame.MOUSEWHEEL:
                 action = stage.wheel(pygame.mouse.get_pos(), -event.y)
             elif event.type == pygame.KEYDOWN:
-                if _music_key(event, music):
-                    _music_caption(args.world, music)
-                    continue
                 if pending is None and event.key in preference_keys:
                     bridge.cycle_preference(preference_keys[event.key])
                     stage.preference_controls = _preference_controls(bridge, preferences)
@@ -463,6 +468,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
                 frame = _frame(bridge, envelope, frame)
+                stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source)
                 _music_caption(args.world, music)
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue

@@ -11,6 +11,32 @@ persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
 
+## Compact disclosed status (#581)
+
+Status: the initial pygame slice consumes public `ui-branding` separately from
+optional story-dynamic exact `ui-status`. The latter is ordinary ordered
+`ProjectedSection` data, not a HUD/widget type or a second state authority.
+Section ids identify entries; titles, existing values and advisory `hints.icon`
+provide the readable floor. Backend/world contributors choose disclosed facts,
+entry order and meaningful time/item wording. Clients choose layout and glyph
+treatment; they must not parse English labels, assume a calendar or inspect a
+private graph to reconstruct status.
+
+Scope resolution belongs to existing projection contributors and `PhaseCtx.get_ns`.
+A world can advertise status across ordinary blocks, including called scenes,
+without tying availability to one menu node kind. Empty sections are meaningful.
+No new context, implicit call origin, journal channel or persistent HUD cache is
+introduced. The optional sandbox contributor uses its existing shared scope;
+arbitrary non-sandbox worlds can provide the same exact channel independently.
+
+Pygame reserves shell space outside the logical world canvas, maintains one
+coordinate transform for input, and offers paged compact entries with local
+mouse/keyboard details. InfoState availability and dirty/version hints govern
+read-only refresh; rendering and preferences do not poll. Story/world switches
+reset dynamic freshness even at equal steps; branding is independently cacheable.
+The general inspection-channel browser, theme/icon library and finer invalidation
+remain follow-ups rather than part of this slice.
+
 ## Presentation roles and explicit overrides
 
 Presentation has two complementary author-facing modes.

@@ -19,6 +19,10 @@ from uuid import UUID
 
 import pygame
 
+from tangl.presentation.projection import BrandingValue, ProjectedSection
+
+from .chrome import Chrome, wrap_pixels
+
 from dataclasses import dataclass
 
 
@@ -282,6 +286,7 @@ class Stage:
         animate: bool = True,
         keep_on_screen: bool = True,
         choice_fraction: float = 0.4,
+        chrome: bool = False,
     ) -> None:
         try:
             self.density = _SUPPORTED_DENSITIES[logical_size]
@@ -309,14 +314,17 @@ class Stage:
         self.row_text_left = _BASE_ROW_TEXT_LEFT * self.density
         self.surface_contour = _BASE_SURFACE_CONTOUR * self.density
         pygame.init()
+        self.chrome = Chrome(logical_size[0], self.density) if chrome else None
+        self.chrome_height = self.chrome.height if self.chrome is not None else 0
         self.window = pygame.display.set_mode(
             (
                 self.logical_size[0] * self.display_scale,
-                self.logical_size[1] * self.display_scale,
+                (self.logical_size[1] + self.chrome_height) * self.display_scale,
             )
         )
         pygame.display.set_caption(title)
         self.surface = pygame.Surface(self.logical_size)
+        self.shell = pygame.Surface((logical_size[0], logical_size[1] + self.chrome_height))
         self.asset_dir = asset_dir
         self.keep_on_screen = keep_on_screen
         """Hold a *named* position inside the frame when the image is too wide
@@ -380,7 +388,7 @@ class Stage:
         if candidate.is_file():
             try:
                 surface = pygame.image.load(str(candidate)).convert_alpha()
-            except pygame.error:
+            except (pygame.error, OSError):
                 surface = None
         self._cache[source] = surface
         return surface
@@ -462,8 +470,7 @@ class Stage:
             # playback, or a clip resumes mid-cycle on the far side of the map.
             self._clips.clear()
             self._staged_turn = None
-            pygame.transform.scale(self.surface, self.window.get_size(), self.window)
-            pygame.display.flip()
+            self._present()
             return
         self._draw_background(loaded)
         self._draw_preferences()
@@ -563,7 +570,23 @@ class Stage:
             )
         else:
             self._draw_choices(choice_rows, top=choices_top, bottom=bottom)
-        pygame.transform.scale(self.surface, self.window.get_size(), self.window)
+        self._present()
+
+    def set_info(
+        self, branding: BrandingValue | None, sections: list[ProjectedSection],
+        logo_source: str | None,
+    ) -> None:
+        if self.chrome is not None:
+            self.chrome.set_content(branding, sections, self._load(logo_source) if logo_source else None)
+
+    def _present(self) -> None:
+        if self.chrome is not None:
+            self.shell.blit(self.surface, (0, self.chrome_height))
+            self.chrome.draw(self.shell)
+            source = self.shell
+        else:
+            source = self.surface
+        pygame.transform.scale(source, self.window.get_size(), self.window)
         pygame.display.flip()
 
     def _draw_preferences(self) -> None:
@@ -1467,7 +1490,7 @@ class Stage:
             self.scroll_by(action.delta * (self.prose_capacity if action.page else 1))
 
     def wheel(self, position: tuple[int, int], delta: int) -> ScrollText | None:
-        point = (position[0] // self.display_scale, position[1] // self.display_scale)
+        point = self._world_point(position)
         if self.choice_rect.collidepoint(point):
             return ScrollText("choices", delta)
         if self.prose_rect.collidepoint(point):
@@ -1588,26 +1611,7 @@ class Stage:
 
     def _wrap_pixels(self, text: str, width: int) -> list[str]:
         """Wrap by font metrics, splitting oversized tokens without losing characters."""
-        rows: list[str] = []
-        for paragraph in text.split("\n"):
-            if not paragraph:
-                rows.append("")
-            while paragraph:
-                low, high = 1, len(paragraph)
-                while low < high:
-                    mid = (low + high + 1) // 2
-                    if self.font.size(paragraph[:mid])[0] <= width:
-                        low = mid
-                    else:
-                        high = mid - 1
-                end = low
-                if end < len(paragraph) and (space := paragraph.rfind(" ", 0, end + 1)) > 0:
-                    end = space
-                rows.append(paragraph[:end])
-                paragraph = paragraph[end:]
-                if paragraph.startswith(" "):
-                    paragraph = paragraph[1:]
-        return rows or [""]
+        return wrap_pixels(self.font, text, width)
 
     @staticmethod
     def _shown(placed: list[tuple[SurfaceSlot, Piece]]) -> set[str]:
@@ -1914,16 +1918,22 @@ class Stage:
     def hit(self, position: tuple[int, int]) -> Action | None:
         """Map a window click to the action its row performs."""
 
-        logical = (
-            position[0] // self.display_scale,
-            position[1] // self.display_scale,
-        )
+        logical = self._world_point(position)
         # Reverse draw order: the footer is drawn over the plate, so a legend
         # row sitting on top of a region must win the click it visibly owns.
         for rect, action in reversed(self.hitboxes):
             if rect.collidepoint(logical):
                 return action
         return None
+
+    def window_point(self, point: tuple[int, int]) -> tuple[int, int]:
+        """Map a logical world point into the shell's window coordinates."""
+        return (point[0] * self.display_scale,
+                (point[1] + self.chrome_height) * self.display_scale)
+
+    def _world_point(self, point: tuple[int, int]) -> tuple[int, int]:
+        return (point[0] // self.display_scale,
+                point[1] // self.display_scale - self.chrome_height)
 
     def _clip(self, text: str) -> str:
         """Return `text` shortened until the row fits the frame.

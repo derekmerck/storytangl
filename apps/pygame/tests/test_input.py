@@ -118,13 +118,10 @@ def test_mouse_click_commits_the_choice_under_the_cursor(
     pygame.init()
     from tangl.pygame_client.stage import Stage
 
-    stage = Stage()
+    stage = Stage(chrome=True)
     stage.draw(Turn(step=1, choices=gated))
     rect, action = stage.hitboxes[0]
-    position = (
-        rect.centerx * stage.display_scale,
-        rect.centery * stage.display_scale,
-    )
+    position = stage.window_point(rect.center)
     pygame.quit()
 
     _run([pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1, "pos": position})])
@@ -196,14 +193,14 @@ def test_viewport_events_are_independent_and_never_commit(
         if kind == "quit":
             return [pygame.event.Event(pygame.QUIT)]
         if kind == "wheel":
-            point = tuple(v * stage.display_scale for v in stage.choice_rect.center)
+            point = stage.window_point(stage.choice_rect.center)
             monkeypatch.setattr(pygame.mouse, "get_pos", lambda: point)
             return [pygame.event.Event(pygame.MOUSEWHEEL, {"y": -1})]
         if kind.endswith("click"):
             region = "prose" if kind == "prose-click" else "choices"
             box = next(box for box, action in stage.hitboxes
                        if isinstance(action, ScrollText) and action.region == region and action.delta == 1)
-            point = tuple(v * stage.display_scale for v in box.center)
+            point = stage.window_point(box.center)
             return [pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1, "pos": point})]
         return [pygame.event.Event(pygame.KEYDOWN, {
             "key": pygame.K_PAGEDOWN if "page" in kind else pygame.K_DOWN,
@@ -344,15 +341,12 @@ def test_a_click_on_a_piece_commits_what_its_number_commits(
     pygame.init()
     from tangl.pygame_client.stage import Stage
 
-    stage = Stage()
+    stage = Stage(chrome=True)
     frame = client._merge([])
     pending = PendingSelection(choice=packet)
     stage.draw(frame, pending)
     rect, action = stage.hitboxes[0]
-    position = (
-        rect.centerx * stage.display_scale,
-        rect.centery * stage.display_scale,
-    )
+    position = stage.window_point(rect.center)
     pygame.quit()
 
     _run([_key(pygame.K_1), pygame.event.Event(

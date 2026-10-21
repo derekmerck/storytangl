@@ -50,10 +50,10 @@ def _plate_file(tmp_path, logical_size=(320, 200)):
     return path
 
 
-@pytest.fixture
-def stage(tmp_path):
+@pytest.fixture(params=[False, True], ids=["stage", "chrome"])
+def stage(tmp_path, request):
     _plate_file(tmp_path)
-    made = Stage(asset_dir=tmp_path, title="map test")
+    made = Stage(asset_dir=tmp_path, title="map test", chrome=request.param)
     yield made
     pygame.quit()
 
@@ -90,10 +90,7 @@ def _centre(stage: Stage, region: MapRegion) -> tuple[int, int]:
 
     x = (region.x + region.w / 2) * stage.logical_size[0]
     y = (region.y + region.h / 2) * stage.logical_size[1]
-    return (
-        round(x) * stage.display_scale,
-        round(y) * stage.display_scale,
-    )
+    return stage.window_point((round(x), round(y)))
 
 
 def test_a_region_click_commits_what_its_numbered_entry_commits(stage, frame) -> None:
@@ -271,10 +268,7 @@ def test_a_legend_row_wins_the_click_over_the_region_beneath_it(stage, frame):
         and rect.h == stage.row_height
         and rect.x == stage.row_text_left
     )
-    click = (
-        (legend.x + 1) * stage.display_scale,
-        (legend.y + 1) * stage.display_scale,
-    )
+    click = stage.window_point((legend.x + 1, legend.y + 1))
 
     # Both the region and the legend row cover this pixel; the legend is on top.
     assert wide.x == 0.0 and wide.y == 0.0  # the region really does cover it

@@ -30,10 +30,13 @@ from tangl.media import MediaDataType
 from tangl.presentation.hints import ClipBinding, STAGING_MAX, STAGING_MIN, TimingName, VisibilityBinding
 from tangl.presentation.intent import EntityRef
 from tangl.presentation.projection import (
+    BrandingValue,
     BooleanPreference,
     EnumPreference,
     PreferenceDeclaration,
     StageExtentValue,
+    InfoState,
+    ProjectedState,
     UiPreferencesValue,
 )
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
@@ -303,6 +306,13 @@ class PygameSessionBridge:
         self.world_id: str | None = None
         self.music_player = music_player
         self.voice_player = voice_player
+        self.branding: BrandingValue | None = None
+        self.logo_source: str | None = None
+        self.status = ProjectedState()
+        self._world_catalogs: dict[str, ProjectedState] = {}
+        self._brands: dict[str, tuple[BrandingValue, str | None]] = {}
+        self._available_info: frozenset[str] | None = None
+        self._status_version: int | None = None
         self.preferences: dict[str, bool | str] = {}
         self._preference_ids: frozenset[str] = frozenset()
         self._preference_declarations: dict[str, PreferenceDeclaration] = {}
@@ -320,7 +330,7 @@ class PygameSessionBridge:
         Absence is an explicit client fallback, not a claim made by the world.
         """
 
-        catalog = self.service_manager.get_world_info(world_id=world_id)
+        catalog = self._world_catalog(world_id)
         if not any(channel.channel_id == "ui-stage" for channel in catalog.channels):
             return _DEFAULT_STAGE_EXTENT
         state = self.service_manager.get_world_info(
@@ -344,7 +354,7 @@ class PygameSessionBridge:
 
     def discover_preferences(self, world_id: str) -> list[PreferenceDeclaration]:
         """Fetch world-static declarations once and retain local values."""
-        catalog = self.service_manager.get_world_info(world_id=world_id)
+        catalog = self._world_catalog(world_id)
         if not any(channel.channel_id == "ui-preferences" for channel in catalog.channels):
             return []
         state = self.service_manager.get_world_info(world_id=world_id, channels=["ui-preferences"])
@@ -377,6 +387,53 @@ class PygameSessionBridge:
     def media_visibility(self) -> Mapping[str, bool | str]:
         """Expose the already-declared local values for renderer binding."""
         return self.preferences
+
+    def _world_catalog(self, world_id: str) -> ProjectedState:
+        if world_id not in self._world_catalogs:
+            self._world_catalogs[world_id] = self.service_manager.get_world_info(world_id=world_id)
+        return self._world_catalogs[world_id]
+
+    def _sync_info(self, envelope: RuntimeEnvelope) -> None:
+        if self.world_id is not None:
+            if self.world_id not in self._brands:
+                brand = BrandingValue(name=self.world_id)
+                logo = None
+                if any(c.channel_id == "ui-branding"
+                       for c in self._world_catalog(self.world_id).channels):
+                    state = self.service_manager.get_world_info(
+                        world_id=self.world_id, channels=["ui-branding"],
+                    )
+                    for section in state.sections:
+                        if isinstance(section.value, BrandingValue):
+                            brand = section.value
+                    if brand.logo_media:
+                        payload = self.service_manager.get_world_media(
+                            world_id=self.world_id, media=brand.logo_media,
+                            render_profile=self.media_render_profile,
+                        )
+                        if (payload is not None and payload.get("content_format") == "path"
+                                and payload.get("media_type") in ("image", "vector")
+                                and isinstance(payload.get("path"), str)):
+                            logo = payload["path"]
+                self._brands[self.world_id] = (brand, logo)
+            self.branding, self.logo_source = self._brands[self.world_id]
+        marker = envelope.metadata.get("info_state")
+        if marker is None:
+            return
+        info = InfoState.model_validate(marker)
+        available = frozenset(info.available_channels)
+        newly_available = self._available_info is None or "ui-status" not in self._available_info
+        if available != self._available_info:
+            self._available_info = available
+        if "ui-status" not in available:
+            self.status = ProjectedState()
+            self._status_version = None
+        elif newly_available or (info.version != self._status_version
+                                 and "ui-status" in info.dirty_channels):
+            self.status = self.service_manager.get_story_info(
+                user_id=self.user_id, ledger_id=self.ledger_id, channels=["ui-status"],
+            )
+            self._status_version = info.version
 
     def start(self, world_id: str) -> RuntimeEnvelope:
         """Create a fresh story session for ``world_id``."""
@@ -412,6 +469,11 @@ class PygameSessionBridge:
         return envelope
 
     def close(self) -> None:
+        self.status = ProjectedState()
+        self.branding = None
+        self.logo_source = None
+        self._available_info = None
+        self._status_version = None
         if self.voice_player is not None:
             self.voice_player.close()
         if self.music_player is not None:
@@ -440,9 +502,12 @@ class PygameSessionBridge:
         if raw is None:
             raise RuntimeError("RuntimeEnvelope metadata did not include ledger_id")
         ledger_id = raw if isinstance(raw, UUID) else UUID(str(raw))
-        if ledger_id != self.ledger_id:
+        world_id = envelope.metadata.get("world_id", self.world_id)
+        if ledger_id != self.ledger_id or world_id != self.world_id:
             self.close()
         self.ledger_id = ledger_id
+        self.world_id = world_id
+        self._sync_info(envelope)
         if self.music_player is not None:
             music = envelope.presentation.music if envelope.presentation is not None else None
             payload = media_fragment_to_payload(
@@ -500,11 +565,13 @@ class PygameSessionBridge:
 
         if self.user_id is None or self.ledger_id is None:
             return {}
-        catalog = self.service_manager.get_story_info(
-            user_id=self.user_id,
-            ledger_id=self.ledger_id,
-        )
-        available = {channel.channel_id for channel in catalog.channels}
+        if self._available_info is None:
+            catalog = self.service_manager.get_story_info(
+                user_id=self.user_id, ledger_id=self.ledger_id,
+            )
+            available = {channel.channel_id for channel in catalog.channels}
+        else:
+            available = self._available_info
         if any(channel not in available for channel in channels):
             return {}
         state = self.service_manager.get_story_info(
