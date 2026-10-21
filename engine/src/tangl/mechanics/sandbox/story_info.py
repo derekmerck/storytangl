@@ -77,6 +77,7 @@ class ProjectedAssetSurface(Protocol):
     """Minimal asset-token surface disclosed through story-info projection."""
 
     name: str
+    icon: str | None
     traits: set[str]
     lit: bool
     charge: ChargeFacet | None

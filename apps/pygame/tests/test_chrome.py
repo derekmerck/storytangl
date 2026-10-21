@@ -89,7 +89,7 @@ def hud_world(tmp_path: Path) -> Iterator[World]:
             return
         for label in ("lamp", "key", "bag"):
             if HudAssetType.get_instance(f"hud_{label}") is None:
-                HudAssetType(label=f"hud_{label}", name=label.title(), portable=True,
+                HudAssetType(label=f"hud_{label}", name=label.title(), portable=True, icon=label,
                              lit=label == "lamp",
                              charge=ChargeFacet(current=3, maximum=3) if label == "lamp" else None)
             asset = EntityTemplate.compile({
@@ -195,7 +195,8 @@ def test_status_queries_are_pure_and_cached_by_dirty_version(
             bridge._sync(envelope)
             bridge.refresh()
             frame = _frame(bridge, envelope)
-            stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source)
+            stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                           status_available=bridge.status_available, session_id=bridge.ledger_id)
             stage.draw(frame)
             stage.chrome.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_i,
                                                          mod=pygame.KMOD_CTRL), 3)
@@ -230,25 +231,41 @@ def test_status_queries_are_pure_and_cached_by_dirty_version(
 
 
 def test_world_switch_at_equal_step_clears_status_and_reuses_only_public_branding(
-    hud_world: World,
+    hud_world: World, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     empty = World.from_script_data(script_data={
         "label": "empty_hud_world", "metadata": {"title": "A quiet world"},
         "scenes": {"quiet": {"blocks": {"start": {"content": "No status provider."}}}},
     })
     register_manual_world(empty)
     try:
+        stage = Stage(display_scale=1)
         bridge = PygameSessionBridge()
         first = bridge.start(hud_world.label)
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
+        stage.draw(Turn(step=1))
+        original_chrome = stage.chrome
+        original_chrome.open = True
         second = bridge.start(empty.label)
         assert first.step == second.step
         assert not bridge.status.sections and bridge.logo_source is None
         assert bridge.branding.name == "A quiet world"
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
+        assert stage.chrome is None and stage.chrome_height == 0
+        assert stage.window.get_size() == (320, 200)
         bridge.start(hud_world.label)
         assert "item:lamp" in values(bridge)
         assert bridge.branding.name == "The Workshop"
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
+        assert stage.chrome is not original_chrome and not stage.chrome.open
+        assert not stage.chrome.hitboxes
     finally:
         pop_manual_world(empty.label)
+        pygame.quit()
 
 
 @pytest.mark.parametrize("override", [[], [section("block", "Block wins")]])
@@ -322,13 +339,17 @@ def test_detail_wrap_preserves_words_and_splits_only_oversized_tokens(
         pygame.quit()
 
 
-def test_non_sandbox_custom_provider_uses_the_same_channel_and_scoped_namespace() -> None:
+def test_non_sandbox_custom_provider_uses_the_same_channel_and_scoped_namespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from tangl.presentation.projection import ProjectedState
 
     world = World.from_script_data(script_data={
         "label": "custom_compact_status", "locals": {"ui_status": [
-            {**section("calendar", "24 Brumaire"), "hints": {"icon": "alien-calendar"}},
-            {**section("phase", "Fifth watch"), "hints": {"icon": "unknown-phase"}},
+            {**section("calendar", "24 Brumaire"),
+             "hints": {"icon": "alien-calendar", "placement": "end", "icon_only": True}},
+            {**section("phase", "Fifth watch"),
+             "hints": {"icon": "unknown-phase", "placement": "start"}},
         ]},
         "scenes": {"intro": {"blocks": {
             "start": {"content": "No sandbox, clock or inventory.",
@@ -350,15 +371,28 @@ def test_non_sandbox_custom_provider_uses_the_same_channel_and_scoped_namespace(
     world.dispatch.register(advertise, task="advertise_story_info_channels")
     world.dispatch.register(project, task="get_story_info")
     register_manual_world(world)
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    stage = Stage(display_scale=1)
     try:
         bridge = PygameSessionBridge()
         bridge.start(world.label)
         assert values(bridge) == {"calendar": "24 Brumaire", "phase": "Fifth watch"}
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
+        stage.draw(Turn(step=1))
+        assert [identity for _box, identity in stage.chrome.hitboxes] == ["phase", "calendar"]
+        assert stage.chrome._entry_text(bridge.status.sections[0]) == "calendar: 24 Brumaire"
+        height = stage.chrome_height
         pick(bridge, "Next")
         assert not bridge.status.sections
         assert bridge.branding.name == world.label
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
+        stage.draw(Turn(step=1))
+        assert stage.chrome_height == height and not stage.chrome.hitboxes
     finally:
         pop_manual_world(world.label)
+        pygame.quit()
 
 
 @pytest.mark.parametrize("mode", ["missing", "pointer", "url", "inline", "decoder"])
@@ -381,7 +415,8 @@ def test_logo_uses_normal_profiles_and_unavailable_media_falls_back_to_name(
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     stage = Stage(chrome=True)
     try:
-        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source)
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
         stage.draw(Turn(step=1))
         assert stage.chrome.branding.name == "The Workshop"
         assert stage.chrome.logo is None
@@ -417,9 +452,18 @@ def test_render_service_backed_compact_status_layout(
     stage = Stage(logical_size=size, display_scale=scale, chrome=True, animate=False)
     try:
         frame = _frame(bridge, envelope)
-        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source)
+        stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                       status_available=bridge.status_available, session_id=bridge.ledger_id)
         stage.draw(frame)
         assert stage.chrome.logo is not None
+        assert stage.chrome.height == stage.chrome.line_height + 2 * stage.density
+        assert 12 * stage.density <= stage.chrome.height <= 16 * stage.density
+        boxes = dict((identity, box) for box, identity in stage.chrome.hitboxes)
+        assert set(boxes) == {s.section_id for s in bridge.status.sections}
+        assert len({box.top for box in boxes.values()}) == 1
+        assert boxes["scene"].right <= boxes["item:bag"].left
+        assert boxes["item:lamp"].right <= boxes["day"].left
+        assert boxes["day"].right <= boxes["period"].left
         pygame.image.save(stage.window, str(tmp_path / f"hud-{size[0]}x{size[1]}.png"))
         stage.chrome.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_i,
                                                      mod=pygame.KMOD_CTRL), scale)
@@ -491,20 +535,20 @@ def test_status_clicks_keep_identity_when_entries_change_before_redraw(
                ProjectedSection(**section("b", "Second"))]
     brand = BrandingValue(name="Identity witness")
     try:
-        stage.set_info(brand, entries, None)
+        stage.set_info(brand, entries, None, status_available=True)
         stage.draw(Turn(step=1))
         boxes = [box for box, _entry in stage.chrome.hitboxes]
-        stage.set_info(brand, list(reversed(entries)), None)
+        stage.set_info(brand, list(reversed(entries)), None, status_available=True)
         click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=boxes[0].center)
         assert stage.chrome.handle_event(click, 1)
         assert stage.chrome.selected_id == "a"
-        stage.set_info(brand, [entries[1]], None)
+        stage.set_info(brand, [entries[1]], None, status_available=True)
         click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=boxes[1].center)
         assert stage.chrome.handle_event(click, 1)
         assert stage.chrome.selected_id == "b"
-        stage.set_info(brand, [], None)
+        stage.set_info(brand, [], None, status_available=True)
         assert stage.chrome.handle_event(click, 1)
-        assert not stage.chrome.open
+        assert not stage.chrome.hitboxes
     finally:
         pygame.quit()
 
@@ -522,7 +566,7 @@ def test_shell_keeps_world_surface_and_choice_coordinates(
     stage.set_info(BrandingValue(name="A world"), [
         ProjectedSection(**section(f"Entry {i}", "Long status " * 300),
                          hints=PresentationHints(icon="unknown-icon")) for i in range(9)
-    ], None)
+    ], None, status_available=True)
     stage.draw(turn)
     assert stage.surface.get_size() == size
     assert stage.window.get_size() == (size[0] * scale,
@@ -546,7 +590,7 @@ def test_shell_keeps_world_surface_and_choice_coordinates(
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_TAB, mod=0)
         stage.chrome.handle_event(event, scale)
     stage.draw(turn)
-    assert stage.chrome.selected_id == "Entry 7" and stage.chrome.page == 1
+    assert stage.chrome.selected_id == "Entry 7" and stage.chrome.page > 0
     event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_PAGEDOWN, mod=0)
     stage.chrome.handle_event(event, scale)
     stage.draw(turn)
@@ -554,3 +598,206 @@ def test_shell_keeps_world_surface_and_choice_coordinates(
     stage.chrome.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0), scale)
     assert not stage.chrome.open and stage.hit(screen) == action
     pygame.quit()
+
+
+@pytest.mark.parametrize("size,scale", [((320, 200), 2), ((640, 400), 1)])
+@pytest.mark.parametrize("empty", [[], None])
+def test_advertisement_not_content_controls_geometry_and_clears_stale_inspection(
+    hud_world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    size: tuple[int, int], scale: int, empty: list | None,
+) -> None:
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    bridge = PygameSessionBridge()
+    envelope = bridge.start(hud_world.label)
+    read = Mock(wraps=bridge.service_manager.get_story_info)
+    monkeypatch.setattr(bridge.service_manager, "get_story_info", read)
+    stage = Stage(logical_size=size, display_scale=scale)
+    try:
+        def display() -> None:
+            stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
+                           status_available=bridge.status_available, session_id=bridge.ledger_id)
+            stage.draw(Turn(step=1))
+
+        display()
+        height = stage.chrome_height
+        old = stage.chrome
+        old.open = True
+        with bridge.service_manager.open_session(user_id=bridge.user_id, write_back=True) as session:
+            session.ledger.cursor.locals["ui_status"] = empty
+        # A normal dirty-version refresh, not an extra redraw read.
+        marker = envelope.metadata["info_state"]
+        dirty = envelope.model_copy(update={"metadata": {
+            **envelope.metadata, "info_state": {**marker, "version": marker["version"] + 1},
+        }})
+        bridge._sync(dirty)
+        display()
+        assert bridge.status_available and not bridge.status.sections
+        assert stage.chrome_height == height and not stage.chrome.hitboxes
+        assert stage.chrome.selected_id is None
+        pygame.image.save(stage.window, str(tmp_path / f"empty-status-{size[0]}.png"))
+        # Empty advertised rows still expose branding through their local affordance.
+        stage.chrome.open = False
+        stage.chrome.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_i,
+                                                     mod=pygame.KMOD_CTRL), scale)
+        stage.draw(Turn(step=1))
+        assert stage.chrome.open and stage.chrome.branding.name == "The Workshop"
+        removed = dirty.model_copy(update={"metadata": {
+            **dirty.metadata, "info_state": {**dirty.metadata["info_state"],
+                                             "available_channels": ["ui-sidebar", "time", "inventory"]},
+        }})
+        bridge._sync(removed)
+        display()
+        assert stage.chrome is None and stage.chrome_height == 0
+        assert stage.window.get_size() == (size[0] * scale, size[1] * scale)
+        pygame.image.save(stage.window, str(tmp_path / f"absent-status-{size[0]}.png"))
+        assert stage._world_point(stage.window_point((15, 30))) == (15, 30)
+        bridge._sync(dirty)
+        display()
+        assert stage.chrome_height == height and stage.chrome is not old
+        assert not stage.chrome.open and not stage.chrome.hitboxes
+        assert read.call_count == 2
+        for _ in range(3):
+            bridge._sync(dirty)
+            display()
+        assert read.call_count == 2
+    finally:
+        pygame.quit()
+
+
+def test_main_branded_world_without_status_has_no_reserved_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tangl.pygame_client import __main__ as client
+
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    monkeypatch.setenv("SDL_AUDIODRIVER", "dummy")
+    world = World.from_script_data(script_data={
+        "label": "branded_without_status", "metadata": {"title": "Only branding"},
+        "scenes": {"intro": {"blocks": {"start": {"content": "No status row."}}}},
+    })
+    register_manual_world(world)
+    observed = []
+
+    def events(stage: Stage) -> list[pygame.event.Event]:
+        observed.append(stage.window.get_size())
+        assert stage.chrome is None and stage.chrome_height == 0
+        return [pygame.event.Event(pygame.QUIT)]
+
+    monkeypatch.setattr(client, "_next_events", events)
+    try:
+        assert client.main(["--world", world.label, "--scale", "1"]) == 0
+        assert observed == [(320, 200)]
+    finally:
+        pop_manual_world(world.label)
+
+
+@pytest.mark.parametrize("size", [(320, 200), (640, 400)])
+def test_generic_hints_preserve_group_order_text_floor_and_overflow(
+    monkeypatch: pytest.MonkeyPatch, size: tuple[int, int],
+) -> None:
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    stage = Stage(logical_size=size, display_scale=1)
+    entries = [
+        ProjectedSection(**section("z", "End value"), hints=PresentationHints(placement="end")),
+        ProjectedSection(**section("b", "Opaque"), hints=PresentationHints(
+            placement="middle", icon="key", icon_only=True)),
+        ProjectedSection(**section("a", "Beginning"), hints=PresentationHints(placement="start")),
+        ProjectedSection(**section("unknown", "Readable"), hints=PresentationHints(
+            placement="middle", icon="alien", icon_only=True)),
+        ProjectedSection(**section("unhinted", "Default")),
+        *[ProjectedSection(**section(str(i), "Long text " * 300)) for i in range(10)],
+    ]
+    try:
+        stage.set_info(None, entries, None, status_available=True)
+        chrome = stage.chrome
+        pages = chrome._pages()
+        flattened = [s.section_id for page in pages for s in page]
+        assert flattened == ["a", "unhinted", *map(str, range(10)), "b", "unknown", "z"]
+        assert chrome._entry_width(entries[3]) > chrome._entry_width(entries[1])
+        assert chrome._entry_text(entries[3]) == "unknown: Readable"
+        for _ in entries:
+            stage.draw(Turn(step=1))
+            boxes = [box for box, _identity in chrome.hitboxes]
+            assert all(box.left >= 0 and box.right <= chrome.next_box.left for box in boxes)
+            assert all(not first.colliderect(second) for i, first in enumerate(boxes)
+                       for second in boxes[i + 1:])
+            chrome.open = True
+            chrome.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_TAB, mod=0), 1)
+        assert chrome.selected_id == entries[0].section_id
+    finally:
+        pygame.quit()
+
+
+@pytest.mark.parametrize("size", [(320, 200), (640, 400)])
+def test_authored_icons_render_distinctly_and_graph_json_preserves_hints_and_tokens(
+    monkeypatch: pytest.MonkeyPatch, size: tuple[int, int],
+) -> None:
+    from tangl.mechanics.sandbox.compiler import SandboxSliceCompiler
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    labels = {"authored_a": "lamp", "authored_b": "key", "authored_c": "bag"}
+    compiled = SandboxSliceCompiler().compile({
+        "id": "icon_source_witness", "scope": {"id": "scope"},
+        "locations": {"room": {"name": "Workshop"}},
+        "assets": {label: {"name": "Not the token name", "icon": token,
+                           "traits": ["portable"], "initial": {"location": "room"}}
+                   for label, token in labels.items()},
+    })
+    stage = Stage(logical_size=size, display_scale=1)
+    try:
+        for label in labels:
+            compiled.scope.player_assets.add_asset(compiled.locations["room"].remove_asset(label))
+        # The ordinary inherited singleton value delegates through the token.
+        HudAssetType(label="icon_parent", icon="key")
+        inherited = HudAssetType(label="icon_child", inherit_from="icon_parent")
+        assert inherited.icon == "key"
+        token = EntityTemplate.compile({"kind": Token[HudAssetType], "label": "inherited",
+                                        "token_from": "icon_child"}).materialize()
+        compiled.graph.add(token)
+        compiled.scope.player_assets.add_asset(token)
+        room = compiled.locations["room"]
+        sections = project_compact_status(
+            caller=room, ctx=PhaseCtx(graph=compiled.graph, cursor_id=room.uid),
+            request=ProjectionRequest(channels=["ui-status"]),
+        )
+        expected = {f"item:{label}": icon for label, icon in labels.items()}
+        expected["item:inherited"] = "key"
+        assert {s.section_id: s.hints.icon for s in sections if s.section_id in expected} == expected
+        stage.set_info(None, sections, None, status_available=True)
+        stage.draw(Turn(step=1))
+        boxes = dict((identity, box) for box, identity in stage.chrome.hitboxes)
+        pixels = [pygame.image.tobytes(stage.shell.subsurface(boxes[f"item:{label}"]), "RGB")
+                  for label in labels]
+        assert len(set(pixels)) == 3
+        compiled.scope.locals["ui_status"] = [{
+            **section("saved", "Portable hints"),
+            "hints": {"placement": "middle", "icon_only": True, "icon": "key"},
+        }]
+        for graph in (compiled.graph,
+                      StoryGraph.structure(compiled.graph.unstructure()),
+                      StoryGraph.structure(Json.deserialize(Json.serialize(compiled.graph.unstructure())))):
+            scope = graph.find_one(Selector(label="scope"))
+            room = graph.find_one(Selector(label="room"))
+            override = project_compact_status(caller=room, ctx=PhaseCtx(graph=graph, cursor_id=room.uid),
+                                              request=ProjectionRequest(channels=["ui-status"]))
+            assert override[0].hints == PresentationHints(icon="key", placement="middle", icon_only=True)
+            assert room.parent is scope
+            # Holder maps remain the existing excluded staging surface. Verify
+            # the persisted graph tokens and their live singleton referents,
+            # rather than claiming the holder map is restored by this change.
+            for label, icon in {**labels, "inherited": "key"}.items():
+                asset = graph.find_one(Selector(label=label))
+                assert asset is graph.get(asset.uid) and asset.graph is graph
+                assert asset.icon == icon
+                assert asset.reference_singleton is (
+                    HudAssetType.get_instance("icon_child") if label == "inherited"
+                    else SandboxCompiledAssetType.get_instance(label)
+                )
+    finally:
+        pygame.quit()
+        HudAssetType.clear_instances()
+        for label in labels:
+            instance = SandboxCompiledAssetType.get_instance(label)
+            if instance is not None:
+                SandboxCompiledAssetType._instances.remove(instance.uid)

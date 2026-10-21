@@ -13,6 +13,7 @@ silently invents a placement is worse than one that draws no desk at all.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -55,9 +56,13 @@ SURFACE = Surface(
 )
 
 
-@pytest.fixture(params=[False, True], ids=["stage", "chrome"])
+@pytest.fixture(params=[False, True, "removed", "returned"],
+                ids=["stage", "chrome", "status-removed", "status-returned"])
 def stage(tmp_path, request):
-    made = Stage(asset_dir=tmp_path, title="surface test", chrome=request.param)
+    made = Stage(asset_dir=tmp_path, title="surface test", chrome=request.param is True)
+    if isinstance(request.param, str):
+        for available in ([True, False] if request.param == "removed" else [True, False, True]):
+            made.set_info(None, [], None, status_available=available)
     yield made
     pygame.quit()
 
@@ -167,6 +172,26 @@ def test_two_slots_of_one_kind_fill_in_declared_order() -> None:
 
 
 # ── input parity ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("size", [(320, 200), (640, 400)])
+def test_live_status_allocation_preserves_pending_surface_selection(
+    tmp_path: Path, frame: Turn, size: tuple[int, int],
+) -> None:
+    stage = Stage(asset_dir=tmp_path, logical_size=size, display_scale=2)
+    pending = PendingSelection(choice=frame.choices[0])
+    try:
+        for available in (False, True, False, True):
+            stage.set_info(None, [], None, status_available=available)
+            stage.draw(frame, pending)
+            assert stage.hit(_centre(stage, _box(stage, "papers"))) == PickPiece(
+                piece_id="0:passport",
+            )
+            number = stage.selection_numbers["0:passport"]
+            assert _keyed(stage, frame, pending, number) == PickPiece(piece_id="0:passport")
+            assert pending.picked == []
+    finally:
+        pygame.quit()
 
 
 def test_a_desk_click_and_its_number_key_pick_the_same_piece(stage, frame) -> None:

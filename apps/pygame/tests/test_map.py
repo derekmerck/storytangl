@@ -8,6 +8,7 @@ commit exactly what selecting its numbered entry commits.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from dataclasses import replace
 from uuid import uuid4
 
@@ -50,10 +51,14 @@ def _plate_file(tmp_path, logical_size=(320, 200)):
     return path
 
 
-@pytest.fixture(params=[False, True], ids=["stage", "chrome"])
+@pytest.fixture(params=[False, True, "removed", "returned"],
+                ids=["stage", "chrome", "status-removed", "status-returned"])
 def stage(tmp_path, request):
     _plate_file(tmp_path)
-    made = Stage(asset_dir=tmp_path, title="map test", chrome=request.param)
+    made = Stage(asset_dir=tmp_path, title="map test", chrome=request.param is True)
+    if isinstance(request.param, str):
+        for available in ([True, False] if request.param == "removed" else [True, False, True]):
+            made.set_info(None, [], None, status_available=available)
     yield made
     pygame.quit()
 
@@ -103,6 +108,28 @@ def test_a_region_click_commits_what_its_numbered_entry_commits(stage, frame) ->
     assert stage.hit(_centre(stage, quayside)) == Commit(
         edge_id=choice.edge_id, payload={"move": "quayside"}
     )
+
+
+@pytest.mark.parametrize("size", [(320, 200), (640, 400)])
+def test_live_status_allocation_preserves_map_actions_and_wheel_targets(
+    tmp_path: Path, frame: Turn, size: tuple[int, int],
+) -> None:
+    _plate_file(tmp_path, size)
+    stage = Stage(asset_dir=tmp_path, logical_size=size, display_scale=2)
+    try:
+        expected = Commit(edge_id=frame.choices[0].edge_id, payload={"move": "quayside"})
+        region = PLATE.regions[0]
+        for available in (False, True, False, True):
+            stage.set_info(None, [], None, status_available=available)
+            stage.draw(frame)
+            assert stage.hit(_centre(stage, region)) == expected
+            assert stage.wheel(stage.window_point(stage.prose_rect.center), 1).region == "prose"
+            # Map narration and numbered choices share the established footer;
+            # they do not create the ordinary split choice viewport.
+            assert stage.choice_rect.height == 0
+            assert stage.wheel(_centre(stage, region), 1) is None
+    finally:
+        pygame.quit()
 
 
 def test_a_guarded_region_is_drawn_but_refuses_the_click(stage, frame) -> None:

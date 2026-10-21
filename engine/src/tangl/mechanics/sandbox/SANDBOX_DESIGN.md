@@ -1037,7 +1037,7 @@ suppressed location description with a darkness fragment.
 
 ### Projected State As Disclosure
 
-Status (#581 compact slice): worlds may register the opt-in contributors from
+Status (#581 optional compact-row follow-up): worlds may register the opt-in contributors from
 `compact_status` on their own ordinary authority. They offer exact `ui-status`
 throughout the existing `SandboxScope` namespace, not only while the cursor is a
 `SandboxLocation`. A called multi-block scene under that shared scope therefore
@@ -1053,6 +1053,20 @@ Period wording/icons are world suggestions, not a client four-daypart/calendar
 assumption. No inventory or clock is synthesized outside the mechanic's scope.
 Queries and local inspection do not provision, mutate the graph, append journal
 output or advance time. General multi-channel browsing remains separate.
+
+Exact channel advertisement, not sandbox type, clock/inventory or branding, opts
+into the pygame row. Advertised empty/null content keeps its geometry; withdrawing
+the channel removes it. The pygame README gives the concrete world-dispatch
+registration recipe; merely importing these helpers does not register them.
+Default sections suggest title at `placement="start"`, items at `"middle"` with
+`icon_only=True`, and day then period at `"end"`. A realizable period token may
+be icon-only; unknown icons retain full readable labels/state.
+Compact asset source accepts typed optional `icon: str | None`. Compilation
+places it on the ordinary `AssetType.icon` vocabulary; singleton inheritance and
+token delegation carry it into the section's existing `hints.icon`. No item-name
+guessing, extra serializer, inventory engine or icon-file resolution is added.
+The lamp/key/bag witness uses genuinely distinct glyphs; unsupported tokens are
+still legal suggestions. Existing holder-map persistence limits are unchanged.
 
 Sandbox projected state is an optional client convenience, not an authority
 surface. The backend owns world truth, action availability, hidden schedules,
