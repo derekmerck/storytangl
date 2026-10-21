@@ -622,9 +622,11 @@ wraps a `MediaResourceRegistry` with:
 `get_rit` keeps exact label → general identifier → first basename-or-root-relative
 match precedence and registry insertion order, including basename matches outside
 the root. Its manager-local derived memo reuses only
-`(record.path, resource_path) → relative string | None` (`None` means lexical
-`relative_to` rejected that path/root pair). Both keys are immutable Path values;
-direct path/root assignment therefore selects a new key without mutation hooks.
+`(record.path, resource_path, str(record.path)) → relative string | None` (`None` means lexical
+`relative_to` rejected that path/root pair). Both path components are immutable;
+changed path/root values therefore select a new key without mutation hooks.
+The spelling component distinguishes case-fold-equal Windows paths whose relative
+strings differ; it does not change matching or normalize paths/case.
 No path resolution, case normalization, stat or admission policy is added.
 The manager's lifetime bounds this disposable memo; obsolete value pairs may
 remain until the manager is discarded. Entries contain no records, UIDs or graph

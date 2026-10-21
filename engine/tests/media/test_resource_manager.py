@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -295,3 +295,18 @@ def test_late_registration_and_replacement_index_handlers_after_warmed_misses(
     current.path = tmp_path / "nested/changed.svg"
     assert manager.get_rit("nested/b.svg") is None
     assert manager.get_rit("nested/changed.svg") is current
+
+
+def test_windows_path_equality_must_not_reuse_differently_spelled_relative_strings() -> None:
+    # PureWindowsPath exercises Windows lexical rules without a Windows filesystem.
+    root = PureWindowsPath("C:/media")
+    upper = PureWindowsPath("C:/media/nested/Picture.svg")
+    lower = PureWindowsPath("C:/media/nested/picture.svg")
+    assert upper == lower and str(upper) != str(lower)
+    manager = ResourceManager(root)
+    record = _path_record(label="record").model_copy(update={"path": upper})
+    manager.registry.add(record)
+    assert manager.get_rit(str(upper.relative_to(root))) is record
+    record.path = lower
+    assert manager.get_rit(str(lower.relative_to(root))) is record
+    assert manager.get_rit(str(upper.relative_to(root))) is None
