@@ -239,7 +239,9 @@ def test_lookup_keeps_lexical_paths_and_does_not_touch_filesystem(
             assert manager.get_rit(alias) is (record if found else None)
 
 
-def test_live_membership_overwrite_clear_and_direct_path_label_root_mutation(tmp_path: Path) -> None:
+def test_live_membership_overwrite_clear_and_direct_path_label_root_mutation(
+    tmp_path: Path,
+) -> None:
     manager = ResourceManager(tmp_path / "media")
     assert manager.get_rit("nested/a.svg") is None
     original = _path_record(label="original", path=manager.resource_path / "nested/a.svg")
@@ -270,7 +272,9 @@ def test_live_membership_overwrite_clear_and_direct_path_label_root_mutation(tmp
     assert manager.get_rit("media/nested/b.svg") is replacement
 
 
-def test_late_registration_and_replacement_index_handlers_after_warmed_misses(tmp_path: Path) -> None:
+def test_late_registration_and_replacement_index_handlers_after_warmed_misses(
+    tmp_path: Path,
+) -> None:
     manager = ResourceManager(tmp_path)
     assert manager.get_rit("nested/a.svg") is None
     _write_svg(tmp_path / "nested/a.svg")
