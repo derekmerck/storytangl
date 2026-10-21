@@ -481,6 +481,14 @@ and `ctx.get_inline_behaviors()`.
 Deduplication is by `id()`, preserving insertion order. Behaviors across all registries
 are sorted by `sort_key = (dispatch_layer, priority, wants_exact_kind, seq)`.
 
+The upstream `Graph`, `StoryGraph`, `World` and `PhaseCtx.get_authorities()` producers
+use the same object-identity policy (#514 alignment). A live registry appears once
+at its first position; distinct objects remain distinct even when value-equal or
+sharing a UID. Assembly does not compare, hash or unstructure registry values.
+Each call reads live sources, preserving the producer's existing None/type filters
+and source/layer order. There is no authority cache or new persistence state.
+This does not change general entity/registry equality, replay or behavior sorting.
+
 **Three-tier dispatch layering:**
 - GLOBAL — registered at module level via `on_init`, `on_create`, etc.
 - APPLICATION — carried by the runtime context's registries

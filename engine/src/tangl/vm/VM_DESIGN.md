@@ -475,6 +475,12 @@ order. Frame and Ledger may also inject populated local registries explicitly fo
 call path via `PhaseCtx.local_authorities`. This keeps story/world registries automatic
 while preserving narrow local override seams without ambient per-instance discovery.
 
+Authority producers follow Core dispatch's object-identity deduplication (#514):
+first occurrence wins only for the same object, not an equal value or shared UID.
+`PhaseCtx` keeps its BehaviorRegistry filter and reads graph/local sources afresh
+on every call. Assembly performs no value comparison/hash or serialization; later
+dispatch/replay semantics are unchanged. See Core's Behavior & Dispatch contract.
+
 **Template scope discovery is factory-authority-first.** `PhaseCtx.get_template_scope_groups()`
 delegates to the bound graph factory when it exposes `get_template_scope_groups(...)`
 and otherwise falls back to the factory's template registry. Token catalogs and media

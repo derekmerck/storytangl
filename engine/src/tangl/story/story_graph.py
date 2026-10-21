@@ -160,10 +160,10 @@ class StoryGraph(TraversableGraph):
         return self._template_registry()
 
     def get_authorities(self) -> list[object]:
-        """Return story + application/world authority registries when available."""
+        """Return story + application/world authorities, distinct by object identity."""
         registries: list[object] = [story_dispatch, presentation_dispatch]
         for registry in super().get_authorities():
-            if registry not in registries:
+            if all(registry is not existing for existing in registries):
                 registries.append(registry)
 
         world = self.world
@@ -171,7 +171,7 @@ class StoryGraph(TraversableGraph):
             get_world_authorities = getattr(world, "get_authorities", None)
             if callable(get_world_authorities):
                 for registry in get_world_authorities() or ():
-                    if registry not in registries:
+                    if all(registry is not existing for existing in registries):
                         registries.append(registry)
         return registries
 

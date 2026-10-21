@@ -346,7 +346,7 @@ class Graph(Registry[GraphItem]):
         get_factory_authorities = getattr(self.factory, "get_authorities", None)
         if callable(get_factory_authorities):
             for authority in get_factory_authorities() or ():
-                if authority not in authorities:
+                if all(authority is not existing for existing in authorities):
                     authorities.append(authority)
         return authorities
 
