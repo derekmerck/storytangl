@@ -8,6 +8,7 @@
 ```
 
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
+> #514 reuses manager-local pure lexical relative-path derivations during lookup.
 > #571 slice 2a implements explicit control targets and read-only desired-BGM
 > snapshots. Slice 2b adds co-located pygame BGM playback and local controls;
 > Pygame also consumes ordered character barks with simple local BGM attenuation.
@@ -617,6 +618,23 @@ wraps a `MediaResourceRegistry` with:
 - **`register_file(path)`** — indexes one newly created file into the registry
 - **`get_rit(alias)`** — lookup by label, identifier, hash, or relative filename
 - **`get_url(rit)`** — deterministic URL-style path derivation from content hash
+
+`get_rit` keeps exact label → general identifier → first basename-or-root-relative
+match precedence and registry insertion order, including basename matches outside
+the root. Its manager-local derived memo reuses only
+`(record.path, resource_path, str(record.path)) → relative string | None` (`None` means lexical
+`relative_to` rejected that path/root pair). Both path components are immutable;
+changed path/root values therefore select a new key without mutation hooks.
+The spelling component distinguishes case-fold-equal Windows paths whose relative
+strings differ; it does not change matching or normalize paths/case.
+No path resolution, case normalization, stat or admission policy is added.
+The manager's lifetime bounds this disposable memo; obsolete value pairs may
+remain until the manager is discarded. Entries contain no records, UIDs or graph
+pointers and are not identity or persistence state. No serializer changes are
+needed. Label/identifier checks, basename checks and registry membership/path
+reads remain live on every query: add/remove/overwrite/clear, handlers, direct
+relabeling and late registration after a miss need no cache repair. This is not
+a record-result, negative-alias-query cache or generic alias index.
 
 Two factory functions create scoped managers:
 

@@ -61,6 +61,7 @@ class ResourceManager:
         self.default_tags = {f"scope:{scope}", *default_tags}
         self.index_handlers = list(index_handlers)
         self.registry = MediaResourceRegistry(label=self.label)
+        self._relative_paths: dict[tuple[Path, Path, str], str | None] = {}
 
     def register_index_handler(self, handler: IndexHandler) -> None:
         """Register one reusable indexing handler for this manager."""
@@ -128,10 +129,14 @@ class ResourceManager:
                 return False
             if record.path.name == alias:
                 return True
-            try:
-                return str(record.path.relative_to(self.resource_path)) == alias
-            except ValueError:
-                return False
+            # Windows Path equality folds case; relative strings preserve spelling.
+            key = (record.path, self.resource_path, str(record.path))
+            if key not in self._relative_paths:
+                try:
+                    self._relative_paths[key] = str(record.path.relative_to(self.resource_path))
+                except ValueError:
+                    self._relative_paths[key] = None
+            return self._relative_paths[key] == alias
 
         return next(
             (
