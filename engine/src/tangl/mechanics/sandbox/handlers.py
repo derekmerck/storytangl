@@ -242,11 +242,10 @@ def _resolve_ref(
     if graph is None:
         return None
 
-    candidates = [
-        candidate
-        for candidate in graph.find_all(Selector(has_path=target_ref))
-        if isinstance(candidate, kind)
-    ]
+    # Keep the instance-type restriction: Token.has_kind can delegate to its referent.
+    candidates = list(graph.find_all(Selector(
+        predicate=lambda candidate: isinstance(candidate, kind), has_path=target_ref,
+    )))
     if not candidates:
         candidates = [
             candidate
