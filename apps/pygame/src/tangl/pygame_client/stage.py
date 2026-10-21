@@ -315,6 +315,7 @@ class Stage:
         self.surface_contour = _BASE_SURFACE_CONTOUR * self.density
         pygame.init()
         self.chrome = Chrome(logical_size[0], self.density) if chrome else None
+        self._info_session: UUID | None = None
         self.chrome_height = self.chrome.height if self.chrome is not None else 0
         self.window = pygame.display.set_mode(
             (
@@ -574,8 +575,19 @@ class Stage:
 
     def set_info(
         self, branding: BrandingValue | None, sections: list[ProjectedSection],
-        logo_source: str | None,
+        logo_source: str | None, *, status_available: bool, session_id: UUID | None = None,
     ) -> None:
+        """Allocate shell space only for an advertised status channel, even if empty."""
+        if status_available != (self.chrome is not None) or session_id != self._info_session:
+            self.chrome = Chrome(self.logical_size[0], self.density) if status_available else None
+            self.chrome_height = self.chrome.height if self.chrome is not None else 0
+            self.shell = pygame.Surface((self.logical_size[0],
+                                         self.logical_size[1] + self.chrome_height))
+            self.window = pygame.display.set_mode((
+                self.logical_size[0] * self.display_scale,
+                (self.logical_size[1] + self.chrome_height) * self.display_scale,
+            ))
+            self._info_session = session_id
         if self.chrome is not None:
             self.chrome.set_content(branding, sections, self._load(logo_source) if logo_source else None)
 

@@ -18,6 +18,8 @@ class PresentationHints(BaseModel, extra="allow"):
     style_tags: list[StyleClass] = Field(default_factory=list)
     style_dict: StyleDict = Field(default_factory=dict)
     icon: str | None = None
+    placement: Literal["start", "middle", "end"] | None = None
+    icon_only: bool = False
 
     def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("by_alias", True)

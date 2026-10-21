@@ -58,10 +58,10 @@ def test_opt_in_compact_status_uses_shared_scope_and_nearest_override() -> None:
     assert [c.channel_id for c in advertise_compact_status(caller=block, ctx=ctx)] == ["ui-status"]
     sections = project_compact_status(caller=block, ctx=ctx,
                                       request=ProjectionRequest(channels=["ui-status"]))
-    assert [s.section_id for s in sections] == ["scene", "period", "day"]
+    assert [s.section_id for s in sections] == ["scene", "day", "period"]
     assert sections[0].value.value == "A called scene"
-    assert sections[1].hints.icon == "moon"
-    assert sections[2].value.value == "Day 1"
+    assert sections[2].hints.icon == "moon"
+    assert sections[1].value.value == "Day 1"
     assert graph.unstructure() == before
     block.locals["ui_status"] = []
     assert not project_compact_status(caller=block,

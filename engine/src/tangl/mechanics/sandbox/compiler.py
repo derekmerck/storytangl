@@ -248,6 +248,7 @@ class SandboxAssetSpec(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     name: str
+    icon: str | None = None
     kind: str = ""
     traits: list[str] = Field(default_factory=list)
     initial: SandboxInitialAssetSpec
@@ -598,6 +599,7 @@ class SandboxSliceCompiler:
             "traits": set(traits),
             "portable": "portable" in traits,
             "readable": "readable" in traits,
+            "icon": spec.icon,
             "switchable": SwitchableFacet() if "switchable" in traits else None,
             "light_source": (
                 LightSourceFacet(requires_switch="switchable" in traits)

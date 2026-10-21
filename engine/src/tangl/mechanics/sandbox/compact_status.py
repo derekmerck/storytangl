@@ -12,7 +12,7 @@ from tangl.vm.runtime.frame import PhaseCtx
 
 from .scope import SandboxScope
 from .location import SandboxLocation
-from .story_info import DEFAULT_PERIOD_LABELS, _period_label, sandbox_asset_items
+from .story_info import DEFAULT_PERIOD_LABELS, _asset_surface, _period_label, sandbox_asset_items
 from .time import current_world_time
 
 
@@ -46,12 +46,12 @@ def project_compact_status(
     period_icon = ns.get("period_icons", {}).get(str(time.period))
     sections = [
         ProjectedSection(section_id="scene", title="Scene", value=ScalarValue(value=title),
-                         hints=PresentationHints(icon="scene")),
-        ProjectedSection(section_id="period", title="Period", value=ScalarValue(value=period),
-                         hints=PresentationHints(icon=period_icon)),
+                         hints=PresentationHints(placement="start")),
         ProjectedSection(section_id="day", title="Day",
                          value=ScalarValue(value=f"Day {time.run_day}"),
-                         hints=PresentationHints(icon="calendar")),
+                         hints=PresentationHints(placement="end")),
+        ProjectedSection(section_id="period", title="Period", value=ScalarValue(value=period),
+                         hints=PresentationHints(icon=period_icon, placement="end", icon_only=True)),
     ]
     # This provider chooses entries and order; the client never joins private inventory.
     items = sandbox_asset_items(scope.player_assets)
@@ -59,6 +59,7 @@ def project_compact_status(
         sections.append(ProjectedSection(
             section_id=f"item:{asset}", title=item.label,
             value=ScalarValue(value=item.detail or "carried"),
-            hints=PresentationHints(icon="inventory"),
+            hints=PresentationHints(icon=_asset_surface(scope.player_assets.assets[asset]).icon,
+                                    placement="middle", icon_only=True),
         ))
     return sections

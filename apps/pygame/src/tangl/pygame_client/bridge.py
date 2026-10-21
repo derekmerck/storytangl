@@ -435,6 +435,11 @@ class PygameSessionBridge:
             )
             self._status_version = info.version
 
+    @property
+    def status_available(self) -> bool:
+        """Advertisement opts in independently of the current section contents."""
+        return self._available_info is not None and "ui-status" in self._available_info
+
     def start(self, world_id: str) -> RuntimeEnvelope:
         """Create a fresh story session for ``world_id``."""
 

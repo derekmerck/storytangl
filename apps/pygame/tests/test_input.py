@@ -39,6 +39,13 @@ from tangl.service import JsonValue, RuntimeEnvelope  # noqa: E402
 WORLD = "repartee_loop"
 
 
+@pytest.fixture(autouse=True, params=[False, True], ids=["no-status", "empty-status"])
+def status_shell(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> bool:
+    """Exercise the event loop with absent and advertised-but-empty rows."""
+    monkeypatch.setattr(PygameSessionBridge, "status_available", property(lambda self: request.param))
+    return request.param
+
+
 @pytest.fixture
 def committed(monkeypatch: pytest.MonkeyPatch) -> list[tuple[UUID, JsonValue | None]]:
     """Record every choice the loop commits, without changing behaviour."""
@@ -113,12 +120,12 @@ def test_quit_event_ends_the_loop(
 
 
 def test_mouse_click_commits_the_choice_under_the_cursor(
-    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]]
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]], status_shell: bool,
 ) -> None:
     pygame.init()
     from tangl.pygame_client.stage import Stage
 
-    stage = Stage(chrome=True)
+    stage = Stage(chrome=status_shell)
     stage.draw(Turn(step=1, choices=gated))
     rect, action = stage.hitboxes[0]
     position = stage.window_point(rect.center)
@@ -334,14 +341,14 @@ def test_zero_cancels_a_selection(
 
 
 def test_a_click_on_a_piece_commits_what_its_number_commits(
-    packet: Choice, committed: list[tuple[UUID, JsonValue | None]]
+    packet: Choice, committed: list[tuple[UUID, JsonValue | None]], status_shell: bool,
 ) -> None:
     """Input Parity: the hitbox and the key produce the same payload."""
 
     pygame.init()
     from tangl.pygame_client.stage import Stage
 
-    stage = Stage(chrome=True)
+    stage = Stage(chrome=status_shell)
     frame = client._merge([])
     pending = PendingSelection(choice=packet)
     stage.draw(frame, pending)

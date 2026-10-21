@@ -1,6 +1,7 @@
 # tangl.story.concepts.asset - Design Notes
 
-> Status: Implemented vocabulary, holder, transaction, and sandbox integration slice.
+> Status: Implemented vocabulary, holder, transaction, and sandbox integration slice;
+> optional icon-token disclosure added for #581's compact-row follow-up.
 
 ## Position
 
@@ -12,6 +13,9 @@ This package currently defines:
 - `AssetType`: a singleton definition for tokenizable, lightly stateful assets.
   It includes a small `traits` set for story/mechanics layers that need
   semantic acceptance checks.
+  Optional `icon: str | None` nominates a presentation token, inherited through
+  the existing singleton/type and token delegation mechanisms. It is advisory,
+  not a filename or media reference; a provider may copy it to section hints.
 - `CountableAsset`: a fungible asset definition tracked by quantity.
 - `AssetWallet`: a compact counter for fungible assets.
 - `HasAssets`: a story-level facet for nodes that hold wallet counts and

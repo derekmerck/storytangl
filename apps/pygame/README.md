@@ -105,29 +105,38 @@ second only while a clip is actually playing.
 
 ## Compact gameplay chrome (#581)
 
-The runnable client adds a small brand/status strip **outside** the world's
-logical canvas. A 320×200 world remains 320×200; the shell adds 44 logical pixels
-at density one (88 at 640×400), then applies the existing integer window zoom.
+The runnable client adds a single compact row **only when exact `ui-status` is
+advertised**. Branding, a sidebar, a clock or inventory alone never enable it.
+Without that advertisement there is no reserved gameplay strip. The window
+caption remains available. The row sits **outside** the world's logical canvas:
+a 320×200 world remains 320×200. Its font-metric height is about 14 logical pixels
+at density one (28 at 640×400), then the existing integer window zoom applies.
 Art, map regions, surfaces, prose, choices and pending selections retain their
 world coordinates. `Stage.window_point()` and the inverse input transform account
-for the shell offset. Standalone Stage users may omit chrome.
+for the shell offset, including when availability changes during play.
 
 Branding comes from public `ui-branding`, cached separately per world. An optional
 logo is resolved by `ServiceManager.get_world_media` through normal inventory and
 media-profile delivery; pygame consumes only supported co-located image/vector
 paths. Missing, unfetched LFS, unsupported or undecodable logos retain the world
-name. There is no alternate filename loader or media downloader.
+name in local details. There is no alternate filename loader or media downloader.
 
 The optional exact story channel `ui-status` supplies ordered `ProjectedSection`
 values. The backend chooses entries, identities, wording, disclosure and icon
-suggestions; pygame arranges them in six-entry pages. It does not parse English
+suggestions; pygame arranges width-bounded pages of up to six entries in one row.
+Optional `hints.placement` (`start`, `middle`, `end`) groups entries, preserving
+provider order within each group; unhinted entries join the start group.
+`hints.icon_only` defaults to false. A recognized token can use just its glyph;
+unknown/missing tokens always retain readable text. Full labels and state stay
+available in details. The client does not parse English
 field names, inspect a graph, compute inventory rules, assume a calendar/daypart
 count, or read the host clock. Unknown icons keep their readable text floor.
 
 - Click an entry, or press `Ctrl+I`, for its full label/value/details.
+- Click `i` to open/close details, including branding/logo and help on an empty row.
 - In details, `Tab` / `Shift+Tab` visits entries (including overflow pages),
   `PageUp` / `PageDown` or the wheel pages long text, and `Esc` closes.
-- Click the page footer to cycle compact pages. Details never submit a choice.
+- Click `>` to cycle compact pages. Details never submit a choice.
 - Music controls and native voice completion remain active while inspecting.
 
 Runtime-envelope `InfoState` governs refresh. The bridge discovers availability
@@ -146,12 +155,47 @@ Sandbox worlds may opt in by registering
 so a called scene under the same `SandboxScope` retains its clock and carried
 items. Nearest `ui_status` locals may replace the default set with ordinary
 projected-section data; `[]` / `None` explicitly remove entries without removing
-chrome. Worlds choose optional `period_labels` / `period_icons` suggestions.
+chrome while the channel stays advertised. Channel absence, unlike empty content,
+removes the row and clears old inspection targets. Worlds choose optional
+`period_labels` / `period_icons` suggestions.
 `period_icons` uses string period identities, for example `{"4": "moon"}`, so
 keys remain unchanged through JSON restoration. Lookup uses the mechanic's
 actual period identity, not its displayed label; integer-key aliases are not supported.
 Non-sandbox worlds can provide the same exact channel through their own ordinary
 projection handlers, without adopting a sandbox clock or inventory.
+
+For example, after constructing the world's ordinary `World` authority:
+
+```python
+from tangl.story import Block
+from tangl.mechanics.sandbox.compact_status import (
+    advertise_compact_status, project_compact_status,
+)
+
+world.dispatch.register(
+    advertise_compact_status, task="advertise_story_info_channels",
+    wants_caller_kind=Block, wants_exact_kind=False,
+)
+world.dispatch.register(
+    project_compact_status, task="get_story_info",
+    wants_caller_kind=Block, wants_exact_kind=False,
+)
+```
+
+Omit these registrations to opt out. A non-sandbox world's advertisement handler
+returns `InfoAffordance(channel_id="ui-status")`; its `get_story_info` contributor
+returns ordinary sections only when `"ui-status" in request.requested_channels()`.
+No `show_status` flag or special metadata is required.
+
+The default sandbox provider suggests title at start, carried items in the middle
+and day/period at end. Compact sandbox source assets may declare `icon: lamp`,
+`icon: key` or `icon: bag`; `SandboxAssetSpec.icon` compiles to the ordinary
+`AssetType.icon` default inherited/delegated through tokens, then to `hints.icon`.
+Those three tokens have distinct drawn treatments. Arbitrary tokens remain legal
+and degrade to text, not a guessed filename. Custom scoped sections can carry
+`hints: {placement: middle, icon: key, icon_only: true}`. Icon images/media bindings
+remain deferred. This does not change the documented excluded holder-map staging
+surface or add inventory persistence; graph tokens retain their existing references.
 
 Always-on Service-backed witnesses cover scoped call/return, time/charge and item
 changes, custom non-sandbox calendar wording, purity, query counts and fallbacks.

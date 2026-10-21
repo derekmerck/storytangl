@@ -13,7 +13,7 @@ them. Backend state remains authoritative for every action.
 
 ## Compact disclosed status (#581)
 
-Status: the initial pygame slice consumes public `ui-branding` separately from
+Status: the optional compact-row follow-up consumes public `ui-branding` separately from
 optional story-dynamic exact `ui-status`. The latter is ordinary ordered
 `ProjectedSection` data, not a HUD/widget type or a second state authority.
 Section ids identify entries; titles, existing values and advisory `hints.icon`
@@ -22,6 +22,12 @@ entry order and meaningful time/item wording. Clients choose layout and glyph
 treatment; they must not parse English labels, assume a calendar or inspect a
 private graph to reconstruct status.
 
+`PresentationHints.placement` is optional coarse advice (`start`, `middle`, `end`),
+not a coordinate. `icon_only` defaults to false and requests glyph-only compact
+presentation only where the client can realize the icon; unknown/missing icons
+retain text. Full label/value remains inspectable. These hints introduce no
+parallel section type, mandatory layout, persistent UI state or icon-media loader.
+
 Scope resolution belongs to existing projection contributors and `PhaseCtx.get_ns`.
 A world can advertise status across ordinary blocks, including called scenes,
 without tying availability to one menu node kind. Empty sections are meaningful.
@@ -29,7 +35,12 @@ No new context, implicit call origin, journal channel or persistent HUD cache is
 introduced. The optional sandbox contributor uses its existing shared scope;
 arbitrary non-sandbox worlds can provide the same exact channel independently.
 
-Pygame reserves shell space outside the logical world canvas, maintains one
+Pygame reserves one font-metric, density-scaled row outside the logical world
+canvas only while exact `ui-status` is advertised. Public branding alone does
+not enable it. An advertised empty/null section list retains the opted-in row;
+channel removal drops the allocation and clears inspection. Provider order is
+stable within placement groups; unhinted entries join start in provider order.
+Pygame maintains one
 coordinate transform for input, and offers paged compact entries with local
 mouse/keyboard details. InfoState availability and dirty/version hints govern
 read-only refresh; rendering and preferences do not poll. Story/world switches
