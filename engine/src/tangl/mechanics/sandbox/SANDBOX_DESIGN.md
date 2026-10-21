@@ -8,7 +8,8 @@
 ```
 
 **Status:** IMPLEMENTED FIRST-SPIKE; scheduled-event binding/disclosure and
-destination-owned render-time choice text (#558) shipped +
+destination-owned render-time choice text (#558) and type-first reference lookup
+(#514) implemented +
 ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,
@@ -186,6 +187,15 @@ again; new or missing bindings resolve normally. This is binding-local reuse, no
 a graph-wide reference cache or topology invalidation policy. Use-time availability
 uses ordinary ``Action.once`` for the successor visit check and does not re-gather
 the event catalog.
+
+Reference lookup (#514 type-first scan) retains path → identifier → scoped-identifier
+precedence and stable nearest-target ordering. Its ordinary Selector predicate
+checks Python ``isinstance(candidate, kind)`` before expensive ``has_path`` work;
+``has_kind`` is not equivalent because tokens can delegate it to their referent.
+Every lookup still sees current graph membership and hierarchy. There is no index,
+cached target pool or literal-tail filter: dotted labels and custom path/matching
+policies remain authoritative, including glob and platform case behavior.
+
 Mobs, fixtures, assets, provider events, and game moves still refresh their
 generated actions on each visit. This keeps the retained binding narrow without
 turning general sandbox projection into a cache.
