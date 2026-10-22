@@ -161,8 +161,9 @@ def test_overflow_headers_keep_the_rows_margins_and_the_scene_beneath(
     stage: Stage, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # A header is washed like the rows it pages, inside the frame's margins
-    # rather than edge to edge. Over choices it leaves the scene showing
-    # beneath it, as the choices do between themselves.
+    # rather than edge to edge, and leaves the scene showing beneath it, as
+    # the choices do between themselves. The narration's wash is exactly as
+    # wide as its header.
     washed: list[pygame.Rect] = []
     wash = stage._wash
 
@@ -172,11 +173,14 @@ def test_overflow_headers_keep_the_rows_margins_and_the_scene_beneath(
 
     monkeypatch.setattr(stage, "_wash", record)
     stage.draw(crowded())
-    above_choices = stage.choice_rect.top - stage.choice_pitch
-    headers = [rect for rect in washed if rect.top in (stage.prose_top, above_choices)]
-    assert len(headers) == 2
-    assert all(0 < rect.left and rect.right < stage.logical_size[0] for rect in headers)
-    assert max(rect.bottom for rect in headers if rect.top == above_choices) < stage.choice_rect.top
+    (prose,) = [rect for rect in washed if rect.top == stage.prose_top]
+    (choices,) = [rect for rect in washed if rect.top == stage.choice_rect.top - stage.choice_pitch]
+    assert all(0 < rect.left and rect.right < stage.logical_size[0] for rect in (prose, choices))
+    assert prose.bottom < stage.prose_rect.top and choices.bottom < stage.choice_rect.top
+    narration = [rect for rect in washed
+                 if stage.prose_rect.top <= rect.top < stage.prose_rect.bottom]
+    assert narration
+    assert {(rect.left, rect.right) for rect in narration} == {(prose.left, prose.right)}
 
 
 def test_short_turn_has_no_overflow_controls(stage: Stage) -> None:

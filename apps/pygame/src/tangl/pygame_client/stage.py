@@ -541,15 +541,13 @@ class Stage:
         )
         capacity = max(1, (prose_floor - self.prose_top) // self.row_height)
         overflow = len(rows) > capacity
+        # The header takes a choice's pitch, as it does over choices, so the
+        # scene shows between it and the first row.
+        body_top = self.prose_top + (self.choice_pitch if overflow else 0)
         if overflow:
-            capacity = max(1, capacity - 1)
+            capacity = max(1, (prose_floor - body_top) // self.row_height)
         self.prose_capacity = capacity
-        self.prose_rect = pygame.Rect(
-            0,
-            self.prose_top + (self.row_height if overflow else 0),
-            width,
-            capacity * self.row_height,
-        )
+        self.prose_rect = pygame.Rect(0, body_top, width, capacity * self.row_height)
         self.max_scroll = max(0, len(rows) - capacity)
         if turn is not self._last_turn:
             self.scroll = 0
@@ -1467,18 +1465,20 @@ class Stage:
         for row in rows:
             fill, colour = _ROW_STYLES[row.kind]
             rendered = self.font.render(row.text, False, colour)
+            # The rows' margin, as choices, the legend and the header keep it:
+            # a pixel further in, the prose's wash sat inside its own header.
             self._wash(
                 self._backing(
                     rendered,
-                    left=9 * self.density,
+                    left=self.row_text_left,
                     y=y,
                     kind=row.kind,
-                    width=width - 12 * self.density,
+                    width=width - 2 * (self.row_text_left - 3 * self.density),
                     pitch=self.row_height,
                 ),
                 fill,
             )
-            self.surface.blit(rendered, (9 * self.density, y))
+            self.surface.blit(rendered, (self.row_text_left, y))
             y += self.row_height
         self.surface.set_clip(old_clip)
         if self.max_scroll:
