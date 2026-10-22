@@ -21,7 +21,7 @@ from tangl.presentation.projection import (
 )
 from tangl.presentation.surface import HasSurface, Surface
 from tangl.pygame_client.bridge import PygameSessionBridge
-from tangl.pygame_client.chrome import section_text
+from tangl.pygame_client.chrome import BAR, SELECTED, section_text
 from tangl.pygame_client.models import Choice, Commit, Line, Turn
 from tangl.pygame_client.stage import Stage
 from tangl.service import ServiceManager
@@ -689,6 +689,36 @@ def test_main_branded_world_without_status_has_no_reserved_row(
         assert observed == [(320, 200)]
     finally:
         pop_manual_world(world.label)
+
+
+def test_entries_sit_on_the_bar_and_only_the_open_one_is_lit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The bar is one opaque ink, and so is every entry on it: a lighter box of
+    # its own read as a text wash brightening the bar. Only the entry whose
+    # details are open is lit, and a moon's crescent is cut in whatever is
+    # behind it.
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    stage = Stage(chrome=True, display_scale=1)
+    entries = [ProjectedSection(**section("a", "First")),
+               ProjectedSection(**section("b", "Night"),
+                                hints=PresentationHints(icon="moon", icon_only=True))]
+    try:
+        stage.set_info(None, entries, None, status_available=True)
+        stage.draw(Turn(step=1))
+        chrome, d = stage.chrome, stage.chrome.density
+        boxes = [box for box, _identity in chrome.hitboxes]
+        corner = lambda box: tuple(stage.shell.get_at((box.left + 1, box.bottom - 1)))[:3]
+        crescent = (boxes[1].left + 2 * d + 6 * d, (chrome.height - 8 * d) // 2 + 2 * d)
+        assert [corner(box) for box in boxes] == [BAR, BAR]
+        assert tuple(stage.shell.get_at(crescent))[:3] == BAR
+
+        chrome.selected_id, chrome.open = "b", True
+        stage.draw(Turn(step=1))
+        assert [corner(box) for box in boxes] == [BAR, SELECTED]
+        assert tuple(stage.shell.get_at(crescent))[:3] == SELECTED
+    finally:
+        pygame.quit()
 
 
 @pytest.mark.parametrize("size", [(320, 200), (640, 400)])

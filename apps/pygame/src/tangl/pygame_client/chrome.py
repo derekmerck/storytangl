@@ -9,6 +9,13 @@ from tangl.presentation.projection import (
     ScalarValue, TableValue,
 )
 
+BAR = (26, 28, 44)
+"""The bar, and every entry on it: the stage's ink, opaque. An entry once drew
+on a lighter box of its own, which read as a text wash laid over the bar."""
+
+SELECTED = (63, 96, 99)
+"""The one entry that is lit: the one whose details are open."""
+
 
 def section_text(section: ProjectedSection) -> str:
     """Readable floor without interpreting domain keys or private state."""
@@ -133,7 +140,7 @@ class Chrome:
 
     def draw(self, shell: pygame.Surface) -> None:
         d = self.density
-        shell.fill((26, 28, 44), pygame.Rect(0, 0, self.width, self.height))
+        shell.fill(BAR, pygame.Rect(0, 0, self.width, self.height))
         self.hitboxes.clear()
         pages = self._pages()
         self.page %= len(pages)
@@ -153,11 +160,12 @@ class Chrome:
                 x = right - width
             for section in group:
                 box = pygame.Rect(x, 0, self._entry_width(section), self.height)
-                selected = section.section_id == self.selected_id and self.open
-                pygame.draw.rect(shell, (63, 96, 99) if selected else (43, 48, 63), box)
+                ground = SELECTED if section.section_id == self.selected_id and self.open \
+                    else BAR
+                pygame.draw.rect(shell, ground, box)
                 hints = section.hints
                 token = hints.icon if hints else None
-                inset = self._icon(shell, token, x + 2 * d, (self.height - 8 * d) // 2)
+                inset = self._icon(shell, token, x + 2 * d, (self.height - 8 * d) // 2, ground)
                 if not (hints and hints.icon_only and inset):
                     text = self._clip(self._entry_text(section), box.width - inset - 4 * d)
                     shell.blit(self.font.render(text, False, (232, 226, 205)),
@@ -174,13 +182,15 @@ class Chrome:
     ICON_TOKENS = frozenset({"sun", "sunset", "moon", "scene", "calendar", "inventory",
                              "lamp", "key", "bag"})
 
-    def _icon(self, surface: pygame.Surface, token: str | None, x: int, y: int) -> int:
+    def _icon(self, surface: pygame.Surface, token: str | None, x: int, y: int,
+              ground: tuple[int, int, int]) -> int:
+        """Draw an icon token at `x`, `y` over `ground`; return the width it took."""
         d = self.density
         colour = (232, 194, 95)
         if token in ("sun", "sunset", "moon"):
             pygame.draw.circle(surface, colour, (x + 4 * d, y + 4 * d), 3 * d)
             if token == "moon":
-                pygame.draw.circle(surface, (43, 48, 63), (x + 6 * d, y + 2 * d), 3 * d)
+                pygame.draw.circle(surface, ground, (x + 6 * d, y + 2 * d), 3 * d)
             elif token == "sunset":
                 pygame.draw.line(surface, (168, 92, 56), (x, y + 5 * d),
                                  (x + 8 * d, y + 5 * d), 2 * d)
