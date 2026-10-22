@@ -533,6 +533,15 @@ choices produces the same random outcomes. `ctx.get_random()` exposes the shared
 
 ### Frame (`runtime/frame.py`)
 
+**Owned requirement kind references survive JSON.** At the owning
+`HasRequirement.requirement` constructor field, an explicit string `has_kind`
+reference resolves through the existing loaded-Entity class lookup used by graph
+constructor restoration. Unknown/unloaded references raise; no modules are imported,
+arbitrary strings/fields are not self-cast, and live Requirement objects keep their
+existing matching semantics. This narrow repair lets unresolved lazy destinations
+resolve after graph/Ledger constructor form plus actual JSON restoration. It adds
+no serializer or general class-coercion pipeline.
+
 Drives one `resolve_choice` call: a sequence of `follow_edge` steps through the graph
 until the pipeline reaches a selectable continuation, or a terminal unwinds the return
 stack and that stack is exhausted.
