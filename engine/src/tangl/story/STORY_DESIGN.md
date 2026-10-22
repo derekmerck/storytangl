@@ -1,6 +1,7 @@
 # tangl.story — Design Notes
 
 > Status: Current contract; #514 authority identity applies at construction and runtime.
+> #592 slice 1 enforces explicit text Actions before ordinary movement.
 > Authority: Journal fragment types are defined in `tangl.journal.fragments`;
 > story owns the narrative vocabulary, compilation, and journal policy layered
 > over VM/core.
@@ -41,6 +42,37 @@ factory. Generic topology materialization belongs to `GraphFactory` and
 preview/prelink policy.
 
 ## Choice Disclosure
+
+### Explicit text submission (#592 slice 1)
+
+The TextAccepts/validator models predate authoritative Action submission enforcement.
+Story's `validate_text_submission` now enforces explicit `TextAccepts` Actions at
+ordinary pre-move VALIDATE, using `PhaseCtx.selected_payload` after Frame's existing
+authored-activation/submitted-override merge. No adapter duplicates that merge.
+Non-text accepts, ordinary picks and game moves retain their existing policy.
+There is no VM import, new endpoint or phase-order change.
+
+The effective payload must contain string `text`, even when optional. Missing/null
+is not optional empty. Required blank uses Python `str.strip()` only as a predicate;
+the submitted text is never trimmed/coerced/normalized. Optional explicit `""` is
+valid unless another validator excludes it. Inclusive length counts Unicode code
+points (`len`), not grapheme clusters or UTF-16 units. Regex uses Python `re.search`
+with only `i`/`m`/`s`; invalid patterns/unsupported flags reject explicitly. Enum uses
+exact strings when case-sensitive and Python `lower()` otherwise, never casefolding.
+Current web UTF-16 `string.length` and JavaScript regex checks remain advisory and
+may disagree. This slice does not change that widget or introduce a regex framework.
+
+`BackendValidator` supplies no algorithm or proof a domain check ran; actual domain
+restrictions still use existing Action/world validation dispatch. Invalid submissions
+raise normal `ValueError` before the hop's cursor/effects/history/journal change, not
+general transaction rollback. Frame-local selected-request metadata may change.
+Automatic Actions use authored payloads through the same VALIDATE seam; bad explicit
+text declarations fail without inventing a prompt. Deliberately skipped phases retain
+their existing contract. CLI positional text joins/trims words; raw JSON preserves
+exact strings. Backend rejection prints the error and leaves choices usable for retry.
+Pygame editing (slice 2) and beat paging (#587) remain separate follow-ups.
+
+### Availability and disclosure
 
 Choice availability and disclosure are separate Story contracts. Availability
 continues to decide whether an `Action` can be selected. Disclosure decides

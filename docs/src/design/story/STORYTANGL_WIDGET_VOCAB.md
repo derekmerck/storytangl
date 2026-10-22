@@ -1375,6 +1375,25 @@ Concrete `place` (edge variant) — "lay track on the Toledo-Chicago connection"
 - A backend-side validation failure surfaces as an inline, non-replayed
   `UxEvent` (§6.4). Step does not advance.
 
+**Current explicit text enforcement (#592 slice 1).** Models existed before ordinary
+Action submission enforced them. Story now validates explicit TextAccepts at the
+existing pre-move VALIDATE seam against Frame's effective merged payload. It must
+contain `{ "text": str }`: missing/null/non-string is invalid even when optional.
+Optional explicit empty is valid unless another constraint excludes it. Required
+blank uses Python `str.strip()` as a predicate only; actual text is never rewritten.
+Inclusive length counts Unicode code points, not grapheme clusters/UTF-16 units.
+Regex is Python `re.search`, not fullmatch, with only `i`/`m`/`s`; invalid patterns
+and unsupported flags reject explicitly. Enum uses exact strings or `lower()`, not
+casefolding/normalization. Current web length/JavaScript regex feedback is advisory
+and may disagree; no cross-language regex framework is implied.
+
+The opaque backend marker provides no algorithm; worlds/Actions still own domain
+checks through existing validation dispatch. This bounded implementation uses normal
+`ValueError` before traversal/effects/history/journal, and CLI prints it without
+replacing choices. The general inline `UxEvent` guidance above is not a claim that
+generic text failures are already converted into UX events. Non-text accepts,
+deliberately skipped phases and general transaction/recovery policy are unchanged.
+
 ### 6.2 Typed `UIHints`
 
 ```python

@@ -50,6 +50,13 @@ The CLI floor is:
 - submit the same UUID `edge_id` plus payload that a rich widget submits
 - optionally submit raw command text through a typed `find_edge` request
 
+Explicit TextAccepts CLI floor: `do 1 Dana Reyes` joins/trims positional words.
+Use `do 1 --payload '{"text":"  Dana  Reyes "}'` for exact leading/trailing/repeated
+whitespace or `--payload '{"text":""}'` for optional empty. Missing/null/non-string
+is not empty. CLI submits only the override; Frame already merges authored activation
+fields. Story enforces constraints before mutation; CLI backend rejection prints
+the error and retains choices for retry. Client feedback remains advisory.
+
 Web, Ren'Py, Godot, or tabletop-like clients may render richer controls, but
 those controls are affordances over the same visible fragments. They are not a
 client-side rules runtime.
