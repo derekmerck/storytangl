@@ -9,6 +9,8 @@
 
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
 > #514 reuses manager-local pure lexical relative-path derivations during lookup.
+> Graph-local static admission/JSON restoration is covered as the current stopgap
+> for CarWars #34; scoped catalog/provenance design remains deferred under #284.
 > #571 slice 2a implements explicit control targets and read-only desired-BGM
 > snapshots. Slice 2b adds co-located pygame BGM playback and local controls;
 > Pygame also consumes ordered character barks with simple local BGM attenuation.
@@ -557,6 +559,24 @@ extend `GraphItem`; RITs can live in registries outside any graph. When a media
 dependency is resolved, the accepted RIT may be copied into the story graph as a
 graph-local entity, but inventory-scoped registries remain the authoritative
 source for static assets.
+
+Current rit-backed journal persistence resolves resource IDs only through the
+restored story graph. Static inventory resources must therefore be admitted before
+emission using `MediaInventoryProvisioner.graph_local_copy` and normal graph
+registration; follow the returned provider's actual UID because content reuse can
+select an existing graph record. The source stays owned by its inventory, and
+repeat admission reuses the graph member. The constructor-form plus JSON ledger
+regression covers this without a restore-time world lookup or fragment-embedded
+resource bypass.
+
+Graph-local copies are a **stopgap**, not a universal ownership contract.
+[The #284 design direction](https://github.com/derekmerck/storytangl/issues/284#issuecomment-6330005455)
+is catalog-backed resource selection/materialization with source provenance and
+scoped canonical resources plus graph-local bookkeeping. That representation and
+request/provider work are deferred; this stopgap adds no serializers, Singleton
+design, requests or dummy dependency owners. Optional consumers with a finite
+palette may admit it at the existing construction boundary and keep composition
+read-only. This does not change direct graph-only restoration or close #284/#400.
 
 **What a MediaRIT does NOT carry:** client-relative URLs, transport format
 decisions, or presentation hints. Those belong on `MediaFragment` (journal layer)

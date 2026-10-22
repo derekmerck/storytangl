@@ -9,8 +9,12 @@ from tangl.journal.media import MediaFragment
 from tangl.presentation.hints import StagingHints
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaRITStatus, MediaResourceInventoryTag as MediaRIT
+from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
+from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
+from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.service.media import media_fragment_to_payload
 from tangl.vm import Ledger
+from tangl.vm.runtime.frame import PhaseCtx
 
 def test_media_fragment_with_url():
     # Test media fragment with URL
@@ -138,13 +142,19 @@ def test_rit_media_fragment_evolution_revalidates_changed_content():
         fragment.evolve(content=replacement, rit_id=rit.uid)
 
 
-def test_ledger_round_trip_rebinds_media_fragment_to_the_restored_rit():
-    """Persisted journal media observes the restored graph resource lifecycle."""
+@pytest.mark.parametrize("json_store", [False, True])
+def test_ledger_round_trip_rebinds_admitted_inventory_media(json_store: bool) -> None:
+    """Admission preserves inventory ownership; restore binds only graph resources."""
 
     graph = Graph()
     start = graph.add_node(label="start")
-    rit = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR)
+    inventory = MediaResourceRegistry(label="world_media")
+    source = MediaRIT(data="<svg/>", data_type=MediaDataType.VECTOR, registry=inventory)
+    ctx = PhaseCtx(graph=graph, cursor_id=start.uid)
+    rit = MediaInventoryProvisioner.graph_local_copy(source, _ctx=ctx)
     graph.add(rit)
+    assert rit is not source and rit.registry is graph
+    assert MediaInventoryProvisioner.graph_local_copy(source, _ctx=ctx) is rit
     ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
     fragment = MediaFragment(
         content=rit,
@@ -153,13 +163,20 @@ def test_ledger_round_trip_rebinds_media_fragment_to_the_restored_rit():
     )
     ledger.output_stream.append(fragment)
 
-    restored = Ledger.structure(ledger.unstructure())
+    payload = ledger.unstructure()
+    if json_store:
+        payload = Json.deserialize(Json.serialize(payload))
+    restored = Ledger.structure(payload)
     restored_fragment = next(
         item for item in restored.output_stream.values() if isinstance(item, MediaFragment)
     )
     restored_rit = restored.graph.get(rit.uid)
 
     assert restored_fragment.content is restored_rit
+    assert restored_rit.registry is restored.graph
+    assert source.registry is inventory and inventory.get(source.uid) is source
+    restored_ctx = PhaseCtx(graph=restored.graph, cursor_id=start.uid)
+    assert MediaInventoryProvisioner.graph_local_copy(source, _ctx=restored_ctx) is restored_rit
     restored_rit.status = MediaRITStatus.PENDING
     assert media_fragment_to_payload(restored_fragment) is None
 
