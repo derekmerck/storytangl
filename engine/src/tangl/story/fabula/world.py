@@ -337,10 +337,10 @@ class World(TraversableGraphFactory):
         return payload
 
     def get_authorities(self) -> list[object]:
-        """Return world-owned behavior authorities with stable declaration order."""
+        """Return world-owned authorities in first-occurrence object-identity order."""
         authorities: list[object] = []
         for authority in [self.dispatch, *self.extra_authorities]:
-            if authority is None or authority in authorities:
+            if authority is None or any(authority is existing for existing in authorities):
                 continue
             authorities.append(authority)
         return authorities

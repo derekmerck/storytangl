@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
+from tangl.core import BehaviorRegistry
 from tangl.loaders.bundle import WorldBundle
-from tangl.loaders.compiler import WorldCompiler
+from tangl.loaders.compiler import WorldCompiler, _WorldDomainAdjuncts
 from tangl.service.world_registry import WorldRegistry
-from tangl.story import World
+from tangl.story import Block, StoryGraph, World
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def test_bundle_loads_from_directory(media_mvp_path: Path) -> None:
@@ -17,6 +21,75 @@ def test_bundle_loads_from_directory(media_mvp_path: Path) -> None:
     assert bundle.manifest.label == "media_mvp"
     assert bundle.media_dir.exists()
     assert len(bundle.script_paths) > 0
+
+
+@pytest.mark.parametrize("guard_assembly", [False, True])
+def test_compiler_preserves_distinct_equal_domain_authorities(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, guard_assembly: bool,
+) -> None:
+    events: list[str] = []
+    first = BehaviorRegistry(label="domain_identity")
+    first.register(task="domain_identity", func=lambda **_kw: events.append("shared"))
+    equal = first.model_copy()
+    last = BehaviorRegistry(label="domain_last")
+    last.register(task="domain_identity", func=lambda **_kw: events.append("last"))
+    marker = object()
+    assert first is not equal and first.uid == equal.uid and first == equal
+    supplied = [None, first, equal, first, marker, last, None, equal]
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("authority dedup must not compare or serialize values")
+
+    def authorities() -> Iterator[object]:
+        # The generator scopes interception to the loader's authority loop.
+        # Imports, other domain hooks, compilation and dispatch are unguarded.
+        with monkeypatch.context() as patch:
+            if guard_assembly:
+                for name in ("__eq__", "eq_by_value", "value_hash", "unstructure"):
+                    patch.setattr(BehaviorRegistry, name, forbidden)
+            yield from supplied
+
+    domain = ModuleType("identity_test_domain")
+    domain.get_authorities = authorities
+    monkeypatch.setitem(sys.modules, domain.__name__, domain)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    bundle_root = tmp_path / "domain_identity_world"
+    bundle_root.mkdir()
+    (bundle_root / "world.yaml").write_text(
+        "label: domain_identity_world\nscripts: story.yaml\n"
+        "domain_module: identity_test_domain\n", encoding="utf-8",
+    )
+    (bundle_root / "story.yaml").write_text(
+        "label: domain_identity_world\nscenes: {}\n", encoding="utf-8",
+    )
+    # Observe the loader's intermediate list: it keeps None; WorldBuilder removes it.
+    collected: list[object] = []
+    original = _WorldDomainAdjuncts.get_authorities
+
+    def observe(adjuncts: _WorldDomainAdjuncts) -> list[object]:
+        result = original(adjuncts)
+        collected[:] = result
+        return result
+
+    monkeypatch.setattr(_WorldDomainAdjuncts, "get_authorities", observe)
+    world = WorldCompiler().compile(WorldBundle.load(bundle_root))
+    assert [id(a) for a in collected] == [
+        id(world.dispatch), id(None), id(first), id(equal), id(marker), id(last),
+    ]
+    assert [id(a) for a in world.extra_authorities] == [
+        id(first), id(equal), id(marker), id(last),
+    ]
+    assert [id(a) for a in world.get_authorities()] == [
+        id(world.dispatch), id(first), id(equal), id(marker), id(last),
+    ]
+    graph = StoryGraph(factory=world)
+    caller = Block(label="caller", registry=graph)
+    ctx = PhaseCtx(graph=graph, cursor_id=caller.uid)
+    receipts = list(BehaviorRegistry.chain_execute_all(
+        ctx=ctx, task="domain_identity", call_kwargs={"caller": caller},
+    ))
+    assert len(receipts) == 3
+    assert events == ["shared", "shared", "last"]
 
 
 def test_loader_discovers_bundles(tmp_path: Path) -> None:

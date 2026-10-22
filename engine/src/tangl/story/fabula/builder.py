@@ -11,7 +11,7 @@ from .world import World, _coerce_template_registries
 def _dedupe(values: list[Any]) -> list[Any]:
     seen: list[Any] = []
     for value in values:
-        if value is None or value in seen:
+        if value is None or any(value is existing for existing in seen):
             continue
         seen.append(value)
     return seen

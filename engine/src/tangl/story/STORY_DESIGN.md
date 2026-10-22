@@ -1,6 +1,6 @@
 # tangl.story — Design Notes
 
-> Status: Current contract
+> Status: Current contract; #514 authority identity applies at construction and runtime.
 > Authority: Journal fragment types are defined in `tangl.journal.fragments`;
 > story owns the narrative vocabulary, compilation, and journal policy layered
 > over VM/core.
@@ -138,6 +138,16 @@ World/factory authority is the canonical story runtime model.
 
 The old provider-collection layer and domain-view compatibility wrappers are no
 longer part of the runtime design.
+
+Authority construction follows the same first-occurrence object-identity policy
+as runtime dispatch (#514). `WorldBuilder` explicit/domain authority assembly and
+`WorldCompiler` domain-module collection retain distinct equal or same-UID
+registries; only repeated references to the same object collapse. Neither step
+compares, hashes or unstructures authority values. Existing filtering is unchanged:
+the loader collection retains `None`, while the builder removes it before World
+construction. Non-registry contributions retain their order; runtime `PhaseCtx`
+still filters to BehaviorRegistry. Media-index handler deduplication is separate
+and unchanged. No authority cache or persistence state is added.
 
 ### Construction-ready domain work
 

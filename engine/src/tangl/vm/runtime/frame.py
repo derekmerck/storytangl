@@ -187,15 +187,19 @@ class PhaseCtx:
     # -- Dispatch protocol --------------------------------------------------
 
     def get_authorities(self) -> list[BehaviorRegistry]:
-        """Authority registries contributed by the graph/runtime environment."""
+        """Live graph/runtime authorities, distinct by object identity in source order."""
         registries: list[BehaviorRegistry] = []
         get_authorities = getattr(self.graph, "get_authorities", None)
         if callable(get_authorities):
             for registry in get_authorities() or ():
-                if isinstance(registry, BehaviorRegistry) and registry not in registries:
+                if isinstance(registry, BehaviorRegistry) and all(
+                    registry is not existing for existing in registries
+                ):
                     registries.append(registry)
         for registry in self.local_authorities:
-            if isinstance(registry, BehaviorRegistry) and registry not in registries:
+            if isinstance(registry, BehaviorRegistry) and all(
+                registry is not existing for existing in registries
+            ):
                 registries.append(registry)
         return registries
 
