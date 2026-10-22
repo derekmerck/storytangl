@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from tangl.core import BehaviorRegistry, EntityTemplate, TemplateRegistry
-from tangl.story import WorldBuilder
+from tangl.story import Block, StoryGraph, WorldBuilder
 from tangl.story.concepts import Actor
 from tangl.story.fabula import StoryCompiler
+from tangl.story.fabula import builder as builder_module
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _script() -> dict[str, object]:
@@ -85,3 +89,50 @@ def test_world_builder_coerces_legacy_domain_and_extra_template_registries() -> 
     assert world.dispatch.label == "legacy_domain_dispatch"
     assert registries[0] is bundle.template_registry
     assert extra_templates in registries
+
+
+@pytest.mark.parametrize("guard_assembly", [False, True])
+def test_world_builder_preserves_distinct_equal_authorities(
+    monkeypatch: pytest.MonkeyPatch, guard_assembly: bool,
+) -> None:
+    bundle = StoryCompiler().compile(_script())
+    events: list[str] = []
+    first = BehaviorRegistry(label="builder_identity")
+    first.register(task="builder_identity", func=lambda **_kw: events.append("shared"))
+    equal = first.model_copy()
+    last = BehaviorRegistry(label="builder_last")
+    last.register(task="builder_identity", func=lambda **_kw: events.append("last"))
+    marker = object()
+    assert first is not equal and first.uid == equal.uid and first == equal
+
+    if guard_assembly:
+        original = builder_module._dedupe
+
+        def forbidden(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("authority dedup must not compare or serialize values")
+
+        def guarded(values: list[object]) -> list[object]:
+            # Guard only dedup, not World construction or later dispatch.
+            with monkeypatch.context() as patch:
+                for name in ("__eq__", "eq_by_value", "value_hash", "unstructure"):
+                    patch.setattr(BehaviorRegistry, name, forbidden)
+                return original(values)
+
+        monkeypatch.setattr(builder_module, "_dedupe", guarded)
+
+    world = WorldBuilder().build(
+        label="builder_identity_world", bundle=bundle, dispatch=first,
+        extra_authorities=[None, equal, first, marker, last, equal, None],
+    )
+    assert [id(a) for a in world.extra_authorities] == [id(equal), id(marker), id(last)]
+    assert [id(a) for a in world.get_authorities()] == [
+        id(first), id(equal), id(marker), id(last),
+    ]
+    graph = StoryGraph(factory=world)
+    caller = Block(label="caller", registry=graph)
+    ctx = PhaseCtx(graph=graph, cursor_id=caller.uid)
+    receipts = list(BehaviorRegistry.chain_execute_all(
+        ctx=ctx, task="builder_identity", call_kwargs={"caller": caller},
+    ))
+    assert len(receipts) == 3
+    assert events == ["shared", "shared", "last"]

@@ -38,7 +38,7 @@ class _WorldDomainAdjuncts:
         get_authorities = getattr(module, "get_authorities", None)
         if callable(get_authorities):
             for authority in get_authorities() or ():
-                if authority not in self._authorities:
+                if all(authority is not existing for existing in self._authorities):
                     self._authorities.append(authority)
 
         get_story_codecs = getattr(module, "get_story_codecs", None)
