@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Optional, Generic, Iterable, TypeVar
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
 from ..ctx import VmPhaseCtx
@@ -210,6 +210,19 @@ class HasRequirement(RegistryAware, Generic[PT]):
     # a single requirement.
 
     requirement: Requirement[PT]
+
+    @field_validator("requirement", mode="before")
+    @classmethod
+    def _restore_requirement_kind(
+        cls, value: Requirement[PT] | dict[str, Any],
+    ) -> Requirement[PT] | dict[str, Any]:
+        """Restore the explicit Entity kind reference in constructor-form input."""
+        if isinstance(value, dict) and isinstance(value.get("has_kind"), str):
+            kind = Entity.dereference_cls_name(value["has_kind"])
+            if kind is None:
+                raise ValueError(f"Unknown requirement kind reference: {value['has_kind']!r}")
+            return {**value, "has_kind": kind}
+        return value
 
     # delegators
 
