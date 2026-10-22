@@ -550,6 +550,15 @@ the VM keeps this bus concrete rather than hiding it behind a generic phase-spec
 because redirect capture, tracing, and return-edge resumption are part of the runtime
 contract.
 
+**Payload guard precedes admission.** Frame merges authored/submitted payload once,
+then calls the edge's typed `validate_payload(payload)` hook when VALIDATE is enabled.
+VM edges default to accepting it; higher layers own their payload vocabulary.
+Only then may a selected persistent edge provision a missing destination, followed
+by the ordinary destination-dependent VALIDATE chain exactly once. Automatic edges
+retain their existing planning-time provisioning policy. The hop's before-snapshot
+precedes lazy admission so its delta includes newly admitted members and bindings.
+This is not a general rollback or failure-atomicity guarantee for later validation.
+
 **Selectability is factory policy.** `TraversableGraphFactory.is_selectable_edge()`
 defaults to `edge.available(ctx=ctx)`. A higher-layer factory may refine that decision
 without VM importing its vocabulary; `World` uses the same Story policy that publishes

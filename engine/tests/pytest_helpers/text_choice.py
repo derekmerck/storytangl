@@ -12,10 +12,10 @@ from tangl.story import World
 from tangl.vm.runtime.frame import PhaseCtx
 
 
-def text_choice_session(
+def text_choice_world(
     accepts: Accepts | None, *, payload: object = None, available: bool = True,
     activation: str | None = None,
-) -> tuple[World, ServiceManager, User, RuntimeEnvelope]:
+) -> World:
     world = World.from_script_data(script_data={
         "label": "text_submission",
         "metadata": {"start_at": "intro.start"},
@@ -45,6 +45,16 @@ def text_choice_session(
 
     authority.register(submitted_value, task="gather_ns")
     world.extra_authorities.append(authority)
+    return world
+
+
+def text_choice_session(
+    accepts: Accepts | None, *, payload: object = None, available: bool = True,
+    activation: str | None = None,
+) -> tuple[World, ServiceManager, User, RuntimeEnvelope]:
+    world = text_choice_world(
+        accepts, payload=payload, available=available, activation=activation,
+    )
     persistence = PersistenceManagerFactory.create_persistence_manager(
         manager_name="json_sqlite_in_mem",
     )

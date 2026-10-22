@@ -373,24 +373,6 @@ class Ledger(Entity):
             step=trace.step,
         )
 
-    def _provision_selected_destination(self, edge: TraversableEdge) -> None:
-        """Provision a selected edge's destination if planning never reached it.
-
-        The frame provisions the cursor's destinations when it enters the
-        cursor. This covers a ledger that is choosing before its cursor was
-        ever entered.
-        """
-        if edge.successor is not None:
-            return
-        from tangl.vm import Resolver
-
-        ctx = self._make_phase_ctx()
-        Resolver.from_ctx(ctx).provision_destination(
-            edge,
-            allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
-            _ctx=ctx,
-        )
-
     def _make_phase_ctx(self) -> PhaseCtx:
         return PhaseCtx(
             graph=self.graph,
@@ -452,7 +434,6 @@ class Ledger(Entity):
         """Resolve a player choice and sync frame results into ledger state."""
         update_start_step = max(self.cursor_steps + 1, 0)
         edge = self._require_choice_edge(edge_id)
-        self._provision_selected_destination(edge)
 
         frame = self.get_frame()
         self._run_frame_choice(frame=frame, edge=edge, choice_payload=choice_payload)

@@ -751,6 +751,7 @@ class Frame:
         self,
         *,
         edge: AnyTraversableEdge,
+        was_choice: bool,
         selected_payload_override: Any = None,
     ) -> tuple[ResolutionPhase, Graph | None, VmPhaseCtx]:
         entry_phase = self._entry_phase(edge)
@@ -759,6 +760,21 @@ class Frame:
         self.selected_payload = incoming_payload
 
         before_graph = self._snapshot_before_hop()
+        if entry_phase <= ResolutionPhase.VALIDATE:
+            if not edge.validate_payload(incoming_payload):
+                raise ValueError(f"Edge payload validation failed: {edge!r}")
+        self._push_call_edge_if_needed(edge)
+        if was_choice and isinstance(edge, TraversableEdge) and edge.successor is None:
+            from ..provision import Resolver  # provisioning imports the runtime
+
+            provision_ctx = self._make_ctx(
+                incoming_edge=edge, incoming_payload=incoming_payload,
+            )
+            Resolver.from_ctx(provision_ctx).provision_destination(
+                edge,
+                allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
+                _ctx=provision_ctx,
+            )
         self._validate_before_move(
             edge=edge,
             entry_phase=entry_phase,
@@ -1015,10 +1031,6 @@ class Frame:
         is_choice_edge: bool,
         choice_payload: Any = None,
     ) -> AnyTraversableEdge | None:
-        # Push a call before following it, so the call is on the stack for its
-        # whole traversal - the callee and anywhere it redirects - and every
-        # handler along the way can see it is inside one.
-        self._push_call_edge_if_needed(edge)
         redirect = self.follow_edge(
             edge,
             was_choice=is_choice_edge,
@@ -1053,6 +1065,7 @@ class Frame:
         """
         entry_phase, before_graph, ctx = self._prepare_follow_edge(
             edge=edge,
+            was_choice=was_choice,
             selected_payload_override=selected_payload_override,
         )
         self._run_planning_phase(ctx=ctx, entry_phase=entry_phase)

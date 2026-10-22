@@ -46,11 +46,12 @@ preview/prelink policy.
 ### Explicit text submission (#592 slice 1)
 
 The TextAccepts/validator models predate authoritative Action submission enforcement.
-Story's `validate_text_submission` now enforces explicit `TextAccepts` Actions at
-ordinary pre-move VALIDATE, using `PhaseCtx.selected_payload` after Frame's existing
-authored-activation/submitted-override merge. No adapter duplicates that merge.
+Story's `Action.validate_payload` enforces explicit `TextAccepts` Actions after
+Frame's authored-activation/submitted-override merge, before selected lazy-destination
+admission. Ordinary destination-dependent VALIDATE dispatch runs once afterward.
+No adapter duplicates that merge.
 Non-text accepts, ordinary picks and game moves retain their existing policy.
-There is no VM import, new endpoint or phase-order change.
+There is no upward VM import, new endpoint or new phase.
 
 The effective payload must contain string `text`, even when optional. Missing/null
 is not optional empty. Required blank uses Python `str.strip()` only as a predicate;

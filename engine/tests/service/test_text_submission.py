@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.journal.fragments import ChoiceFragment
+from tangl.core import BehaviorRegistry, Selector
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.presentation.intent import (
     Accepts, BackendValidator, ComposeAccepts, EnumValidator, LengthValidator, PickAccepts,
     PiecesAccepts, PlaceAccepts, QuantityAccepts, RegexValidator, TextAccepts,
 )
 from tangl.service.response import DirectEdgeRequest
-from tangl.story import Action, World
+from tangl.story import Action, InitMode, World
 from tangl.vm import Ledger
+from tangl.vm.replay import CheckpointRecord, StepRecord, get_replay_engine
 from tangl.vm.runtime.frame import PhaseCtx
 
-from pytest_helpers.text_choice import text_choice_session
+from pytest_helpers.text_choice import text_choice_session, text_choice_world
 
 
 @pytest.mark.parametrize("payload", [None, {}, {"text": None}, {"text": 123},
@@ -242,3 +244,87 @@ def test_automatic_explicit_text_declaration_rejects_bad_authored_text_before_it
         frame.goto_node(ledger.cursor)
     assert frame.cursor.label == "start"
     assert graph.locals["effect_ran"] is False
+
+
+@pytest.mark.parametrize(("payload", "restore"), [
+    ({"text": ""}, False),
+    ({"text": 123}, False),
+    ({"text": "too long to be accepted"}, False),
+    ({"text": ""}, True),
+])
+def test_lazy_text_rejection_precedes_destination_admission_and_valid_retry(
+    payload: dict[str, object], restore: bool,
+) -> None:
+    base = {"text": "base", "operation": "rename", "kept": 3}
+    world = text_choice_world(
+        TextAccepts(validators=[LengthValidator(min=2, max=8)]), payload=base,
+    )
+    validated: list[object] = []
+    authority = BehaviorRegistry(label="lazy_text_validation")
+
+    def validate_destination(*, caller: Action, ctx: PhaseCtx, **_kw: object) -> bool:
+        assert caller.successor is not None
+        validated.append(ctx.selected_payload)
+        return True
+
+    authority.register(validate_destination, task="validate_edge", wants_caller_kind=Action)
+    world.extra_authorities.append(authority)
+    graph = world.create_story("lazy_text", init_mode=InitMode.LAZY).graph
+    ledger = Ledger.from_graph(graph=graph, entry_id=graph.initial_cursor_id)
+    if restore:
+        ledger = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+        graph = ledger.graph
+    edge = graph.find_one(Selector(has_kind=Action))
+    assert edge.successor_id is None
+    members = set(graph.members)
+    history = list(ledger.cursor_history)
+    before = Json.serialize(ledger.unstructure())
+
+    with pytest.raises(ValueError):
+        ledger.resolve_choice(edge.uid, choice_payload=payload)
+
+    assert set(graph.members) == members
+    assert edge.successor_id is None
+    assert ledger.cursor.label == "start"
+    assert ledger.cursor_history == history
+    assert graph.locals["answer"] == "untouched"
+    assert graph.locals["effect_count"] == 0
+    assert Json.serialize(ledger.unstructure()) == before
+    assert validated == []
+
+    # Retry on this very ledger, not a fresh/eager graph or discarded Service load.
+    override = {"text": "  Dana ", "kept": 4}
+    ledger.resolve_choice(edge.uid, choice_payload=override)
+    assert len(graph) == len(members) + 1
+    assert edge.successor is ledger.cursor and ledger.cursor.label == "end"
+    assert ledger.cursor_history == [*history, ledger.cursor.uid]
+    assert ledger.choice_steps == 1
+    assert graph.locals["effect_count"] == 1
+    assert graph.locals["answer"] == override["text"]
+    assert graph.locals["activation"] == {**base, **override}
+    assert edge.payload == base
+    assert validated == [{**base, **override}]
+    assert len([
+        f for f in ledger.output_stream.values()
+        if isinstance(f, ContentFragment) and f.content == "Answer saved."
+    ]) == 1
+
+    # Replay the admitted destination/binding from the pre-hop checkpoint;
+    # replay must not run validation or effects or append journal output again.
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    checkpoint = restored.output_stream.find_one(Selector(has_kind=CheckpointRecord))
+    step = restored.output_stream.find_one(Selector(has_kind=StepRecord))
+    engine = get_replay_engine(restored.replay_algorithm_id)
+    replay_graph = engine.restore_checkpoint(checkpoint)
+    assert replay_graph.get(edge.uid).successor is None
+    replay_graph = engine.apply_delta(
+        graph=replay_graph, delta=restored.output_stream.get(step.delta_id),
+    )
+    replay_edge = replay_graph.get(edge.uid)
+    assert replay_edge.successor.uid == ledger.cursor.uid
+    assert replay_graph.locals["effect_count"] == 1
+    assert validated == [{**base, **override}]
+    assert len([
+        f for f in restored.output_stream.values()
+        if isinstance(f, ContentFragment) and f.content == "Answer saved."
+    ]) == 1

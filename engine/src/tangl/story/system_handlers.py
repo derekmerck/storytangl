@@ -14,8 +14,6 @@ resolver mechanisms in :mod:`tangl.vm`.
 from __future__ import annotations
 
 import logging
-import re
-from collections.abc import Mapping
 from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector
@@ -25,9 +23,7 @@ from tangl.prose import DialogHandler, TextRenderSession
 from tangl.prose.mu_block import RealizationValue
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
-from tangl.presentation.intent import (
-    Blocker, EnumValidator, LengthValidator, RegexValidator, TextAccepts,
-)
+from tangl.presentation.intent import Blocker
 from tangl.vm import (
     Affordance,
     Dependency,
@@ -49,59 +45,13 @@ from tangl.journal.fragments import (
 from tangl.vm.runtime.frame import PhaseCtx
 
 from .dispatch import (
-    do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal, story_dispatch,
+    do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal,
 )
 from .episode import Action, Block, MenuBlock
 from .presentation import choice_text_source, render_text_as
 
 logger = logging.getLogger(__name__)
 
-
-@story_dispatch.register(
-    task="validate_edge", wants_caller_kind=Action, wants_exact_kind=False, priority=Priority.EARLY,
-)
-def validate_text_submission(*, caller: Action, ctx: PhaseCtx, **_kw: object) -> bool:
-    """Enforce explicit text declarations on the effective payload before movement.
-
-    BackendValidator is only a marker; domain restrictions still use ordinary
-    Action/world validation handlers. No input is normalized or coerced here.
-    """
-    accepts = caller.accepts
-    if not isinstance(accepts, TextAccepts):
-        return True
-    payload = ctx.selected_payload
-    if not isinstance(payload, Mapping) or not isinstance(payload.get("text"), str):
-        raise ValueError("Text input must be a string in payload['text'].")
-    text = payload["text"]
-    if accepts.required and not text.strip():
-        raise ValueError("Text input is required.")
-    for validator in accepts.validators:
-        if isinstance(validator, LengthValidator):
-            if validator.min is not None and len(text) < validator.min:
-                raise ValueError(f"Use at least {validator.min} characters.")
-            if validator.max is not None and len(text) > validator.max:
-                raise ValueError(f"Use at most {validator.max} characters.")
-        elif isinstance(validator, RegexValidator):
-            flags = re.NOFLAG
-            supported = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL}
-            for flag in validator.flags or "":
-                if flag not in supported:
-                    raise ValueError(f"Unsupported text regex flags: {validator.flags!r}")
-                flags |= supported[flag]
-            try:
-                pattern = re.compile(validator.pattern, flags)
-            except re.error as exc:
-                raise ValueError(f"Invalid text regex: {exc}") from exc
-            if pattern.search(text) is None:
-                raise ValueError(validator.message or "Does not match the expected pattern.")
-        elif isinstance(validator, EnumValidator):
-            value = text if validator.case_sensitive else text.lower()
-            values = validator.values if validator.case_sensitive else [
-                item.lower() for item in validator.values
-            ]
-            if value not in values:
-                raise ValueError(f"Use one of: {', '.join(validator.values)}")
-    return True
 
 
 def _unavailable_choice_disclosure(
