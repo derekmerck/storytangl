@@ -309,8 +309,28 @@ def test_lazy_text_rejection_precedes_destination_admission_and_valid_retry(
         if isinstance(f, ContentFragment) and f.content == "Answer saved."
     ]) == 1
 
-    # Replay the admitted destination/binding from the pre-hop checkpoint;
-    # replay must not run validation or effects or append journal output again.
+
+def test_lazy_admission_and_member_effect_survive_json_and_delta_replay() -> None:
+    # Diff replay covers graph members, not graph-level locals. Keep this
+    # witness within that existing contract; global-effect retry is above.
+    world = World.from_script_data(script_data={
+        "label": "text_lazy_replay", "metadata": {"start_at": "intro.start"},
+        "scenes": {"intro": {"blocks": {
+            "start": {"actions": [{
+                "text": "Answer", "successor": "end", "accepts": {"kind": "text"},
+                "effects": ["cursor.locals['effect_count'] += 1"],
+            }]},
+            "end": {"content": "Answer saved.", "locals": {"effect_count": 0}},
+        }}},
+    })
+    graph = world.create_story("text_lazy_replay", init_mode=InitMode.LAZY).graph
+    ledger = Ledger.from_graph(graph=graph)
+    edge = graph.find_one(Selector(has_kind=Action))
+    assert edge.successor is None
+    ledger.resolve_choice(edge.uid, choice_payload={"text": "Dana"})
+    assert ledger.cursor.locals["effect_count"] == 1
+
+    # Restore/replay must not rerun effects or append journal output again.
     restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
     checkpoint = restored.output_stream.find_one(Selector(has_kind=CheckpointRecord))
     step = restored.output_stream.find_one(Selector(has_kind=StepRecord))
@@ -322,8 +342,7 @@ def test_lazy_text_rejection_precedes_destination_admission_and_valid_retry(
     )
     replay_edge = replay_graph.get(edge.uid)
     assert replay_edge.successor.uid == ledger.cursor.uid
-    assert replay_graph.locals["effect_count"] == 1
-    assert validated == [{**base, **override}]
+    assert replay_edge.successor.locals["effect_count"] == 1
     assert len([
         f for f in restored.output_stream.values()
         if isinstance(f, ContentFragment) and f.content == "Answer saved."

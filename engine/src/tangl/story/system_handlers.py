@@ -53,7 +53,6 @@ from .presentation import choice_text_source, render_text_as
 logger = logging.getLogger(__name__)
 
 
-
 def _unavailable_choice_disclosure(
     *, edge: Action, caller: Block, ctx
 ) -> UnavailableChoiceDisclosure:

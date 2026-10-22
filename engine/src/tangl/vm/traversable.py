@@ -803,7 +803,6 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
     """
 
     trigger_phase: Optional[ResolutionPhase] = None
-
     """If set, this edge is an auto-follow redirect during the named phase.
 
     When the cursor arrives at this edge's predecessor and the pipeline
@@ -819,10 +818,6 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
     - ``ResolutionPhase.PREREQS`` — auto-redirect before the player sees content.
     - ``ResolutionPhase.POSTREQS`` — continuation after content, before choices.
     """
-
-    def validate_payload(self, payload: Any) -> bool:
-        """Check payload-only constraints before destination admission."""
-        return True
 
     entry_phase: Optional[ResolutionPhase] = None
     """Pipeline phase to start at when the cursor arrives via this edge.
@@ -858,6 +853,10 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
     When present, ``available()`` requires ``ns[predicate]`` to be truthy
     before successor availability is considered.
     """
+
+    def validate_payload(self, payload: Any) -> bool:
+        """Check payload-only constraints before destination admission."""
+        return True
 
     @property
     def predecessor(self) -> Optional[TraversableNode]:
@@ -1005,15 +1004,15 @@ class AnonymousEdge:
     successor: TraversableNode
     """Destination node (required)."""
 
-    def validate_payload(self, payload: Any) -> bool:
-        """Transient edges impose no payload-only constraints."""
-        return True
-
     predecessor: Optional[TraversableNode] = None
     """Origin node (optional, for context)."""
 
     entry_phase: Optional[ResolutionPhase] = None
     """Pipeline phase to start at when following this edge."""
+
+    def validate_payload(self, payload: Any) -> bool:
+        """Transient edges impose no payload-only constraints."""
+        return True
 
     def __repr__(self) -> str:
         src = self.predecessor.get_label() if self.predecessor is not None else "anon"

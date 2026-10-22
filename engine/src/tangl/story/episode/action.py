@@ -9,11 +9,11 @@ from pydantic import field_serializer
 from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
 from tangl.presentation.intent import (
     Accepts,
+    Blocker,
     EnumValidator,
     LengthValidator,
     RegexValidator,
     TextAccepts,
-    Blocker,
     UIHints,
 )
 from tangl.vm import ResolutionPhase, TraversableEdge

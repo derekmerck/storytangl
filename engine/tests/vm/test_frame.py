@@ -446,7 +446,7 @@ class TestFollowEdgeEntryPhase:
 
         g, [a, b] = _simple_graph("a", "b")
         edge = RejectPayload(
-            registry=g, predecessor=a, successor=b,
+            registry=g, predecessor_id=a.uid, successor_id=b.uid,
             entry_phase=ResolutionPhase.UPDATE if skip_validate else None,
             return_phase=ResolutionPhase.UPDATE,
         )
