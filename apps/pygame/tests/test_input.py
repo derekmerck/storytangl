@@ -18,6 +18,7 @@ pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client r
 
 from tangl.pygame_client import __main__ as client  # noqa: E402
 from tangl.pygame_client.bridge import PygameSessionBridge  # noqa: E402
+from tangl.presentation.projection import BrandingValue  # noqa: E402
 from tangl.presentation.intent import (  # noqa: E402
     PieceConstraints,
     PiecesAccepts,
@@ -164,6 +165,39 @@ def test_initial_icon_is_installed_before_the_window_opens(
     assert events[0] == ("icon", expected_size)
     assert events[1][0] == "window"
     assert [event for event in events if event[0] == "icon"] == [("icon", expected_size)]
+
+
+@pytest.mark.parametrize("name", ["An Authored Title", "", None])
+def test_window_title_uses_branding_and_stays_clear_of_audio_controls(
+    monkeypatch: pytest.MonkeyPatch, name: str | None,
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]],
+) -> None:
+    start = PygameSessionBridge.start
+
+    def start_with_branding(self: PygameSessionBridge, world_id: str) -> RuntimeEnvelope:
+        envelope = start(self, world_id)
+        self.branding = BrandingValue(name=name) if name is not None else None
+        return envelope
+
+    captions: list[str] = []
+    monkeypatch.setattr(PygameSessionBridge, "start", start_with_branding)
+    monkeypatch.setattr(pygame.display, "set_caption", captions.append)
+    _run([
+        pygame.event.Event(pygame.KEYDOWN, key=key, mod=pygame.KMOD_CTRL, unicode="")
+        for key in (pygame.K_m, pygame.K_RIGHTBRACKET, pygame.K_LEFTBRACKET)
+    ] + [_key(pygame.K_2)])
+
+    assert captions == [name or WORLD, name or WORLD]
+    assert [edge for edge, _payload in committed] == [gated[1].edge_id]
+
+
+def test_window_title_uses_the_real_world_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    captions: list[str] = []
+    monkeypatch.setattr(pygame.display, "set_caption", captions.append)
+
+    _run([])
+
+    assert captions == ["Marmoset Island"]
 
 
 def test_mouse_click_commits_the_choice_under_the_cursor(

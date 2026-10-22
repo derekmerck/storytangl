@@ -123,6 +123,8 @@ name in local details. There is no alternate filename loader or media downloader
 The initial logo also becomes the window icon before the window opens; without a
 readable logo, the client uses StoryTangl's glyph. Later icon changes are
 best-effort because some platforms only accept an icon at window creation.
+The window caption is just the public world title (`ui-branding.name`), falling
+back to its technical world label. It does not display audio state or shortcuts.
 
 The optional exact story channel `ui-status` supplies ordered `ProjectedSection`
 values. The backend chooses entries, identities, wording, disclosure and icon
@@ -230,7 +232,7 @@ targets. Final snapshots win over stale controls. Story/world switches and
 teardown stop old playback; changing scenes does not. No playback state is sent
 to Service or stored in the journal.
 
-Local controls, also shown in the window title:
+Local keyboard controls:
 
 - `Ctrl+M`: mute/unmute.
 - `Ctrl+[` / `Ctrl+]`: volume down/up in 10% steps.
@@ -239,7 +241,7 @@ Local controls, also shown in the window title:
 They do not collide with choice letters, numeric selection, or world preference
 F-keys, and persist through redraws and track changes. Missing optional files,
 unsupported delivery, unavailable devices and decoder failures are logged;
-device/decode failures show music as unavailable in the title. Prose and choices
+device/decode failures remain available through local diagnostics. Prose and choices
 remain usable. There is no completion-dependent progression, generic SFX, remote
 pygame audio, crossfade, playlist, or playback-position restoration.
 
