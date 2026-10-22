@@ -1519,11 +1519,26 @@ class Stage:
         top: int,
         width: int,
     ) -> None:
-        """Only overflow gets controls; all actions stay local to the client."""
+        """Only overflow gets controls; all actions stay local to the client.
+
+        The header is washed as the map legend washes a line, inside the
+        frame's margins on both sides. Edge to edge, it was the one slab left
+        across the scene above a menu whose rows each hug their text.
+        """
         total = maximum + capacity
         label = f"{region} {offset + 1}-{min(offset + capacity, total)}/{total}"
         surface = self.font.render(label, False, CREAM)
-        self._wash(pygame.Rect(0, top, width, self.row_height), INK)
+        self._wash(
+            self._backing(
+                surface,
+                left=self.row_text_left,
+                y=top,
+                kind="prose",
+                width=width - 2 * (self.row_text_left - 3 * self.density),
+                pitch=self.row_height,
+            ),
+            INK,
+        )
         self.surface.blit(surface, (self.row_text_left, top))
         right = width - self.row_text_left
         for text, delta, enabled in [
@@ -1586,7 +1601,9 @@ class Stage:
     def _draw_choices(self, rows: list[_ChoiceRow], *, top: int, bottom: int) -> None:
         capacity = max(1, (bottom - top) // self.choice_pitch)
         overflow = len(rows) > capacity
-        body_top = top + (self.row_height if overflow else 0)
+        # The header takes a choice's pitch, not a prose row's, so the scene
+        # shows beneath it as it does between choices.
+        body_top = top + (self.choice_pitch if overflow else 0)
         if overflow:
             capacity = max(1, (bottom - body_top) // self.choice_pitch)
         self.choice_capacity = capacity

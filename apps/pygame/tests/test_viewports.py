@@ -157,6 +157,28 @@ def test_configured_allocations_leave_both_views_usable(stage: Stage, fraction: 
     assert stage.surface.get_rect().contains(stage.choice_rect)
 
 
+def test_overflow_headers_keep_the_rows_margins_and_the_scene_beneath(
+    stage: Stage, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A header is washed like the rows it pages, inside the frame's margins
+    # rather than edge to edge. Over choices it leaves the scene showing
+    # beneath it, as the choices do between themselves.
+    washed: list[pygame.Rect] = []
+    wash = stage._wash
+
+    def record(rect: pygame.Rect, colour: tuple[int, int, int]) -> None:
+        washed.append(rect)
+        wash(rect, colour)
+
+    monkeypatch.setattr(stage, "_wash", record)
+    stage.draw(crowded())
+    above_choices = stage.choice_rect.top - stage.choice_pitch
+    headers = [rect for rect in washed if rect.top in (stage.prose_top, above_choices)]
+    assert len(headers) == 2
+    assert all(0 < rect.left and rect.right < stage.logical_size[0] for rect in headers)
+    assert max(rect.bottom for rect in headers if rect.top == above_choices) < stage.choice_rect.top
+
+
 def test_short_turn_has_no_overflow_controls(stage: Stage) -> None:
     stage.draw(Turn(step=1, lines=[Line(text="A short turn.")],
                     choices=[Choice(edge_id=uuid4(), text="Continue")]))
