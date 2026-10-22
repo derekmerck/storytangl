@@ -297,9 +297,12 @@ def _music_key(event: pygame.event.Event, music: MusicPlayer) -> bool:
     return True
 
 
-def _music_caption(world: str, music: MusicPlayer) -> None:
-    pygame.display.set_caption(
-        f"StoryTangl — {world} | Music: {music.status} | Ctrl+M mute, Ctrl+[/] volume",
+def _world_title(bridge: PygameSessionBridge) -> str:
+    """Use public world branding, never client audio state, as the caption."""
+    return (
+        (bridge.branding.name if bridge.branding is not None else None)
+        or bridge.world_id
+        or "StoryTangl"
     )
 
 
@@ -353,14 +356,15 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         and preference.shortcut.casefold() in supported_preference_shortcuts
         and (key := getattr(pygame, f"K_{preference.shortcut.upper()}", None)) is not None
     }
+    envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
         logical_size=logical_size,
         display_scale=args.scale,
-        title=f"StoryTangl — {args.world}",
+        title=_world_title(bridge),
         animate=not args.reduced_motion,
+        logo_source=bridge.logo_source,
     )
-    envelope = bridge.start(args.world)
     stage.preference_controls = _preference_controls(bridge, preferences)
     frame = _frame(bridge, envelope)
 
@@ -392,11 +396,11 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
             break
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         frame = _frame(bridge, envelope, frame)
+        pygame.display.set_caption(_world_title(bridge))
 
     stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
                    status_available=bridge.status_available, session_id=bridge.ledger_id)
     stage.draw(frame, media_visibility=bridge.media_visibility())
-    _music_caption(args.world, music)
 
     if args.screenshot is not None:
         pygame.image.save(stage.window, str(args.screenshot))
@@ -411,7 +415,6 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
             if bridge.voice_player is not None and bridge.voice_player.handle_event(event):
                 continue
             if event.type == pygame.KEYDOWN and _music_key(event, music):
-                _music_caption(args.world, music)
                 continue
             if stage.chrome is not None and stage.chrome.handle_event(event, stage.display_scale):
                 stage.draw(frame, pending, media_visibility=bridge.media_visibility())
@@ -470,7 +473,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 frame = _frame(bridge, envelope, frame)
                 stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
                                status_available=bridge.status_available, session_id=bridge.ledger_id)
-                _music_caption(args.world, music)
+                pygame.display.set_caption(_world_title(bridge))
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze

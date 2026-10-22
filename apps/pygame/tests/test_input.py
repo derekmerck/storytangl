@@ -7,6 +7,7 @@ These drive the loop rather than probing the renderer. Events are queued before
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -17,6 +18,7 @@ pygame = pytest.importorskip("pygame", reason="pygame-ce is an optional client r
 
 from tangl.pygame_client import __main__ as client  # noqa: E402
 from tangl.pygame_client.bridge import PygameSessionBridge  # noqa: E402
+from tangl.presentation.projection import BrandingValue  # noqa: E402
 from tangl.presentation.intent import (  # noqa: E402
     PieceConstraints,
     PiecesAccepts,
@@ -117,6 +119,85 @@ def test_quit_event_ends_the_loop(
     _run([])
 
     assert committed == []
+
+
+@pytest.mark.parametrize("logo_kind", ["valid", "absent", "missing", "unreadable"])
+def test_initial_icon_is_installed_before_the_window_opens(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, logo_kind: str,
+) -> None:
+    """Exercise normal startup without a display to hide load-order errors."""
+
+    pygame.quit()
+    logo = tmp_path / "logo.png"
+    if logo_kind == "valid":
+        image = pygame.Surface((40, 20), pygame.SRCALPHA)
+        image.fill((200, 30, 60, 255))
+        pygame.image.save(image, str(logo))
+    elif logo_kind == "unreadable":
+        logo.write_text("not image bytes", encoding="utf-8")
+    source = None if logo_kind == "absent" else str(logo)
+    start = PygameSessionBridge.start
+
+    def start_with_logo(self: PygameSessionBridge, world_id: str) -> RuntimeEnvelope:
+        envelope = start(self, world_id)
+        self.logo_source = source
+        return envelope
+
+    events: list[tuple[str, tuple[int, int]]] = []
+    set_icon = pygame.display.set_icon
+    set_mode = pygame.display.set_mode
+
+    def record_icon(surface: pygame.Surface) -> None:
+        events.append(("icon", surface.get_size()))
+        set_icon(surface)
+
+    def record_window(size: tuple[int, int]) -> pygame.Surface:
+        events.append(("window", size))
+        return set_mode(size)
+
+    monkeypatch.setattr(PygameSessionBridge, "start", start_with_logo)
+    monkeypatch.setattr(pygame.display, "set_icon", record_icon)
+    monkeypatch.setattr(pygame.display, "set_mode", record_window)
+
+    assert client.main(["--world", WORLD, "--screenshot", str(tmp_path / "frame.png")]) == 0
+
+    expected_size = (40, 20) if logo_kind == "valid" else (64, 64)
+    assert events[0] == ("icon", expected_size)
+    assert events[1][0] == "window"
+    assert [event for event in events if event[0] == "icon"] == [("icon", expected_size)]
+
+
+@pytest.mark.parametrize("name", ["An Authored Title", "", None])
+def test_window_title_uses_branding_and_stays_clear_of_audio_controls(
+    monkeypatch: pytest.MonkeyPatch, name: str | None,
+    gated: list[Choice], committed: list[tuple[UUID, JsonValue | None]],
+) -> None:
+    start = PygameSessionBridge.start
+
+    def start_with_branding(self: PygameSessionBridge, world_id: str) -> RuntimeEnvelope:
+        envelope = start(self, world_id)
+        self.branding = BrandingValue(name=name) if name is not None else None
+        return envelope
+
+    captions: list[str] = []
+    monkeypatch.setattr(PygameSessionBridge, "start", start_with_branding)
+    monkeypatch.setattr(pygame.display, "set_caption", captions.append)
+    _run([
+        pygame.event.Event(pygame.KEYDOWN, key=key, mod=pygame.KMOD_CTRL, unicode="")
+        for key in (pygame.K_m, pygame.K_RIGHTBRACKET, pygame.K_LEFTBRACKET)
+    ] + [_key(pygame.K_2)])
+
+    assert captions == [name or WORLD, name or WORLD]
+    assert [edge for edge, _payload in committed] == [gated[1].edge_id]
+
+
+def test_window_title_uses_the_real_world_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    captions: list[str] = []
+    monkeypatch.setattr(pygame.display, "set_caption", captions.append)
+
+    _run([])
+
+    assert captions == ["Marmoset Island"]
 
 
 def test_mouse_click_commits_the_choice_under_the_cursor(
