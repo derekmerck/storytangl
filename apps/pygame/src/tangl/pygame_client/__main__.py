@@ -353,14 +353,15 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         and preference.shortcut.casefold() in supported_preference_shortcuts
         and (key := getattr(pygame, f"K_{preference.shortcut.upper()}", None)) is not None
     }
+    envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
         logical_size=logical_size,
         display_scale=args.scale,
         title=f"StoryTangl — {args.world}",
         animate=not args.reduced_motion,
+        logo_source=bridge.logo_source,
     )
-    envelope = bridge.start(args.world)
     stage.preference_controls = _preference_controls(bridge, preferences)
     frame = _frame(bridge, envelope)
 

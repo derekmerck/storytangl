@@ -120,6 +120,9 @@ logo is resolved by `ServiceManager.get_world_media` through normal inventory an
 media-profile delivery; pygame consumes only supported co-located image/vector
 paths. Missing, unfetched LFS, unsupported or undecodable logos retain the world
 name in local details. There is no alternate filename loader or media downloader.
+The initial logo also becomes the window icon before the window opens; without a
+readable logo, the client uses StoryTangl's glyph. Later icon changes are
+best-effort because some platforms only accept an icon at window creation.
 
 The optional exact story channel `ui-status` supplies ordered `ProjectedSection`
 values. The backend chooses entries, identities, wording, disclosure and icon

@@ -7,6 +7,7 @@ These drive the loop rather than probing the renderer. Events are queued before
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -117,6 +118,52 @@ def test_quit_event_ends_the_loop(
     _run([])
 
     assert committed == []
+
+
+@pytest.mark.parametrize("logo_kind", ["valid", "absent", "missing", "unreadable"])
+def test_initial_icon_is_installed_before_the_window_opens(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, logo_kind: str,
+) -> None:
+    """Exercise normal startup without a display to hide load-order errors."""
+
+    pygame.quit()
+    logo = tmp_path / "logo.png"
+    if logo_kind == "valid":
+        image = pygame.Surface((40, 20), pygame.SRCALPHA)
+        image.fill((200, 30, 60, 255))
+        pygame.image.save(image, str(logo))
+    elif logo_kind == "unreadable":
+        logo.write_text("not image bytes", encoding="utf-8")
+    source = None if logo_kind == "absent" else str(logo)
+    start = PygameSessionBridge.start
+
+    def start_with_logo(self: PygameSessionBridge, world_id: str) -> RuntimeEnvelope:
+        envelope = start(self, world_id)
+        self.logo_source = source
+        return envelope
+
+    events: list[tuple[str, tuple[int, int]]] = []
+    set_icon = pygame.display.set_icon
+    set_mode = pygame.display.set_mode
+
+    def record_icon(surface: pygame.Surface) -> None:
+        events.append(("icon", surface.get_size()))
+        set_icon(surface)
+
+    def record_window(size: tuple[int, int]) -> pygame.Surface:
+        events.append(("window", size))
+        return set_mode(size)
+
+    monkeypatch.setattr(PygameSessionBridge, "start", start_with_logo)
+    monkeypatch.setattr(pygame.display, "set_icon", record_icon)
+    monkeypatch.setattr(pygame.display, "set_mode", record_window)
+
+    assert client.main(["--world", WORLD, "--screenshot", str(tmp_path / "frame.png")]) == 0
+
+    expected_size = (40, 20) if logo_kind == "valid" else (64, 64)
+    assert events[0] == ("icon", expected_size)
+    assert events[1][0] == "window"
+    assert [event for event in events if event[0] == "icon"] == [("icon", expected_size)]
 
 
 def test_mouse_click_commits_the_choice_under_the_cursor(

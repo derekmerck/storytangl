@@ -309,6 +309,7 @@ class Stage:
         keep_on_screen: bool = True,
         choice_fraction: float = 0.4,
         chrome: bool = False,
+        logo_source: str | None = None,
     ) -> None:
         try:
             self.density = _SUPPORTED_DENSITIES[logical_size]
@@ -338,8 +339,12 @@ class Stage:
         pygame.init()
         self.chrome = Chrome(logical_size[0], self.density) if chrome else None
         self._info_session: UUID | None = None
-        self._icon_source: str | None = None
-        pygame.display.set_icon(storytangl_glyph())
+        self.asset_dir = asset_dir
+        self._cache: dict[str, pygame.Surface | None] = {}
+        self._icon_source: str | None = logo_source
+        logo = self._load(logo_source) if logo_source else None
+        # Some platforms accept an icon only before the first window is shown.
+        pygame.display.set_icon(logo or storytangl_glyph())
         self.chrome_height = self.chrome.height if self.chrome is not None else 0
         self.window = pygame.display.set_mode(
             (
@@ -350,14 +355,12 @@ class Stage:
         pygame.display.set_caption(title)
         self.surface = pygame.Surface(self.logical_size)
         self.shell = pygame.Surface((logical_size[0], logical_size[1] + self.chrome_height))
-        self.asset_dir = asset_dir
         self.keep_on_screen = keep_on_screen
         """Hold a *named* position inside the frame when the image is too wide
         to sit there whole. Client policy, not world data: an explicit fraction
         is never adjusted, so an image meant to leave the frame still can."""
 
         self.font = pygame.font.Font(None, 11 * self.density)
-        self._cache: dict[str, pygame.Surface | None] = {}
         self.hitboxes: list[tuple[pygame.Rect, Action]] = []
         self.slot_boxes: list[tuple[SurfaceSlot, Piece, pygame.Rect]] = []
         """Where each placed piece was drawn this frame.
@@ -412,7 +415,10 @@ class Stage:
             candidate = self.asset_dir / source
         if candidate.is_file():
             try:
-                surface = pygame.image.load(str(candidate)).convert_alpha()
+                surface = pygame.image.load(str(candidate))
+                # Initial window branding is loaded before a display exists.
+                if pygame.display.get_surface() is not None:
+                    surface = surface.convert_alpha()
             except (pygame.error, OSError):
                 surface = None
         self._cache[source] = surface
@@ -600,6 +606,11 @@ class Stage:
         logo_source: str | None, *, status_available: bool, session_id: UUID | None = None,
     ) -> None:
         """Allocate shell space only for an advertised status channel, even if empty."""
+        if logo_source != self._icon_source:
+            # Runtime icon changes are best-effort on platforms that support them.
+            self._icon_source = logo_source
+            logo = self._load(logo_source) if logo_source else None
+            pygame.display.set_icon(logo or storytangl_glyph())
         if status_available != (self.chrome is not None) or session_id != self._info_session:
             self.chrome = Chrome(self.logical_size[0], self.density) if status_available else None
             self.chrome_height = self.chrome.height if self.chrome is not None else 0
@@ -612,11 +623,6 @@ class Stage:
             self._info_session = session_id
         if self.chrome is not None:
             self.chrome.set_content(branding, sections, self._load(logo_source) if logo_source else None)
-        if logo_source != self._icon_source:
-            # A world's own logo is its window's icon; one without keeps StoryTangl's.
-            self._icon_source = logo_source
-            logo = self._load(logo_source) if logo_source else None
-            pygame.display.set_icon(logo or storytangl_glyph())
 
     def _present(self) -> None:
         if self.chrome is not None:
