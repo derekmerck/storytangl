@@ -255,6 +255,28 @@ MAP_FOOTER_ROWS = 8
 footer that grows without limit is a map nobody can see."""
 
 
+def storytangl_glyph(size: int = 64) -> pygame.Surface:
+    """StoryTangl's glyph, the window's icon unless a world brands it.
+
+    Drawn as ``brand/assets/glyph-round.svg`` describes it -- a near-black disc,
+    a bold serif G squeezed to 0.82 and turned half round -- rather than
+    loaded, since that file sets its G as webfont text and SDL's SVG loader
+    draws no text.
+    """
+
+    icon = pygame.Surface((size, size), pygame.SRCALPHA)
+    centre = (size // 2, size // 2)
+    pygame.draw.circle(icon, (0x1A, 0x1A, 0x1A), centre, size // 2)
+    pygame.draw.aacircle(icon, (0x1A, 0x1A, 0x1A), centre, size // 2)
+    font = pygame.font.SysFont("newsreader,georgia,timesnewroman,serif",
+                               round(size * 188 / 240), bold=True)
+    letter = font.render("G", True, (0xF6, 0xF3, 0xEA))
+    letter = pygame.transform.rotate(pygame.transform.smoothscale(
+        letter, (round(letter.get_width() * 0.82), letter.get_height())), 180)
+    icon.blit(letter, letter.get_rect(center=centre))
+    return icon
+
+
 _ClipKey = tuple[str, str, str, int]
 """A staged occurrence: role, source, resolved slot, and its count among equals."""
 
@@ -316,6 +338,8 @@ class Stage:
         pygame.init()
         self.chrome = Chrome(logical_size[0], self.density) if chrome else None
         self._info_session: UUID | None = None
+        self._icon_source: str | None = None
+        pygame.display.set_icon(storytangl_glyph())
         self.chrome_height = self.chrome.height if self.chrome is not None else 0
         self.window = pygame.display.set_mode(
             (
@@ -588,6 +612,11 @@ class Stage:
             self._info_session = session_id
         if self.chrome is not None:
             self.chrome.set_content(branding, sections, self._load(logo_source) if logo_source else None)
+        if logo_source != self._icon_source:
+            # A world's own logo is its window's icon; one without keeps StoryTangl's.
+            self._icon_source = logo_source
+            logo = self._load(logo_source) if logo_source else None
+            pygame.display.set_icon(logo or storytangl_glyph())
 
     def _present(self) -> None:
         if self.chrome is not None:

@@ -45,6 +45,29 @@ def stage() -> Stage:
     pygame.quit()
 
 
+def test_the_window_wears_storytangls_glyph_until_a_world_brands_it(
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # pygame's own icon is not the client's. The window opens with StoryTangl's
+    # glyph, takes a world's logo once one is resolved, and goes back to the
+    # glyph for a world without one; an unchanged logo is not set again.
+    icons: list[pygame.Surface] = []
+    monkeypatch.setattr(pygame.display, "set_icon", icons.append)
+    logo = tmp_path / "logo.png"
+    made = Stage()
+    try:
+        pygame.image.save(pygame.Surface((40, 20)), str(logo))
+        (glyph,) = icons
+        assert glyph.get_size() == (64, 64) and glyph.get_at((0, 0)).a == 0
+        assert tuple(glyph.get_at((32, 3)))[:3] == (0x1A, 0x1A, 0x1A)
+        made.set_info(None, [], str(logo), status_available=False)
+        made.set_info(None, [], str(logo), status_available=False)
+        made.set_info(None, [], None, status_available=False)
+        assert [icon.get_size() for icon in icons] == [(64, 64), (40, 20), (64, 64)]
+    finally:
+        pygame.quit()
+
+
 def _turn(line_count: int, choice_count: int) -> Turn:
     return Turn(
         step=1,
