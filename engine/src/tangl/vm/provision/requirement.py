@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Optional, Generic, Iterable, TypeVar
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
 from ..ctx import VmPhaseCtx
@@ -158,6 +158,18 @@ def stamp_requirement_resolution(
     requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
 
 
+def _restore_requirement_kind(
+    value: Requirement[PT] | dict[str, Any],
+) -> Requirement[PT] | dict[str, Any]:
+    """Restore an explicit Entity kind reference at a requirement-owner field."""
+    if isinstance(value, dict) and isinstance(value.get("has_kind"), str):
+        kind = Entity.dereference_cls_name(value["has_kind"])
+        if kind is None:
+            raise ValueError(f"Unknown requirement kind reference: {value['has_kind']!r}")
+        return {**value, "has_kind": kind}
+    return value
+
+
 class HasRequirement(RegistryAware, Generic[PT]):
     """HasRequirement(requirement: Requirement[PT])
 
@@ -210,6 +222,10 @@ class HasRequirement(RegistryAware, Generic[PT]):
     # a single requirement.
 
     requirement: Requirement[PT]
+
+    _restore_requirement_kind = field_validator("requirement", mode="before")(
+        _restore_requirement_kind,
+    )
 
     # delegators
 
@@ -411,6 +427,9 @@ class Fanout(Edge, Generic[PT]):
     """
 
     requirement: Requirement[PT]
+    _restore_requirement_kind = field_validator("requirement", mode="before")(
+        _restore_requirement_kind,
+    )
     provider_ids: list[UUID] = Field(default_factory=list)
 
     @property
