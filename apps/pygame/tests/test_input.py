@@ -22,7 +22,7 @@ from tangl.presentation.projection import BrandingValue  # noqa: E402
 from tangl.presentation.intent import (  # noqa: E402
     PieceConstraints,
     PiecesAccepts,
-    TextAccepts,
+    QuantityAccepts,
 )
 from tangl.pygame_client.models import (  # noqa: E402
     CancelSelection,
@@ -336,7 +336,7 @@ def test_uppercase_shortcut_does_not_bypass_refusal(
     choices.append(Choice(
         edge_id=uuid4(), text="Refused uppercase action",
         available=blocked != "unavailable",
-        accepts=TextAccepts() if blocked == "unsupported" else None,
+        accepts=QuantityAccepts() if blocked == "unsupported" else None,
     ))
     monkeypatch.setattr(client, "_merge", lambda _: Turn(step=1, choices=choices))
     _run([pygame.event.Event(pygame.KEYDOWN, {
@@ -454,7 +454,7 @@ def test_a_choice_this_port_cannot_collect_renders_inert(
     The CLI refuses the same kinds unless handed an explicit `--payload`.
     """
 
-    choice = Choice(edge_id=uuid4(), text="Say something", accepts=TextAccepts())
+    choice = Choice(edge_id=uuid4(), text="Choose an amount", accepts=QuantityAccepts())
     frame = Turn(step=1, choices=[choice])
     monkeypatch.setattr(client, "_merge", lambda _turns: frame)
     monkeypatch.setattr(client, "_turns", lambda _bridge, _envelope: [frame])

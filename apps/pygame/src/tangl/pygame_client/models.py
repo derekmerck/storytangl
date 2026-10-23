@@ -300,6 +300,18 @@ class BeginSelection:
 
 
 @dataclass(slots=True, frozen=True)
+class BeginText:
+    """Focus a local editor for an already selected text choice."""
+
+    choice: Choice
+
+
+@dataclass(slots=True, frozen=True)
+class SubmitText:
+    """Submit the focused editor, without treating editing as traversal."""
+
+
+@dataclass(slots=True, frozen=True)
 class PickPiece:
     """Add one piece to the pending selection. Client-local."""
 
@@ -357,6 +369,8 @@ class PagePreferences:
 Action = (
     Commit
     | BeginSelection
+    | BeginText
+    | SubmitText
     | PickPiece
     | ConfirmSelection
     | PageSelection
