@@ -224,6 +224,7 @@ export interface BrandingValue {
   value_type: 'branding'
   name: string
   logo_media?: string | null
+  banner_media?: string | null
   light?: ThemeTokens | null
   dark?: ThemeTokens | null
 }

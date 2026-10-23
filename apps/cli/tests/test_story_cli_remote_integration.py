@@ -160,3 +160,27 @@ def test_remote_cli_walkthrough_against_live_server(
     final_step = _capture_output(app)
     assert "You arrive at the village." in final_step
     assert "No available choices." in final_step
+
+
+def test_a_remote_cli_opens_a_branded_world_with_the_stock_rule(
+    remote_linear_story_server: str,
+) -> None:
+    # The remote transport can't fetch world media yet, so a world's banner
+    # can't reach a remote CLI. Its story still opens, with the stock rule.
+    script_data = yaml.safe_load(LINEAR_SCRIPT.read_text(encoding="utf-8"))
+    script_data["metadata"] |= {"title": "The Branded Path",
+                                "branding": {"banner_media": "banner.txt"}}
+    get_service_manager().load_world(script_data=script_data)
+    settings.set("service.manager.backend", "remote")
+    settings.set("service.remote.api_url", remote_linear_story_server)
+
+    app = create_cli_app()
+    app.stdout = io.StringIO()
+    app.onecmd("create_user remote-banner-secret")
+    _capture_output(app)
+
+    app.onecmd("create_story the_branded_path")
+    created_story = _capture_output(app)
+    assert "Story Begins" in created_story
+    assert "You begin your journey at dawn." in created_story
+    assert "1. Continue" in created_story

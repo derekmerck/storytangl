@@ -45,6 +45,7 @@ class StoryTanglCLI(cmd2.Cmd):
         self.ledger_id = ledger_id
         self.terminal_style = terminal_style
         self.terminal_renderer = create_terminal_renderer(terminal_style)
+        self.display_version = _major_minor_version(__version__)
         self.intro = _load_splash_text()
 
         if register_controllers:

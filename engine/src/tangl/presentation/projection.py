@@ -106,6 +106,9 @@ class BrandingValue(BaseModel):
     value_type: Literal["branding"] = "branding"
     name: str
     logo_media: str | None = None
+    #: A text file among the world's media that a text client may print as the
+    #: world's banner when a story begins. ``{version}`` in it is the engine's.
+    banner_media: str | None = None
     light: ThemeTokens | None = None
     dark: ThemeTokens | None = None
 

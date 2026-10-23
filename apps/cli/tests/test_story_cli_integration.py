@@ -141,6 +141,48 @@ def test_choose_advances_story(tangl_cli: TanglShell) -> None:
     assert "No available choices" in output
 
 
+@pytest.mark.parametrize("style", ["plain", "rich"])
+def test_a_world_banner_opens_its_story_with_the_engine_version(
+        tmp_path: Path, style: str) -> None:
+    # A world brands itself for text clients with a banner among its media
+    # (`banner_media`). It opens the story in place of the stock rule, with the
+    # engine's version where it says `{version}`. A banner that isn't text is
+    # not printed.
+    if style == "rich":
+        pytest.importorskip("rich")
+    from tangl.media.media_resource.resource_manager import ResourceManager
+    from tangl.service.world_registry import pop_manual_world, register_manual_world
+
+    (tmp_path / "banner.txt").write_text("=== The Lighthouse ===  v{version}\n")
+    (tmp_path / "banner.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    resources = ResourceManager(tmp_path)
+    resources.index_directory(".")
+    for label, banner in (("lighthouse", "banner.txt"), ("lighthouse_svg", "banner.svg")):
+        register_manual_world(World.from_script_data(script_data={
+            "label": label,
+            "metadata": {"title": "Lighthouse", "start_at": "keep.door",
+                         "branding": {"banner_media": banner}},
+            "scenes": {"keep": {"blocks": {"door": {"content": "The lamp turns."}}}},
+        }, resources=resources))
+    app = create_cli_app(terminal_style=style)
+    app.stdout = io.StringIO()
+    app.onecmd("create_user my_password")
+    _capture_output(app)
+    try:
+        app.onecmd("create_story lighthouse")
+        output = _capture_output(app)
+        assert f"=== The Lighthouse ===  v{app.display_version}" in output
+        assert "{version}" not in output and "Story Begins" not in output
+        assert "The lamp turns." in output
+
+        app.onecmd("create_story lighthouse_svg")
+        output = _capture_output(app)
+        assert "Story Begins" in output and "<svg" not in output
+    finally:
+        pop_manual_world("lighthouse")
+        pop_manual_world("lighthouse_svg")
+
+
 def test_create_story_with_missing_world(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()

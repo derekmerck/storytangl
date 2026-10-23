@@ -59,13 +59,14 @@ class PlainTerminalRenderer:
         choices: list[Any],
         ux_events: list[Any] | None = None,
         metadata: JsonMapping | None = None,
+        banner: str | None = None,
     ) -> list[Any]:
         lines: list[Any] = [f"\nCreated story: {title}"]
         if ledger_id is not None:
             lines.append(f"Ledger ID: {ledger_id}\n")
 
         if fragments:
-            lines.append("--- Story Begins ---")
+            lines.append(banner or "--- Story Begins ---")
             for fragment in fragments:
                 lines.extend(_plain_fragment_lines(fragment))
             lines.append("")
@@ -204,12 +205,13 @@ class RichTerminalRenderer(PlainTerminalRenderer):
         choices: list[Any],
         ux_events: list[Any] | None = None,
         metadata: JsonMapping | None = None,
+        banner: str | None = None,
     ) -> list[Any]:
         renderables: list[Any] = [_rich_text(f"Created story: {title}", style="bold")]
         if ledger_id is not None:
             renderables.append(_rich_text(f"Ledger ID: {ledger_id}", style="dim"))
         if fragments:
-            renderables.append(_rich_rule("Story Begins"))
+            renderables.append(_rich_text(banner) if banner else _rich_rule("Story Begins"))
             for fragment in fragments:
                 renderables.extend(_rich_fragment_renderables(fragment))
         renderables.extend(_rich_ux_events(ux_events or []))
