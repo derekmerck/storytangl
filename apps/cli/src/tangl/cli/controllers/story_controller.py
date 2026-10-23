@@ -295,7 +295,8 @@ class StoryController(CommandSet):
     choose_parser.add_argument(
         "values",
         nargs="*",
-        help="Text, quantity, or piece identifiers required by the choice",
+        help="Text, quantity, or piece identifiers required by the choice; "
+             "a text choice given none asks for its text",
     )
     choose_parser.add_argument(
         "--payload",
@@ -342,24 +343,53 @@ class StoryController(CommandSet):
         if not choice.available:
             self._cmd.poutput(f"{index} is not available: {self._refusal(choice)}")
             return
+        if (choice.accepts or {}).get("kind") == "text" and not args.values and args.payload is None:
+            self._ask_for_text(choice)
+            return
         try:
-            choice_payload = self._choice_payload(choice, args.values, args.payload)
-            result = cast(
-                RuntimeEnvelope,
-                self._call_service(
-                    "resolve_choice",
-                    request=DirectEdgeRequest(
-                        edge_id=choice.edge_id,
-                        payload=choice_payload,
-                    ),
-                ),
-            )
+            result = self._resolve(choice, self._choice_payload(choice, args.values, args.payload))
         except ValueError as exc:
             self._cmd.poutput(str(exc))
             return
 
         self._apply_runtime_envelope(result)
         self._render_current_story_update()
+
+    def _resolve(self, choice: _CachedChoice, payload: dict[str, Any] | None) -> RuntimeEnvelope:
+        return cast(RuntimeEnvelope, self._call_service(
+            "resolve_choice",
+            request=DirectEdgeRequest(edge_id=choice.edge_id, payload=payload),
+        ))
+
+    def _ask_for_text(self, choice: _CachedChoice) -> None:
+        """Take a text choice's text the way a modal would.
+
+        Enter submits the line exactly as typed. Ctrl-D, or a blank line where
+        text is required, cancels and leaves the choices as they were. A refusal
+        -- the story validates the text (``TextAccepts``) -- says why and asks
+        again.
+        """
+
+        accepts = cast(dict[str, Any], choice.accepts)
+        required = bool(accepts.get("required", True))
+        prompt = f"{accepts.get('placeholder') or choice.label}{' (blank cancels)' if required else ''}> "
+        while True:
+            try:
+                text = self._cmd.read_input(prompt)
+            except EOFError:
+                text = None
+            # Ctrl-D at a terminal raises; cmd2 reports the end of piped input as "eof".
+            if text in (None, "eof") or (required and not text.strip()):
+                self._cmd.poutput("Cancelled.")
+                return
+            try:
+                result = self._resolve(choice, {"text": text})
+            except ValueError as exc:
+                self._cmd.poutput(str(exc))
+                continue
+            self._apply_runtime_envelope(result)
+            self._render_current_story_update()
+            return
 
     command_parser = argparse.ArgumentParser()
     command_parser.add_argument("text", nargs="+", help="Natural-language story command")
