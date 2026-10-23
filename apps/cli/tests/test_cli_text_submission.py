@@ -43,7 +43,6 @@ def _cli(accepts: TextAccepts, *, available: bool = True) -> StoryTanglCLI:
 @pytest.mark.parametrize(("command", "accepts", "answer", "extra"), [
     ("do 1 Dana Reyes", TextAccepts(), "Dana Reyes", {}),
     ("do 1   Dana    Reyes  ", TextAccepts(), "Dana Reyes", {}),
-    ("do 1", TextAccepts(required=False), "", {}),
     ("do 1 --payload " + shlex.quote(json.dumps({"text": "  Dana  Reyes \t", "kept": 4})),
      TextAccepts(), "  Dana  Reyes \t", {"kept": 4}),
     ("do 1 --payload " + shlex.quote(json.dumps({"text": ""})),
@@ -102,3 +101,90 @@ def test_cli_unavailable_text_choice_does_not_advance() -> None:
     assert "not available" in app.stdout.getvalue()
     with app.service_manager.open_session(user_id=app.user_id) as session:
         assert Json.serialize(session.ledger.unstructure()) == before
+
+
+def _typing(app: StoryTanglCLI, *lines: str) -> None:
+    """Answer the CLI's prompts with these lines, then end the input."""
+    app.use_rawinput = False
+    app.echo = True
+    app.stdin = io.StringIO("".join(f"{line}\n" for line in lines))
+
+
+def _state(app: StoryTanglCLI) -> str:
+    with app.service_manager.open_session(user_id=app.user_id) as session:
+        return Json.serialize(session.ledger.unstructure())
+
+
+@pytest.mark.parametrize(("accepts", "prompt", "typed"), [
+    (TextAccepts(placeholder="Your name"), "Your name (blank cancels)> ", "  Dana  Reyes "),
+    (TextAccepts(required=False), "Answer> ", ""),
+])
+def test_cli_asks_for_a_text_choices_text_and_submits_the_line_as_typed(
+    accepts: TextAccepts, prompt: str, typed: str,
+) -> None:
+    # `do N` given no text asks for it, as pygame's text modal does. The line
+    # is submitted exactly as typed; where text is optional, a blank line is
+    # its empty answer.
+    app = _cli(accepts)
+    _typing(app, typed)
+    app.onecmd("do 1")
+    output = app.stdout.getvalue()
+    assert f"{prompt}{typed}" in output and "Answer saved." in output
+    with app.service_manager.open_session(user_id=app.user_id) as session:
+        assert session.ledger.graph.locals["answer"] == typed
+        assert session.ledger.graph.locals["effect_count"] == 1
+
+
+def test_cli_asks_again_when_the_story_refuses_the_text() -> None:
+    app = _cli(TextAccepts(validators=[LengthValidator(min=2, max=8)]))
+    _typing(app, "x", "Dana")
+    app.onecmd("do 1")
+    output = app.stdout.getvalue()
+    assert output.index("at least 2") < output.index("Answer saved.")
+    with app.service_manager.open_session(user_id=app.user_id) as session:
+        assert session.ledger.graph.locals["answer"] == "Dana"
+        assert session.ledger.graph.locals["effect_count"] == 1
+
+
+@pytest.mark.parametrize("reader", ["terminal", "stream"])
+def test_cli_submits_the_word_eof_typed_at_the_prompt(
+    reader: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The end of input cancels, but the word "eof" is an answer like any other,
+    # whether typed at a terminal or read from a stream.
+    app = _cli(TextAccepts(validators=[EnumValidator(values=["eof"])]))
+    if reader == "terminal":
+        monkeypatch.setattr("builtins.input", lambda *_: "eof")
+    else:
+        _typing(app, "eof")
+    app.onecmd("do 1")
+    assert "Answer saved." in app.stdout.getvalue()
+    with app.service_manager.open_session(user_id=app.user_id) as session:
+        assert session.ledger.graph.locals["answer"] == "eof"
+
+
+@pytest.mark.parametrize("ending", ["blank line", "end of stream", "ctrl-d",
+                                    "refused, then the end of stream"])
+def test_cli_cancels_a_required_text_prompt_and_keeps_the_choice(
+    ending: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Ctrl-D at a terminal and a stream run out both end the prompt, so a
+    # script that ends on a refused answer stops rather than asking forever.
+    app = _cli(TextAccepts(validators=[LengthValidator(min=2, max=8)]))
+    before = _state(app)
+    if ending == "ctrl-d":
+        def ctrl_d(*_: object) -> str:
+            raise EOFError
+        monkeypatch.setattr("builtins.input", ctrl_d)
+    else:
+        _typing(app, *{"blank line": [""], "end of stream": [],
+                       "refused, then the end of stream": ["x"]}[ending])
+    app.onecmd("do 1")
+    output = app.stdout.getvalue()
+    assert output.rstrip().endswith("Cancelled.")
+    assert ("at least 2" in output) == ending.startswith("refused")
+    assert _state(app) == before
+    monkeypatch.undo()
+    app.onecmd("do 1 Dana")
+    with app.service_manager.open_session(user_id=app.user_id) as session:
+        assert session.ledger.cursor.label == "end"
