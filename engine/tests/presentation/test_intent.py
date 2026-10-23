@@ -30,7 +30,7 @@ def test_entity_references_restore_as_uuid_identities_or_exact_labels(
     original = model(**dict.fromkeys(fields, reference))
     flat = Json.serialize(original.unstructure())
     assert isinstance(flat, str)
-    restored = StructuringHandler.structure(Json.deserialize(flat), {model.__name__: model})
+    restored = StructuringHandler.structure(Json.deserialize(flat), {model.__fqn__(): model})
     expected = reference if reference in ("packet", "Packet") else REFERENCE_UID
     for field in fields:
         assert getattr(original, field) == expected

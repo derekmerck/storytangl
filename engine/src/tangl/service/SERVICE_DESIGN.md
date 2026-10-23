@@ -1,6 +1,6 @@
 # tangl.service — Design Notes
 
-> Status: Current manager-first contract
+> Status: Current manager-first contract; persisted class references retain module identity
 > Authority: The canonical public service surface is `ServiceManager`,
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
@@ -61,6 +61,20 @@ Service manages four distinct runtime resources:
 artifacts, and user linkage.
 
 `Frame` is per-request execution context. Service does not persist frames.
+
+Constructor form carries selected live classes. JSON/BSON's existing type-encoding
+branches persist these as `module.Class` strings, matching `BaseModelPlus.__fqn__()`;
+`PersistenceManager.register_kind()` uses the same qualified keys for top-level
+`StructuringHandler` lookup. Graph/Ledger and owned requirement references use the
+existing loaded-Entity class lookup, without importing modules during restoration.
+Domain bootstrap must already have loaded the selected class. Singleton references
+keep their existing `(class, label)` ownership and restoration path.
+
+Qualification is unconditional generated persistence data, not author syntax or a
+new resolver. Bare authored cardinal names remain protected; explicit classes and
+dotted author paths retain their exact selected identity. Ordinary string values
+are not converted to classes by the serializer. This changes the previously lossy
+persisted class representation; there is no legacy-name migration or alias layer.
 
 `World` is discovered and compiled through `WorldRegistry`. Service owns world
 loading/unloading policy, not world semantics.

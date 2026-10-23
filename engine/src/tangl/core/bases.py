@@ -417,12 +417,15 @@ class Unstructurable(BaseModelPlus):
         if isinstance(value, dict):
             cls_hint = value.get("kind", annotation)
             if isinstance(cls_hint, str):
-                # Serialization reduces constructor-form ``kind`` to a class
-                # name. Embedded value objects are not graph entities, so the
+                # Serialization preserves constructor-form ``kind`` as a qualified
+                # class name. Embedded value objects are not graph entities, so the
                 # Entity name registry cannot resolve them -- but the field
                 # annotation already names the candidate class. Mismatches raise
                 # so a union caller moves on to its next option.
-                if not (isclass(annotation) and annotation.__name__ == cls_hint):
+                if not (
+                    isclass(annotation)
+                    and f"{annotation.__module__}.{annotation.__name__}" == cls_hint
+                ):
                     raise TypeError(
                         f"Constructor-form kind {cls_hint!r} does not name {annotation!r}"
                     )
