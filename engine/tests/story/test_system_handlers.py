@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -9,7 +10,9 @@ import pytest
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.prose.dialog import DialogMuBlock
-from tangl.journal.fragments import AttributedFragment, GroupFragment
+from tangl.journal.fragments import (
+    AttributedFragment, GroupFragment, fragment_from_dto, fragment_to_dto,
+)
 from tangl.presentation.hints import PresentationHints
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.lang.body_parts import BodyPart, BodyRegion
@@ -19,6 +22,9 @@ from tangl.mechanics.presence.ornaments import Ornament, OrnamentType
 from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableType
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.persistence.structuring import StructuringHandler
+from tangl.service.media import media_fragment_to_payload
 from tangl.story import Actor, Role, Scene, StoryGraph
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
@@ -966,17 +972,21 @@ def test_render_block_media_facet_metadata_only_payload_uses_fallback_text() -> 
     assert fragments[0].content == "No portrait available."
 
 
-def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_fallback() -> None:
+@pytest.mark.parametrize("name, role", [("missing.svg", "narrative_im"), ("audio/theme.mp3", "music")])
+def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_fallback(
+    name: str, role: str,
+) -> None:
     graph = StoryGraph()
     block = Block(
         label="start",
-        media=[{"name": "missing.svg", "source_kind": "inventory", "media_role": "narrative_im"}],
+        media=[{"name": name, "source_kind": "inventory", "media_role": role}],
     )
     graph.add(block)
 
-    dep = MediaDep(registry=graph, predecessor_id=block.uid, media_id="missing.svg", scope="world")
+    dep = MediaDep(registry=graph, predecessor_id=block.uid, media_id=name, scope="world")
     dep.requirement.resolution_reason = "no_offers"
-    dep.requirement.resolution_meta = {"alternatives": []}
+    metadata = {"alternatives": [{"scope": "world", "accepted": False}]}
+    dep.requirement.resolution_meta = metadata
     block.media[0]["dependency_id"] = dep.uid
 
     fragments = render_block_media(caller=block, ctx=_ctx_with_ns())
@@ -987,10 +997,26 @@ def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_f
     assert fragments[0].fragment_type == "media"
     assert fragments[0].content_format == "json"
     assert fragments[0].scope == "world"
-    assert fragments[0].content["name"] == "missing.svg"
+    assert fragments[0].content["name"] == name
     assert fragments[0].content["source_kind"] == "inventory"
     assert fragments[0].content["unresolved_reason"] == "no_offers"
-    assert fragments[0].content["resolution_meta"] == {"alternatives": []}
+    assert fragments[0].content["resolution_meta"] == metadata
+
+    fragment = fragments[0]
+    dto = json.loads(json.dumps(fragment_to_dto(fragment)))
+    assert dto["content"] == fragment.content
+    assert fragment_from_dto(dto).content == fragment.content
+    restored = StructuringHandler.structure(
+        Json.deserialize(Json.serialize(fragment.unstructure())),
+        kind_map={JournalMediaFragment.__fqn__(): JournalMediaFragment},
+    )
+    assert restored.content == fragment.content
+    payload = media_fragment_to_payload(fragment)
+    assert payload["name"] == name
+    assert payload["unresolved_reason"] == "no_offers"
+    assert payload["resolution_meta"] == metadata
+    assert payload["content_format"] == "json"
+    assert not {"content", "url", "path", "data"} & payload.keys()
 
 
 def test_render_block_media_emits_placeholder_for_unresolved_potential_without_fallback() -> None:

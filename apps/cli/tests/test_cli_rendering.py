@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -9,7 +10,44 @@ pytest.importorskip("rich")
 
 from rich.table import Table
 
-from tangl.cli.rendering import RichTerminalRenderer
+from tangl.cli.rendering import PlainTerminalRenderer, RichTerminalRenderer
+from tangl.journal.fragments import MediaFragment
+from tangl.service.remote_service_manager import RemoteServiceManager
+from tangl.service.response import RuntimeEnvelope
+
+
+@pytest.mark.parametrize("renderer_type", [PlainTerminalRenderer, RichTerminalRenderer])
+@pytest.mark.parametrize("remote", [False, True])
+def test_unresolved_media_names_survive_remote_dto_without_repr(
+    renderer_type: type[PlainTerminalRenderer] | type[RichTerminalRenderer], remote: bool,
+) -> None:
+    fragment = MediaFragment(
+        content={
+            "name": "world/audio/theme.mp3",
+            "unresolved_reason": "no_offers",
+            "resolution_meta": {"alternatives": [{"path": "private/other.mp3"}]},
+        },
+        content_format="json",
+        media_role="music",
+    )
+    envelope = RuntimeEnvelope(fragments=[fragment])
+    if remote:
+        wire = json.loads(json.dumps(envelope.to_dto()))
+        envelope = RemoteServiceManager("https://example.test/api/v2")._decode_runtime_envelope(wire)
+    renderer = renderer_type()
+    output = io.StringIO()
+    renderer.emit(
+        SimpleNamespace(stdout=output, poutput=lambda line: output.write(line + "\n")),
+        renderer.story_update(fragments=envelope.fragments, choices=[]),
+    )
+
+    transcript = output.getvalue()
+    assert "theme.mp3 (unresolved: no_offers)" in transcript
+    assert "music" in transcript
+    if renderer_type is PlainTerminalRenderer:
+        assert "[music: theme.mp3 (unresolved: no_offers)]" in transcript
+    for leak in ("resolution_meta", "alternatives", "private/", "world/audio/", "{'name'"):
+        assert leak not in transcript
 
 
 def test_rich_renderer_exports_envelope_text() -> None:

@@ -678,13 +678,22 @@ def _media_name(fragment: Any) -> str:
 
     The DTO projects RIT-backed media as the resource's name (see
     ``MediaFragment._encode_binary_content``), so ``content`` is normally a
-    plain string by the time it reaches here. The attribute probe stays for fragments still
-    holding a live resource object, and accepts only string-ish values: feeding
-    an object repr through ``_basename`` is what used to splice everything
+    plain string by the time it reaches here. JSON placeholders expose only
+    their named resource and unresolved reason. The attribute probe stays for
+    fragments still holding a live resource object, and accepts only string-ish
+    values: feeding an object repr through ``_basename`` used to splice everything
     after the last path separator into the narrative.
     """
 
     content = _read(fragment, "content")
+    if _read(fragment, "content_format") == "json" and isinstance(content, Mapping):
+        reason = content.get("unresolved_reason")
+        if isinstance(reason, str) and reason.strip():
+            name = content.get("name")
+            label = _basename(name.strip()) if isinstance(name, str) and name.strip() else (
+                _read(fragment, "media_role") or "media"
+            )
+            return f"{label} (unresolved: {reason.strip()})"
     for attr in ("label", "path"):
         value = getattr(content, attr, None)
         if isinstance(value, (str, Path)) and str(value).strip():

@@ -51,6 +51,26 @@ def test_media_fragment_with_binary_data():
     assert serialized["content"] == b64encode(binary_data).decode("utf-8")
 
 
+def test_ledger_json_round_trip_preserves_structured_placeholder() -> None:
+    graph = Graph()
+    start = graph.add_node(label="start")
+    ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
+    fragment = MediaFragment(
+        content={
+            "name": "audio/theme.mp3", "unresolved_reason": "no_offers",
+            "resolution_meta": {"alternatives": [{"scope": "world"}]},
+        },
+        content_format="json", media_role="music",
+    )
+    ledger.output_stream.append(fragment)
+
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    restored_fragment = restored.output_stream.get(fragment.uid)
+
+    assert isinstance(restored_fragment, MediaFragment)
+    assert restored_fragment.content == fragment.content
+
+
 def test_media_fragment_rit_round_trip_requires_an_owning_graph():
     """A standalone persisted fragment cannot fabricate a graph-owned RIT."""
 

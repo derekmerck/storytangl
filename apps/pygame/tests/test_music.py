@@ -431,12 +431,20 @@ def test_disappearing_optional_source_stops_stale_music_without_blocking_choices
 def test_unadmitted_optional_music_is_logged_without_image_loading_or_lost_choices(
     bridge: PygameSessionBridge, backend: dict[str, Mock], caplog: pytest.LogCaptureFixture,
 ) -> None:
-    unresolved = MediaFragment(content="unresolved optional cue", content_format="json",
-                               content_type=MediaDataType.AUDIO, media_role="music")
+    unresolved = MediaFragment(
+        content={
+            "name": "audio/theme.mp3", "unresolved_reason": "no_offers",
+            "resolution_meta": {"alternatives": []},
+        },
+        content_format="json", content_type=MediaDataType.AUDIO, media_role="music",
+    )
     turn = bridge.build_turns([unresolved, ChoiceFragment(text="Continue", edge_id=uuid4())])[0]
     assert "Music cue unavailable: no admitted resource" in caplog.text
     assert turn.choices and not turn.images
+    bridge.ledger_id = uuid4()
+    deliver(bridge, unresolved)
     backend["load"].assert_not_called()
+    backend["play"].assert_not_called()
 
 
 def test_create_and_reconnect_never_execute_historical_restarts(
