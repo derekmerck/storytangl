@@ -267,7 +267,7 @@ def _apply(
                 payload = commit_payload(pending.choice, [pending.text])
                 envelope = bridge.choose(pending.choice.edge_id, payload)
             except ValueError as exc:
-                pending.error = str(exc)
+                pending.error = str(exc) or "Text was not accepted. Please try again."
                 return pending, None
             return None, envelope
         case PageSelection():

@@ -194,14 +194,15 @@ def test_gameplay_letter_mapping_without_text_input(mod, expected):
     assert client._choice_letter(event) == expected
 
 
-def test_backend_rejection_keeps_same_buffer_and_caret_for_retry(harness, monkeypatch):
+@pytest.mark.parametrize("rejection", ["That name is already in use.", ""])
+def test_backend_rejection_keeps_same_buffer_and_caret_for_retry(harness, monkeypatch, rejection):
     bridge, choice, frame, calls, draws, focus, run = harness
     attempts = []
 
     def choose(edge_id, payload):
         attempts.append((edge_id, payload))
         if len(attempts) == 1:
-            raise ValueError("That name is already in use.")
+            raise ValueError(rejection)
         calls.append((edge_id, payload))
         return RuntimeEnvelope()
 
@@ -210,7 +211,7 @@ def test_backend_rejection_keeps_same_buffer_and_caret_for_retry(harness, monkey
     def retry(stage):
         editor = draws[-1]
         assert editor.text == " Dana " and editor.caret == len(editor.text)
-        assert editor.error == "That name is already in use."
+        assert editor.error == (rejection or "Text was not accepted. Please try again.")
         return [key(pygame.K_BACKSPACE), text(" Reyes "), key(pygame.K_RETURN)]
 
     run([[key(pygame.K_2), text(" Dana "), key(pygame.K_RETURN)], retry])
@@ -320,6 +321,17 @@ def test_text_payload_never_duplicates_activation_merge():
                     payload={"text": "default", "operation": "rename", "kept": 7})
     assert commit_payload(choice, ["  Dana  Reyes "]) == {"text": "  Dana  Reyes "}
     assert choice_action(choice) == BeginText(choice)
+
+
+@pytest.mark.parametrize("payload", [
+    None, {}, {"text": None}, {"text": 123}, {"text": []}, "activation",
+])
+def test_only_disclosed_string_text_can_prefill(payload):
+    bridge = PygameSessionBridge()
+    choice = Choice(edge_id=uuid4(), text="Name", accepts=TextAccepts(), payload=payload)
+    turn = Turn(step=1, choices=[choice])
+    editor, envelope = client._apply(bridge, Stage(display_scale=1), turn, None, BeginText(choice))
+    assert editor.text == "" and editor.caret == 0 and envelope is None
 
 
 def test_unrelated_submission_exception_is_not_swallowed(harness, monkeypatch):
