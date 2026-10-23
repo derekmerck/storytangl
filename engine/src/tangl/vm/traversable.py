@@ -854,6 +854,10 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
     before successor availability is considered.
     """
 
+    def validate_payload(self, payload: Any) -> bool:
+        """Check payload-only constraints before destination admission."""
+        return True
+
     @property
     def predecessor(self) -> Optional[TraversableNode]:
         """Type-narrowed predecessor."""
@@ -1005,6 +1009,10 @@ class AnonymousEdge:
 
     entry_phase: Optional[ResolutionPhase] = None
     """Pipeline phase to start at when following this edge."""
+
+    def validate_payload(self, payload: Any) -> bool:
+        """Transient edges impose no payload-only constraints."""
+        return True
 
     def __repr__(self) -> str:
         src = self.predecessor.get_label() if self.predecessor is not None else "anon"

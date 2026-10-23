@@ -436,6 +436,30 @@ class TestFollowEdge:
 class TestFollowEdgeEntryPhase:
     """entry_phase controls which pipeline phases are skipped."""
 
+    @pytest.mark.parametrize("skip_validate", [False, True])
+    def test_payload_guard_precedes_call_stack_and_honors_skipped_validate(
+        self, skip_validate: bool,
+    ) -> None:
+        class RejectPayload(TraversableEdge):
+            def validate_payload(self, payload: object) -> bool:
+                raise ValueError("rejected payload")
+
+        g, [a, b] = _simple_graph("a", "b")
+        edge = RejectPayload(
+            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+            entry_phase=ResolutionPhase.UPDATE if skip_validate else None,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        frame = Frame(graph=g, cursor=a)
+        if skip_validate:
+            frame.follow_edge(edge)
+            assert frame.cursor is b
+        else:
+            with pytest.raises(ValueError, match="rejected payload"):
+                frame.resolve_choice(edge)
+            assert frame.cursor is a
+            assert frame.return_stack == []
+
     def test_entry_at_update_skips_validate_and_planning(self) -> None:
         validate_called = []
 

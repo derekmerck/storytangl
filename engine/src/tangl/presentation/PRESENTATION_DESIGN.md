@@ -11,6 +11,17 @@ persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
 
+## Explicit text intent (#592 slice 1)
+
+`TextAccepts` and its existing validator models are syntax, not an enforcement
+engine. Story now enforces explicitly declared text Actions at ordinary pre-move
+VALIDATE; `STORY_DESIGN.md` records the exact rules. Effective payload text must be
+a string, including optional explicit empty; missing/null is not empty. Text is
+preserved, length counts Unicode code points, regex is Python search with `i`/`m`/`s`,
+and enum case-insensitivity uses `lower()`. BackendValidator remains opaque and
+relies on ordinary domain validation. Client checks are advisory, including current
+web UTF-16/regex differences. No new model, serializer or forms middleware is added.
+
 ## Compact disclosed status (#581)
 
 Status: the optional compact-row follow-up consumes public `ui-branding` separately from

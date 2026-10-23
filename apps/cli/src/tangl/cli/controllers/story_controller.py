@@ -182,7 +182,11 @@ class StoryController(CommandSet):
         values: list[str],
         raw_payload: str | None,
     ) -> dict[str, Any] | None:
-        """Build one documented choice payload from CLI input."""
+        """Build the submitted override; Frame merges authored activation fields.
+
+        Positional text joins/trims tokens for convenience. JSON payload text
+        preserves the exact supplied string, including empty or repeated spaces.
+        """
 
         if raw_payload is not None:
             if values:
@@ -295,7 +299,7 @@ class StoryController(CommandSet):
     )
     choose_parser.add_argument(
         "--payload",
-        help="Explicit JSON object for place, compose, or extension choices",
+        help="Explicit JSON object; use for exact text whitespace or structured choices",
     )
 
     @staticmethod
@@ -340,20 +344,20 @@ class StoryController(CommandSet):
             return
         try:
             choice_payload = self._choice_payload(choice, args.values, args.payload)
+            result = cast(
+                RuntimeEnvelope,
+                self._call_service(
+                    "resolve_choice",
+                    request=DirectEdgeRequest(
+                        edge_id=choice.edge_id,
+                        payload=choice_payload,
+                    ),
+                ),
+            )
         except ValueError as exc:
             self._cmd.poutput(str(exc))
             return
 
-        result = cast(
-            RuntimeEnvelope,
-            self._call_service(
-                "resolve_choice",
-                request=DirectEdgeRequest(
-                    edge_id=choice.edge_id,
-                    payload=choice_payload,
-                ),
-            ),
-        )
         self._apply_runtime_envelope(result)
         self._render_current_story_update()
 

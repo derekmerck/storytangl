@@ -44,7 +44,9 @@ from tangl.journal.fragments import (
 )
 from tangl.vm.runtime.frame import PhaseCtx
 
-from .dispatch import do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal
+from .dispatch import (
+    do_render_text, on_compose_journal, on_find_edges, on_gather_ns, on_journal,
+)
 from .episode import Action, Block, MenuBlock
 from .presentation import choice_text_source, render_text_as
 
