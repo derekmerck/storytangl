@@ -61,7 +61,7 @@ def test_targets_distinguish_occurrence_resource_role_and_authored_handle() -> N
         assert "ref_id" not in dto and "reference_id" not in dto
         canonical = StructuringHandler.structure(
             Json.deserialize(Json.serialize(control.unstructure())),
-            kind_map={"ControlFragment": ControlFragment},
+            kind_map={ControlFragment.__fqn__(): ControlFragment},
         )
         assert canonical.target == control.target
 
@@ -243,7 +243,7 @@ def test_media_replacement_does_not_require_universal_rit_identity() -> None:
     assert updated.rit_id is None
     restored = StructuringHandler.structure(
         Json.deserialize(Json.serialize(control.unstructure())),
-        kind_map={"ControlFragment": ControlFragment},
+        kind_map={ControlFragment.__fqn__(): ControlFragment},
     )
     assert restored.media.content == replacement.content and restored.media.rit_id is None
 
@@ -277,7 +277,7 @@ def test_presentation_hint_coordinates_merge_and_null_clears_after_json(
     )
     restored = StructuringHandler.structure(
         Json.deserialize(Json.serialize(control.unstructure())),
-        kind_map={"ControlFragment": ControlFragment},
+        kind_map={ControlFragment.__fqn__(): ControlFragment},
     )
     expected = hints
     if "staging_hints" in payload:
@@ -358,9 +358,9 @@ def test_group_and_piece_hint_edits_survive_constructor_json_and_dto(
     before = Json.serialize(first.unstructure())
     control_before = Json.serialize(control.unstructure())
     kinds = {
-        "GroupFragment": GroupFragment,
-        "PieceFragment": PieceFragment,
-        "ControlFragment": ControlFragment,
+        GroupFragment.__fqn__(): GroupFragment,
+        PieceFragment.__fqn__(): PieceFragment,
+        ControlFragment.__fqn__(): ControlFragment,
     }
     restored_first = StructuringHandler.structure(Json.deserialize(before), kind_map=kinds)
     restored_control = StructuringHandler.structure(Json.deserialize(control_before), kind_map=kinds)

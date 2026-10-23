@@ -84,7 +84,7 @@ class JsonSerializationHandler:
             if isinstance(o, set):
                 return list(o)
             elif isinstance(o, type):
-                return o.__name__
+                return f"{o.__module__}.{o.__name__}"
             elif isinstance(o, datetime):
                 return o.isoformat()
             elif isinstance(o, Enum):
@@ -158,9 +158,9 @@ class BsonSerializationHandler:
 
     @staticmethod
     def fallback_encoder(value):  # pragma: no cover
-        # Check if the value is a class encode it by name
+        # Use the same qualified class reference as JSON.
         if inspect.isclass(value):
-            return value.__name__
+            return f"{value.__module__}.{value.__name__}"
         if isinstance(value, Enum):
             return value.value
         return value

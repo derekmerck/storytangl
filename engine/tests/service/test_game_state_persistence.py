@@ -191,7 +191,7 @@ def test_json_service_session_restores_history_before_another_selected_move(
 
     stored = persistence.storage[ledger_id]
     assert isinstance(stored, str)
-    assert json.loads(stored)["kind"] == "Ledger"
+    assert json.loads(stored)["kind"] == "tangl.vm.runtime.ledger.Ledger"
     reopened_manager = ServiceManager(persistence)
     with reopened_manager.open_session(user_id=user.uid, write_back=False) as session:
         restored_host = session.ledger.cursor

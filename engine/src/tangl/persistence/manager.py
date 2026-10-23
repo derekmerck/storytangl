@@ -35,7 +35,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
 
     def register_kind(self, kind: Type[HasUid]) -> None:
         """Register one top-level class that this manager may restore."""
-        self.kind_map[kind.__name__] = kind
+        self.kind_map[f"{kind.__module__}.{kind.__name__}"] = kind
 
     def register_kinds(self, *kinds: Type[HasUid]) -> None:
         """Register the top-level resource classes owned by one composition root."""

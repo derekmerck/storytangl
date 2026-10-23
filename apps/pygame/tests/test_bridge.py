@@ -509,7 +509,8 @@ def test_zone_uuid_identity_filters_pieces_before_and_after_json_restore(
     )
     if restore:
         fragment = StructuringHandler.structure(
-            Json.deserialize(Json.serialize(fragment.unstructure())), {"ChoiceFragment": ChoiceFragment},
+            Json.deserialize(Json.serialize(fragment.unstructure())),
+            {ChoiceFragment.__fqn__(): ChoiceFragment},
         )
     choice = Choice(edge_id=fragment.edge_id, text=fragment.text, accepts=fragment.accepts)
     # Client-local pieces may also arrive using different UUID spellings.
@@ -525,7 +526,8 @@ def test_zone_uuid_identity_filters_pieces_before_and_after_json_restore(
 def test_symbolic_zone_labels_remain_exact_after_json_restore(label: str) -> None:
     constraints = PieceConstraints(target_zone_ref=label)
     restored = StructuringHandler.structure(
-        Json.deserialize(Json.serialize(constraints.unstructure())), {"PieceConstraints": PieceConstraints},
+        Json.deserialize(Json.serialize(constraints.unstructure())),
+        {PieceConstraints.__fqn__(): PieceConstraints},
     )
     choice = Choice(edge_id=uuid4(), text="Select", accepts=PiecesAccepts(constraints=restored))
     turn = Turn(step=1, pieces=[
