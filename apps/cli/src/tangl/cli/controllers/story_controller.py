@@ -10,6 +10,7 @@ from uuid import UUID
 from cmd2 import CommandSet, with_argparser, with_default_category
 
 from tangl.presentation.projection import BrandingValue, ProjectedState
+from tangl.service.exceptions import InvalidOperationError
 from tangl.service.media import MediaContentProfile, MediaRenderProfile
 
 from ..rendering import _choice_blocker_messages, _choice_refusal_text
@@ -128,7 +129,8 @@ class StoryController(CommandSet):
         """The banner a world brands itself with for text clients, if it has one.
 
         It is one of the world's media (``banner_media``), read like any other,
-        with the engine's version where it says ``{version}``.
+        with the engine's version where it says ``{version}``. A transport that
+        can't fetch world media, as the remote one can't yet, opens without it.
         """
 
         state = cast(ProjectedState, self._call_service(
@@ -137,10 +139,13 @@ class StoryController(CommandSet):
         brand = next(s.value for s in state.sections if isinstance(s.value, BrandingValue))
         if brand.banner_media is None:
             return None
-        payload = self._call_service(
-            "get_world_media", world_id=world_id, media=brand.banner_media,
-            render_profile=MediaRenderProfile(content_profile=MediaContentProfile.PASSTHROUGH),
-        )
+        try:
+            payload = self._call_service(
+                "get_world_media", world_id=world_id, media=brand.banner_media,
+                render_profile=MediaRenderProfile(content_profile=MediaContentProfile.PASSTHROUGH),
+            )
+        except InvalidOperationError:
+            return None
         if payload is None or payload["content_format"] != "path" or payload["media_type"] != "text":
             return None
         banner = Path(payload["path"]).read_text(encoding="utf-8")
