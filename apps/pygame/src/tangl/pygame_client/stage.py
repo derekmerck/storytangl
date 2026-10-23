@@ -22,6 +22,7 @@ import pygame
 from tangl.presentation.projection import BrandingValue, ProjectedSection
 
 from .chrome import Chrome, wrap_pixels
+from .text_entry import PendingText, draw_text_entry
 
 from dataclasses import dataclass
 
@@ -35,6 +36,7 @@ from .bridge import (
 from .models import (
     Action,
     BeginSelection,
+    BeginText,
     CancelSelection,
     Choice,
     Commit,
@@ -173,7 +175,7 @@ def choice_action(choice: Choice) -> Action | None:
     """Return the action a row for ``choice`` performs, or None if it cannot.
 
     Three outcomes, and the third is the interesting one. A ``pick`` resolves
-    straight to a commit. A ``pieces`` choice opens a selection first. Anything
+    straight to a commit. ``pieces`` and ``text`` choices collect input first. Anything
     this port cannot collect a value for yields None, so the row renders inert
     with its reason rather than committing a guessed payload or crashing the
     frame -- the CLI refuses the same kinds unless handed an explicit payload.
@@ -183,6 +185,8 @@ def choice_action(choice: Choice) -> Action | None:
         return None
     if getattr(choice.accepts, "kind", "pick") == "pieces":
         return BeginSelection(choice=choice)
+    if getattr(choice.accepts, "kind", "pick") == "text":
+        return BeginText(choice=choice)
     try:
         return Commit(edge_id=choice.edge_id, payload=commit_payload(choice))
     except UnsupportedAccepts:
@@ -361,6 +365,7 @@ class Stage:
         is never adjusted, so an image meant to leave the frame still can."""
 
         self.font = pygame.font.Font(None, 11 * self.density)
+        self.text_font = pygame.font.Font(None, 14 * self.density)
         self.hitboxes: list[tuple[pygame.Rect, Action]] = []
         self.slot_boxes: list[tuple[SurfaceSlot, Piece, pygame.Rect]] = []
         """Where each placed piece was drawn this frame.
@@ -476,7 +481,7 @@ class Stage:
     def draw(
         self,
         turn: Turn,
-        pending: PendingSelection | None = None,
+        pending: PendingSelection | PendingText | None = None,
         media_visibility: Mapping[str, bool | str] | None = None,
     ) -> None:
         """Render one turn and record its hitboxes for the input layer.
@@ -487,6 +492,9 @@ class Stage:
         keys, and the same payload the CLI would build.
         """
 
+        editor = pending if isinstance(pending, PendingText) else None
+        if editor is not None:
+            pending = None
         self.hitboxes.clear()
         self.slot_boxes.clear()
         self.animating = False
@@ -501,6 +509,8 @@ class Stage:
             # playback, or a clip resumes mid-cycle on the far side of the map.
             self._clips.clear()
             self._staged_turn = None
+            if editor is not None:
+                self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
             self._present()
             return
         self._draw_background(loaded)
@@ -599,6 +609,8 @@ class Stage:
             )
         else:
             self._draw_choices(choice_rows, top=choices_top, bottom=bottom)
+        if editor is not None:
+            self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
         self._present()
 
     def set_info(

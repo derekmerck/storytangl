@@ -7,7 +7,8 @@ adapts typed `RuntimeEnvelope` output into a small turn model and draws it.
 ## Status
 
 Adapter proof of concept. The bridge and turn model are covered by ordinary
-`pytest`; the renderer is deliberately thin.
+`pytest`; the renderer is deliberately thin. #592 slice 2 adds local text editing
+over the existing authoritative Action submission path.
 
 ## What Is Included
 
@@ -19,6 +20,7 @@ Adapter proof of concept. The bridge and turn model are covered by ordinary
 - `src/tangl/pygame_client/music.py` — one persistent client-local BGM stream,
   separate from images and historical turn rendering.
 - `src/tangl/pygame_client/__main__.py` — event loop.
+- `src/tangl/pygame_client/text_entry.py` — one local text editor and bounded modal.
 - `tests/` — adapter and live-session tests.
 
 ## Design Commitments
@@ -291,8 +293,71 @@ audible output. Tests never fetch media or depend on git-lfs being installed.
 ## Typed Choices
 
 Most choices are answered by their `edge_id` alone. Some want a value first, and
-`accepts.kind` says which (§6.1). This port collects `pieces`; the rest render
-inert with a reason rather than committing a guessed payload.
+`accepts.kind` says which (§6.1). This port collects `pieces` and `text`;
+quantity/place/compose remain inert with a reason rather than guessing a payload.
+
+### Text entry (#592 slice 2)
+
+An available `TextAccepts` choice opens the same editor through its original
+number/letter shortcut or pointer hitbox. Its label remains the instruction and
+its placeholder is guidance, never input. A disclosed string activation `text`
+prefills the buffer; otherwise it opens empty. The local `PendingText` state is
+separate from piece counters and never reaches Service or persistence.
+
+The modal fits 320×200 and 640×400, with or without the optional status shell.
+It uses a steady focused caret and a horizontal viewport with overflow markers;
+the full value is retained, not truncated to the visible substring. Left/Right,
+Home/End, Backspace/Delete edit one Unicode code point at a time. Character input
+uses pygame `TEXTINPUT`, with `start_text_input` / `stop_text_input`; `TEXTEDITING`
+composition is only local pre-edit until committed by the text system. Enter
+while composing does not submit the unfinished composition. This is bounded
+desktop composition handling, not a broad IME/mobile or clipboard framework.
+See the [pygame text-input API](https://www.pygame.org/docs/ref/key.html#pygame.key.start_text_input).
+SDL text input is stopped before the first gameplay frame as well as after editing,
+so the activation shortcut cannot type itself into the new buffer. Gameplay's ASCII
+letter shortcuts retain Shift/Caps mapping without assembling editor text from keys.
+
+Enter or clickable Submit sends the exact buffer as `{"text": value}` through
+`commit_payload` → `bridge.choose(edge_id, payload)`. The new text path does not
+duplicate Frame's authored/submitted activation merge. No trimming, normalization,
+capitalization, name-only restrictions, cancellation words or hidden truncation:
+literal `eof` is ordinary text. Optional `""` is a real submission. Required blank
+has useful local feedback; all other declared/domain constraints are checked by
+the existing authoritative backend. A normal submission `ValueError` retains the
+same editable buffer/caret and shows feedback for retry. Other exception types
+propagate; no general rollback or failure-atomicity guarantee is implied.
+
+Escape or clickable Cancel closes without a Service call, narrative time, or
+journal record. Focus suppresses choice shortcuts, map/piece/paging/preference
+actions and underlying pointer/chrome interaction. Window close, native voice
+completion and local Ctrl music controls remain active. Music ownership and
+sprite clocks are not paused; a still stage still sleeps rather than polling to
+blink a caret. Cancel/success/session loss stops text input. Native glyph support
+depends on the bundled pygame font; missing glyphs do not rewrite the buffer.
+
+Pending input belongs to the user/ledger/world, turn step and selected offer.
+Session replacement or offer withdrawal/unavailability/replacement cancels it;
+queued old input cannot submit another offer. Equivalent same-turn restatements,
+local redraws/preferences and animation retain the buffer. Keystrokes/redraws do
+not fetch Service state. Choice numbering and source edge identity are unchanged.
+
+Headless tests cover keyboard/pointer parity, focus, editing/overflow at both
+extents and chrome states, Unicode/whitespace/empty/`eof`, composition, rejection
+and exactly-once retry, session/offer resets, native completion and animation.
+A real JSON-backed inline world stores a Cedar-shaped name through its authored
+Action effect and proves activation merge and ordinary restore; no private world
+or LFS asset is needed. Rendered layouts are inspected as pixel evidence, not
+human-confirmed native IME or audible playback validation.
+
+**Future boundary, not implemented:** completion is editing, not committing.
+Selecting a completion will fill the buffer, not submit it. `EnumValidator.values`
+can declare a finite restricted vocabulary; non-restricting advisory suggestions
+need a separate future hint contract. `metadata.grammar` concerns exploratory
+command-to-edge resolution, not this already-selected Action's text argument.
+No suggestion fields, autocomplete, command entry or general forms framework are
+included here. Web/CLI and #604's prompt/EOF work remain separate.
+
+### Piece selection
 
 A `pieces` choice opens a second numbered list of the pieces it will take, and
 the payload is built only once that list has been answered:

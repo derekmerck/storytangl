@@ -179,7 +179,15 @@ def commit_payload(choice: Choice, values: Sequence[str] = ()) -> JsonValue:
             raise UnsupportedAccepts(f"Select at most {maximum} piece(s).")
         return _merge_authored(authored, {"piece_ids": list(values)})
 
-    # text, quantity, place and compose need input surfaces this port does not
+    if kind == "text":
+        if len(values) != 1 or not isinstance(values[0], str):
+            raise UnsupportedAccepts("Supply one text string.")
+        if accepts.required and not values[0].strip():
+            raise UnsupportedAccepts("Text input is required.")
+        # Only the submitted argument travels here. Frame owns activation merge.
+        return {"text": values[0]}
+
+    # quantity, place and compose need input surfaces this port does not
     # have yet. Land them with the world that needs one, not speculatively.
     raise UnsupportedAccepts(f"This port cannot collect a {kind!r} value yet.")
 

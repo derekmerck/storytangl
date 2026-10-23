@@ -7,9 +7,9 @@ Number keys select a choice, arrows and page keys scroll prose, escape quits.
 Every click and choice key resolves to a choice ``edge_id``, never to a bespoke
 action, so a hotspot commits the same payload as the numbered list.
 
-A choice that wants a value first -- ``accepts.kind = "pieces"`` -- opens a
-second numbered list of the pieces it will take. Escape leaves that list without
-committing. Only the finished ``(edge_id, payload)`` pair reaches the service,
+A ``pieces`` choice opens a second numbered list; a ``text`` choice opens a focused
+editor. Escape leaves either without committing. Only the finished
+``(edge_id, payload)`` pair reaches the service,
 and it is byte-identical to what the CLI builds for the same choice.
 """
 
@@ -31,6 +31,7 @@ from .bridge import (
 from .models import (
     Action,
     BeginSelection,
+    BeginText,
     CancelSelection,
     Commit,
     ConfirmSelection,
@@ -44,6 +45,7 @@ from .models import (
     PickPiece,
     ScrollText,
     StageImage,
+    SubmitText,
     Turn,
     TogglePreference,
     Zone,
@@ -61,6 +63,7 @@ from .stage import (
 )
 from .music import MusicPlayer
 from .voice import VoicePlayer
+from .text_entry import PendingText
 
 logger = logging.getLogger(__name__)
 
@@ -213,11 +216,20 @@ def _keyed(
     return None
 
 
+def _choice_letter(event: pygame.event.Event) -> str:
+    """Resolve ASCII gameplay shortcuts even while SDL text input is stopped."""
+    if event.unicode or not pygame.K_a <= event.key <= pygame.K_z:
+        return event.unicode
+    letter = chr(event.key)
+    uppercase = bool(event.mod & pygame.KMOD_SHIFT) != bool(event.mod & pygame.KMOD_CAPS)
+    return letter.upper() if uppercase else letter
+
+
 def _apply(
     bridge: PygameSessionBridge,
     stage: Stage,
     frame: Turn,
-    pending: PendingSelection | None,
+    pending: PendingSelection | PendingText | None,
     action: Action,
 ):
     """Advance the input state machine. Returns the new pending state and, when
@@ -237,6 +249,27 @@ def _apply(
             return None, None
         case BeginSelection(choice=choice):
             return PendingSelection(choice=choice), None
+        case BeginText(choice=choice):
+            authored = choice.payload
+            text = authored.get("text", "") if isinstance(authored, dict) else ""
+            text = text if isinstance(text, str) else ""
+            return PendingText(
+                choice=choice, text=text, caret=len(text), step=frame.step,
+                session=(bridge.user_id, bridge.ledger_id, bridge.world_id),
+            ), None
+        case SubmitText():
+            if not isinstance(pending, PendingText) or not _text_current(pending, bridge, frame):
+                return None, None
+            if pending.composition:
+                pending.error = "Finish composing text before submitting."
+                return pending, None
+            try:
+                payload = commit_payload(pending.choice, [pending.text])
+                envelope = bridge.choose(pending.choice.edge_id, payload)
+            except ValueError as exc:
+                pending.error = str(exc)
+                return pending, None
+            return None, envelope
         case PageSelection():
             stage.selection_scroll += 1
             return pending, None
@@ -260,6 +293,14 @@ def _apply(
         case Commit(edge_id=edge_id, payload=payload):
             return None, bridge.choose(edge_id, payload)
     return pending, None
+
+
+def _text_current(editor: PendingText, bridge: PygameSessionBridge, frame: Turn) -> bool:
+    return (
+        editor.session == (bridge.user_id, bridge.ledger_id, bridge.world_id)
+        and editor.step == frame.step
+        and any(choice == editor.choice and choice.available for choice in frame.choices)
+    )
 
 
 def _commit_pending(bridge: PygameSessionBridge, pending: PendingSelection):
@@ -366,6 +407,9 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         logo_source=bridge.logo_source,
     )
     stage.preference_controls = _preference_controls(bridge, preferences)
+    # Gameplay is not text input: the key opening an editor must not also type
+    # itself into its buffer. TEXTINPUT starts only once that offer has focus.
+    pygame.key.stop_text_input()
     frame = _frame(bridge, envelope)
 
     for step in range(args.advance):
@@ -384,7 +428,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 if choice.available
                 and (
                     choice_action(choice) is None
-                    or isinstance(choice_action(choice), BeginSelection)
+                    or isinstance(choice_action(choice), (BeginSelection, BeginText))
                 )
             ]
             if blocked:
@@ -406,22 +450,38 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         pygame.image.save(stage.window, str(args.screenshot))
         return 0
 
-    pending: PendingSelection | None = None
+    pending: PendingSelection | PendingText | None = None
     running = True
     while running:
+        stale_text = False
         for event in _next_events(stage):
-            if event.type == pygame.NOEVENT:
-                continue
+            if event.type == pygame.QUIT:
+                running = False
+                break
+            if isinstance(pending, PendingText) and not _text_current(pending, bridge, frame):
+                pending = None
+                stale_text = True
+                pygame.key.stop_text_input()
+                stage.draw(frame, media_visibility=bridge.media_visibility())
             if bridge.voice_player is not None and bridge.voice_player.handle_event(event):
+                continue
+            if stale_text or event.type == pygame.NOEVENT:
                 continue
             if event.type == pygame.KEYDOWN and _music_key(event, music):
                 continue
-            if stage.chrome is not None and stage.chrome.handle_event(event, stage.display_scale):
+            if (not isinstance(pending, PendingText) and stage.chrome is not None
+                    and stage.chrome.handle_event(event, stage.display_scale)):
                 stage.draw(frame, pending, media_visibility=bridge.media_visibility())
                 continue
             action: Action | None = None
-            if event.type == pygame.QUIT:
-                running = False
+            if isinstance(pending, PendingText):
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    action = stage.hit(event.pos)
+                else:
+                    action = pending.handle(event)
+                if action is None:
+                    stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+                    continue
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 action = stage.hit(event.pos)
             elif event.type == pygame.MOUSEWHEEL:
@@ -457,7 +517,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 elif (
                     pending is None
                     and not event.mod & (pygame.KMOD_CTRL | pygame.KMOD_ALT | pygame.KMOD_GUI)
-                    and (position := position_for_key(event.unicode)) is not None
+                    and (position := position_for_key(_choice_letter(event))) is not None
                 ):
                     # Letters reach the choice list only. The selection panel
                     # binds digits to its own controls, so a letter there would
@@ -466,7 +526,14 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
 
             if action is None:
                 continue
+            was_text = isinstance(pending, PendingText)
             pending, envelope = _apply(bridge, stage, frame, pending, action)
+            if isinstance(pending, PendingText) and not was_text:
+                pygame.key.start_text_input()
+                if stage.chrome is not None:
+                    stage.chrome.open = False
+            elif was_text and not isinstance(pending, PendingText):
+                pygame.key.stop_text_input()
             if isinstance(action, TogglePreference):
                 stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
@@ -475,11 +542,19 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                                status_available=bridge.status_available, session_id=bridge.ledger_id)
                 pygame.display.set_caption(_world_title(bridge))
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+            if isinstance(pending, PendingText):
+                rect = pending.field_rect
+                pygame.key.set_text_input_rect(pygame.Rect(
+                    stage.window_point(rect.topleft),
+                    (rect.width * stage.display_scale, rect.height * stage.display_scale),
+                ))
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze
         # every clip for as long as the pointer moved.
         if stage.animating and stage.since_drawn_ms() >= FRAME_MS:
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+    if isinstance(pending, PendingText):
+        pygame.key.stop_text_input()
     return 0
 
 

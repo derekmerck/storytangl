@@ -24,7 +24,7 @@ from tangl.pygame_client.models import (  # noqa: E402
     Turn,
     Zone,
 )
-from tangl.presentation.intent import PiecesAccepts, TextAccepts  # noqa: E402
+from tangl.presentation.intent import PiecesAccepts, QuantityAccepts  # noqa: E402
 from tangl.pygame_client.models import PagePanel  # noqa: E402
 from tangl.pygame_client.stage import (  # noqa: E402
     CHOICE_KEYS,
@@ -453,11 +453,11 @@ def test_an_unsupported_map_choice_is_dimmed_and_explains_itself(stage) -> None:
     the choice was on offer.
     """
 
-    choice = Choice(edge_id=uuid4(), text="Say something", accepts=TextAccepts())
+    choice = Choice(edge_id=uuid4(), text="Choose an amount", accepts=QuantityAccepts())
 
     assert choice_action(choice) is None
-    assert unsupported_reason(choice) == "needs text input"
-    assert "needs text input" in Stage._choice_label(1, choice)
+    assert unsupported_reason(choice) == "needs quantity input"
+    assert "needs quantity input" in Stage._choice_label(1, choice)
 
 
 # ── fractional staging (placement, not slotting) ─────────────────────────────
