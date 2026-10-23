@@ -31,7 +31,7 @@ def test_audio_file_metadata_declares_format_not_codec(extension: str, mime_type
     assert "codec" not in rit.unstructure()
     restored = StructuringHandler.structure(
         Json.deserialize(Json.serialize(rit.unstructure())),
-        kind_map={"MediaResourceInventoryTag": MediaResourceInventoryTag},
+        kind_map={MediaResourceInventoryTag.__fqn__(): MediaResourceInventoryTag},
     )
     assert restored.uid == rit.uid
     assert restored.media_format == extension

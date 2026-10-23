@@ -84,7 +84,7 @@ def test_authored_audio_provisions_and_restores_through_real_json(audio_session:
         dep = next(ledger.cursor.edges_out(Selector(has_kind=MediaDep)))
         restored = next(f for f in ledger.output_stream.values() if isinstance(f, MediaFragment))
         assert isinstance(persistence.storage[ledger.uid], str)
-        assert json.loads(persistence.storage[ledger.uid])["kind"] == "Ledger"
+        assert json.loads(persistence.storage[ledger.uid])["kind"] == "tangl.vm.runtime.ledger.Ledger"
         assert restored.content is dep.provider is ledger.graph.get(emitted.rit_id)
         assert restored.uid == emitted.uid
         assert restored.content.path == path
