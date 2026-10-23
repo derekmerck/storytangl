@@ -961,7 +961,7 @@ populated `kv_list`s (see §2.5.1).
 | `item_list` | `items: list[{label, detail?, tags?}]` | roster | `- label (detail) [tags]` | listbox + detail |
 | `table` | `columns: list[str]`, `rows: list[list[PrimitiveValue]]` | `<table>` | aligned columns | `ttk.Treeview` |
 | `badges` | `items: list[str]` | chips | `[tag1][tag2]` | small labels |
-| `branding` | `name`, optional `logo_media`, `light`, `dark` theme tokens | world identity / theme | labeled fields | labels + theme hints |
+| `branding` | `name`, optional `logo_media`, `banner_media`, `light`, `dark` theme tokens | world identity / theme | labeled fields; `banner_media` printed as the story begins | labels + theme hints |
 
 `kv_list` is the workhorse: it absorbs ledger-like data, capacity bars,
 deltas, and styled rows via the field-population mechanics in §2.5.1.

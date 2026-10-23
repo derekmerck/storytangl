@@ -23,6 +23,8 @@ class MediaDataType(EnumPlusMixin, Enum):
 
     AUDIO = "audio"  # roles such as music and voice are separate
 
+    TEXT = "text"  # plain text a text client prints as is, such as a world's banner
+
     VIDEO = "video"  # generic video default, mp4
     OTHER = "other"  # unrecognized media type
 
@@ -34,6 +36,7 @@ class MediaDataType(EnumPlusMixin, Enum):
             cls.IMAGE: ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
             cls.VECTOR: ["svg", "ai"],
             cls.AUDIO: list(AUDIO_MIME_TYPES),
+            cls.TEXT: ["txt"],
             cls.VIDEO: ["mp4", "mkv", "webm"],
         }
 

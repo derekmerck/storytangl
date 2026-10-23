@@ -3,12 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
-from tangl.presentation.projection import ProjectedState
+from tangl.presentation.projection import BrandingValue, ProjectedState
+from tangl.service.media import MediaContentProfile, MediaRenderProfile
 
 from ..rendering import _choice_blocker_messages, _choice_refusal_text
 from tangl.service.response import (
@@ -121,6 +123,28 @@ class StoryController(CommandSet):
 
     def _call_service(self, method_name: str, **params: Any) -> Any:
         return self._cmd.call_service(method_name, **params)
+
+    def _world_banner(self, world_id: str) -> str | None:
+        """The banner a world brands itself with for text clients, if it has one.
+
+        It is one of the world's media (``banner_media``), read like any other,
+        with the engine's version where it says ``{version}``.
+        """
+
+        state = cast(ProjectedState, self._call_service(
+            "get_world_info", world_id=world_id, channels=["ui-branding"],
+        ))
+        brand = next(s.value for s in state.sections if isinstance(s.value, BrandingValue))
+        if brand.banner_media is None:
+            return None
+        payload = self._call_service(
+            "get_world_media", world_id=world_id, media=brand.banner_media,
+            render_profile=MediaRenderProfile(content_profile=MediaContentProfile.PASSTHROUGH),
+        )
+        if payload is None or payload["content_format"] != "path" or payload["media_type"] != "text":
+            return None
+        banner = Path(payload["path"]).read_text(encoding="utf-8")
+        return banner.replace("{version}", self._cmd.display_version).rstrip("\n")
 
     def _apply_runtime_envelope(self, envelope: RuntimeEnvelope) -> None:
         payload = envelope.to_dto()
@@ -241,6 +265,7 @@ class StoryController(CommandSet):
             self._cmd.terminal_renderer.story_created(
                 title=title,
                 ledger_id=ledger_id,
+                banner=self._world_banner(args.world_id),
                 fragments=self._current_story_update,
                 choices=self._current_choices,
                 ux_events=self._current_ux_events,
