@@ -16,6 +16,8 @@ from tangl.journal.fragments import (
     KvFragment,
     MediaFragment,
     PieceFragment,
+    fragment_from_dto,
+    fragment_to_dto,
 )
 from tangl.presentation.intent import (
     Blocker,
@@ -50,6 +52,20 @@ from tangl.pygame_client.models import Choice, PendingSelection, Piece, StageIma
 @pytest.fixture
 def bridge() -> PygameSessionBridge:
     return PygameSessionBridge()
+
+
+def test_json_placeholder_never_becomes_a_stage_image(bridge: PygameSessionBridge) -> None:
+    fragment = MediaFragment(
+        content={"name": "images/missing.svg", "unresolved_reason": "no_offers"},
+        content_format="json", content_type="image", media_role="narrative_im",
+    )
+    hydrated = fragment_from_dto(Json.deserialize(Json.serialize(fragment_to_dto(fragment))))
+
+    turn = bridge.build_turns([hydrated, ChoiceFragment(text="Continue", edge_id=uuid4())])[0]
+
+    assert not turn.images
+    assert turn.choices
+    assert not turn.lines
 
 
 class _WorldInfoService:

@@ -366,7 +366,7 @@ class MediaFragment(ContentFragment, extra="allow"):
         return self
 
     @field_serializer("content")
-    def _encode_binary_content(self, content: Any) -> str:
+    def _encode_binary_content(self, content: Any) -> str | dict[str, Any]:
         """Serialize content by format, never by falling back to ``repr``.
 
         A graph-owned :class:`MediaRIT` has no JSON encoder, so the bare
@@ -376,8 +376,12 @@ class MediaFragment(ContentFragment, extra="allow"):
         needs to name the resource. Persistence is unaffected either way:
         :meth:`unstructure` drops ``content`` for RIT media entirely and
         :meth:`structure` rebinds it from the owning graph.
+        JSON content stays structured in both DTOs and constructor form;
+        Pydantic handles its JSON-safe value encoding.
         """
 
+        if self.content_format == "json":
+            return content
         if self.content_format == "data" and isinstance(content, bytes):
             return b64encode(content).decode("utf-8")
         if self.content_format == "rit" and isinstance(content, MediaRIT):

@@ -6,6 +6,7 @@ unknown-fragment fallback, and discriminator validation.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -17,13 +18,48 @@ from tangl.journal.fragments import (
     AttributedFragment,
     ChoiceFragment,
     ContentFragment,
+    ContentFormatType,
     MediaFragment,
     PieceFragment,
     fragment_from_dto,
     fragment_to_dto,
 )
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.persistence.structuring import StructuringHandler
 from tangl.presentation.intent import Blocker, CostPreview, UIHints
+
+
+def test_json_media_preserves_structured_content_through_dto_and_constructor_form() -> None:
+    content = {
+        "name": "audio/theme.mp3",
+        "unresolved_reason": "no_offers",
+        "resolution_meta": {"alternatives": [{"scope": "world", "accepted": False}]},
+    }
+    fragment = MediaFragment(content=content, content_format="json", media_role="music")
+
+    dto = json.loads(json.dumps(fragment_to_dto(fragment)))
+    assert dto["content"] == content
+    assert fragment_from_dto(dto).content == content
+    constructor = Json.deserialize(Json.serialize(fragment.unstructure()))
+    assert constructor["content"] == content
+    restored = StructuringHandler.structure(
+        constructor, kind_map={MediaFragment.__fqn__(): MediaFragment},
+    )
+    assert isinstance(restored, MediaFragment)
+    assert restored.content == content
+
+
+def test_json_media_uses_normal_pydantic_json_value_encoding() -> None:
+    identifier = uuid4()
+    fragment = MediaFragment(
+        content={"metadata": {"id": identifier, "path": Path("audio/theme.mp3")}},
+        content_format="json",
+    )
+
+    assert fragment_to_dto(fragment)["content"] == {
+        "metadata": {"id": str(identifier), "path": "audio/theme.mp3"},
+    }
 
 
 def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
@@ -223,10 +259,21 @@ def test_media_rit_dto_falls_back_to_the_path_name() -> None:
     assert fragment_to_dto(fragment)["content"] == "salon_bg.png"
 
 
-def test_non_rit_media_content_is_left_alone() -> None:
-    fragment = MediaFragment(content="cover.png", content_format="url")
+@pytest.mark.parametrize(
+    "content_format, content, expected",
+    [
+        ("url", "https://example.test/cover.png", "https://example.test/cover.png"),
+        ("path", Path("images/cover.png"), "images/cover.png"),
+        ("xml", "<svg/>", "<svg/>"),
+        ("data", b"abc", "YWJj"),
+    ],
+)
+def test_non_rit_media_content_keeps_its_encoding(
+    content_format: ContentFormatType, content: str | Path | bytes, expected: str,
+) -> None:
+    fragment = MediaFragment(content=content, content_format=content_format)
 
-    assert fragment_to_dto(fragment)["content"] == "cover.png"
+    assert fragment_to_dto(fragment)["content"] == expected
 
 
 def test_media_rit_persistence_still_drops_content() -> None:

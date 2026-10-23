@@ -23,6 +23,20 @@ def _transcript(fragments: list[object]) -> list[str]:
     return [str(line) for line in renderer.story_update(fragments=fragments, choices=[])]
 
 
+def test_arbitrary_json_media_is_not_labelled_unresolved() -> None:
+    assert _plain_fragment_lines({
+        "fragment_type": "media", "content_format": "json", "media_role": "music",
+        "content": {"name": "theme.mp3", "metadata": {"private": "secret"}},
+    }) == ["[music: music]"]
+
+
+def test_unresolved_media_without_name_uses_role() -> None:
+    assert _plain_fragment_lines({
+        "fragment_type": "media", "content_format": "json", "media_role": "music",
+        "content": {"unresolved_reason": "no_offers"},
+    }) == ["[music: music (unresolved: no_offers)]"]
+
+
 def test_group_fragment_names_itself_without_its_members() -> None:
     """A group is a relational overlay: it draws its own identity, not its
     contents, because the members are peer fragments that render themselves."""

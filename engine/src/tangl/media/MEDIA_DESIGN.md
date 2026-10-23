@@ -8,6 +8,8 @@
 ```
 
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
+> #602 preserves structured JSON placeholder content through DTO and constructor-form
+> serialization; CLI renders only the named resource and unresolved reason.
 > #514 reuses manager-local pure lexical relative-path derivations during lookup.
 > Graph-local static admission/JSON restoration is covered as the current stopgap
 > for CarWars #34; scoped catalog/provenance design remains deferred under #284.
@@ -876,6 +878,12 @@ a path — never still a `"rit"`. `_base_payload` therefore takes the representa
 as a required argument: defaulting it made "forgot to relabel" the silent
 fallback, and `MEDIA_SERVER` shipped dereferenced payloads labelled `"rit"` for
 long enough that the web client encoded the lie as a pending-media check.
+
+Unresolved placeholders carry `content_format: "json"`, not a loadable source.
+Fragment DTOs retain the structured object under `content`; the service media
+payload keeps its existing flattened JSON fields. Neither representation is a
+Python repr string. Text clients name the resource and `unresolved_reason`;
+image/audio clients must not interpret the placeholder's `name` as a source.
 
 | Tier | Profile | Payload | Built |
 |---|---|---|---|

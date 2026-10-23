@@ -6,6 +6,7 @@ import * as directives from 'vuetify/directives'
 
 import StoryBlock from './StoryBlock.vue'
 import StoryAction from './StoryAction.vue'
+import { mediaContentUrl, mediaData } from './fragmentUtils'
 import type { StoryFragment, StorySceneModel } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
@@ -31,6 +32,30 @@ const mountBlock = (fragments: Record<string, StoryFragment>, memberIds: string[
   })
 
 describe('StoryBlock', () => {
+  it.each(['nested', 'flattened'])('keeps %s JSON media placeholders non-loadable', (shape) => {
+    const content = {
+      name: 'audio/theme.mp3',
+      unresolved_reason: 'no_offers',
+      resolution_meta: { alternatives: [{ scope: 'world', accepted: false }] },
+    }
+    const media = {
+      uid: 'media',
+      fragment_type: 'media' as const,
+      content_format: 'json',
+      media_role: 'music',
+      ...(shape === 'nested' ? { content } : content),
+    }
+    const wrapper = mountBlock({ media }, ['media'])
+
+    expect(mediaContentUrl(media)).toBeUndefined()
+    expect(mediaData(media)).toBeUndefined()
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
+    expect(wrapper.find('audio, video, img').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'VImg' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'VParallax' }).exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   beforeEach(() => {
     vi.stubEnv('VITE_DEBUG', 'false')
     vi.stubEnv('VITE_VERBOSE', 'false')
