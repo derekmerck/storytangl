@@ -158,6 +158,18 @@ def stamp_requirement_resolution(
     requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
 
 
+def _restore_requirement_kind(
+    value: Requirement[PT] | dict[str, Any],
+) -> Requirement[PT] | dict[str, Any]:
+    """Restore an explicit Entity kind reference at a requirement-owner field."""
+    if isinstance(value, dict) and isinstance(value.get("has_kind"), str):
+        kind = Entity.dereference_cls_name(value["has_kind"])
+        if kind is None:
+            raise ValueError(f"Unknown requirement kind reference: {value['has_kind']!r}")
+        return {**value, "has_kind": kind}
+    return value
+
+
 class HasRequirement(RegistryAware, Generic[PT]):
     """HasRequirement(requirement: Requirement[PT])
 
@@ -211,18 +223,9 @@ class HasRequirement(RegistryAware, Generic[PT]):
 
     requirement: Requirement[PT]
 
-    @field_validator("requirement", mode="before")
-    @classmethod
-    def _restore_requirement_kind(
-        cls, value: Requirement[PT] | dict[str, Any],
-    ) -> Requirement[PT] | dict[str, Any]:
-        """Restore the explicit Entity kind reference in constructor-form input."""
-        if isinstance(value, dict) and isinstance(value.get("has_kind"), str):
-            kind = Entity.dereference_cls_name(value["has_kind"])
-            if kind is None:
-                raise ValueError(f"Unknown requirement kind reference: {value['has_kind']!r}")
-            return {**value, "has_kind": kind}
-        return value
+    _restore_requirement_kind = field_validator("requirement", mode="before")(
+        _restore_requirement_kind,
+    )
 
     # delegators
 
@@ -424,6 +427,9 @@ class Fanout(Edge, Generic[PT]):
     """
 
     requirement: Requirement[PT]
+    _restore_requirement_kind = field_validator("requirement", mode="before")(
+        _restore_requirement_kind,
+    )
     provider_ids: list[UUID] = Field(default_factory=list)
 
     @property

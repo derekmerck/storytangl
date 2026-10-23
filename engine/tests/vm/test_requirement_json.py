@@ -8,22 +8,37 @@ from tangl.core import Graph, Selector
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.story import Action, InitMode, World
 from tangl.vm import Ledger, TraversableNode
-from tangl.vm.provision import Dependency, HasRequirement, Requirement
+from tangl.vm.provision import Affordance, Dependency, Fanout, HasRequirement, Requirement
 from tangl.vm.dispatch import on_gather_ns, on_update
 from tangl.vm.system_handlers import apply_selected_edge_effects, contribute_runtime_baseline
 
 
-@pytest.mark.parametrize("carrier_kind", [HasRequirement, Dependency])
+@pytest.mark.parametrize("carrier_kind", [HasRequirement, Dependency, Affordance, Fanout])
 def test_owned_requirement_kind_uses_existing_entity_class_lookup(carrier_kind: type) -> None:
     graph = Graph()
-    provider = TraversableNode(label="target", registry=graph)
+    literal = {"has_kind": "not_a_loaded_entity.Class"}
+    provider = TraversableNode(label="target", registry=graph, locals={"literal": literal})
+    other = TraversableNode(label="other", registry=graph)
     carrier = carrier_kind(
-        requirement=Requirement(has_kind=TraversableNode, has_identifier="target"), registry=graph,
+        requirement=Requirement(has_kind=TraversableNode), registry=graph,
     )
     restored = Graph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
-    requirement = restored.get(carrier.uid).requirement
+    restored_carrier = restored.get(carrier.uid)
+    requirement = restored_carrier.requirement
     assert requirement.has_kind is TraversableNode
-    assert requirement.satisfied_by(restored.get(provider.uid))
+    restored_provider = restored.get(provider.uid)
+    restored_other = restored.get(other.uid)
+    assert requirement.satisfied_by(restored_provider)
+    assert requirement.satisfied_by(restored_other)
+    assert restored_provider.locals["literal"] == literal
+    if isinstance(restored_carrier, Fanout):
+        restored_carrier.set_providers([restored_provider, restored_other])
+        assert restored_carrier.providers == [restored_provider, restored_other]
+        assert restored_carrier.providers[0] is restored_provider
+        assert restored_carrier.providers[1] is restored_other
+    else:
+        restored_carrier.set_provider(restored_provider)
+        assert restored_carrier.provider is restored_provider
 
 
 def test_unresolved_lazy_destination_resolves_after_graph_and_ledger_json_restore() -> None:
@@ -54,6 +69,16 @@ def test_unresolved_lazy_destination_resolves_after_graph_and_ledger_json_restor
     assert restored.graph.locals["count"] == 1
 
 
-def test_unknown_persisted_kind_is_not_imported_or_guessed() -> None:
+@pytest.mark.parametrize("carrier_kind", [HasRequirement, Dependency, Affordance, Fanout])
+def test_unknown_persisted_kind_is_not_imported_or_guessed(carrier_kind: type) -> None:
     with pytest.raises(ValueError, match="Unknown requirement kind reference"):
-        HasRequirement(requirement={"has_kind": "not_a_loaded_entity.Class"})
+        carrier_kind(requirement={"has_kind": "not_a_loaded_entity.Class"})
+
+
+@pytest.mark.parametrize("carrier_kind", [HasRequirement, Dependency, Affordance, Fanout])
+def test_live_requirement_criteria_keep_their_existing_behavior(carrier_kind: type) -> None:
+    requirement = Requirement(has_kind=TraversableNode)
+    carrier = carrier_kind(requirement=requirement)
+    assert carrier.requirement is requirement
+    assert requirement.has_kind is TraversableNode
+    assert requirement.satisfied_by(TraversableNode(label="live"))
