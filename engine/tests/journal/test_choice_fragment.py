@@ -33,7 +33,8 @@ from tangl.journal.prose import ChoiceFragment
 def test_reference_accepts_cross_real_json_and_keep_string_dto_fields(accepts) -> None:
     fragment = ChoiceFragment(edge_id=uuid4(), text="Select", accepts=accepts)
     restored = StructuringHandler.structure(
-        Json.deserialize(Json.serialize(fragment.unstructure())), {"ChoiceFragment": ChoiceFragment},
+        Json.deserialize(Json.serialize(fragment.unstructure())),
+        {ChoiceFragment.__fqn__(): ChoiceFragment},
     )
     assert restored.accepts == accepts
     dto = fragment_to_dto(restored)["accepts"]
