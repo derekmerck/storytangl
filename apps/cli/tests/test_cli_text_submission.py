@@ -146,20 +146,43 @@ def test_cli_asks_again_when_the_story_refuses_the_text() -> None:
         assert session.ledger.graph.locals["effect_count"] == 1
 
 
-@pytest.mark.parametrize("cancel", ["blank line", "end of input", "ctrl-d"])
-def test_cli_cancels_a_required_text_prompt_and_keeps_the_choice(
-    cancel: str, monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("reader", ["terminal", "stream"])
+def test_cli_submits_the_word_eof_typed_at_the_prompt(
+    reader: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = _cli(TextAccepts())
-    before = _state(app)
-    if cancel == "ctrl-d":
-        def ctrl_d(_prompt: str) -> str:
-            raise EOFError
-        monkeypatch.setattr(app, "read_input", ctrl_d)
+    # The end of input cancels, but the word "eof" is an answer like any other,
+    # whether typed at a terminal or read from a stream.
+    app = _cli(TextAccepts(validators=[EnumValidator(values=["eof"])]))
+    if reader == "terminal":
+        monkeypatch.setattr("builtins.input", lambda *_: "eof")
     else:
-        _typing(app, *([""] if cancel == "blank line" else []))
+        _typing(app, "eof")
     app.onecmd("do 1")
-    assert "Cancelled." in app.stdout.getvalue()
+    assert "Answer saved." in app.stdout.getvalue()
+    with app.service_manager.open_session(user_id=app.user_id) as session:
+        assert session.ledger.graph.locals["answer"] == "eof"
+
+
+@pytest.mark.parametrize("ending", ["blank line", "end of stream", "ctrl-d",
+                                    "refused, then the end of stream"])
+def test_cli_cancels_a_required_text_prompt_and_keeps_the_choice(
+    ending: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Ctrl-D at a terminal and a stream run out both end the prompt, so a
+    # script that ends on a refused answer stops rather than asking forever.
+    app = _cli(TextAccepts(validators=[LengthValidator(min=2, max=8)]))
+    before = _state(app)
+    if ending == "ctrl-d":
+        def ctrl_d(*_: object) -> str:
+            raise EOFError
+        monkeypatch.setattr("builtins.input", ctrl_d)
+    else:
+        _typing(app, *{"blank line": [""], "end of stream": [],
+                       "refused, then the end of stream": ["x"]}[ending])
+    app.onecmd("do 1")
+    output = app.stdout.getvalue()
+    assert output.rstrip().endswith("Cancelled.")
+    assert ("at least 2" in output) == ending.startswith("refused")
     assert _state(app) == before
     monkeypatch.undo()
     app.onecmd("do 1 Dana")

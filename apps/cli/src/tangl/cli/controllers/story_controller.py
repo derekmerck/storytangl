@@ -4,7 +4,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TextIO, cast
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
@@ -24,6 +24,27 @@ from tangl.service.response import (
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
+
+
+class _EndRaises:
+    """A stream whose end raises ``EOFError``, as ``input()``'s does.
+
+    cmd2 reads an alternate stream (``use_rawinput`` off) as the text "eof"
+    once it runs out, which a reader may also type. Read through this, the end
+    of the stream and the word stay different.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def readline(self) -> str:
+        line = self._stream.readline()
+        if not line:
+            raise EOFError
+        return line
+
+    def isatty(self) -> bool:
+        return self._stream.isatty()
 
 
 @dataclass(frozen=True)
@@ -364,22 +385,24 @@ class StoryController(CommandSet):
     def _ask_for_text(self, choice: _CachedChoice) -> None:
         """Take a text choice's text the way a modal would.
 
-        Enter submits the line exactly as typed. Ctrl-D, or a blank line where
-        text is required, cancels and leaves the choices as they were. A refusal
-        -- the story validates the text (``TextAccepts``) -- says why and asks
-        again.
+        Enter submits the line exactly as typed. The end of input -- Ctrl-D, or
+        a script run out -- or a blank line where text is required, cancels and
+        leaves the choices as they were. A refusal -- the story validates the
+        text (``TextAccepts``) -- says why and asks again.
         """
 
         accepts = cast(dict[str, Any], choice.accepts)
         required = bool(accepts.get("required", True))
         prompt = f"{accepts.get('placeholder') or choice.label}{' (blank cancels)' if required else ''}> "
         while True:
+            stdin, self._cmd.stdin = self._cmd.stdin, _EndRaises(self._cmd.stdin)
             try:
                 text = self._cmd.read_input(prompt)
             except EOFError:
                 text = None
-            # Ctrl-D at a terminal raises; cmd2 reports the end of piped input as "eof".
-            if text in (None, "eof") or (required and not text.strip()):
+            finally:
+                self._cmd.stdin = stdin
+            if text is None or (required and not text.strip()):
                 self._cmd.poutput("Cancelled.")
                 return
             try:
