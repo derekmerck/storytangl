@@ -9,6 +9,8 @@ authority. Start with the [authoring guide](../../../../docs/src/design/story/PR
 for activation, naming examples, voice/environment policy, and escape hatches.
 The #562 packed-look backend slice is opt-in through `tangl.prose.portraits`;
 per-line client realization remains deferred to #538/#587.
+#578 slice 1 shares personal-name enrichment with non-Actor Player compositions;
+parser-policy decisions and #577 speech/discovery remain separate.
 
 The shared `TextRenderSession` environment supports explicit `upper_first`:
 `text[:1].upper() + text[1:]`, with empty text unchanged and no trimming. Ordinary
@@ -190,7 +192,10 @@ names and deliberate proper forms/aliases, excluding the generated display-only
 adoption phrase. Ordinary speech remains opaque; narration only links with the
 separate scoped consent below.
 
-`PersonalNamedActor` optionally embeds the existing `tangl.lang.PersonalName`.
+`PersonalNamedConcept` optionally embeds the existing `tangl.lang.PersonalName`.
+`PersonalNamedActor(PersonalNamedConcept, NamedActor)` retains its public type
+and Actor/NamedActor relationships. A world may instead compose
+`NamedPlayer(PersonalNamedConcept, Player)` without acquiring Actor identity.
 Basic named actors, places and items do not need one. `PersonalName.forms()`
 preserves the provenance that `akas()` flattens: proper, familiar, formal, full,
 familiar_full, formal_full, given, family, nickname, then sorted explicit aliases.
@@ -198,13 +203,33 @@ This local order decides duplicate spelling precedence; explicit proper-form and
 alias parameter overrides remain available. No universal form ranking or
 relationship/formality simulation is implied. Lang imports no Story/prose code.
 PersonalName uses ordinary `Unstructurable` constructor form, with the explicit
-include/recursion markers on the owning actor field and include on mutable aliases.
+include/recursion markers on the owning concept field and include on mutable aliases.
 Empty/aliases-only personal names discover only their available aliases; they do
 not require given/family/nickname data or block the actor's display-name fallback.
 MuBlock's existing marked text field retains reference parameters, including
 in-place edits. Owner graph constructor/flat JSON and normally bootstrapped
 fresh-process service witnesses retain declared types, state and knowledge with
 no extra components, class registry, owner pointers or custom serializers.
+
+The #578 first slice is only this reusable enrichment. The personal-name field
+remains optional/None by default; vanilla Player has no naming enrichment.
+World-specific field defaults must retain explicit include/unstructurable markers
+when overridden. In-place edits to default-created PersonalName values, explicit
+proper_forms and declared aliases survive the owning graph/Ledger JSON path.
+Normal NamingOperations dispatch and per-narrator knowledge are unchanged.
+
+A world rename is an ordinary Action UPDATE effect. It replaces an explicitly
+constructed PersonalName and deliberately maintains its chosen `NamedConcept.name`
+display floor; `personal_name` alone does not synchronize `name` or
+`Player.full_name`. Saved fragments remain as emitted while later explicit
+references realize the new name. JSON-backed ServiceManager reopening reads the
+same session with normal World/type registration, not a reset or cold bootstrap.
+See the [explicit rename example](../../../../docs/src/design/story/PROSE_AUTHORING.md#optional-personal-names-on-player).
+
+No PersonalName parsing, gender/title inference/defaults, lexical adoption,
+role-owned spelling discovery, speech linking, automatic alias history or
+template/UI sugar changes here. The remaining #578 parser-policy decisions and
+#577 discovery/speech work stay separate.
 
 The demo's domain explicitly materializes/nominates one `NamedSword` at the
 existing story-ready/namespace boundaries through EntityTemplate. It does not
