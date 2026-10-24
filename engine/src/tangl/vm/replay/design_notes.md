@@ -1,5 +1,8 @@
 # Replay Architecture — Patches, Step Records, and Reconstruction
 
+Status: current MVP replay contract, including insertion-order preservation for
+new graph members.
+
 ## Context
 
 The VM phase pipeline has two mutation windows bracketing the journal:
@@ -36,6 +39,14 @@ order. Arbitrary Python-object string fallbacks are not a portable hash contract
 This corrects the former order-dependent set string encoding: stored checkpoints
 and patches containing those old hashes must be regenerated, not accepted by
 disabling integrity checks or by a legacy hash fallback.
+
+`DiffReplayEngine` emits CREATE events in `after_graph.members` insertion order,
+not UUID order. Registry membership is an ordered list in constructor form, and
+first-match selection observes that order. Replaying new members must therefore
+preserve both their logical IDs and their insertion order, so the final hash and
+the next patch's initial guard agree. Existing DELETE/UPDATE behavior is unchanged:
+deletion preserves survivor order and replacement retains the member's position.
+This does not add support for arbitrary reordering of existing registry members.
 
 ### RegistryObserver (vm/replay/observer.py)
 
