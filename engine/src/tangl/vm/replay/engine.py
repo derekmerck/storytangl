@@ -39,9 +39,8 @@ class DiffReplayEngine:
                 )
             )
 
-        for item_id in sorted(after_ids - before_ids, key=str):
-            item = after_graph.get(item_id)
-            if item is None:
+        for item_id, item in after_graph.members.items():
+            if item_id in before_ids:
                 continue
             events.append(
                 Event(
