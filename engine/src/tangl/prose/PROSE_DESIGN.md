@@ -7,6 +7,8 @@ implemented. #557's compile-time-only linker was closed
 unmerged; its useful lexical witnesses informed the replacement, not its runtime
 authority. Start with the [authoring guide](../../../../docs/src/design/story/PROSE_AUTHORING.md)
 for activation, naming examples, voice/environment policy, and escape hatches.
+The #562 packed-look backend slice is opt-in through `tangl.prose.portraits`;
+per-line client realization remains deferred to #538/#587.
 
 The shared `TextRenderSession` environment supports explicit `upper_first`:
 `text[:1].upper() + text[1:]`, with empty text unchanged and no trimming. Ordinary
@@ -328,7 +330,106 @@ labels before their own bodies, while raw whole-block Jinja still runs before
 composition. Existing explicit body/reference/introduce operations share one
 provider/narrator knowledge record. No new phase or epistemic snapshot is implied.
 
-Speech linking (#577), silent introductions (#566), portrait selection (#562),
-hint vocabulary (#579), and casting/alias history remain deferred. Existing
+Speech linking (#577), silent introductions (#566), hint vocabulary (#579), and
+casting/alias history remain deferred. Packed portrait selection is described below. Existing
 symbolic late binding, historical output, replay and owner-graph JSON restoration
 remain the contract, not automatic rediscovery of former actors' aliases.
+
+## Packed portraits on nominated looks (#562 backend slice)
+
+World domains opt in by composing `HasPortraits` with their graph concept and
+including `portraits.get_authorities()` in their ordinary authority chain. It
+does not require `HasLook`, DiceBear, generated portraits, or naming adoption.
+For example:
+
+```python
+from tangl.prose.portraits import HasPortraits, get_authorities
+from tangl.story import Actor
+
+class Speaker(HasPortraits, Actor):
+    pass
+```
+
+The one canonical declaration is the concept's embedded `portraits: PackedPortraits`:
+
+```yaml
+kind: Speaker
+portraits:
+  default_look: everyday
+  scope: world
+  attitudes:
+    amused: happy
+    relieved: happy
+    dry: skeptical
+    dry.attentive: skeptical
+    flat: neutral
+  looks:
+    everyday:
+      base: portraits/everyday/base.svg
+      expressions:
+        happy: portraits/everyday/happy.svg
+        skeptical: portraits/everyday/skeptical.svg
+    special:
+      base: portraits/special/base.svg
+      expressions:
+        happy: portraits/special/happy.svg
+        skeptical: portraits/special/skeptical.svg
+```
+
+Each `PortraitLook` owns its optional base and expression references. Names are
+open strings, not a standard-eight enum. Attitude lookup is an exact full-string
+mapping, including explicitly authored multi-term chains; there is no term
+ranking, substring matching, or inference. The original `speaker_attitude` and
+`how` remain untouched. Neutral means the selected look's base, not a separately
+required variant. Missing/unmapped attitude also requests that base.
+
+`nominate_portrait_look(*, ctx: PhaseCtx, attitude: str | None)` is the smallest
+world override: return a declared look key, or None to decline. The default
+returns `portraits.default_look`. A world may read existing scoped context, e.g.
+`ctx.get_ns(ctx.cursor).get("portrait_look", self.portraits.default_look)`, including
+an explicit None. Nomination is a pure request-time read; no outfit, mood,
+knowledge, last-used state, or nomination history is changed. An invalid declared
+default fails typed construction; a world override returning an undeclared look
+fails with the provider and look key rather than silently choosing another look.
+
+The shared dialog path resolves a Role/Setting's current provider before speaker
+metadata. The opt-in post-merge composer uses that line's provider identity, not
+its displayed or anonymous name or literal title. Raw callouts and pre-parsed
+mu-blocks therefore share the same selection and output path. Existing
+`adapt_look_media_spec` descriptions (including `HasSimpleLook`) do not shadow
+this ordinary-fragment path, and no resolved transport is hidden in
+`AttributedFragment.media_payload`.
+
+During UPDATE, the opted-in behavior prepares the finite declared references
+of currently scoped providers through ordinary soft `MediaDep` bindings. The
+existing named block-media prelink is shared as
+`MediaInventoryProvisioner.bind_named`, with normal Resolver/inventory offers
+for unresolved references. Lazy providers receive this preparation when they
+appear in scope, before JOURNAL. Source inventories remain read-only; admitted
+providers belong to each story graph. There is no inventory or graph scan per
+dialog line and no global cache or separate palette loader.
+
+Named relative aliases use the manager for the declaration's `scope`: the
+graph's existing story manager (or normal read-only story-manager discovery),
+the current world's resource manager, or the configured system manager. A pinned
+`story`/`sys` request never prelinks a competing world alias. Scope tags still
+constrain ordinary provider offers, and delivery keeps the corresponding story,
+world, or system URL route. Historical RIT restoration needs only the owning
+graph, not those source managers or another nomination.
+
+JOURNAL only reads dependency IDs and graph-owned resources. Fallback is the
+requested expression's usable variant in the nominated look, then that look's
+usable base, then no extra portrait. Missing optional art is soft; there is no
+cross-look fallback, generation, copying, registration, or provisioning during
+selection. Constructor-form fields explicitly opt into include/embedded recursion;
+historical MediaFragments persist graph RIT IDs and restore through the owning
+graph without world lookup or inline duplicates. Playback/patch replay reads
+historical output without nomination or duplicate fragments.
+
+Output is an ordinary `dialog_im` MediaFragment immediately following its
+AttributedFragment, retaining source/step provenance. Service media dereferencing
+is unchanged. Explicit block/base `avatar_im` staging is retained independently.
+The backend does not make pygame visibly switch per line: pygame still flattens
+lines and media into turns, and focus, sides, pacing, pagination, and audio sync
+remain deferred to #538/#587. No bark/history manager, wardrobe/holding migration,
+runtime face composition, or location-prop policy is introduced.

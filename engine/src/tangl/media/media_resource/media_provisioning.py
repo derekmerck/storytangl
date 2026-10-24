@@ -13,6 +13,7 @@ from tangl.type_hints import UnstructuredData
 from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.provision.provisioner import ProvisionOffer, ProvisionPolicy
 from tangl.vm.provision.requirement import Requirement
+from tangl.vm.ctx import VmPhaseCtx
 
 from ..media_creators.composition_forge.composition_inputs import (
     CompositionInputUnavailable,
@@ -30,6 +31,8 @@ from .media_resource_inv_tag import (
 )
 from .media_inventory import MediaInventory
 from .media_resource_registry import MediaResourceRegistry
+from .media_dependency import MediaDep
+from .resource_manager import ResourceManager
 
 on_provision_media = BehaviorRegistry(label="provision_media")
 
@@ -392,6 +395,26 @@ class MediaInventoryProvisioner:
     """Offer EXISTING media providers discovered through authority inventories."""
 
     inventories: list[MediaInventory]
+
+    @staticmethod
+    def bind_named(
+        dep: MediaDep, *, media_id: str, resources: ResourceManager, ctx: VmPhaseCtx,
+    ) -> None:
+        """Prelink a scoped inventory alias through ordinary graph-local admission."""
+        candidate = resources.get_rit(media_id)
+        if candidate is None:
+            return
+        provider = MediaInventoryProvisioner.graph_local_copy(candidate, _ctx=ctx)
+        # ResourceManager owns relative-path aliases; validate the resolved identity.
+        resolved = dep.requirement.model_copy(update={"has_identifier": provider.shortcode()})
+        if not resolved.satisfied_by(provider):
+            return
+        dep.requirement = resolved
+        if provider.registry is not ctx.graph:
+            ctx.graph.add(provider)
+        dep.set_provider(provider, _ctx=ctx)
+        if dep.requirement.resolution_reason is None:
+            dep.requirement.resolution_reason = "direct_media_id"
 
     @staticmethod
     def graph_local_copy(candidate: MediaRIT, *, _ctx: Any = None) -> MediaRIT:

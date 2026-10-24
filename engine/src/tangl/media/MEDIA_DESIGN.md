@@ -10,6 +10,8 @@
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
 > #602 preserves structured JSON placeholder content through DTO and constructor-form
 > serialization; CLI renders only the named resource and unresolved reason.
+> #562's opt-in prose portrait backend selects packed look variants from pre-admitted
+> graph resources; per-line client realization remains deferred to #538/#587.
 > #514 reuses manager-local pure lexical relative-path derivations during lookup.
 > Graph-local static admission/JSON restoration is covered as the current stopgap
 > for CarWars #34; scoped catalog/provenance design remains deferred under #284.
@@ -977,6 +979,18 @@ speaker attitude. Media currently still leans more heavily on namespace
 snapshots. If multiple consumers begin performing the same late-bound
 entity-method calls with different request contexts, that is the moment a
 general request-scoped contribution protocol will have earned its complexity.
+
+The opt-in `tangl.prose.portraits` backend uses ordinary packed inventory
+references, not generation or runtime face composition. A typed prose-side
+declaration owns looks and exact attitude-to-expression policy; UPDATE binds
+their finite resources through soft MediaDeps. `MediaInventoryProvisioner.bind_named`
+is the same named-alias prelink used by ordinary block media, not a second palette
+loader. JOURNAL selects only admitted graph-owned RITs and emits following
+`dialog_im` fragments. Selection never copies or registers assets. Fallback stays
+inside the nominated look: usable expression variant, usable base/neutral, none.
+Normal service dereferencing, source inventory ownership, graph-reference
+restoration, and explicit block/base staging remain unchanged. See
+[packed portrait authoring](../prose/PROSE_DESIGN.md#packed-portraits-on-nominated-looks-562-backend-slice).
 
 ### Indirection Through Content-Addressed Inventory
 

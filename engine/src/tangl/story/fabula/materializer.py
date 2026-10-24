@@ -852,27 +852,11 @@ class StoryMaterializer:
         if resources is None:
             return
 
-        candidate = resources.get_rit(media_id)
-        if candidate is None:
-            return
-
         ctx = self._make_prelink_ctx(
             state=state,
             cursor_id=dep.predecessor_id,
         )
-        provider = MediaInventoryProvisioner.graph_local_copy(candidate, _ctx=ctx)
-        # ResourceManager owns scoped aliases, including subdirectory names.
-        # Validate the resolved resource by identity, not its basename label.
-        resolved = dep.requirement.model_copy(update={"has_identifier": provider.shortcode()})
-        if not resolved.satisfied_by(provider):
-            return
-        dep.requirement = resolved
-
-        if provider.registry is not state.graph:
-            state.graph.add(provider)
-        dep.set_provider(provider, _ctx=ctx)
-        if dep.requirement.resolution_reason is None:
-            dep.requirement.resolution_reason = "direct_media_id"
+        MediaInventoryProvisioner.bind_named(dep, media_id=media_id, resources=resources, ctx=ctx)
 
     def _wire_actions_for_block(
         self,
