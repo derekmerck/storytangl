@@ -28,6 +28,7 @@ from tangl.journal.fragments import AttributedFragment, ContentFragment
 from tangl.presentation.hints import PresentationHints
 from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.ctx import VmPhaseCtx
+from tangl.vm import Dependency
 
 from .mu_block import DialogSpeakerBinding, MuBlock, MuBlockHandler, NameResolver, SpeakerResolver
 from .literals import code_regions
@@ -218,6 +219,12 @@ class DialogMuBlock(MuBlock):
         style_dict: dict[str, str] = {}
         if binding is not None:
             subject = binding.subject
+            if isinstance(subject, Dependency):
+                subject = subject.provider
+                if subject is None:
+                    raise ValueError(
+                        f"source {self.source_id or source_id}: unbound speaker {binding.key!r}"
+                    )
             speaker_key = binding.key
             params = (
                 dict(binding.title_reference.params)
