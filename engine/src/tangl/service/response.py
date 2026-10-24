@@ -249,7 +249,7 @@ class UserSecret(InfoModel):
 class WorldInfo(InfoModel):
     label: str
     title: str | None = None
-    author: str | None = None
+    author: str | list[str] | None = None
 
 
 class AuthoringDiagnostic(InfoModel):
