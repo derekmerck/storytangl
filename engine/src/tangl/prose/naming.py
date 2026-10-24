@@ -116,8 +116,8 @@ class NamedLocation(NamedConcept, Location):
     """Location adopting the same prose naming vocabulary as actors."""
 
 
-class PersonalNamedActor(NamedActor):
-    """Optional personal-name enrichment; basic actors/items need no name parsing."""
+class PersonalNamedConcept(NamedConcept):
+    """Optional personal-name forms for a world-composed graph concept."""
 
     personal_name: PersonalName | None = Field(
         default=None, json_schema_extra={"include": True, "unstructurable": True},
@@ -126,6 +126,10 @@ class PersonalNamedActor(NamedActor):
     def _proper_forms(self) -> dict[str, str]:
         generated = self.personal_name.forms() if self.personal_name is not None else {}
         return generated | self.proper_forms
+
+
+class PersonalNamedActor(PersonalNamedConcept, NamedActor):
+    """Actor retaining the optional personal-name enrichment and naming behavior."""
 
 
 def _scoped_named_bindings(ns: Mapping[str, object]) -> dict[str, tuple[str, NamedConcept]]:

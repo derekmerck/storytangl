@@ -126,8 +126,9 @@ an explicit, idempotent identification for the active narrator.
 
 `reference(host, form='formal')` requests a form, not disclosure. An unknown
 concealed person can still be anonymous. `reference(host, 'proper', form='formal')`
-explicitly forces that wording without introducing anyone. `PersonalNamedActor`
-can optionally supply forms from the existing `PersonalName` value; ordinary named
+explicitly forces that wording without introducing anyone. `PersonalNamedConcept`
+and its actor composition `PersonalNamedActor` can optionally supply forms from
+the existing `PersonalName` value; ordinary named
 actors, places, and items need no personal-name parser. Worlds may override nominal
 selection or ordinary named text-aspect handlers for their own policy.
 
@@ -137,6 +138,56 @@ narrator; recasting a role with Nanae does not transfer it. The standard narrato
 key comes from context metadata, defaulting to `_`. Reading references or
 `peek_knowledge()` does not create an unknown record. Speaking does not select a
 new narrator automatically.
+
+### Optional personal names on Player
+
+A world can reuse the same enrichment without making its Player an Actor:
+
+```python
+from tangl.prose.naming import PersonalNamedConcept
+from tangl.story import Player
+
+class NamedPlayer(PersonalNamedConcept, Player):
+    pass
+```
+
+The world adopts the existing naming authorities and materializes its Player
+through the normal template/world path. `personal_name` is optional and embeds
+`tangl.lang.PersonalName`; vanilla Player remains unchanged. Generated forms
+(`familiar`, `formal`, `full`, `given`, `family`, etc.) flow through the same
+context-aware `reference(player, 'proper', form='formal')` operation. Explicit
+`proper_forms` overrides win over generated forms, and declared `proper_aliases`
+keep their existing behavior. AUTO reads still obey narrator policy; PROPER
+does not introduce knowledge. `PersonalNamedActor` retains its existing public
+type, Actor relationships, and behavior.
+
+Renaming does not implicitly synchronize three different fields. A world's
+ordinary Action UPDATE effect can deliberately replace the embedded value and
+update the selected display-name floor, for example:
+
+```python
+# PersonalName is supplied by the world's ordinary scoped namespace authority.
+player.personal_name = PersonalName(
+    given_name="Dana", family_name="Reyes", title="Mr.", gender="XY",
+)
+player.name = "Dana"
+# Player.full_name is independent; leave or change it deliberately.
+```
+
+These are directly constructed values with explicit choices, not a parser
+repair or a new rename endpoint. Updating only `personal_name` leaves an existing
+`name` display floor intact. Replacing it also does not silently retain an old
+nickname, grow an alias history, or rewrite declared `proper_forms` overrides.
+Embedded values and declarations use the normal constructor-form graph/Ledger/
+Service JSON path. Player UID, narrator knowledge and historical fragments remain
+stable; subsequent realization uses the new wording. Reopening ServiceManager is
+not a name/knowledge reset or a cold world bootstrap.
+
+For now, author explicit symbolic `ConceptReference(ref="player", ...)` parts
+or explicit reference operations when wording must follow the rename. This slice
+does not implement #577's stable role-owned spellings or automatic speech-body
+linking. `from_full_name`, `get_title`, title/gender inference/defaults, parser
+constants, and their open #578 policy questions are unchanged.
 
 ## Three authoring paths, one naming policy
 
