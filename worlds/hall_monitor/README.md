@@ -55,7 +55,7 @@ witness; create the local session through the documented REST API first.
 poetry run tangl-serve
 curl -X POST 'http://127.0.0.1:8000/api/v2/user/create?secret=dev-secret-123'
 curl -X POST \
-  'http://127.0.0.1:8000/api/v2/story/story/create?world_id=hall_monitor&init_mode=EAGER' \
+  'http://127.0.0.1:8000/api/v2/story/create?world_id=hall_monitor&init_mode=EAGER' \
   -H "X-API-Key: $(curl -s 'http://127.0.0.1:8000/api/v2/system/secret?secret=dev-secret-123' | jq -r .api_key)"
 cd apps/web
 VITE_DEFAULT_API_URL=http://127.0.0.1:8000/api/v2 \
@@ -79,8 +79,8 @@ encounter: its packet is fresh, while its bearer is the same live graph subject.
 
 ### Current framework friction
 
-- The REST creation route is currently `/story/story/create`; the web client
-  consumes an existing session rather than owning session/world selection.
+- The web client consumes an existing session rather than owning session/world
+  selection; REST creation is available at `/story/create`.
 - The web client gates API-backed components until authentication completes and
   disables prior transcript choices, so the current live frontier remains the
   only submit surface.

@@ -128,7 +128,7 @@ def test_story_info_returns_projected_state(
     client, headers, _ = multi_world_client
 
     create_resp = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_crossroads"},
         headers=headers,
     )
@@ -155,7 +155,7 @@ def test_story_debug_endpoints_are_wired(
     client, headers, _ = multi_world_client
 
     create_resp = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_crossroads"},
         headers=headers,
     )
@@ -197,7 +197,7 @@ def test_drop_story_archive_preserves_ledger(
     service_manager = get_service_manager()
 
     create_resp = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_crossroads"},
         headers=headers,
     )
@@ -231,7 +231,7 @@ def test_drop_story_without_archive_deletes_ledger(
     service_manager = get_service_manager()
 
     create_resp = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_crossroads"},
         headers=headers,
     )
@@ -259,7 +259,7 @@ def test_multi_world_switching_flow(
     service_manager = get_service_manager()
 
     create_demo = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_crossroads"},
         headers=headers,
     )
@@ -319,7 +319,7 @@ def test_multi_world_switching_flow(
     assert user.current_ledger_id is None
 
     create_linear = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_path"},
         headers=headers,
     )
@@ -353,7 +353,7 @@ def test_multi_world_switching_flow(
     assert drop_linear_payload.get("persistence_deleted") is True
 
     recreate_demo = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "the_crossroads"},
         headers=headers,
     )

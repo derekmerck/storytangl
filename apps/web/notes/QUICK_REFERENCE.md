@@ -258,7 +258,7 @@ metadata: {
 GET  /story/update           → RuntimeEnvelope
 POST /story/do               → RuntimeEnvelope
 GET  /story/info             → ProjectedState
-POST /story/story/create     → RuntimeInfo + envelope
+POST /story/create           → RuntimeEnvelope
 
 // System
 GET  /system/info            → SystemStatus

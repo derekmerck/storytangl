@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -323,6 +324,50 @@ def test_world_preflight_rest_returns_404_for_unknown_world(
     assert response.status_code == 404
 
 
+def test_canonical_creation_route_walkthrough(
+    story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, _headers, world_label = story_client
+    with client:
+        registered = client.post("user/create", params={"secret": str(uuid4())})
+        assert registered.status_code == 200
+        credentials = registered.json()
+        headers = {"X-API-Key": credentials["api_key"]}
+
+        created = client.post(
+            "story/create",
+            params={"world_id": world_label, "init_mode": "EAGER"},
+            headers=headers,
+        )
+        assert created.status_code == 200
+        initial = created.json()
+        assert initial["metadata"]["world_id"] == world_label
+        assert _first_choice_fragment(initial)["edge_id"]
+        user = get_service_manager().persistence.get(UUID(credentials["user_id"]))
+        assert user.current_ledger_id is not None
+
+        update = client.get("story/update", headers=headers)
+        assert update.status_code == 200
+        current = update.json()
+        assert current["step"] == initial["step"]
+        choice = _first_choice_fragment(current)
+        advanced = client.post("story/do", json={"edge_id": choice["edge_id"]}, headers=headers)
+        assert advanced.status_code == 200
+        assert advanced.json()["step"] > initial["step"]
+        assert any(
+            fragment.get("content") == "End"
+            for fragment in advanced.json()["fragments"]
+        )
+
+        obsolete = client.post(
+            "story/story/create", params={"world_id": world_label}, headers=headers
+        )
+        assert obsolete.status_code == 404
+        schema = client.get("openapi.json").json()
+        assert "/story/story/create" not in schema["paths"]
+        assert "post" in schema["paths"]["/story/create"]
+
+
 def test_story_rest_envelope_flow(
     story_client: tuple[TestClient, dict[str, str], str],
     monkeypatch,
@@ -330,7 +375,7 @@ def test_story_rest_envelope_flow(
     client, headers, world_label = story_client
 
     create = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -407,7 +452,7 @@ def test_story_update_preserves_choice_fragment_uid_and_edge_id(
     client, headers, world_label = story_client
 
     create = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -438,7 +483,7 @@ def test_story_do_accepts_find_edge_command_requests(
     client, headers, world_label = story_client
 
     create = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -481,7 +526,7 @@ def test_story_update_preserves_choice_payload_contracts(
     client, headers, world_label = payload_story_client
 
     create = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -533,7 +578,7 @@ def test_story_runtime_endpoints_publish_envelope_payload_schema() -> None:
     schema = api_app.openapi()
 
     for path, method in (
-        ("/story/story/create", "post"),
+        ("/story/create", "post"),
         ("/story/update", "get"),
         ("/story/do", "post"),
     ):
@@ -573,7 +618,7 @@ def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_u
 
     client, headers, world_label = story_client
     create = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -691,7 +736,7 @@ def projected_story_client(
     headers = {"X-API-Key": key_for_secret(secret)}
     try:
         create = client.post(
-            "story/story/create",
+            "story/create",
             params={"world_id": world_label, "init_mode": "EAGER"},
             headers=headers,
         )

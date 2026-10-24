@@ -100,7 +100,7 @@ def test_hall_monitor_inspection_survives_http_session_reload(
 
     client, headers = hall_monitor_client
     created = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "hall_monitor", "init_mode": "EAGER"},
         headers=headers,
     )
@@ -154,7 +154,7 @@ def test_hall_monitor_delivers_subject_mismatch_card_without_hidden_truth(
 
     client, headers = hall_monitor_client
     created = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "hall_monitor", "init_mode": "EAGER"},
         headers=headers,
     )
@@ -221,7 +221,7 @@ def test_hall_monitor_keeps_the_text_floor_when_card_becomes_pending(
 
     client, headers = hall_monitor_client
     created = client.post(
-        "story/story/create",
+        "story/create",
         params={"world_id": "hall_monitor", "init_mode": "EAGER"},
         headers=headers,
     )

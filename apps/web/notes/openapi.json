@@ -768,10 +768,10 @@
         ]
       }
     },
-    "/story/story/create": {
+    "/story/create": {
       "post": {
         "description": "Create a story session and return the initial runtime envelope.",
-        "operationId": "create_story_story_story_create_post",
+        "operationId": "create_story_story_create_post",
         "parameters": [
           {
             "description": "World template to instantiate",

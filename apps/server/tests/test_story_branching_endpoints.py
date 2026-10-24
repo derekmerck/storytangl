@@ -69,7 +69,7 @@ def _edge_id(choice: dict[str, object]) -> object:
 def test_branching_story_left_path_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
     client, headers = branching_story_client
 
-    create = client.post("story/story/create", params={"world_id": "the_crossroads"}, headers=headers)
+    create = client.post("story/create", params={"world_id": "the_crossroads"}, headers=headers)
     assert create.status_code == 200
 
     update = client.get("story/update", headers=headers)
@@ -103,7 +103,7 @@ def test_branching_story_left_path_rest(branching_story_client: tuple[TestClient
 def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
     client, headers = branching_story_client
 
-    client.post("story/story/create", params={"world_id": "the_crossroads"}, headers=headers)
+    client.post("story/create", params={"world_id": "the_crossroads"}, headers=headers)
 
     first_update = client.get("story/update", headers=headers)
     payload = first_update.json()
@@ -149,7 +149,7 @@ def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClien
 def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
     client, headers = branching_story_client
 
-    client.post("story/story/create", params={"world_id": "the_crossroads"}, headers=headers)
+    client.post("story/create", params={"world_id": "the_crossroads"}, headers=headers)
 
     first_update = client.get("story/update", headers=headers).json()
     first_choices = extract_choices_from_fragments(first_update["fragments"])
