@@ -409,6 +409,14 @@ appear in scope, before JOURNAL. Source inventories remain read-only; admitted
 providers belong to each story graph. There is no inventory or graph scan per
 dialog line and no global cache or separate palette loader.
 
+Named relative aliases use the manager for the declaration's `scope`: the
+graph's existing story manager (or normal read-only story-manager discovery),
+the current world's resource manager, or the configured system manager. A pinned
+`story`/`sys` request never prelinks a competing world alias. Scope tags still
+constrain ordinary provider offers, and delivery keeps the corresponding story,
+world, or system URL route. Historical RIT restoration needs only the owning
+graph, not those source managers or another nomination.
+
 JOURNAL only reads dependency IDs and graph-owned resources. Fallback is the
 requested expression's usable variant in the nominated look, then that look's
 usable base, then no extra portrait. Missing optional art is soft; there is no

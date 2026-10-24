@@ -13,6 +13,7 @@ from tangl.core import EntityTemplate, Selector
 from tangl.journal.fragments import AttributedFragment, MediaFragment
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.resource_manager import ResourceManager
+from tangl.media import story_media, system_media
 from tangl.mechanics.presence.look.look import HasSimpleLook
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.prose import DialogMuBlock
@@ -483,3 +484,106 @@ def test_setting_speaker_resolves_its_current_provider_before_portrait_selection
     portrait = fragments[fragments.index(line) + 1]
     assert line.speaker_id == str(location.uid)
     assert portrait.content is location.dialog_portrait(ctx=prepare(ledger), attitude="dry")
+
+
+@pytest.mark.parametrize("scope", ["story", "sys"])
+@pytest.mark.parametrize("with_world_resources", [False, True])
+def test_scoped_nested_aliases_use_their_manager_and_restore_history_without_lookup(
+    world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    scope: str, with_world_resources: bool,
+) -> None:
+    scoped_world = WorldBuilder().build(
+        label=f"scoped_portraits_{scope}", bundle=world.bundle,
+        resources=world.resources if with_world_resources else None,
+        class_registry=world.class_registry, extra_authorities=world.extra_authorities,
+    )
+    root = tmp_path / scope
+    for index, (look, face) in enumerate(
+        (look, face) for look in ("everyday", "special") for face in ("base", "happy", "skeptical")
+    ):
+        path = root / "rin" / look / f"{face}.svg"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f'<svg xmlns="http://www.w3.org/2000/svg"><rect fill="#{index + 100:06x}"/></svg>'
+        )
+    manager = ResourceManager(root, scope=scope)
+    manager.index_directory(".")
+    if scope == "sys":
+        system_media.get_system_resource_manager.cache_clear()
+        monkeypatch.setattr(system_media, "get_sys_media_dir", lambda: root)
+        manager = system_media.get_system_resource_manager()
+    try:
+        ledger = make_ledger(scoped_world)
+        if scope == "story":
+            ledger.graph.story_resources = manager
+        subject = actor(ledger)
+        subject.portraits.scope = scope
+        source = manager.get_rit("rin/everyday/happy.svg")
+        source_state = [item.unstructure() for item in manager.registry.values()]
+        if with_world_resources:
+            assert source.content_hash() != world.resources.get_rit(
+                "rin/everyday/happy.svg",
+            ).content_hash()
+        ctx = prepare(ledger)
+        assert manager.registry in [inventory.registry for inventory in ctx.get_media_inventories()]
+        dependencies = [ledger.graph.get(uid) for uid in subject.portrait_dependency_ids.values()]
+        assert len(dependencies) == 6 and all(dep.provider is not None for dep in dependencies)
+        assert all(dep.provider.registry is ledger.graph for dep in dependencies)
+        assert all(dep.provider.path.is_relative_to(root) for dep in dependencies)
+        selected = subject.dialog_portrait(ctx=ctx, attitude="amused")
+        assert selected.uid == source.uid and selected is not source
+        ledger.get_frame().goto_node(ledger.cursor)
+        fragments = list(ledger.get_journal())
+        line = next(item for item in fragments if isinstance(item, AttributedFragment))
+        portrait = fragments[fragments.index(line) + 1]
+        assert isinstance(portrait, MediaFragment) and portrait.scope == scope
+        assert portrait.content is ledger.graph.get(source.uid)
+        payload = media_fragment_to_payload(
+            portrait, world_id=scoped_world.label, story_id=str(ledger.graph.story_id),
+            world_media_root=world.resources.resource_path if with_world_resources else None,
+            story_media_root=root if scope == "story" else None,
+            system_media_root=root if scope == "sys" else None,
+        )
+        prefix = f"/media/story/{ledger.graph.story_id}" if scope == "story" else "/media/sys"
+        assert payload["scope"] == scope and payload["rit_id"] == str(source.uid)
+        assert payload["url"] == f"{prefix}/rin/everyday/happy.svg"
+        assert source_state == [item.unstructure() for item in manager.registry.values()]
+        historical = journal_dto(ledger)
+
+        def forbidden(*_args: object, **_kwargs: object) -> None:
+            pytest.fail("historical readback must not nominate or look up source inventory")
+
+        monkeypatch.setattr(PortraitActor, "nominate_portrait_look", forbidden)
+        monkeypatch.setattr(ResourceManager, "get_rit", forbidden)
+        restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+        assert journal_dto(restored) == historical
+        for fragment in restored.get_journal():
+            if isinstance(fragment, MediaFragment) and fragment.content_format == "rit":
+                assert fragment.content is restored.graph.get(fragment.rit_id)
+    finally:
+        if scope == "sys":
+            system_media.get_system_resource_manager.cache_clear()
+
+
+def test_story_portrait_manager_uses_normal_read_only_discovery(
+    world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ledger = make_ledger(world)
+    root = tmp_path / "discovered_story"
+    path = root / "nested" / "portrait.svg"
+    path.parent.mkdir(parents=True)
+    path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>')
+    monkeypatch.setattr(story_media, "get_story_media_dir", lambda _story_id: root)
+    ledger.graph.story_resources = None
+    subject = actor(ledger)
+    subject.portraits = PackedPortraits(
+        scope="story", default_look="day", looks={"day": PortraitLook(base="nested/portrait.svg")},
+    )
+    before = sorted(root.rglob("*"))
+
+    ctx = prepare(ledger)
+
+    assert ledger.graph.story_resources.resource_path == root
+    resource = subject.dialog_portrait(ctx=ctx, attitude=None)
+    assert resource.path == path and resource.registry is ledger.graph
+    assert sorted(root.rglob("*")) == before

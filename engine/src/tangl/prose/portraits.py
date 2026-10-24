@@ -13,6 +13,9 @@ from tangl.journal.fragments import AttributedFragment, MediaFragment
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
 from tangl.media.media_resource.media_resource_inv_tag import is_materialized_media_file
+from tangl.media.media_resource.resource_manager import ResourceManager
+from tangl.media.story_media import get_story_resource_manager
+from tangl.media.system_media import get_system_resource_manager
 from tangl.story import Block, Role, Setting, StoryGraph
 from tangl.vm import Resolver
 from tangl.vm.runtime.frame import PhaseCtx
@@ -96,6 +99,20 @@ portrait_dispatch = BehaviorRegistry(
 )
 
 
+def _portrait_resources(scope: str, *, ctx: PhaseCtx) -> ResourceManager | None:
+    """Use the existing manager owned by the declared inventory scope."""
+    if scope == "sys":
+        return get_system_resource_manager()
+    if not isinstance(ctx.graph, StoryGraph):
+        return None
+    if scope == "story":
+        if ctx.graph.story_resources is None:
+            ctx.graph.story_resources = get_story_resource_manager(ctx.graph.story_id, create=False)
+        return ctx.graph.story_resources
+    world = ctx.graph.world
+    return world.resources if world is not None else None
+
+
 @portrait_dispatch.register(task="apply_update", priority=Priority.LAST)
 def prepare_portraits(*, caller: Block, ctx: PhaseCtx, **_kwargs: object) -> None:
     """Prepare finite resources of currently scoped providers, including lazy ones."""
@@ -113,6 +130,7 @@ def prepare_portraits(*, caller: Block, ctx: PhaseCtx, **_kwargs: object) -> Non
         }
         provider_ctx = ctx.derive(cursor_id=provider.uid)
         resolver = Resolver.from_ctx(provider_ctx)
+        resources = _portrait_resources(provider.portraits.scope, ctx=provider_ctx)
         for reference in sorted(references):
             dependency_id = provider.portrait_dependency_ids.get(reference)
             if dependency_id is None:
@@ -124,10 +142,9 @@ def prepare_portraits(*, caller: Block, ctx: PhaseCtx, **_kwargs: object) -> Non
             else:
                 dependency = ctx.graph.get(dependency_id)
             if dependency.provider is None:
-                world = ctx.graph.world if isinstance(ctx.graph, StoryGraph) else None
-                if world is not None and world.resources is not None:
+                if resources is not None:
                     MediaInventoryProvisioner.bind_named(
-                        dependency, media_id=reference, resources=world.resources, ctx=provider_ctx,
+                        dependency, media_id=reference, resources=resources, ctx=provider_ctx,
                     )
                 if dependency.provider is None:
                     resolver.resolve_dependency(dependency, _ctx=provider_ctx)
