@@ -87,6 +87,7 @@ export interface SystemStatus {
  */
 export interface UserInfo {
   user_id: string
+  current_ledger_id: string | null
   user_secret: string
   created_dt: string
   last_played_dt?: string | null
@@ -114,11 +115,11 @@ export interface UIConfig {
  * Detailed information about a world, including media and UI hints.
  */
 export interface WorldInfo {
-  world_id: string
+  label: string
   version?: string
-  title: string
-  author: string | string[]
-  date: string
+  title?: string | null
+  author: string | string[] | null
+  date?: string
   comments?: string
   summary?: string
   ui_config?: UIConfig
@@ -264,7 +265,7 @@ export interface InfoState {
 
 export type StoryStatus = ProjectedState
 export type WorldSceneList = JournalKVItem[]
-export type WorldList = JournalKVItem[]
+export type WorldList = WorldInfo[]
 
 export type FragmentId = string
 

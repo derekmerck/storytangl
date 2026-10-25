@@ -1,11 +1,13 @@
 import axios from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { http, HttpResponse, server } from '@tests/setup'
+import { flushPromises } from '@vue/test-utils'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
-let useStore: typeof import('./index')['useStore']
-let useGlobal: typeof import('@/composables/globals')['useGlobal']
+let useStore: (typeof import('./index'))['useStore']
+let useGlobal: (typeof import('@/composables/globals'))['useGlobal']
 
 beforeEach(async () => {
   vi.unstubAllEnvs()
@@ -26,6 +28,37 @@ afterEach(() => {
 })
 
 describe('Store', () => {
+  it('ignores branding from a previously selected world', async () => {
+    let release!: () => void
+    server.use(
+      http.get(
+        `${DEFAULT_API_URL}/world/old/info`,
+        () =>
+          new Promise((resolve) => {
+            release = () =>
+              resolve(
+                HttpResponse.json({
+                  sections: [
+                    {
+                      section_id: 'ui-branding',
+                      title: 'Branding',
+                      value: { value_type: 'branding', name: 'Old world' },
+                    },
+                  ],
+                })
+              )
+          })
+      )
+    )
+    const store = useStore()
+    store.current_world_uid = 'old'
+    const previous = store.getCurrentWorldInfo()
+    await flushPromises()
+    await store.setCurrentWorld('new_world')
+    release()
+    await previous
+    expect(store.current_world_info?.name).toBe('new_world')
+  })
   it('initializes with default world from env', () => {
     const store = useStore()
     expect(store.current_world_uid).toBe('tangl_world')

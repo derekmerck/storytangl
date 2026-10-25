@@ -32,8 +32,7 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
     {
       uid: 'f-content-open',
       fragment_type: 'content',
-      content:
-        'Rain drums on the thatch. Inside the Crossroads Inn the air is smoke and peat.',
+      content: 'Rain drums on the thatch. Inside the Crossroads Inn the air is smoke and peat.',
       content_format: 'md',
       hints: { style_tags: ['narrative', 'establishing'] },
     },
@@ -181,7 +180,7 @@ export const crossroadsRuntimeEnvelope: RuntimeEnvelope = {
       details: { id: 'met_10_strangers', progress: '7/10' },
     },
   ],
-  metadata: { world: 'crossroads' },
+  metadata: { world_id: 'tangl_world', ledger_id: 'ledger-1' },
 }
 
 export const crossroadsNextRuntimeEnvelope: RuntimeEnvelope = {
@@ -208,5 +207,5 @@ export const crossroadsNextRuntimeEnvelope: RuntimeEnvelope = {
       available: true,
     },
   ],
-  metadata: { world: 'crossroads' },
+  metadata: { world_id: 'tangl_world', ledger_id: 'ledger-1' },
 }

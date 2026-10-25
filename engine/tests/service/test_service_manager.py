@@ -605,6 +605,7 @@ def test_story_drop_clears_user_session_without_implicit_ledger_archive(
     persistence,
     user: User,
 ) -> None:
+    assert manager.get_user_info(user_id=user.uid).current_ledger_id is None
     world = World.from_script_data(script_data=_story_script())
     manager.create_story(
         user_id=user.uid,
@@ -615,11 +616,13 @@ def test_story_drop_clears_user_session_without_implicit_ledger_archive(
     )
 
     ledger_id = user.current_ledger_id
+    assert manager.get_user_info(user_id=user.uid).current_ledger_id == ledger_id
     result = manager.drop_story(user_id=user.uid, archive=True)
 
     assert isinstance(result, RuntimeInfo)
     assert result.status == "ok"
     assert user.current_ledger_id is None
+    assert manager.get_user_info(user_id=user.uid).current_ledger_id is None
     assert ledger_id is not None
     assert ledger_id in persistence
 

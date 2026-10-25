@@ -36,7 +36,7 @@ describe('MSW Handlers', () => {
       axios.post('/story/do', {
         uid: 'action_uid',
         passback: null,
-      }),
+      })
     ).rejects.toMatchObject({
       response: {
         status: 400,
@@ -47,7 +47,7 @@ describe('MSW Handlers', () => {
   it('returns world list on /system/worlds', async () => {
     const response = await axios.get('/system/worlds')
     expect(Array.isArray(response.data)).toBe(true)
-    expect(response.data[0]).toHaveProperty('key')
+    expect(response.data[0]).toHaveProperty('label')
   })
 
   it('returns projected state on /story/info', async () => {

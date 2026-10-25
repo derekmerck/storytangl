@@ -25,6 +25,7 @@ const props = defineProps<{
   fragments: Record<string, StoryFragment>
   metadata?: Record<string, unknown>
   disabled?: boolean
+  activeChoiceIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -37,19 +38,22 @@ const sceneRoot = ref<HTMLElement | null>(null)
 const sceneMembers = computed(() =>
   props.scene.memberIds
     .map((id) => props.fragments[id])
-    .filter((fragment): fragment is StoryFragment => Boolean(fragment)),
+    .filter((fragment): fragment is StoryFragment => Boolean(fragment))
 )
-const choices = computed<ChoiceStoryFragment[]>(() =>
-  sceneMembers.value.filter(isChoiceFragment),
+const choices = computed<ChoiceStoryFragment[]>(() => sceneMembers.value.filter(isChoiceFragment))
+const currentChoices = computed(() =>
+  choices.value.filter(
+    (choice) => !props.activeChoiceIds || props.activeChoiceIds.includes(choice.uid)
+  )
 )
-const choiceHotkeys = computed(() => choiceKeysForList(choices.value))
+const choiceHotkeys = computed(() => choiceKeysForList(currentChoices.value))
 const flowMembers = computed(() =>
   sceneMembers.value.filter(
     (fragment) =>
       !isChoiceFragment(fragment) &&
       fragment.fragment_type !== 'update' &&
-      fragment.fragment_type !== 'delete',
-  ),
+      fragment.fragment_type !== 'delete'
+  )
 )
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 
@@ -78,7 +82,7 @@ const handleChoiceKey = (event: KeyboardEvent) => {
   }
   const key = event.key.toLowerCase()
   const row = Array.from(
-    sceneRoot.value?.querySelectorAll<HTMLElement>('.choice-row[data-hotkey]') ?? [],
+    sceneRoot.value?.querySelectorAll<HTMLElement>('.choice-row[data-hotkey]') ?? []
   ).find((candidate) => candidate.dataset.hotkey?.toLowerCase() === key)
   if (!row) {
     return
@@ -93,7 +97,7 @@ const handleChoiceKey = (event: KeyboardEvent) => {
   row
     .querySelector<HTMLElement>(
       'input:not(:disabled), select:not(:disabled), textarea:not(:disabled), ' +
-        '[contenteditable]:not([contenteditable="false"]), [role="option"][tabindex="0"]',
+        '[contenteditable]:not([contenteditable="false"]), [role="option"][tabindex="0"]'
     )
     ?.focus()
 }
@@ -107,10 +111,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleChoiceKey))
     <v-card class="mb-4 story-scene" data-testid="story-scene">
       <v-card-item>
         <div v-for="fragment in flowMembers" :key="fragment.uid" class="fragment-row">
-          <ContentFragmentView
-            v-if="fragment.fragment_type === 'content'"
-            :fragment="fragment"
-          />
+          <ContentFragmentView v-if="fragment.fragment_type === 'content'" :fragment="fragment" />
 
           <MediaFragmentView v-else-if="isMediaFragment(fragment)" :fragment="fragment" />
 
@@ -132,12 +133,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleChoiceKey))
         <v-card-actions v-if="choices.length > 0" role="group" aria-label="choices">
           <v-row dense>
             <StoryAction
-              v-for="(choice, index) in choices"
+              v-for="choice in choices"
               :key="choice.uid"
               :choice="choice"
-              :hotkey="choiceHotkeys[index]"
+              :hotkey="choiceHotkeys[currentChoices.indexOf(choice)]"
               :fragments="fragments"
-              :disabled="disabled"
+              :disabled="disabled || !currentChoices.includes(choice)"
               @doAction="handleAction"
             />
           </v-row>
@@ -146,9 +147,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleChoiceKey))
 
       <v-card-item v-if="debugEnabled">
         <v-card border>
-          <v-card-text class="text-caption">
-            Scene: {{ scene }}
-          </v-card-text>
+          <v-card-text class="text-caption"> Scene: {{ scene }} </v-card-text>
         </v-card>
       </v-card-item>
     </v-card>

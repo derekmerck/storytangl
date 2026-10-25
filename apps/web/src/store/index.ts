@@ -25,23 +25,17 @@ export const useStore = defineStore('main', {
   actions: {
     async setCurrentWorld(worldUid: string) {
       this.current_world_uid = worldUid
-
-      try {
-        await $http.value.put('/user/world', { uid: worldUid })
-      } catch (error) {
-        console.error('Failed to set current world.', error)
-      }
-
       await this.getCurrentWorldInfo()
     },
 
     async getCurrentWorldInfo() {
-      const response = await $http.value.get<ProjectedState>(
-        `/world/${this.current_world_uid}/info`,
-        { params: { channels: 'ui-branding' } },
-      )
+      const worldUid = this.current_world_uid
+      const response = await $http.value.get<ProjectedState>(`/world/${worldUid}/info`, {
+        params: { channels: 'ui-branding' },
+      })
+      if (this.current_world_uid !== worldUid) return
       const value = response.data.sections.find(
-        (section) => section.value.value_type === 'branding',
+        (section) => section.value.value_type === 'branding'
       )?.value
       this.current_world_info = value?.value_type === 'branding' ? value : undefined
     },

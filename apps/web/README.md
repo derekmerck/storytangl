@@ -6,11 +6,15 @@ Modern Vue 3 + TypeScript web interface for the StoryTangl narrative engine.
 
 **Current Phase:** v38-era client stabilization
 
-The web client is useful for development and narrative-engine inspection, but it is
-not a production-ready MVP. The v38 engine/service surface has moved faster than
-these notes, fixtures, and mock payloads. This pass repairs the Vitest/MSW
-harness enough for the current suites to collect and run while keeping the richer
-canonical fixture rewrite deferred to issue #224.
+The basic session path uses the real world catalog, player-secret bootstrap,
+explicit story creation, and Continue through the user's current ledger pointer.
+Story/status readers wait for session entry. History is readable, while only
+current choice occurrences can submit. Broader presentation parity remains work
+under #611; staging, attributed dialog and audio are outside this entry slice.
+
+The [Chromium smoke](e2e/README.md) builds the client and serves it through the
+real REST app, proving the reference-world entry, two choices, status, and
+same-server reload. Vitest/MSW remains component evidence, not a substitute.
 
 ---
 

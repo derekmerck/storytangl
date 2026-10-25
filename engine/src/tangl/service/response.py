@@ -215,6 +215,7 @@ class SystemInfo(InfoModel):
 
 class UserInfo(InfoModel):
     user_id: UUID
+    current_ledger_id: UUID | None = None
     user_secret: str
     created_dt: datetime
     last_played_dt: Optional[datetime] = None
@@ -227,6 +228,7 @@ class UserInfo(InfoModel):
     def from_user(cls, user: User, **kwargs: object) -> Self:
         return cls(
             user_id=user.uid,
+            current_ledger_id=user.current_ledger_id,
             user_secret=getattr(user, "secret", ""),
             created_dt=user.created_dt,
             last_played_dt=user.last_played_dt,

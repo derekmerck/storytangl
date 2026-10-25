@@ -333,6 +333,7 @@ def test_canonical_creation_route_walkthrough(
         assert registered.status_code == 200
         credentials = registered.json()
         headers = {"X-API-Key": credentials["api_key"]}
+        assert client.get("user/info", headers=headers).json()["current_ledger_id"] is None
 
         created = client.post(
             "story/create",
@@ -345,6 +346,9 @@ def test_canonical_creation_route_walkthrough(
         assert _first_choice_fragment(initial)["edge_id"]
         user = get_service_manager().persistence.get(UUID(credentials["user_id"]))
         assert user.current_ledger_id is not None
+        assert client.get("user/info", headers=headers).json()["current_ledger_id"] == str(
+            user.current_ledger_id
+        )
 
         update = client.get("story/update", headers=headers)
         assert update.status_code == 200
@@ -366,6 +370,8 @@ def test_canonical_creation_route_walkthrough(
         schema = client.get("openapi.json").json()
         assert "/story/story/create" not in schema["paths"]
         assert "post" in schema["paths"]["/story/create"]
+        assert client.delete("story/drop", headers=headers).status_code == 200
+        assert client.get("user/info", headers=headers).json()["current_ledger_id"] is None
 
 
 def test_story_rest_envelope_flow(

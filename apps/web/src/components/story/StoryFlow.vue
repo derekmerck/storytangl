@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { isAxiosError } from 'axios'
 
 import CommandBar from './CommandBar.vue'
 import StoryBlock from './StoryBlock.vue'
@@ -17,6 +18,7 @@ import {
   applyControlFragment,
   isControlFragment,
   isGroupFragment,
+  isChoiceFragment,
   normalizeEnvelope,
 } from './fragmentUtils'
 
@@ -25,7 +27,16 @@ const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
 
 const emit = defineEmits<{
   storyUpdate: [envelope: RuntimeEnvelope]
+  writePending: [pending: boolean]
+  resynchronize: [message: string]
 }>()
+const props = defineProps<{ initialEnvelope: RuntimeEnvelope; activeChoiceIds: string[] }>()
+const activeChoiceIds = ref([...props.activeChoiceIds])
+const currentStep = ref(props.initialEnvelope.step)
+let alive = true
+onBeforeUnmount(() => {
+  alive = false
+})
 
 const fragmentRegistry = ref<Record<string, StoryFragment>>({})
 const scenes = ref<StorySceneModel[]>([])
@@ -35,7 +46,6 @@ const currentMetadata = ref<RuntimeMetadata>({})
 const sceneRefs = ref<InstanceType<typeof StoryBlock>[]>([])
 const sceneCounter = ref(0)
 const loading = ref(false)
-const error = ref<string | null>(null)
 
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 const commandGrammar = computed<GrammarHint>(() => currentMetadata.value.grammar ?? {})
@@ -44,11 +54,12 @@ const isSceneGroup = (fragment: StoryFragment): fragment is GroupStoryFragment =
   isGroupFragment(fragment) && fragment.group_type === 'scene'
 
 const visibleFragmentIds = (fragments: StoryFragment[]): string[] =>
-  fragments
-    .filter((fragment) => !isControlFragment(fragment))
-    .map((fragment) => fragment.uid)
+  fragments.filter((fragment) => !isControlFragment(fragment)).map((fragment) => fragment.uid)
 
-const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]): StorySceneModel[] => {
+const buildScenes = (
+  envelope: RuntimeEnvelope,
+  renderFragments: StoryFragment[]
+): StorySceneModel[] => {
   const sceneGroups = renderFragments.filter(isSceneGroup)
   const groups = sceneGroups.length > 0 ? sceneGroups : []
   const metadata = envelope.metadata ?? {}
@@ -125,63 +136,49 @@ const applyEnvelope = async (envelope: RuntimeEnvelope) => {
 const handlePayload = async (payload: unknown, fallbackPrefix: string) => {
   const envelope = normalizeEnvelope(payload, { fallbackPrefix })
   if (envelope === null) {
-    return
+    throw new Error('Invalid runtime envelope')
   }
+  if (envelope.step !== currentStep.value) {
+    activeChoiceIds.value = envelope.fragments.filter(isChoiceFragment).map((item) => item.uid)
+  }
+  currentStep.value = envelope.step
   await applyEnvelope(envelope)
-  emit('storyUpdate', envelope)
+  if (alive) emit('storyUpdate', envelope)
 }
 
-const fetchInitialBlocks = async () => {
-  try {
-    loading.value = true
-    error.value = null
-    const response = await $http.value.get<unknown>(`${storyRoutePrefix}/update`)
-    await handlePayload(response.data, 'initial-fragment')
-  } catch (err) {
-    console.error('Failed to fetch initial story.', err)
-    error.value = 'Failed to load story. Please refresh the page.'
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(() => handlePayload(props.initialEnvelope, 'initial-fragment'))
 
-onMounted(fetchInitialBlocks)
-
-const doAction = async (edgeId: string, payload?: unknown) => {
+const submit = async (request: Record<string, unknown>) => {
+  if (loading.value) return
+  loading.value = true
+  emit('writePending', true)
   try {
-    loading.value = true
-    error.value = null
-    const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
-      edge_id: edgeId,
-      payload,
-    })
+    const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, request)
+    if (!alive) return
     await handlePayload(response.data, `action-${scenes.value.length + 1}`)
   } catch (err) {
+    if (!alive) return
     console.error('Failed to execute action.', err)
-    error.value = 'Failed to execute action. Please try again.'
+    const detail = isAxiosError<{ detail?: string }>(err) ? err.response?.data?.detail : undefined
+    emit('resynchronize', typeof detail === 'string' ? detail : 'The request failed.')
   } finally {
-    loading.value = false
+    if (alive) {
+      loading.value = false
+      emit('writePending', false)
+    }
   }
 }
 
-const doCommand = async (command: string) => {
-  try {
-    loading.value = true
-    error.value = null
-    const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
-      find_edge: {
-        kind: 'command',
-        command,
-      },
-    })
-    await handlePayload(response.data, `command-${scenes.value.length + 1}`)
-  } catch (err) {
-    console.error('Failed to execute command.', err)
-    error.value = 'Failed to execute command. Please try again.'
-  } finally {
-    loading.value = false
-  }
+const doAction = async (edgeId: string, payload?: unknown) => {
+  const offered = activeChoiceIds.value.some((id) => {
+    const choice = fragmentRegistry.value[id]
+    return (
+      choice && isChoiceFragment(choice) && choice.edge_id === edgeId && choice.available !== false
+    )
+  })
+  if (offered) await submit({ edge_id: edgeId, payload })
 }
+const doCommand = (command: string) => submit({ find_edge: { kind: 'command', command } })
 </script>
 
 <template>
@@ -193,17 +190,6 @@ const doCommand = async (command: string) => {
       indeterminate
       data-testid="storyflow-progress"
     />
-
-    <v-alert
-      v-if="error"
-      class="mb-4"
-      type="error"
-      variant="tonal"
-      closable
-      @click:close="error = null"
-    >
-      {{ error }}
-    </v-alert>
 
     <div
       v-for="event in interruptEvents"
@@ -218,13 +204,14 @@ const doCommand = async (command: string) => {
     </div>
 
     <StoryBlock
-      v-for="(scene, index) in scenes"
+      v-for="scene in scenes"
       :key="scene.key"
       ref="sceneRefs"
       :scene="scene"
       :fragments="fragmentRegistry"
       :metadata="scene.metadata"
-      :disabled="loading || index !== scenes.length - 1"
+      :disabled="loading"
+      :active-choice-ids="activeChoiceIds"
       @doAction="doAction"
     />
 
@@ -239,8 +226,7 @@ const doCommand = async (command: string) => {
       <v-card-item>
         <v-card border>
           <v-card-text class="text-caption">
-            Scenes: {{ scenes }}
-            Fragments: {{ fragmentRegistry }}
+            Scenes: {{ scenes }} Fragments: {{ fragmentRegistry }}
           </v-card-text>
         </v-card>
       </v-card-item>
