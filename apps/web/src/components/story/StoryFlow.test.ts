@@ -1,311 +1,185 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-
+import StoryFlow from './StoryFlow.vue'
+import StoryBlock from './StoryBlock.vue'
+import { isChoiceFragment } from './fragmentUtils'
+import type { RuntimeEnvelope } from '@/types'
+import { useGlobal } from '@/composables/globals'
 import { HttpResponse, http, server } from '@tests/setup'
-import {
-  commandHintRuntimeEnvelope,
-  crossroadsNextRuntimeEnvelope,
-  crossroadsRuntimeEnvelope,
-} from '@tests/fixtures'
+import { commandHintRuntimeEnvelope, crossroadsRuntimeEnvelope } from '@tests/fixtures'
 
-const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
+const api = 'http://localhost:8000/api/v2'
 const vuetify = createVuetify({ components, directives })
-
-let StoryFlow: typeof import('./StoryFlow.vue')['default']
-let StoryBlock: typeof import('./StoryBlock.vue')['default']
-let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView
-
-beforeAll(() => {
-  originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+const mountFlow = (
+  envelope = crossroadsRuntimeEnvelope,
+  activeChoiceIds = envelope.fragments.filter(isChoiceFragment).map((item) => item.uid)
+) =>
+  mount(StoryFlow, {
+    props: { initialEnvelope: envelope, activeChoiceIds },
+    global: { plugins: [vuetify] },
+  })
+const offered: RuntimeEnvelope = {
+  step: 1,
+  fragments: [{ uid: 'choice', fragment_type: 'choice', edge_id: 'edge', text: 'Try' }],
+}
+beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn()
 })
-
-afterAll(() => {
-  HTMLElement.prototype.scrollIntoView = originalScrollIntoView
-})
-
-beforeEach(async () => {
-  vi.unstubAllEnvs()
-  vi.stubEnv('VITE_DEFAULT_API_URL', DEFAULT_API_URL)
-  vi.stubEnv('VITE_DEBUG', 'false')
-  vi.stubEnv('VITE_VERBOSE', 'false')
-  vi.resetModules()
-  ;({ default: StoryFlow } = await import('./StoryFlow.vue'))
-  ;({ default: StoryBlock } = await import('./StoryBlock.vue'))
-})
-
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const mountFlow = () =>
-  mount(StoryFlow, {
-    global: {
-      plugins: [vuetify],
-      components: { StoryBlock },
-    },
-  })
-
-describe('StoryFlow', () => {
-  it('shows a loading indicator while fetching the initial envelope', async () => {
-    let resolveResponse!: () => void
-    let notifyHandlerReady!: () => void
-    const handlerInvoked = new Promise<void>((resolve) => {
-      notifyHandlerReady = resolve
-    })
-
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        new Promise((resolve) => {
-          notifyHandlerReady()
-          resolveResponse = () => resolve(HttpResponse.json(crossroadsRuntimeEnvelope))
-        }),
-      ),
-    )
-
-    const wrapper = mountFlow()
-    const component = wrapper.findComponent(StoryFlow)
-    const vm = component.vm as unknown as { loading: boolean }
-
-    await handlerInvoked
-    await flushPromises()
-    await nextTick()
-
-    expect(vm.loading).toBe(true)
-    expect(wrapper.find('[data-testid="storyflow-progress"]').exists()).toBe(true)
-
-    resolveResponse()
-    await flushPromises()
-    await nextTick()
-
-    expect(vm.loading).toBe(false)
-  })
-
-  it('fetches and renders scene groups on mount', async () => {
+describe('StoryFlow session rendering', () => {
+  it('applies the initial envelope once without an update request', async () => {
+    const read = vi.spyOn(useGlobal().$http.value, 'get')
     const wrapper = mountFlow()
     await flushPromises()
-
-    const scenes = wrapper.findAllComponents(StoryBlock)
-    expect(scenes).toHaveLength(1)
+    expect(read).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(StoryBlock)).toHaveLength(1)
     expect(wrapper.text()).toContain('Rain drums on the thatch')
     expect(wrapper.text()).toContain('Pay the forty silver')
-  })
-
-  it('emits a story update after accepting an initial envelope', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    expect(wrapper.emitted('storyUpdate')).toBeTruthy()
-    expect(wrapper.emitted('storyUpdate')![0]![0]).toMatchObject({
-      cursor_id: crossroadsRuntimeEnvelope.cursor_id,
-    })
-  })
-
-  it('renders canonical media fragments and remaps media URLs', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const imgs = wrapper.findAllComponents({ name: 'VImg' })
-    const srcs = imgs.map((img) => String(img.props('src')))
-
-    expect(srcs.some((src) => src === 'http://localhost:8000/media/world/tangl_world/stranger_booth.svg')).toBe(true)
-  })
-
-  it('renders locked choices, freeform choices, pending media, kv, and UX events', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
+    expect(wrapper.emitted('storyUpdate')).toHaveLength(1)
+    expect(
+      wrapper
+        .findAllComponents({ name: 'VImg' })
+        .some((image) => String(image.props('src')).includes('/media/world/'))
+    ).toBe(true)
     expect(wrapper.text()).toContain('Sleight of Hand 1, need 2.')
-    expect(wrapper.find('input').exists()).toBe(true)
     expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('late evening')
     expect(wrapper.find('[data-testid="interrupt-ux-event"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
   })
 
-  it('renders the command floor and inline UX events without grammar metadata', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        HttpResponse.json({
-          cursor_id: 'cursor-1',
-          step: 1,
-          fragments: [],
-          ux_events: [
-            {
-              event_id: 'event-validation',
-              event_type: 'validation_failed',
-              message: 'Choose at least one piece.',
-              presentation: 'inline',
-              replay: false,
-              severity: 'warning',
-            },
-          ],
-          metadata: {},
-        }),
-      ),
-    )
-
-    const wrapper = mountFlow()
+  it('applies controls and retains unknown-fragment fallback', async () => {
+    const wrapper = mountFlow({
+      step: 1,
+      fragments: [
+        { uid: 'content', fragment_type: 'content', content: 'Before' },
+        {
+          uid: 'control',
+          fragment_type: 'update',
+          target: { kind: 'fragment', fragment_id: 'content' },
+          payload: { content: 'After' },
+        },
+        { uid: 'unknown', fragment_type: 'new_unsupported_kind' },
+      ],
+    })
     await flushPromises()
-
-    expect(wrapper.find('[data-testid="command-bar"]').exists()).toBe(true)
-    expect(wrapper.find('input').attributes('placeholder')).toBe('Type a command')
-    expect(wrapper.find('[data-testid="inline-ux-event"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Choose at least one piece.')
+    expect(wrapper.text()).toContain('After')
+    expect(wrapper.text()).not.toContain('Before')
+    expect(wrapper.text()).toContain('new_unsupported_kind')
   })
 
-  it('applies control updates against the fragment registry', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        HttpResponse.json({
-          cursor_id: 'cursor-1',
-          step: 1,
-          fragments: [
-            {
-              uid: 'scene',
-              fragment_type: 'group',
-              group_type: 'scene',
-              member_ids: ['content'],
-            },
-            {
-              uid: 'content',
-              fragment_type: 'content',
-              content: 'Before update',
-            },
-            {
-              uid: 'ctrl',
-              fragment_type: 'update',
-              target: { kind: 'fragment', fragment_id: 'content' },
-              payload: { content: 'After update' },
-            },
-          ],
-        }),
-      ),
-    )
-
-    const wrapper = mountFlow()
+  it('keeps historical occurrences disabled when an edge is revisited', async () => {
+    const envelope: RuntimeEnvelope = {
+      step: 3,
+      fragments: [
+        { uid: 'old', fragment_type: 'choice', edge_id: 'reused', text: 'Historical visit' },
+        { uid: 'new', fragment_type: 'choice', edge_id: 'reused', text: 'Current visit' },
+      ],
+    }
+    const wrapper = mountFlow(envelope, ['new'])
     await flushPromises()
-
-    expect(wrapper.text()).toContain('After update')
-    expect(wrapper.text()).not.toContain('Before update')
+    const buttons = wrapper.findAll('button.choice-button')
+    expect(buttons[0]!.attributes('disabled')).toBeDefined()
+    expect(buttons[1]!.attributes('disabled')).toBeUndefined()
+    expect(wrapper.findAll('.choice-row[data-hotkey]')).toHaveLength(1)
   })
 
-  it('calls the API on doAction and appends returned scenes', async () => {
+  it('blocks repeat activation synchronously and preserves authored payload', async () => {
+    let release!: () => void
+    const submitted: unknown[] = []
     server.use(
-      http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
-        const body = await request.json()
-        expect(body).toEqual({
-          edge_id: 'edge-1',
-          payload: { offer_silver: 12 },
+      http.post(`${api}/story/do`, async ({ request }) => {
+        submitted.push(await request.json())
+        await new Promise<void>((resolve) => {
+          release = resolve
         })
         return HttpResponse.json({
-          ...crossroadsNextRuntimeEnvelope,
-          ux_events: crossroadsRuntimeEnvelope.ux_events,
+          step: 2,
+          fragments: [{ uid: 'end', fragment_type: 'content', content: 'Advanced' }],
         })
-      }),
+      })
     )
-
-    const wrapper = mountFlow()
+    const wrapper = mountFlow(offered)
     await flushPromises()
-
-    const initialCount = wrapper.findAllComponents(StoryBlock).length
-    const firstScene = wrapper.findComponent(StoryBlock)
-    await firstScene.vm.$emit('doAction', 'edge-1', { offer_silver: 12 })
+    const scene = wrapper.findComponent(StoryBlock)
+    scene.vm.$emit('doAction', 'edge', { offer_silver: 12 })
+    scene.vm.$emit('doAction', 'edge', { offer_silver: 12 })
     await flushPromises()
-
-    const scenes = wrapper.findAllComponents(StoryBlock)
-    expect(scenes.length).toBeGreaterThan(initialCount)
-    expect(scenes[0]!.props('disabled')).toBe(true)
-    const latestScene = scenes[scenes.length - 1]
-    expect(latestScene).toBeDefined()
-    expect(latestScene!.props('disabled')).toBe(false)
-    expect(wrapper.text()).toContain('The stranger slides the folded vellum')
-    expect(wrapper.findAll('[data-testid="interrupt-ux-event"]')).toHaveLength(1)
-    expect(wrapper.emitted('storyUpdate')!.length).toBeGreaterThanOrEqual(2)
+    expect(submitted).toEqual([{ edge_id: 'edge', payload: { offer_silver: 12 } }])
+    expect(wrapper.find('[data-testid="storyflow-progress"]').exists()).toBe(true)
+    release()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Advanced')
+    expect(wrapper.find('button.choice-button').attributes('disabled')).toBeDefined()
   })
 
-  it('submits command text through a typed find-edge request', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        HttpResponse.json(commandHintRuntimeEnvelope),
-      ),
-      http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
-        const body = await request.json()
-        expect(body).toEqual({
-          find_edge: {
-            kind: 'command',
-            command: 'take lamp',
-          },
-        })
-        return HttpResponse.json(crossroadsNextRuntimeEnvelope)
-      }),
-    )
-
-    const wrapper = mountFlow()
+  it('preserves choices on refusal and requests resync on transport failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(http.post(`${api}/story/do`, () => HttpResponse.json({ step: 1, fragments: [] })))
+    const wrapper = mountFlow(offered)
     await flushPromises()
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'edge')
+    await flushPromises()
+    expect(wrapper.find('button.choice-button').attributes('disabled')).toBeUndefined()
+    server.use(http.post(`${api}/story/do`, () => HttpResponse.error()))
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'edge')
+    await flushPromises()
+    expect(wrapper.emitted('resynchronize')).toHaveLength(1)
+    server.use(
+      http.post(`${api}/story/do`, () =>
+        HttpResponse.json({ detail: 'A permit is required.' }, { status: 400 })
+      )
+    )
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'edge')
+    await flushPromises()
+    expect(wrapper.emitted('resynchronize')![1]).toEqual(['A permit is required.'])
+  })
 
+  it('ignores a response after its session is unmounted', async () => {
+    const updated = vi.fn()
+    let release!: () => void
+    server.use(
+      http.post(
+        `${api}/story/do`,
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve(HttpResponse.json({ step: 2, fragments: [] }))
+          })
+      )
+    )
+    const wrapper = mount(StoryFlow, {
+      props: { initialEnvelope: offered, activeChoiceIds: ['choice'], onStoryUpdate: updated },
+      global: { plugins: [vuetify] },
+    })
+    await flushPromises()
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'edge')
+    await flushPromises()
+    wrapper.unmount()
+    release()
+    await flushPromises()
+    expect(updated).toHaveBeenCalledTimes(1)
+  })
+
+  it('submits a command through the existing typed find-edge request', async () => {
+    const submitted: unknown[] = []
+    server.use(
+      http.post(`${api}/story/do`, async ({ request }) => {
+        submitted.push(await request.json())
+        return HttpResponse.json({ step: 2, fragments: [] })
+      })
+    )
+    const wrapper = mountFlow(commandHintRuntimeEnvelope)
+    await flushPromises()
     const input = wrapper.find('input')
-    expect(input.attributes('placeholder')).toBe('e.g. take lamp')
-
-    await input.setValue('take lamp')
-    const commandButton = wrapper.find('button[aria-label="Submit command"]')
-    expect(commandButton.exists()).toBe(true)
-    await wrapper.find('[data-testid="command-bar"] form').trigger('submit')
+    await input.setValue('look around')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
-
-    expect(wrapper.text()).toContain('The stranger slides the folded vellum')
-  })
-
-  it('handles unknown fragment types with visible fallbacks', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        HttpResponse.json({
-          cursor_id: 'cursor-1',
-          step: 1,
-          fragments: [
-            {
-              uid: 'mystery',
-              fragment_type: 'future_widget',
-              content: { value: 6 },
-            },
-          ],
-        }),
-      ),
-    )
-
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('future_widget')
-  })
-
-  it('keeps referenced choice state visible for decision legibility', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Show a card from your hand')
-    expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Traveler hand')
-    expect(wrapper.text()).toContain('Rust map card')
-  })
-
-  it('handles API errors gracefully', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () => HttpResponse.error()),
-    )
-
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    expect(wrapper.exists()).toBe(true)
-    expect(wrapper.text()).toContain('Failed to load story')
-    expect(consoleSpy).toHaveBeenCalled()
+    expect(submitted).toEqual([{ find_edge: { kind: 'command', command: 'look around' } }])
   })
 })

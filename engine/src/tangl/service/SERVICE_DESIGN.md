@@ -56,6 +56,8 @@ Service manages four distinct runtime resources:
 | `World` | Loadable | Label | `WorldRegistry` |
 
 `User` tracks caller identity and session affinity.
+`UserInfo.current_ledger_id` projects the user's nullable current pointer directly.
+Clients use it to gate explicit creation versus Continue; it is not a per-world save catalog.
 
 `Ledger` is the durable story/session state: graph, cursor, journal/replay
 artifacts, and user linkage.

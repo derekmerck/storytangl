@@ -31,13 +31,13 @@ export default defineConfig({
     preprocessorOptions: {
       sass: {
         // Fix warnings in _test_
-        api: "modern-compiler",
+        api: 'modern-compiler',
         // Suppress Dart Sass legacy API deprecation warnings
         // silenceDeprecations: ['legacy-js-api'],
       },
       scss: {
         // Fix warnings in _dev_
-        api: "modern-compiler",
+        api: 'modern-compiler',
         // Suppress Dart Sass legacy API deprecation warnings
         // silenceDeprecations: ['legacy-js-api'],
       },
@@ -56,10 +56,11 @@ export default defineConfig({
     },
   },
   test: {
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     server: {
       deps: {
         inline: ['vuetify'],
-      }
+      },
     },
     globals: true,
     environment: 'happy-dom',
@@ -68,14 +69,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'tests/',
-        '**/*.d.ts',
-        '**/*.config.*',
-        '**/mockData',
-        '**/types',
-      ],
+      exclude: ['node_modules/', 'tests/', '**/*.d.ts', '**/*.config.*', '**/mockData', '**/types'],
     },
-  }
+  },
 })

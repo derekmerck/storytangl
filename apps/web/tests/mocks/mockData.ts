@@ -1,12 +1,13 @@
 import type { WorldInfo, WorldList } from '@/types'
 
 export const mockWorldList: WorldList = [
-  { key: 'tangl_world', value: 'Tangl World' },
-  { key: 'solarpunk', value: 'Solarpunk Stories' },
+  { label: 'tangl_world', title: 'Tangl World', author: ['StoryTangl Team'] },
+  { label: 'solarpunk', title: 'Solarpunk Stories', author: 'Tests' },
+  { label: 'anonymous', title: 'Anonymous Stories', author: null },
 ]
 
 export const mockWorldInfo: WorldInfo = {
-  world_id: 'tangl_world',
+  label: 'tangl_world',
   title: 'My world!',
   author: ['StoryTangl Team'],
   date: '2025-01-01',
@@ -33,6 +34,7 @@ export const mockUpdatedSecretResponse = {
 
 export const mockUserInfo = {
   user_id: 'test-user-id',
+  current_ledger_id: null,
   user_secret: 'dev-secret-123',
   created_dt: '2026-01-01T00:00:00Z',
   last_played_dt: '2026-01-01T00:00:00Z',

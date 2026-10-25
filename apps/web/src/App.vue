@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useDisplay } from 'vuetify'
 
 import AppNavbar from '@/components/AppNavbar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import StoryStatus from '@/components/StoryStatus.vue'
 import StoryFlow from '@/components/story/StoryFlow.vue'
-import type { InfoState, RuntimeEnvelope } from '@/types'
+import type { InfoState, RuntimeEnvelope, UserInfo } from '@/types'
+import { useGlobal } from '@/composables/globals'
 import { clearPlayerSecret, loadPlayerSecret } from '@/playerSession'
 import { useStore } from '@/store'
+import { isChoiceFragment, normalizeEnvelope } from '@/components/story/fragmentUtils'
 
 const drawer = ref(true)
 const statusRefreshKey = ref(0)
@@ -16,21 +18,165 @@ const infoState = ref<InfoState | null>(null)
 const clientState = ref<'initializing' | 'needs-auth' | 'ready'>('initializing')
 const authenticationError = ref<string | null>(null)
 const authenticationSecret = ref('')
+const authenticationPending = ref(false)
 const store = useStore()
 const display = useDisplay()
 
 const isDesktop = computed(() => display.mdAndUp.value)
+const sessionGeneration = ref(0)
+onBeforeUnmount(() => {
+  sessionGeneration.value += 1
+})
+const sessionLoading = ref(false)
+const writePending = ref(false)
+const sessionError = ref<string | null>(null)
+const sessionUncertain = ref(false)
+const activeSession = ref<{ envelope: RuntimeEnvelope; choiceIds: string[] } | null>(null)
+const { $http } = useGlobal()
+const sessionBusy = computed(
+  () => sessionLoading.value || writePending.value || sessionUncertain.value
+)
+
+const resetSession = () => {
+  sessionGeneration.value += 1
+  activeSession.value = null
+  infoState.value = null
+  statusRefreshKey.value = 0
+  store.current_world_uid = ''
+  store.current_world_info = undefined
+}
+
+const decodeEnvelope = (payload: unknown): RuntimeEnvelope => {
+  const envelope = normalizeEnvelope(payload, { fallbackPrefix: 'session' })
+  if (
+    !envelope ||
+    typeof envelope.metadata?.ledger_id !== 'string' ||
+    typeof envelope.metadata?.world_id !== 'string'
+  ) {
+    throw new Error('Missing story identity in response')
+  }
+  return envelope
+}
+
+const activateSession = (envelope: RuntimeEnvelope, current: RuntimeEnvelope) => {
+  if (
+    envelope.metadata?.ledger_id !== current.metadata?.ledger_id ||
+    envelope.step !== current.step
+  ) {
+    throw new Error('Story changed while loading; retry the current story')
+  }
+  store.current_world_uid = envelope.metadata!.world_id as string
+  if (store.current_user)
+    store.current_user.current_ledger_id = envelope.metadata!.ledger_id as string
+  activeSession.value = {
+    envelope,
+    choiceIds: current.fragments.filter(isChoiceFragment).map((fragment) => fragment.uid),
+  }
+  sessionUncertain.value = false
+}
+
+const resumeStory = async () => {
+  resetSession()
+  const generation = sessionGeneration.value
+  sessionLoading.value = true
+  try {
+    const history = decodeEnvelope((await $http.value.get('/story/update')).data)
+    if (generation !== sessionGeneration.value) return
+    const current = decodeEnvelope(
+      (
+        await $http.value.get('/story/update', {
+          params: { since_step: history.step },
+        })
+      ).data
+    )
+    if (generation !== sessionGeneration.value) return
+    activateSession(history, current)
+  } catch {
+    if (generation === sessionGeneration.value) {
+      sessionError.value =
+        'Unable to continue the current story. Retry without creating a replacement.'
+      sessionUncertain.value = true
+    }
+  } finally {
+    if (generation === sessionGeneration.value) sessionLoading.value = false
+  }
+}
+
+const synchronizePlayer = async () => {
+  if (sessionLoading.value || writePending.value) return
+  sessionError.value = null
+  sessionLoading.value = true
+  const generation = sessionGeneration.value
+  try {
+    const user = await $http.value.get<UserInfo>('/user/info')
+    if (generation !== sessionGeneration.value) return
+    store.current_user = user.data
+    if (user.data.current_ledger_id) {
+      await resumeStory()
+    } else {
+      resetSession()
+      sessionUncertain.value = false
+    }
+  } catch {
+    sessionError.value = 'Unable to check the current story. Please retry.'
+    sessionUncertain.value = true
+  } finally {
+    sessionLoading.value = false
+  }
+}
+
+const startStory = async (worldId: string) => {
+  if (sessionBusy.value) return
+  resetSession()
+  const generation = sessionGeneration.value
+  sessionLoading.value = true
+  sessionError.value = null
+  try {
+    const envelope = decodeEnvelope(
+      (
+        await $http.value.post('/story/create', undefined, {
+          params: { world_id: worldId, init_mode: 'EAGER' },
+        })
+      ).data
+    )
+    if (generation === sessionGeneration.value) activateSession(envelope, envelope)
+  } catch {
+    if (generation === sessionGeneration.value) {
+      sessionError.value = 'Story creation failed. Check the current story before trying again.'
+      sessionUncertain.value = true
+    }
+  } finally {
+    if (generation === sessionGeneration.value) sessionLoading.value = false
+  }
+}
+
+const resynchronizeStory = async (message: string) => {
+  writePending.value = false
+  sessionError.value = `${message} Checking the current story before another move.`
+  await resumeStory()
+}
 
 const bootstrapPlayer = async (action: () => Promise<void>) => {
+  if (authenticationPending.value) return
+  authenticationPending.value = true
   clientState.value = 'initializing'
+  resetSession()
+  const generation = sessionGeneration.value
+  sessionError.value = null
+  sessionUncertain.value = false
   authenticationError.value = null
   try {
     await action()
+    if (generation !== sessionGeneration.value) return
     clientState.value = 'ready'
+    if (store.current_user?.current_ledger_id) await resumeStory()
   } catch (error) {
+    if (generation !== sessionGeneration.value) return
     console.error('Failed to initialize authentication:', error)
     authenticationError.value = 'Unable to authenticate with the story service.'
     clientState.value = 'needs-auth'
+  } finally {
+    authenticationPending.value = false
   }
 }
 
@@ -64,6 +210,8 @@ const initializeClient = async () => {
 }
 
 const recoverPlayer = () => {
+  if (sessionLoading.value || writePending.value) return
+  resetSession()
   authenticationSecret.value = ''
   authenticationError.value = null
   clientState.value = 'needs-auth'
@@ -135,11 +283,7 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
             </v-alert>
           </v-card-text>
           <v-card-actions>
-            <v-btn
-              data-testid="authentication-existing"
-              variant="text"
-              @click="useExistingSecret"
-            >
+            <v-btn data-testid="authentication-existing" variant="text" @click="useExistingSecret">
               Use Recovery Secret
             </v-btn>
             <v-spacer />
@@ -152,9 +296,16 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
     </v-main>
 
     <template v-else-if="clientState === 'ready'">
-      <AppNavbar @toggle-drawer="toggleDrawer" @recover-player="recoverPlayer" />
+      <AppNavbar
+        :busy="sessionBusy"
+        @select-world="startStory"
+        @toggle-drawer="toggleDrawer"
+        @recover-player="recoverPlayer"
+      />
 
       <v-navigation-drawer
+        v-if="activeSession"
+        :key="sessionGeneration"
         v-model="drawer"
         :permanent="isDesktop"
         width="260"
@@ -166,17 +317,30 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
           </v-list-item>
         </v-list>
         <v-divider class="mb-2" />
-        <StoryStatus
-          :refresh-key="statusRefreshKey"
-          :info-state="infoState"
-        />
+        <StoryStatus :refresh-key="statusRefreshKey" :info-state="infoState" />
       </v-navigation-drawer>
 
       <v-main>
         <v-container class="py-6" fluid>
           <v-row justify="center">
             <v-col cols="12" lg="9">
-              <StoryFlow @story-update="handleStoryUpdate" />
+              <v-progress-linear v-if="sessionLoading" indeterminate />
+              <v-alert v-if="sessionError" type="error">{{ sessionError }}</v-alert>
+              <v-btn v-if="sessionUncertain" :disabled="sessionLoading" @click="synchronizePlayer">
+                Retry current story
+              </v-btn>
+              <p v-if="!activeSession && !sessionLoading && !sessionError">
+                Choose a world from Worlds to start a story.
+              </p>
+              <StoryFlow
+                v-if="activeSession"
+                :key="sessionGeneration"
+                :initial-envelope="activeSession.envelope"
+                :active-choice-ids="activeSession.choiceIds"
+                @write-pending="writePending = $event"
+                @resynchronize="resynchronizeStory"
+                @story-update="handleStoryUpdate"
+              />
             </v-col>
           </v-row>
           <AppFooter />

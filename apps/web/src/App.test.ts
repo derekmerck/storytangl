@@ -6,15 +6,27 @@ import * as directives from 'vuetify/directives'
 import { setActivePinia, createPinia } from 'pinia'
 
 import App from '@/App.vue'
+import AppNavbar from '@/components/AppNavbar.vue'
+import StoryFlow from '@/components/story/StoryFlow.vue'
+import { useGlobal } from '@/composables/globals'
 import { useStore } from '@/store'
 import { HttpResponse, http, server } from '@tests/setup'
 import { crossroadsRuntimeEnvelope, sandboxInfoState, sandboxProjectedState } from '@tests/fixtures'
+import { mockUserInfo } from '@tests/mocks/mockData'
 
 const vuetify = createVuetify({ components, directives })
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
 describe('App.vue', () => {
   beforeEach(() => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/user/info`, () =>
+        HttpResponse.json({
+          ...mockUserInfo,
+          current_ledger_id: 'ledger-1',
+        })
+      )
+    )
     setActivePinia(createPinia())
     vi.unstubAllEnvs()
     vi.stubEnv('VITE_DEFAULT_API_URL', DEFAULT_API_URL)
@@ -34,6 +46,120 @@ describe('App.vue', () => {
       },
     })
 
+  it('gates new players until explicit creation, serializes creation, and uses response identity', async () => {
+    server.use(http.get(`${DEFAULT_API_URL}/user/info`, () => HttpResponse.json(mockUserInfo)))
+    const read = vi.spyOn(useGlobal().$http.value, 'get')
+    let release!: () => void
+    let creations = 0
+    server.use(
+      http.post(`${DEFAULT_API_URL}/story/create`, () => {
+        creations += 1
+        return new Promise((resolve) => {
+          release = () =>
+            resolve(
+              HttpResponse.json({
+                ...crossroadsRuntimeEnvelope,
+                metadata: { world_id: 'actual-world', ledger_id: 'actual-ledger' },
+              })
+            )
+        })
+      })
+    )
+    const wrapper = mountApp()
+    await flushPromises()
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
+    expect(read.mock.calls.some(([url]) => /\/story\/(update|info)/.test(String(url)))).toBe(false)
+    const navbar = wrapper.findComponent(AppNavbar)
+    navbar.vm.$emit('select-world', 'requested-world')
+    navbar.vm.$emit('select-world', 'requested-world')
+    await flushPromises()
+    expect(navbar.props('busy')).toBe(true)
+    expect(creations).toBe(1)
+    release()
+    await flushPromises()
+    expect(useStore().current_world_uid).toBe('actual-world')
+    expect(useStore().current_user?.current_ledger_id).toBe('actual-ledger')
+    expect(wrapper.findAllComponents(StoryFlow)).toHaveLength(1)
+    expect(read.mock.calls.some(([url]) => String(url) === '/story/update')).toBe(false)
+  })
+
+  it('reports creation failure and checks current state before permitting another write', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(
+      http.get(`${DEFAULT_API_URL}/user/info`, () => HttpResponse.json(mockUserInfo)),
+      http.post(`${DEFAULT_API_URL}/story/create`, () =>
+        HttpResponse.json({ detail: 'failed' }, { status: 500 })
+      )
+    )
+    const wrapper = mountApp()
+    await flushPromises()
+    wrapper.findComponent(AppNavbar).vm.$emit('select-world', 'reference')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Story creation failed')
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
+    expect(wrapper.findComponent(AppNavbar).props('busy')).toBe(true)
+    const retry = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Retry current story'))!
+    await retry.trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent(AppNavbar).props('busy')).toBe(false)
+  })
+
+  it('keeps a failed stored-user resume visible without creating a replacement', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let creations = 0
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({ detail: 'missing ledger' }, { status: 400 })
+      ),
+      http.post(`${DEFAULT_API_URL}/story/create`, () => {
+        creations += 1
+        return HttpResponse.json(crossroadsRuntimeEnvelope)
+      })
+    )
+    const wrapper = mountApp()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Unable to continue the current story')
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
+    expect(creations).toBe(0)
+  })
+
+  it('does not repopulate a new session from a late history read', async () => {
+    let release!: () => void
+    let reads = 0
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () => {
+        reads += 1
+        return new Promise((resolve) => {
+          release = () => resolve(HttpResponse.json(crossroadsRuntimeEnvelope))
+        })
+      })
+    )
+    const previous = mountApp()
+    await flushPromises()
+    previous.unmount()
+    server.use(http.get(`${DEFAULT_API_URL}/user/info`, () => HttpResponse.json(mockUserInfo)))
+    const current = mountApp()
+    await flushPromises()
+    release()
+    await flushPromises()
+    expect(current.findComponent(StoryFlow).exists()).toBe(false)
+    expect(current.text()).toContain('Choose a world')
+    expect(reads).toBe(1)
+  })
+
+  it('clears story and status on a player switch', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(true)
+    wrapper.findComponent(AppNavbar).vm.$emit('recover-player')
+    await flushPromises()
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
+    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(false)
+    expect(useStore().current_world_uid).toBe('')
+  })
+
   it('renders the full application shell', async () => {
     const wrapper = mountApp()
     await flushPromises()
@@ -52,7 +178,7 @@ describe('App.vue', () => {
       () =>
         new Promise<void>((resolve) => {
           resolveAuthentication = resolve
-        }),
+        })
     )
 
     const wrapper = mountApp()
@@ -86,8 +212,8 @@ describe('App.vue', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     server.use(
       http.get(`${DEFAULT_API_URL}/user/info`, () =>
-        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 }),
-      ),
+        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 })
+      )
     )
 
     const wrapper = mountApp()
@@ -105,8 +231,8 @@ describe('App.vue', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     server.use(
       http.get(`${DEFAULT_API_URL}/user/info`, () =>
-        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 }),
-      ),
+        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 })
+      )
     )
 
     const wrapper = mountApp()
@@ -174,9 +300,9 @@ describe('App.vue', () => {
             ...crossroadsRuntimeEnvelope.metadata,
             info_state: sandboxInfoState,
           },
-        }),
+        })
       ),
-      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState)),
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json(sandboxProjectedState))
     )
 
     const wrapper = mountApp()

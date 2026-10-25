@@ -1,50 +1,111 @@
 name: Web Client Checks
 
 on:
-  # Opt-in on PRs by adding the "ci:web" label.
   pull_request:
     branches: ["**"]
-    types: ["labeled", "synchronize", "reopened"]
-  # Keep main honest when web files actually change.
   push:
     branches: ["main"]
-    paths:
-      - "apps/web/**"
-      - ".github/workflows/web-client.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: web-client-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  web-client-tests:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:web')
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web == 'true' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'apps/server/**'
+              - 'engine/**'
+              - 'worlds/**'
+              - '*.toml'
+              - '*.lock'
+              - '.env*'
+              - '.python-version'
+              - '.gitattributes'
+              - '.github/workflows/**'
+
+  web-client-tests:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: apps/web
+    env:
+      MPLBACKEND: Agg
+      MPLCONFIGDIR: /tmp/storytangl-browser-mpl
     steps:
       - uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "yarn"
-          cache-dependency-path: "apps/web/yarn.lock"
-
-      - name: Install dependencies
+          cache: yarn
+          cache-dependency-path: apps/web/yarn.lock
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: poetry.lock
+      - name: Install engine and REST dependencies
+        run: |
+          python -m pip install poetry
+          poetry install --no-interaction --with dev
+      - name: Install web dependencies
         run: yarn install --frozen-lockfile
-
+      - name: Install pinned Chromium
+        run: yarn playwright install --with-deps chromium
       - name: Type check
         run: yarn type-check
-
-      - name: Run tests
+      - name: Component and contract tests
         run: yarn test --run
+      - name: Build same-origin browser client
+        run: yarn build:e2e
+      - name: Real Chromium journey
+        run: yarn test:e2e
+      - name: Preserve browser and server diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-failure
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+            apps/web/e2e-artifacts/
+          retention-days: 7
 
-      - name: Build
-        run: yarn build
+  web-client-gate:
+    name: Web Client Gate
+    if: always()
+    needs: [changes, web-client-tests]
+    runs-on: ubuntu-latest
+    env:
+      CHANGE_RESULT: ${{ needs.changes.result }}
+      RELEVANT: ${{ needs.changes.outputs.relevant }}
+      TEST_RESULT: ${{ needs.web-client-tests.result }}
+    steps:
+      - name: Require successful browser checks for relevant changes
+        run: |
+          test "$CHANGE_RESULT" = success
+          if [ "$RELEVANT" = true ]; then
+            test "$TEST_RESULT" = success
+          else
+            test "$RELEVANT" = false
+            test "$TEST_RESULT" = skipped
+          fi

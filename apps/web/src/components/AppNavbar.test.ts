@@ -8,6 +8,8 @@ import { setActivePinia, createPinia } from 'pinia'
 import AppNavbar from './AppNavbar.vue'
 import WorldInfo from '@/components/dialogs/WorldInfo.vue'
 import { useStore } from '@/store'
+import { useGlobal } from '@/composables/globals'
+import { http, HttpResponse, server } from '@tests/setup'
 
 const vuetify = createVuetify({ components, directives })
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
@@ -15,6 +17,7 @@ const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 describe('AppNavbar', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    useStore().current_world_uid = 'tangl_world'
     vi.unstubAllEnvs()
     vi.stubEnv('VITE_DEFAULT_API_URL', DEFAULT_API_URL)
     vi.spyOn(window, 'open').mockImplementation(() => null)
@@ -32,7 +35,7 @@ describe('AppNavbar', () => {
       },
       {
         global: { plugins: [vuetify] },
-      },
+      }
     )
 
   it('displays app title', () => {
@@ -61,6 +64,72 @@ describe('AppNavbar', () => {
 
     const worldsBtn = wrapper.findAll('button').find((button) => button.text().includes('Worlds'))
     expect(worldsBtn).toBeDefined()
+  })
+
+  it('uses catalog labels and titles, emits explicit selection, and performs no user/world write', async () => {
+    const put = vi.spyOn(useGlobal().$http.value, 'put')
+    const wrapper = mount(AppNavbar, {
+      global: {
+        plugins: [vuetify],
+        stubs: {
+          VAppBar: { template: '<header><slot/></header>' },
+          VMenu: {
+            template: '<div><slot name="activator" :props="{}"/><slot/></div>',
+          },
+        },
+      },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Tangl World')
+    expect(wrapper.text()).toContain('Anonymous Stories')
+    await wrapper
+      .findAll('.v-list-item')
+      .find((item) => item.text() === 'Solarpunk Stories')!
+      .trigger('click')
+    expect(wrapper.emitted('select-world')).toEqual([['solarpunk']])
+    expect(put).not.toHaveBeenCalled()
+    await wrapper.setProps({ busy: true })
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Worlds')!
+        .attributes('disabled')
+    ).toBeDefined()
+  })
+
+  it('shows a catalog failure and an empty catalog honestly', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(http.get(`${DEFAULT_API_URL}/system/worlds`, () => HttpResponse.json([])))
+    const wrapper = mount(AppNavbar, {
+      global: {
+        plugins: [vuetify],
+        stubs: {
+          VAppBar: { template: '<header><slot/></header>' },
+          VMenu: {
+            template: '<div><slot name="activator" :props="{}"/><slot/></div>',
+          },
+        },
+      },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('No worlds available')
+    wrapper.unmount()
+    server.use(
+      http.get(`${DEFAULT_API_URL}/system/worlds`, () => HttpResponse.json({}, { status: 500 }))
+    )
+    const failed = mount(AppNavbar, {
+      global: {
+        plugins: [vuetify],
+        stubs: {
+          VAppBar: { template: '<header><slot/></header>' },
+          VMenu: {
+            template: '<div><slot name="activator" :props="{}"/><slot/></div>',
+          },
+        },
+      },
+    })
+    await flushPromises()
+    expect(failed.text()).toContain('Unable to load worlds')
   })
 
   it('has user and info menu buttons', () => {

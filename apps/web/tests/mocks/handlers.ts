@@ -16,10 +16,9 @@ import {
 
 const apiBase = (import.meta.env?.VITE_DEFAULT_API_URL ?? 'http://localhost:8000/api/v2').replace(
   /\/$/,
-  '',
+  ''
 )
 
-type UserWorldRequest = { uid?: string }
 type StoryDoRequest = {
   edge_id?: unknown
   find_edge?: { kind?: unknown; command?: unknown }
@@ -39,7 +38,7 @@ export const handlers = [
     if (!direct && !command) {
       return HttpResponse.json(
         { error: 'story action payload requires edge_id or find_edge' },
-        { status: 400 },
+        { status: 400 }
       )
     }
     return HttpResponse.json(crossroadsNextRuntimeEnvelope)
@@ -76,10 +75,7 @@ export const handlers = [
     return HttpResponse.json(mockSystemInfo)
   }),
 
-  http.put(`${apiBase}/user/world`, async ({ request }) => {
-    const body = (await request.json()) as UserWorldRequest | null
-    return HttpResponse.json({ uid: body?.uid ?? 'tangl_world' })
-  }),
+  http.post(`${apiBase}/story/create`, () => HttpResponse.json(crossroadsRuntimeEnvelope)),
 
   http.get(`${apiBase}/system/secret`, () => {
     return HttpResponse.json(mockUserSecretResponse)

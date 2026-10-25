@@ -11,6 +11,9 @@ lerna-debug.log*
 
 # Testing
 coverage
+test-results/
+playwright-report/
+e2e-artifacts/
 
 # Dependencies
 node_modules

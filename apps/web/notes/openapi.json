@@ -113,6 +113,11 @@
       },
       "UserInfo": {
         "properties": {
+          "current_ledger_id": {
+            "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+            "default": null,
+            "title": "Current Ledger Id"
+          },
           "achievements": {
             "anyOf": [
               {

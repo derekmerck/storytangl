@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
-import type { CSSProperties } from 'vue'
 
 import WorldInfo from '@/components/dialogs/WorldInfo.vue'
 import SystemInfo from '@/components/dialogs/SystemInfo.vue'
@@ -12,12 +11,15 @@ import { useStore } from '@/store'
 const emit = defineEmits<{
   'toggle-drawer': []
   'recover-player': []
+  'select-world': [worldId: string]
 }>()
+defineProps<{ busy?: boolean }>()
 
 const { $http, remapURL } = useGlobal()
 const store = useStore()
 
 const worlds = ref<WorldList>([])
+const catalogError = ref('')
 const showWorldInfo = ref(false)
 const showSystemInfo = ref(false)
 const showSecretDialog = ref(false)
@@ -26,7 +28,7 @@ const guideUrl = computed((): string => '/guide')
 
 onMounted(async () => {
   try {
-    if (!store.current_world_info) {
+    if (store.current_world_uid && !store.current_world_info) {
       await store.getCurrentWorldInfo()
     }
   } catch (error) {
@@ -38,17 +40,11 @@ onMounted(async () => {
     worlds.value = response.data ?? []
   } catch (error) {
     console.error('Failed to fetch worlds:', error)
+    catalogError.value = 'Unable to load worlds. Reload to retry.'
   }
 })
 
-const selectWorld = async (worldId: string) => {
-  try {
-    await $http.value.put('/user/world', { uid: worldId })
-    await store.setCurrentWorld(worldId)
-  } catch (error) {
-    console.error('Failed to select world:', error)
-  }
-}
+const selectWorld = (worldId: string) => emit('select-world', worldId)
 
 const openGuide = () => {
   const target = guideUrl.value
@@ -58,13 +54,6 @@ const openGuide = () => {
 
   const resolved = remapURL(target)
   window.open(resolved, 'StoryTangl User Guide')
-}
-
-const worldStyle = (world: WorldList[number]): CSSProperties => {
-  const style = world.style ?? world.style_dict
-  return style && typeof style === 'object' && !Array.isArray(style)
-    ? (style as CSSProperties)
-    : {}
 }
 </script>
 
@@ -77,18 +66,20 @@ const worldStyle = (world: WorldList[number]): CSSProperties => {
 
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" variant="text" color="on-primary">
-            Worlds
-          </v-btn>
+          <v-btn v-bind="props" :disabled="busy" variant="text" color="on-primary"> Worlds </v-btn>
         </template>
         <v-list density="compact">
+          <v-list-item v-if="catalogError || !worlds.length">
+            {{ catalogError || 'No worlds available.' }}
+          </v-list-item>
           <v-list-item
             v-for="world in worlds"
-            :key="world.key"
-            @click="selectWorld(world.key)"
+            :key="world.label"
+            :disabled="busy"
+            @click="selectWorld(world.label)"
           >
-            <v-list-item-title :style="worldStyle(world)">
-              {{ world.value }}
+            <v-list-item-title>
+              {{ world.title || world.label }}
             </v-list-item-title>
           </v-list-item>
         </v-list>
@@ -96,9 +87,7 @@ const worldStyle = (world: WorldList[number]): CSSProperties => {
 
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" variant="text" color="on-primary">
-            User
-          </v-btn>
+          <v-btn v-bind="props" variant="text" color="on-primary"> User </v-btn>
         </template>
         <v-list density="compact">
           <v-list-item v-if="store.current_user">
@@ -115,9 +104,7 @@ const worldStyle = (world: WorldList[number]): CSSProperties => {
 
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" variant="text" color="on-primary">
-            Info
-          </v-btn>
+          <v-btn v-bind="props" variant="text" color="on-primary"> Info </v-btn>
         </template>
         <v-list density="compact">
           <v-list-item @click="showWorldInfo = true">

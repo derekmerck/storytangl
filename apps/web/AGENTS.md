@@ -154,6 +154,16 @@ App.vue (root)
 ```
 
 ## Data flow pattern
+The App shell owns authentication and session entry. `UserInfo.current_ledger_id`
+gates Continue; a new player explicitly selects a `{label, title, author}` catalog
+entry and calls `POST /story/create`. Never call the unsupported `/user/world`.
+Apply the creation envelope once. On Continue, load history and then
+`GET /story/update?since_step=<history.step>` to identify current choice occurrence
+uids. Historical occurrences remain read-only even when an edge is revisited.
+StoryFlow and StoryStatus mount only after successful session bootstrap, keyed
+by a session generation. Serialize writes, prevent repeat activation, discard
+late responses, and resynchronize after uncertain writes before another move.
+
 1. User clicks action button
 2. StoryAction emits `doAction(edge_id, payload)`
 3. StoryBlock passes event up
@@ -202,14 +212,17 @@ export const useStore = defineStore('main', {
 Create `.env.local` for development:
 ```bash
 VITE_DEFAULT_API_URL=http://localhost:8000/api/v2
-VITE_DEFAULT_WORLD=tangl_world
-VITE_DEFAULT_USER_SECRET=dev-secret-123
+VITE_DEFAULT_WORLD=
+VITE_DEFAULT_USER_SECRET=
 VITE_DEBUG=true
 VITE_MOCK_RESPONSES=false
 VITE_SHOW_RESPONSES=true
 ```
 
 ## Testing and quality checks
+- The real Chromium witness is documented in `e2e/README.md`; it uses the built
+  client and real top-level REST app with fresh browser/user/storage state.
+  Vitest/MSW is component evidence, not proof of browser/server integration.
 - Run `yarn test` before committing changes
 - Run `yarn type-check` to verify TypeScript types
 - Run `yarn test:coverage` to check coverage (target: 80%+)
