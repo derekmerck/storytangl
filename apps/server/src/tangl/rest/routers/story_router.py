@@ -288,7 +288,7 @@ def _call_service_method(
 
 
 @router.post(
-    "/story/create",
+    "/create",
     response_model=RuntimeEnvelopePayload,
     response_model_exclude_none=True,
 )

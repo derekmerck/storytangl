@@ -240,6 +240,7 @@ class TestRemoteTransportAndAuth:
         }
         assert envelope.metadata["world_id"] == "demo_world"
         assert manager._bound_secret == "new-secret"
+        assert session.calls[2]["url"] == "https://example.test/api/v2/story/create"
         assert manager._bound_api_key == "new-key"
         assert manager._bound_user_id == user_id
         assert session.calls[0]["params"] == {

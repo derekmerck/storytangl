@@ -397,7 +397,7 @@ class RemoteServiceManager(ServiceManager):
 
         payload = self._request(
             "POST",
-            "/story/story/create",
+            "/story/create",
             auth_required=True,
             params=params,
         )

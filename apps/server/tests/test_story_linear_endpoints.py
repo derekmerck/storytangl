@@ -66,7 +66,7 @@ def _edge_id(choice: dict[str, object]) -> object:
 def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str, str]]) -> None:
     client, headers = linear_story_client
 
-    create = client.post("story/story/create", params={"world_id": "the_path"}, headers=headers)
+    create = client.post("story/create", params={"world_id": "the_path"}, headers=headers)
     assert create.status_code == 200
 
     update = client.get("story/update", headers=headers)
@@ -121,7 +121,7 @@ def test_linear_story_update_supports_html_render_profile(
 ) -> None:
     client, headers = linear_story_client
 
-    create = client.post("story/story/create", params={"world_id": "the_path"}, headers=headers)
+    create = client.post("story/create", params={"world_id": "the_path"}, headers=headers)
     assert create.status_code == 200
 
     update = client.get(
@@ -141,7 +141,7 @@ def test_linear_story_do_supports_html_render_profile(
 ) -> None:
     client, headers = linear_story_client
 
-    create = client.post("story/story/create", params={"world_id": "the_path"}, headers=headers)
+    create = client.post("story/create", params={"world_id": "the_path"}, headers=headers)
     assert create.status_code == 200
 
     update = client.get("story/update", headers=headers)
