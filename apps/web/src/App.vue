@@ -154,6 +154,7 @@ const resynchronizeStory = async (message: string) => {
   writePending.value = false
   sessionError.value = `${message} Checking the current story before another move.`
   await resumeStory()
+  if (activeSession.value) sessionError.value = message
 }
 
 const bootstrapPlayer = async (action: () => Promise<void>) => {
@@ -251,6 +252,10 @@ const normalizeInfoState = (value: unknown): InfoState | null => {
 }
 
 const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
+  const initialStep = activeSession.value?.envelope.step
+  if (initialStep != null && envelope.step != null && envelope.step > initialStep) {
+    sessionError.value = null
+  }
   if (envelope.metadata && Object.prototype.hasOwnProperty.call(envelope.metadata, 'info_state')) {
     infoState.value = normalizeInfoState(envelope.metadata.info_state)
   }

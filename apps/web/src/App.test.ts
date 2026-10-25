@@ -9,9 +9,15 @@ import App from '@/App.vue'
 import AppNavbar from '@/components/AppNavbar.vue'
 import StoryFlow from '@/components/story/StoryFlow.vue'
 import { useGlobal } from '@/composables/globals'
+import StoryBlock from '@/components/story/StoryBlock.vue'
 import { useStore } from '@/store'
 import { HttpResponse, http, server } from '@tests/setup'
-import { crossroadsRuntimeEnvelope, sandboxInfoState, sandboxProjectedState } from '@tests/fixtures'
+import {
+  crossroadsRuntimeEnvelope,
+  crossroadsNextRuntimeEnvelope,
+  sandboxInfoState,
+  sandboxProjectedState,
+} from '@tests/fixtures'
 import { mockUserInfo } from '@tests/mocks/mockData'
 
 const vuetify = createVuetify({ components, directives })
@@ -147,6 +153,71 @@ describe('App.vue', () => {
     expect(current.findComponent(StoryFlow).exists()).toBe(false)
     expect(current.text()).toContain('Choose a world')
     expect(reads).toBe(1)
+  })
+
+  it('retires reconciliation progress, preserves refusal, and clears it after a successful move', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let submissions = 0
+    let creations = 0
+    server.use(
+      http.post(`${DEFAULT_API_URL}/story/create`, () => {
+        creations += 1
+        return HttpResponse.json(crossroadsRuntimeEnvelope)
+      }),
+      http.post(`${DEFAULT_API_URL}/story/do`, () => {
+        submissions += 1
+        return submissions === 1
+          ? HttpResponse.json({ detail: 'A permit is required.' }, { status: 400 })
+          : HttpResponse.json(crossroadsNextRuntimeEnvelope)
+      })
+    )
+    const wrapper = mountApp()
+    await flushPromises()
+    const scene = wrapper.findComponent(StoryBlock)
+    scene.vm.$emit('doAction', 'e-crossroads-03-bargain')
+    scene.vm.$emit('doAction', 'e-crossroads-03-bargain')
+    await flushPromises()
+    expect(submissions).toBe(1)
+    expect(wrapper.text()).toContain('A permit is required.')
+    expect(wrapper.text()).not.toContain('Checking the current story')
+    expect(wrapper.findComponent(AppNavbar).props('busy')).toBe(false)
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'e-crossroads-03-bargain')
+    await flushPromises()
+    expect(wrapper.text()).toContain('The stranger slides the folded vellum')
+    expect(wrapper.text()).not.toContain('A permit is required.')
+    expect(submissions).toBe(2)
+    expect(creations).toBe(0)
+  })
+
+  it('retains a failed reconciliation and blocks writes without a replacement story', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let submissions = 0
+    let creations = 0
+    const wrapper = mountApp()
+    await flushPromises()
+    server.use(
+      http.post(`${DEFAULT_API_URL}/story/do`, () => {
+        submissions += 1
+        return HttpResponse.error()
+      }),
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({ detail: 'Unavailable' }, { status: 500 })
+      ),
+      http.post(`${DEFAULT_API_URL}/story/create`, () => {
+        creations += 1
+        return HttpResponse.json(crossroadsRuntimeEnvelope)
+      })
+    )
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'e-crossroads-03-bargain')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Unable to continue the current story')
+    expect(wrapper.text()).not.toContain('Checking the current story')
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
+    expect(wrapper.findComponent(AppNavbar).props('busy')).toBe(true)
+    wrapper.findComponent(AppNavbar).vm.$emit('select-world', 'reference')
+    await flushPromises()
+    expect(submissions).toBe(1)
+    expect(creations).toBe(0)
   })
 
   it('clears story and status on a player switch', async () => {
