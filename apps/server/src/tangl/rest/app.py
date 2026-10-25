@@ -22,6 +22,9 @@ Default mounts:
 - docs:  `/docs`
 - media: `/media`
 
+Startup mounts media from discovered bundle manifests without compiling worlds.
+Script-only ``ServiceManager.load_world`` does not register a bundle media root.
+
 """
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -36,8 +39,10 @@ from starlette.responses import RedirectResponse
 from tangl.config import settings
 from tangl.rest.dependencies_gateway import get_service_manager
 from tangl.rest.media_mounts import mount_system_media
+from tangl.rest.media_server import initialize_media_mounts
 from tangl.service import ServiceManager
 from tangl.service.response import RuntimeInfo
+from tangl.service.world_registry import WorldRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +73,13 @@ def get_user_credentials(service_manager: ServiceManager) -> UUID:
 
 @asynccontextmanager
 async def _app_lifespan(_: FastAPI):
-    """Run startup initialization for service-backed REST app."""
+    """Initialize credentials and discovered bundle media for the REST app."""
     try:
         get_user_credentials(get_service_manager())
     except Exception:
         logger.exception("Failed to initialize dev user credentials during startup")
         raise
+    initialize_media_mounts(media_server, WorldRegistry())
     yield
 
 app = FastAPI(
