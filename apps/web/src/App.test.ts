@@ -319,6 +319,32 @@ describe('App.vue', () => {
     expect(store.current_user?.user_id).toBe('test-user-id')
   })
 
+  it('does not mint a player when an invalid recovery secret is entered', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const store = useStore()
+    store.user_secret = 'unknown-recovery-secret'
+    let creations = 0
+    server.use(
+      http.get(`${DEFAULT_API_URL}/user/info`, () =>
+        HttpResponse.json({ detail: 'Invalid API key' }, { status: 401 })
+      ),
+      http.post(`${DEFAULT_API_URL}/user/create`, () => {
+        creations += 1
+        return HttpResponse.json({ api_key: 'invalid', user_secret: 'unknown-recovery-secret' })
+      })
+    )
+    const wrapper = mountApp()
+    await flushPromises()
+    await wrapper
+      .get('[data-testid="authentication-secret"] input')
+      .setValue('unknown-recovery-secret')
+    await wrapper.get('[data-testid="authentication-existing"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="authentication-error"]').exists()).toBe(true)
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
+    expect(creations).toBe(0)
+  })
+
   it('silently creates and stores a player on first visit', async () => {
     const store = useStore()
     store.user_secret = ''

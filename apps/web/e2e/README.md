@@ -9,6 +9,7 @@ yarn type-check
 yarn test --run
 yarn build:e2e
 yarn test:e2e
+yarn test:e2e:restart
 ```
 
 On Linux, use `yarn playwright install --with-deps chromium` for browser system
@@ -31,9 +32,34 @@ It checks DOM and network outcomes and fails on browser errors, failed requests,
 or unsuccessful API/media responses. This does not prove Service-restart or
 cross-browser JSON recovery, audio playback, or staging/presentation parity.
 
+The separate `test:e2e:restart` witness owns two real backend processes on the
+same port and one temporary JSON store. It copies the reference bundle once,
+creates a player/story through the UI, takes two choices, gracefully stops the
+first backend, and starts the second over the existing files. Readiness checks
+use only system info: no world compilation, world-info warm-up, or replacement
+story. Reload must restore the same player, ledger, cursor, step and current
+choice occurrence/edge IDs, with history once and decoded SVG media.
+
+A completely fresh browser context first creates an unrelated player with no
+story. It then uses Switch or Recover Player and the original recovery secret
+through the existing UI, without storage/cookie/header injection. Invalid-secret
+recovery must stay at the gate without creating an account. Successful recovery
+must show the original history/frontier/media, take a third choice and survive
+reload. Supplemental requests using the unrelated player's observed credentials
+must neither read nor advance that story. Both processes stop and the temporary
+store is removed, including on failure. Run the two browser commands serially.
+
+This checks identity and current-story continuity, not timestamp fidelity.
+The existing `UserInfo.created_dt` drift observed across JSON restoration is
+explicitly deferred; this witness does not fix or guarantee that timestamp.
+See [the restoration fix](https://github.com/derekmerck/StoryTangl/pull/620).
+
 Failure artifacts are `test-results/` (screenshot, trace, request/response/error
 attachment), `playwright-report/`, and `e2e-artifacts/server.log`. Open a trace
 with `yarn playwright show-trace <trace.zip>`. CI uploads these on failure.
-The always-reported Web Client Gate requires Chromium and component checks on
+JSON failure logs are `e2e-artifacts/json-a.log` and `json-b.log`; traces,
+screenshots, network observations and process/identity receipts are under
+`test-results/json-restart/`. Both witnesses reuse the pinned browser install.
+The always-reported Web Client Gate requires both Chromium witnesses and component checks on
 relevant web/server/engine/world/config/lock/workflow changes. Docs-only changes
 skip the browser installation and explicitly pass the gate's skip condition.

@@ -79,6 +79,8 @@ jobs:
         run: yarn build:e2e
       - name: Real Chromium journey
         run: yarn test:e2e
+      - name: JSON restart and fresh-context recovery
+        run: yarn test:e2e:restart
       - name: Preserve browser and server diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
