@@ -1,4 +1,4 @@
-"""JSON auth recovery is independent of unavailable ledger World authorities."""
+"""Fresh JSON auth is isolated; Service prepares the World on the first story read."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 
-def test_json_auth_startup_and_profile_in_a_fresh_process(tmp_path: Path) -> None:
+def test_json_auth_and_story_recovery_in_a_fresh_process(tmp_path: Path) -> None:
     repo = Path(__file__).resolve().parents[3]
     shutil.copytree(repo / "worlds/reference", tmp_path / "worlds/reference")
     for key in ("user_data", "story_media", "cache_data"):

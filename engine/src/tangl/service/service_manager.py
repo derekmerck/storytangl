@@ -11,7 +11,7 @@ from uuid import UUID
 
 import yaml
 
-from tangl.core import BaseFragment, Ctx
+from tangl.core import BaseFragment, Ctx, Entity
 from tangl.journal.fragments import ChoiceFragment, PieceFragment
 from tangl.journal.presentation import desired_music
 from tangl.persistence import PersistenceManager
@@ -186,13 +186,26 @@ class ServiceManager:
         return user
 
     def _load_ledger(self, ledger_id: UUID) -> Ledger:
+        with self.open_ledger(ledger_id) as ledger:
+            return ledger
+
+    def _prepare_ledger_world(self, record: UnstructuredData) -> None:
+        """Make only the persisted World authority available before restoration."""
         persistence = self._require_persistence()
-        if ledger_id not in persistence:
-            raise ValueError(f"Ledger {ledger_id} not found")
-        ledger = persistence.load(ledger_id)
-        if not isinstance(ledger, Ledger):
-            raise TypeError(f"Expected Ledger for {ledger_id}, got {type(ledger).__name__}")
-        return ledger
+        kind = record["kind"]
+        if isinstance(kind, str):
+            kind = persistence.kind_map[kind]
+        if not isinstance(kind, type) or not issubclass(kind, Ledger):
+            return
+        factory = record["graph"].get("factory")
+        if not isinstance(factory, dict):
+            return
+        factory_kind = factory["kind"]
+        if isinstance(factory_kind, str):
+            factory_kind = Entity.dereference_cls_name(factory_kind)
+        if isinstance(factory_kind, type) and issubclass(factory_kind, World):
+            if factory_kind.get_instance(factory["label"]) is None:
+                self.open_world(factory["label"])
 
     def _save(self, payload: Any) -> None:
         persistence = self._require_persistence()
@@ -236,6 +249,9 @@ class ServiceManager:
         persistence = self._require_persistence()
         if ledger_id not in persistence:
             raise ValueError(f"Ledger {ledger_id} not found")
+        record = persistence.read_record(ledger_id)
+        if isinstance(record, dict):
+            self._prepare_ledger_world(record)
         with persistence.open(ledger_id, write_back=write_back) as ledger:
             if not isinstance(ledger, Ledger):
                 raise TypeError(f"Expected Ledger for {ledger_id}, got {type(ledger).__name__}")
