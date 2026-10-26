@@ -14,13 +14,13 @@ resolver mechanisms in :mod:`tangl.vm`.
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
-from tangl.core import Priority, Record, Selector
+from tangl.core import Node, Priority, Record, Selector
 from tangl.ir.story_ir.choice_disclosure import UnavailableChoiceDisclosure
 from tangl.ir.story_ir.text_template import TextTemplate
 from tangl.prose import DialogHandler, TextRenderSession
-from tangl.prose.mu_block import RealizationValue
+from tangl.prose.mu_block import RealizationValue, SpeakerResolver
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
 from tangl.presentation.intent import Blocker
@@ -708,6 +708,16 @@ def render_block_media(*, caller, ctx, **_kw):
     for media_item in caller.media:
         payload = media_item if isinstance(media_item, dict) else {"value": media_item}
         source_kind = payload.get("source_kind")
+        speaker_id = None
+        if (speaker := payload.get("speaker")) is not None:
+            ns = ctx.get_ns(caller)
+            resolver = cast(SpeakerResolver | None, ns.get("dialog_speaker_resolver"))
+            if resolver is None:
+                raise TypeError("Authored media speaker requires the scoped speaker binder")
+            binding = resolver(speaker, None, False)
+            if binding is None:
+                raise ValueError(f"{caller.get_label()}: unbound media speaker {speaker!r}")
+            speaker_id = cast(Node, binding.subject).uid
 
         dependency_id = payload.get("dependency_id")
         dependency = graph.get(dependency_id) if graph is not None and dependency_id is not None else None
@@ -720,6 +730,7 @@ def render_block_media(*, caller, ctx, **_kw):
                     staging_hints=payload.get("staging_hints"),
                     content=provider,
                     presentation_handle=payload.get("presentation_handle"),
+                    speaker_id=speaker_id,
                     content_format="rit",
                     content_type=provider.data_type or MediaDataType.MEDIA,
                     text=payload.get("text"),
@@ -737,6 +748,7 @@ def render_block_media(*, caller, ctx, **_kw):
                     staging_hints=payload.get("staging_hints"),
                     content=str(payload.get("url")),
                     presentation_handle=payload.get("presentation_handle"),
+                    speaker_id=speaker_id,
                     content_format="url",
                     content_type=_media_type_for_item(payload),
                     text=payload.get("text"),
@@ -753,6 +765,7 @@ def render_block_media(*, caller, ctx, **_kw):
                     staging_hints=payload.get("staging_hints"),
                     content=payload.get("data"),
                     presentation_handle=payload.get("presentation_handle"),
+                    speaker_id=speaker_id,
                     content_format="data",
                     content_type=_media_type_for_item(payload),
                     text=payload.get("text"),

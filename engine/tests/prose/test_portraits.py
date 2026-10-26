@@ -137,6 +137,8 @@ def test_actual_journal_emits_following_portraits_with_original_attitudes(world:
     assert skeptical.content.path.name == "skeptical.svg"
     assert happy.content.registry is ledger.graph
     assert first.source_id == happy.source_id == ledger.cursor_id
+    assert happy.origin_id == first.origin_id and skeptical.origin_id == second.origin_id
+    assert happy.speaker_id == skeptical.speaker_id == actor(ledger).uid
     assert happy.media_role == skeptical.media_role == "dialog_im"
     wire = json.loads(json.dumps(RuntimeEnvelope(fragments=fragments).to_dto()))
     projected = next(item for item in wire["fragments"] if item["uid"] == str(happy.uid))
@@ -478,11 +480,14 @@ def test_setting_speaker_resolves_its_current_provider_before_portrait_selection
         "requirement": Requirement(has_kind=Location),
     }).materialize(registry=ledger.graph)
     setting.set_provider(location)
+    ledger.cursor.media[0]["speaker"] = "place_setting"
     ledger.cursor.prose = [DialogMuBlock(dialog_class="place_setting.dry", text="Welcome.")]
     fragments = do_journal(ledger.cursor, ctx=prepare(ledger))
     line = next(item for item in fragments if isinstance(item, AttributedFragment))
     portrait = fragments[fragments.index(line) + 1]
     assert line.speaker_id == str(location.uid)
+    assert all(item.speaker_id == location.uid for item in fragments
+               if isinstance(item, MediaFragment))
     assert portrait.content is location.dialog_portrait(ctx=prepare(ledger), attitude="dry")
 
 

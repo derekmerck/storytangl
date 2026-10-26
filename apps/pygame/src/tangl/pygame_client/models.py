@@ -20,12 +20,15 @@ from tangl.service.response import JsonValue
 
 @dataclass(slots=True, frozen=True)
 class StageImage:
-    """One image to draw, keyed by ``media_role`` rather than world identity."""
+    """One image to draw; associated portraits use speaker identity, never asset identity."""
 
     role: str
     source: str
     alt_text: str | None = None
     source_id: UUID | None = None
+    speaker_id: UUID | None = None
+    """Resolved provider identity, independent of resource/provenance IDs."""
+    presentation_handle: str | None = None
     x_slot: str | None = None
     """From ``staging_hints.media_x`` when it names a slot.
 
@@ -68,9 +71,11 @@ class StageImage:
     for the station exactly where it falls.
     """
 
-    flip_h: bool = False
-    """From ``staging_hints.media_flip_h``. Other staging hints are ignored by
-    this port; honouring a subset is expected of a conforming client."""
+    flip_h: bool | None = None
+    """From ``staging_hints.media_flip_h``; None preserves omission on replacement.
+
+    Explicit false overrides an established flip rather than inheriting it.
+    """
 
     clip: str | None = None
     """From ``staging_hints.media_clip``: which clip of a sprite sheet to play.

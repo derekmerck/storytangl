@@ -170,6 +170,7 @@ def compose_portraits(*, fragments: list[Record], ctx: PhaseCtx, **_kwargs: obje
             output.append(MediaFragment(
                 content=resource, content_format="rit", content_type=resource.data_type,
                 media_role="dialog_im", scope=provider.portraits.scope,
+                speaker_id=speaker_id,
                 source_id=fragment.source_id, origin_id=fragment.origin_id, step=ctx.step,
             ))
     return output

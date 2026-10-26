@@ -268,6 +268,8 @@ def _base_payload(
         payload["rit_id"] = str(rit_id)
     if fragment.presentation_handle is not None:
         payload["presentation_handle"] = fragment.presentation_handle
+    if fragment.speaker_id is not None:
+        payload["speaker_id"] = str(fragment.speaker_id)
     # Per-use staging travels with the media it stages. Before this, every media
     # payload dropped it: an in-process client read hints off the fragment and
     # never noticed, while a remote client had no way to place, flip or animate

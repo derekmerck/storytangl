@@ -11,7 +11,8 @@
 > #602 preserves structured JSON placeholder content through DTO and constructor-form
 > serialization; CLI renders only the named resource and unresolved reason.
 > #562's opt-in prose portrait backend selects packed look variants from pre-admitted
-> graph resources; per-line client realization remains deferred to #538/#587.
+> graph resources; #538 slice 1 replaces associated pygame portraits in place.
+> Ordered per-line presentation remains deferred to #587.
 > #514 reuses manager-local pure lexical relative-path derivations during lookup.
 > Graph-local static admission/JSON restoration is covered as the current stopgap
 > for CarWars #34; scoped catalog/provenance design remains deferred under #284.
@@ -714,6 +715,8 @@ fragment-only compatibility import path.
 - `content_format` — `"rit"`, `"url"`, `"data"`, `"json"`, `"xml"`
 - `content_type` — `MediaDataType` classification
 - `media_role` — narrative intent (for example `"narrative_im"`, `"dialog_im"`)
+- `speaker_id` — optional resolved character/provider UUID, independent of the
+  resource, source and origin IDs; retained by ordinary URL/path delivery
 - `scope` — inventory scope for service-layer resolution
 - `staging_hints` — optional `StagingHints` for client presentation
 
@@ -739,6 +742,19 @@ includes a static fallback standing in for pending media, which is a still like
 any other.
 Earlier the payload dropped staging hints entirely, which an in-process client
 never noticed and a remote client could not work around.
+
+Authored base portraits can declare `speaker: host` alongside `name`,
+`media_role: avatar_im` and `staging_hints`. The existing scoped speaker binder
+resolves the exact key and current Role/Setting provider at JOURNAL time;
+this requires adoption of the naming binder, not a global actor scan or display
+name matching. The resulting fragment carries `speaker_id`, not the symbolic
+reference. `presentation_handle` still distinguishes deliberate separate
+presentations of one speaker. pygame replaces associated avatar/dialog portraits
+in place, inheriting omitted staging while retaining explicit false flip.
+Staging defaults do not assert a supplied coordinate. No selected packed art
+leaves the explicit base intact. Each response still shows the final expression
+per speaker; #587 must pair following generated portrait media with its preceding
+attributed line before implementing ordered/paged presentation.
 
 
 ### Creator Pipeline (`media_creators/`)
