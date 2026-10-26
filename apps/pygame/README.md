@@ -50,6 +50,18 @@ deliberate independent presentations of one speaker. Variant arrivals consume
 no extra slots. An unstaged speaker takes normal deterministic placement; missing
 packed art keeps the explicitly staged base. Unassociated decoration is unchanged.
 
+At pygame's existing room-restatement boundary (a `narrative_im` backdrop or
+`staged_im` figure), omitted associated portraits retire. Restated speaker/handle
+presentations keep their established staging, including when the new expression
+supplies no hints. A room statement without portraits retires the old associated
+cast; an art-free continuation keeps it. The rule is the same within a batch and
+across responses and does not change unassociated decoration's existing policy.
+FIFO residency bounded by supported portrait stations and explicit authored
+dismissal through existing controls remain separate #538/#409 design work.
+`speaker_id` is semantic association, not a control target: existing
+`presentation_handle` is the route for deliberate addressing. This is pygame's
+room realization policy, not universal backend stage lifecycle.
+
 **A response still shows each speaker's final expression.** #587 owns narrow
 ordered/paged presentation with the passages. #613 emits each generated portrait
 AFTER its attributed line; later pacing must pair it with that line before

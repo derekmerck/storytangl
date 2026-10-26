@@ -225,6 +225,84 @@ def test_next_response_without_art_keeps_associated_portrait() -> None:
     assert frame.images == [image]
 
 
+@pytest.mark.parametrize("room_role", ["narrative_im", "staged_im"])
+def test_room_restatement_retires_old_cast_in_successive_frames_and_batches(
+    portrait_world: World, room_role: str,
+) -> None:
+    root = portrait_world.resources.resource_path
+    speakers = [uuid4() for _ in range(4)]
+    first = RuntimeEnvelope(fragments=[
+        MediaFragment(content=root / "base.png", content_format="path", content_type="image",
+                      media_role="narrative_im", step=1),
+        *[MediaFragment(content=root / "base.png", content_format="path", content_type="image",
+                        media_role="avatar_im", speaker_id=speaker, step=1)
+          for speaker in speakers[:3]],
+    ])
+    second = RuntimeEnvelope(fragments=[
+        MediaFragment(content=root / "base.png", content_format="path", content_type="image",
+                      media_role=room_role, step=2),
+        MediaFragment(content=root / "dry.png", content_format="path", content_type="image",
+                      media_role="dialog_im", speaker_id=speakers[3], step=2),
+    ])
+    bridge = PygameSessionBridge()
+    old = _frame(bridge, first)
+    assert len([image for image in old.images if image.speaker_id]) == 3
+    current = _frame(bridge, second, previous=old)
+    assert [image.speaker_id for image in current.images if image.speaker_id] == [speakers[3]]
+    batch = _frame(bridge, RuntimeEnvelope(fragments=[*first.fragments, *second.fragments]))
+    assert batch.images == current.images
+    stage = Stage()
+    try:
+        stage.surface.fill("black")
+        stage._draw_portraits(current, {}, fresh=True)
+        point = (stage.margin + 15, stage.logical_size[1] - 10)
+        assert tuple(stage.surface.get_at(point))[:3] == (0, 255, 0)
+    finally:
+        pygame.quit()
+
+
+def test_room_restatement_keeps_matching_handle_staging_and_retires_omissions(
+    portrait_world: World,
+) -> None:
+    path = portrait_world.resources.resource_path / "base.png"
+    speaker = uuid4()
+    hints = {"media_x": 0.25, "media_y": 0.8, "media_flip_h": True,
+             "media_visibility": {"preference_id": "portraits", "values": [True]},
+             "media_clip_binding": {"axes": ["motion"], "rows": [
+                 {"values": [True], "clip": "idle"},
+             ]}}
+    base = MediaFragment(content=path, content_format="path", content_type="image",
+                         media_role="avatar_im", speaker_id=speaker,
+                         presentation_handle="primary", staging_hints=hints, step=1)
+    omitted = base.evolve(presentation_handle="mirror")
+    room = MediaFragment(content=path, content_format="path", content_type="image",
+                         media_role="narrative_im", step=2)
+    expression = base.evolve(content=path.with_name("dry.png"), media_role="dialog_im",
+                             staging_hints=None, step=2)
+    bridge = PygameSessionBridge()
+    old = _frame(bridge, RuntimeEnvelope(fragments=[base, omitted]))
+    expected = replace(old.images[0], role="dialog_im", source=str(path.with_name("dry.png")))
+    expression_only = _frame(bridge, RuntimeEnvelope(fragments=[expression]), previous=old)
+    assert expression_only.images == [expected, old.images[1]]
+    current = _frame(bridge, RuntimeEnvelope(fragments=[room, expression]), previous=old)
+    portraits = [image for image in current.images if image.speaker_id]
+    assert len(portraits) == 1
+    assert portraits[0] == expected
+    empty = RuntimeEnvelope(fragments=[room.evolve(step=3)])
+    empty_room = _frame(bridge, empty, previous=current)
+    assert not any(image.speaker_id for image in empty_room.images)
+    batch = _frame(bridge, RuntimeEnvelope(fragments=[base, omitted, room, expression]))
+    assert batch.images == current.images
+    empty_batch = _frame(bridge, RuntimeEnvelope(
+        fragments=[base, omitted, room, expression, *empty.fragments],
+    ))
+    assert empty_batch.images == empty_room.images
+    decoration = StageImage(role="avatar_im", source="decoration")
+    merged = _merge([Turn(step=1, images=[decoration, old.images[0]]),
+                     Turn(step=2, images=[StageImage(role="narrative_im", source="new-room")])])
+    assert merged.images == [decoration, StageImage(role="narrative_im", source="new-room")]
+
+
 def test_two_speakers_handles_defaults_and_explicit_false() -> None:
     left, right = uuid4(), uuid4()
     base = StageImage(role="avatar_im", source="base", speaker_id=left,

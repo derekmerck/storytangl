@@ -96,7 +96,8 @@ def _merge(turns: list[Turn]) -> Turn:
     role/source/slot key. First-appearance order stays stable for default slots.
 
     A turn that states the room -- a backdrop or any staged figure -- replaces
-    the figures before it, which leave with the room they stood in; a turn that
+    the figures before it and retires omitted associated portraits. Matching
+    speaker/handle presentations retain their established staging. A turn that
     states nothing keeps the room, and a cover is chrome and replaces none. This
     is how this client collapses a stream into frames, not a stream contract:
     which figures a statement holds is the backend's to say.
@@ -118,8 +119,13 @@ def _merge(turns: list[Turn]) -> Turn:
         for finding in turn.findings:
             findings[finding.key] = finding
         if any(image.role in ROOM_ROLES for image in turn.images):
+            restated = {_slot(image) for image in turn.images
+                        if image.role in PORTRAIT_ROLES and image.speaker_id is not None}
             staged = {key: image for key, image in staged.items()
-                      if image.role not in STAGED_ROLES}
+                      if image.role not in STAGED_ROLES and (
+                          image.role not in PORTRAIT_ROLES
+                          or image.speaker_id is None or key in restated
+                      )}
         for image in turn.images:
             key = _slot(image)
             previous = staged.get(key)
