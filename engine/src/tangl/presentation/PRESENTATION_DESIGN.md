@@ -21,10 +21,24 @@ and omitted placement, flip, visibility and clip bindings. Supplied axes and
 explicit false flip override; omitted DTO hints must not become explicit defaults.
 Unassociated decoration and default placement retain their existing policy.
 
-This is final staging for a response. Ordered expressions with their passages
-remain #587: generated portraits follow their attributed line and must be paired
-with that preceding line before showing its beat. Paging, focus/dimming, side
-selection, slides and audio changes remain separate slices.
+pygame's #587 first slice offers compact client-local paging in addition to
+default scrolling. The existing world-static `ui-preferences` channel may declare
+enum preference `pacing`, values `scrolling`/`paged`, with the desired default.
+The reader's local override wins. No new journal, Service pagination, subscription
+or account-persistence contract is implied.
+
+The client preserves ordered step/source groups before folding the response.
+Following generated portraits pair with their PRECEDING attributed line; explicit
+block staging applies before its own text even when emitted later. Ephemeral
+snapshots reuse the same stage fold and room retirement as scrolling. Four measured
+wrapped body rows plus bounded attribution/navigation leave the stage visible.
+Choices/actions are gated until the final page or deliberate skip; Back and mode
+switches do not execute effects. Scrolling remains the no-hint default and history
+does not replay local pages. pygame's runner still starts fresh stories, not resume.
+
+Audio remains batch-applied, not beat-synchronized; pages/redraw/back do not requeue
+BGM/barks. Moving audio to beat boundaries is a separate #587 slice. Focus/dimming,
+side selection, slides and avatar-control realization remain separate.
 
 ## Explicit text intent (#592 slice 1)
 

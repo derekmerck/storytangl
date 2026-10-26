@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
@@ -36,33 +35,31 @@ from .models import (
     CancelSelection,
     Commit,
     ConfirmSelection,
-    Finding,
     PendingSelection,
     PagePanel,
     PagePreferences,
     PageSelection,
-    Piece,
     PreferenceControl,
     PickPiece,
     ScrollText,
-    StageImage,
+    PassagePage,
+    TogglePacing,
     SubmitText,
     Turn,
     TogglePreference,
-    Zone,
 )
 from .stage import (
     BACKGROUND_ROLES,
     PORTRAIT_ROLES,
     CANCEL_KEY,
     CONFIRM_KEY,
-    MAP_ROLES,
     PAGE_KEY,
     STAGED_ROLES,
     Stage,
     choice_action,
     position_for_key,
 )
+from .presentation import merge_turns as _merge, visual_passages
 from .music import MusicPlayer
 from .voice import VoicePlayer
 from .text_entry import PendingText
@@ -72,109 +69,6 @@ logger = logging.getLogger(__name__)
 
 def _turns(bridge: PygameSessionBridge, envelope) -> list[Turn]:
     return bridge.build_turns(list(getattr(envelope, "fragments", []) or []))
-
-
-ROOM_ROLES = ("narrative_im", *STAGED_ROLES)
-"""What states the room. A cover is persistent chrome, not a room, so it does not."""
-
-
-def _merge(turns: list[Turn]) -> Turn:
-    """Collapse a batch of turns into the one frame the player acts on.
-
-    Time Parity: the client may show intermediate steps, but must never trap the
-    player below the CLI floor, which presents the whole batch at once.
-
-    Media is stage state rather than a transcript, so it is merged by identity
-    rather than concatenated. Consecutive steps in one batch restate the scene —
-    the dockhand contest and its aftermath both carry the same background and
-    portrait — and concatenating them draws a character twice, at two default
-    slots, since unslotted duplicates take successive positions.
-
-    One background, last one wins. Speaker-associated avatar/dialog portraits
-    share a slot keyed by speaker and optional presentation handle; later faces
-    inherit omitted staging and replace in place. Unassociated media keeps its
-    role/source/slot key. First-appearance order stays stable for default slots.
-
-    A turn that states the room -- a backdrop or any staged figure -- replaces
-    the figures before it and retires omitted associated portraits. Matching
-    speaker/handle presentations retain their established staging. A turn that
-    states nothing keeps the room, and a cover is chrome and replaces none. This
-    is how this client collapses a stream into frames, not a stream contract:
-    which figures a statement holds is the backend's to say.
-    """
-
-    merged = Turn(step=turns[-1].step if turns else 0)
-    staged: dict[tuple[str, ...], StageImage] = {}
-    pieces: dict[str, Piece] = {}
-    zones: dict[UUID, Zone] = {}
-    findings: dict[str, Finding] = {}
-    for turn in turns:
-        # Pieces and zones are stage state too, and a re-entrant block restates
-        # them every turn. Keyed by identity so a restatement updates the piece
-        # in place instead of listing the same document twice.
-        for piece in turn.pieces:
-            pieces[piece.piece_id] = piece
-        for zone in turn.zones:
-            zones[zone.uid] = zone
-        for finding in turn.findings:
-            findings[finding.key] = finding
-        if any(image.role in ROOM_ROLES for image in turn.images):
-            restated = {_slot(image) for image in turn.images
-                        if image.role in PORTRAIT_ROLES and image.speaker_id is not None}
-            staged = {key: image for key, image in staged.items()
-                      if image.role not in STAGED_ROLES and (
-                          image.role not in PORTRAIT_ROLES
-                          or image.speaker_id is None or key in restated
-                      )}
-        for image in turn.images:
-            key = _slot(image)
-            previous = staged.get(key)
-            if image.role in PORTRAIT_ROLES and image.speaker_id is not None and previous:
-                image = _inherit_portrait(image, previous)
-            staged[key] = image
-        merged.lines.extend(turn.lines)
-    merged.images.extend(staged.values())
-    merged.pieces.extend(pieces.values())
-    merged.zones.extend(zones.values())
-    merged.findings.extend(findings.values())
-    merged.choices.extend(turns[-1].choices if turns else [])
-    return merged
-
-
-def _slot(image: StageImage) -> tuple[str, ...]:
-    """One backdrop/map; associated portraits by speaker/handle; others by asset/slot.
-
-    A plate is stage state like a background: a batch that crosses between two
-    maps must not keep the old one and pair it with the new geometry. Both
-    collapse to one slot, last one wins.
-    """
-
-    if image.role in BACKGROUND_ROLES:
-        return ("background",)
-    if image.role in MAP_ROLES:
-        return ("map",)
-    if image.role in PORTRAIT_ROLES and image.speaker_id is not None:
-        return ("portrait", str(image.speaker_id), image.presentation_handle or "")
-    return (image.role, image.source, image.x_slot or "")
-
-
-def _inherit_portrait(image: StageImage, previous: StageImage) -> StageImage:
-    """Keep established staging; a supplied axis replaces both its slot and fraction."""
-    inherit_x = image.x_slot is None and image.x_frac is None
-    inherit_y = image.y_slot is None and image.y_frac is None
-    return replace(
-        image,
-        x_slot=previous.x_slot if inherit_x else image.x_slot,
-        x_frac=previous.x_frac if inherit_x else image.x_frac,
-        y_slot=previous.y_slot if inherit_y else image.y_slot,
-        y_frac=previous.y_frac if inherit_y else image.y_frac,
-        keep=previous.keep if image.keep is None else image.keep,
-        flip_h=previous.flip_h if image.flip_h is None else image.flip_h,
-        clip=previous.clip if image.clip is None else image.clip,
-        timing=previous.timing if image.timing is None else image.timing,
-        visibility=previous.visibility if image.visibility is None else image.visibility,
-        clip_binding=previous.clip_binding if image.clip_binding is None else image.clip_binding,
-    )
 
 
 def _frame(bridge: PygameSessionBridge, envelope, previous: Turn | None = None) -> Turn:
@@ -231,6 +125,8 @@ def _keyed(
     reads and the number a key selects drift apart.
     """
 
+    if not stage.choices_ready and pending is None:
+        return None
     if pending is not None:
         # The control bindings are the ones the renderer draws, so a candidate
         # can never share a number with Confirm or More.
@@ -268,7 +164,17 @@ def _apply(
     """Advance the input state machine. Returns the new pending state and, when
     the action reached the service, the envelope it produced."""
 
+    if not stage.choices_ready and isinstance(action, (Commit, BeginText, BeginSelection)):
+        return pending, None
     match action:
+        case PassagePage():
+            stage.page(action)
+            return pending, None
+        case TogglePacing():
+            stage.paged = not stage.paged
+            if bridge.preferences.get("pacing") in ("paged", "scrolling"):
+                bridge.preferences["pacing"] = "paged" if stage.paged else "scrolling"
+            return pending, None
         case ScrollText():
             stage.scroll_text(action)
             return pending, None
@@ -277,6 +183,8 @@ def _apply(
             return pending, None
         case TogglePreference(preference_id=preference_id):
             bridge.cycle_preference(preference_id)
+            if preference_id == "pacing":
+                stage.paged = bridge.preferences["pacing"] == "paged"
             return pending, None
         case CancelSelection():
             return None, None
@@ -440,10 +348,12 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         logo_source=bridge.logo_source,
     )
     stage.preference_controls = _preference_controls(bridge, preferences)
+    stage.paged = bridge.preferences.get("pacing") == "paged"
     # Gameplay is not text input: the key opening an editor must not also type
     # itself into its buffer. TEXTINPUT starts only once that offer has focus.
     pygame.key.stop_text_input()
     frame = _frame(bridge, envelope)
+    stage.present(frame, visual_passages(bridge, envelope))
 
     for step in range(args.advance):
         # Only choices that commit outright. A typed choice needs a value this
@@ -472,7 +382,9 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 )
             break
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
-        frame = _frame(bridge, envelope, frame)
+        previous = frame
+        frame = _frame(bridge, envelope, previous)
+        stage.present(frame, visual_passages(bridge, envelope, previous))
         pygame.display.set_caption(_world_title(bridge))
 
     stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
@@ -522,10 +434,24 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
             elif event.type == pygame.KEYDOWN:
                 if pending is None and event.key in preference_keys:
                     bridge.cycle_preference(preference_keys[event.key])
+                    if preference_keys[event.key] == "pacing":
+                        stage.paged = bridge.preferences["pacing"] == "paged"
                     stage.preference_controls = _preference_controls(bridge, preferences)
                     stage.draw(frame, media_visibility=bridge.media_visibility())
                     continue
-                if event.key == pygame.K_ESCAPE:
+                if (pending is None and event.key == pygame.K_p
+                        and event.mod & pygame.KMOD_CTRL):
+                    action = TogglePacing()
+                elif (pending is None and stage.paged and stage.pages
+                        and event.key in (pygame.K_UP, pygame.K_PAGEUP, pygame.K_DOWN,
+                                          pygame.K_PAGEDOWN, pygame.K_SPACE, pygame.K_RETURN,
+                                          pygame.K_END)
+                        and not event.mod & pygame.KMOD_SHIFT):
+                    action = PassagePage(
+                        -1 if event.key in (pygame.K_UP, pygame.K_PAGEUP) else 1,
+                        end=event.key == pygame.K_END,
+                    )
+                elif event.key == pygame.K_ESCAPE:
                     # Escape leaves a selection before it leaves the game: a
                     # player who opened one by mistake should not have to quit.
                     if pending is not None:
@@ -567,10 +493,12 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                     stage.chrome.open = False
             elif was_text and not isinstance(pending, PendingText):
                 pygame.key.stop_text_input()
-            if isinstance(action, TogglePreference):
+            if isinstance(action, (TogglePreference, TogglePacing)):
                 stage.preference_controls = _preference_controls(bridge, preferences)
             if envelope is not None:
-                frame = _frame(bridge, envelope, frame)
+                previous = frame
+                frame = _frame(bridge, envelope, previous)
+                stage.present(frame, visual_passages(bridge, envelope, previous))
                 stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
                                status_available=bridge.status_available, session_id=bridge.ledger_id)
                 pygame.display.set_caption(_world_title(bridge))

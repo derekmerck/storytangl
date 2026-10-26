@@ -787,3 +787,66 @@ def test_a_response_that_restates_the_room_retires_the_figures_it_omits() -> Non
     then = client._frame(_Replies(_staging(2, ("narrative_im", "clinic.png"))), None, first)
 
     assert [image.source for image in then.images] == ["clinic.png"]
+
+
+def _paged_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    discover = PygameSessionBridge.discover_preferences
+
+    def paged(bridge, world_id):
+        result = discover(bridge, world_id)
+        bridge.preferences["pacing"] = "paged"
+        return result
+
+    monkeypatch.setattr(PygameSessionBridge, "discover_preferences", paged)
+    monkeypatch.setattr(client, "visual_passages", lambda *_: [
+        Turn(step=index, lines=[Line(f"Passage {index}")]) for index in (1, 2, 3)
+    ])
+
+
+def test_paged_navigation_gates_hotkeys_and_never_submits_without_a_choice_event(
+    monkeypatch: pytest.MonkeyPatch, gated: list[Choice],
+    committed: list[tuple[UUID, JsonValue | None]],
+) -> None:
+    _paged_input(monkeypatch)
+    _run([_key(pygame.K_2), _key(pygame.K_DOWN), _key(pygame.K_2),
+          _key(pygame.K_UP), _key(pygame.K_END), _key(pygame.K_2)])
+    assert committed == [(gated[1].edge_id, {})]
+
+
+def test_page_advance_click_does_not_also_activate_a_newly_revealed_choice(
+    monkeypatch: pytest.MonkeyPatch, gated: list[Choice],
+    committed: list[tuple[UUID, JsonValue | None]],
+) -> None:
+    from tangl.pygame_client.models import PassagePage
+
+    _paged_input(monkeypatch)
+    count = 0
+
+    def events(stage):
+        nonlocal count
+        count += 1
+        if count > 2:
+            return [pygame.event.Event(pygame.QUIT)]
+        rect = next(rect for rect, action in stage.hitboxes
+                    if isinstance(action, PassagePage) and action.end)
+        return [pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
+                                   pos=stage.window_point(rect.center))]
+
+    monkeypatch.setattr(client, "_next_events", events)
+    client.main(["--world", WORLD])
+    assert committed == []
+
+
+def test_paged_editor_keeps_focus_and_page_keys_do_not_submit_or_navigate(
+    monkeypatch: pytest.MonkeyPatch, gated: list[Choice],
+    committed: list[tuple[UUID, JsonValue | None]],
+) -> None:
+    from tangl.presentation.intent import TextAccepts
+
+    _paged_input(monkeypatch)
+    gated[1] = Choice(gated[1].edge_id, "Speak", accepts=TextAccepts())
+    _run([_key(pygame.K_2), _key(pygame.K_END), _key(pygame.K_2),
+          pygame.event.Event(pygame.TEXTINPUT, text="Hello"),
+          _key(pygame.K_UP), _key(pygame.K_DOWN), _key(pygame.K_END),
+          pygame.event.Event(pygame.TEXTINPUT, text=" there"), _key(pygame.K_RETURN)])
+    assert committed == [(gated[1].edge_id, {"text": "Hello there"})]

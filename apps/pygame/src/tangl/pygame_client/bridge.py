@@ -706,6 +706,43 @@ class PygameSessionBridge:
             self._append(turns.setdefault(step, Turn(step=step)), fragment)
         return [turns[step] for step in sorted(turns)]
 
+    def build_passages(self, fragments: list[BaseFragment]) -> list[list[Turn]]:
+        """Keep block/step order and pair following speaker media before the turn fold."""
+        groups: dict[tuple[int, UUID | None], list[BaseFragment]] = {}
+        for fragment in self._flatten(fragments):
+            if isinstance(fragment, (ChoiceFragment, ControlFragment)):
+                continue
+            source = fragment.source_id if isinstance(fragment, ContentFragment) else None
+            groups.setdefault((_step(fragment), source), []).append(fragment)
+        blocks: list[list[Turn]] = []
+        for (step, source), group in groups.items():
+            paired: dict[int, MediaFragment] = {}
+            for index, fragment in enumerate(group[:-1]):
+                following = group[index + 1]
+                if (isinstance(fragment, AttributedFragment)
+                        and isinstance(following, MediaFragment)
+                        and following.media_role == "dialog_im"
+                        and following.speaker_id is not None
+                        and str(following.speaker_id) == (fragment.model_extra or {}).get("speaker_id")):
+                    paired[index] = following
+            following_ids = {item.uid for item in paired.values()}
+            base = Turn(step=step, source_id=source)
+            for fragment in group:
+                if fragment.uid not in following_ids and (
+                    isinstance(fragment, MediaFragment) or not isinstance(fragment, ContentFragment)
+                ):
+                    self._append(base, fragment)
+            passages: list[Turn] = []
+            for index, fragment in enumerate(group):
+                if isinstance(fragment, ContentFragment) and not isinstance(fragment, MediaFragment):
+                    passage = base if not passages else Turn(step=step, source_id=source)
+                    self._append(passage, fragment)
+                    if index in paired:
+                        self._append(passage, paired[index])
+                    passages.append(passage)
+            blocks.append(passages or [base])
+        return blocks
+
     def _flatten(self, fragments: list[BaseFragment]) -> list[BaseFragment]:
         """Flatten grouping fragments, keeping the ones that are not decoration.
 
@@ -833,6 +870,11 @@ class PygameSessionBridge:
                         text=text,
                         speaker=_text(fragment.who),
                         manner=_text(fragment.how),
+                        speaker_id=UUID(str(fragment.model_extra["speaker_id"]))
+                        if (fragment.model_extra or {}).get("speaker_id") else None,
+                        mode=(fragment.model_extra or {}).get("dialog_mode"),
+                        attitude=(fragment.model_extra or {}).get("speaker_attitude"),
+                        hints=fragment.presentation_hints,
                     )
                 )
             return
@@ -840,7 +882,7 @@ class PygameSessionBridge:
         if isinstance(fragment, ContentFragment):
             text = _text(fragment.content)
             if text is not None:
-                turn.lines.append(Line(text=text))
+                turn.lines.append(Line(text=text, hints=fragment.presentation_hints))
 
     @staticmethod
     def _append_fallback_text(

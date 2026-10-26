@@ -13,6 +13,7 @@ from uuid import UUID
 
 from tangl.presentation.intent import Accepts, EntityRef
 from tangl.presentation.hints import TimingName
+from tangl.presentation.hints import PresentationHints
 from tangl.presentation.hints import ClipBinding, VisibilityBinding
 from tangl.presentation.sprite_sheet import SpriteSheetManifest
 from tangl.service.response import JsonValue
@@ -118,6 +119,10 @@ class Line:
     text: str
     speaker: str | None = None
     manner: str | None = None
+    speaker_id: UUID | None = None
+    mode: str | None = None
+    attitude: str | None = None
+    hints: PresentationHints | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -256,6 +261,7 @@ class Turn:
     """One step's worth of images, lines, pieces, and choices."""
 
     step: int
+    source_id: UUID | None = None
     images: list[StageImage] = field(default_factory=list)
     lines: list[Line] = field(default_factory=list)
     choices: list[Choice] = field(default_factory=list)
@@ -353,6 +359,19 @@ class ScrollText:
 
 
 @dataclass(slots=True, frozen=True)
+class PassagePage:
+    """Local passage navigation; no traversal or audio effect."""
+
+    delta: int = 1
+    end: bool = False
+
+
+@dataclass(slots=True, frozen=True)
+class TogglePacing:
+    """Local scrolling/paged override for this client session."""
+
+
+@dataclass(slots=True, frozen=True)
 class CancelSelection:
     """Abandon the pending selection. Client-local.
 
@@ -381,6 +400,8 @@ Action = (
     | PageSelection
     | PagePanel
     | ScrollText
+    | PassagePage
+    | TogglePacing
     | CancelSelection
     | TogglePreference
     | PagePreferences

@@ -10,7 +10,8 @@ Adapter proof of concept. The bridge and turn model are covered by ordinary
 `pytest`; the renderer is deliberately thin. #592 slice 2 adds local text editing
 over the existing authoritative Action submission path.
 The #538 first slice replaces speaker-associated expression portraits in place;
-ordered/paged expression changes remain #587.
+The #587 first slice adds optional compact local paging with ordered visuals;
+beat-synchronized audio remains deferred.
 
 ## What Is Included
 
@@ -23,6 +24,7 @@ ordered/paged expression changes remain #587.
   separate from images and historical turn rendering.
 - `src/tangl/pygame_client/__main__.py` — event loop.
 - `src/tangl/pygame_client/text_entry.py` — one local text editor and bounded modal.
+- `src/tangl/pygame_client/presentation.py` — shared stage fold and ephemeral ordered snapshots.
 - `tests/` — adapter and live-session tests.
 
 ## Design Commitments
@@ -62,11 +64,69 @@ dismissal through existing controls remain separate #538/#409 design work.
 `presentation_handle` is the route for deliberate addressing. This is pygame's
 room realization policy, not universal backend stage lifecycle.
 
-**A response still shows each speaker's final expression.** #587 owns narrow
-ordered/paged presentation with the passages. #613 emits each generated portrait
-AFTER its attributed line; later pacing must pair it with that line before
-display, rather than use it for the next beat. Focus/dimming, opposite-side
-placement, slides, audio changes and web rendering remain separate follow-ups.
+**Scrolling shows final-response staging; paging follows passages.** The local
+pager pairs #613's immediately following generated portrait with its PRECEDING
+attributed line before displaying either. Explicit block/base images, including
+images emitted after prose, apply before that block's text using existing
+step/source boundaries. Each snapshot uses the #622 stage fold, hint inheritance
+and room retirement. Future rooms/expressions stay hidden; Back displays an earlier
+snapshot without replaying traversal. No journal or transport pagination is added.
+
+## Compact paging (#587 first slice)
+
+Scrolling remains the default when a world makes no suggestion. A world may use
+the existing `metadata.ui_preferences` declarations, discovered through the
+ordinary world-info catalog and exact `ui-preferences` channel:
+
+```yaml
+metadata:
+  ui_preferences:
+    - id: pacing
+      kind: enum
+      label: Reading
+      values: [scrolling, paged]
+      default: paged
+```
+
+The reader can override this locally with Ctrl+P or the Pages/Scroll control.
+Declared preference controls/F-key shortcuts still work. Mode and page position
+are client-local for this run; there is no account setting or backend page state.
+
+The window allocates FOUR wrapped body rows, one bounded attribution row and
+one navigation row. Wrapping uses the actual font's pixel metrics and preserves
+paragraphs/words, splitting oversized tokens when necessary. Compatible narration
+or same-speaker fragments combine while they fit. Speaker identity, wording/style,
+mode, attitude/expression and step/source/visual boundaries keep incompatible
+passages apart. The panel sits at the bottom of the existing logical stage; no
+world coordinates or portrait natural sizes are moved. Headless pixel witnesses
+at 320×200 and 640×400 keep both faces of naturally sized 112/224-pixel portraits
+visible above the window. Arbitrary authored face positions remain the author's
+staging choice, not an automatic relocation policy.
+
+Up/Down and PageUp/PageDown move between pages. Space/Enter, a click on the prose,
+or `>` advance locally; `<` goes back. End and its visible clickable control skip
+to the final page. An advance event never doubles as a choice activation.
+Choices, letter/number hotkeys, map regions and typed interactions become actionable
+only on the last page or after deliberate skip. Terminal menus retain independent
+bounded scrolling (Shift+Up/Down/PageUp/PageDown, wheel and pointer controls), full
+wording, refusal state, numbering and payloads. Existing surface/selection/editor
+views remain in use once an interaction is opened. Empty/media-only and single-page
+responses are immediately actionable. Status chrome describes committed runtime
+state; paging does not rewind game state or call Service.
+
+Only fresh opening/choice output gets pages. The runner currently starts a new
+story; it does not offer a resume command. Bridge refresh/readback remains an
+ordinary history operation, and the presentation entry point accepts `fresh=False`
+to show that history without replaying pages. Redraw/Back/mode switches are local.
+
+**Audio synchronization is deferred.** BGM/barks retain their existing batch
+application on fresh responses. Paging, redraw and Back do not synchronize/requeue
+them; refresh retains existing non-fresh audio policy. A later #587 slice must move
+bark/BGM application to beat boundaries. Paging does not claim audio follows text.
+Focus/dimming, automatic opposite-side placement, slides, FIFO station arbitration,
+avatar control realization and web rendering remain separate follow-ups.
+
+## Stage and interaction conventions
 
 **Logical extent comes from world info; window scale stays local.** Before it
 constructs `Stage`, the bridge discovers exact world-info channel `ui-stage`.
@@ -618,7 +678,7 @@ from the type signatures, and a third port would pay the same tax again.
 | | Ren'Py | pygame |
 |---|---|---|
 | media | ordered `scene`/`show` ops, stateful | flat per-turn image list, stateless |
-| speaker | `portrait_tag` for a defined character image | `speaker` string, looked up by role |
+| speaker | `portrait_tag` for a defined character image | resolved `speaker_id`, optional presentation handle, and portrait role family |
 | choices | menu built by the runtime | hitboxes owned by the renderer |
 | typed input | not attempted | two-step numbered selection for `pieces`, paged |
 | turns | one per step, played in sequence | merged into one actionable frame |
