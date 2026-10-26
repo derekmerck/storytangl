@@ -912,6 +912,8 @@ class PygameSessionBridge:
                 source=source,
                 alt_text=_text(payload.get("text")),
                 source_id=getattr(fragment, "rit_id", None),
+                speaker_id=UUID(payload["speaker_id"]) if payload.get("speaker_id") else None,
+                presentation_handle=payload.get("presentation_handle"),
                 x_slot=None if _fraction(hints.get("media_x")) is not None
                 else _text(hints.get("media_x")),
                 y_slot=None if _fraction(hints.get("media_y")) is not None
@@ -919,7 +921,7 @@ class PygameSessionBridge:
                 x_frac=_fraction(hints.get("media_x")),
                 y_frac=_fraction(hints.get("media_y")),
                 keep=_text(hints.get("media_keep")),
-                flip_h=bool(hints.get("media_flip_h")),
+                flip_h=hints.get("media_flip_h"),
                 clip=_text(hints.get("media_clip")),
                 timing=_timing(hints.get("media_timing")),
                 sheets=self._sheets(payload),

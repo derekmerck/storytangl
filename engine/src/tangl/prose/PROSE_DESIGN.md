@@ -8,7 +8,8 @@ unmerged; its useful lexical witnesses informed the replacement, not its runtime
 authority. Start with the [authoring guide](../../../../docs/src/design/story/PROSE_AUTHORING.md)
 for activation, naming examples, voice/environment policy, and escape hatches.
 The #562 packed-look backend slice is opt-in through `tangl.prose.portraits`;
-per-line client realization remains deferred to #538/#587.
+pygame's #538 slice 1 replaces speaker-associated portraits in place; ordered
+per-line realization remains deferred to #587.
 #578 slice 1 shares personal-name enrichment with non-Actor Player compositions;
 parser-policy decisions and #577 speech/discovery remain separate.
 
@@ -452,9 +453,21 @@ graph without world lookup or inline duplicates. Playback/patch replay reads
 historical output without nomination or duplicate fragments.
 
 Output is an ordinary `dialog_im` MediaFragment immediately following its
-AttributedFragment, retaining source/step provenance. Service media dereferencing
-is unchanged. Explicit block/base `avatar_im` staging is retained independently.
-The backend does not make pygame visibly switch per line: pygame still flattens
-lines and media into turns, and focus, sides, pacing, pagination, and audio sync
-remain deferred to #538/#587. No bark/history manager, wardrobe/holding migration,
+AttributedFragment, retaining source/step provenance and carrying that line's
+resolved provider `speaker_id`. Resource/provenance IDs are not speaker identity.
+Explicit block/base `avatar_im` declarations may bind `speaker: host` through the
+existing exact scoped speaker binder (naming adoption); inherited scene casts and
+recasting resolve their current Role/Setting provider at JOURNAL time. Names are
+not guessed. Missing/unknown bindings fail explicitly.
+
+pygame treats associated avatar/dialog images as one portrait family keyed by
+speaker and the existing optional `presentation_handle`. Later expressions keep
+the established order and omitted staging; explicit coordinates override only
+their axis, including explicit false flip. No portrait selected keeps the staged
+base; an unstaged speaker uses ordinary default placement. Unassociated decoration
+keeps its previous behavior. pygame still shows each speaker's final expression
+in a response. #587's ordered/paged follow-up must pair the portrait emitted
+AFTER a line with that line before display, not with the next beat. Focus/dimming,
+automatic sides, pacing, pagination, and audio sync remain separate #538/#587
+slices. No bark/history manager, wardrobe/holding migration,
 runtime face composition, or location-prop policy is introduced.

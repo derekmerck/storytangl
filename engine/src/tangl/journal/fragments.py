@@ -289,6 +289,7 @@ class MediaFragment(ContentFragment, extra="allow"):
     rit_id: UUID | None = None
     staging_hints: _StagingHints | None = None
     media_role: str | None = None
+    speaker_id: UUID | None = None
     presentation_handle: str | None = None
     scope: str | None = "world"
     fragment_type: Literal["media"] = "media"

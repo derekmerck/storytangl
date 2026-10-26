@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
@@ -52,6 +53,7 @@ from .models import (
 )
 from .stage import (
     BACKGROUND_ROLES,
+    PORTRAIT_ROLES,
     CANCEL_KEY,
     CONFIRM_KEY,
     MAP_ROLES,
@@ -88,11 +90,10 @@ def _merge(turns: list[Turn]) -> Turn:
     portrait — and concatenating them draws a character twice, at two default
     slots, since unslotted duplicates take successive positions.
 
-    The rule is deliberately small: one background, last one wins so a scene
-    change during the batch is not stale; other media keyed by role, source, and
-    slot, so two genuinely distinct portraits both survive while a restatement
-    of the same one does not. Later values replace earlier ones in place, which
-    keeps first-appearance order stable for default slot assignment.
+    One background, last one wins. Speaker-associated avatar/dialog portraits
+    share a slot keyed by speaker and optional presentation handle; later faces
+    inherit omitted staging and replace in place. Unassociated media keeps its
+    role/source/slot key. First-appearance order stays stable for default slots.
 
     A turn that states the room -- a backdrop or any staged figure -- replaces
     the figures before it, which leave with the room they stood in; a turn that
@@ -120,7 +121,11 @@ def _merge(turns: list[Turn]) -> Turn:
             staged = {key: image for key, image in staged.items()
                       if image.role not in STAGED_ROLES}
         for image in turn.images:
-            staged[_slot(image)] = image
+            key = _slot(image)
+            previous = staged.get(key)
+            if image.role in PORTRAIT_ROLES and image.speaker_id is not None and previous:
+                image = _inherit_portrait(image, previous)
+            staged[key] = image
         merged.lines.extend(turn.lines)
     merged.images.extend(staged.values())
     merged.pieces.extend(pieces.values())
@@ -131,7 +136,7 @@ def _merge(turns: list[Turn]) -> Turn:
 
 
 def _slot(image: StageImage) -> tuple[str, ...]:
-    """Where a merged image lives: one backdrop, one map, else by role, source, slot.
+    """One backdrop/map; associated portraits by speaker/handle; others by asset/slot.
 
     A plate is stage state like a background: a batch that crosses between two
     maps must not keep the old one and pair it with the new geometry. Both
@@ -142,7 +147,28 @@ def _slot(image: StageImage) -> tuple[str, ...]:
         return ("background",)
     if image.role in MAP_ROLES:
         return ("map",)
+    if image.role in PORTRAIT_ROLES and image.speaker_id is not None:
+        return ("portrait", str(image.speaker_id), image.presentation_handle or "")
     return (image.role, image.source, image.x_slot or "")
+
+
+def _inherit_portrait(image: StageImage, previous: StageImage) -> StageImage:
+    """Keep established staging; a supplied axis replaces both its slot and fraction."""
+    inherit_x = image.x_slot is None and image.x_frac is None
+    inherit_y = image.y_slot is None and image.y_frac is None
+    return replace(
+        image,
+        x_slot=previous.x_slot if inherit_x else image.x_slot,
+        x_frac=previous.x_frac if inherit_x else image.x_frac,
+        y_slot=previous.y_slot if inherit_y else image.y_slot,
+        y_frac=previous.y_frac if inherit_y else image.y_frac,
+        keep=previous.keep if image.keep is None else image.keep,
+        flip_h=previous.flip_h if image.flip_h is None else image.flip_h,
+        clip=previous.clip if image.clip is None else image.clip,
+        timing=previous.timing if image.timing is None else image.timing,
+        visibility=previous.visibility if image.visibility is None else image.visibility,
+        clip_binding=previous.clip_binding if image.clip_binding is None else image.clip_binding,
+    )
 
 
 def _frame(bridge: PygameSessionBridge, envelope, previous: Turn | None = None) -> Turn:
@@ -158,7 +184,8 @@ def _frame(bridge: PygameSessionBridge, envelope, previous: Turn | None = None) 
     turns = _turns(bridge, envelope)
     if previous is not None:
         room = [image for image in previous.images
-                if image.role in BACKGROUND_ROLES + STAGED_ROLES]
+                if image.role in BACKGROUND_ROLES + STAGED_ROLES
+                or image.role in PORTRAIT_ROLES and image.speaker_id is not None]
         turns = [Turn(step=previous.step, images=room), *turns]
     frame = _merge(turns)
     frame.plate = bridge.map_plate()

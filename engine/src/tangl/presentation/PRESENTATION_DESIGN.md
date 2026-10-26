@@ -11,6 +11,21 @@ persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
 
+## Portrait association (#538 slice 1)
+
+Journal media's optional `speaker_id` identifies the resolved provider, while
+resource/source/origin IDs keep their existing asset/provenance meanings.
+pygame merges associated `avatar_im`/`dialog_im` presentations by speaker plus
+the existing optional `presentation_handle`, preserving first appearance order
+and omitted placement, flip, visibility and clip bindings. Supplied axes and
+explicit false flip override; omitted DTO hints must not become explicit defaults.
+Unassociated decoration and default placement retain their existing policy.
+
+This is final staging for a response. Ordered expressions with their passages
+remain #587: generated portraits follow their attributed line and must be paired
+with that preceding line before showing its beat. Paging, focus/dimming, side
+selection, slides and audio changes remain separate slices.
+
 ## Explicit text intent (#592 slice 1)
 
 `TextAccepts` and its existing validator models are syntax, not an enforcement

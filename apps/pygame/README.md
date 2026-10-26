@@ -9,6 +9,8 @@ adapts typed `RuntimeEnvelope` output into a small turn model and draws it.
 Adapter proof of concept. The bridge and turn model are covered by ordinary
 `pytest`; the renderer is deliberately thin. #592 slice 2 adds local text editing
 over the existing authoritative Action submission path.
+The #538 first slice replaces speaker-associated expression portraits in place;
+ordered/paged expression changes remain #587.
 
 ## What Is Included
 
@@ -32,6 +34,27 @@ still plays, rendering flat colour plus text. Art is purely additive.
 Image geometry remains an orthogonal staging hint: Repartee's backgrounds use
 `media_shape: landscape`, while this stage is free to promote the current
 `narrative_im` to its full-frame background.
+
+**Expressions keep the speaker's established placement.** An authored base may
+declare `speaker: host` with its `name`, `media_role: avatar_im` and staging hints.
+Adopt the existing naming binder: the exact in-scope key resolves the current
+Role/Setting provider, including inherited scene cast and recasting. The backend
+carries that provider's `speaker_id` on both base and following packed portraits.
+Names, paths, resource IDs and provenance never establish speaker identity.
+
+Associated `avatar_im` and `dialog_im` share one portrait family. Expressions
+replace that speaker in first-appearance order, retaining omitted position,
+fractions, flip, visibility and clip preference bindings. Supplied hints override
+only their coordinates; false flip works. `presentation_handle` separates
+deliberate independent presentations of one speaker. Variant arrivals consume
+no extra slots. An unstaged speaker takes normal deterministic placement; missing
+packed art keeps the explicitly staged base. Unassociated decoration is unchanged.
+
+**A response still shows each speaker's final expression.** #587 owns narrow
+ordered/paged presentation with the passages. #613 emits each generated portrait
+AFTER its attributed line; later pacing must pair it with that line before
+display, rather than use it for the next beat. Focus/dimming, opposite-side
+placement, slides, audio changes and web rendering remain separate follow-ups.
 
 **Logical extent comes from world info; window scale stays local.** Before it
 constructs `Stage`, the bridge discovers exact world-info channel `ui-stage`.
