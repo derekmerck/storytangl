@@ -33,7 +33,10 @@ def test_pr_opening_and_main_pushes_participate_without_an_opt_in_label(workflow
     assert checks["if"] == "needs.changes.outputs.relevant == 'true'"
     assert "ci:web" not in yaml.dump(checks)
     commands = [step.get("run", "") for step in checks["steps"]]
-    assert {"yarn type-check", "yarn test --run", "yarn build:e2e", "yarn test:e2e"} <= set(commands)
+    assert {
+        "yarn type-check", "yarn test --run", "yarn build:e2e",
+        "yarn test:e2e", "yarn test:e2e:restart",
+    } <= set(commands)
     assert "yarn playwright install --with-deps chromium" in commands
 
 

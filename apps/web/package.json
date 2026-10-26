@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:e2e": "playwright test",
+    "test:e2e:restart": "playwright test --config playwright.restart.config.ts",
     "build:e2e": "VITE_DEFAULT_API_URL=http://127.0.0.1:4173/api/v2 VITE_DEFAULT_USER_SECRET= VITE_DEFAULT_WORLD= VITE_MOCK_RESPONSES=false VITE_DEBUG=false VITE_VERBOSE=false yarn build",
     "dev": "vite",
     "build": "vue-tsc && vite build",
@@ -12,7 +13,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "type-check": "vue-tsc --noEmit",
+    "type-check": "vue-tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint .",
     "format": "prettier --write src/",
     "generate-api": "openapi-typescript ../server/openapi.json -o src/types/api.d.ts"

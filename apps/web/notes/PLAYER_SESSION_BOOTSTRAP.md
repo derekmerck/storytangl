@@ -1,6 +1,7 @@
 # Player Session Bootstrap
 
-**Status:** Current browser/session transport contract.
+**Status:** Current browser/session transport contract; JSON backend restart and
+fresh-context recovery have a separate real-browser witness in `e2e/README.md`.
 
 The web client provides one small persistence capability for a single-player
 story session. It is not an authentication or account framework.
@@ -25,9 +26,11 @@ story session. It is not an authentication or account framework.
    mounting the application.
 3. Missing or invalid browser state exposes the recovery surface. The player
    may recover with a codename, start a new player, or explicitly switch.
-4. Recovery uses `POST /user/create?secret=...`: an existing codename restores
-   its existing user; a new one creates a user. The operation supplies the
-   intent, so identical bearer values are not treated as an error here.
+4. The browser's Use Existing Secret action derives the key and validates it
+   through `GET /user/info`. An unknown codename stays at the recovery gate;
+   it must not silently create another player. Start New Player owns creation.
+   Service still supports explicit `POST /user/create?secret=...` callers;
+   that create operation is separate from browser recovery.
 5. Authenticated rotation uses `PUT /user/secret?secret=...`. It preserves the
    current UUID; a codename owned by another user conflicts rather than merging
    identities. Rotating to the current codename is a no-op.

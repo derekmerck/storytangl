@@ -1,5 +1,7 @@
 """Serve the built client and real REST app in one isolated smoke-test process."""
 
+import argparse
+from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
 from shutil import copytree
@@ -11,17 +13,24 @@ from tangl.config import settings
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path)
+    parser.add_argument("--profile", choices=("native_in_mem", "json_file"), default="native_in_mem")
+    parser.add_argument("--log-name", default="server.log")
+    args = parser.parse_args()
     repo = Path(__file__).resolve().parents[3]
-    with TemporaryDirectory(prefix="storytangl-browser-") as temporary:
+    owner = nullcontext(args.root) if args.root else TemporaryDirectory(prefix="storytangl-browser-")
+    with owner as temporary:
         root = Path(temporary)
-        copytree(repo / "worlds/reference", root / "worlds/reference")
+        if args.root is None:
+            copytree(repo / "worlds/reference", root / "worlds/reference")
         settings.set("service.paths.worlds", [root / "worlds"])
         settings.set("service.paths.client_dist", repo / "apps/web/dist")
         for key in ("user_data", "story_media", "cache_data"):
             directory = root / key
-            directory.mkdir()
+            directory.mkdir(exist_ok=True)
             settings.set(f"service.paths.{key}", directory)
-        settings.set("service.persistence", "native_in_mem")
+        settings.set("service.persistence", args.profile)
         settings.set("service.caches.shelved", False)
         settings.set("client.secret", "browser-server-bootstrap")
 
@@ -32,7 +41,7 @@ if __name__ == "__main__":
         config = deepcopy(uvicorn.config.LOGGING_CONFIG)
         config["handlers"]["file"] = {
             "class": "logging.FileHandler",
-            "filename": str(logs / "server.log"),
+            "filename": str(logs / args.log_name),
             "mode": "w",
             "formatter": "default",
         }

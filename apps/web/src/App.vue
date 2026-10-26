@@ -186,7 +186,7 @@ const useExistingSecret = async () => {
     authenticationError.value = 'Enter a recovery secret.'
     return
   }
-  await bootstrapPlayer(() => store.ensurePlayer(authenticationSecret.value))
+  await bootstrapPlayer(() => store.authenticateWithSecret(authenticationSecret.value))
 }
 
 const startNewPlayer = async () => {
