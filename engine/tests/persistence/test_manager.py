@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 from uuid import uuid4, UUID
 
 import pydantic
@@ -25,6 +26,25 @@ def test_save_and_load(manager, test_obj):
     uid = test_obj.uid
     loaded_obj = manager.load(uid)
     assert loaded_obj == test_obj, "Loaded object should match the saved object"
+
+
+def test_decoded_record_read_and_canonical_load(manager, test_obj, monkeypatch):
+    manager.save(test_obj)
+    if manager.structuring is not None:
+        restore = Mock(wraps=manager.structuring.structure)
+        monkeypatch.setattr(manager.structuring, "structure", restore)
+    decoded = manager.read_record(test_obj.uid)
+    if manager.structuring is None:
+        assert decoded == test_obj
+    else:
+        assert decoded["uid"] == test_obj.uid
+        assert decoded["kind"] in (ManagerModel, ManagerModel.__module__ + ".ManagerModel")
+        restore.assert_not_called()
+    read = Mock(wraps=manager.read_record)
+    monkeypatch.setattr(manager, "read_record", read)
+    assert manager.load(test_obj.uid) == test_obj
+    read.assert_called_once()
+    assert read.call_args.args[0] == test_obj.uid
 
 def test_remove(manager, test_obj):
     manager.save(test_obj)

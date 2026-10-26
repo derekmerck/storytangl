@@ -1,6 +1,8 @@
 # tangl.service — Design Notes
 
 > Status: Current manager-first contract; persisted class references retain module identity
+> Authentication now reads decoded records before restoring matching Users;
+> fresh-process ledger World preparation remains pending under #73/#611.
 > Authority: The canonical public service surface is `ServiceManager`,
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
@@ -80,6 +82,27 @@ persisted class representation; there is no legacy-name migration or alias layer
 
 `World` is discovered and compiled through `WorldRegistry`. Service owns world
 loading/unloading policy, not world semantics.
+
+### Record reading and restoration
+
+`PersistenceManager.read_record(uid)` owns storage read and serializer decode;
+`load(uid)` reuses that stage, then applies the configured structuring handler.
+It preserves the existing decoded representation and on-disk encoding. Native
+in-memory profiles return the live stored object without serializing its graph.
+Constructor-form profiles such as JSON-file return a mapping without constructing
+its entity/graph. Pickle profiles that store live objects may construct them
+during deserialization; this boundary does not provide a new pickle restore guarantee.
+
+Authentication scans decoded top-level kind and credential hash, then uses normal
+`load` only for a matching User. The reverse-index UID is only a hint: its current
+hash is checked again, including after rotation. UIDs are not derived from secrets.
+Generic persistence knows nothing about Users, Worlds or authentication.
+
+This isolates User discovery/startup from unrelated stored Ledgers. It does not
+yet complete durable story recovery: Service ledger opening must make the World
+named by the existing `graph.factory` reference available before constructor-form
+Ledger/Graph restoration. That preparation is a separate pending slice; Core's
+strict singleton lookup and the existing factory provenance remain unchanged.
 
 ## Execution Model
 

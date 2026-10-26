@@ -42,7 +42,12 @@ class PersistenceManager(Mapping[UUID, HasUid]):
         for kind in kinds:
             self.register_kind(kind)
 
-    def load(self, uid: UUID, data: FlatData = None) -> HasUid:
+    def read_record(self, uid: UUID, data: FlatData | None = None) -> HasUid | UnstructuredData:
+        """Read and decode one record without applying constructor-form restoration.
+
+        Native profiles return their stored live object. Constructor-form profiles
+        return the decoded mapping; pickle deserialization may itself construct objects.
+        """
 
         if isinstance(uid, str) and is_valid_uuid( uid ):
             uid = UUID(uid)
@@ -59,6 +64,10 @@ class PersistenceManager(Mapping[UUID, HasUid]):
         else:
             unstructured = flat
 
+        return unstructured
+
+    def load(self, uid: UUID, data: FlatData | None = None) -> HasUid:
+        unstructured = self.read_record(uid, data)
         if self.structuring:
             structured = self.structuring.structure(unstructured, self.kind_map)
         else:
