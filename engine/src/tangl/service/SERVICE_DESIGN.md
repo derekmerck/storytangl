@@ -2,7 +2,7 @@
 
 > Status: Current manager-first contract; persisted class references retain module identity
 > Authentication now reads decoded records before restoring matching Users;
-> fresh-process ledger World preparation remains pending under #73/#611.
+> Service ledger opening prepares its referenced World before constructor restoration.
 > Authority: The canonical public service surface is `ServiceManager`,
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
@@ -98,11 +98,25 @@ Authentication scans decoded top-level kind and credential hash, then uses norma
 hash is checked again, including after rotation. UIDs are not derived from secrets.
 Generic persistence knows nothing about Users, Worlds or authentication.
 
-This isolates User discovery/startup from unrelated stored Ledgers. It does not
-yet complete durable story recovery: Service ledger opening must make the World
-named by the existing `graph.factory` reference available before constructor-form
-Ledger/Graph restoration. That preparation is a separate pending slice; Core's
-strict singleton lookup and the existing factory provenance remain unchanged.
+This isolates User discovery/startup from unrelated stored Ledgers. At actual
+story opening, `open_ledger` reads the constructor record, identifies the existing
+`graph.factory` World kind/label, and resolves precisely that World through the
+existing registry when its exact singleton is not already available. Registered
+authorities, including manually supplied Worlds without bundles, are reused.
+Non-World Core factories are left to Core's existing singleton restoration.
+
+`_load_ledger` and `open_session` both use `open_ledger`, so preparation has one
+Service owner. Normal persistence `open`/`load` still performs restoration and
+writeback; no storage encoding or factory reference is rewritten. Unknown kinds
+retain the existing strict class/singleton failures. Missing or unloadable Worlds
+fail without replacing the story or changing the user's saved pointer. Generic
+persistence, VM and Core acquire no Story/Service loading policy.
+
+Fresh-process JSON REST evidence covers history, current frontier, media and a
+further persisted action after restart. Core's strict singleton lookup remains
+unchanged when invoked without Service preparation. A browser restart/recovery
+witness is still separate; this does not establish recovery for every pickle
+profile, backend, world revision or custom domain.
 
 ## Execution Model
 
