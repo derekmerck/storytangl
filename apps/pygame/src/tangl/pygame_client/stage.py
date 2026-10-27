@@ -130,7 +130,13 @@ choice list, and 24 is where the top had risen to at the moment that shrinking
 began. Keeping the number and dropping the mechanism turns the highest a head
 ever went into the highest it may go.
 """
-_BASE_MARGIN = 10
+_BASE_GUTTER = 10
+"""How far a figure staged by name stands in from the frame's edge.
+
+Staging only. Text keeps its own edge, :data:`_BASE_ROW_TEXT_LEFT`, and every
+backing under text comes from :meth:`Stage._backing`; a header washed from the
+gutter instead sat inside the rows it heads.
+"""
 _DEFAULT_SLOTS = ("left", "right", "mid")
 _BASE_ROW_HEIGHT = 9
 _BASE_PROSE_TOP = 24
@@ -344,7 +350,7 @@ class Stage:
         self.logical_size = logical_size
         self.display_scale = display_scale
         self.portrait_headroom = _BASE_PORTRAIT_HEADROOM * self.density
-        self.margin = _BASE_MARGIN * self.density
+        self.gutter = _BASE_GUTTER * self.density
         self.row_height = _BASE_ROW_HEIGHT * self.density
         self.prose_top = _BASE_PROSE_TOP * self.density
         self.panel_width = _BASE_PANEL_WIDTH * self.density
@@ -726,7 +732,7 @@ class Stage:
 
     def _draw_pacing_switch(self) -> None:
         text = self.font.render("Pages (Ctrl+P)", False, CREAM)
-        rect = text.get_rect(topright=(self.logical_size[0] - self.margin, 2 * self.density))
+        rect = text.get_rect(topright=(self.logical_size[0] - self.row_text_left, 2 * self.density))
         self._wash(rect, INK)
         self.surface.blit(text, rect)
         self.hitboxes.append((rect, TogglePacing()))
@@ -739,8 +745,21 @@ class Stage:
         self.prose_rect = pygame.Rect(0, top + 2 * self.row_height, width, 4 * self.row_height)
         self.prose_capacity, self.max_scroll, self.scroll = 4, 0, 0
         self._draw_rows(page.rows, capacity=4, width=width)
-        self._wash(pygame.Rect(self.margin, top, width - 2 * self.margin, 2 * self.row_height), INK)
         heading = self.font.render(self._clip(page.heading or ""), False, RUST)
+        # Each header row is backed as the rows beneath it are, so the page's
+        # header and text share both edges, as the scrolling header does.
+        for y in (top, top + self.row_height):
+            self._wash(
+                self._backing(
+                    heading,
+                    left=self.row_text_left,
+                    y=y,
+                    kind="prose",
+                    width=width,
+                    pitch=self.row_height,
+                ),
+                INK,
+            )
         self.surface.blit(heading, (self.row_text_left, top + self.row_height))
         x = self.row_text_left
         controls = [(f"{self.page_index + 1}/{len(self.pages)}", None),
@@ -1000,8 +1019,7 @@ class Stage:
                     left=self.row_text_left,
                     y=y,
                     kind=row.kind,
-                    width=self.logical_size[0]
-                    - 2 * (self.row_text_left - 3 * self.density),
+                    width=self.logical_size[0],
                     pitch=self.row_height,
                 ),
                 INK,
@@ -1525,9 +1543,9 @@ class Stage:
 
         hold = self.keep_on_screen if keep is None else keep in ("whole", "width")
         if slot == "left":
-            x = self.margin
+            x = self.gutter
         elif slot == "right":
-            x = self.logical_size[0] - width - self.margin
+            x = self.logical_size[0] - width - self.gutter
         else:
             x = (self.logical_size[0] - width) // 2
         if hold:
@@ -1548,9 +1566,9 @@ class Stage:
 
         hold = self.keep_on_screen if keep is None else keep in ("whole", "height")
         if slot == "top":
-            y = self.margin
+            y = self.gutter
         elif slot == "mid":
-            y = max(self.margin, (floor - height) // 2)
+            y = max(self.gutter, (floor - height) // 2)
         else:
             y = floor - height
         if hold:
@@ -1625,10 +1643,12 @@ class Stage:
                 rendered.get_width() + 6 * self.density,
                 pitch - self.density,
             )
+        # Prose spans the region `width` gives, standing in from its right
+        # edge as far as from its left, so no caller derives the band itself.
         return pygame.Rect(
             max(0, left - 3 * self.density),
             y,
-            width,
+            width - 2 * (left - 3 * self.density),
             self.row_height,
         )
 
@@ -1661,7 +1681,7 @@ class Stage:
                     left=self.row_text_left,
                     y=y,
                     kind=row.kind,
-                    width=width - 2 * (self.row_text_left - 3 * self.density),
+                    width=width,
                     pitch=self.row_height,
                 ),
                 fill,
@@ -1722,7 +1742,7 @@ class Stage:
                 left=self.row_text_left,
                 y=top,
                 kind="prose",
-                width=width - 2 * (self.row_text_left - 3 * self.density),
+                width=width,
                 pitch=self.row_height,
             ),
             INK,
@@ -1753,7 +1773,7 @@ class Stage:
 
         surface = self.font.render(self._clip(f"{marker} {text}"), False, colour)
         rect = pygame.Rect(
-            8 * self.density,
+            self.row_text_left,
             y,
             surface.get_width(),
             surface.get_height(),
@@ -1761,7 +1781,7 @@ class Stage:
         self._wash(
             self._backing(
                 surface,
-                left=8 * self.density,
+                left=self.row_text_left,
                 y=y,
                 kind="choice",
                 width=self.logical_size[0],

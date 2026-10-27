@@ -207,10 +207,11 @@ def test_a_legend_row_backs_only_its_own_text(stage, frame) -> None:
     assert backing.width < stage.logical_size[0]
     assert backing.width == rendered.get_width() + 6
     # Prose stays a block: a ragged edge on wrapped narration reads as damage.
+    # It spans the region it is given, standing in as far from either edge.
     prose = stage._backing(
         rendered, left=8, y=0, kind="narration", width=200, pitch=9
     )
-    assert prose.width == 200
+    assert (prose.left, prose.right) == (5, 195)
     # Both begin three pixels before the text, so their left edges agree.
     assert prose.left == backing.left
 

@@ -212,7 +212,7 @@ def test_unstaged_speaker_uses_normal_default_placement(portrait_world: World) -
     try:
         stage.surface.fill("black")
         stage._draw_portraits(frame, {}, fresh=True)
-        point = (stage.margin + 1, stage.logical_size[1] - 10)
+        point = (stage.gutter + 1, stage.logical_size[1] - 10)
         assert tuple(stage.surface.get_at(point))[:3] == (255, 255, 0)
     finally:
         pygame.quit()
@@ -255,7 +255,7 @@ def test_room_restatement_retires_old_cast_in_successive_frames_and_batches(
     try:
         stage.surface.fill("black")
         stage._draw_portraits(current, {}, fresh=True)
-        point = (stage.margin + 15, stage.logical_size[1] - 10)
+        point = (stage.gutter + 15, stage.logical_size[1] - 10)
         assert tuple(stage.surface.get_at(point))[:3] == (0, 255, 0)
     finally:
         pygame.quit()

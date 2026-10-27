@@ -632,8 +632,8 @@ def test_a_station_is_this_port_s_reading_not_a_coordinate(stage: Stage) -> None
     """
 
     w = 60
-    assert stage._slot_x("left", w) == stage.margin
-    assert stage._slot_x("right", w) == stage.logical_size[0] - w - stage.margin
+    assert stage._slot_x("left", w) == stage.gutter
+    assert stage._slot_x("right", w) == stage.logical_size[0] - w - stage.gutter
     assert stage._slot_x("mid", w) == (stage.logical_size[0] - w) // 2
     assert stage._slot_x("nonsense", w) == stage._slot_x("mid", w)
 
@@ -643,9 +643,9 @@ def test_a_vertical_station_is_honoured_rather_than_discarded(stage: Stage) -> N
 
     h, floor = 40, 150
     assert stage._slot_y("bottom", h, floor) == floor - h
-    assert stage._slot_y("top", h, floor) == stage.margin
+    assert stage._slot_y("top", h, floor) == stage.gutter
     assert stage._slot_y(None, h, floor) == floor - h     # the shared baseline
-    assert stage.margin <= stage._slot_y("mid", h, floor) <= floor - h
+    assert stage.gutter <= stage._slot_y("mid", h, floor) <= floor - h
 
 
 def test_keeping_a_station_whole_only_bites_when_it_would_clip(stage: Stage) -> None:
@@ -779,7 +779,7 @@ def test_end_to_end_a_named_vertical_level_reaches_the_pixels(
     try:
         high, low = baseline_of("hi.png", "top"), baseline_of("lo.png", "bottom")
         assert high < low, "a named level did not move the image"
-        assert high == stage.margin + 29  # tucked under the top gutter
+        assert high == stage.gutter + 29  # tucked under the top gutter
         assert low == stage.logical_size[1] - 1  # standing on the floor
     finally:
         pygame.quit()
@@ -932,7 +932,7 @@ def test_density_two_stage_scales_layout_but_not_staged_art(tmp_path) -> None:
         assert stage.window.get_size() == (640, 400)
         assert stage.density == 2
         assert stage.row_height == 18
-        assert stage.margin == 20
+        assert stage.gutter == 20
         assert stage.prose_top == 48
         assert stage.panel_width == 208
         assert stage.font.get_height() >= 14

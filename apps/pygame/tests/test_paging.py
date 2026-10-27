@@ -142,6 +142,27 @@ def test_actual_journal_pairs_portraits_groups_compatible_lines_and_exposes_face
     assert stage.paged and bridge.preferences["pacing"] == "paged"
 
 
+def test_page_header_is_washed_to_the_margins_of_the_rows_beneath_it(exchange) -> None:
+    # Both header rows, the page controls and the speaker, span exactly the
+    # columns the page's text washes over, as the scrolling header does.
+    _, _, _, envelope, bridge, stage = exchange
+    frame = _frame(bridge, envelope)
+    stage.paged = True
+    stage.present(frame, visual_passages(bridge, envelope))
+    stage.draw(frame)
+    room = (0, 0, 128)
+
+    def washed(y: int) -> tuple[int, int]:
+        columns = [x for x in range(stage.logical_size[0])
+                   if tuple(stage.surface.get_at((x, y)))[:3] != room]
+        return columns[0], columns[-1]
+
+    pitch = stage.row_height
+    header = stage.prose_rect.top - 2 * pitch
+    assert washed(header + pitch // 2) == washed(header + 3 * pitch // 2) \
+        == washed(stage.prose_rect.bottom - pitch // 2)
+
+
 def test_multi_room_batch_does_not_reveal_future_staging_and_skip_matches_fold(exchange) -> None:
     world, manager, user, first, bridge, stage = exchange
     # One actual resolution traverses both blocks, as an authored continuation does.
