@@ -11,7 +11,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 pygame = pytest.importorskip("pygame")
 
 from tangl.presentation.intent import TextAccepts  # noqa: E402
-from tangl.pygame_client.models import Choice, Commit, Line, ScrollText, Turn  # noqa: E402
+from tangl.pygame_client.models import (  # noqa: E402
+    Choice, Commit, Finding, Line, ScrollText, Surface, SurfaceSlot, Turn,
+)
 from tangl.pygame_client.stage import Stage  # noqa: E402
 
 
@@ -107,7 +109,8 @@ def test_long_tokens_and_single_oversized_choice_do_not_lose_text(stage: Stage) 
     choice = Choice(edge_id=uuid4(), text=token)
     turn = Turn(step=1, lines=[Line(text=token)], choices=[choice])
     stage.draw(turn)
-    assert "".join(row.text for row in stage._rows(turn, [], pixel_width=stage.prose_rect.width - 18 * stage.density)) == token
+    bounds = stage.text_bounds(stage.prose_rect, clearance=stage.prose_wrap_clearance)
+    assert "".join(row.text for row in stage._rows(turn, [], pixel_width=bounds.width)) == token
     rows = stage._choice_rows(turn)
     assert "".join(row.text[3:] for row in rows) == token
     assert len(rows) > stage.choice_capacity
@@ -188,3 +191,82 @@ def test_short_turn_has_no_overflow_controls(stage: Stage) -> None:
                     choices=[Choice(edge_id=uuid4(), text="Continue")]))
     assert stage.max_scroll == stage.max_choice_scroll == 0
     assert not any(isinstance(action, ScrollText) for _, action in stage.hitboxes)
+
+
+@pytest.mark.parametrize("narrow", [False, True], ids=["full", "state-panel"])
+@pytest.mark.parametrize("surface", [False, True], ids=["stage", "surface"])
+@pytest.mark.parametrize("paged", [False, True], ids=["scrolling", "paged"])
+def test_text_regions_bound_attribution_controls_and_align_backing(
+    stage: Stage, monkeypatch: pytest.MonkeyPatch, narrow: bool, surface: bool, paged: bool,
+) -> None:
+    heading = "A guide with an intentionally long attribution " * 10
+    turn = Turn(step=1, lines=[Line("Complete body wording " * 100, heading)],
+                findings=[Finding("status", "open")] if narrow else [],
+                choices=[Choice(uuid4(), "Continue")],
+                surface=Surface("desk", band=(0, .7, 1, .3), slots=(
+                    SurfaceSlot("card", "id_card", .1, .75, .3, .2),
+                )) if surface else None)
+    clipped = []
+    clip = stage._clip
+    washes = []
+    wash = stage._wash
+
+    def record_clip(text, **kwargs):
+        result = clip(text, **kwargs)
+        if text == heading:
+            clipped.append(result)
+        return result
+
+    def record_wash(rect, colour):
+        washes.append(rect.copy())
+        wash(rect, colour)
+
+    monkeypatch.setattr(stage, "_clip", record_clip)
+    monkeypatch.setattr(stage, "_wash", record_wash)
+    stage.present(turn, [turn])
+    stage.paged = paged
+    stage.draw(turn)
+    region = stage.prose_rect
+    assert (region.width < stage.logical_size[0]) is narrow
+    if paged:
+        assert clipped and stage.font.size(clipped[0])[0] <= region.width - 2 * stage.row_text_left
+    header_y = region.top - 2 * stage.row_height if paged else stage.prose_top
+    header = next(rect for rect in washes if rect.top == header_y and rect.right <= region.right)
+    bodies = [rect for rect in washes if region.top <= rect.top < region.bottom
+              and rect.right <= region.right]
+    assert bodies and {(rect.left, rect.right) for rect in bodies} == {(header.left, header.right)}
+    controls = [(rect, action) for rect, action in stage.hitboxes
+                if rect.y == header_y and rect.width < region.width]
+    bounds = pygame.Rect(stage.row_text_left, header_y,
+                         region.width - 2 * stage.row_text_left, stage.row_height)
+    assert controls
+    for rect, action in controls:
+        assert bounds.contains(rect)
+        assert stage.hit(stage.window_point(rect.center)) == action
+
+
+def test_long_header_label_stays_in_region_and_controls_match_painted_geometry(stage: Stage) -> None:
+    width = stage.logical_size[0] - stage.panel_width
+    top = stage.prose_top
+    stage.surface.fill("black")
+    stage._text_controls("prose", 1, 10 ** 60, 4, top=top, width=width)
+    for x in range(width, stage.logical_size[0]):
+        for y in range(top, top + stage.row_height):
+            assert tuple(stage.surface.get_at((x, y)))[:3] == (0, 0, 0)
+    for rect, action in stage.hitboxes:
+        if isinstance(action, ScrollText):
+            label = "next >" if action.delta > 0 else "< prev"
+            assert rect.size == stage.font.render(label, False, "white").get_size()
+            assert stage.hit(stage.window_point(rect.center)) == action
+    stage.hitboxes.clear()
+    right = width - stage.row_text_left
+    cut = right - stage.font.size("next >")[0] // 2
+    stage.surface.set_clip(pygame.Rect(0, top, cut, stage.row_height))
+    try:
+        stage._text_controls("prose", 1, 100, 4, top=top, width=width)
+        next_box = next(rect for rect, action in stage.hitboxes
+                        if isinstance(action, ScrollText) and action.delta == 1)
+        assert next_box.right == cut
+        assert stage.hit(stage.window_point((right - 1, top + 1))) is None
+    finally:
+        stage.surface.set_clip(None)
