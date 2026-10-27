@@ -353,7 +353,8 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
     # itself into its buffer. TEXTINPUT starts only once that offer has focus.
     pygame.key.stop_text_input()
     frame = _frame(bridge, envelope)
-    stage.present(frame, visual_passages(bridge, envelope))
+    passages = visual_passages(bridge, envelope)
+    stage.present(frame, passages, media_visibility=bridge.media_visibility())
 
     for step in range(args.advance):
         # Only choices that commit outright. A typed choice needs a value this
@@ -384,7 +385,8 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         envelope = bridge.choose(commits[0].edge_id, commits[0].payload)
         previous = frame
         frame = _frame(bridge, envelope, previous)
-        stage.present(frame, visual_passages(bridge, envelope, previous))
+        passages = visual_passages(bridge, envelope, previous)
+        stage.present(frame, passages, media_visibility=bridge.media_visibility())
         pygame.display.set_caption(_world_title(bridge))
 
     stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
@@ -437,6 +439,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                     if preference_keys[event.key] == "pacing":
                         stage.paged = bridge.preferences["pacing"] == "paged"
                     stage.preference_controls = _preference_controls(bridge, preferences)
+                    stage.present(frame, passages, media_visibility=bridge.media_visibility())
                     stage.draw(frame, media_visibility=bridge.media_visibility())
                     continue
                 if (pending is None and event.key == pygame.K_p
@@ -495,10 +498,12 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 pygame.key.stop_text_input()
             if isinstance(action, (TogglePreference, TogglePacing)):
                 stage.preference_controls = _preference_controls(bridge, preferences)
+                stage.present(frame, passages, media_visibility=bridge.media_visibility())
             if envelope is not None:
                 previous = frame
                 frame = _frame(bridge, envelope, previous)
-                stage.present(frame, visual_passages(bridge, envelope, previous))
+                passages = visual_passages(bridge, envelope, previous)
+                stage.present(frame, passages, media_visibility=bridge.media_visibility())
                 stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
                                status_available=bridge.status_available, session_id=bridge.ledger_id)
                 pygame.display.set_caption(_world_title(bridge))

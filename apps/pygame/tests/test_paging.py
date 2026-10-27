@@ -10,7 +10,7 @@ import pytest
 pygame = pytest.importorskip("pygame")
 
 from tangl.core import Selector
-from tangl.journal.fragments import MediaFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.persistence import PersistenceManagerFactory
 from tangl.prose.naming import NamedActor, ProseBlock, naming_dispatch
@@ -221,12 +221,15 @@ def test_long_body_grouping_and_style_boundaries_use_font_geometry(exchange) -> 
 
 
 def test_terminal_menu_and_media_only_output_stay_reachable(exchange) -> None:
-    _, _, _, _, _, stage = exchange
+    world, _, _, _, _, stage = exchange
     choices = [Choice(uuid4(), f"Choice {index}: " + "long wording " * 16,
                       available=index % 3 != 1, payload={"index": index})
                for index in range(45)]
-    first = Turn(step=1, images=[StageImage("narrative_im", "first")], lines=[Line("First room.")])
-    last = Turn(step=2, images=[StageImage("narrative_im", "last")], choices=choices)
+    root = world.resources.resource_path
+    first = Turn(step=1, images=[StageImage("narrative_im", str(root / "room1.png"))],
+                 lines=[Line("First room.")])
+    last = Turn(step=2, images=[StageImage("narrative_im", str(root / "room2.png"))],
+                choices=choices)
     stage.present(last, [first, last])
     stage.paged = True
     assert len(stage.pages) == 2
@@ -324,3 +327,83 @@ def test_back_redraw_switch_and_readback_do_not_requeue_audio_or_advance(exchang
     assert music.calls[-1] == {"live": False} and voice.calls[-1] == {"fresh": False}
     assert readback.step == envelope.step
     assert readback.to_dto()["fragments"] == envelope.to_dto()["fragments"]
+
+
+@pytest.mark.parametrize("with_prose", [False, True], ids=["media-only", "with-prose"])
+@pytest.mark.parametrize("source", ["missing-url", "bad-file"])
+def test_failed_media_text_floor_is_measured_once_in_its_passage(
+    exchange, tmp_path: Path, source: str, with_prose: bool,
+) -> None:
+    _, _, _, _, bridge, stage = exchange
+    caption = "A smiling guide waits beside the door. " * 70
+    bad = tmp_path / "unreadable.png"
+    bad.write_text("not image bytes")
+    media = MediaFragment(
+        content="https://example.invalid/guide.png" if source == "missing-url" else bad,
+        content_format="url" if source == "missing-url" else "path",
+        content_type="image", media_role="avatar_im", text=caption,
+        source_id=uuid4(), step=1,
+    )
+    fragments = [media]
+    if with_prose:
+        fragments.extend([ContentFragment(content="First passage.", source_id=media.source_id, step=1),
+                          ContentFragment(content="Next passage.", source_id=media.source_id, step=1)])
+    fragments.append(ChoiceFragment(text="Continue", edge_id=uuid4(), step=1))
+    envelope = RuntimeEnvelope(fragments=fragments)
+    frame = _frame(bridge, envelope)
+    passages = visual_passages(bridge, envelope)
+    stage.present(frame, passages)
+    stage.paged = True
+    wording = " ".join(row.text for page in stage.pages for row in page.rows)
+    expected = f"First passage. {caption} Next passage." if with_prose else caption
+    assert "".join(wording.split()) == "".join(expected.split())
+    assert all(len(page.rows) <= 4 for page in stage.pages)
+    assert all(stage.font.size(row.text)[0] <= stage.logical_size[0] - 2 * stage.row_text_left
+               for page in stage.pages for row in page.rows)
+    assert len(stage.pages) > 1 and not stage.choices_ready
+    assert _keyed(stage, frame, None, 1) is None
+    measured = [[(row.text, row.kind) for row in page.rows] for page in stage.pages]
+    for index in (1, 0, len(stage.pages) - 1, 1):
+        stage.page_index = index
+        stage.draw(frame)
+        stage.draw(frame)
+        _apply(bridge, stage, frame, None, TogglePacing())
+        stage.draw(frame)
+        _apply(bridge, stage, frame, None, TogglePacing())
+        stage.present(frame, passages)
+        assert stage.page_index == index
+        assert [[(row.text, row.kind) for row in page.rows] for page in stage.pages] == measured
+        for mode in ("scrolling", "paged"):
+            stage.present(frame, passages, media_visibility={"pacing": mode})
+            assert stage.page_index == index
+            assert [[(row.text, row.kind) for row in page.rows] for page in stage.pages] == measured
+    stage.page(PassagePage(end=True))
+    stage.draw(frame)
+    assert isinstance(_keyed(stage, frame, None, 1), Commit)
+    _, failed = stage._resolve_images(frame, {})
+    scrolling = stage._rows(frame, failed, pixel_width=stage.logical_size[0] - 2 * stage.row_text_left)
+    assert "".join(row.text.replace(" ", "") for row in scrolling if row.kind == "alt") == (
+        caption.replace(" ", "")
+    )
+
+
+def test_short_media_only_floor_and_hidden_media_follow_existing_resolution(exchange) -> None:
+    _, _, _, _, bridge, stage = exchange
+    media = MediaFragment(content="https://example.invalid/guide.png", content_format="url",
+                          content_type="image", media_role="avatar_im", text="A smiling guide.",
+                          staging_hints={"media_visibility": {
+                              "preference_id": "portraits", "values": [True],
+                          }}, step=1)
+    envelope = RuntimeEnvelope(fragments=[media])
+    frame = _frame(bridge, envelope)
+    passages = visual_passages(bridge, envelope)
+    stage.present(frame, passages, media_visibility={"portraits": False})
+    stage.paged = True
+    stage.draw(frame, media_visibility={"portraits": False})
+    assert not any(page.rows for page in stage.pages)
+    stage.present(frame, passages, media_visibility={"portraits": True})
+    assert [row.text for page in stage.pages for row in page.rows] == ["A smiling guide."]
+    stage.present(frame, passages, media_visibility={"portraits": False})
+    assert not any(page.rows for page in stage.pages)
+    stage.present(replace(frame), [], media_visibility={"portraits": True})
+    assert [row.text for page in stage.pages for row in page.rows] == ["A smiling guide."]

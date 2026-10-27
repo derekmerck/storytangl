@@ -390,6 +390,7 @@ class Stage:
         self.pages: list[_Page] = []
         self.page_index = 0
         self._presentation_frame: Turn | None = None
+        self._presentation_visibility: dict[str, bool | str] = {}
         self.max_scroll = 0
         self.prose_capacity = 1
         self.prose_rect = pygame.Rect(0, 0, 0, 0)
@@ -497,11 +498,18 @@ class Stage:
     def choices_ready(self) -> bool:
         return not (self.paged and self.pages and self.page_index < len(self.pages) - 1)
 
-    def present(self, frame: Turn, passages: list[Turn], *, fresh: bool = True) -> None:
+    def present(
+        self, frame: Turn, passages: list[Turn], *, fresh: bool = True,
+        media_visibility: Mapping[str, bool | str] | None = None,
+    ) -> None:
         """Prepare fresh local pages once; history/readback never starts a replay."""
-        if fresh and frame is self._presentation_frame:
+        visibility = dict(media_visibility or {})
+        same_frame = frame is self._presentation_frame
+        if fresh and same_frame and visibility == self._presentation_visibility:
             return
+        previous_index = self.page_index if same_frame else 0
         self._presentation_frame = frame
+        self._presentation_visibility = visibility
         self.pages = []
         self.page_index = 0
         if not fresh:
@@ -511,8 +519,15 @@ class Stage:
         placed = place_pieces(frame.surface, frame.pieces) if frame.surface else []
         if self._has_state(frame, placed=placed):
             pixel_width -= self.panel_width
+        passages = passages or [frame]
+        previous_failed: list[StageImage] = []
         for index, passage in enumerate(passages):
-            if not passage.lines:
+            _, failed = self._resolve_images(passage, visibility)
+            # Snapshots carry resident images forward; their caption is not a new arrival.
+            arriving_failed = [image for image in failed if image not in previous_failed]
+            previous_failed = failed
+            fallback = self._rows(Turn(step=passage.step), arriving_failed, pixel_width=pixel_width)
+            if not passage.lines and not fallback:
                 if index + 1 == len(passages) or passages[index + 1].step != passage.step:
                     if self.pages:
                         self.pages.append(_Page(passage, [], None))
@@ -538,10 +553,14 @@ class Stage:
                     for offset in range(0, len(rows), 4):
                         self.pages.append(_Page(passage, rows[offset:offset + 4], heading))
                 previous_key = key
+            for offset in range(0, len(fallback), 4):
+                self.pages.append(_Page(passage, fallback[offset:offset + 4], None))
+                previous_key = None
         if not self.pages:
             self.pages = [_Page(frame, [], None)]
         last = self.pages[-1]
         last.turn = replace(frame, lines=last.turn.lines)
+        self.page_index = min(previous_index, len(self.pages) - 1)
 
     def page(self, action: PassagePage) -> None:
         if self.pages:

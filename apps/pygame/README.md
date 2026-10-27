@@ -94,8 +94,12 @@ are client-local for this run; there is no account setting or backend page state
 
 The window allocates FOUR wrapped body rows, one bounded attribution row and
 one navigation row. Wrapping uses the actual font's pixel metrics and preserves
-paragraphs/words, splitting oversized tokens when necessary. Compatible narration
-or same-speaker fragments combine while they fit. Speaker identity, wording/style,
+paragraphs/words, splitting oversized tokens when necessary. Failed visible images retain
+their existing text floor, measured into bounded pages in their visual scope.
+Carried-forward failures do not duplicate captions; deliberately hidden media
+stays suppressed. Preference changes remeasure once and clamp the current page,
+while redraw/Back/mode switches do not append captions during drawing. Compatible
+narration or same-speaker fragments combine while they fit. Speaker identity, wording/style,
 mode, attitude/expression and step/source/visual boundaries keep incompatible
 passages apart. The panel sits at the bottom of the existing logical stage; no
 world coordinates or portrait natural sizes are moved. Headless pixel witnesses
