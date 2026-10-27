@@ -51,6 +51,8 @@ from .models import (
     Piece,
     PickPiece,
     ScrollText,
+    PassagePage,
+    TogglePacing,
     StageImage,
     TogglePreference,
     Surface,
@@ -76,6 +78,15 @@ class _Row:
 class _ChoiceRow:
     text: str
     choice: Choice
+
+
+@dataclass(slots=True)
+class _Page:
+    """Measured local text rows and their deterministic visual snapshot."""
+
+    turn: Turn
+    rows: list[_Row]
+    heading: str | None
 
 
 REFUSED_PIN = "X"
@@ -375,6 +386,11 @@ class Stage:
         slot fractions is a second derivation that can drift.
         """
         self.scroll = 0
+        self.paged = False
+        self.pages: list[_Page] = []
+        self.page_index = 0
+        self._presentation_frame: Turn | None = None
+        self._presentation_visibility: dict[str, bool | str] = {}
         self.max_scroll = 0
         self.prose_capacity = 1
         self.prose_rect = pygame.Rect(0, 0, 0, 0)
@@ -478,6 +494,80 @@ class Stage:
 
     # ── drawing ──────────────────────────────────────────────────────────
 
+    @property
+    def choices_ready(self) -> bool:
+        return not (self.paged and self.pages and self.page_index < len(self.pages) - 1)
+
+    def present(
+        self, frame: Turn, passages: list[Turn], *, fresh: bool = True,
+        media_visibility: Mapping[str, bool | str] | None = None,
+    ) -> None:
+        """Prepare fresh local pages once; history/readback never starts a replay."""
+        visibility = dict(media_visibility or {})
+        same_frame = frame is self._presentation_frame
+        if fresh and same_frame and visibility == self._presentation_visibility:
+            return
+        previous_index = self.page_index if same_frame else 0
+        self._presentation_frame = frame
+        self._presentation_visibility = visibility
+        self.pages = []
+        self.page_index = 0
+        if not fresh:
+            return
+        previous_key = None
+        pixel_width = self.logical_size[0] - 2 * self.row_text_left
+        placed = place_pieces(frame.surface, frame.pieces) if frame.surface else []
+        if self._has_state(frame, placed=placed):
+            pixel_width -= self.panel_width
+        passages = passages or [frame]
+        previous_failed: list[StageImage] = []
+        for index, passage in enumerate(passages):
+            _, failed = self._resolve_images(passage, visibility)
+            # Snapshots carry resident images forward; their caption is not a new arrival.
+            arriving_failed = [image for image in failed if image not in previous_failed]
+            previous_failed = failed
+            fallback = self._rows(Turn(step=passage.step), arriving_failed, pixel_width=pixel_width)
+            if not passage.lines and not fallback:
+                if index + 1 == len(passages) or passages[index + 1].step != passage.step:
+                    if self.pages:
+                        self.pages.append(_Page(passage, [], None))
+                continue
+            for line in passage.lines:
+                identity = line.speaker_id if line.speaker_id else (
+                    id(line) if line.speaker is not None else None
+                )
+                key = (passage.step, passage.source_id, identity, line.speaker, line.mode,
+                       line.manner, line.attitude, line.hints)
+                rows = [_Row(part, "dialog" if line.speaker else "narration")
+                        for part in self._wrap_pixels(
+                            line.text, pixel_width,
+                        )]
+                heading = line.speaker
+                if heading and line.attitude:
+                    heading = f"{heading} ({line.attitude})"
+                if (self.pages and key == previous_key
+                        and passage.images == self.pages[-1].turn.images
+                        and len(self.pages[-1].rows) + len(rows) <= 4):
+                    self.pages[-1].rows.extend(rows)
+                else:
+                    for offset in range(0, len(rows), 4):
+                        self.pages.append(_Page(passage, rows[offset:offset + 4], heading))
+                previous_key = key
+            for offset in range(0, len(fallback), 4):
+                self.pages.append(_Page(passage, fallback[offset:offset + 4], None))
+                previous_key = None
+        if not self.pages:
+            self.pages = [_Page(frame, [], None)]
+        last = self.pages[-1]
+        last.turn = replace(frame, lines=last.turn.lines)
+        self.page_index = min(previous_index, len(self.pages) - 1)
+
+    def page(self, action: PassagePage) -> None:
+        if self.pages:
+            self.page_index = len(self.pages) - 1 if action.end else min(
+                max(0, self.page_index + action.delta), len(self.pages) - 1,
+            )
+
     def draw(
         self,
         turn: Turn,
@@ -495,6 +585,10 @@ class Stage:
         editor = pending if isinstance(pending, PendingText) else None
         if editor is not None:
             pending = None
+        paged = bool(self.paged and self.pages and editor is None and pending is None
+                     and turn is self._presentation_frame)
+        if paged:
+            turn = self.pages[self.page_index].turn
         self.hitboxes.clear()
         self.slot_boxes.clear()
         self.animating = False
@@ -503,7 +597,7 @@ class Stage:
         loaded, unloadable = self._resolve_images(turn, visibility)
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
-        if pending is None and self._draw_map(turn, loaded):
+        if pending is None and not paged and self._draw_map(turn, loaded):
             self._draw_preferences()
             # The map replaces the stage, so every sprite has left it: drop their
             # playback, or a clip resumes mid-cycle on the far side of the map.
@@ -511,9 +605,19 @@ class Stage:
             self._staged_turn = None
             if editor is not None:
                 self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
+            elif self.pages:
+                self._draw_pacing_switch()
             self._present()
             return
         self._draw_background(loaded)
+        if paged:
+            maps = self._pick(loaded, MAP_ROLES)
+            plate = (self._plate_surface(turn.plate, maps) if turn.plate else maps[0][1]) if maps else None
+            if plate is not None:
+                self.surface.blit(pygame.transform.scale(plate, self.logical_size), (0, 0))
+                if turn.plate is not None:
+                    for index, choice, region in self._claimed_regions(turn, turn.plate):
+                        self._draw_region(index, choice, region)
         self._draw_preferences()
         # Rows below are laid out first and always reserved, so a long exchange
         # can never push the only way to continue off the logical surface.
@@ -546,6 +650,8 @@ class Stage:
             2 * self.choice_pitch,
             int((bottom - self.prose_top) * self.choice_fraction),
         )
+        if paged:
+            choice_limit = 2 * self.choice_pitch
         choice_height = below * self.choice_pitch
         if pending is None:
             choice_height = min(choice_height, choice_limit)
@@ -594,7 +700,10 @@ class Stage:
             self.choice_scroll = 0
             self._last_turn = turn
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
-        self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
+        if paged:
+            self._draw_page(width=width, floor=prose_floor)
+        else:
+            self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
         if panelled:
             self._draw_state_panel(
                 turn,
@@ -611,7 +720,39 @@ class Stage:
             self._draw_choices(choice_rows, top=choices_top, bottom=bottom)
         if editor is not None:
             self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
+        elif self.pages and not paged:
+            self._draw_pacing_switch()
         self._present()
+
+    def _draw_pacing_switch(self) -> None:
+        text = self.font.render("Pages (Ctrl+P)", False, CREAM)
+        rect = text.get_rect(topright=(self.logical_size[0] - self.margin, 2 * self.density))
+        self._wash(rect, INK)
+        self.surface.blit(text, rect)
+        self.hitboxes.append((rect, TogglePacing()))
+
+    def _draw_page(self, *, width: int, floor: int) -> None:
+        page = self.pages[self.page_index]
+        top = max(self.prose_top, floor - 6 * self.row_height)
+        panel = pygame.Rect(0, top, width, 6 * self.row_height)
+        self.hitboxes.append((panel, PassagePage()))
+        self.prose_rect = pygame.Rect(0, top + 2 * self.row_height, width, 4 * self.row_height)
+        self.prose_capacity, self.max_scroll, self.scroll = 4, 0, 0
+        self._draw_rows(page.rows, capacity=4, width=width)
+        self._wash(pygame.Rect(self.margin, top, width - 2 * self.margin, 2 * self.row_height), INK)
+        heading = self.font.render(self._clip(page.heading or ""), False, RUST)
+        self.surface.blit(heading, (self.row_text_left, top + self.row_height))
+        x = self.row_text_left
+        controls = [(f"{self.page_index + 1}/{len(self.pages)}", None),
+                    ("<", PassagePage(-1)), (">", PassagePage()),
+                    ("End", PassagePage(end=True)), ("Scroll", TogglePacing())]
+        for label, action in controls:
+            text = self.font.render(label, False, CREAM)
+            rect = text.get_rect(topleft=(x, top))
+            self.surface.blit(text, rect)
+            if action is not None:
+                self.hitboxes.append((rect, action))
+            x = rect.right + 8 * self.density
 
     def set_info(
         self, branding: BrandingValue | None, sections: list[ProjectedSection],

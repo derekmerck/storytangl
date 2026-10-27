@@ -9,7 +9,8 @@ authority. Start with the [authoring guide](../../../../docs/src/design/story/PR
 for activation, naming examples, voice/environment policy, and escape hatches.
 The #562 packed-look backend slice is opt-in through `tangl.prose.portraits`;
 pygame's #538 slice 1 replaces speaker-associated portraits in place; ordered
-per-line realization remains deferred to #587.
+the #587 first pygame slice now pairs following portraits with their preceding
+lines for optional compact local paging; audio synchronization remains deferred.
 #578 slice 1 shares personal-name enrichment with non-Actor Player compositions;
 parser-policy decisions and #577 speech/discovery remain separate.
 
@@ -465,9 +466,13 @@ speaker and the existing optional `presentation_handle`. Later expressions keep
 the established order and omitted staging; explicit coordinates override only
 their axis, including explicit false flip. No portrait selected keeps the staged
 base; an unstaged speaker uses ordinary default placement. Unassociated decoration
-keeps its previous behavior. pygame still shows each speaker's final expression
-in a response. #587's ordered/paged follow-up must pair the portrait emitted
-AFTER a line with that line before display, not with the next beat. Focus/dimming,
-automatic sides, pacing, pagination, and audio sync remain separate #538/#587
-slices. No bark/history manager, wardrobe/holding migration,
+keeps its previous behavior. Scrolling shows final-response staging. pygame's #587
+first slice preserves step/source boundaries and pairs a portrait emitted AFTER a
+line with that PRECEDING line for compact local paging, not with the next beat.
+The existing world-info enum preference `pacing` suggests `paged`/`scrolling`; the
+reader can override it locally. This adds no persisted prose/page model. Runtime
+choices are gated to the final page; history does not replay pages or audio.
+Audio still applies per response; beat-aligned BGM/barks remain a separate #587
+slice. Focus/dimming, automatic sides and slides remain separate #538 work.
+No bark/history manager, wardrobe/holding migration,
 runtime face composition, or location-prop policy is introduced.

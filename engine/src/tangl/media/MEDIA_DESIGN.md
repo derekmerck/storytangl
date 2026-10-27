@@ -12,7 +12,8 @@
 > serialization; CLI renders only the named resource and unresolved reason.
 > #562's opt-in prose portrait backend selects packed look variants from pre-admitted
 > graph resources; #538 slice 1 replaces associated pygame portraits in place.
-> Ordered per-line presentation remains deferred to #587.
+> #587 adds optional compact pygame pages pairing following portraits with preceding
+> lines; beat-synchronized audio remains deferred.
 > #514 reuses manager-local pure lexical relative-path derivations during lookup.
 > Graph-local static admission/JSON restoration is covered as the current stopgap
 > for CarWars #34; scoped catalog/provenance design remains deferred under #284.
@@ -752,9 +753,9 @@ reference. `presentation_handle` still distinguishes deliberate separate
 presentations of one speaker. pygame replaces associated avatar/dialog portraits
 in place, inheriting omitted staging while retaining explicit false flip.
 Staging defaults do not assert a supplied coordinate. No selected packed art
-leaves the explicit base intact. Each response still shows the final expression
-per speaker; #587 must pair following generated portrait media with its preceding
-attributed line before implementing ordered/paged presentation.
+leaves the explicit base intact. Scrolling shows the final expression per speaker;
+#587's first pygame slice pairs following generated media with its preceding
+attributed line for optional compact local paging. Audio remains batch-applied.
 
 
 ### Creator Pipeline (`media_creators/`)
