@@ -262,7 +262,7 @@ Review lens:
 - **Attachment points:** called by world/mechanic UPDATE policy
 - **Appearance:** normally projected by the consuming mechanic
 
-### `demographics` — Foundation, first modernization spike
+### `demographics` — Foundation, explicit packs implemented
 
 Why it stays:
 
@@ -271,8 +271,15 @@ Why it stays:
 
 Current gap:
 
-- historically written as a standalone generator library rather than a v38
-  mechanics facet
+- explicit world-scoped catalogs, extensible name formation, and committed
+  profile/name ownership still need implementation; explicit pack loading and
+  honest availability are implemented (slice 1)
+
+The source-local design and retrofit plan live in
+`engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md` and
+`DEMOGRAPHICS_RETROFIT_PLAN.md`, tracked by issue #285. They separate shared
+definitions from sampled individuals and retain custom world origins without
+requiring a geographic demographic model for every species.
 
 Review lens:
 

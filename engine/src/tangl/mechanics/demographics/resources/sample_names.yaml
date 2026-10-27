@@ -1,0 +1,11 @@
+# Illustrative pools previously embedded in the loader; not frequency data.
+fra:
+  female: [Marie, Sophie, Camille]
+  male: [Jean, Pierre, Louis]
+  surname: [Dubois, Moreau, Bernard]
+  male_surnames: {}
+jpn:
+  female: [Yuki, Aiko, Hana]
+  male: [Haruto, Ren, Yuto]
+  surname: [Sato, Suzuki, Takahashi]
+  male_surnames: {}

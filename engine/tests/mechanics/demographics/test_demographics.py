@@ -1,3 +1,6 @@
+"""Sampler and facet behavior with explicitly selected sample data."""
+from __future__ import annotations
+
 import logging
 import random
 
@@ -15,81 +18,17 @@ from tangl.lang.gens import Gens as Gender
 from tangl.lang.age_range import AgeRange
 from tangl.story.concepts import Actor as StoryActor
 
-@pytest.fixture(autouse=True)
-def clear_singletons():
-    print("Clearing singletons")
-    Region.clear_instances()
-    Country.clear_instances()
-    Subtype.clear_instances()
-    NameBank.clear_instances()
-
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 def test_data():
+    from tangl.mechanics.demographics import load_pack, register_pack
 
-    assert len(Subtype._instances) == 0, "Subtype instances should be cleared before test"
-
-    # Create test subtypes
-    european = Subtype(label="european", name="European", demonym="European")
-    asian = Subtype(label="asian", name="Asian", demonym="Asian")
-
-    assert len(Subtype._instances) == 2
-
-    # Create test regions
-    europe = Region(label="europe", name="Europe", demonym="European", eth_mix={'european': 1})
-    asia = Region(label="asia", name="Asia", demonym="Asian", eth_mix={'asian': 1})
-
-    # Create test countries
-    france = Country(label="france", name="France", demonym="French", population=67000000)
-    germany = Country(label="germany", name="Germany", demonym="German", population=83000000)
-    japan = Country(label="japan", name="Japan", demonym="Japanese", population=126000000)
-    #
-    # Add countries to regions
-    europe.countries.add(france)
-    europe.countries.add(germany)
-    asia.countries.add(japan)
-
-
-    # Create test name banks
-    french_names = NameBank(
-        label="france",
-        female=["Marie", "Sophie"],
-        male=["Jean", "Pierre"],
-        surname=["Dupont", "Durand"]
-    )
-    german_names = NameBank(
-        label="germany",
-        female=["Anna", "Maria"],
-        male=["Hans", "Klaus"],
-        surname=["Mueller", "Schmidt"]
-    )
-    japanese_names = NameBank(
-        label="japan",
-        female=["Yuki", "Aiko"],
-        male=["Hiroshi", "Takeshi"],
-        surname=["Tanaka", "Sato"]
-    )
-    #
-    # # Associate name banks with countries and subtypes
-    # france.name_bank() = french_names
-    # germany.name_banks[german] = german_names
-    # japan.name_banks[japanese] = japanese_names
-    #
-    # # Set up eth_mix for countries
-    # france.eth_mix_ = {french: 1}
-    # germany.eth_mix_ = {german: 1}
-    # japan.eth_mix_ = {japanese: 1}
-    #
-    # # Set up eth_mix for regions
-    # europe.eth_mix = {french: 1, german: 1}
-    # asia.eth_mix = {japanese: 1}
-
+    register_pack(load_pack("sample"))
     yield {
-        "regions": [europe, asia],
-        "countries": [france, germany, japan],
-        "subtypes": [european, asian],
-        "name_banks": [french_names, german_names, japanese_names]
+        "regions": [Region.get_instance("west_europe"), Region.get_instance("asia")],
+        "countries": [Country.get_instance("fra"), Country.get_instance("jpn")],
+        "subtypes": [Subtype.get_instance("european"), Subtype.get_instance("asian")],
     }
+
 
 def test_namebank_singleton():
     nb1 = NameBank(label="test_bank", female=["Alice"], male=["Bob"], surname=["Smith"])
@@ -106,21 +45,17 @@ def test_country_namebank():
     NameBank(label=f"{country.label}_{subtype.label}", female=["Alice"], male=["Bob"], surname=["Smith"])
     assert country.namebank().xx_names == ["Eve"]
 
-    print( country.namebank() )
-    print( country.namebank('test_subtype'))
-    print( NameBank.all_instance_labels() )
 
     assert country.namebank(subtype).xx_names == ["Alice"]
-    # assert country.namebank(subtype.label).xx_names == ["Alice"]
 
-    # ensure singleton subclasses hash
     { country.namebank() }
     { country.namebank(subtype) }
 
-def test_region_eth_mix_validator():
-    subtype = Subtype(label="test_subtype")
-    region = Region(label="test_region", name="Test Region", demonym="Test", eth_mix={"test_subtype": 1})
-    assert isinstance(list(region.eth_mix.keys())[0], Subtype)
+def test_region_retains_explicit_subtype_reference():
+    subtype = Subtype(label="explicit_region_subtype")
+    region = Region(label="explicit_region", name="Test Region", demonym="Test",
+                    eth_mix={subtype: 1})
+    assert next(iter(region.eth_mix)) is subtype
 
 def test_demographic_data_inheritance():
     demo_data = DemographicData(given_name="John", family_name="Doe")
@@ -172,7 +107,7 @@ def test_age_range_sampling():
 
 def test_region_sampling(test_data):
     region = DemographicSampler.sample_region()
-    assert region in test_data["regions"]
+    assert region in Region.all_instances()
 
 
 def test_country_sampling(test_data):
@@ -209,7 +144,6 @@ def test_gender_sampling():
 
 def test_name_sampling(test_data):
     country = test_data["countries"][0]  # France
-    # subtype = list(country.name_banks.keys())[0]
     nb = NameBank.get_instance(country.label)
     gender = Gender.XX
     d = DemographicSampler.sample_demographic(country=country, gender=gender)
@@ -218,9 +152,9 @@ def test_name_sampling(test_data):
 
 
 def test_demographic_sampling(test_data):
-    demo_data = DemographicSampler.sample_demographic()
+    demo_data = DemographicSampler.sample_demographic(country=test_data["countries"][0])
     assert isinstance(demo_data, DemographicData)
-    assert demo_data.region in test_data["regions"]
+    assert demo_data.region in Region.all_instances()
     assert demo_data.country in demo_data.region.countries
     assert demo_data.subtype in demo_data.country.eth_mix
     assert demo_data.gender in [Gender.XX, Gender.XY]
@@ -236,13 +170,12 @@ def test_demographic_sampling_with_params(test_data):
 
     assert demo_data.region == region
     assert demo_data.country == country
-    # assert demo_data.subtype == subtype
     assert demo_data.gender == gender
 
 
 def test_demographic_sampling_normalizes_string_inputs(test_data):
     demo_data = DemographicSampler.sample_demographic(
-        country="france",
+        country="fra",
         subtype="european",
         gender="XX",
         age_range="ADULT",
@@ -250,9 +183,9 @@ def test_demographic_sampling_normalizes_string_inputs(test_data):
     )
 
     assert isinstance(demo_data.region, Region)
-    assert demo_data.region.label == "europe"
+    assert demo_data.region.label == "west_europe"
     assert isinstance(demo_data.country, Country)
-    assert demo_data.country.label == "france"
+    assert demo_data.country.label == "fra"
     assert isinstance(demo_data.subtype, Subtype)
     assert demo_data.subtype.label == "european"
     assert isinstance(demo_data.gender, Gender)
@@ -265,9 +198,9 @@ def test_demonym_property():
     demo_data = DemographicData(
         given_name="Test",
         family_name="User",
-        region=Region(label="test_region", name="Test Region", demonym="Test Regional", eth_mix={}),
-        country=Country(label="test_country", name="Test Country", demonym="Test National", population=1000000),
-        subtype=Subtype(label="test_subtype", name="Test Subtype", demonym="Test Subtype")
+        region=Region(label="demonym_region", name="Test Region", demonym="Test Regional", eth_mix={}),
+        country=Country(label="demonym_country", name="Test Country", demonym="Test National", population=1000000),
+        subtype=Subtype(label="demonym_subtype", name="Test Subtype", demonym="Test Subtype")
     )
 
     assert demo_data.demonym == "Test Regional"
@@ -280,7 +213,7 @@ def test_demonym_property():
     assert demo_data.demonym == "Test Subtype"
 
 def test_full_demographic_sampling(test_data):
-    demo = DemographicSampler.sample_demographic()
+    demo = DemographicSampler.sample_demographic(country=test_data["countries"][0])
     assert isinstance(demo, DemographicData)
     assert demo.region is not None
     assert demo.country is not None
@@ -290,8 +223,8 @@ def test_full_demographic_sampling(test_data):
 
 
 def test_demographic_sampling_with_explicit_rng_is_reproducible(test_data):
-    left = DemographicSampler.sample_demographic(rng=random.Random(7))
-    right = DemographicSampler.sample_demographic(rng=random.Random(7))
+    left = DemographicSampler.sample_demographic(country="fra", rng=random.Random(7))
+    right = DemographicSampler.sample_demographic(country="fra", rng=random.Random(7))
 
     assert left.given_name == right.given_name
     assert left.family_name == right.family_name

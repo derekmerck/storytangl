@@ -1,102 +1,181 @@
-import itertools
+"""Explicit pack availability, pure parsing, repeat loading, and honest coverage."""
+from __future__ import annotations
 
+from copy import deepcopy
+from importlib.resources import files
+from pathlib import Path
+import subprocess
+import sys
+
+from pydantic import ValidationError
 import pytest
+import yaml
 
-from tangl.mechanics.demographics import DemographicSampler, DemographicData
-from tangl.mechanics.demographics.data_models import Region, Country, Subtype
-from tangl.mechanics.demographics.data_models import load_demographic_distributions, Region, Country, Subtype
-
-@pytest.fixture(autouse=True, scope='module')
-def load_default_data():
-    Region.clear_instances()
-    Country.clear_instances()
-    Subtype.clear_instances()
-    load_demographic_distributions()
+from tangl.mechanics.demographics import (
+    Country, DemographicPack, DemographicSampler, NameBank, PackUnavailableError, Region, Subtype,
+    load_pack, parse_pack, register_pack,
+)
+from tangl.mechanics.demographics import packs
 
 
-def test_demographic_data():
-
-    for r in Region.all_instances():
-        print( r.name )
-
-    for c in Country.all_instances():
-        print( c.name )
+@pytest.fixture
+def sample() -> DemographicPack:
+    return load_pack("sample")
 
 
-def test_demographic_sampler():
-
-    print( DemographicSampler.sample_region().name )
-    print( DemographicSampler.sample_country().name )
-    print( DemographicSampler.sample_country( region=Region.get_instance('asia') ) )
-    print( DemographicSampler.sample_subtype() )
-    print( DemographicSampler.sample_subtype( country=Country.get_instance('jpn') ) )
-    print( DemographicSampler.sample_subtype( region=Region.get_instance('west_europe') ) )
-
-
-def test_name_sampler():
-
-    print( DemographicSampler.sample_xx_name('fra' ) )
-    print( DemographicSampler.sample_xy_name('jpn' ) )
-
-def country_params():
-    for country in Country.all_instances():
-        marks = []
-        if country.label in ['zaf', 'usa']:
-            marks.append(
-                pytest.mark.xfail(
-                    reason="zaf and usa require subtype"
-                )
-            )
-        yield pytest.param(country, marks=marks)
-
-@pytest.mark.parametrize("country", country_params())
-def test_name_sampler_variations(country: Country):
-
-    female_name = DemographicSampler.sample_xx_name(country.label)
-    male_name = DemographicSampler.sample_xy_name(country.label)
-    print( country.name, female_name, male_name )
-
-# def test_demographic_factory():
-#
-#     d = DemographicFactory.create_demographic()
-#
-#     print( d )
-#
-# def test_faker():
-#
-#     fake = Faker()
-#     fake.add_provider( DemographicProvider )
-#
-#     d = fake.demographic(country="cog")
-#     print( d )
-
-def test_country_data_singleton():
-    # Test that CountryData instances are unique and correctly instantiated
-    angola = Country.get_instance('ago')
-    assert angola.label == 'ago'
-    assert angola.population == 31825295
-    assert angola.demonym == 'Angolan'
-
-def test_region_data_population():
-    # Test the population attribute in RegionData
-    africa = Region.get_instance('africa')
-    assert africa.population == 1109541977
-
-# def test_name_sampler_consistency():
-#     from tangl.mechanics.demographics.demographic_data import world_name_data
-#     # Test if NameSampler returns correct names based on country and subtype
-#     angolan_names = NameSampler.name_female(CountryData['ago'], 'black')
-#     assert angolan_names[0] in world_name_data['ago']['female']
-#
-# def test_demographic_sampler2():
-#     # Test DemographicSampler for correct region and country sampling
-#     sampled_country = DemographicSampler.sample_country()
-#     assert sampled_country in CountryData
-#
-# def test_ethnicity_mix_sampling():
-#     # Test if the sampled subtype is from the country's ethnic mix
-#     subtype = DemographicSampler.sample_subtype(CountryData['ago'])
-#     assert subtype.value in CountryData['ago'].eth_mix
-#
+def test_parsing_is_pure_and_repeat_registration_preserves_references(sample: DemographicPack) -> None:
+    resources = files(packs.__package__).joinpath("resources")
+    geography = yaml.safe_load(resources.joinpath("nationalities.yaml").read_text())
+    names = yaml.safe_load(resources.joinpath("sample_names.yaml").read_text())
+    before = deepcopy((geography, names))
+    parsed = parse_pack(sample.metadata, geography, names)
+    assert (geography, names) == before
+    assert parsed == sample
+    unrelated = NameBank(label="unrelated_pack_witness", female=["Only"], surname=["Here"])
+    register_pack(parsed)
+    country = Country.get_instance("fra")
+    region = Region.get_instance("west_europe")
+    bank = NameBank.get_instance("fra")
+    register_pack(load_pack("sample"))
+    assert Country.get_instance("fra") is country
+    assert Region.get_instance("west_europe") is region
+    assert NameBank.get_instance("fra") is bank
+    assert NameBank.get_instance("unrelated_pack_witness") is unrelated
+    assert (geography, names) == before
+    assert DemographicSampler.sample_xx_name(bank) in [
+        (given, family) for given in names["fra"]["female"] for family in names["fra"]["surname"]
+    ]
 
 
+def test_historical_geography_and_illustrative_pools_are_preserved(sample: DemographicPack) -> None:
+    register_pack(sample)
+    assert Country.get_instance("ago").population == 31825295
+    assert Country.get_instance("ago").demonym == "Angolan"
+    assert Region.get_instance("africa").population == 1109541977
+    assert sample.names["fra"].female == ["Marie", "Sophie", "Camille"]
+    assert sample.names["jpn"].male == ["Haruto", "Ren", "Yuto"]
+    assert set(sample.names) == {"fra", "jpn"}
+    assert Country.get_instance("ago").namebank() is None
+
+
+def test_coverage_audit_does_not_assume_base_banks_cover_exact_subtypes(sample: DemographicPack) -> None:
+    assert len(sample.countries_without_banks()) == 213
+    assert "ago" in sample.countries_without_banks()
+    assert "fra" not in sample.countries_without_banks()
+    assert len(sample.uncovered_subtypes()) == 978
+    assert ("fra", "european") in sample.uncovered_subtypes()
+    assert ("usa", "black") in sample.uncovered_subtypes()
+    assert sample.uncovered_subtypes() == load_pack("sample").uncovered_subtypes()
+
+
+@pytest.mark.parametrize("pack", ["sample", "full"])
+def test_metadata_identifies_source_revision_and_known_gaps(pack: str) -> None:
+    metadata = packs.PackMetadata.model_validate(packs._read_yaml(f"{pack}_metadata.yaml"))
+    assert metadata.label == pack
+    assert metadata.revision
+    assert metadata.source
+    assert "2021" in metadata.geography
+    assert metadata.transformations
+    assert metadata.provenance_gaps
+
+
+@pytest.mark.parametrize("full_state", ["absent", "pointer"])
+def test_fresh_import_neither_reads_full_pack_nor_registers_definitions(
+    tmp_path: Path, full_state: str,
+) -> None:
+    resources = files(packs.__package__).joinpath("resources")
+    for name in ("sample_names.yaml", "sample_metadata.yaml", "full_metadata.yaml",
+                 "nationalities.yaml"):
+        (tmp_path / name).write_text(resources.joinpath(name).read_text())
+    if full_state == "pointer":
+        (tmp_path / "world_names.yaml").write_text(
+            "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 123\n"
+        )
+    script = '''
+import importlib.resources
+from pathlib import Path
+import sys
+original = importlib.resources.files
+reads = []
+def resources(package):
+    if package == "tangl.mechanics.demographics":
+        reads.append(package)
+        return Path(sys.argv[1])
+    return original(package)
+importlib.resources.files = resources
+from tangl.mechanics.demographics import (
+    Country, NameBank, Region, Subtype, PackUnavailableError, load_pack, register_pack,
+)
+assert reads == []
+assert all(not list(cls.all_instances()) for cls in (Country, NameBank, Region, Subtype))
+# _read_yaml joins resources/ below the package root.
+try:
+    load_pack("full")
+except PackUnavailableError as exc:
+    assert "world_names.yaml" in str(exc)
+else:
+    raise AssertionError("Missing full data was accepted")
+assert all(not list(cls.all_instances()) for cls in (Country, NameBank, Region, Subtype))
+register_pack(load_pack("sample"))
+assert set(NameBank.all_instance_labels()) == {"fra", "jpn"}
+'''
+    root = tmp_path / "package"
+    root.mkdir()
+    # Keep the fixture resource layout identical to the installed package.
+    (root / "resources").symlink_to(tmp_path, target_is_directory=True)
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(root)], capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("contents", ["[broken", "- wrong shape", "fra: {female: []}"])
+def test_malformed_actual_full_data_is_never_unavailable_or_sample(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, contents: str,
+) -> None:
+    root = tmp_path / "resources"
+    root.mkdir()
+    resources = files(packs.__package__).joinpath("resources")
+    for name in ("full_metadata.yaml", "nationalities.yaml"):
+        (root / name).write_text(resources.joinpath(name).read_text())
+    (root / "world_names.yaml").write_text(contents)
+    monkeypatch.setattr(packs, "files", lambda _package: tmp_path)
+    with pytest.raises((yaml.YAMLError, ValidationError)):
+        load_pack("full")
+
+
+def test_invalid_geography_is_rejected_without_mutating_input(sample: DemographicPack) -> None:
+    geography = {"wrong-key": sample.regions["asia"].model_dump()}
+    before = deepcopy(geography)
+    with pytest.raises(ValueError, match="differs from id"):
+        parse_pack(sample.metadata, geography, {"jpn": sample.names["jpn"].model_dump()})
+    assert geography == before
+
+
+def test_duplicate_pool_entries_and_unicode_are_not_normalized(sample: DemographicPack) -> None:
+    names = {"unicode_witness": {"female": ["Éva", "Éva", "李"], "surname": ["de Vries"]}}
+    parsed = parse_pack(sample.metadata, {"asia": sample.regions["asia"].model_dump()}, names)
+    assert parsed.names["unicode_witness"].female == ["Éva", "Éva", "李"]
+    assert parsed.names["unicode_witness"].surname == ["de Vries"]
+
+
+def test_conflicting_definition_fails_instead_of_overwriting(sample: DemographicPack) -> None:
+    register_pack(sample)
+    original = NameBank.get_instance("fra")
+    sample.names["fra"].female = ["Changed"]
+    with pytest.raises(ValueError, match="Conflicting NameBank.*fra"):
+        register_pack(sample)
+    assert NameBank.get_instance("fra") is original
+    assert original.xx_names == ["Marie", "Sophie", "Camille"]
+
+
+def test_optional_full_pack_is_valid_or_truly_unavailable() -> None:
+    try:
+        pack = load_pack("full")
+    except PackUnavailableError as exc:
+        pytest.skip(str(exc))
+    assert pack.metadata.label == "full"
+    assert len(pack.names) > 2
+    # Audit real coverage instead of xfail-ing selected countries or fabricating banks.
+    assert all(country in {c.id for r in pack.regions.values() for c in r.countries.values()}
+               for country, _subtype in pack.uncovered_subtypes())
