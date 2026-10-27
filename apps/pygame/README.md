@@ -132,6 +132,26 @@ avatar control realization and web rendering remain separate follow-ups.
 
 ## Stage and interaction conventions
 
+**Text geometry stays local to Stage.** `row_text_left` is the text inset (8
+logical pixels); `backing_padding` adds 3 pixels outside the glyph region. Both
+scale once with density. A new text renderer takes its actual `pygame.Rect`
+region to `Stage.text_bounds()`, measures/wraps within that result, and gives
+the same region width to `_backing()`. The narrower prose region beside a state
+panel follows the same rule. Clipping takes that measured width rather than
+assuming the full window. Header/body backing edges stay aligned, including
+the compact-page header fixed in #624.
+
+The existing extra 2-pixel right clearance for scrolling prose remains explicit
+as `prose_wrap_clearance`; paged prose and choice wrapping keep their symmetric
+insets. Scrolling header controls retain their 5-pixel gap; compact-page controls
+retain their distinct 8-pixel gap. Labels are bounded before controls so long
+attributions/counters cannot paint over the state panel or navigation. Control
+hitboxes use the rendered glyph surface intersected with its region and active
+clip; they do not extend into invisible text. Body/choice row pitches, fonts,
+state-panel padding and the staging-only `gutter` remain separate policies.
+No common numeric value makes two of these policies the same, and no legacy
+`margin` alias exists. Paging/audio and stage lifecycle contracts are unchanged.
+
 **Logical extent comes from world info; window scale stays local.** Before it
 constructs `Stage`, the bridge discovers exact world-info channel `ui-stage`.
 Pygame supports declared extents 320×200 and 640×400 in this slice, with density

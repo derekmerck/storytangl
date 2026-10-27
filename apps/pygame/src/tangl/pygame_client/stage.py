@@ -250,8 +250,12 @@ _BASE_CHOICE_PITCH = 11
 """Vertical step between choice rows, one more than the backing they carry."""
 
 _BASE_ROW_TEXT_LEFT = 8
-"""Left edge of row text. The backing sits three pixels outside it, so a row
-and a legend line share one margin however each surface lays them out."""
+"""Text inset; backing padding sits outside it, independently of staging."""
+_BASE_BACKING_PADDING = 3
+_BASE_CONTROL_GAP = 5
+_BASE_PAGE_CONTROL_GAP = 8
+_BASE_PROSE_WRAP_CLEARANCE = 2
+"""Additional right clearance retained for scrolling prose wrapping."""
 
 TEXT_WASH = 210
 """Opacity of a text backing, out of 255.
@@ -356,6 +360,10 @@ class Stage:
         self.panel_width = _BASE_PANEL_WIDTH * self.density
         self.choice_pitch = _BASE_CHOICE_PITCH * self.density
         self.row_text_left = _BASE_ROW_TEXT_LEFT * self.density
+        self.backing_padding = _BASE_BACKING_PADDING * self.density
+        self.control_gap = _BASE_CONTROL_GAP * self.density
+        self.page_control_gap = _BASE_PAGE_CONTROL_GAP * self.density
+        self.prose_wrap_clearance = _BASE_PROSE_WRAP_CLEARANCE * self.density
         self.surface_contour = _BASE_SURFACE_CONTOUR * self.density
         pygame.init()
         self.chrome = Chrome(logical_size[0], self.density) if chrome else None
@@ -521,10 +529,11 @@ class Stage:
         if not fresh:
             return
         previous_key = None
-        pixel_width = self.logical_size[0] - 2 * self.row_text_left
+        width = self.logical_size[0]
         placed = place_pieces(frame.surface, frame.pieces) if frame.surface else []
         if self._has_state(frame, placed=placed):
-            pixel_width -= self.panel_width
+            width -= self.panel_width
+        pixel_width = self.text_bounds(pygame.Rect(0, 0, width, 0)).width
         passages = passages or [frame]
         previous_failed: list[StageImage] = []
         for index, passage in enumerate(passages):
@@ -689,7 +698,7 @@ class Stage:
         rows = self._rows(
             turn,
             unloadable,
-            pixel_width=width - 18 * self.density,
+            pixel_width=self.text_bounds(stage_rect, clearance=self.prose_wrap_clearance).width,
         )
         capacity = max(1, (prose_floor - self.prose_top) // self.row_height)
         overflow = len(rows) > capacity
@@ -732,10 +741,10 @@ class Stage:
 
     def _draw_pacing_switch(self) -> None:
         text = self.font.render("Pages (Ctrl+P)", False, CREAM)
-        rect = text.get_rect(topright=(self.logical_size[0] - self.row_text_left, 2 * self.density))
+        bounds = self.text_bounds(self.surface.get_rect())
+        rect = text.get_rect(topright=(bounds.right, 2 * self.density))
         self._wash(rect, INK)
-        self.surface.blit(text, rect)
-        self.hitboxes.append((rect, TogglePacing()))
+        self._blit_control(text, rect.topleft, bounds, TogglePacing())
 
     def _draw_page(self, *, width: int, floor: int) -> None:
         page = self.pages[self.page_index]
@@ -745,7 +754,8 @@ class Stage:
         self.prose_rect = pygame.Rect(0, top + 2 * self.row_height, width, 4 * self.row_height)
         self.prose_capacity, self.max_scroll, self.scroll = 4, 0, 0
         self._draw_rows(page.rows, capacity=4, width=width)
-        heading = self.font.render(self._clip(page.heading or ""), False, RUST)
+        bounds = self.text_bounds(panel)
+        heading = self.font.render(self._clip(page.heading or "", width=bounds.width), False, RUST)
         # Each header row is backed as the rows beneath it are, so the page's
         # header and text share both edges, as the scrolling header does.
         for y in (top, top + self.row_height):
@@ -760,18 +770,18 @@ class Stage:
                 ),
                 INK,
             )
-        self.surface.blit(heading, (self.row_text_left, top + self.row_height))
-        x = self.row_text_left
-        controls = [(f"{self.page_index + 1}/{len(self.pages)}", None),
-                    ("<", PassagePage(-1)), (">", PassagePage()),
+        self._blit_control(heading, (bounds.left, top + self.row_height), bounds)
+        x = bounds.left
+        controls = [("<", PassagePage(-1)), (">", PassagePage()),
                     ("End", PassagePage(end=True)), ("Scroll", TogglePacing())]
-        for label, action in controls:
+        reserved = sum(self.font.size(label)[0] for label, _ in controls)
+        reserved += len(controls) * self.page_control_gap
+        counter = self._clip(f"{self.page_index + 1}/{len(self.pages)}",
+                             width=max(0, bounds.width - reserved))
+        for label, action in [(counter, None), *controls]:
             text = self.font.render(label, False, CREAM)
-            rect = text.get_rect(topleft=(x, top))
-            self.surface.blit(text, rect)
-            if action is not None:
-                self.hitboxes.append((rect, action))
-            x = rect.right + 8 * self.density
+            self._blit_control(text, (x, top), bounds, action)
+            x += text.get_width() + self.page_control_gap
 
     def set_info(
         self, branding: BrandingValue | None, sections: list[ProjectedSection],
@@ -1638,17 +1648,17 @@ class Stage:
             # hairline of scene between them however the caller spaces them.
             # That gap is what makes a row read as a separate thing to click.
             return pygame.Rect(
-                max(0, left - 3 * self.density),
+                max(0, left - self.backing_padding),
                 y,
-                rendered.get_width() + 6 * self.density,
+                rendered.get_width() + 2 * self.backing_padding,
                 pitch - self.density,
             )
         # Prose spans the region `width` gives, standing in from its right
         # edge as far as from its left, so no caller derives the band itself.
         return pygame.Rect(
-            max(0, left - 3 * self.density),
+            max(0, left - self.backing_padding),
             y,
-            width - 2 * (left - 3 * self.density),
+            width - 2 * (left - self.backing_padding),
             self.row_height,
         )
 
@@ -1735,6 +1745,10 @@ class Stage:
         """
         total = maximum + capacity
         label = f"{region} {offset + 1}-{min(offset + capacity, total)}/{total}"
+        bounds = self.text_bounds(pygame.Rect(0, top, width, self.row_height))
+        controls = [("next >", 1, offset < maximum), ("< prev", -1, offset > 0)]
+        reserved = sum(self.font.size(text)[0] + self.control_gap for text, _, _ in controls)
+        label = self._clip(label, width=max(0, bounds.width - reserved))
         surface = self.font.render(label, False, CREAM)
         self._wash(
             self._backing(
@@ -1747,20 +1761,14 @@ class Stage:
             ),
             INK,
         )
-        self.surface.blit(surface, (self.row_text_left, top))
-        right = width - self.row_text_left
-        for text, delta, enabled in [
-            ("next >", 1, offset < maximum),
-            ("< prev", -1, offset > 0),
-        ]:
+        self._blit_control(surface, bounds.topleft, bounds)
+        right = bounds.right
+        for text, delta, enabled in controls:
             rendered = self.font.render(text, False, CREAM if enabled else DIM)
-            rect = pygame.Rect(
-                right - rendered.get_width(), top, rendered.get_width(), self.row_height,
-            )
-            self.surface.blit(rendered, rect.topleft)
-            if enabled:
-                self.hitboxes.append((rect, ScrollText(region, delta, page=True)))
-            right = rect.left - 5 * self.density
+            left = right - rendered.get_width()
+            action = ScrollText(region, delta, page=True) if enabled else None
+            self._blit_control(rendered, (left, top), bounds, action)
+            right = left - self.control_gap
 
     def _row(self, marker: str, text: str, *, y: int, colour, action: Action | None) -> None:
         """Draw one numbered row and, when actionable, record its hitbox.
@@ -1800,7 +1808,7 @@ class Stage:
             label = choice.text
             if reason := (choice.unavailable_reason or unsupported_reason(choice)):
                 label = f"{label}  — {reason}"
-            width = self.logical_size[0] - 2 * self.row_text_left - self.font.size(marker)[0]
+            width = self.text_bounds(self.surface.get_rect()).width - self.font.size(marker)[0]
             rows.extend(
                 _ChoiceRow(marker + part, choice) for part in self._wrap_pixels(label, width)
             )
@@ -2172,8 +2180,25 @@ class Stage:
         return (point[0] // self.display_scale,
                 point[1] // self.display_scale - self.chrome_height)
 
-    def _clip(self, text: str) -> str:
-        """Return `text` shortened until the row fits the frame.
+    def text_bounds(self, region: pygame.Rect, *, clearance: int = 0) -> pygame.Rect:
+        """Glyph bounds inside a text region; backing padding and staging stay separate."""
+        return pygame.Rect(region.left + self.row_text_left, region.top,
+                           max(0, region.width - 2 * self.row_text_left - clearance), region.height)
+
+    def _blit_control(
+        self, rendered: pygame.Surface, position: tuple[int, int], bounds: pygame.Rect,
+        action: Action | None = None,
+    ) -> None:
+        """Paint and hit-test the same visible glyph rectangle."""
+        rect = rendered.get_rect(topleft=position)
+        visible = rect.clip(bounds).clip(self.surface.get_clip())
+        if visible.width and visible.height:
+            self.surface.blit(rendered, visible, visible.move(-rect.x, -rect.y))
+            if action is not None:
+                self.hitboxes.append((visible, action))
+
+    def _clip(self, text: str, *, width: int | None = None) -> str:
+        """Return `text` shortened to its measured text-region width.
 
         A choice row is one line by construction — the number a reader presses
         has to stay with the words it names — so a long one cannot wrap and
@@ -2183,9 +2208,11 @@ class Stage:
         column budget would clip the wrong worlds.
         """
 
-        limit = self.logical_size[0] - 12 * self.density
+        limit = self.text_bounds(self.surface.get_rect()).width if width is None else width
         if self.font.size(text)[0] <= limit:
             return text
+        if self.font.size("…")[0] > limit:
+            return ""
         clipped = text
         while clipped and self.font.size(f"{clipped}…")[0] > limit:
             clipped = clipped[:-1]
