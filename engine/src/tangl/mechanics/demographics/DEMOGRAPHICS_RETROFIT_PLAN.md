@@ -157,8 +157,8 @@ facts only. Neither automatically materializes an individual.
 
 ## 4b. Sample missing facts at the lifecycle boundary — implemented for UPDATE
 
-**Capability:** preserve authored inputs, generate missing facts once at normal
-setup/UPDATE boundaries, and retain committed results/provenance through replay.
+**Capability:** preserve authored inputs, generate missing facts once through explicit
+UPDATE-handler integration, and retain committed results/provenance through replay.
 
 **Implemented UPDATE acceptance:**
 
@@ -167,11 +167,11 @@ setup/UPDATE boundaries, and retain committed results/provenance through replay.
   fail descriptively; explicit fallback remains separate from exact coverage.
 - Age aliases do not accidentally add weight. Advertised weighting options work
   or are removed; broader age/name parser changes remain separate.
-- Decide and persist generation provenance, including selected origin/bank and
+- Generation provenance persists selected origin/bank and
   catalog revision, without duplicating the authoritative personal name.
-- Normal setup/UPDATE generation uses frame RNG through existing dispatch and
-  EntityTemplate materialization; no automatic generation in model validators,
-  getters, PLANNING/JOURNAL, or structure().
+- Explicit world UPDATE handlers use frame RNG through existing dispatch for
+  already EntityTemplate-materialized actors; no automatic setup generation or
+  generation in model validators, getters, PLANNING/JOURNAL, or structure().
 - A real ledger witness proves exactly-once generation, no resampling during
   restore/replay, actual committed values, and preserved authored facts.
 

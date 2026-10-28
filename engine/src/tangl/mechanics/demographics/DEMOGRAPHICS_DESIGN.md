@@ -257,8 +257,8 @@ disabled. Getters/rendering also preserve frame RNG state. Singleton persistence
 Core identity/authority and restoration order are unchanged.
 
 **4b UPDATE completion is implemented:** authored-partial merge/RNG budgeting, geographic constraint
-checks, age-alias weighting, generation origin/bank/revision provenance, normal
-setup/UPDATE integration, and exactly-once generation under real ledger replay.
+checks, age-alias weighting, generation origin/bank/revision provenance,
+explicit UPDATE-handler integration, and exactly-once generation under real ledger replay.
 4a itself does not establish those policies; the implemented UPDATE boundary is documented below. Anonymous/proper
 realization, role binding and narrator knowledge stay prose policy; no discovery,
 introductions or alias-history refactor is included.
@@ -323,7 +323,10 @@ Only requested missing values draw, in region/country/subtype/gender/age/bank/gi
 order with sorted candidates. Explicit request flags preserve intentional absence
 across constructor form; model_fields_set alone is not durable presence metadata.
 Age aliases have one slot per value; unsupported gender/age weighting flags are
-removed. Scoped bank/form and pinned geographic constraints validate before drawing.
+removed. Scoped references and dependent geographic candidates validate before drawing.
+Zero-weight origin references must resolve, but only positive-weight banks need the
+requested form. A requested region can supply a subtype without generating a country;
+regions and countries without an eligible dependent mixture are excluded before draws.
 
 Actual UPDATE traversal, pre-event deterministic re-execution, recorded diff replay,
 renamed committed-state continuation and fresh-process JSON restore are separate

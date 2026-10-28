@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
+from tangl.core import Selector
 from tangl.core.bases import Unstructurable
 from tangl.lang.age_range import AgeRange
 from tangl.lang.gens import Gens
@@ -12,7 +13,7 @@ from tangl.lang.personal_name import PersonalName
 from tangl.vm import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 
-from .data_models import Country, NameBank, Region
+from .data_models import Country, NameBank, Region, Subtype
 from .demographic import DemographicData
 from .sampler import _sample_part
 from .selection import Origin, select_bank, select_origin
@@ -73,25 +74,24 @@ def complete_generation(
     if demographic.country is not None and demographic.region is not None:
         if demographic.country.region is not demographic.region:
             raise ValueError("Country and region constraints contradict one another")
-    if "subtype" in request.facts and demographic.subtype is None:
+    needs_region = "region" in request.facts and demographic.region is None
+    needs_country = "country" in request.facts and demographic.country is None
+    needs_subtype = "subtype" in request.facts and demographic.subtype is None
+    if needs_subtype:
         if (demographic.country is None and demographic.region is None
-                and "country" not in request.facts):
+                and not needs_country and not needs_region):
             raise ValueError("Subtype generation requires country or region constraints")
 
-    if ("region" in request.facts and demographic.region is None
-            and demographic.country is not None):
+    if needs_region and demographic.country is not None:
         if demographic.country.region is None:
             raise LookupError("Country has no declared region")
 
     current = ({"given_name": personal_name.given_name, "family_name": personal_name.family_name}
                if personal_name is not None else {"given_name": None, "family_name": None})
     missing = {field for field, fill in request.name_parts.items() if fill and current[field] is None}
-    if "subtype" in request.facts and demographic.subtype is None:
-        if (demographic.country is not None and demographic.country.eth_mix_ is None
-                and demographic.country.region is None):
-            raise ValueError("Country has no declared subtype mixture")
     catalogs = ctx.get_token_catalogs()
     banks: list[NameBank] = []
+    eligible_banks: list[NameBank] = []
     if missing:
         if request.form is None:
             raise ValueError("Requested name parts require an explicit form")
@@ -109,22 +109,67 @@ def complete_generation(
                 banks = [select_bank(request.fallback_bank, catalogs=catalogs)]
         else:
             raise ValueError("Requested name parts require an explicit bank or origin")
-        for bank in banks:
+        eligible_banks = (
+            [bank for (_ref, weight), bank in zip(
+                sorted(request.origin.banks.items()), banks, strict=True,
+            ) if weight > 0] if request.origin is not None else banks
+        )
+        for bank in eligible_banks:
             if request.form not in bank.forms:
                 raise LookupError(f"Bank {bank.label!r} has no form {request.form!r}")
 
-    region_choices = sorted(
-        (region for region in Region.all_instances()
-         if region.countries or "country" not in request.facts),
-        key=lambda value: value.label,
-    )
-    country_choices = sorted(
-        demographic.region.countries if demographic.region is not None else Country.all_instances(),
-        key=lambda value: value.label,
-    )
-    if "region" in request.facts and demographic.region is None and not region_choices:
+    def country_mix(country: Country) -> dict[Subtype, int]:
+        parent = country.region
+        return country.eth_mix_ or (parent.eth_mix if parent is not None else {})
+
+    def valid_mix(mix: dict[Subtype, int]) -> bool:
+        return all(weight >= 0 for weight in mix.values()) and any(
+            weight > 0 for weight in mix.values()
+        )
+
+    if needs_subtype and demographic.country is not None:
+        if not valid_mix(country_mix(demographic.country)):
+            raise ValueError("Country has no eligible subtype mixture")
+    elif needs_subtype and not needs_country and demographic.region is not None:
+        if not valid_mix(demographic.region.eth_mix):
+            raise ValueError("Region has no eligible subtype mixture")
+
+    # Prepare every dependent branch before drawing, including countries beneath
+    # a generated region. A region with no usable continuation is not eligible.
+    country_selector = Selector(predicate=lambda country: (
+        (not needs_subtype or valid_mix(country_mix(country)))
+        and (not request.population_weighted or country.population > 0)
+    ))
+    countries_by_region: dict[Region, list[Country]] = {}
+    region_choices: list[Region] = []
+    country_choices: list[Country] = []
+    if needs_country and demographic.region is not None:
+        country_choices = sorted(
+            country_selector.filter(demographic.region.countries), key=lambda value: value.label,
+        )
+    elif needs_country and not needs_region:
+        country_choices = sorted(
+            Country.find_all_instances(country_selector), key=lambda value: value.label,
+        )
+    if needs_region and demographic.country is None:
+        if needs_country:
+            countries_by_region = {
+                region: sorted(
+                    country_selector.filter(region.countries), key=lambda value: value.label,
+                )
+                for region in Region.find_all_instances()
+            }
+        region_selector = Selector(predicate=lambda region: (
+            (not needs_country or bool(countries_by_region[region]))
+            and (not needs_subtype or needs_country or valid_mix(region.eth_mix))
+            and (not request.population_weighted or region.population > 0)
+        ))
+        region_choices = sorted(
+            Region.find_all_instances(region_selector), key=lambda value: value.label,
+        )
+    if needs_region and demographic.country is None and not region_choices:
         raise LookupError("No eligible regions")
-    if "country" in request.facts and demographic.country is None and not country_choices:
+    if needs_country and not region_choices and not country_choices:
         raise LookupError("No eligible countries")
     # Work on detached values; failures never partly overwrite the owned profile/name.
     profile = demographic.evolve()
@@ -134,21 +179,20 @@ def complete_generation(
     def choose[T: (Region, Country)](values: list[T]) -> T:
         if request.population_weighted:
             weights = [value.population for value in values]
-            if not any(weight > 0 for weight in weights):
-                raise ValueError("Population selection requires positive weight")
             return rng.choices(values, weights=weights, k=1)[0]
         return rng.choice(values)
 
-    if "region" in request.facts and profile.region is None:
-        profile.region = profile.country.region if profile.country is not None else choose(region_choices)
+    if needs_region:
+        profile.region = (
+            profile.country.region if profile.country is not None else choose(region_choices)
+        )
         generated.append("region")
-    if "country" in request.facts and profile.country is None:
-        choices = (sorted(profile.region.countries, key=lambda value: value.label)
-                   if profile.region is not None else country_choices)
+    if needs_country:
+        choices = countries_by_region[profile.region] if region_choices else country_choices
         profile.country = choose(choices)
         generated.append("country")
-    if "subtype" in request.facts and profile.subtype is None:
-        mix = profile.country.eth_mix if profile.country is not None else profile.region.eth_mix
+    if needs_subtype:
+        mix = country_mix(profile.country) if profile.country is not None else profile.region.eth_mix
         candidates = sorted(mix, key=lambda value: value.label)
         profile.subtype = rng.choices(candidates, weights=[mix[value] for value in candidates], k=1)[0]
         generated.append("subtype")
@@ -159,10 +203,6 @@ def complete_generation(
         profile.age_range = rng.choice(list(AgeRange))
         generated.append("age_range")
 
-    eligible_banks = (
-        [bank for (_ref, weight), bank in zip(sorted(request.origin.banks.items()), banks, strict=True)
-         if weight > 0] if request.origin is not None and banks else banks
-    )
     active = any(
         ("given_name" in missing and bank.forms[request.form].given is not None)
         or ("family_name" in missing and bank.forms[request.form].family is not None)
