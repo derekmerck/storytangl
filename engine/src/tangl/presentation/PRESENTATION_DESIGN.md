@@ -88,6 +88,53 @@ reset dynamic freshness even at equal steps; branding is independently cacheable
 The general inspection-channel browser, theme/icon library and finer invalidation
 remain follow-ups rather than part of this slice.
 
+## Content affiliations (#629)
+
+A surface a client draws (a status bar, a map's regions) gets its content
+across the info channel, as typed data with ids. A journal fragment may declare,
+informally, that its content is also available there, naming the surface by its
+own id. The client decides what that means for it: a client that draws the
+surface may treat the line as redundant; one that doesn't, or that ignores the
+affiliation, shows everything. The journal stays the complete narrative floor.
+
+Content is never scraped out of fragments and routed to a surface. A surface
+fed from prose would depend on its wording and would be a second authority.
+The info channel already has the typed value; the fragment only says "this is
+also available as info".
+
+The instances so far:
+
+- **`status:<section_id>`**, a style tag on a content line, says the line
+  restates that `ui-status` section: a scene's title is `status:scene`, a day
+  line `status:day` and `status:period`. Story carries a block's `content_hints`
+  to every line its content is journaled as. Pygame drops a line when every
+  section it names is one its bar carries.
+- **`ui:plate:<plate>:<region>`**, a client-visible choice tag, says a map
+  region also offers that choice.
+- **A media fragment's own `text`** is its caption. The affiliation is
+  intrinsic, since the caption rides with the audio packet, so no tag is needed.
+  Whether to show captions is a client or viewer preference.
+
+Style hints say how to draw a line; affiliation tags say where else it is
+drawn. Don't invent content kinds for a client to learn: name the surface
+by its own id. The two instances ride different carriers today (a line's
+`presentation_hints.style_tags`, a choice's `ui:` tags), and neither needs them
+unified.
+
+**Numbering is global.** A choice keeps one key however it is offered: `1`-`9`,
+then letters, over the whole choice list, whether a region also offers it or the
+list shows it. A region never renumbers its own choices (no `home-1`,
+`station-1`).
+
+**Open, undecided:**
+
+- **Whether a region-claimed choice leaves the exhaustive list,** or only also
+  appears on the region's rollover.
+- **Whether plate geometry belongs on the info channel.** Today the cursor
+  publishes one plate through story-info. That may not generalize to many maps,
+  or a map per scene. Geometry could instead ride with the plate's own media,
+  as a sprite sheet's manifest rides with the sheet.
+
 ## Presentation roles and explicit overrides
 
 Presentation has two complementary author-facing modes.
