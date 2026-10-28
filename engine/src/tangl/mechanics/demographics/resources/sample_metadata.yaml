@@ -1,0 +1,9 @@
+label: sample
+revision: sample-v1
+source: Illustrative France/Japan pools previously embedded as FALLBACK_WORLD_NAME_DATA.
+geography: Unchanged nationalities.yaml; historical approximate 2021 geography and categories.
+transformations: Existing illustrative pools moved verbatim into explicit regular-git YAML; no deduplication or reweighting.
+provenance_gaps:
+  - Original source and extraction revision for these illustrative pools were not recorded.
+  - These small pools do not claim population coverage or observed name frequencies.
+  - Historical geography source URLs and redistribution terms were not recorded.

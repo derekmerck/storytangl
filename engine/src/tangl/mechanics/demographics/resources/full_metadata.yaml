@@ -1,0 +1,10 @@
+label: full
+revision: sha256:2a1e86df5b4a540dffb02d2aabcd5af69323be67be3373bd0eb16de958521e89
+source: Historical world_names.yaml; primarily compiled from the FreeCities Twine game according to the original package credits.
+geography: Unchanged nationalities.yaml; historical approximate 2021 geography and categories scraped from the web.
+transformations: Historical pools retained as stored; no deduplication, rebalancing, or synthetic missing-country banks.
+provenance_gaps:
+  - Original FreeCities revision, extraction method, and additional per-bank sources were not recorded.
+  - Redistribution permissions and licenses for compiled source material were not recorded.
+  - Historical geography source URLs and extraction dates were not recorded.
+  - Revision identifies the repository historical LFS blob, not a verified upstream release.
