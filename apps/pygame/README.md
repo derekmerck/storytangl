@@ -101,7 +101,8 @@ stays suppressed. Preference changes remeasure once and clamp the current page,
 while redraw/Back/mode switches do not append captions during drawing. Compatible
 narration or same-speaker fragments combine while they fit. Speaker identity, wording/style,
 mode, attitude/expression and step/source/visual boundaries keep incompatible
-passages apart. The panel sits at the bottom of the existing logical stage; no
+passages apart. The panel sits at the bottom of the existing logical stage, above
+the choices, and its rows start directly under the bar on every page; no
 world coordinates or portrait natural sizes are moved. Headless pixel witnesses
 at 320×200 and 640×400 keep both faces of naturally sized 112/224-pixel portraits
 visible above the window. Arbitrary authored face positions remain the author's
@@ -115,7 +116,10 @@ only on the last page or after deliberate skip. Terminal menus retain independen
 bounded scrolling (Shift+Up/Down/PageUp/PageDown, wheel and pointer controls), full
 wording, refusal state, numbering and payloads. Existing surface/selection/editor
 views remain in use once an interaction is opened. Empty/media-only and single-page
-responses are immediately actionable. Status chrome describes committed runtime
+responses are immediately actionable and have nothing to turn: they draw as they
+would scrolling, with no bar and no Pages switch, and their choices keep the
+scrolling choice area. A media-only page between text pages has no bar either; a
+click anywhere on it advances. Status chrome describes committed runtime
 state; paging does not rewind game state or call Service.
 
 Only fresh opening/choice output gets pages. The runner currently starts a new

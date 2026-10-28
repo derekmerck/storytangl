@@ -38,6 +38,17 @@ class PagingSpeaker(HasPortraits, NamedActor):
     pass
 
 
+ROOM = (0, 0, 128)
+"""The fixture's first room, solid navy, so any other colour over it is drawn."""
+
+
+def _washed(stage: Stage, y: int) -> tuple[int, int] | None:
+    """The first and last columns drawn over the room on one pixel row."""
+    columns = [x for x in range(stage.logical_size[0])
+               if tuple(stage.surface.get_at((x, y)))[:3] != ROOM]
+    return (columns[0], columns[-1]) if columns else None
+
+
 @pytest.fixture(params=[1, 2], ids=["320", "640"])
 def exchange(request: pytest.FixtureRequest, tmp_path: Path):
     density = request.param
@@ -150,17 +161,55 @@ def test_page_header_is_washed_to_the_margins_of_the_rows_beneath_it(exchange) -
     stage.paged = True
     stage.present(frame, visual_passages(bridge, envelope))
     stage.draw(frame)
-    room = (0, 0, 128)
-
-    def washed(y: int) -> tuple[int, int]:
-        columns = [x for x in range(stage.logical_size[0])
-                   if tuple(stage.surface.get_at((x, y)))[:3] != room]
-        return columns[0], columns[-1]
-
     pitch = stage.row_height
     header = stage.prose_rect.top - 2 * pitch
-    assert washed(header + pitch // 2) == washed(header + 3 * pitch // 2) \
-        == washed(stage.prose_rect.bottom - pitch // 2)
+    assert _washed(stage, header + pitch // 2) == _washed(stage, header + 3 * pitch // 2) \
+        == _washed(stage, stage.prose_rect.top + pitch // 2)
+
+
+def test_a_page_reads_from_just_under_its_bar_however_few_its_rows(exchange) -> None:
+    # The first row sits under the bar on every page, so the bar and the text
+    # keep one distance as a reader turns them, two rows or one.
+    _, _, _, envelope, bridge, stage = exchange
+    frame = _frame(bridge, envelope)
+    stage.paged = True
+    stage.present(frame, visual_passages(bridge, envelope))
+    assert [len(page.rows) for page in stage.pages] == [2, 1, 1]
+    for index, page in enumerate(stage.pages):
+        stage.page_index = index
+        stage.draw(frame)
+        # The rows' left edge, where no figure stands: washed where a row is.
+        left, _ = _washed(stage, stage.prose_rect.top - 2 * stage.row_height)
+        washed = [tuple(stage.surface.get_at((left, stage.prose_rect.top + row * stage.row_height
+                                             + stage.row_height // 2)))[:3] != ROOM
+                  for row in range(4)]
+        assert washed == [row < len(page.rows) for row in range(4)]
+
+
+def test_nothing_to_page_draws_no_bar_and_keeps_the_whole_menu(exchange) -> None:
+    # A plate, an encounter, or a menu that fits on one page has nothing to
+    # turn: no bar, no switch, and its choices get the room they get scrolling.
+    world, _, _, _, _, stage = exchange
+    root = world.resources.resource_path
+    choices = [Choice(uuid4(), f"Choice {index}") for index in range(12)]
+    plate = Turn(step=1, images=[StageImage("narrative_im", str(root / "room1.png"))],
+                 choices=choices[:1])
+    menu = Turn(step=1, images=[StageImage("narrative_im", str(root / "room1.png"))],
+                lines=[Line("Day 3, morning.")], choices=choices)
+
+    def controls() -> list[object]:
+        return [action for _, action in stage.hitboxes
+                if isinstance(action, (PassagePage, TogglePacing))]
+
+    capacities = {}
+    for paged in (False, True):
+        stage.paged = paged
+        for turn in (plate, menu):
+            stage.present(turn, [turn])
+            stage.draw(turn)
+            assert controls() == [] and stage.choices_ready
+        capacities[paged] = stage.choice_capacity
+    assert capacities[True] == capacities[False] > 2
 
 
 def test_multi_room_batch_does_not_reveal_future_staging_and_skip_matches_fold(exchange) -> None:

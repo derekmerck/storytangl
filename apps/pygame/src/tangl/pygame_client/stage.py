@@ -604,7 +604,13 @@ class Stage:
                      and turn is self._presentation_frame)
         if paged:
             turn = self.pages[self.page_index].turn
+        # Only text to read gets the page's bar. A plate, an encounter, or a
+        # response that fits on one page draws as it would scrolling.
+        reading = paged and len(self.pages) > 1 and bool(self.pages[self.page_index].rows)
         self.hitboxes.clear()
+        if paged and not reading and not self.choices_ready:
+            # Drawn under everything, so any control still wins its own click.
+            self.hitboxes.append((self.surface.get_rect(), PassagePage()))
         self.slot_boxes.clear()
         self.animating = False
         self._drawn_at = self._now()
@@ -612,7 +618,7 @@ class Stage:
         loaded, unloadable = self._resolve_images(turn, visibility)
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
-        if pending is None and not paged and self._draw_map(turn, loaded):
+        if pending is None and not reading and self._draw_map(turn, loaded):
             self._draw_preferences()
             # The map replaces the stage, so every sprite has left it: drop their
             # playback, or a clip resumes mid-cycle on the far side of the map.
@@ -620,12 +626,12 @@ class Stage:
             self._staged_turn = None
             if editor is not None:
                 self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
-            elif self.pages:
+            elif len(self.pages) > 1 and not self.paged:
                 self._draw_pacing_switch()
             self._present()
             return
         self._draw_background(loaded)
-        if paged:
+        if reading:
             maps = self._pick(loaded, MAP_ROLES)
             plate = (self._plate_surface(turn.plate, maps) if turn.plate else maps[0][1]) if maps else None
             if plate is not None:
@@ -665,8 +671,6 @@ class Stage:
             2 * self.choice_pitch,
             int((bottom - self.prose_top) * self.choice_fraction),
         )
-        if paged:
-            choice_limit = 2 * self.choice_pitch
         choice_height = below * self.choice_pitch
         if pending is None:
             choice_height = min(choice_height, choice_limit)
@@ -715,7 +719,7 @@ class Stage:
             self.choice_scroll = 0
             self._last_turn = turn
         self.scroll = min(max(self.scroll, 0), self.max_scroll)
-        if paged:
+        if reading:
             self._draw_page(width=width, floor=prose_floor)
         else:
             self._draw_rows(rows[self.scroll : self.scroll + capacity], capacity=capacity, width=width)
@@ -735,7 +739,7 @@ class Stage:
             self._draw_choices(choice_rows, top=choices_top, bottom=bottom)
         if editor is not None:
             self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
-        elif self.pages and not paged:
+        elif len(self.pages) > 1 and not self.paged:
             self._draw_pacing_switch()
         self._present()
 
@@ -753,7 +757,8 @@ class Stage:
         self.hitboxes.append((panel, PassagePage()))
         self.prose_rect = pygame.Rect(0, top + 2 * self.row_height, width, 4 * self.row_height)
         self.prose_capacity, self.max_scroll, self.scroll = 4, 0, 0
-        self._draw_rows(page.rows, capacity=4, width=width)
+        # Under the bar, at the same distance on every page, however few rows.
+        self._draw_rows(page.rows, capacity=len(page.rows), width=width)
         bounds = self.text_bounds(panel)
         heading = self.font.render(self._clip(page.heading or "", width=bounds.width), False, RUST)
         # Each header row is backed as the rows beneath it are, so the page's
