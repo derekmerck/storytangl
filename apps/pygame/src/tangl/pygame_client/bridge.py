@@ -861,6 +861,10 @@ class PygameSessionBridge:
             self._append_media(turn, fragment)
             return
 
+        # Narration or a speaker's line alike: one the bar already says is its.
+        if isinstance(fragment, ContentFragment) and self._echoes_status(fragment):
+            return
+
         # AttributedFragment subclasses ContentFragment, so it is checked first.
         if isinstance(fragment, AttributedFragment):
             text = _text(fragment.content)
@@ -881,7 +885,7 @@ class PygameSessionBridge:
 
         if isinstance(fragment, ContentFragment):
             text = _text(fragment.content)
-            if text is not None and not self._echoes_status(fragment):
+            if text is not None:
                 turn.lines.append(Line(text=text, hints=fragment.presentation_hints))
 
     def _echoes_status(self, fragment: ContentFragment) -> bool:

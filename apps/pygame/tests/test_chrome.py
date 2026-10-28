@@ -15,7 +15,7 @@ from tangl.mechanics.sandbox import (
     ChargeFacet, SandboxCompiledAssetType, SandboxLocation, SandboxMap, SandboxScope,
 )
 from tangl.mechanics.sandbox.compact_status import advertise_compact_status, project_compact_status
-from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.journal.fragments import AttributedFragment, ChoiceFragment, ContentFragment
 from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     BrandingValue, InfoAffordance, ProjectedSection, ProjectionRequest, ScalarValue,
@@ -120,17 +120,21 @@ def pick(bridge: PygameSessionBridge, text: str) -> RuntimeEnvelope:
 
 def test_a_line_that_only_restates_the_status_is_left_to_the_bar(hud_world: World) -> None:
     # A world tags a line that says what the status says, `status:<section_id>`.
-    # This bar shows the scene and the day, so those lines are the bar's alone.
-    # A line that names a section the bar does not show, or no section, is the
-    # reader's, and in a world with no status bar, every line is.
+    # This bar shows the scene and the day, so those lines are the bar's alone,
+    # narration or a speaker's. A line that names a section the bar does not
+    # show, or no section, is the reader's, and in a world with no status bar,
+    # every line is.
     said = [("**Workshop**", ["status:scene"]), ("Day 1, morning.", ["status:day", "status:period"]),
             ("Ready to work.", []), ("Rain later.", ["status:day", "status:weather"])]
+    spoken = AttributedFragment(content="Welcome to the Workshop.", who="Guide", how="", media="",
+                                hints=PresentationHints(style_tags=["status:scene"]))
 
     def read(bridge: PygameSessionBridge) -> list[str]:
         fragments = [ContentFragment(content=text,
                                      hints=PresentationHints(style_tags=tags) if tags else None)
                      for text, tags in said]
-        return [line.text for turn in bridge.build_turns(fragments) for line in turn.lines]
+        turns = bridge.build_turns([*fragments, spoken])
+        return [line.text for turn in turns for line in turn.lines]
 
     bridge = PygameSessionBridge()
     bridge.start(hud_world.label)
@@ -142,7 +146,7 @@ def test_a_line_that_only_restates_the_status_is_left_to_the_bar(hud_world: Worl
     try:
         elsewhere = PygameSessionBridge()
         elsewhere.start(plain.label)
-        assert read(elsewhere) == [text for text, _ in said]
+        assert read(elsewhere) == [*(text for text, _ in said), "Welcome to the Workshop."]
     finally:
         pop_manual_world(plain.label)
 

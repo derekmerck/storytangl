@@ -301,7 +301,8 @@ available in details. The client does not parse English
 field names, inspect a graph, compute inventory rules, assume a calendar/daypart
 count, or read the host clock. Unknown icons keep their readable text floor.
 
-A prose line tagged `status:<section_id>` restates that section (#629). When
+A line, narration or a speaker's, tagged `status:<section_id>` restates
+that section (#629). When
 every section it names is one the bar carries -- on any of its pages -- the
 bridge drops the line, so a scene's title or the day is said once, by the bar.
 A line that also names a section the bar does not carry, an untagged line, and
