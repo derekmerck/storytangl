@@ -16,6 +16,7 @@ from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.media import story_media, system_media
 from tangl.mechanics.presence.look.look import HasSimpleLook
 from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.presentation.hints import StagingHints
 from tangl.prose import DialogMuBlock
 from tangl.prose.naming import NamedActor, NamedLocation, ProseBlock, naming_dispatch
 from tangl.prose.portraits import HasPortraits, PackedPortraits, PortraitLook, portrait_dispatch
@@ -155,6 +156,25 @@ def test_actual_journal_emits_following_portraits_with_original_attitudes(world:
     assert ledger.graph.value_hash() == before
     assert all(resource.registry is world.resources.registry
                for resource in world.resources.registry.values())
+
+
+def test_each_lines_portrait_carries_the_worlds_staging_and_keeps_it_restored(
+        world: World) -> None:
+    # A speaker with no staged portrait has no staging to take, so the world
+    # says how a line's portrait is staged -- here, hidden with the viewer's
+    # faces -- and every one a line brings carries it, before and after restore.
+    ledger = make_ledger(world)
+    hints = StagingHints(media_visibility={"preference_id": "portraits", "values": [True]})
+    subject = actor(ledger)
+    subject.portraits = subject.portraits.model_copy(update={"staging_hints": hints})
+    restored = type(ledger.graph).structure(Json.deserialize(Json.serialize(
+        ledger.graph.unstructure())))
+    for graph in (ledger.graph, restored):
+        story = Ledger.from_graph(graph=graph, entry_id=graph.initial_cursor_id)
+        faces = [item for item in do_journal(story.cursor, ctx=prepare(story))
+                 if isinstance(item, MediaFragment) and item.media_role == "dialog_im"]
+        assert len(faces) == 2
+        assert all(face.staging_hints == hints for face in faces)
 
 
 @pytest.mark.parametrize("look", ["everyday", "special"])
