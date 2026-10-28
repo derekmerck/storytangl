@@ -294,10 +294,12 @@ same individual and save/restore without changing identity.
 
 The cast consists of three slots materialized by ordinary templates before UPDATE.
 Opening another file selects another allocated individual; reopening a file does
-not generate a replacement. Each entry declares an explicit seed for its first
-completion using the existing frame RNG. This makes values reproducible across
-independent story identities; receipts prevent reseeding on revisit. Ordinary role
-bindings target completion, and prose/inspection read the actor-owned PersonalName.
+not generate a replacement. Completion consumes the VM-supplied frame RNG without
+reseeding it. Controlled contexts with matching supplied RNG seeds and versioned
+inputs reproduce values and post-draw RNG states; independent story identities can
+have different VM seeds and need not produce matching applicants. Fully authored
+completions and revisits preserve RNG state. Ordinary role bindings target completion,
+and prose/inspection read the actor-owned PersonalName.
 Cold JSON service continuation loads the world/catalog before restoring bank refs.
 
 Appearance and outfit remain Presence facts. Portraits use the existing semantic

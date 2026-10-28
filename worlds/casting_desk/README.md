@@ -38,17 +38,18 @@ creating a user. Its assertions live in the CLI witness harness.
 ## What the bundle demonstrates
 
 `script.yaml` declares all actors, roles, requested dimensions, partial values,
-forms and entry seeds. Ordinary eager template materialization creates the three
+and forms. Ordinary eager template materialization creates the three
 slots before generation. The world domain explicitly adopts the regular-git sample
 pack, adds one compound sprite recipe and publishes its bounded catalog through
 the existing module authority seam. Importing the generic demographics package
 does not adopt this world or load its data.
 
 An explicit world UPDATE handler completes only the current `applicant` role and
-commits the returned `personal_name`, facts and receipt. Each first completion
-seeds the existing frame RNG from its entry block; it adds no RNG stream or stored
-generator. Identical entry seeds and versioned recipes reproduce values across
-independent story identities. Revisits skip completion, including reseeding.
+commits the returned `personal_name`, facts and receipt using the VM-supplied frame
+RNG unchanged. Identical versioned inputs and explicitly supplied RNG seeds reproduce
+values and post-draw RNG states in controlled contexts. Independent stories can
+have different VM seeds because their runtime identities differ; their applicant
+values need not match. Fully authored completions and revisits leave RNG untouched.
 
 Prose's `reference(..., form='full')` and the actor's normal namespace read the
 same actor-owned `PersonalName`. Inspection includes origin, requested profile
@@ -57,7 +58,7 @@ stored. Ordinary JSON service restoration bootstraps the declared world/catalog
 before restoring live bank references and continues play without sampling.
 
 Maintained witnesses cover all three service paths, preserved authored values,
-targeted completion, independent-story determinism, unchanged IDs/receipts on
+targeted completion, controlled-seed reproducibility, unchanged IDs/receipts on
 revisit, current-name prose, no-draw reads, cold JSON restore and cmd2 play.
 
 This is a finite, text-first consumer. Dynamic actor creation, a regenerate button,

@@ -50,9 +50,7 @@ class Applicant(PersonalNamedActor, HasDemographics):
 
 
 class CompleteApplicant(ProseBlock):
-    """An authored entry event, with a reproducible seed for its one applicant."""
-
-    seed: int
+    """An explicit UPDATE entry for one scene-bound applicant."""
 
 
 desk_dispatch = BehaviorRegistry(label="casting_desk.update")
@@ -63,7 +61,6 @@ def complete_applicant(*, caller: CompleteApplicant, ctx: PhaseCtx, **_kwargs: o
     applicant = cast(Applicant, ctx.get_ns()["applicant"])
     if applicant.generation_receipt is not None:
         return
-    ctx.get_random().seed(caller.seed)
     (
         applicant.personal_name, applicant.demographic, applicant.generation_receipt,
     ) = complete_generation(

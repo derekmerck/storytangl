@@ -193,8 +193,8 @@ narrows the original dynamic-creation aspiration to the landed completion contra
 
 **Implemented witnesses:**
 
-- The demo uses declared catalogs only; identical versioned inputs and seed give
-  the same committed cast.
+- The demo uses declared catalogs only. Controlled contexts with identical versioned
+  inputs and matching supplied RNG seeds give the same committed values and RNG state.
 - Namespace/prose forms and inspection refer to the same actor-owned PersonalName.
 - Save/restore retains individuals without regeneration.
 - The world README explains intent and the demonstrated capability; add its line
@@ -203,8 +203,9 @@ narrows the original dynamic-creation aspiration to the landed completion contra
 
 Service choices and cmd2 cover generation/inspection/revisits. Fresh-process JSON
 service restore retains IDs, committed values/receipts and live banks with completion
-disabled. Per-entry authored seeds reproduce values across independent story IDs;
-getters, JOURNAL and completed UPDATE preserve RNG state. Partial names/facts and
+disabled. The world consumes the VM-supplied frame RNG without reseeding; independent
+story IDs can yield different VM seeds and applicant values. Fully authored first
+completion, getters, JOURNAL and completed UPDATE preserve RNG state. Partial names/facts and
 intentional absence survive; the sprite requests no demographic dimensions.
 
 Text completes the initial demo. Runtime actor creation and credentials remain

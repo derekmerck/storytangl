@@ -48,7 +48,6 @@ scenes:
     blocks:
       complete:
         kind: CompleteApplicant
-        seed: 28501
         prose:
           - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
           - text: Ari kept the given name and adult age band already on the form.
@@ -83,7 +82,6 @@ scenes:
     blocks:
       complete:
         kind: CompleteApplicant
-        seed: 28502
         prose:
           - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
           - text: This applicant keeps an authored neutral gender and no family name.
@@ -97,7 +95,6 @@ scenes:
     blocks:
       complete:
         kind: CompleteApplicant
-        seed: 28503
         prose:
           - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
           - text: The sprite's family name joins a seasonal stem to a leafy ending.

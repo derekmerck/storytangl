@@ -15,12 +15,12 @@ from tangl.journal.fragments import ContentFragment
 from tangl.lang.age_range import AgeRange
 from tangl.lang.gens import Gens
 from tangl.lang.personal_name import PersonalName
-from tangl.mechanics.demographics import NameBank
+from tangl.mechanics.demographics import GenerationRequest, NameBank
 from tangl.persistence import PersistenceManagerFactory
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.service import ServiceManager, world_registry
 from tangl.service.response import DirectEdgeRequest, RuntimeEnvelope
-from tangl.story import Actor
+from tangl.story import Actor, Scene
 from tangl.vm import Ledger, ResolutionPhase
 from tangl.vm.dispatch import do_journal, do_update
 from tangl.vm.runtime.frame import PhaseCtx
@@ -128,20 +128,55 @@ def test_service_walkthrough_preserves_authored_values_and_targeted_completion(
     assert "desk closes" in text(choose(manager, user_id, "close"))
 
 
-def test_independent_story_identity_reproduces_values_from_authored_seeds(
+def test_matching_supplied_rng_reproduces_values_and_post_draw_state(
     desk: tuple[ServiceManager, UUID],
 ) -> None:
     manager, user_id = desk
-    complete_cast(manager, user_id)
-    with manager.open_session(user_id=user_id) as session:
-        first = values(session.ledger)
-        first_ids = {applicant(session.ledger, slot).uid for slot in SLOTS}
-    other_id = UUID(manager.create_user(secret="another-casting-reader").details["user_id"])
-    manager.create_story(user_id=other_id, world_id="casting_desk")
-    complete_cast(manager, other_id)
-    with manager.open_session(user_id=other_id) as session:
-        assert values(session.ledger) == first
-        assert {applicant(session.ledger, slot).uid for slot in SLOTS}.isdisjoint(first_ids)
+    world = manager.open_world("casting_desk")
+    results = []
+    for index in range(2):
+        graph = world.create_story(f"controlled-{index}").graph
+        ledger = Ledger.from_graph(graph, entry_id=graph.initial_cursor_id)
+        rng = Random(11)
+        before = rng.getstate()
+        for slot in SLOTS:
+            scene = graph.find_one(Selector(label=slot, has_kind=Scene))
+            block = graph.get(scene.source_id)
+            ctx = PhaseCtx(
+                graph=graph, cursor_id=block.uid, current_phase=ResolutionPhase.UPDATE,
+                random=rng,
+            )
+            do_update(block, ctx=ctx)
+        assert rng.getstate() != before
+        results.append((values(ledger), rng.getstate()))
+    assert results[0] == results[1]
+
+
+@pytest.mark.parametrize("seed", [11, 29])
+@pytest.mark.parametrize("empty_request", [False, True])
+def test_authored_first_completion_preserves_supplied_rng(
+    desk: tuple[ServiceManager, UUID], seed: int, empty_request: bool,
+) -> None:
+    manager, _user_id = desk
+    graph = manager.open_world("casting_desk").create_story("authored").graph
+    ledger = Ledger.from_graph(graph, entry_id=graph.initial_cursor_id)
+    actor = applicant(ledger, "river")
+    actor.personal_name = PersonalName(given_name="Fixed", family_name="Value", title="")
+    actor.demographic.gender = Gens.X_
+    if empty_request:
+        actor.generation_request = GenerationRequest()
+    scene = graph.find_one(Selector(label="river", has_kind=Scene))
+    block = graph.get(scene.source_id)
+    rng = Random(seed)
+    before = rng.getstate()
+    ctx = PhaseCtx(
+        graph=graph, cursor_id=block.uid, current_phase=ResolutionPhase.UPDATE, random=rng,
+    )
+    do_update(block, ctx=ctx)
+    assert actor.generation_receipt.generated == []
+    assert rng.getstate() == before
+    do_update(block, ctx=ctx)
+    assert rng.getstate() == before
 
 
 def test_getters_journal_and_completed_update_preserve_rng_and_read_current_name(
