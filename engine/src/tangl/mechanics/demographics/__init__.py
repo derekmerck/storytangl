@@ -29,9 +29,15 @@ from .packs import (
 )
 from .demographic import DemographicData, HasDemographic, HasDemographics
 from .sampler import DemographicSampler
+from .selection import NameSelection, Origin, name_catalog, select_bank, select_origin
 
 __all__ = [
     "Country",
+    "NameSelection",
+    "Origin",
+    "name_catalog",
+    "select_bank",
+    "select_origin",
     "DemographicData",
     "DemographicSampler",
     "HasDemographic",

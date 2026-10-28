@@ -1,11 +1,17 @@
-import random
+from __future__ import annotations
+
+from collections.abc import Sequence
 import logging
+import random
 from typing import Any
 
-from tangl.lang.gens import Gens as Gender
+from tangl.core import TokenCatalog
 from tangl.lang.age_range import AgeRange
+from tangl.lang.gens import Gens as Gender
+
 from .data_models import Subtype, Country, Region, NameBank
 from .demographic import DemographicData
+from .selection import select_bank
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -155,28 +161,29 @@ class DemographicSampler:
         return age_range
 
     @classmethod
-    def _normalize_nb(cls, namebank: NameBank | str) -> NameBank:
-        if namebank is None:
-            raise KeyError(f'No NameBank provided')
-        if isinstance(namebank, str):
-            passed_str = namebank
-            namebank = NameBank.get_instance(namebank)
-            if namebank is None:
-                raise KeyError(f'No NameBank found for {passed_str}')
-        return namebank
-
-    @classmethod
-    def sample_xx_name(cls, nb: NameBank, rng: Any = None) -> tuple[str, str]:
-        nb = cls._normalize_nb(nb)
-        rand = cls._rand(rng)
+    def sample_xx_name(
+        cls,
+        nb: NameBank | str,
+        *,
+        catalogs: Sequence[TokenCatalog[NameBank]],
+        rng: random.Random,
+    ) -> tuple[str, str]:
+        nb = select_bank(nb, catalogs=catalogs, rng=rng)
+        rand = rng
         given_name = rand.choice(nb.xx_names)
         family_name = rand.choice(nb.surname)
         return given_name, family_name
 
     @classmethod
-    def sample_xy_name(cls, nb: NameBank, rng: Any = None) -> tuple[str, str]:
-        nb = cls._normalize_nb(nb)
-        rand = cls._rand(rng)
+    def sample_xy_name(
+        cls,
+        nb: NameBank | str,
+        *,
+        catalogs: Sequence[TokenCatalog[NameBank]],
+        rng: random.Random,
+    ) -> tuple[str, str]:
+        nb = select_bank(nb, catalogs=catalogs, rng=rng)
+        rand = rng
         if nb.xy_names:
             # Not guaranteed to have male names
             given_name = rand.choice(nb.xy_names)
@@ -188,15 +195,22 @@ class DemographicSampler:
         return given_name, family_name
 
     @classmethod
-    def sample_namebank(cls, nb: NameBank, gender: Gender = None, rng: Any = None) -> tuple[str, str]:
-        nb = cls._normalize_nb(nb)
+    def sample_namebank(
+        cls,
+        nb: NameBank | str,
+        gender: Gender | None = None,
+        *,
+        catalogs: Sequence[TokenCatalog[NameBank]],
+        rng: random.Random,
+    ) -> tuple[str, str]:
+        nb = select_bank(nb, catalogs=catalogs, rng=rng)
         # No name popularity stats, assume gender is 50/50, so no weighted sampling
         gender = cls._normalize_gender(gender, rng=rng)
 
         if gender is Gender.XY:
-            return cls.sample_xy_name(nb, rng=rng)
+            return cls.sample_xy_name(nb, catalogs=catalogs, rng=rng)
 
-        return cls.sample_xx_name(nb, rng=rng)
+        return cls.sample_xx_name(nb, catalogs=catalogs, rng=rng)
 
     @classmethod
     def sample_demographic(
@@ -207,7 +221,10 @@ class DemographicSampler:
         gender: Gender = None,
         age_range: AgeRange = None,
         weighted: bool = True,
-        rng: Any = None,
+        *,
+        catalogs: Sequence[TokenCatalog[NameBank]],
+        rng: random.Random,
+        fallback_bank: str | None = None,
     ) -> DemographicData:
 
         country = (
@@ -230,8 +247,8 @@ class DemographicSampler:
         gender = cls._normalize_gender(gender, weighted=weighted, rng=rng)
         age_range = cls._normalize_age_range(age_range, weighted=weighted, rng=rng)
 
-        nb = country.namebank(subtype)
-        given_name, family_name = cls.sample_namebank(nb, gender=gender, rng=rng)
+        nb = country.namebank(subtype, catalogs=catalogs, fallback_bank=fallback_bank)
+        given_name, family_name = cls.sample_namebank(nb, gender=gender, catalogs=catalogs, rng=rng)
 
         return DemographicData(
             given_name=given_name,

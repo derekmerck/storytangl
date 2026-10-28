@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICE 1 IMPLEMENTED — explicit sample/full loading, pure parsing,
-honest availability, and coverage auditing are implemented. The existing sampler
-remains in use; world-scoped selection, naming, and profile ownership are pending.
+**Status:** SLICES 1–2 IMPLEMENTED — explicit packs, honest availability, scoped
+name-bank catalogs, and origin selection are implemented. Name formation and
+committed profile/name ownership remain pending (slices 3–5).
 **Tracking:** [issue #285](https://github.com/derekmerck/storytangl/issues/285).
 **Execution:** [bounded retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md).
 
@@ -39,8 +39,8 @@ not a promotion of the retired scratch implementations.
 
 The remaining gaps are concrete:
 
-- Pack registration is explicit but still uses process-global Singleton collections.
-  `Country.namebank()` performs global lookup without an explicit world catalog.
+- Definition registration still uses process-global Singleton collections, while
+  name-bank offers and lookup are bounded by explicitly supplied catalogs.
 - Name-bank fields assume female/male given-name pools and a surname. Custom
   species, single names, and compound fairy surnames do not fit naturally.
 - The sample pack deliberately covers only two name banks. Explicit coverage audits
@@ -103,6 +103,41 @@ The world controls correlations. Country, residence, ancestry, naming tradition,
 age, pronouns, appearance, and voice are distinct facts. A fantasy bank need not
 declare a country or ethnicity. Existing geographic distributions remain an
 optional data pack, not mandatory fields for all generated characters.
+
+### Implemented scope/reference shape (slice 2)
+
+`register_pack` returns a `TokenCatalog[NameBank]` with exactly that pack's banks.
+`NameBank.selection_key` uses Core's existing identifier field marker; internal
+identity remains `(class, label)`. Two worlds can offer different internally named
+banks for the same local key. The collision witness passes through actual World,
+GraphFactory/Graph resolution, story materialization, and PhaseCtx catalog access.
+No Core identity, authority, token restoration, or serializer changes are needed.
+
+`name_catalog(*bases, overrides=...)` is explicit naming-offer composition at world
+setup. Overrides replace an offer by local key before the result is published;
+they never mutate a built-in or leave a hidden runtime override map. Conflicting
+base keys and repeated override keys fail. If a world publishes overlapping
+uncomposed catalogs, normal exact-reference ambiguity still fails; list order is
+not a priority system.
+
+`select_bank` uses Selector/TokenCatalog against only the supplied catalogs,
+including when passed a live bank. Exact lookups reject ambiguity. Selector draws
+use stable label/class ordering and the caller's RNG. Pure name samplers require
+explicit catalogs and RNGs; world handlers obtain them from `ctx.get_token_catalogs()`
+and `ctx.get_random()`. No engine layer activates demographics on a world's behalf.
+
+`Origin(label, banks={ref: weight})` is a constructor-form-capable authored value.
+Its explicit mixture validates finite non-negative weights and requires all refs,
+including zero-weight refs, to resolve in scope. Draws exclude zero weights and
+use sorted reference order; a positive eligible total is required. A transient
+`NameSelection` retains the origin and chosen live bank. This is not actor
+materialization or a durable profile/provenance owner.
+
+Country/subtype lookup is exact. A caller can declare `fallback_bank` explicitly,
+resolved in the same scope; bank presence does not change the exact coverage audit.
+Geography sampling is still the historical optional policy, not a requirement on
+custom origins. Actor/name ownership and profile persistence remain the slice 4
+checkpoint.
 
 ## Name formation
 

@@ -6,6 +6,7 @@ from importlib.resources import files
 from pathlib import Path
 import subprocess
 import sys
+from random import Random
 
 from pydantic import ValidationError
 import pytest
@@ -32,7 +33,7 @@ def test_parsing_is_pure_and_repeat_registration_preserves_references(sample: De
     assert (geography, names) == before
     assert parsed == sample
     unrelated = NameBank(label="unrelated_pack_witness", female=["Only"], surname=["Here"])
-    register_pack(parsed)
+    catalog = register_pack(parsed)
     country = Country.get_instance("fra")
     region = Region.get_instance("west_europe")
     bank = NameBank.get_instance("fra")
@@ -42,7 +43,7 @@ def test_parsing_is_pure_and_repeat_registration_preserves_references(sample: De
     assert NameBank.get_instance("fra") is bank
     assert NameBank.get_instance("unrelated_pack_witness") is unrelated
     assert (geography, names) == before
-    assert DemographicSampler.sample_xx_name(bank) in [
+    assert DemographicSampler.sample_xx_name(bank, catalogs=[catalog], rng=Random(7)) in [
         (given, family) for given in names["fra"]["female"] for family in names["fra"]["surname"]
     ]
 
@@ -55,7 +56,8 @@ def test_historical_geography_and_illustrative_pools_are_preserved(sample: Demog
     assert sample.names["fra"].female == ["Marie", "Sophie", "Camille"]
     assert sample.names["jpn"].male == ["Haruto", "Ren", "Yuto"]
     assert set(sample.names) == {"fra", "jpn"}
-    assert Country.get_instance("ago").namebank() is None
+    with pytest.raises(LookupError, match="No eligible NameBank"):
+        Country.get_instance("ago").namebank(catalogs=[register_pack(sample)])
 
 
 def test_coverage_audit_does_not_assume_base_banks_cover_exact_subtypes(sample: DemographicPack) -> None:
@@ -95,6 +97,7 @@ def test_fresh_import_neither_reads_full_pack_nor_registers_definitions(
 import importlib.resources
 from pathlib import Path
 import sys
+from random import Random
 original = importlib.resources.files
 reads = []
 def resources(package):

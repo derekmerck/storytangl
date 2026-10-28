@@ -7,8 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICE 1 IMPLEMENTED — explicit packs and availability witnesses are
-implemented in this change. Slices 2–5 remain planned, with their checkpoints intact.
+**Status:** SLICES 1–2 IMPLEMENTED — explicit packs plus scoped bank and origin
+selection are implemented. Slices 3–5 remain planned; the actor/name ownership
+checkpoint remains open.
 **Contract:** [Demographics design](DEMOGRAPHICS_DESIGN.md).
 **Tracker:** [#285](https://github.com/derekmerck/storytangl/issues/285).
 
@@ -78,6 +79,19 @@ mixture. Geography remains an optional origin policy.
 **Checkpoint before code:** verify the declaration/reference shape against current
 catalog APIs. If they cannot express this scope, bring back the smallest collision
 witness and implicated contract before changing Core.
+
+**Checkpoint result / implemented:** Core identifier fields and explicit bounded
+TokenCatalog offers express the local-key collision without foundational changes.
+`NameBank.selection_key` is a normal identifier; definitions retain unique internal
+labels. `name_catalog` replaces explicit offers before world publication, rather
+than changing factory precedence or shared Singleton values. Pure selection and
+name samplers require explicit scope; world handlers use existing context catalog
+access. `Origin` declares a finite non-negative weighted reference mixture, and a
+transient `NameSelection` preserves the origin and bank. Exact subtype lookup and
+explicit fallback policy remain separate. Tests cover two actual worlds in both
+initialization orders, real story/context access, scoped exact/Selector selection,
+invalid/zero weights, deterministic order, and constructor-form embedding of the
+new origin value. No actor persistence or name-formation refresh is claimed.
 
 ## 3. Generalize the small naming kernel
 
@@ -157,6 +171,6 @@ paths. They are not prerequisites for completing slices 1–4.
 status and the package README then. Record still-desired advanced work as deferred
 follow-ups rather than claiming the whole synthetic-NPC/media problem is solved.
 
-Slice 1 is the implemented boundary. Reassess declaration and name-ownership
+Slices 1–2 are the implemented boundary. Reassess declaration and name-ownership
 checkpoints before their respective slices; this sequence is not permission to
 refactor foundational contracts opportunistically.

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from pydantic import Field
 
-from tangl.core.singleton import Singleton
+from tangl.core import Singleton, TokenCatalog
 
 
 class Subtype(Singleton):
@@ -14,6 +16,10 @@ class Subtype(Singleton):
 
 class NameBank(Singleton):
     """Shared name pools; loading and registration are explicit pack operations."""
+
+    selection_key: str | None = Field(
+        default=None, min_length=1, json_schema_extra={"is_identifier": True},
+    )
 
     xx_names: list[str] = Field(alias="female")
     xy_names: list[str] | None = Field(None, alias="male")
@@ -40,14 +46,25 @@ class Country(Singleton):
     def eth_mix(self) -> dict[Subtype, int]:
         return self.eth_mix_ or self.region.eth_mix
 
-    def namebank(self, subtype: Subtype | str | None = None) -> NameBank | None:
+    def namebank(
+        self,
+        subtype: Subtype | str | None = None,
+        *,
+        catalogs: Sequence[TokenCatalog[NameBank]],
+        fallback_bank: str | None = None,
+    ) -> NameBank:
+        """Resolve the exact country/subtype bank or an explicitly declared fallback."""
+        from .selection import select_bank
+
+        key = self.label
         if subtype:
-            if isinstance(subtype, Subtype):
-                subtype = subtype.label
-            key = f"{self.label}_{subtype}"
-            if bank := NameBank.get_instance(key):
-                return bank
-        return NameBank.get_instance(self.label)
+            key = f"{self.label}_{subtype.label if isinstance(subtype, Subtype) else subtype}"
+        try:
+            return select_bank(key, catalogs=catalogs)
+        except LookupError:
+            if fallback_bank is None:
+                raise
+            return select_bank(fallback_bank, catalogs=catalogs)
 
 
 class Region(Singleton):
