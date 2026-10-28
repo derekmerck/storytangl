@@ -271,9 +271,9 @@ Why it stays:
 
 Current gap:
 
-- lifecycle generation/provenance and real replay remain 4b work; explicit packs,
-  bounded naming, and one owned PersonalName alongside durable profile facts are
-  implemented (slices 1–3 and 4a). Casting Desk remains slice 5.
+- explicit packs, bounded naming, owned names/profiles, and opted-in UPDATE
+  completion/provenance/replay are implemented (slices 1–4). Casting Desk remains
+  slice 5; automatic setup generation and media remain outside this boundary.
 
 The source-local design and retrofit plan live in
 `engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md` and

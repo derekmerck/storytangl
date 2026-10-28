@@ -82,6 +82,8 @@ class DemographicSampler:
             region = cls.sample_region(weighted=weighted, rng=rng)
         elif not isinstance(region, Region):
             region = Region.get_instance(region)
+            if region is None:
+                raise LookupError("Unknown region")
         return region
 
     @classmethod
@@ -117,6 +119,8 @@ class DemographicSampler:
             country = cls.sample_country(region=region, weighted=weighted, rng=rng)
         elif isinstance(country, str):
             country = Country.get_instance(country)
+            if country is None:
+                raise LookupError("Unknown country")
         return country
 
     @classmethod
@@ -124,7 +128,7 @@ class DemographicSampler:
         cls,
         country: Country = None,
         region: Region = None,
-        weighted: bool = False,
+        weighted: bool = True,
         rng: Any = None,
     ) -> Subtype:
         if region:
@@ -134,9 +138,9 @@ class DemographicSampler:
             country = cls._normalize_country(country, weighted=weighted, rng=rng)
             eth_mix = country.eth_mix
         rand = cls._rand(rng)
-        subtype = rand.choices(
-            [*eth_mix.keys()],
-            weights=[*eth_mix.values()], k=1)[0]
+        candidates = sorted(eth_mix, key=lambda value: value.label)
+        subtype = (rand.choices(candidates, weights=[eth_mix[value] for value in candidates], k=1)[0]
+                   if weighted else rand.choice(candidates))
         return subtype
 
     @classmethod
@@ -155,22 +159,24 @@ class DemographicSampler:
             subtype = cls.sample_subtype(country=country, weighted=weighted, rng=rng)
         elif isinstance(subtype, str):
             subtype = Subtype.get_instance(subtype)
+            if subtype is None:
+                raise LookupError("Unknown subtype")
         return subtype
 
     @classmethod
-    def sample_gender(cls, weighted: bool = False, rng: Any = None) -> Gender:
+    def sample_gender(cls, rng: Any = None) -> Gender:
         gender = Gender.pick(rand=cls._rand(rng))
         return gender
 
     @classmethod
-    def sample_age_range(cls, weighted: bool = False, rng: Any = None) -> AgeRange:
-        age_range = cls._rand(rng).choice([*AgeRange.__members__.values()])
+    def sample_age_range(cls, rng: Any = None) -> AgeRange:
+        age_range = cls._rand(rng).choice(list(AgeRange))
         return age_range
 
     @classmethod
-    def _normalize_gender(cls, gender: Gender = None, weighted: bool = True, rng: Any = None) -> Gender:
+    def _normalize_gender(cls, gender: Gender = None, rng: Any = None) -> Gender:
         if not gender:
-            gender = cls.sample_gender(weighted=weighted, rng=rng)
+            gender = cls.sample_gender(rng=rng)
         elif not isinstance(gender, Gender):
             gender = Gender(gender)
         return gender
@@ -179,11 +185,10 @@ class DemographicSampler:
     def _normalize_age_range(
         cls,
         age_range: AgeRange = None,
-        weighted: bool = True,
         rng: Any = None,
     ) -> AgeRange:
         if age_range is None:
-            age_range = cls.sample_age_range(weighted=weighted, rng=rng)
+            age_range = cls.sample_age_range(rng=rng)
         elif not isinstance(age_range, AgeRange):
             age_range = AgeRange(age_range)
         return age_range
@@ -229,6 +234,11 @@ class DemographicSampler:
             else None
         )
 
+        if region is not None and country is not None:
+            region = cls._normalize_region(region, rng=rng)
+            if country.region is not region:
+                raise ValueError("Country and region constraints contradict one another")
+
         if region is None and country is not None:
             region = country.region
         region = cls._normalize_region(region, weighted=weighted, rng=rng)
@@ -240,8 +250,8 @@ class DemographicSampler:
             weighted=weighted,
             rng=rng,
         )
-        gender = cls._normalize_gender(gender, weighted=weighted, rng=rng)
-        age_range = cls._normalize_age_range(age_range, weighted=weighted, rng=rng)
+        gender = cls._normalize_gender(gender, rng=rng)
+        age_range = cls._normalize_age_range(age_range, rng=rng)
 
         return DemographicData(
             region=region,

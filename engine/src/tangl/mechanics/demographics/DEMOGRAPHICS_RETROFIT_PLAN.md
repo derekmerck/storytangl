@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–3 AND 4a IMPLEMENTED — naming and durable Actor/profile
-composition are implemented. Slice 4 is split: 4b lifecycle generation/provenance
-and real replay remain planned, as does Casting Desk (5). Full slice 4 is not complete.
+**Status:** SLICES 1–4 IMPLEMENTED (UPDATE completion) — naming and durable Actor/profile
+composition are implemented. Slice 4 supports explicit UPDATE completion; automatic setup generation is not
+installed. Casting Desk (5) remains planned.
 **Contract:** [Demographics design](DEMOGRAPHICS_DESIGN.md).
 **Tracker:** [#285](https://github.com/derekmerck/storytangl/issues/285).
 
@@ -124,7 +124,7 @@ without changing data bytes or multiplicity. Tiny fixtures prove formation,
 substitutions, invalid declarations, fixed-RNG weighted/unweighted draws, owned
 value JSON constructor form, and real-world catalog/origin use. The read-only full
 bank audit verifies its recorded hash and all original pools/maps. Geographic
-profile/name ownership is resolved below in 4a; lifecycle generation remains 4b.
+profile/name ownership is resolved in 4a; UPDATE lifecycle generation is implemented in 4b.
 
 ## 4a. One name owner and durable Actor/profile composition — implemented
 
@@ -155,12 +155,12 @@ projects current personal-name symbols through normal namespace contribution.
 Pure APIs are separate: sample_name returns PersonalName; sample_demographic returns
 facts only. Neither automatically materializes an individual.
 
-## 4b. Sample missing facts at the lifecycle boundary — planned
+## 4b. Sample missing facts at the lifecycle boundary — implemented for UPDATE
 
 **Capability:** preserve authored inputs, generate missing facts once at normal
 setup/UPDATE boundaries, and retain committed results/provenance through replay.
 
-**Remaining witnesses / full slice 4 acceptance:**
+**Implemented UPDATE acceptance:**
 
 - Pinned fields win; only missing values consume RNG under a settled budget.
   Contradictory geographic constraints and uncovered required naming selections
@@ -176,7 +176,7 @@ setup/UPDATE boundaries, and retain committed results/provenance through replay.
   restore/replay, actual committed values, and preserved authored facts.
 
 4a's graph/JSON witnesses do not claim lifecycle generation or ledger replay.
-Reassess the generation/provenance contract before 4b implementation; no parallel
+The UPDATE generation/provenance contract is implemented below; no parallel
 NPC/token factory or global rollback policy is implied.
 
 ## 5. Ship a small Casting Desk consumer
@@ -208,6 +208,27 @@ paths. They are not prerequisites for completing slices 1–4.
 status and the package README then. Record still-desired advanced work as deferred
 follow-ups rather than claiming the whole synthetic-NPC/media problem is solved.
 
-Slices 1–3 and 4a are the implemented boundary. Reassess the generation/provenance
-checkpoint before 4b; this sequence is not permission to
+Slices 1–4 are implemented at the explicit UPDATE boundary; this sequence is not permission to
 refactor foundational contracts opportunistically.
+
+## Slice 4b implementation status
+
+Explicit UPDATE completion is implemented for already template-materialized actors.
+`GenerationRequest` declares requested facts and durable per-part fill/absence flags;
+`GenerationReceipt` commits completion plus selected live bank/form/revision and
+generated field names, never another name value. `complete_generation` returns
+name, facts and receipt for a normal opted-in world UPDATE handler to assign.
+There is no automatic setup/construction generator.
+
+Only requested missing values draw, in region/country/subtype/gender/age/bank/given/family
+order with sorted candidates. Explicit request flags preserve intentional absence
+across constructor form; model_fields_set alone is not durable presence metadata.
+Age aliases have one slot per value; unsupported gender/age weighting flags are
+removed. Scoped bank/form and pinned geographic constraints validate before drawing.
+
+Actual UPDATE traversal, pre-event deterministic re-execution, recorded diff replay,
+renamed committed-state continuation and fresh-process JSON restore are separate
+witnesses. The existing actor identity is reused, so no new UUID scheme or factory
+is needed. Dynamic actor creation inside this helper and automatic setup generation
+are unsupported; Casting Desk (5), media and global rollback remain outstanding.
+See README for exact vocabulary, draw order, and receipt/revision semantics.

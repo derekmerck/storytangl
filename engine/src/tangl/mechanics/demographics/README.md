@@ -31,7 +31,7 @@ It provides:
 - Naming requires an explicit RNG, form, and catalog scope. Historical geography
   helpers retain their existing optional RNG policy.
 - Slices 1–3 and 4a (one name owner plus durable profile/Actor composition) are
-  implemented. Lifecycle generation/replay (4b) and Casting Desk (5) remain planned. See the
+  implemented. Explicit UPDATE completion (4b) is implemented; Casting Desk (5) remains planned. See the
   [design contract](DEMOGRAPHICS_DESIGN.md) and
   [staged retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md), tracked by
   [issue #285](https://github.com/derekmerck/storytangl/issues/285).
@@ -84,7 +84,7 @@ name = DemographicSampler.sample_name(
 - Definition registration remains process-global and sequential; conflicting values
   fail rather than mutating a Singleton. Catalog offers and bank selection are
   explicitly scoped. Transactional replacement is not implemented. Actor/name
-  ownership is settled in 4a; lifecycle generation and replay remain the 4b checkpoint.
+  ownership is settled in 4a; the supported 4b UPDATE boundary is documented below.
 
 ## Scoped banks and origins
 
@@ -141,14 +141,14 @@ from the draw. Reference order is sorted before drawing. `NameSelection` is a
 transient receipt retaining the original origin and selected live bank, so two
 origins can borrow one bank without losing their labels. An origin can be embedded
 through the existing constructor-form field marker; no custom serialization is used.
-Committing generation provenance remains slice 4b.
+Committed UPDATE generation provenance is documented in the 4b section below.
 
 Country lookup requests the exact `country_subtype` reference when a subtype is
 present. `fallback_bank="fra"` above is a deliberate caller policy, not a statement
 that the sample bank covers every French subtype. Fallback references must also
 be offered by the supplied catalogs. Historical geography sampling remains the
 existing optional policy; constraint/age-alias corrections and generation policy
-remain 4b work. Custom bank/origin selection needs no country or ethnicity.
+are handled by the explicit 4b UPDATE policy below. Custom bank/origin selection needs no country or ethnicity.
 
 ## Name formation (slice 3)
 
@@ -259,14 +259,65 @@ catalogs/world authorities before fresh-process restore. No sampler runs during
 construction, namespace reads, rendering, or restore. There is no automatic world
 activation, custom serializer, NPC factory, or name-sync bridge.
 
-4a supplies durable composition, not missing-facts policy. Partial authored-fact
-merge/RNG budgeting, geographic contradictions, age-alias weighting, generation
-provenance/revisions, setup/UPDATE integration, and exactly-once generation through
-real ledger replay remain **4b**. NameBank/origin generation provenance is not added
-to the profile here. Casting Desk and media remain later work. Full slice 4 is not
-complete.
+4a supplies durable composition. The explicit UPDATE policy below implements 4b;
+this does not install automatic setup generation. NameBank/origin provenance is
+recorded in the separate completion receipt, not duplicated into the facts profile.
+Casting Desk and media remain later work.
 
-## Credits
+## Explicit UPDATE completion (slice 4b)
 
-The name bank was primarily compiled from the FreeCities Twine game. Additional
-demographic data such as populations and demonyms were scraped from the web.
+Worlds opt in by declaring an owned `GenerationRequest` and optional
+`GenerationReceipt` on their actor, with `unstructurable=True` owning-field markers
+(and `include=True` for the receipt). In an ordinary world `apply_update` handler,
+commit the tuple returned by the one supported entry point:
+
+```python
+from tangl.mechanics.demographics import complete_generation
+# In an opted-in world UPDATE handler, with its explicit actor and PhaseCtx:
+# actor.personal_name, actor.demographic, actor.generation_receipt = complete_generation(
+#     actor.generation_request, personal_name=actor.personal_name,
+#     demographic=actor.demographic, receipt=actor.generation_receipt, ctx=ctx,
+# )
+```
+
+Actors are materialized through normal templates **before** this helper fills them.
+UPDATE is supported; automatic setup/construction generation is not installed.
+There is no global actor scan or automatic dispatch registration. Worlds that do
+not call the helper remain unchanged.
+
+`GenerationRequest(facts={"gender", "age_range"}, name_parts={"given_name": True,
+"family_name": False}, bank="fra", form="female")` requests only those dimensions.
+For name parts, true means fill if the value is None; false leaves the part alone,
+including intentional absence, and omitted keys request nothing. Encode intentional absence in the request,
+not `model_fields_set`: constructor form elides explicitly set default None values.
+A recipe with an absent family part never invents one. Non-None authored components,
+titles, aliases, ordering, and prose overrides are preserved.
+
+Choose an exact bank (optionally an explicit scoped fallback) or an `Origin` mixture.
+Required references and forms are checked before drawing; country/region contradictions fail.
+Bank selection stays within ctx catalogs. Fully pinned names do not draw from an
+unused mixture. Facts are independent: a mononym request need not request geography,
+gender, or age. Missing subtype requests require geographic constraints.
+
+Draw order is region, country, subtype, gender, age, bank mixture, given, family.
+Geographic and subtype candidates are label-sorted; region/country population
+weighting is controlled by `population_weighted`. Subtypes use the declared mixture;
+gender retains the existing uniform XX/XY policy; age is uniform over unique enum
+values, including OTHER. No empirical gender/age weights are invented. The old
+unused gender/age `weighted` switches are removed; subtype's switch now works.
+
+The helper returns detached proposed values and a completion receipt for one normal
+world UPDATE assignment. No global transaction/recovery contract is added. A receipt
+makes every later call a no-op, including after author rename. It records generated
+field names, selected origin, live bank, form, and definition revision (None when
+unknown), without copying the authoritative name. NameBank.revision comes directly
+from pack metadata or an authored world recipe, never its identity hash.
+
+Replay has two distinct meanings: recorded diff replay reapplies actual values and
+IDs without executing generation; re-execution from the same pre-event graph runs
+the original deterministic draws once. Tests prove identical actor state, graph
+hash and observed RNG state, followed by committed-state no-op continuation. JSON
+fresh-process restore bootstraps declared world/catalogs first and makes no name
+sampling calls. Dynamic creation of new actors during the helper, automatic setup
+hooks, global rollback and hot reload are not supported. Casting Desk/media remain
+slice 5 and later work.
