@@ -357,6 +357,49 @@ def test_terminal_menu_and_media_only_output_stay_reachable(exchange) -> None:
     stage.draw(stage._presentation_frame)
 
 
+def test_an_image_that_cannot_be_drawn_is_captioned_once_and_on_a_map_too(
+        exchange, tmp_path: Path, monkeypatch) -> None:
+    # A failed image leaves its caption on the page it arrives on, and a page
+    # with no text that still stages it does not repeat it. A map footer
+    # captions one too, rather than dropping it.
+    world, _, _, _, _, stage = exchange
+    root = world.resources.resource_path
+    room = StageImage("narrative_im", str(root / "room1.png"))
+    failed = StageImage("avatar_im", str(tmp_path / "missing.png"), alt_text="A guide waits.")
+    frame = Turn(step=3, images=[room, failed], lines=[Line("Last.")],
+                 choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(frame, [Turn(step=1, images=[room, failed], lines=[Line("First.")]),
+                          Turn(step=2, images=[room, failed]),
+                          Turn(step=3, images=[room, failed], lines=[Line("Last.")])])
+    captions: list[str] = []
+    rows = stage._rows
+
+    def spy(*args, **kwargs):
+        found = rows(*args, **kwargs)
+        captions.extend(row.text for row in found if row.kind == "alt")
+        return found
+
+    monkeypatch.setattr(stage, "_rows", spy)
+    shown = []
+    for index, page in enumerate(stage.pages):
+        stage.page_index = index
+        captions.clear()
+        stage.draw(frame)
+        shown.append(bool(captions) or any(row.kind == "alt" for row in page.rows))
+    assert shown.count(True) == 1
+
+    plate = StageImage("map_im", str(root / "room1.png"))
+    choice = Choice(uuid4(), "Go there", tags=frozenset({"ui:plate:test:place"}))
+    atlas = Turn(step=4, images=[plate, failed], choices=[choice],
+                 plate=MapPlate("test", plate.source, (MapRegion("place", .1, .1, .2, .2),)))
+    stage.paged = False
+    stage.present(atlas, [atlas])
+    captions.clear()
+    stage.draw(atlas)
+    assert captions == ["A guide waits."]
+
+
 def test_maps_and_typed_choices_are_gated_until_end(exchange) -> None:
     world, _, _, _, bridge, stage = exchange
     image = StageImage(role="map_im", source=str(world.resources.resource_path / "room1.png"))

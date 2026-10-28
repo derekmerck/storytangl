@@ -617,9 +617,12 @@ class Stage:
         self._drawn_at = self._now()
         visibility = media_visibility or {}
         loaded, unloadable = self._resolve_images(turn, visibility)
+        # A whole frame captions each image it cannot draw. A page among several
+        # captions none: each was captioned on the page it arrived on (`present`).
+        captioned = [] if paged and len(self.pages) > 1 else unloadable
         # A map is a way to travel, not a way to pick a document; while a
         # selection is open the plate would offer edges that are not on offer.
-        if pending is None and not reading and self._draw_map(turn, loaded):
+        if pending is None and not reading and self._draw_map(turn, loaded, captioned):
             self._draw_preferences()
             # The map replaces the stage, so every sprite has left it: drop their
             # playback, or a clip resumes mid-cycle on the far side of the map.
@@ -702,7 +705,7 @@ class Stage:
         prose_floor = self.prose_floor
         rows = self._rows(
             turn,
-            unloadable,
+            captioned,
             pixel_width=self.text_bounds(stage_rect, clearance=self.prose_wrap_clearance).width,
         )
         capacity = max(1, (prose_floor - self.prose_top) // self.row_height)
@@ -850,7 +853,8 @@ class Stage:
     # ── map view ─────────────────────────────────────────────────────────
 
     def _draw_map(
-        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]]
+        self, turn: Turn, loaded: list[tuple[StageImage, pygame.Surface]],
+        captioned: list[StageImage],
     ) -> bool:
         """Draw the plate with a hitbox per claimed region. False when no map.
 
@@ -873,7 +877,7 @@ class Stage:
         for index, choice, region in claimed:
             self._draw_region(index, choice, region)
 
-        self._draw_map_footer(turn)
+        self._draw_map_footer(turn, captioned)
         return True
 
     @staticmethod
@@ -964,7 +968,7 @@ class Stage:
         if action is not None:
             self.hitboxes.append((rect, action))
 
-    def _draw_map_footer(self, turn: Turn) -> None:
+    def _draw_map_footer(self, turn: Turn, captioned: list[StageImage]) -> None:
         """Narration and the full numbered legend, bounded and pageable.
 
         Every choice appears here, including ones that already have a box on
@@ -977,7 +981,7 @@ class Stage:
         the only way to continue, are what a fresh turn shows.
         """
 
-        rows = self._rows(turn, [], columns=74)
+        rows = self._rows(turn, captioned, columns=74)
         rows.extend(
             _Row(self._choice_label(index, choice), "choice")
             for index, choice in enumerate(turn.choices, start=1)
