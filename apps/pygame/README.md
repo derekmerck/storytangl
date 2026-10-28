@@ -180,6 +180,44 @@ That number is the old fit-to-`112` mechanism's own: it is the height at which
 that mechanism used to start shrinking. The shipped demo art is conformed to
 exactly 112, so it is unaffected either way.
 
+**Where a staged image stands, what covers it, and who sizes it.** Pygame
+reads `staging_hints` through these rules (`Stage._place_x`, `_slot_y`,
+`_draw_staged`, `_draw_portraits`):
+
+- **A fraction is an anchor, not an edge.** `media_x` is where the image's
+  horizontal *centre* sits across the logical stage, and `media_y` is where its
+  *bottom* sits down it: a figure stands on something, so its baseline is what
+  a placement is about. The same anchor is used for sprite-sheet frames.
+  Fractions are honoured exactly and never clamped; off-stage is a real
+  position, as in an entrance sliding in from -0.5.
+- **A name is a request, read this client's way.** For `left` and `right`, the
+  image's edge stands the staging `gutter` (10 logical pixels, ×density) in from
+  that side; `mid`, and any name pygame doesn't know, centres it. Vertically,
+  `top` is a gutter down, `mid` centres it above the floor, and `bottom`, the
+  default, stands it on the floor. Only names are held on screen, under
+  `keep_on_screen` or an image's own `media_keep`, never fractions. A world that
+  doesn't know an image's size should give a name, not a number.
+- **Without a placement:** a staged figure centres on the floor. Portraits take
+  stations by arrival: `left`, `right`, then `mid` for the third. Pygame draws
+  at most three portraits and twelve staged figures.
+- **Draw order is a painter's algorithm:**
+  1. The background fills the surface.
+  2. Staged figures (`staged_im`), nearest last. Nearness is the *resolved*
+     baseline, the bottom of the placed box, so a name and a fraction compete
+     on the same terms. Ties keep arrival order, so a room of people on one
+     floor doesn't shuffle.
+  3. Portraits (`avatar_im` and `dialog_im`), in arrival order. They are always
+     in front of the staged figures, and not depth-sorted among themselves.
+  4. Text, choices and chrome over all of it.
+- **The client never scales for depth or for the author.** A staged figure is
+  drawn at its natural pixel size, so whoever packed it has already baked in
+  how near it stands and any resize the author chose. A portrait is drawn at
+  natural size too, except for the one ceiling above, which only ever shrinks
+  it. Mirroring (`media_flip_h`) flips the image before it is placed, so a
+  turned figure keeps its anchor. Backgrounds and map plates are the only
+  images scaled, and they fill the logical surface. The window then scales
+  the whole surface by an integer, nearest-neighbour.
+
 **Every click resolves to an `edge_id`.** The input layer never commits a
 bespoke action, so a map hotspot produces the same payload as selecting the
 numbered choice (widget vocabulary §5.3, Input Parity). That is now exercised
