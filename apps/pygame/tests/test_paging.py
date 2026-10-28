@@ -38,6 +38,17 @@ class PagingSpeaker(HasPortraits, NamedActor):
     pass
 
 
+ROOM = (0, 0, 128)
+"""The fixture's first room, solid navy, so any other colour over it is drawn."""
+
+
+def _washed(stage: Stage, y: int) -> tuple[int, int] | None:
+    """The first and last columns drawn over the room on one pixel row."""
+    columns = [x for x in range(stage.logical_size[0])
+               if tuple(stage.surface.get_at((x, y)))[:3] != ROOM]
+    return (columns[0], columns[-1]) if columns else None
+
+
 @pytest.fixture(params=[1, 2], ids=["320", "640"])
 def exchange(request: pytest.FixtureRequest, tmp_path: Path):
     density = request.param
@@ -127,7 +138,7 @@ def test_actual_journal_pairs_portraits_groups_compatible_lines_and_exposes_face
             expected_colour = {"happy.png": (0, 255, 0), "dry.png": (255, 0, 0),
                                "base.png": (255, 255, 0)}[Path(image.source).name]
             assert tuple(stage.surface.get_at(point))[:3] == expected_colour
-            assert point[1] < stage.prose_rect.top - 2 * stage.row_height
+            assert point[1] < stage.prose_rect.top - stage.row_height
         assert len(page.rows) <= 4
     stage.page(PassagePage(-1))
     stage.draw(frame)
@@ -143,24 +154,97 @@ def test_actual_journal_pairs_portraits_groups_compatible_lines_and_exposes_face
 
 
 def test_page_header_is_washed_to_the_margins_of_the_rows_beneath_it(exchange) -> None:
-    # Both header rows, the page controls and the speaker, span exactly the
-    # columns the page's text washes over, as the scrolling header does.
+    # The bar, the speaker and the page's controls, spans exactly the columns
+    # the page's text washes over, as the scrolling header does.
     _, _, _, envelope, bridge, stage = exchange
     frame = _frame(bridge, envelope)
     stage.paged = True
     stage.present(frame, visual_passages(bridge, envelope))
     stage.draw(frame)
-    room = (0, 0, 128)
-
-    def washed(y: int) -> tuple[int, int]:
-        columns = [x for x in range(stage.logical_size[0])
-                   if tuple(stage.surface.get_at((x, y)))[:3] != room]
-        return columns[0], columns[-1]
-
     pitch = stage.row_height
-    header = stage.prose_rect.top - 2 * pitch
-    assert washed(header + pitch // 2) == washed(header + 3 * pitch // 2) \
-        == washed(stage.prose_rect.bottom - pitch // 2)
+    assert _washed(stage, stage.prose_rect.top - pitch // 2) \
+        == _washed(stage, stage.prose_rect.top + pitch // 2)
+
+
+def test_a_page_reads_from_just_under_its_bar_however_few_its_rows(exchange) -> None:
+    # The first row sits under the bar on every page, so the bar and the text
+    # keep one distance as a reader turns them, two rows or one.
+    _, _, _, envelope, bridge, stage = exchange
+    frame = _frame(bridge, envelope)
+    stage.paged = True
+    stage.present(frame, visual_passages(bridge, envelope))
+    assert [len(page.rows) for page in stage.pages] == [2, 1, 1]
+    for index, page in enumerate(stage.pages):
+        stage.page_index = index
+        stage.draw(frame)
+        # The rows' left edge, where no figure stands: washed where a row is.
+        left, _ = _washed(stage, stage.prose_rect.top - stage.row_height)
+        washed = [tuple(stage.surface.get_at((left, stage.prose_rect.top + row * stage.row_height
+                                             + stage.row_height // 2)))[:3] != ROOM
+                  for row in range(4)]
+        assert washed == [row < len(page.rows) for row in range(4)]
+
+
+def test_narration_reads_from_the_row_under_the_bar_with_no_blank_speaker_row(exchange) -> None:
+    # The speaker shares the bar with the page's controls, so a page nobody
+    # speaks on starts its text on the next row, as a dialog page does.
+    world, _, _, _, _, stage = exchange
+    room = StageImage("narrative_im", str(world.resources.resource_path / "room1.png"))
+    first = Turn(step=1, images=[room], lines=[Line("The platform is crowded.")])
+    last = Turn(step=2, images=[room], lines=[Line("Somebody waves.")],
+                choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(last, [first, last])
+    stage.draw(last)
+    # Each control's own glyph rectangle, not the whole panel that also advances.
+    bar = {rect.y for rect, action in stage.hitboxes
+           if isinstance(action, (PassagePage, TogglePacing)) and rect.height <= stage.row_height}
+    assert bar == {stage.prose_rect.top - stage.row_height}
+    left, _ = _washed(stage, stage.prose_rect.top - stage.row_height)
+    assert tuple(stage.surface.get_at((left, stage.prose_rect.top + 1)))[:3] != ROOM
+
+
+def test_a_one_page_response_draws_every_passage_it_combined(exchange, monkeypatch) -> None:
+    # Two passages that fit together make one page. Drawn as it would scroll,
+    # that page is the whole frame: the second passage's text is not lost.
+    _, _, _, _, _, stage = exchange
+    first, second = Line("The first sentence."), Line("The second sentence.")
+    frame = Turn(step=1, lines=[first, second], choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(frame, [Turn(step=1, lines=[first]), Turn(step=1, lines=[second])])
+    assert len(stage.pages) == 1
+    drawn: list[str] = []
+    draw_rows = stage._draw_rows
+    monkeypatch.setattr(stage, "_draw_rows", lambda rows, **kwargs: (
+        drawn.extend(row.text for row in rows), draw_rows(rows, **kwargs)))
+    stage.draw(frame)
+    assert drawn == ["The first sentence.", "The second sentence."]
+
+
+def test_nothing_to_page_draws_no_bar_and_keeps_the_whole_menu(exchange) -> None:
+    # A plate, an encounter, or a menu that fits on one page has nothing to
+    # turn: no bar, no switch, and its choices get the room they get scrolling.
+    world, _, _, _, _, stage = exchange
+    root = world.resources.resource_path
+    choices = [Choice(uuid4(), f"Choice {index}") for index in range(12)]
+    plate = Turn(step=1, images=[StageImage("narrative_im", str(root / "room1.png"))],
+                 choices=choices[:1])
+    menu = Turn(step=1, images=[StageImage("narrative_im", str(root / "room1.png"))],
+                lines=[Line("Day 3, morning.")], choices=choices)
+
+    def controls() -> list[object]:
+        return [action for _, action in stage.hitboxes
+                if isinstance(action, (PassagePage, TogglePacing))]
+
+    capacities = {}
+    for paged in (False, True):
+        stage.paged = paged
+        for turn in (plate, menu):
+            stage.present(turn, [turn])
+            stage.draw(turn)
+            assert controls() == [] and stage.choices_ready
+        capacities[paged] = stage.choice_capacity
+    assert capacities[True] == capacities[False] > 2
 
 
 def test_multi_room_batch_does_not_reveal_future_staging_and_skip_matches_fold(exchange) -> None:
@@ -271,6 +355,49 @@ def test_terminal_menu_and_media_only_output_stay_reachable(exchange) -> None:
     stage.present(Turn(step=3, choices=choices), [])
     assert len(stage.pages) == 1 and stage.choices_ready
     stage.draw(stage._presentation_frame)
+
+
+def test_an_image_that_cannot_be_drawn_is_captioned_once_and_on_a_map_too(
+        exchange, tmp_path: Path, monkeypatch) -> None:
+    # A failed image leaves its caption on the page it arrives on, and a page
+    # with no text that still stages it does not repeat it. A map footer
+    # captions one too, rather than dropping it.
+    world, _, _, _, _, stage = exchange
+    root = world.resources.resource_path
+    room = StageImage("narrative_im", str(root / "room1.png"))
+    failed = StageImage("avatar_im", str(tmp_path / "missing.png"), alt_text="A guide waits.")
+    frame = Turn(step=3, images=[room, failed], lines=[Line("Last.")],
+                 choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(frame, [Turn(step=1, images=[room, failed], lines=[Line("First.")]),
+                          Turn(step=2, images=[room, failed]),
+                          Turn(step=3, images=[room, failed], lines=[Line("Last.")])])
+    captions: list[str] = []
+    rows = stage._rows
+
+    def spy(*args, **kwargs):
+        found = rows(*args, **kwargs)
+        captions.extend(row.text for row in found if row.kind == "alt")
+        return found
+
+    monkeypatch.setattr(stage, "_rows", spy)
+    shown = []
+    for index, page in enumerate(stage.pages):
+        stage.page_index = index
+        captions.clear()
+        stage.draw(frame)
+        shown.append(bool(captions) or any(row.kind == "alt" for row in page.rows))
+    assert shown.count(True) == 1
+
+    plate = StageImage("map_im", str(root / "room1.png"))
+    choice = Choice(uuid4(), "Go there", tags=frozenset({"ui:plate:test:place"}))
+    atlas = Turn(step=4, images=[plate, failed], choices=[choice],
+                 plate=MapPlate("test", plate.source, (MapRegion("place", .1, .1, .2, .2),)))
+    stage.paged = False
+    stage.present(atlas, [atlas])
+    captions.clear()
+    stage.draw(atlas)
+    assert captions == ["A guide waits."]
 
 
 def test_maps_and_typed_choices_are_gated_until_end(exchange) -> None:

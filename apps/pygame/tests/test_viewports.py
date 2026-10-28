@@ -230,7 +230,7 @@ def test_text_regions_bound_attribution_controls_and_align_backing(
     assert (region.width < stage.logical_size[0]) is narrow
     if paged:
         assert clipped and stage.font.size(clipped[0])[0] <= region.width - 2 * stage.row_text_left
-    header_y = region.top - 2 * stage.row_height if paged else stage.prose_top
+    header_y = region.top - stage.row_height if paged else stage.prose_top
     header = next(rect for rect in washes if rect.top == header_y and rect.right <= region.right)
     bodies = [rect for rect in washes if region.top <= rect.top < region.bottom
               and rect.right <= region.right]
