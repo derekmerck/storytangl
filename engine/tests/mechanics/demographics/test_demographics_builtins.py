@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 from random import Random
+from uuid import uuid4
 
 from pydantic import ValidationError
 import pytest
@@ -189,3 +190,52 @@ def test_optional_full_pack_is_valid_or_truly_unavailable() -> None:
     # Audit real coverage instead of xfail-ing selected countries or fabricating banks.
     assert all(country in {c.id for r in pack.regions.values() for c in r.countries.values()}
                for country, _subtype in pack.uncovered_subtypes())
+
+
+@pytest.mark.parametrize("mutation", ["candidates", "substitutions", "weights", "form"])
+def test_registration_owns_recipe_values_independently_of_parsed_pack(mutation: str) -> None:
+    label = f"registration_ownership_{uuid4().hex}"
+    pack = load_pack("sample")
+    shared_given = NamePart(pool=NamePool(candidates=["Never", "Original"], weights=[0, 1]))
+    shared_family = NamePart(
+        pool=NamePool(candidates=["Base"]), substitutions={"Base": "Family"},
+    )
+    pack.names = {label: {
+        "plain": NameForm(given=shared_given, family=shared_family),
+        "other": NameForm(given=shared_given, family=shared_family),
+    }}
+    before = deepcopy(pack.names)
+    catalog = register_pack(pack)
+    bank = NameBank.get_instance(label)
+    assert pack.names == before
+    repeated = register_pack(pack)
+    assert next(repeated.find_all()) is bank
+    assert next(catalog.find_all()) is bank
+    original_output = DemographicSampler.sample_name(
+        bank, form="plain", catalogs=[catalog], rng=Random(7),
+    ).full_name()
+    assert original_output == "Original Family"
+
+    recipe = pack.names[label]["plain"]
+    if mutation == "candidates":
+        recipe.given.pool.candidates[:] = ["Changed", "Corrupt"]
+    elif mutation == "substitutions":
+        recipe.family.substitutions["Base"] = "Changed"
+    elif mutation == "weights":
+        recipe.given.pool.weights[:] = [1, 0]
+    else:
+        pack.names[label]["plain"] = NameForm(given=NamePart(
+            pool=NamePool(candidates=["Changed"]),
+        ))
+
+    assert bank.forms == before[label]
+    assert DemographicSampler.sample_name(
+        bank, form="plain", catalogs=[catalog], rng=Random(7),
+    ).full_name() == original_output
+    with pytest.raises(ValueError, match="Conflicting NameBank"):
+        register_pack(pack)
+    assert next(catalog.find_all()) is bank
+    assert bank.forms == before[label]
+    assert bank.forms["plain"].given is bank.forms["other"].given
+    assert bank.forms["plain"].given is not shared_given
+    assert bank.forms["plain"].family is not shared_family

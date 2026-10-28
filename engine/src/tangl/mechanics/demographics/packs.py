@@ -5,6 +5,7 @@ identical definitions and rejects conflicting labels; it never clears a registry
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from importlib.resources import files
 from typing import Literal
@@ -155,6 +156,7 @@ def register_pack(pack: DemographicPack) -> TokenCatalog[NameBank]:
     """Install explicit definitions, reusing equal values and rejecting collisions.
 
     Definitions are compared as local field snapshots, never as persistence forms.
+    New banks own a copy of the recipe tree, independent of the editable pack.
     Return a bounded catalog containing exactly this pack's name-bank definitions.
     """
 
@@ -202,7 +204,7 @@ def register_pack(pack: DemographicPack) -> TokenCatalog[NameBank]:
     for label, forms in pack.names.items():
         bank = NameBank.get_instance(label)
         if bank is None:
-            bank = NameBank(label=label, forms=forms)
+            bank = NameBank(label=label, forms=deepcopy(forms))
         elif bank.forms != forms or bank.selection_key is not None:
             raise ValueError(f"Conflicting NameBank definition: {label!r}")
         banks.append(bank)
