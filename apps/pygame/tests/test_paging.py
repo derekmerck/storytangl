@@ -113,6 +113,54 @@ def exchange(request: pytest.FixtureRequest, tmp_path: Path):
     pygame.quit()
 
 
+def test_an_unstationed_speakers_face_follows_the_preference_its_world_declares(
+        tmp_path: Path) -> None:
+    # Rin is staged; Mia speaks with no portrait on stage to take staging from.
+    # Their world says each line's portrait hides with the `faces` preference,
+    # so with faces off neither shows, and with faces on Mia's does, too.
+    for name, colour in (("room", "navy"), ("rin", "yellow"), ("mia", "green")):
+        image = pygame.Surface((48, 112) if name != "room" else (320, 200))
+        image.fill(colour)
+        pygame.image.save(image, str(tmp_path / f"{name}.png"))
+    resources = ResourceManager(tmp_path)
+    resources.index_directory(".")
+    hide = {"media_visibility": {"preference_id": "faces", "values": [True]}}
+    classes = {"PagingSpeaker": PagingSpeaker, "ProseBlock": ProseBlock}
+    script = {"label": "unstationed_faces", "metadata": {
+        "start_at": "s.one", "stage_extent": {"width": 320, "height": 200},
+        "ui_preferences": [{"id": "faces", "kind": "boolean", "label": "Faces", "default": True}],
+    }, "actors": {who: {"kind": "PagingSpeaker", "name": who, "portraits": {
+        "default_look": "day", "looks": {"day": {"base": f"{who}.png"}}, "staging_hints": hide,
+    }} for who in ("rin", "mia")}, "scenes": {"s": {
+        "roles": {who: {"actor_ref": who} for who in ("rin", "mia")}, "blocks": {"one": {
+            "kind": ProseBlock, "media": [
+                {"name": "room.png", "media_role": "narrative_im"},
+                {"name": "rin.png", "media_role": "avatar_im", "speaker": "rin",
+                 "staging_hints": {"media_x": 0.25, **hide}}],
+            "prose": [{"dialog_class": "rin.happy", "text": "Hello."},
+                      {"dialog_class": "mia.happy", "text": "Hi, both of you."}],
+            "actions": [{"text": "Next", "successor": "one"}]}}}}}
+    world = WorldBuilder().build(
+        label="unstationed_faces", class_registry=classes, resources=resources,
+        bundle=StoryCompiler().compile(script, class_registry=classes),
+        extra_authorities=[naming_dispatch, portrait_dispatch])
+    register_manual_world(world)
+    try:
+        bridge = PygameSessionBridge()
+        bridge.discover_preferences(world.label)
+        envelope = bridge.start(world.label)
+        stage = Stage(logical_size=(320, 200), display_scale=1)
+        stage.present(_frame(bridge, envelope), visual_passages(bridge, envelope),
+                      media_visibility=bridge.media_visibility())
+        (page,) = [page for page in stage.pages
+                   if any(Path(i.source).name == "mia.png" for i in page.turn.images)]
+        for shown, faces in ((True, {"rin.png", "mia.png"}), (False, set())):
+            loaded, _ = stage._resolve_images(page.turn, {"faces": shown})
+            assert {Path(i.source).name for i, _ in loaded if i.speaker_id} == faces
+    finally:
+        pop_manual_world(world.label)
+
+
 def test_actual_journal_pairs_portraits_groups_compatible_lines_and_exposes_faces(
     exchange, tmp_path: Path,
 ) -> None:

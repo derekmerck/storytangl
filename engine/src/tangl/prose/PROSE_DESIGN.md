@@ -464,7 +464,9 @@ AttributedFragment, retaining source/step provenance and carrying that line's
 resolved provider `speaker_id`, and the declaration's optional `staging_hints`.
 These say how the world stages each line's portrait -- for one, the viewer
 preference that hides faces (`media_visibility`) -- so a speaker with no staged
-portrait to take staging from is staged as the world's others are. Resource/provenance IDs are not speaker identity.
+portrait to take staging from is staged as the world's others are. The world
+checks them at load against its declared `ui_preferences`, by the same rules as a
+block's media (`WorldCompiler._validate_preference_bindings`). Resource/provenance IDs are not speaker identity.
 Explicit block/base `avatar_im` declarations may bind `speaker: host` through the
 existing exact scoped speaker binder (naming adoption); inherited scene casts and
 recasting resolve their current Role/Setting provider at JOURNAL time. Names are
