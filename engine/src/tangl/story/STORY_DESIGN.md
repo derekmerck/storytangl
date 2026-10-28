@@ -461,6 +461,14 @@ maps when graph/template lookup can answer the question directly.
 The journal is the only narrative output surface. Story owns what fragments
 mean; service/transports decide how to present them.
 
+A block's `content_hints` (`PresentationHints`) ride on its content fragment,
+so an author can say how a client is meant to read a line without a second
+channel. One convention so far (#629): a style tag `status:<section_id>` marks
+a line that restates that `ui-status` section -- a scene's title,
+`status:scene`; a day line, `status:day` and `status:period`. The journal keeps
+the line, for clients that show no status; a client whose status bar carries
+every section a line names may leave it to the bar.
+
 ## Graph Analysis And Projection
 
 Story also owns the graph-analysis helpers that sit *beside* runtime execution

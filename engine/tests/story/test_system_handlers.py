@@ -25,7 +25,7 @@ from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as Me
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.persistence.structuring import StructuringHandler
 from tangl.service.media import media_fragment_to_payload
-from tangl.story import Actor, Role, Scene, StoryGraph
+from tangl.story import Actor, InitMode, Role, Scene, StoryGraph, World
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.story.system_handlers import (
@@ -591,6 +591,26 @@ def test_dispatch_journal_dialog_composition_leaves_plain_content_unchanged() ->
     fragments = do_journal(block, ctx=ctx)
     assert isinstance(fragments, ContentFragment)
     assert fragments.content == "Hello there."
+
+
+def test_block_content_carries_its_authored_hints_from_the_script_and_after_restore() -> None:
+    # A block's content can say how a client is meant to read it: here, that it
+    # restates the status's scene. The hints reach its content fragment from
+    # the script, and again after the story is saved and restored.
+    world = World.from_script_data(script_data={
+        "label": "hinted", "metadata": {"start_at": "s.one"},
+        "scenes": {"s": {"blocks": {"one": {
+            "content": "**Orientation**", "content_hints": {"style_tags": ["status:scene"]},
+        }}}},
+    })
+    graph = world.create_story("hinted", init_mode=InitMode.EAGER).graph
+    restored = type(graph).structure(Json.deserialize(Json.serialize(graph.unstructure())))
+    for story in (graph, restored):
+        block = next(node for node in story.values()
+                     if isinstance(node, Block) and node.label == "one")
+        fragment = do_journal(block, ctx=PhaseCtx(graph=story, cursor_id=block.uid))
+        assert isinstance(fragment, ContentFragment)
+        assert fragment.presentation_hints.style_tags == ["status:scene"]
 
 
 def test_dispatch_journal_dialog_composition_preserves_media_and_choice_order() -> None:

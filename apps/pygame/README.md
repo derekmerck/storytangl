@@ -301,6 +301,12 @@ available in details. The client does not parse English
 field names, inspect a graph, compute inventory rules, assume a calendar/daypart
 count, or read the host clock. Unknown icons keep their readable text floor.
 
+A prose line tagged `status:<section_id>` restates that section (#629). When
+every section it names is one the bar carries -- on any of its pages -- the
+bridge drops the line, so a scene's title or the day is said once, by the bar.
+A line that also names a section the bar does not carry, an untagged line, and
+every line in a world without `ui-status`, are kept.
+
 - Click an entry, or press `Ctrl+I`, for its full label/value/details.
 - Click `i` to open/close details, including branding/logo and help on an empty row.
 - In details, `Tab` / `Shift+Tab` visits entries (including overflow pages),

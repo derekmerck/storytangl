@@ -15,6 +15,7 @@ from tangl.mechanics.sandbox import (
     ChargeFacet, SandboxCompiledAssetType, SandboxLocation, SandboxMap, SandboxScope,
 )
 from tangl.mechanics.sandbox.compact_status import advertise_compact_status, project_compact_status
+from tangl.journal.fragments import ContentFragment
 from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     BrandingValue, InfoAffordance, ProjectedSection, ProjectionRequest, ScalarValue,
@@ -115,6 +116,35 @@ def pick(bridge: PygameSessionBridge, text: str) -> RuntimeEnvelope:
     turns = bridge.build_turns(list(bridge.refresh().fragments))
     edge_id = next(choice.edge_id for choice in turns[-1].choices if choice.text == text)
     return bridge.choose(edge_id)
+
+
+def test_a_line_that_only_restates_the_status_is_left_to_the_bar(hud_world: World) -> None:
+    # A world tags a line that says what the status says, `status:<section_id>`.
+    # This bar shows the scene and the day, so those lines are the bar's alone.
+    # A line that names a section the bar does not show, or no section, is the
+    # reader's, and in a world with no status bar, every line is.
+    said = [("**Workshop**", ["status:scene"]), ("Day 1, morning.", ["status:day", "status:period"]),
+            ("Ready to work.", []), ("Rain later.", ["status:day", "status:weather"])]
+
+    def read(bridge: PygameSessionBridge) -> list[str]:
+        fragments = [ContentFragment(content=text,
+                                     hints=PresentationHints(style_tags=tags) if tags else None)
+                     for text, tags in said]
+        return [line.text for turn in bridge.build_turns(fragments) for line in turn.lines]
+
+    bridge = PygameSessionBridge()
+    bridge.start(hud_world.label)
+    assert read(bridge) == ["Ready to work.", "Rain later."]
+    plain = World.from_script_data(script_data={
+        "label": "no_status_bar", "scenes": {"intro": {"blocks": {"start": {"content": "Hi."}}}},
+    })
+    register_manual_world(plain)
+    try:
+        elsewhere = PygameSessionBridge()
+        elsewhere.start(plain.label)
+        assert read(elsewhere) == [text for text, _ in said]
+    finally:
+        pop_manual_world(plain.label)
 
 
 def test_service_sandbox_status_survives_called_scene_and_return(hud_world: World) -> None:

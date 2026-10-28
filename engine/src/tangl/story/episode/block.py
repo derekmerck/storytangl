@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import Field
 
+from tangl.presentation.hints import PresentationHints
 from tangl.vm import TraversableNode
 
 
@@ -28,7 +29,8 @@ class Block(TraversableNode):
 
     API
     ---
-    - :attr:`content` stores authored narrative text.
+    - :attr:`content` stores authored narrative text, and :attr:`content_hints`
+      how a client is meant to read it, carried on its content fragment.
     - :attr:`actions`, :attr:`continues`, and :attr:`redirects` hold authored
       navigation declarations.
     - :attr:`roles`, :attr:`settings`, and :attr:`media` hold local provider and
@@ -36,6 +38,7 @@ class Block(TraversableNode):
     """
 
     content: str = ""
+    content_hints: PresentationHints | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     continues: list[dict[str, Any]] = Field(default_factory=list)
     redirects: list[dict[str, Any]] = Field(default_factory=list)

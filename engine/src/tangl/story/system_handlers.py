@@ -692,7 +692,8 @@ def render_block_content(*, caller, ctx, **_kw):
 
     rendered_content = _render_block_content(caller, ctx=ctx)
     if rendered_content:
-        return ContentFragment(content=rendered_content, source_id=caller.uid)
+        return ContentFragment(content=rendered_content, source_id=caller.uid,
+                               hints=caller.content_hints)
     return None
 
 
