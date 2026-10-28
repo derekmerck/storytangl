@@ -89,6 +89,12 @@ class _Page:
     heading: str | None
 
 
+def _shown(turn: Turn) -> Turn:
+    """What a turn puts before the reader besides its text and its choices:
+    images, pieces, zones, findings, a plate and a surface alike."""
+    return replace(turn, step=0, source_id=None, lines=[], choices=[])
+
+
 REFUSED_PIN = "X"
 """What a map region pins when no key commits it. See :meth:`Stage._pin`."""
 
@@ -543,8 +549,11 @@ class Stage:
             previous_failed = failed
             fallback = self._rows(Turn(step=passage.step), arriving_failed, pixel_width=pixel_width)
             if not passage.lines and not fallback:
+                # A step's last staging is a page of its own only if it shows
+                # something the page before does not. A step whose only text the
+                # client dropped -- a status echo (#629) -- leaves nothing to see.
                 if index + 1 == len(passages) or passages[index + 1].step != passage.step:
-                    if self.pages:
+                    if self.pages and _shown(passage) != _shown(self.pages[-1].turn):
                         self.pages.append(_Page(passage, [], None))
                 continue
             for line in passage.lines:

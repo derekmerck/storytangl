@@ -861,6 +861,10 @@ class PygameSessionBridge:
             self._append_media(turn, fragment)
             return
 
+        # Narration or a speaker's line alike: one the bar already says is its.
+        if isinstance(fragment, ContentFragment) and self._echoes_status(fragment):
+            return
+
         # AttributedFragment subclasses ContentFragment, so it is checked first.
         if isinstance(fragment, AttributedFragment):
             text = _text(fragment.content)
@@ -883,6 +887,21 @@ class PygameSessionBridge:
             text = _text(fragment.content)
             if text is not None:
                 turn.lines.append(Line(text=text, hints=fragment.presentation_hints))
+
+    def _echoes_status(self, fragment: ContentFragment) -> bool:
+        """Whether a line only restates status sections the chrome is showing.
+
+        A world tags such a line ``status:<section_id>`` -- a scene's title,
+        ``status:scene``; a day line, ``status:day`` and ``status:period`` -- so
+        a client showing those sections drops it, and one that shows no status
+        keeps it. Only when every section it names is shown: a line that also
+        says something the bar does not is the reader's.
+        """
+        hints = fragment.presentation_hints
+        echoed = {tag.removeprefix("status:") for tag in (hints.style_tags if hints else [])
+                  if isinstance(tag, str) and tag.startswith("status:")}
+        shown = {section.section_id for section in self.status.sections}
+        return bool(echoed) and self.status_available and echoed <= shown
 
     @staticmethod
     def _append_fallback_text(

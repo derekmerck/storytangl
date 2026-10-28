@@ -14,8 +14,9 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Priority, Record, contribute_ns
-from tangl.journal.fragments import ChoiceFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.lang.personal_name import PersonalName
+from tangl.presentation.hints import layered
 from tangl.story import Actor, Block, Location, Role, Setting, get_narrator_key
 from tangl.story.concepts.narrator_knowledge import HasNarratorKnowledge
 from tangl.story.dispatch import do_render_text
@@ -370,6 +371,11 @@ def render_linked_prose(
         speaker_resolver=operations.speaker,
         parts_resolver=lambda parts: operations.realize(parts, disclose=True),
     )
+    if caller.content_hints is not None:
+        # Its prose is its content: each line carries the block's say about it.
+        fragments = [fragment.model_copy(update={"presentation_hints": layered(
+            fragment.presentation_hints, caller.content_hints)})
+            if isinstance(fragment, ContentFragment) else fragment for fragment in fragments]
     return fragments or None
 
 

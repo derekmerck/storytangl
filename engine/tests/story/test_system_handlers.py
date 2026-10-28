@@ -9,7 +9,9 @@ import pytest
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core.runtime_op import Effect, Predicate
+from tangl.prose import MuBlock
 from tangl.prose.dialog import DialogMuBlock
+from tangl.prose.naming import ProseBlock, naming_dispatch
 from tangl.journal.fragments import (
     AttributedFragment, GroupFragment, fragment_from_dto, fragment_to_dto,
 )
@@ -25,7 +27,7 @@ from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as Me
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.persistence.structuring import StructuringHandler
 from tangl.service.media import media_fragment_to_payload
-from tangl.story import Actor, Role, Scene, StoryGraph
+from tangl.story import Actor, InitMode, Role, Scene, StoryGraph, World
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.story.system_handlers import (
@@ -36,7 +38,7 @@ from tangl.story.system_handlers import (
     render_block_media,
 )
 from tangl.vm.dispatch import do_journal
-from tangl.vm import Dependency, Ledger, Requirement
+from tangl.vm import Dependency, Ledger, Requirement, ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -591,6 +593,51 @@ def test_dispatch_journal_dialog_composition_leaves_plain_content_unchanged() ->
     fragments = do_journal(block, ctx=ctx)
     assert isinstance(fragments, ContentFragment)
     assert fragments.content == "Hello there."
+
+
+def test_block_content_carries_its_authored_hints_from_the_script_and_after_restore() -> None:
+    # A block's content can say how a client is meant to read it: here, that it
+    # restates the status's scene. The hints reach its content fragment from
+    # the script, and again after the story is saved and restored.
+    world = World.from_script_data(script_data={
+        "label": "hinted", "metadata": {"start_at": "s.one"},
+        "scenes": {"s": {"blocks": {"one": {
+            "content": "**Orientation**", "content_hints": {"style_tags": ["status:scene"]},
+        }}}},
+    })
+    graph = world.create_story("hinted", init_mode=InitMode.EAGER).graph
+    restored = type(graph).structure(Json.deserialize(Json.serialize(graph.unstructure())))
+    for story in (graph, restored):
+        block = next(node for node in story.values()
+                     if isinstance(node, Block) and node.label == "one")
+        fragment = do_journal(block, ctx=PhaseCtx(graph=story, cursor_id=block.uid))
+        assert isinstance(fragment, ContentFragment)
+        assert fragment.presentation_hints.style_tags == ["status:scene"]
+
+
+@pytest.mark.parametrize("block", [
+    Block(label="plain", content="Scene title"),
+    Block(label="callout", content="> [!note|]\n> Scene title"),
+    ProseBlock(label="stored", prose=[MuBlock(text="Scene title")]),
+], ids=["plain", "callout", "stored prose"])
+def test_a_blocks_content_hints_reach_the_line_its_content_is_journaled_as(block: Block) -> None:
+    # However the content is written -- plain, a callout composed into a line
+    # of its own, or a prose block's stored units -- the line it ends as keeps
+    # its own say and adds the block's, so a client can still read it.
+    block = block.model_copy(update={"content_hints": PresentationHints(
+        style_tags=["status:scene"], style_dict={"color": "rust"})})
+    graph = StoryGraph()
+    graph.add(block)
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid, current_phase=ResolutionPhase.JOURNAL)
+    ctx.local_authorities.append(naming_dispatch)
+    journaled = do_journal(block, ctx=ctx)
+    (line,) = [fragment for fragment in (journaled if isinstance(journaled, list) else [journaled])
+               if isinstance(fragment, ContentFragment) and fragment.content]
+    assert line.content == "Scene title"
+    assert "status:scene" in line.presentation_hints.style_tags
+    assert line.presentation_hints.style_dict["color"] == "rust"
+    if block.label == "callout":
+        assert line.presentation_hints.style_name == "note"
 
 
 def test_dispatch_journal_dialog_composition_preserves_media_and_choice_order() -> None:

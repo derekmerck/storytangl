@@ -15,6 +15,7 @@ from tangl.mechanics.sandbox import (
     ChargeFacet, SandboxCompiledAssetType, SandboxLocation, SandboxMap, SandboxScope,
 )
 from tangl.mechanics.sandbox.compact_status import advertise_compact_status, project_compact_status
+from tangl.journal.fragments import AttributedFragment, ChoiceFragment, ContentFragment
 from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     BrandingValue, InfoAffordance, ProjectedSection, ProjectionRequest, ScalarValue,
@@ -115,6 +116,60 @@ def pick(bridge: PygameSessionBridge, text: str) -> RuntimeEnvelope:
     turns = bridge.build_turns(list(bridge.refresh().fragments))
     edge_id = next(choice.edge_id for choice in turns[-1].choices if choice.text == text)
     return bridge.choose(edge_id)
+
+
+def test_a_line_that_only_restates_the_status_is_left_to_the_bar(hud_world: World) -> None:
+    # A world tags a line that says what the status says, `status:<section_id>`.
+    # This bar shows the scene and the day, so those lines are the bar's alone,
+    # narration or a speaker's. A line that names a section the bar does not
+    # show, or no section, is the reader's, and in a world with no status bar,
+    # every line is.
+    said = [("**Workshop**", ["status:scene"]), ("Day 1, morning.", ["status:day", "status:period"]),
+            ("Ready to work.", []), ("Rain later.", ["status:day", "status:weather"])]
+    spoken = AttributedFragment(content="Welcome to the Workshop.", who="Guide", how="", media="",
+                                hints=PresentationHints(style_tags=["status:scene"]))
+
+    def read(bridge: PygameSessionBridge) -> list[str]:
+        fragments = [ContentFragment(content=text,
+                                     hints=PresentationHints(style_tags=tags) if tags else None)
+                     for text, tags in said]
+        turns = bridge.build_turns([*fragments, spoken])
+        return [line.text for turn in turns for line in turn.lines]
+
+    bridge = PygameSessionBridge()
+    bridge.start(hud_world.label)
+    assert read(bridge) == ["Ready to work.", "Rain later."]
+    plain = World.from_script_data(script_data={
+        "label": "no_status_bar", "scenes": {"intro": {"blocks": {"start": {"content": "Hi."}}}},
+    })
+    register_manual_world(plain)
+    try:
+        elsewhere = PygameSessionBridge()
+        elsewhere.start(plain.label)
+        assert read(elsewhere) == [*(text for text, _ in said), "Welcome to the Workshop."]
+    finally:
+        pop_manual_world(plain.label)
+
+
+def test_a_dropped_status_line_leaves_no_page_to_turn_to(hud_world: World) -> None:
+    # Narration, then a menu whose only text is the day the bar already shows:
+    # the reader reads the narration and acts there, with no blank page between.
+    from tangl.pygame_client.__main__ import _frame
+    from tangl.pygame_client.presentation import visual_passages
+
+    bridge = PygameSessionBridge()
+    bridge.start(hud_world.label)
+    envelope = RuntimeEnvelope(fragments=[
+        ContentFragment(content="The errand ends.", step=1),
+        ContentFragment(content="Day 1, morning.", step=2,
+                        hints=PresentationHints(style_tags=["status:day", "status:period"])),
+        ChoiceFragment(text="Visit the study", edge_id=UUID(int=1), step=2),
+    ])
+    stage = Stage(logical_size=(320, 200), display_scale=1)
+    stage.paged = True
+    stage.present(_frame(bridge, envelope), visual_passages(bridge, envelope))
+    assert [[row.text for row in page.rows] for page in stage.pages] == [["The errand ends."]]
+    assert stage.choices_ready
 
 
 def test_service_sandbox_status_survives_called_scene_and_return(hud_world: World) -> None:

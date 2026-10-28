@@ -23,6 +23,7 @@ from tangl.prose import DialogHandler, TextRenderSession
 from tangl.prose.mu_block import RealizationValue, SpeakerResolver
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
+from tangl.presentation.hints import layered
 from tangl.presentation.intent import Blocker
 from tangl.vm import (
     Affordance,
@@ -692,7 +693,8 @@ def render_block_content(*, caller, ctx, **_kw):
 
     rendered_content = _render_block_content(caller, ctx=ctx)
     if rendered_content:
-        return ContentFragment(content=rendered_content, source_id=caller.uid)
+        return ContentFragment(content=rendered_content, source_id=caller.uid,
+                               hints=caller.content_hints)
     return None
 
 
@@ -962,6 +964,10 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
                     update["step"] = fragment.step
                 if getattr(fragment, "origin_id", None) is not None:
                     update["origin_id"] = fragment.origin_id
+                # The block's say about its content holds for each line made of it.
+                if fragment.presentation_hints is not None:
+                    update["presentation_hints"] = layered(
+                        rendered_fragment.presentation_hints, fragment.presentation_hints)
 
                 composed.append(rendered_fragment.model_copy(update=update))
             changed = True

@@ -400,6 +400,20 @@ def test_an_image_that_cannot_be_drawn_is_captioned_once_and_on_a_map_too(
     assert captions == ["A guide waits."]
 
 
+def test_a_step_that_only_lays_a_piece_down_keeps_its_page(exchange) -> None:
+    # A step with no text and no new image can still put something before the
+    # reader -- a card on the desk. It keeps a page of its own, so the card
+    # does not appear on the narration before it.
+    world, _, _, _, _, stage = exchange
+    room = StageImage("narrative_im", str(world.resources.resource_path / "room1.png"))
+    card = Piece("card", "id_card", "Card")
+    frame = Turn(step=2, images=[room], pieces=[card], choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(frame, [Turn(step=1, images=[room], lines=[Line("A desk.")]),
+                          Turn(step=2, images=[room], pieces=[card])])
+    assert [page.turn.pieces for page in stage.pages] == [[], [card]]
+
+
 def test_maps_and_typed_choices_are_gated_until_end(exchange) -> None:
     world, _, _, _, bridge, stage = exchange
     image = StageImage(role="map_im", source=str(world.resources.resource_path / "room1.png"))

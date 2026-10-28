@@ -27,6 +27,24 @@ class PresentationHints(BaseModel, extra="allow"):
         return super().model_dump(*args, **kwargs)
 
 
+def layered(
+    own: PresentationHints | None, inherited: PresentationHints | None,
+) -> PresentationHints | None:
+    """A unit's own hints laid over those it inherits from its container, such
+    as a line rendered from a block's content under the block's
+    ``content_hints``: a field the unit set wins, and style tags and style
+    properties add up, so neither side's say is lost."""
+    if own is None or inherited is None:
+        return own or inherited
+    return inherited.model_copy(update={
+        **{name: getattr(own, name) for name in own.model_fields_set},
+        **(own.model_extra or {}),
+        "style_tags": [*own.style_tags,
+                       *(tag for tag in inherited.style_tags if tag not in own.style_tags)],
+        "style_dict": {**inherited.style_dict, **own.style_dict},
+    })
+
+
 ShapeName = Literal["landscape", "portrait", "square", "avatar", "banner", "bg"]
 PositionName = Literal["top", "bottom", "left", "right", "cover", "inline"]
 SizeName = Literal["small", "medium", "large"]
