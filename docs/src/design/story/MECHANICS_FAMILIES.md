@@ -262,7 +262,7 @@ Review lens:
 - **Attachment points:** called by world/mechanic UPDATE policy
 - **Appearance:** normally projected by the consuming mechanic
 
-### `demographics` — Foundation, naming kernel implemented
+### `demographics` — Foundation, durable name/profile composition implemented
 
 Why it stays:
 
@@ -271,9 +271,9 @@ Why it stays:
 
 Current gap:
 
-- committed profile/name ownership still needs implementation; explicit packs,
-  bounded naming catalogs, authored origins, and complete/compound name formation
-  are implemented (slices 1–3)
+- lifecycle generation/provenance and real replay remain 4b work; explicit packs,
+  bounded naming, and one owned PersonalName alongside durable profile facts are
+  implemented (slices 1–3 and 4a). Casting Desk remains slice 5.
 
 The source-local design and retrofit plan live in
 `engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md` and

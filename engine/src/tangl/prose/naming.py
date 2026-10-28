@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from tangl.core import BehaviorRegistry, DispatchLayer, Priority, Record
+from tangl.core import BehaviorRegistry, DispatchLayer, Priority, Record, contribute_ns
 from tangl.journal.fragments import ChoiceFragment
 from tangl.lang.personal_name import PersonalName
 from tangl.story import Actor, Block, Location, Role, Setting, get_narrator_key
@@ -126,6 +126,31 @@ class PersonalNamedConcept(NamedConcept):
     def _proper_forms(self) -> dict[str, str]:
         generated = self.personal_name.forms() if self.personal_name is not None else {}
         return generated | self.proper_forms
+
+    def _proper_nominal(self, *, form: str | None = None, **params: RealizationValue) -> str:
+        if self.name or self.personal_name is None:
+            return super()._proper_nominal(form=form, **params)
+        forms = self._proper_forms()
+        nominal = forms.get("proper", self.get_label())
+        return forms.get(form, nominal) if form is not None else nominal
+
+    @contribute_ns
+    def provide_personal_name_symbols(self) -> dict[str, object]:
+        """Project the current owned value and intentional authored form overrides."""
+        if self.personal_name is None:
+            return {}
+        forms = self._proper_forms()
+        return {
+            "personal_name": self.personal_name,
+            "name": self._proper_nominal(),
+            "given_name": forms.get("given"),
+            "family_name": forms.get("family"),
+            "full_name": forms.get("full"),
+            "familiar_name": forms.get("familiar"),
+            "formal_name": forms.get("formal"),
+            "familiar_full_name": forms.get("familiar_full"),
+            "formal_full_name": forms.get("formal_full"),
+        }
 
 
 class PersonalNamedActor(PersonalNamedConcept, NamedActor):

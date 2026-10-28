@@ -5,20 +5,19 @@ import logging
 import random
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from tangl.core import TokenCatalog
 
 from tangl.mechanics.demographics import (
     DemographicData,
     DemographicSampler,
-    HasDemographic,
     HasDemographics,
     NameForm, NamePart, NamePool,
 )
 from tangl.mechanics.demographics.data_models import Region, Country, Subtype, NameBank
 from tangl.lang.gens import Gens as Gender
 from tangl.lang.age_range import AgeRange
-from tangl.story.concepts import Actor as StoryActor
+from tangl.lang.personal_name import PersonalName
 
 @pytest.fixture(scope="module")
 def test_data():
@@ -65,49 +64,27 @@ def test_region_retains_explicit_subtype_reference():
                     eth_mix={subtype: 1})
     assert next(iter(region.eth_mix)) is subtype
 
-def test_demographic_data_inheritance():
-    demo_data = DemographicData(given_name="John", family_name="Doe")
-    assert demo_data.name() == "John"
-    assert demo_data.full_name() == "John Doe"
+def test_demographic_data_is_profile_only():
+    profile = DemographicData(gender=Gender.X_, age_range=AgeRange.ADULT)
+    assert not isinstance(profile, PersonalName)
+    assert profile.gender is Gender.X_
+    assert profile.age_range is AgeRange.ADULT
+    with pytest.raises(ValidationError):
+        DemographicData(given_name="John", family_name="Doe")
 
 
 class DemoEntity(HasDemographics, BaseModel):
     pass
 
 
-def test_has_demographics():
-    demo_data = DemographicData(given_name="Jane", family_name="Smith")
-    entity = DemoEntity(demographic=demo_data)
-    assert entity.name == "Jane"
-    assert entity.full_name == "Jane Smith"
-    assert entity.get_ns()["full_name"] == "Jane Smith"
+def test_has_demographics_publishes_facts_without_name_shadowing():
+    profile = DemographicData(gender=Gender.X_)
+    entity = DemoEntity(demographic=profile)
+    assert entity.get_ns()["demographic"] is profile
+    assert entity.get_ns()["gender"] is Gender.X_
+    assert "name" not in entity.get_ns()
+    assert "full_name" not in entity.get_ns()
 
-
-def test_has_demographic_alias():
-    assert HasDemographic is HasDemographics
-
-
-class DemoActor(StoryActor, HasDemographics):
-    pass
-
-
-def test_story_actor_demographics_namespace_prefers_explicit_name():
-    demo_data = DemographicData(given_name="Jane", family_name="Smith")
-    actor = DemoActor(label="guide", name="The Guide", demographic=demo_data)
-
-    namespace = actor.get_ns()
-    assert namespace["name"] == "The Guide"
-    assert namespace["full_name"] == "Jane Smith"
-    assert namespace["given_name"] == "Jane"
-
-
-def test_story_actor_demographics_namespace_uses_demographic_name_by_default():
-    demo_data = DemographicData(given_name="Jane", family_name="Smith")
-    actor = DemoActor(label="guide", demographic=demo_data)
-
-    namespace = actor.get_ns()
-    assert namespace["name"] == "Jane"
-    assert namespace["full_name"] == "Jane Smith"
 
 def test_age_range_sampling():
     age_range = DemographicSampler.sample_age_range()
@@ -151,21 +128,18 @@ def test_gender_sampling():
 
 
 def test_name_sampling(test_data):
-    country = test_data["countries"][0]  # France
-    nb = NameBank.get_instance(country.label)
-    gender = Gender.XX
-    d = DemographicSampler.sample_demographic(
-        country=country, gender=gender, catalogs=test_data["catalogs"],
-        fallback_bank="fra", name_form="female", rng=random.Random(7),
+    bank = NameBank.get_instance("fra")
+    name = DemographicSampler.sample_name(
+        bank, form="female", catalogs=test_data["catalogs"], rng=random.Random(7),
     )
-    assert d.given_name in nb.forms["female"].given.pool.candidates
-    assert d.family_name in nb.forms["female"].family.pool.candidates
+    assert name.given_name in bank.forms["female"].given.pool.candidates
+    assert name.family_name in bank.forms["female"].family.pool.candidates
 
 
 def test_demographic_sampling(test_data):
     demo_data = DemographicSampler.sample_demographic(
-        country=test_data["countries"][0], catalogs=test_data["catalogs"],
-        fallback_bank="fra", name_form="female", rng=random.Random(7),
+        country=test_data["countries"][0],
+         rng=random.Random(7),
     )
     assert isinstance(demo_data, DemographicData)
     assert demo_data.region in Region.all_instances()
@@ -182,8 +156,8 @@ def test_demographic_sampling_with_params(test_data):
 
     demo_data = DemographicSampler.sample_demographic(
         region=region, country=country, subtype=subtype, gender=gender,
-        catalogs=test_data["catalogs"], fallback_bank="fra",
-        name_form="female", rng=random.Random(7),
+
+         rng=random.Random(7),
     )
 
     assert demo_data.region == region
@@ -197,8 +171,8 @@ def test_demographic_sampling_normalizes_string_inputs(test_data):
         subtype="european",
         gender="XX",
         age_range="ADULT",
-        catalogs=test_data["catalogs"], fallback_bank="fra",
-        name_form="female", rng=random.Random(7),
+
+         rng=random.Random(7),
     )
 
     assert isinstance(demo_data.region, Region)
@@ -215,8 +189,6 @@ def test_demographic_sampling_normalizes_string_inputs(test_data):
 
 def test_demonym_property():
     demo_data = DemographicData(
-        given_name="Test",
-        family_name="User",
         region=Region(label="demonym_region", name="Test Region", demonym="Test Regional", eth_mix={}),
         country=Country(label="demonym_country", name="Test Country", demonym="Test National", population=1000000),
         subtype=Subtype(label="demonym_subtype", name="Test Subtype", demonym="Test Subtype")
@@ -233,8 +205,8 @@ def test_demonym_property():
 
 def test_full_demographic_sampling(test_data):
     demo = DemographicSampler.sample_demographic(
-        country=test_data["countries"][0], catalogs=test_data["catalogs"],
-        fallback_bank="fra", name_form="female", rng=random.Random(7),
+        country=test_data["countries"][0],
+         rng=random.Random(7),
     )
     assert isinstance(demo, DemographicData)
     assert demo.region is not None
@@ -246,16 +218,14 @@ def test_full_demographic_sampling(test_data):
 
 def test_demographic_sampling_with_explicit_rng_is_reproducible(test_data):
     left = DemographicSampler.sample_demographic(
-        country="fra", catalogs=test_data["catalogs"], fallback_bank="fra",
-        name_form="female", rng=random.Random(7),
+        country="fra",
+         rng=random.Random(7),
     )
     right = DemographicSampler.sample_demographic(
-        country="fra", catalogs=test_data["catalogs"], fallback_bank="fra",
-        name_form="female", rng=random.Random(7),
+        country="fra",
+         rng=random.Random(7),
     )
 
-    assert left.given_name == right.given_name
-    assert left.family_name == right.family_name
     assert left.region.label == right.region.label
     assert left.country.label == right.country.label
     assert left.subtype.label == right.subtype.label

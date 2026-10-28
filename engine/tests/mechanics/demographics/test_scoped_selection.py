@@ -87,10 +87,10 @@ def test_two_real_worlds_resolve_the_same_local_key_without_import_order_leakage
             "european", catalogs=catalogs, fallback_bank="fra",
         ) is chosen[label]
         profile = DemographicSampler.sample_demographic(
-            country="fra", catalogs=catalogs, fallback_bank="fra",
-            name_form="plain", rng=ctx.get_random(),
+            country="fra", rng=ctx.get_random(),
         )
-        assert profile.given_name == label
+        assert profile.country is Country.get_instance("fra")
+        assert "given_name" not in type(profile).model_fields
         other = "B" if label == "A" else "A"
         with pytest.raises(LookupError):
             select_bank(chosen[other].label, catalogs=catalogs)
@@ -127,10 +127,6 @@ def test_country_exact_audit_and_explicit_fallback_remain_distinct() -> None:
     assert france.namebank("european", catalogs=[catalog], fallback_bank="fra").label == "fra"
     with pytest.raises(LookupError):
         france.namebank("european", catalogs=[], fallback_bank="fra")
-    with pytest.raises(LookupError):
-        DemographicSampler.sample_demographic(
-            country="fra", name_form="female", catalogs=[catalog], rng=Random(7),
-        )
     assert ("fra", "european") in load_pack("sample").uncovered_subtypes()
 
 

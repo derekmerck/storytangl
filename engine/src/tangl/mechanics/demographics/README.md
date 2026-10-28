@@ -30,8 +30,8 @@ It provides:
 
 - Naming requires an explicit RNG, form, and catalog scope. Historical geography
   helpers retain their existing optional RNG policy.
-- Slices 1–3 (explicit packs, scoped bank/origin selection, and name formation)
-  are implemented. Slices 4–5 remain planned. See the
+- Slices 1–3 and 4a (one name owner plus durable profile/Actor composition) are
+  implemented. Lifecycle generation/replay (4b) and Casting Desk (5) remain planned. See the
   [design contract](DEMOGRAPHICS_DESIGN.md) and
   [staged retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md), tracked by
   [issue #285](https://github.com/derekmerck/storytangl/issues/285).
@@ -48,9 +48,9 @@ from tangl.mechanics.demographics import DemographicSampler, load_pack, register
 
 pack = load_pack("sample")  # Validates and copies data; no Singleton registration.
 catalog = register_pack(pack)  # Registers definitions and returns this pack's exact offers.
-profile = DemographicSampler.sample_demographic(
-    country="fra", name_form="female", catalogs=[catalog],
-    fallback_bank="fra", rng=random.Random(7),
+profile = DemographicSampler.sample_demographic(country="fra", rng=random.Random(7))
+name = DemographicSampler.sample_name(
+    "fra", form="female", catalogs=[catalog], rng=random.Random(7),
 )
 ```
 
@@ -83,8 +83,8 @@ profile = DemographicSampler.sample_demographic(
   source/app/world consumers outside this package.
 - Definition registration remains process-global and sequential; conflicting values
   fail rather than mutating a Singleton. Catalog offers and bank selection are
-  explicitly scoped. Transactional replacement and actor/name ownership are not
-  implemented; the slice 4 checkpoint remains open.
+  explicitly scoped. Transactional replacement is not implemented. Actor/name
+  ownership is settled in 4a; lifecycle generation and replay remain the 4b checkpoint.
 
 ## Scoped banks and origins
 
@@ -141,14 +141,14 @@ from the draw. Reference order is sorted before drawing. `NameSelection` is a
 transient receipt retaining the original origin and selected live bank, so two
 origins can borrow one bank without losing their labels. An origin can be embedded
 through the existing constructor-form field marker; no custom serialization is used.
-Committing actor provenance remains slice 4.
+Committing generation provenance remains slice 4b.
 
 Country lookup requests the exact `country_subtype` reference when a subtype is
 present. `fallback_bank="fra"` above is a deliberate caller policy, not a statement
 that the sample bank covers every French subtype. Fallback references must also
 be offered by the supplied catalogs. Historical geography sampling remains the
-existing optional policy; constraints, age aliases, and profile ownership remain
-later work. Custom bank/origin selection needs no country or ethnicity.
+existing optional policy; constraint/age-alias corrections and generation policy
+remain 4b work. Custom bank/origin selection needs no country or ethnicity.
 
 ## Name formation (slice 3)
 
@@ -200,15 +200,71 @@ read-only historical audit preserved all 385,828 candidate positions, including
 
 `sample_xx_name`, `sample_xy_name`, and `sample_namebank` are retired; callers use
 `sample_name(..., form=...)`. Origin mixtures select a bank; the caller's requested
-form must exist on the chosen bank. Existing geographic `sample_demographic` now
-requires `name_form` and retains its complete given/family profile requirement.
-Optional names work through the pure kernel; integrating them into a canonical
-actor/profile name owner remains the slice 4 checkpoint. No actor generation,
-profile provenance/replay, or general name-parser changes are included here.
+form must exist on the chosen bank. `sample_demographic(..., rng=...)` now returns
+only demographic facts; it takes no name-form, bank-fallback, or naming-catalog
+arguments. Call `sample_name` separately when a world wants a name. Name selection
+keeps its explicit scoped catalog, form, and RNG contracts.
 
 Nested recipe values opt into existing constructor form at their owning fields.
 Name banks remain ordinary Singleton references; no recipe-specific serializer or
 registry is added.
+
+## One name owner and durable facts (slice 4a)
+
+`actor.personal_name` is the authoritative existing `PersonalName` owned by prose's
+`PersonalNamedActor`/`PersonalNamedConcept`. `DemographicData` is now a profile-only
+constructor-form value: optional gender, age range, country, region, and subtype.
+`HasDemographics` owns and publishes those facts, with no name properties or name
+cache. The obsolete `HasDemographic`/`demographics` aliases and inherited profile
+name fields are removed. Worlds opt into both facets explicitly:
+
+```python
+from tangl.core import EntityTemplate, Graph
+from tangl.prose.naming import PersonalNamedActor
+from tangl.mechanics.demographics import HasDemographics
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+
+class CastActor(PersonalNamedActor, HasDemographics):
+    pass
+
+# Already chosen values are ordinary materialization inputs, not callbacks.
+chosen_name = DemographicSampler.sample_name(
+    "fra", form="female", catalogs=[catalog], rng=random.Random(7),
+)
+template = EntityTemplate.from_data({
+    "kind": CastActor, "label": "guide", "personal_name": chosen_name,
+    "demographic": profile,
+})
+graph = Graph()
+actor = template.materialize(registry=graph)
+actor.personal_name.given_name = "Ari"
+assert actor.name == ""  # No copied display name to become stale.
+assert actor.get_ns()["full_name"] == actor.personal_name.full_name()
+restored = Graph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
+assert restored.get(actor.uid).personal_name.given_name == "Ari"
+```
+
+Given+family, given-only, and family-only personal names compose with the same
+profile. Namespace personal-name forms are computed from the current owned value.
+Without an authored display override, prose's default proper nominal uses the
+current personal name. Explicit `name` and `proper_forms` remain intentional prose
+policy and are not overwritten during rename. The demographic namespace publishes
+`demographic`, `demonym`, and present facts; personal naming publishes its own
+`personal_name`/name-form symbols.
+
+Owning profile/name fields and the profile's Singleton-reference fields explicitly
+opt into existing constructor form. Saved graphs retain actual actor IDs, names,
+and facts; Region/Country/Subtype resolve to live definitions. Bootstrap declared
+catalogs/world authorities before fresh-process restore. No sampler runs during
+construction, namespace reads, rendering, or restore. There is no automatic world
+activation, custom serializer, NPC factory, or name-sync bridge.
+
+4a supplies durable composition, not missing-facts policy. Partial authored-fact
+merge/RNG budgeting, geographic contradictions, age-alias weighting, generation
+provenance/revisions, setup/UPDATE integration, and exactly-once generation through
+real ledger replay remain **4b**. NameBank/origin generation provenance is not added
+to the profile here. Casting Desk and media remain later work. Full slice 4 is not
+complete.
 
 ## Credits
 

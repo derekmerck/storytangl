@@ -13,6 +13,9 @@ the #587 first pygame slice now pairs following portraits with their preceding
 lines for optional compact local paging; audio synchronization remains deferred.
 #578 slice 1 shares personal-name enrichment with non-Actor Player compositions;
 parser-policy decisions and #577 speech/discovery remain separate.
+Demographics 4a uses the same owned PersonalName for default nominals and current
+namespace forms when no display override is authored; explicit name/proper_forms
+policy remains authoritative.
 
 The shared `TextRenderSession` environment supports explicit `upper_first`:
 `text[:1].upper() + text[1:]`, with empty text unchanged and no trimming. Ordinary
@@ -222,8 +225,11 @@ Normal NamingOperations dispatch and per-narrator knowledge are unchanged.
 
 A world rename is an ordinary Action UPDATE effect. It replaces an explicitly
 constructed PersonalName and deliberately maintains its chosen `NamedConcept.name`
-display floor; `personal_name` alone does not synchronize `name` or
-`Player.full_name`. Saved fragments remain as emitted while later explicit
+display override when one is authored; `personal_name` alone does not synchronize
+`name` or `Player.full_name`. When there is no display override, default proper
+nominals and personal-name namespace forms are computed from the current owned
+value (4a demographics composition). Explicit proper_forms still override generated
+forms. Empty/aliases-only names retain the ordinary display/label fallback. Saved fragments remain as emitted while later explicit
 references realize the new name. JSON-backed ServiceManager reopening reads the
 same session with normal World/type registration, not a reset or cold bootstrap.
 See the [explicit rename example](../../../../docs/src/design/story/PROSE_AUTHORING.md#optional-personal-names-on-player).
