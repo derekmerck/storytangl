@@ -262,7 +262,7 @@ Review lens:
 - **Attachment points:** called by world/mechanic UPDATE policy
 - **Appearance:** normally projected by the consuming mechanic
 
-### `demographics` — Foundation, explicit packs implemented
+### `demographics` — Foundation, scoped bank selection implemented
 
 Why it stays:
 
@@ -271,9 +271,9 @@ Why it stays:
 
 Current gap:
 
-- explicit world-scoped catalogs, extensible name formation, and committed
-  profile/name ownership still need implementation; explicit pack loading and
-  honest availability are implemented (slice 1)
+- extensible name formation and committed profile/name ownership still need
+  implementation; explicit packs, bounded naming catalogs, and authored origin
+  selection are implemented (slices 1–2)
 
 The source-local design and retrofit plan live in
 `engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md` and

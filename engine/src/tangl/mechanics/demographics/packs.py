@@ -12,6 +12,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 import yaml
 
+from tangl.core import TokenCatalog
+
 from .data_models import Country, NameBank, Region, Subtype
 
 
@@ -134,11 +136,11 @@ def load_pack(pack: Literal["sample", "full"]) -> DemographicPack:
     )
 
 
-def register_pack(pack: DemographicPack) -> None:
+def register_pack(pack: DemographicPack) -> TokenCatalog[NameBank]:
     """Install explicit definitions, reusing equal values and rejecting collisions.
 
     Definitions are compared as local field snapshots, never as persistence forms.
-    This does not add scoped overlays; world-visible catalogs remain a later slice.
+    Return a bounded catalog containing exactly this pack's name-bank definitions.
     """
 
     def mixture(data: dict[str, int] | None) -> dict[Subtype, int] | None:
@@ -181,11 +183,19 @@ def register_pack(pack: DemographicPack) -> None:
             region_data.name, region_data.demonym, eth_mix, countries,
         ):
             raise ValueError(f"Conflicting Region definition: {region_data.id!r}")
+    banks: list[NameBank] = []
     for label, data in pack.names.items():
         bank = NameBank.get_instance(label)
         if bank is None:
-            NameBank(label=label, **data.model_dump())
-        elif (bank.xx_names, bank.xy_names, bank.surname, bank.xy_surname) != (
-            data.female, data.male, data.surname, data.male_surnames,
+            bank = NameBank(label=label, **data.model_dump())
+        elif (bank.xx_names, bank.xy_names, bank.surname, bank.xy_surname, bank.selection_key) != (
+            data.female, data.male, data.surname, data.male_surnames, None,
         ):
             raise ValueError(f"Conflicting NameBank definition: {label!r}")
+        banks.append(bank)
+
+    return TokenCatalog(
+        NameBank,
+        members=tuple(banks),
+        label=pack.metadata.label,
+    )
