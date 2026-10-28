@@ -138,7 +138,7 @@ def test_actual_journal_pairs_portraits_groups_compatible_lines_and_exposes_face
             expected_colour = {"happy.png": (0, 255, 0), "dry.png": (255, 0, 0),
                                "base.png": (255, 255, 0)}[Path(image.source).name]
             assert tuple(stage.surface.get_at(point))[:3] == expected_colour
-            assert point[1] < stage.prose_rect.top - 2 * stage.row_height
+            assert point[1] < stage.prose_rect.top - stage.row_height
         assert len(page.rows) <= 4
     stage.page(PassagePage(-1))
     stage.draw(frame)
@@ -154,16 +154,15 @@ def test_actual_journal_pairs_portraits_groups_compatible_lines_and_exposes_face
 
 
 def test_page_header_is_washed_to_the_margins_of_the_rows_beneath_it(exchange) -> None:
-    # Both header rows, the page controls and the speaker, span exactly the
-    # columns the page's text washes over, as the scrolling header does.
+    # The bar, the speaker and the page's controls, spans exactly the columns
+    # the page's text washes over, as the scrolling header does.
     _, _, _, envelope, bridge, stage = exchange
     frame = _frame(bridge, envelope)
     stage.paged = True
     stage.present(frame, visual_passages(bridge, envelope))
     stage.draw(frame)
     pitch = stage.row_height
-    header = stage.prose_rect.top - 2 * pitch
-    assert _washed(stage, header + pitch // 2) == _washed(stage, header + 3 * pitch // 2) \
+    assert _washed(stage, stage.prose_rect.top - pitch // 2) \
         == _washed(stage, stage.prose_rect.top + pitch // 2)
 
 
@@ -179,11 +178,30 @@ def test_a_page_reads_from_just_under_its_bar_however_few_its_rows(exchange) -> 
         stage.page_index = index
         stage.draw(frame)
         # The rows' left edge, where no figure stands: washed where a row is.
-        left, _ = _washed(stage, stage.prose_rect.top - 2 * stage.row_height)
+        left, _ = _washed(stage, stage.prose_rect.top - stage.row_height)
         washed = [tuple(stage.surface.get_at((left, stage.prose_rect.top + row * stage.row_height
                                              + stage.row_height // 2)))[:3] != ROOM
                   for row in range(4)]
         assert washed == [row < len(page.rows) for row in range(4)]
+
+
+def test_narration_reads_from_the_row_under_the_bar_with_no_blank_speaker_row(exchange) -> None:
+    # The speaker shares the bar with the page's controls, so a page nobody
+    # speaks on starts its text on the next row, as a dialog page does.
+    world, _, _, _, _, stage = exchange
+    room = StageImage("narrative_im", str(world.resources.resource_path / "room1.png"))
+    first = Turn(step=1, images=[room], lines=[Line("The platform is crowded.")])
+    last = Turn(step=2, images=[room], lines=[Line("Somebody waves.")],
+                choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(last, [first, last])
+    stage.draw(last)
+    # Each control's own glyph rectangle, not the whole panel that also advances.
+    bar = {rect.y for rect, action in stage.hitboxes
+           if isinstance(action, (PassagePage, TogglePacing)) and rect.height <= stage.row_height}
+    assert bar == {stage.prose_rect.top - stage.row_height}
+    left, _ = _washed(stage, stage.prose_rect.top - stage.row_height)
+    assert tuple(stage.surface.get_at((left, stage.prose_rect.top + 1)))[:3] != ROOM
 
 
 def test_nothing_to_page_draws_no_bar_and_keeps_the_whole_menu(exchange) -> None:

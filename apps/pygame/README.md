@@ -92,8 +92,9 @@ The reader can override this locally with Ctrl+P or the Pages/Scroll control.
 Declared preference controls/F-key shortcuts still work. Mode and page position
 are client-local for this run; there is no account setting or backend page state.
 
-The window allocates FOUR wrapped body rows, one bounded attribution row and
-one navigation row. Wrapping uses the actual font's pixel metrics and preserves
+The window allocates FOUR wrapped body rows under one bar: the bounded
+attribution at its left, navigation at its right, so unattributed narration
+leaves no blank row. Wrapping uses the actual font's pixel metrics and preserves
 paragraphs/words, splitting oversized tokens when necessary. Failed visible images retain
 their existing text floor, measured into bounded pages in their visual scope.
 Carried-forward failures do not duplicate captions; deliberately hidden media

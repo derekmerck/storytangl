@@ -752,39 +752,34 @@ class Stage:
 
     def _draw_page(self, *, width: int, floor: int) -> None:
         page = self.pages[self.page_index]
-        top = max(self.prose_top, floor - 6 * self.row_height)
-        panel = pygame.Rect(0, top, width, 6 * self.row_height)
+        # One bar -- the speaker at its left, the page's controls at its right --
+        # and the rows directly under it, at the same distance on every page.
+        top = max(self.prose_top, floor - 5 * self.row_height)
+        panel = pygame.Rect(0, top, width, 5 * self.row_height)
         self.hitboxes.append((panel, PassagePage()))
-        self.prose_rect = pygame.Rect(0, top + 2 * self.row_height, width, 4 * self.row_height)
+        self.prose_rect = pygame.Rect(0, top + self.row_height, width, 4 * self.row_height)
         self.prose_capacity, self.max_scroll, self.scroll = 4, 0, 0
-        # Under the bar, at the same distance on every page, however few rows.
         self._draw_rows(page.rows, capacity=len(page.rows), width=width)
         bounds = self.text_bounds(panel)
-        heading = self.font.render(self._clip(page.heading or "", width=bounds.width), False, RUST)
-        # Each header row is backed as the rows beneath it are, so the page's
-        # header and text share both edges, as the scrolling header does.
-        for y in (top, top + self.row_height):
-            self._wash(
-                self._backing(
-                    heading,
-                    left=self.row_text_left,
-                    y=y,
-                    kind="prose",
-                    width=width,
-                    pitch=self.row_height,
-                ),
-                INK,
-            )
-        self._blit_control(heading, (bounds.left, top + self.row_height), bounds)
-        x = bounds.left
-        controls = [("<", PassagePage(-1)), (">", PassagePage()),
-                    ("End", PassagePage(end=True)), ("Scroll", TogglePacing())]
-        reserved = sum(self.font.size(label)[0] for label, _ in controls)
-        reserved += len(controls) * self.page_control_gap
-        counter = self._clip(f"{self.page_index + 1}/{len(self.pages)}",
-                             width=max(0, bounds.width - reserved))
-        for label, action in [(counter, None), *controls]:
-            text = self.font.render(label, False, CREAM)
+        controls = [(self.font.render(label, False, CREAM), action) for label, action in (
+            (f"{self.page_index + 1}/{len(self.pages)}", None), ("<", PassagePage(-1)),
+            (">", PassagePage()), ("End", PassagePage(end=True)), ("Scroll", TogglePacing()),
+        )]
+        x = bounds.right - sum(text.get_width() for text, _ in controls) \
+            - (len(controls) - 1) * self.page_control_gap
+        heading = self.font.render(
+            self._clip(page.heading or "", width=max(0, x - self.page_control_gap - bounds.left)),
+            False, RUST,
+        )
+        # Backed as the rows beneath it are, so the bar and the text share both
+        # edges, as the scrolling header does.
+        self._wash(
+            self._backing(heading, left=self.row_text_left, y=top, kind="prose",
+                          width=width, pitch=self.row_height),
+            INK,
+        )
+        self._blit_control(heading, (bounds.left, top), bounds)
+        for text, action in controls:
             self._blit_control(text, (x, top), bounds, action)
             x += text.get_width() + self.page_control_gap
 
