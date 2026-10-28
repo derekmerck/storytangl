@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+import re
 
 import pytest
 
 from tangl.cli.app import StoryTanglCLI
 from tangl.loaders import WorldBundle
+from tangl.mechanics.demographics import NameBank
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import build_service_manager
 from tangl.service.world_registry import clear_discovered_world_registries
@@ -116,3 +118,33 @@ def test_destination_choice_cli_witness_renders_live_cast_and_source_scope() -> 
     assert before < introduction < after
     assert transcript.count("Beth invites you") == 2
     assert transcript.count("Rest on the bench") == 2
+
+
+def test_casting_desk_cli_witness_completes_inspects_and_revisits() -> None:
+    transcript = _run_world_script("casting_desk")
+    unwrapped = " ".join(transcript.split())
+    assert _proof_class("casting_desk") == "finite"
+    assert transcript.count("Origin: River Guild.") == 3
+    assert "Origin: Hill Guild." in transcript
+    assert "Origin: Grove Kin." in transcript
+    ready = re.findall(r"^Application ready: (.+)\.$", transcript, re.MULTILINE)
+    inspected = re.findall(r"^Applicant: (.+)\.$", transcript, re.MULTILINE)
+    assert len(ready) == 4
+    assert ready[0] == ready[3]
+    assert inspected == [ready[0], ready[0], ready[1], ready[2], ready[0]]
+    human = NameBank.get_instance("fra").forms["female"]
+    assert ready[0] in {f"Ari {family}" for family in human.family.pool.candidates}
+    assert ready[1] in human.given.pool.candidates
+    sprite = NameBank.get_instance("casting_desk.sprite").forms["plain"]
+    assert ready[2] in {
+        f"{given} {stem}{suffix}"
+        for given in sprite.given.pool.candidates
+        for stem in sprite.family.pool.candidates
+        for suffix in sprite.family.suffix.candidates
+    }
+    assert "Naming source: fra; form female; revision sample-v1." in unwrapped
+    assert "Naming source: sprite; form plain; revision casting-desk-v1." in unwrapped
+    assert "Gender: neutral." in transcript
+    assert "Age band: not requested. Gender: not requested. Country: not requested." in unwrapped
+    assert "The desk closes. The three files remain themselves." in transcript
+    assert transcript.rstrip().endswith("No available choices.")

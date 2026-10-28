@@ -7,9 +7,10 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–4 IMPLEMENTED (UPDATE completion) — naming plus one owned personal name
-and durable profile/Actor composition are implemented. Explicit UPDATE completion, provenance and replay (4b) are implemented;
-Casting Desk (5) remains pending.
+**Status:** SLICES 1–5 IMPLEMENTED (text-first consumer) — naming, one owned personal
+name, durable profile/Actor composition and explicit UPDATE completion/provenance/replay
+are implemented. Casting Desk (5) demonstrates three finite, template-materialized slots;
+dynamic creation and media remain follow-ups.
 **Tracking:** [issue #285](https://github.com/derekmerck/storytangl/issues/285).
 **Execution:** [bounded retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md).
 
@@ -285,11 +286,21 @@ sampling weights during conversion.
 
 ## Projection and the first consumer
 
-The proposed consumer is a small **Casting Desk** demo, borrowing credential and
-presence features without changing Hall Monitor's fixed proofs. Exercise a human
-bank, two world origins sharing a bank, and a custom sprite bank. Authors can pin
-some facts and generate the rest, inspect the individual, and save/restore without
-changing their identity.
+The implemented text-first [Casting Desk](../../../../../worlds/casting_desk/README.md)
+demo leaves Hall Monitor's fixed proofs untouched. Two distinct human origins
+share the sample bank, and a grove sprite uses a world-local compound recipe.
+Authors pin name parts and facts, explicitly request missing values, inspect the
+same individual and save/restore without changing identity.
+
+The cast consists of three slots materialized by ordinary templates before UPDATE.
+Opening another file selects another allocated individual; reopening a file does
+not generate a replacement. Completion consumes the VM-supplied frame RNG without
+reseeding it. Controlled contexts with matching supplied RNG seeds and versioned
+inputs reproduce values and post-draw RNG states; independent story identities can
+have different VM seeds and need not produce matching applicants. Fully authored
+completions and revisits preserve RNG state. Ordinary role bindings target completion,
+and prose/inspection read the actor-owned PersonalName.
+Cold JSON service continuation loads the world/catalog before restoring bank refs.
 
 Appearance and outfit remain Presence facts. Portraits use the existing semantic
 portrait/media pipeline; renderer selection does not regenerate the person.
@@ -297,8 +308,9 @@ A voice may eventually be a selected reference-audio RIT. Nationality must not
 implicitly mandate a voice. Optional DiceBear, generated portraits, or TTS remain
 separate adapters, not sampler imports or required test assets.
 
-Start with text and lightweight fixtures. Portraits, described outfits, and a
-reference greeting can extend the same individual after core witnesses pass.
+The initial consumer is complete with text and lightweight fixtures. Dynamic actor
+creation, credentials, portraits, described outfits and a reference greeting can
+extend it separately.
 
 ## Deferred until a consumer needs them
 
@@ -332,5 +344,5 @@ Actual UPDATE traversal, pre-event deterministic re-execution, recorded diff rep
 renamed committed-state continuation and fresh-process JSON restore are separate
 witnesses. The existing actor identity is reused, so no new UUID scheme or factory
 is needed. Dynamic actor creation inside this helper and automatic setup generation
-are unsupported; Casting Desk (5), media and global rollback remain outstanding.
+are unsupported; Casting Desk (5) uses existing slots. Media and global rollback remain outstanding.
 See README for exact vocabulary, draw order, and receipt/revision semantics.

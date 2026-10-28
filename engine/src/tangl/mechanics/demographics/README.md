@@ -31,7 +31,8 @@ It provides:
 - Naming requires an explicit RNG, form, and catalog scope. Historical geography
   helpers retain their existing optional RNG policy.
 - Slices 1–3 and 4a (one name owner plus durable profile/Actor composition) are
-  implemented. Explicit UPDATE completion (4b) is implemented; Casting Desk (5) remains planned. See the
+  implemented. Explicit UPDATE completion (4b) and the text-first
+  [Casting Desk consumer](../../../../../worlds/casting_desk/README.md) (5) are implemented. See the
   [design contract](DEMOGRAPHICS_DESIGN.md) and
   [staged retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md), tracked by
   [issue #285](https://github.com/derekmerck/storytangl/issues/285).
@@ -262,7 +263,7 @@ activation, custom serializer, NPC factory, or name-sync bridge.
 4a supplies durable composition. The explicit UPDATE policy below implements 4b;
 this does not install automatic setup generation. NameBank/origin provenance is
 recorded in the separate completion receipt, not duplicated into the facts profile.
-Casting Desk and media remain later work.
+Casting Desk demonstrates that boundary with three fixed applicants; media remains later work.
 
 ## Explicit UPDATE completion (slice 4b)
 
@@ -319,5 +320,6 @@ the original deterministic draws once. Tests prove identical actor state, graph
 hash and observed RNG state, followed by committed-state no-op continuation. JSON
 fresh-process restore bootstraps declared world/catalogs first and makes no name
 sampling calls. Dynamic creation of new actors during the helper, automatic setup
-hooks, global rollback and hot reload are not supported. Casting Desk/media remain
-slice 5 and later work.
+hooks, global rollback and hot reload are not supported. Casting Desk (slice 5) uses
+three pre-materialized slots and explicit world UPDATE handlers. Runtime creation,
+credentials, Presence and media remain separate follow-ups.
