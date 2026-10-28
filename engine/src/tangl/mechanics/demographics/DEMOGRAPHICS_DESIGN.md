@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–3 AND 4a IMPLEMENTED — naming plus one owned personal name
-and durable profile/Actor composition are implemented. Lifecycle generation,
-provenance and real replay (4b), plus Casting Desk (5), remain pending.
+**Status:** SLICES 1–4 IMPLEMENTED (UPDATE completion) — naming plus one owned personal name
+and durable profile/Actor composition are implemented. Explicit UPDATE completion, provenance and replay (4b) are implemented;
+Casting Desk (5) remains pending.
 **Tracking:** [issue #285](https://github.com/derekmerck/storytangl/issues/285).
 **Execution:** [bounded retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md).
 
@@ -42,13 +42,13 @@ The remaining gaps are concrete:
 - Definition registration still uses process-global Singleton collections, while
   name-bank offers and lookup are bounded by explicitly supplied catalogs.
 - Names are optional-part PersonalName values owned by prose concepts; profiles
-  contain facts only. Lifecycle generation/commit policy remains 4b work.
+  contain facts only. The implemented UPDATE generation policy is documented below.
 - The sample pack deliberately covers only two name banks. Explicit coverage audits
   expose missing banks; selection policy for uncovered requests remains pending.
 - Sampler inputs include contradictory region/country pairs, uncovered subtype
   banks, unused weighting arguments, and age-enum aliases that affect selection.
 - Actor name/profile composition and graph/JSON persistence are implemented,
-  while generation provenance and exactly-once ledger replay remain open.
+  while generation provenance and deterministic UPDATE replay are documented below.
 
 Historical world overlays and the sprite bank are useful behavioral precedents,
 not implementations to copy. Some older overlay code was unfinished.
@@ -136,7 +136,7 @@ Country/subtype lookup is exact. A caller can declare `fallback_bank` explicitly
 resolved in the same scope; bank presence does not change the exact coverage audit.
 Geography sampling is still the historical optional policy, not a requirement on
 custom origins. Name/profile ownership and graph persistence are settled in 4a;
-generation provenance and ledger replay remain the 4b checkpoint.
+generation provenance and UPDATE replay are implemented in 4b, documented below.
 
 ## Name formation
 
@@ -216,7 +216,7 @@ world-visible definitions + authored constraints + explicit RNG
 - Inconsistent constraints fail descriptively. Optional dimensions may be absent;
   a requested dimension must have an eligible source or an explicit fallback.
 - Pure sampling accepts the caller's RNG. Story integration uses the established
-  frame/runtime RNG at setup or UPDATE; it never draws randomness during a name
+  frame/runtime RNG at UPDATE; it never draws randomness during a name
   getter, JOURNAL projection, PLANNING, or restore.
 - Candidate order is stable before selection. Reproducibility means the same
   constraints, RNG state, algorithm, and versioned catalog yield the same values.
@@ -256,10 +256,10 @@ declared catalogs and world authorities before restoring with every sampler
 disabled. Getters/rendering also preserve frame RNG state. Singleton persistence,
 Core identity/authority and restoration order are unchanged.
 
-**4b remains planned:** authored-partial merge/RNG budgeting, geographic constraint
-checks, age-alias weighting, generation origin/bank/revision provenance, normal
-setup/UPDATE integration, and exactly-once generation under real ledger replay.
-4a does not establish those policies or claim full slice 4 complete. Anonymous/proper
+**4b UPDATE completion is implemented:** authored-partial merge/RNG budgeting, geographic constraint
+checks, age-alias weighting, generation origin/bank/revision provenance,
+explicit UPDATE-handler integration, and exactly-once generation under real ledger replay.
+4a itself does not establish those policies; the implemented UPDATE boundary is documented below. Anonymous/proper
 realization, role binding and narrator knowledge stay prose policy; no discovery,
 introductions or alias-history refactor is included.
 
@@ -309,3 +309,28 @@ reference greeting can extend the same individual after core witnesses pass.
 - Catalog hot reload, cross-version regeneration, and a new RNG-stream framework.
 
 These remain possible extensions, not prerequisites or silently closed work.
+
+## Slice 4b implementation status
+
+Explicit UPDATE completion is implemented for already template-materialized actors.
+`GenerationRequest` declares requested facts and durable per-part fill/absence flags;
+`GenerationReceipt` commits completion plus selected live bank/form/revision and
+generated field names, never another name value. `complete_generation` returns
+name, facts and receipt for a normal opted-in world UPDATE handler to assign.
+There is no automatic setup/construction generator.
+
+Only requested missing values draw, in region/country/subtype/gender/age/bank/given/family
+order with sorted candidates. Explicit request flags preserve intentional absence
+across constructor form; model_fields_set alone is not durable presence metadata.
+Age aliases have one slot per value; unsupported gender/age weighting flags are
+removed. Scoped references and dependent geographic candidates validate before drawing.
+Zero-weight origin references must resolve, but only positive-weight banks need the
+requested form. A requested region can supply a subtype without generating a country;
+regions and countries without an eligible dependent mixture are excluded before draws.
+
+Actual UPDATE traversal, pre-event deterministic re-execution, recorded diff replay,
+renamed committed-state continuation and fresh-process JSON restore are separate
+witnesses. The existing actor identity is reused, so no new UUID scheme or factory
+is needed. Dynamic actor creation inside this helper and automatic setup generation
+are unsupported; Casting Desk (5), media and global rollback remain outstanding.
+See README for exact vocabulary, draw order, and receipt/revision semantics.

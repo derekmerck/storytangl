@@ -20,9 +20,9 @@ class PersonalName(Unstructurable):
     - `full_name`, `familiar_full_name`, `formal_full_name`: detailed address, falls back to short form
     """
 
-    given_name: str = None
+    given_name: str | None = None
     middle_name: str = None
-    family_name: str = None
+    family_name: str | None = None
     title: str = Field(default="mr.")   # this is treated like a gendered nominal
     suffix: str = None
     nickname: str = None  # preferred nick

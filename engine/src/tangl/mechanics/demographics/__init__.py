@@ -31,8 +31,13 @@ from .demographic import DemographicData, HasDemographics
 from .sampler import DemographicSampler
 from .selection import NameSelection, Origin, name_catalog, select_bank, select_origin
 
+from .generation import GenerationRequest, GenerationReceipt, complete_generation
+
 __all__ = [
     "Country",
+    "GenerationRequest",
+    "GenerationReceipt",
+    "complete_generation",
     "NameSelection",
     "Origin",
     "name_catalog",

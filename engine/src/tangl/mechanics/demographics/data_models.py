@@ -72,6 +72,7 @@ class NameBank(Singleton):
     selection_key: str | None = Field(
         default=None, min_length=1, json_schema_extra={"is_identifier": True},
     )
+    revision: str | None = None
     forms: dict[str, NameForm] = Field(
         min_length=1, json_schema_extra={"unstructurable": True, "include": True},
     )

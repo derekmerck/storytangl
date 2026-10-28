@@ -204,8 +204,9 @@ def register_pack(pack: DemographicPack) -> TokenCatalog[NameBank]:
     for label, forms in pack.names.items():
         bank = NameBank.get_instance(label)
         if bank is None:
-            bank = NameBank(label=label, forms=deepcopy(forms))
-        elif bank.forms != forms or bank.selection_key is not None:
+            bank = NameBank(label=label, forms=deepcopy(forms), revision=pack.metadata.revision)
+        elif (bank.forms != forms or bank.selection_key is not None
+              or bank.revision != pack.metadata.revision):
             raise ValueError(f"Conflicting NameBank definition: {label!r}")
         banks.append(bank)
 
