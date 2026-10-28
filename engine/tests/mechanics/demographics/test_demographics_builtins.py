@@ -13,7 +13,8 @@ import pytest
 import yaml
 
 from tangl.mechanics.demographics import (
-    Country, DemographicPack, DemographicSampler, NameBank, PackUnavailableError, Region, Subtype,
+    Country, DemographicPack, DemographicSampler, NameBank, NameForm, NamePart, NamePool,
+    PackUnavailableError, Region, Subtype,
     load_pack, parse_pack, register_pack,
 )
 from tangl.mechanics.demographics import packs
@@ -32,7 +33,10 @@ def test_parsing_is_pure_and_repeat_registration_preserves_references(sample: De
     parsed = parse_pack(sample.metadata, geography, names)
     assert (geography, names) == before
     assert parsed == sample
-    unrelated = NameBank(label="unrelated_pack_witness", female=["Only"], surname=["Here"])
+    unrelated = NameBank(label="unrelated_pack_witness", forms={"plain": NameForm(
+        given=NamePart(pool=NamePool(candidates=["Only"])),
+        family=NamePart(pool=NamePool(candidates=["Here"])),
+    )})
     catalog = register_pack(parsed)
     country = Country.get_instance("fra")
     region = Region.get_instance("west_europe")
@@ -43,7 +47,8 @@ def test_parsing_is_pure_and_repeat_registration_preserves_references(sample: De
     assert NameBank.get_instance("fra") is bank
     assert NameBank.get_instance("unrelated_pack_witness") is unrelated
     assert (geography, names) == before
-    assert DemographicSampler.sample_xx_name(bank, catalogs=[catalog], rng=Random(7)) in [
+    name = DemographicSampler.sample_name(bank, form="female", catalogs=[catalog], rng=Random(7))
+    assert (name.given_name, name.family_name) in [
         (given, family) for given in names["fra"]["female"] for family in names["fra"]["surname"]
     ]
 
@@ -53,8 +58,8 @@ def test_historical_geography_and_illustrative_pools_are_preserved(sample: Demog
     assert Country.get_instance("ago").population == 31825295
     assert Country.get_instance("ago").demonym == "Angolan"
     assert Region.get_instance("africa").population == 1109541977
-    assert sample.names["fra"].female == ["Marie", "Sophie", "Camille"]
-    assert sample.names["jpn"].male == ["Haruto", "Ren", "Yuto"]
+    assert sample.names["fra"]["female"].given.pool.candidates == ["Marie", "Sophie", "Camille"]
+    assert sample.names["jpn"]["male"].given.pool.candidates == ["Haruto", "Ren", "Yuto"]
     assert set(sample.names) == {"fra", "jpn"}
     with pytest.raises(LookupError, match="No eligible NameBank"):
         Country.get_instance("ago").namebank(catalogs=[register_pack(sample)])
@@ -151,25 +156,27 @@ def test_invalid_geography_is_rejected_without_mutating_input(sample: Demographi
     geography = {"wrong-key": sample.regions["asia"].model_dump()}
     before = deepcopy(geography)
     with pytest.raises(ValueError, match="differs from id"):
-        parse_pack(sample.metadata, geography, {"jpn": sample.names["jpn"].model_dump()})
+        parse_pack(sample.metadata, geography, {"jpn": {"female": ["Yuki"], "surname": ["Sato"]}})
     assert geography == before
 
 
 def test_duplicate_pool_entries_and_unicode_are_not_normalized(sample: DemographicPack) -> None:
     names = {"unicode_witness": {"female": ["Éva", "Éva", "李"], "surname": ["de Vries"]}}
     parsed = parse_pack(sample.metadata, {"asia": sample.regions["asia"].model_dump()}, names)
-    assert parsed.names["unicode_witness"].female == ["Éva", "Éva", "李"]
-    assert parsed.names["unicode_witness"].surname == ["de Vries"]
+    assert parsed.names["unicode_witness"]["female"].given.pool.candidates == ["Éva", "Éva", "李"]
+    assert parsed.names["unicode_witness"]["female"].family.pool.candidates == ["de Vries"]
 
 
 def test_conflicting_definition_fails_instead_of_overwriting(sample: DemographicPack) -> None:
     register_pack(sample)
     original = NameBank.get_instance("fra")
-    sample.names["fra"].female = ["Changed"]
+    sample.names["fra"]["female"] = NameForm(
+        given=NamePart(pool=NamePool(candidates=["Changed"])),
+    )
     with pytest.raises(ValueError, match="Conflicting NameBank.*fra"):
         register_pack(sample)
     assert NameBank.get_instance("fra") is original
-    assert original.xx_names == ["Marie", "Sophie", "Camille"]
+    assert original.forms["female"].given.pool.candidates == ["Marie", "Sophie", "Camille"]
 
 
 def test_optional_full_pack_is_valid_or_truly_unavailable() -> None:

@@ -13,6 +13,7 @@ from tangl.mechanics.demographics import (
     DemographicSampler,
     HasDemographic,
     HasDemographics,
+    NameForm, NamePart, NamePool,
 )
 from tangl.mechanics.demographics.data_models import Region, Country, Subtype, NameBank
 from tangl.lang.gens import Gens as Gender
@@ -33,16 +34,25 @@ def test_data():
 
 
 def test_namebank_singleton():
-    nb1 = NameBank(label="test_bank", female=["Alice"], male=["Bob"], surname=["Smith"])
+    nb1 = NameBank(label="test_bank", forms={"plain": NameForm(
+        given=NamePart(pool=NamePool(candidates=["Alice"])),
+        family=NamePart(pool=NamePool(candidates=["Smith"])),
+    )})
     nb2 = NameBank.get_instance("test_bank")
     assert nb1 is nb2
 
 
 def test_country_namebank():
     country = Country(label="test_country", name="Test Country", demonym="Test", population=1000000)
-    base = NameBank(label=country.label, female=["Eve"], male=["Charlie"], surname=["Johnson"])
+    base = NameBank(label=country.label, forms={"plain": NameForm(
+        given=NamePart(pool=NamePool(candidates=["Eve"])),
+        family=NamePart(pool=NamePool(candidates=["Johnson"])),
+    )})
     subtype = Subtype(label="test_subtype")
-    exact = NameBank(label=f"{country.label}_{subtype.label}", female=["Alice"], surname=["Smith"])
+    exact = NameBank(label=f"{country.label}_{subtype.label}", forms={"plain": NameForm(
+        given=NamePart(pool=NamePool(candidates=["Alice"])),
+        family=NamePart(pool=NamePool(candidates=["Smith"])),
+    )})
     catalogs = [TokenCatalog(NameBank, members=(base, exact))]
     assert country.namebank(catalogs=catalogs) is base
     assert country.namebank(subtype, catalogs=catalogs) is exact
@@ -146,16 +156,16 @@ def test_name_sampling(test_data):
     gender = Gender.XX
     d = DemographicSampler.sample_demographic(
         country=country, gender=gender, catalogs=test_data["catalogs"],
-        fallback_bank="fra", rng=random.Random(7),
+        fallback_bank="fra", name_form="female", rng=random.Random(7),
     )
-    assert d.given_name in nb.xx_names
-    assert d.family_name in nb.surname
+    assert d.given_name in nb.forms["female"].given.pool.candidates
+    assert d.family_name in nb.forms["female"].family.pool.candidates
 
 
 def test_demographic_sampling(test_data):
     demo_data = DemographicSampler.sample_demographic(
         country=test_data["countries"][0], catalogs=test_data["catalogs"],
-        fallback_bank="fra", rng=random.Random(7),
+        fallback_bank="fra", name_form="female", rng=random.Random(7),
     )
     assert isinstance(demo_data, DemographicData)
     assert demo_data.region in Region.all_instances()
@@ -172,7 +182,8 @@ def test_demographic_sampling_with_params(test_data):
 
     demo_data = DemographicSampler.sample_demographic(
         region=region, country=country, subtype=subtype, gender=gender,
-        catalogs=test_data["catalogs"], fallback_bank="fra", rng=random.Random(7),
+        catalogs=test_data["catalogs"], fallback_bank="fra",
+        name_form="female", rng=random.Random(7),
     )
 
     assert demo_data.region == region
@@ -186,7 +197,8 @@ def test_demographic_sampling_normalizes_string_inputs(test_data):
         subtype="european",
         gender="XX",
         age_range="ADULT",
-        catalogs=test_data["catalogs"], fallback_bank="fra", rng=random.Random(7),
+        catalogs=test_data["catalogs"], fallback_bank="fra",
+        name_form="female", rng=random.Random(7),
     )
 
     assert isinstance(demo_data.region, Region)
@@ -222,7 +234,7 @@ def test_demonym_property():
 def test_full_demographic_sampling(test_data):
     demo = DemographicSampler.sample_demographic(
         country=test_data["countries"][0], catalogs=test_data["catalogs"],
-        fallback_bank="fra", rng=random.Random(7),
+        fallback_bank="fra", name_form="female", rng=random.Random(7),
     )
     assert isinstance(demo, DemographicData)
     assert demo.region is not None
@@ -234,10 +246,12 @@ def test_full_demographic_sampling(test_data):
 
 def test_demographic_sampling_with_explicit_rng_is_reproducible(test_data):
     left = DemographicSampler.sample_demographic(
-        country="fra", catalogs=test_data["catalogs"], fallback_bank="fra", rng=random.Random(7),
+        country="fra", catalogs=test_data["catalogs"], fallback_bank="fra",
+        name_form="female", rng=random.Random(7),
     )
     right = DemographicSampler.sample_demographic(
-        country="fra", catalogs=test_data["catalogs"], fallback_bank="fra", rng=random.Random(7),
+        country="fra", catalogs=test_data["catalogs"], fallback_bank="fra",
+        name_form="female", rng=random.Random(7),
     )
 
     assert left.given_name == right.given_name

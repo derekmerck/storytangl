@@ -14,7 +14,7 @@ import yaml
 
 from tangl.core import TokenCatalog
 
-from .data_models import Country, NameBank, Region, Subtype
+from .data_models import Country, NameBank, NameForm, NamePart, NamePool, Region, Subtype
 
 
 class PackUnavailableError(FileNotFoundError):
@@ -36,13 +36,27 @@ class _RegionData(_CountryData):
     eth_mix: dict[str, int]
 
 
-class _NameData(BaseModel):
+class _LegacyNameData(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     female: list[str] = Field(min_length=1)
     male: list[str] | None = None
     surname: list[str] = Field(min_length=1)
     male_surnames: dict[str, str] | None = None
+
+
+def _normalize_name_forms(data: _LegacyNameData) -> dict[str, NameForm]:
+    """Import historical spelling and explicit absent-male-pool reuse once."""
+    female = NamePart(pool=NamePool(candidates=data.female))
+    male = NamePart(pool=NamePool(candidates=data.male)) if data.male else female
+    family = NamePool(candidates=data.surname)
+    return {
+        "female": NameForm(given=female, family=NamePart(pool=family)),
+        "male": NameForm(
+            given=male,
+            family=NamePart(pool=family, substitutions=data.male_surnames or {}),
+        ),
+    }
 
 
 class PackMetadata(BaseModel):
@@ -64,7 +78,7 @@ class DemographicPack:
 
     metadata: PackMetadata
     regions: dict[str, _RegionData]
-    names: dict[str, _NameData]
+    names: dict[str, dict[str, NameForm]]
 
     def uncovered_subtypes(self) -> tuple[tuple[str, str], ...]:
         """Report missing exact subtype banks, without applying fallback policy."""
@@ -94,7 +108,8 @@ def parse_pack(
 ) -> DemographicPack:
     """Validate and copy parsed YAML mappings without registration or input mutation."""
     regions = TypeAdapter(dict[str, _RegionData]).validate_python(geography)
-    banks = TypeAdapter(dict[str, _NameData]).validate_python(names)
+    legacy = TypeAdapter(dict[str, _LegacyNameData]).validate_python(names)
+    banks = {label: _normalize_name_forms(data) for label, data in legacy.items()}
     country_ids: set[str] = set()
     for key, region in regions.items():
         if key != region.id:
@@ -184,13 +199,11 @@ def register_pack(pack: DemographicPack) -> TokenCatalog[NameBank]:
         ):
             raise ValueError(f"Conflicting Region definition: {region_data.id!r}")
     banks: list[NameBank] = []
-    for label, data in pack.names.items():
+    for label, forms in pack.names.items():
         bank = NameBank.get_instance(label)
         if bank is None:
-            bank = NameBank(label=label, **data.model_dump())
-        elif (bank.xx_names, bank.xy_names, bank.surname, bank.xy_surname, bank.selection_key) != (
-            data.female, data.male, data.surname, data.male_surnames, None,
-        ):
+            bank = NameBank(label=label, forms=forms)
+        elif bank.forms != forms or bank.selection_key is not None:
             raise ValueError(f"Conflicting NameBank definition: {label!r}")
         banks.append(bank)
 

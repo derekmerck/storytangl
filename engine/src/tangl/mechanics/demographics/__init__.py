@@ -18,7 +18,7 @@ Key Features
 __version__ = "3.0.0"
 __title__ = "StoryTangl DemographicForge"
 
-from .data_models import Country, NameBank, Region, Subtype
+from .data_models import Country, NameBank, NameForm, NamePart, NamePool, Region, Subtype
 from .packs import (
     DemographicPack,
     PackMetadata,
@@ -43,6 +43,9 @@ __all__ = [
     "HasDemographic",
     "HasDemographics",
     "NameBank",
+    "NameForm",
+    "NamePart",
+    "NamePool",
     "Region",
     "Subtype",
     "DemographicPack",

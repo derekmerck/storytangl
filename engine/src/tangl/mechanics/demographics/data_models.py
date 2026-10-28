@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Annotated, Self
 
-from pydantic import Field
+from pydantic import ConfigDict, Field, model_validator
 
 from tangl.core import Singleton, TokenCatalog
+from tangl.core.bases import Unstructurable
 
 
 class Subtype(Singleton):
@@ -14,17 +16,65 @@ class Subtype(Singleton):
     demonym: str | None = None
 
 
+class NamePool(Unstructurable):
+    """Ordered candidates, retaining duplicate multiplicity and optional weights."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    candidates: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
+    weights: list[Annotated[float, Field(ge=0, allow_inf_nan=False, strict=True)]] | None = None
+
+    @model_validator(mode="after")
+    def validate_weights(self) -> Self:
+        if self.weights is not None:
+            if len(self.weights) != len(self.candidates):
+                raise ValueError("Name pool weights must match candidate positions")
+            if not any(weight > 0 for weight in self.weights):
+                raise ValueError("Name pool requires positive eligible weight")
+        return self
+
+
+class NamePart(Unstructurable):
+    """Select a stem, apply exact substitutions, then attach literal affixes."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    pool: NamePool = Field(json_schema_extra={"unstructurable": True})
+    prefix: NamePool | None = Field(default=None, json_schema_extra={"unstructurable": True})
+    suffix: NamePool | None = Field(default=None, json_schema_extra={"unstructurable": True})
+    prefix_separator: str = ""
+    suffix_separator: str = ""
+    substitutions: dict[str, Annotated[str, Field(min_length=1)]] = Field(
+        default_factory=dict, json_schema_extra={"include": True},
+    )
+
+
+class NameForm(Unstructurable):
+    """Declared given/family parts; either may be explicitly absent."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    given: NamePart | None = Field(default=None, json_schema_extra={"unstructurable": True})
+    family: NamePart | None = Field(default=None, json_schema_extra={"unstructurable": True})
+
+    @model_validator(mode="after")
+    def require_part(self) -> Self:
+        if self.given is None and self.family is None:
+            raise ValueError("A name form requires a given or family part")
+        return self
+
+
 class NameBank(Singleton):
-    """Shared name pools; loading and registration are explicit pack operations."""
+    """Shared naming forms; callers choose arbitrary form keys explicitly."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     selection_key: str | None = Field(
         default=None, min_length=1, json_schema_extra={"is_identifier": True},
     )
-
-    xx_names: list[str] = Field(alias="female")
-    xy_names: list[str] | None = Field(None, alias="male")
-    surname: list[str]
-    xy_surname: dict[str, str] | None = Field(None, alias="male_surnames")
+    forms: dict[str, NameForm] = Field(
+        min_length=1, json_schema_extra={"unstructurable": True, "include": True},
+    )
 
 
 class Country(Singleton):

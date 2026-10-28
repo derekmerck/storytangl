@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–2 IMPLEMENTED — explicit packs, honest availability, scoped
-name-bank catalogs, and origin selection are implemented. Name formation and
-committed profile/name ownership remain pending (slices 3–5).
+**Status:** SLICES 1–3 IMPLEMENTED — explicit packs, scoped naming catalogs,
+origin selection, and the small naming kernel are implemented. Committed
+profile/name ownership and the demo remain pending (slices 4–5).
 **Tracking:** [issue #285](https://github.com/derekmerck/storytangl/issues/285).
 **Execution:** [bounded retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md).
 
@@ -41,8 +41,9 @@ The remaining gaps are concrete:
 
 - Definition registration still uses process-global Singleton collections, while
   name-bank offers and lookup are bounded by explicitly supplied catalogs.
-- Name-bank fields assume female/male given-name pools and a surname. Custom
-  species, single names, and compound fairy surnames do not fit naturally.
+- Name-bank forms support optional parts and literal compound assembly. The
+  existing geographic profile still requires complete given/family values until
+  its canonical name-ownership checkpoint.
 - The sample pack deliberately covers only two name banks. Explicit coverage audits
   expose missing banks; selection policy for uncovered requests remains pending.
 - Sampler inputs include contradictory region/country pairs, uncovered subtype
@@ -164,6 +165,36 @@ to preserve old YAML spelling.
 Preserve Unicode, punctuation, and intentional capitalization. Display ordering
 and titles belong to personal-name/form policy, not random string cleanup.
 This is not a general morphology engine, grammar language, or executable YAML DSL.
+
+### Implemented normalized vocabulary (slice 3)
+
+- `NamePool(candidates, weights=None)` retains ordered entries and duplicate
+  multiplicity. Explicit weights correspond to positions, not unique spellings;
+  lengths must match, values must be finite/non-negative, and positive eligible
+  weight is required. Empty strings/pools are invalid required selections.
+- `NamePart(pool, prefix=None, suffix=None, prefix_separator="", suffix_separator="",
+  substitutions={})` selects a stem, performs exact complete-stem substitutions,
+  then attaches literal affixes. Optional absence is declared as `None`; invalid
+  present affixes do not silently disappear.
+- `NameForm(given=None, family=None)` requires at least one part. `NameBank.forms`
+  maps arbitrary keys to these values. `sample_name(..., form=..., catalogs=...,
+  rng=...)` returns the existing `PersonalName`; it does not infer forms from
+  gender/geography, title-case spellings, or create another personal-name model.
+
+Historical resource fields normalize once during parsing to explicit `female`
+and `male` forms. An absent/null/empty historical male pool explicitly reuses the
+female given-part definition. Surname exception maps live on the male family part;
+they replace full selected stems independently of any literal suffix. Source order,
+Unicode, punctuation, case, duplicate entries, and maps remain intact. The recorded
+full blob was audited read-only: 219 banks, 385,828 candidate positions including
+901 duplicates, and 21 exception maps are preserved by normalization.
+
+The old binary name-sampler methods/runtime fields are removed. All callers now
+select a form explicitly; the geographic profile sampler also takes `name_form`.
+The pure kernel supports omitted parts, while the existing geographic profile's
+complete-name requirement and actor/prose ownership remain slice 4 work. Recipe
+values embed through ordinary constructor-form markers; Singleton persistence is
+still only the existing `(class, label)` reference.
 
 ### Frequencies and variety
 
