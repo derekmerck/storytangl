@@ -204,6 +204,23 @@ def test_narration_reads_from_the_row_under_the_bar_with_no_blank_speaker_row(ex
     assert tuple(stage.surface.get_at((left, stage.prose_rect.top + 1)))[:3] != ROOM
 
 
+def test_a_one_page_response_draws_every_passage_it_combined(exchange, monkeypatch) -> None:
+    # Two passages that fit together make one page. Drawn as it would scroll,
+    # that page is the whole frame: the second passage's text is not lost.
+    _, _, _, _, _, stage = exchange
+    first, second = Line("The first sentence."), Line("The second sentence.")
+    frame = Turn(step=1, lines=[first, second], choices=[Choice(uuid4(), "Continue")])
+    stage.paged = True
+    stage.present(frame, [Turn(step=1, lines=[first]), Turn(step=1, lines=[second])])
+    assert len(stage.pages) == 1
+    drawn: list[str] = []
+    draw_rows = stage._draw_rows
+    monkeypatch.setattr(stage, "_draw_rows", lambda rows, **kwargs: (
+        drawn.extend(row.text for row in rows), draw_rows(rows, **kwargs)))
+    stage.draw(frame)
+    assert drawn == ["The first sentence.", "The second sentence."]
+
+
 def test_nothing_to_page_draws_no_bar_and_keeps_the_whole_menu(exchange) -> None:
     # A plate, an encounter, or a menu that fits on one page has nothing to
     # turn: no bar, no switch, and its choices get the room they get scrolling.

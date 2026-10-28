@@ -602,10 +602,11 @@ class Stage:
             pending = None
         paged = bool(self.paged and self.pages and editor is None and pending is None
                      and turn is self._presentation_frame)
-        if paged:
-            turn = self.pages[self.page_index].turn
         # Only text to read gets the page's bar. A plate, an encounter, or a
-        # response that fits on one page draws as it would scrolling.
+        # response that fits on one page draws as it would scrolling: one page
+        # is the whole frame, with the text of every passage it combined.
+        if paged and len(self.pages) > 1:
+            turn = self.pages[self.page_index].turn
         reading = paged and len(self.pages) > 1 and bool(self.pages[self.page_index].rows)
         self.hitboxes.clear()
         if paged and not reading and not self.choices_ready:
