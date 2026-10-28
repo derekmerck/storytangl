@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–3 IMPLEMENTED — explicit packs, scoped bank/origin selection,
-and the small naming kernel are implemented. Slices 4–5 remain planned; the
-actor/name ownership checkpoint remains open.
+**Status:** SLICES 1–3 AND 4a IMPLEMENTED — naming and durable Actor/profile
+composition are implemented. Slice 4 is split: 4b lifecycle generation/provenance
+and real replay remain planned, as does Casting Desk (5). Full slice 4 is not complete.
 **Contract:** [Demographics design](DEMOGRAPHICS_DESIGN.md).
 **Tracker:** [#285](https://github.com/derekmerck/storytangl/issues/285).
 
@@ -124,36 +124,60 @@ without changing data bytes or multiplicity. Tiny fixtures prove formation,
 substitutions, invalid declarations, fixed-RNG weighted/unweighted draws, owned
 value JSON constructor form, and real-world catalog/origin use. The read-only full
 bank audit verifies its recorded hash and all original pools/maps. Geographic
-profile complete-name requirements and canonical actor/name ownership stay at the
-slice 4 checkpoint.
+profile/name ownership is resolved below in 4a; lifecycle generation remains 4b.
 
-## 4. Commit profiles through normal actor construction
+## 4a. One name owner and durable Actor/profile composition — implemented
 
-**Capability:** request missing facts once, then retain them through rendering,
-save/restore, and replay.
+**Ownership:** `actor.personal_name` is the existing authoritative `PersonalName`
+field from prose's PersonalNamedConcept/PersonalNamedActor. `DemographicData` no
+longer inherits it; it contains optional demographic facts and shared references.
+HasDemographics publishes facts without shadowing Actor.name or storing a name.
+A world composes the facets explicitly and supplies chosen values through ordinary
+EntityTemplate/story materialization. No automatic sampling or syncing bridge.
 
-**Chokepoint:** `DemographicData`, `HasDemographics`, sampled construction inputs,
-and template materialization. Choose one authoritative `PersonalName` composition
-that works with prose's `PersonalNamedActor`. Persist actual values and origin/bank
-revision provenance. Add embedded persistence markers where needed; use existing
-singleton reference resolution.
+**Implemented witnesses:**
 
-**Witnesses / done when:**
+- Actual World + EntityTemplate materialization creates one graph-owned Actor with
+  independent owned name/profile values and live definition references.
+- Given+family, given-only, and family-only names work. Mutation/replacement changes
+  namespace and prose forms/default nominals; explicit name/proper_forms overrides
+  remain intentional policy.
+- Graph constructor form through real JSON preserves actor ID, actual values and
+  live Region/Country/Subtype references. Fresh-process restoration bootstraps the
+  declared catalogs/world authorities and succeeds with all samplers disabled.
+- Namespace reads and rendering consume no frame RNG; no sampler runs in getters,
+  constructors, or restoration. Owning field markers reuse existing machinery.
 
-- Pinned fields win; only missing values consume RNG. Inconsistent geographic
-  constraints and uncovered requested banks fail descriptively.
-- Age aliases do not accidentally add selection weight. Advertised weighting
-  options work or are removed. Keep broader age-parser changes separate.
-- Getters, PLANNING, JOURNAL, and restore do not sample or consume RNG.
-- Constructor form through JSON restores a real graph-owned actor/profile with
-  live singleton references. A fresh-process restore loads declared catalogs
-  first. Assert committed values, not merely equal seeds.
-- A later rename uses one name value across demographics and prose.
-- A real story materialization/replay witness uses the frame RNG, not just a
-  direct-constructor shortcut.
+**Checkpoint result:** the composed Actor works without Core identity, authority,
+or restoration changes. The only generic prose correction uses the current owned
+PersonalName as the default nominal when no authored display name exists, and
+projects current personal-name symbols through normal namespace contribution.
+Pure APIs are separate: sample_name returns PersonalName; sample_demographic returns
+facts only. Neither automatically materializes an individual.
 
-**Checkpoint before code:** settle name ownership and actual Actor composition.
-Do not introduce a parallel NPC/token factory to bypass a type mismatch.
+## 4b. Sample missing facts at the lifecycle boundary — planned
+
+**Capability:** preserve authored inputs, generate missing facts once at normal
+setup/UPDATE boundaries, and retain committed results/provenance through replay.
+
+**Remaining witnesses / full slice 4 acceptance:**
+
+- Pinned fields win; only missing values consume RNG under a settled budget.
+  Contradictory geographic constraints and uncovered required naming selections
+  fail descriptively; explicit fallback remains separate from exact coverage.
+- Age aliases do not accidentally add weight. Advertised weighting options work
+  or are removed; broader age/name parser changes remain separate.
+- Decide and persist generation provenance, including selected origin/bank and
+  catalog revision, without duplicating the authoritative personal name.
+- Normal setup/UPDATE generation uses frame RNG through existing dispatch and
+  EntityTemplate materialization; no automatic generation in model validators,
+  getters, PLANNING/JOURNAL, or structure().
+- A real ledger witness proves exactly-once generation, no resampling during
+  restore/replay, actual committed values, and preserved authored facts.
+
+4a's graph/JSON witnesses do not claim lifecycle generation or ledger replay.
+Reassess the generation/provenance contract before 4b implementation; no parallel
+NPC/token factory or global rollback policy is implied.
 
 ## 5. Ship a small Casting Desk consumer
 
@@ -180,10 +204,10 @@ paths. They are not prerequisites for completing slices 1–4.
 
 ## Completion and follow-ups
 
-#285 can close when slices 1–5 land with their behavioral witnesses. Update design
+#285 can close when slices 1–3, 4a–4b, and 5 land with their behavioral witnesses. Update design
 status and the package README then. Record still-desired advanced work as deferred
 follow-ups rather than claiming the whole synthetic-NPC/media problem is solved.
 
-Slices 1–3 are the implemented boundary. Reassess declaration and name-ownership
-checkpoints before their respective slices; this sequence is not permission to
+Slices 1–3 and 4a are the implemented boundary. Reassess the generation/provenance
+checkpoint before 4b; this sequence is not permission to
 refactor foundational contracts opportunistically.

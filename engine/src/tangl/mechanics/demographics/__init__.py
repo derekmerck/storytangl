@@ -27,7 +27,7 @@ from .packs import (
     parse_pack,
     register_pack,
 )
-from .demographic import DemographicData, HasDemographic, HasDemographics
+from .demographic import DemographicData, HasDemographics
 from .sampler import DemographicSampler
 from .selection import NameSelection, Origin, name_catalog, select_bank, select_origin
 
@@ -40,7 +40,6 @@ __all__ = [
     "select_origin",
     "DemographicData",
     "DemographicSampler",
-    "HasDemographic",
     "HasDemographics",
     "NameBank",
     "NameForm",

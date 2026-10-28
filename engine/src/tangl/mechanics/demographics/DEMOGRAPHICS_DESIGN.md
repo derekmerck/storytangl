@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–3 IMPLEMENTED — explicit packs, scoped naming catalogs,
-origin selection, and the small naming kernel are implemented. Committed
-profile/name ownership and the demo remain pending (slices 4–5).
+**Status:** SLICES 1–3 AND 4a IMPLEMENTED — naming plus one owned personal name
+and durable profile/Actor composition are implemented. Lifecycle generation,
+provenance and real replay (4b), plus Casting Desk (5), remain pending.
 **Tracking:** [issue #285](https://github.com/derekmerck/storytangl/issues/285).
 **Execution:** [bounded retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md).
 
@@ -41,16 +41,14 @@ The remaining gaps are concrete:
 
 - Definition registration still uses process-global Singleton collections, while
   name-bank offers and lookup are bounded by explicitly supplied catalogs.
-- Name-bank forms support optional parts and literal compound assembly. The
-  existing geographic profile still requires complete given/family values until
-  its canonical name-ownership checkpoint.
+- Names are optional-part PersonalName values owned by prose concepts; profiles
+  contain facts only. Lifecycle generation/commit policy remains 4b work.
 - The sample pack deliberately covers only two name banks. Explicit coverage audits
   expose missing banks; selection policy for uncovered requests remains pending.
 - Sampler inputs include contradictory region/country pairs, uncovered subtype
   banks, unused weighting arguments, and age-enum aliases that affect selection.
-- `DemographicData` inherits `PersonalName`, while modern prose naming embeds a
-  `PersonalName`. Actor composition needs one authoritative name and an explicit
-  constructor-form persistence contract.
+- Actor name/profile composition and graph/JSON persistence are implemented,
+  while generation provenance and exactly-once ledger replay remain open.
 
 Historical world overlays and the sprite bank are useful behavioral precedents,
 not implementations to copy. Some older overlay code was unfinished.
@@ -137,8 +135,8 @@ materialization or a durable profile/provenance owner.
 Country/subtype lookup is exact. A caller can declare `fallback_bank` explicitly,
 resolved in the same scope; bank presence does not change the exact coverage audit.
 Geography sampling is still the historical optional policy, not a requirement on
-custom origins. Actor/name ownership and profile persistence remain the slice 4
-checkpoint.
+custom origins. Name/profile ownership and graph persistence are settled in 4a;
+generation provenance and ledger replay remain the 4b checkpoint.
 
 ## Name formation
 
@@ -190,9 +188,8 @@ full blob was audited read-only: 219 banks, 385,828 candidate positions includin
 901 duplicates, and 21 exception maps are preserved by normalization.
 
 The old binary name-sampler methods/runtime fields are removed. All callers now
-select a form explicitly; the geographic profile sampler also takes `name_form`.
-The pure kernel supports omitted parts, while the existing geographic profile's
-complete-name requirement and actor/prose ownership remain slice 4 work. Recipe
+select a form explicitly. Name and profile sampling are separate calls in 4a;
+profiles contain no name or required name parts. Recipe
 values embed through ordinary constructor-form markers; Singleton persistence is
 still only the existing `(class, label)` reference.
 
@@ -235,11 +232,36 @@ world-visible definitions + authored constraints + explicit RNG
   loads/binds the declared catalogs before resolving references, then restores
   committed values without invoking the sampler.
 
-The first actor slice must settle whether the profile composes `PersonalName` or
-the actor owns it separately. Prefer the smallest composition sharing the existing
-naming value; test the actual Actor/prose composition before prescribing a new
-inheritance tree. Anonymous/proper realization, role binding, and narrator
-knowledge remain prose policy, not demographics.
+### Implemented name/profile ownership (4a)
+
+The ownership decision is `actor.personal_name`, using prose's existing field.
+DemographicData is a profile-only Unstructurable value with optional gender,
+age range, and Region/Country/Subtype references. HasDemographics owns that value
+and contributes facts; it neither inherits PersonalName nor shadows Actor.name,
+projects duplicate name properties, or caches a name. World domains explicitly
+compose HasDemographics with PersonalNamedActor. Given+family, given-only, and
+family-only names use the same composition.
+
+`sample_name(..., form, catalogs, rng)` returns the existing PersonalName, while
+`sample_demographic(..., rng)` returns facts only. Already chosen values are ordinary
+EntityTemplate/story construction inputs. No actor factory or automatic generation
+is added. Prose's current owned value supplies the default proper nominal only
+when there is no authored display override; explicit name/proper_forms remain
+intentional policy. Current personal-name namespace symbols belong to prose.
+
+Actor-owned profile/name fields and reference-bearing profile fields opt into the
+existing constructor-form markers. Graph → JSON → graph retains actor identity,
+actual values and live Singleton references. The real fresh-process witness loads
+declared catalogs and world authorities before restoring with every sampler
+disabled. Getters/rendering also preserve frame RNG state. Singleton persistence,
+Core identity/authority and restoration order are unchanged.
+
+**4b remains planned:** authored-partial merge/RNG budgeting, geographic constraint
+checks, age-alias weighting, generation origin/bank/revision provenance, normal
+setup/UPDATE integration, and exactly-once generation under real ledger replay.
+4a does not establish those policies or claim full slice 4 complete. Anonymous/proper
+realization, role binding and narrator knowledge stay prose policy; no discovery,
+introductions or alias-history refactor is included.
 
 ## Resource availability and provenance
 

@@ -220,10 +220,7 @@ class DemographicSampler:
         age_range: AgeRange = None,
         weighted: bool = True,
         *,
-        catalogs: Sequence[TokenCatalog[NameBank]],
         rng: random.Random,
-        fallback_bank: str | None = None,
-        name_form: str,
     ) -> DemographicData:
 
         country = (
@@ -246,14 +243,7 @@ class DemographicSampler:
         gender = cls._normalize_gender(gender, weighted=weighted, rng=rng)
         age_range = cls._normalize_age_range(age_range, weighted=weighted, rng=rng)
 
-        nb = country.namebank(subtype, catalogs=catalogs, fallback_bank=fallback_bank)
-        name = cls.sample_name(
-            nb, form=name_form, gender=gender, catalogs=catalogs, rng=rng,
-        )
-
         return DemographicData(
-            given_name=name.given_name,
-            family_name=name.family_name,
             region=region,
             country=country,
             subtype=subtype,
