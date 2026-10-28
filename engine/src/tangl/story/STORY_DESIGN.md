@@ -461,9 +461,12 @@ maps when graph/template lookup can answer the question directly.
 The journal is the only narrative output surface. Story owns what fragments
 mean; service/transports decide how to present them.
 
-A block's `content_hints` (`PresentationHints`) ride on its content fragment,
-so an author can say how a client is meant to read a line without a second
-channel. One convention so far (#629): a style tag `status:<section_id>` marks
+A block's `content_hints` (`PresentationHints`) ride on every line its content
+is journaled as -- its plain text, each line a callout is composed into, and
+each of a prose block's stored units -- so an author can say how a client is
+meant to read a line without a second channel. A line keeps its own say over
+the block's (`presentation.hints.layered`): its own fields win, and style tags
+and style properties add up. One convention so far (#629): a style tag `status:<section_id>` marks
 a line that restates that `ui-status` section -- a scene's title,
 `status:scene`; a day line, `status:day` and `status:period`. The journal keeps
 the line, for clients that show no status; a client whose status bar carries

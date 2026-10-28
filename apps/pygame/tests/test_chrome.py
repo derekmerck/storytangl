@@ -15,7 +15,7 @@ from tangl.mechanics.sandbox import (
     ChargeFacet, SandboxCompiledAssetType, SandboxLocation, SandboxMap, SandboxScope,
 )
 from tangl.mechanics.sandbox.compact_status import advertise_compact_status, project_compact_status
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     BrandingValue, InfoAffordance, ProjectedSection, ProjectionRequest, ScalarValue,
@@ -145,6 +145,27 @@ def test_a_line_that_only_restates_the_status_is_left_to_the_bar(hud_world: Worl
         assert read(elsewhere) == [text for text, _ in said]
     finally:
         pop_manual_world(plain.label)
+
+
+def test_a_dropped_status_line_leaves_no_page_to_turn_to(hud_world: World) -> None:
+    # Narration, then a menu whose only text is the day the bar already shows:
+    # the reader reads the narration and acts there, with no blank page between.
+    from tangl.pygame_client.__main__ import _frame
+    from tangl.pygame_client.presentation import visual_passages
+
+    bridge = PygameSessionBridge()
+    bridge.start(hud_world.label)
+    envelope = RuntimeEnvelope(fragments=[
+        ContentFragment(content="The errand ends.", step=1),
+        ContentFragment(content="Day 1, morning.", step=2,
+                        hints=PresentationHints(style_tags=["status:day", "status:period"])),
+        ChoiceFragment(text="Visit the study", edge_id=UUID(int=1), step=2),
+    ])
+    stage = Stage(logical_size=(320, 200), display_scale=1)
+    stage.paged = True
+    stage.present(_frame(bridge, envelope), visual_passages(bridge, envelope))
+    assert [[row.text for row in page.rows] for page in stage.pages] == [["The errand ends."]]
+    assert stage.choices_ready
 
 
 def test_service_sandbox_status_survives_called_scene_and_return(hud_world: World) -> None:

@@ -543,8 +543,11 @@ class Stage:
             previous_failed = failed
             fallback = self._rows(Turn(step=passage.step), arriving_failed, pixel_width=pixel_width)
             if not passage.lines and not fallback:
+                # A step's last staging is a page of its own only if it shows
+                # something the page before does not. A step whose only text the
+                # client dropped -- a status echo (#629) -- leaves nothing to see.
                 if index + 1 == len(passages) or passages[index + 1].step != passage.step:
-                    if self.pages:
+                    if self.pages and passage.images != self.pages[-1].turn.images:
                         self.pages.append(_Page(passage, [], None))
                 continue
             for line in passage.lines:
