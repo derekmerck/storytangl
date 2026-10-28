@@ -1,0 +1,9 @@
+label: casting_desk
+scripts: script.yaml
+domain_module: casting_desk.domain
+metadata:
+  title: Casting Desk
+  author: StoryTangl
+  description: Complete three applicants once, then inspect the same committed individuals.
+  start_at: desk.start
+  proof_class: finite

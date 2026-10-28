@@ -116,3 +116,20 @@ def test_destination_choice_cli_witness_renders_live_cast_and_source_scope() -> 
     assert before < introduction < after
     assert transcript.count("Beth invites you") == 2
     assert transcript.count("Rest on the bench") == 2
+
+
+def test_casting_desk_cli_witness_completes_inspects_and_revisits() -> None:
+    transcript = _run_world_script("casting_desk")
+    unwrapped = " ".join(transcript.split())
+    assert _proof_class("casting_desk") == "finite"
+    assert transcript.count("Origin: River Guild.") == 3
+    assert "Origin: Hill Guild." in transcript
+    assert "Origin: Grove Kin." in transcript
+    assert "Application ready: Ari Dubois." in transcript
+    assert "Naming source: fra; form female; revision sample-v1." in unwrapped
+    assert "Naming source: sprite; form plain; revision casting-desk-v1." in unwrapped
+    assert "Application ready: Cookie Summermint." in transcript
+    assert "Gender: neutral." in transcript
+    assert "Age band: not requested. Gender: not requested. Country: not requested." in unwrapped
+    assert "The desk closes. The three files remain themselves." in transcript
+    assert transcript.rstrip().endswith("No available choices.")

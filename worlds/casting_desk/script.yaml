@@ -1,0 +1,107 @@
+label: casting_desk
+globals:
+  link_prose: false
+  naming_defaults: {Actor: proper}
+actors:
+  river_applicant:
+    kind: Applicant
+    personal_name: {given_name: Ari, title: ""}
+    demographic: {age_range: 3}
+    generation_request:
+      facts: [gender, age_range]
+      name_parts: {given_name: true, family_name: true}
+      origin: {label: River Guild, banks: {fra: 1}}
+      form: female
+  hill_applicant:
+    kind: Applicant
+    demographic: {gender: X_}
+    generation_request:
+      facts: [gender, age_range]
+      name_parts: {given_name: true, family_name: false}
+      origin: {label: Hill Guild, banks: {fra: 1}}
+      form: female
+  grove_applicant:
+    kind: Applicant
+    demographic: {}
+    generation_request:
+      name_parts: {given_name: true, family_name: true}
+      origin: {label: Grove Kin, banks: {sprite: 1}}
+      form: plain
+scenes:
+  desk:
+    blocks:
+      start:
+        content: |
+          Three applications wait on the Casting Desk: two humans from different
+          guilds and a grove sprite. Open a file to complete its missing details.
+          Each file belongs to one person; reopening it keeps that person.
+        actions:
+          - {label: river, text: Open River Guild file, successor: river.complete}
+          - {label: hill, text: Open Hill Guild file, successor: hill.complete}
+          - {label: grove, text: Open Grove Kin file, successor: grove.complete}
+          - {label: close, text: Close the desk, successor: closed}
+      closed:
+        content: The desk closes. The three files remain themselves.
+  river:
+    roles:
+      applicant: {actor_ref: river_applicant}
+    blocks:
+      complete:
+        kind: CompleteApplicant
+        seed: 28501
+        prose:
+          - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
+          - text: Ari kept the given name and adult age band already on the form.
+        actions:
+          - {label: inspect, text: Inspect profile, successor: inspect}
+          - {label: return, text: Return to desk, successor: desk.start}
+      inspect: &inspection
+        kind: ProseBlock
+        prose:
+          - template: "Applicant: {{ reference(applicant, 'proper', form='full') }}."
+          - template: "Origin: {{ applicant.generation_receipt.origin }}."
+          - template: >-
+              Age band: {{ applicant.demographic.age_range.name
+              if applicant.demographic.age_range is not none else 'not requested' }}.
+              Gender: {{ {'XX': 'female', 'XY': 'male', 'X_': 'neutral'}[
+              applicant.demographic.gender.value]
+              if applicant.demographic.gender is not none else 'not requested' }}.
+              Country: {{ applicant.demographic.country.name
+              if applicant.demographic.country is not none else 'not requested' }}.
+          - template: >-
+              Naming source: {{ applicant.generation_receipt.bank.selection_key
+              or applicant.generation_receipt.bank.label }};
+              form {{ applicant.generation_receipt.form }};
+              revision {{ applicant.generation_receipt.revision }}.
+              Completed: {{ applicant.generation_receipt.generated | join(', ') }}.
+        actions:
+          - {label: return, text: Return to desk, successor: desk.start}
+          - {label: reread, text: Read profile again, successor: inspect}
+  hill:
+    roles:
+      applicant: {actor_ref: hill_applicant}
+    blocks:
+      complete:
+        kind: CompleteApplicant
+        seed: 28502
+        prose:
+          - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
+          - text: This applicant keeps an authored neutral gender and no family name.
+        actions:
+          - {label: inspect, text: Inspect profile, successor: inspect}
+          - {label: return, text: Return to desk, successor: desk.start}
+      inspect: *inspection
+  grove:
+    roles:
+      applicant: {actor_ref: grove_applicant}
+    blocks:
+      complete:
+        kind: CompleteApplicant
+        seed: 28503
+        prose:
+          - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
+          - text: The sprite's family name joins a seasonal stem to a leafy ending.
+        actions:
+          - {label: inspect, text: Inspect profile, successor: inspect}
+          - {label: return, text: Return to desk, successor: desk.start}
+      inspect: *inspection

@@ -7,9 +7,10 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–4 IMPLEMENTED (UPDATE completion) — naming and durable Actor/profile
-composition are implemented. Slice 4 supports explicit UPDATE completion; automatic setup generation is not
-installed. Casting Desk (5) remains planned.
+**Status:** SLICES 1–5 IMPLEMENTED (text-first Casting Desk) — naming, durable Actor/profile
+composition and explicit UPDATE completion are implemented. Casting Desk demonstrates
+three pre-materialized slots; automatic setup generation, dynamic creation and media
+remain outside the implemented scope.
 **Contract:** [Demographics design](DEMOGRAPHICS_DESIGN.md).
 **Tracker:** [#285](https://github.com/derekmerck/storytangl/issues/285).
 
@@ -179,26 +180,35 @@ UPDATE-handler integration, and retain committed results/provenance through repl
 The UPDATE generation/provenance contract is implemented below; no parallel
 NPC/token factory or global rollback policy is implied.
 
-## 5. Ship a small Casting Desk consumer
+## 5. Ship a small Casting Desk consumer — implemented, finite cast
 
 **Capability:** demonstrate the refresh without destabilizing existing Hall Monitor
 or credential fixtures.
 
-Generate and inspect a small cast with authored origin/species/facts. Exercise the
-human and compound-sprite cases and two origins sharing a bank. An ordinary choice
-creates another individual. Use the established world/service walkthrough harness.
+`worlds/casting_desk` completes and inspects three authored slots: two humans with
+distinct origins sharing the sample bank, and a compound-name sprite. Ordinary
+templates materialize the cast before UPDATE. Choosing another application selects
+another allocated slot; it does not create a new actor at runtime. This deliberately
+narrows the original dynamic-creation aspiration to the landed completion contract.
 
-**Witnesses / done when:**
+**Implemented witnesses:**
 
 - The demo uses declared catalogs only; identical versioned inputs and seed give
   the same committed cast.
-- Namespace/prose forms and an optional credential refer to the same actor.
+- Namespace/prose forms and inspection refer to the same actor-owned PersonalName.
 - Save/restore retains individuals without regeneration.
 - The world README explains intent and the demonstrated capability; add its line
   to the world index according to repository governance.
 - Required tests need no LFS, network access, GPUs, or optional renderers.
 
-Text completes the initial demo. A separate follow-up may add Presence/outfit
+Service choices and cmd2 cover generation/inspection/revisits. Fresh-process JSON
+service restore retains IDs, committed values/receipts and live banks with completion
+disabled. Per-entry authored seeds reproduce values across independent story IDs;
+getters, JOURNAL and completed UPDATE preserve RNG state. Partial names/facts and
+intentional absence survive; the sprite requests no demographic dimensions.
+
+Text completes the initial demo. Runtime actor creation and credentials remain
+separate consumer work. A separate follow-up may add Presence/outfit
 prose, an opt-in portrait, and a reference-audio greeting through existing media
 paths. They are not prerequisites for completing slices 1–4.
 
@@ -230,5 +240,6 @@ Actual UPDATE traversal, pre-event deterministic re-execution, recorded diff rep
 renamed committed-state continuation and fresh-process JSON restore are separate
 witnesses. The existing actor identity is reused, so no new UUID scheme or factory
 is needed. Dynamic actor creation inside this helper and automatic setup generation
-are unsupported; Casting Desk (5), media and global rollback remain outstanding.
+are unsupported; Casting Desk (5) uses existing slots. Media and global rollback
+remain outstanding.
 See README for exact vocabulary, draw order, and receipt/revision semantics.

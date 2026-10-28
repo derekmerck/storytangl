@@ -1,0 +1,15 @@
+create_story casting_desk
+do 1
+do 1
+do 2
+do 1
+do 2
+do 1
+do 1
+do 3
+do 1
+do 1
+do 1
+do 1
+do 1
+do 4
