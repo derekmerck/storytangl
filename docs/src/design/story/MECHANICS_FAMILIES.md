@@ -262,7 +262,7 @@ Review lens:
 - **Attachment points:** called by world/mechanic UPDATE policy
 - **Appearance:** normally projected by the consuming mechanic
 
-### `demographics` — Foundation, scoped bank selection implemented
+### `demographics` — Foundation, naming kernel implemented
 
 Why it stays:
 
@@ -271,9 +271,9 @@ Why it stays:
 
 Current gap:
 
-- extensible name formation and committed profile/name ownership still need
-  implementation; explicit packs, bounded naming catalogs, and authored origin
-  selection are implemented (slices 1–2)
+- committed profile/name ownership still needs implementation; explicit packs,
+  bounded naming catalogs, authored origins, and complete/compound name formation
+  are implemented (slices 1–3)
 
 The source-local design and retrofit plan live in
 `engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md` and

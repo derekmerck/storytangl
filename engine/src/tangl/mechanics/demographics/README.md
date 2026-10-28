@@ -28,10 +28,10 @@ It provides:
 
 ## Notes
 
-- Sampling now accepts an optional RNG so callers can make the behavior explicit
-  and reproducible without changing existing defaults.
-- Slices 1–2 (explicit packs and scoped bank/origin selection) are implemented.
-  Slices 3–5 remain planned. See the
+- Naming requires an explicit RNG, form, and catalog scope. Historical geography
+  helpers retain their existing optional RNG policy.
+- Slices 1–3 (explicit packs, scoped bank/origin selection, and name formation)
+  are implemented. Slices 4–5 remain planned. See the
   [design contract](DEMOGRAPHICS_DESIGN.md) and
   [staged retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md), tracked by
   [issue #285](https://github.com/derekmerck/storytangl/issues/285).
@@ -49,7 +49,8 @@ from tangl.mechanics.demographics import DemographicSampler, load_pack, register
 pack = load_pack("sample")  # Validates and copies data; no Singleton registration.
 catalog = register_pack(pack)  # Registers definitions and returns this pack's exact offers.
 profile = DemographicSampler.sample_demographic(
-    country="fra", catalogs=[catalog], fallback_bank="fra", rng=random.Random(7),
+    country="fra", name_form="female", catalogs=[catalog],
+    fallback_bank="fra", rng=random.Random(7),
 )
 ```
 
@@ -71,7 +72,9 @@ profile = DemographicSampler.sample_demographic(
   banks. These are audits of that pack, independent of process-global definitions;
   they do not choose fallbacks or assert that a base bank covers a subtype.
   Sample coverage: 213 countries without banks; 978 missing exact subtype banks.
-  Full coverage must be audited with actual full data; an LFS pointer cannot prove it.
+  A read-only audit of the recorded full blob found 219 banks, zero countries
+  without a bank, and 973 missing exact subtype banks. This does not mean every
+  subtype is covered by its country base bank; an LFS pointer alone proves no coverage.
 - Pure `parse_pack(metadata, geography, names)` is available for already parsed
   historical-format mappings. It validates before registration and leaves inputs
   unchanged. Definitions take live `Subtype`/`Country` references; resource parsing
@@ -90,17 +93,22 @@ A definition's `(class, label)` is its global Singleton identity. An optional
 it is not permission to reuse an internal label for a different value.
 
 ```python
-from tangl.mechanics.demographics import NameBank, Origin, name_catalog, select_origin
+from tangl.mechanics.demographics import (
+    NameBank, NameForm, NamePart, NamePool, Origin, name_catalog, select_origin,
+)
 
 river_bank = NameBank(
     label="my_world.river_names", selection_key="fra",
-    female=["Ari"], surname=["Reed"],
+    forms={"plain": NameForm(
+        given=NamePart(pool=NamePool(candidates=["Ari"])),
+        family=NamePart(pool=NamePool(candidates=["Reed"])),
+    )},
 )
 offered = name_catalog(catalog, overrides=(river_bank,))
-origin = Origin(label="river_kingdom", banks={"fra": 3, "jpn": 1})
+origin = Origin(label="river_kingdom", banks={"fra": 1})
 selection = select_origin(origin, catalogs=[offered], rng=random.Random(7))
-name = DemographicSampler.sample_namebank(
-    selection.bank, catalogs=[offered], rng=random.Random(8),
+name = DemographicSampler.sample_name(
+    selection.bank, form="plain", catalogs=[offered], rng=random.Random(8),
 )
 ```
 
@@ -141,6 +149,66 @@ that the sample bank covers every French subtype. Fallback references must also
 be offered by the supplied catalogs. Historical geography sampling remains the
 existing optional policy; constraints, age aliases, and profile ownership remain
 later work. Custom bank/origin selection needs no country or ethnicity.
+
+## Name formation (slice 3)
+
+`NameBank.forms` maps arbitrary caller-selected keys to `NameForm` values. A form
+has optional `given` and `family` parts, at least one present. `NamePart.pool` is a
+required stem pool; optional `prefix` and `suffix` pools attach literal strings
+using their declared separators. An absent affix/part is `None`; an empty or
+all-zero pool is invalid even when used for an optional affix.
+
+```python
+sprite = NameBank(label="my_world.sprite_names", forms={"open": NameForm(
+    given=NamePart(pool=NamePool(candidates=["Cookie"])),
+    family=NamePart(
+        pool=NamePool(candidates=["Winter"]),
+        suffix=NamePool(candidates=["mint"]),
+    ),
+)})
+sprites = name_catalog(overrides=(sprite,))
+name = DemographicSampler.sample_name(
+    sprite, form="open", catalogs=[sprites], rng=random.Random(7),
+)
+assert name.full_name() == "Cookie Wintermint"
+```
+
+The kernel returns the existing `PersonalName`, with no automatic title and neutral
+name metadata unless the caller supplies `gender`. Gender does not choose a form;
+keys need not be gendered. Omitting `family` gives a single name. Exact spelling,
+Unicode, case, punctuation, and separators survive; no title-casing/parser cleanup
+runs. Draw order is given then family, each stem then any prefix/suffix.
+
+`NamePart.substitutions` replaces an exact selected stem before affix assembly.
+For example, `{"Abelsdóttir": "Abelsson", "Adamcová": "Adamec"}` contains complete
+surname replacements; unmatched stems are unchanged. This is independent of literal
+`Winter` + `mint` composition, with no grammatical inference.
+
+`NamePool(candidates=[...], weights=[...])` uses optional positional weights. The
+lengths must match; weights must be finite non-negative numbers with a positive
+total. Zero positions are excluded from drawing. Unweighted pools use uniform
+selection over their original entries, including repeated spellings. No entries
+are deduplicated, reordered, or assigned invented frequencies.
+
+Historical `female`/`male`/`surname`/`male_surnames` fields exist only at the resource
+import boundary. `parse_pack` turns them into `female`/`male` forms, sharing the
+surname pool and putting exact exceptions on the male family part. Missing, null,
+or empty historical male pools explicitly reuse the female given part in the
+normalized male form. There is no runtime missing-pool or gender fallback. The
+read-only historical audit preserved all 385,828 candidate positions, including
+901 duplicates, and all 21 exception maps; source resource bytes are unchanged.
+
+`sample_xx_name`, `sample_xy_name`, and `sample_namebank` are retired; callers use
+`sample_name(..., form=...)`. Origin mixtures select a bank; the caller's requested
+form must exist on the chosen bank. Existing geographic `sample_demographic` now
+requires `name_form` and retains its complete given/family profile requirement.
+Optional names work through the pure kernel; integrating them into a canonical
+actor/profile name owner remains the slice 4 checkpoint. No actor generation,
+profile provenance/replay, or general name-parser changes are included here.
+
+Nested recipe values opt into existing constructor form at their owning fields.
+Name banks remain ordinary Singleton references; no recipe-specific serializer or
+registry is added.
 
 ## Credits
 

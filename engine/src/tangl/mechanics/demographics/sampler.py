@@ -8,20 +8,48 @@ from typing import Any
 from tangl.core import TokenCatalog
 from tangl.lang.age_range import AgeRange
 from tangl.lang.gens import Gens as Gender
+from tangl.lang.personal_name import PersonalName
 
-from .data_models import Subtype, Country, Region, NameBank
+from .data_models import Subtype, Country, Region, NameBank, NamePart, NamePool
 from .demographic import DemographicData
 from .selection import select_bank
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
+
+def _sample_pool(pool: NamePool, rng: random.Random) -> str:
+    if pool.weights is None:
+        return rng.choice(pool.candidates)
+    eligible = [
+        (value, weight)
+        for value, weight in zip(pool.candidates, pool.weights, strict=True)
+        if weight > 0
+    ]
+    scale = max(weight for _value, weight in eligible)
+    return rng.choices(
+        [value for value, _weight in eligible],
+        weights=[weight / scale for _value, weight in eligible], k=1,
+    )[0]
+
+
+def _sample_part(part: NamePart, rng: random.Random) -> str:
+    stem = _sample_pool(part.pool, rng)
+    stem = part.substitutions.get(stem, stem)
+    if part.prefix is not None:
+        stem = _sample_pool(part.prefix, rng) + part.prefix_separator + stem
+    if part.suffix is not None:
+        stem += part.suffix_separator + _sample_pool(part.suffix, rng)
+    return stem
+
+
 class DemographicSampler:
     """
     Samples region, country, subtype, gender, and name
 
-    If arguments are omitted, a random substitute is generated and propagated
-    through the selection process.
+    Geography/profile helpers sample omitted facts under the existing policy.
+    Naming requires an explicit form, catalog scope, and RNG; forms are not
+    inferred from gender or geography.
 
     methods:
     - `sample_demographic(region, country, subtype, gender) -> DemographicData`
@@ -161,56 +189,26 @@ class DemographicSampler:
         return age_range
 
     @classmethod
-    def sample_xx_name(
+    def sample_name(
         cls,
         nb: NameBank | str,
         *,
+        form: str,
         catalogs: Sequence[TokenCatalog[NameBank]],
         rng: random.Random,
-    ) -> tuple[str, str]:
-        nb = select_bank(nb, catalogs=catalogs, rng=rng)
-        rand = rng
-        given_name = rand.choice(nb.xx_names)
-        family_name = rand.choice(nb.surname)
-        return given_name, family_name
-
-    @classmethod
-    def sample_xy_name(
-        cls,
-        nb: NameBank | str,
-        *,
-        catalogs: Sequence[TokenCatalog[NameBank]],
-        rng: random.Random,
-    ) -> tuple[str, str]:
-        nb = select_bank(nb, catalogs=catalogs, rng=rng)
-        rand = rng
-        if nb.xy_names:
-            # Not guaranteed to have male names
-            given_name = rand.choice(nb.xy_names)
-        else:
-            given_name = rand.choice(nb.xx_names)
-        family_name = rand.choice(nb.surname)
-        if nb.xy_surname:
-            family_name = nb.xy_surname.get(family_name, family_name)
-        return given_name, family_name
-
-    @classmethod
-    def sample_namebank(
-        cls,
-        nb: NameBank | str,
-        gender: Gender | None = None,
-        *,
-        catalogs: Sequence[TokenCatalog[NameBank]],
-        rng: random.Random,
-    ) -> tuple[str, str]:
-        nb = select_bank(nb, catalogs=catalogs, rng=rng)
-        # No name popularity stats, assume gender is 50/50, so no weighted sampling
-        gender = cls._normalize_gender(gender, rng=rng)
-
-        if gender is Gender.XY:
-            return cls.sample_xy_name(nb, catalogs=catalogs, rng=rng)
-
-        return cls.sample_xx_name(nb, catalogs=catalogs, rng=rng)
+        gender: Gender = Gender.X_,
+    ) -> PersonalName:
+        """Form a scoped name without inferring pools from gender or geography."""
+        bank = select_bank(nb, catalogs=catalogs, rng=rng)
+        if form not in bank.forms:
+            raise LookupError(f"NameBank {bank.label!r} has no form {form!r}")
+        declaration = bank.forms[form]
+        parts: dict[str, str] = {}
+        if declaration.given is not None:
+            parts["given_name"] = _sample_part(declaration.given, rng)
+        if declaration.family is not None:
+            parts["family_name"] = _sample_part(declaration.family, rng)
+        return PersonalName(**parts, title="", gender=gender)
 
     @classmethod
     def sample_demographic(
@@ -225,6 +223,7 @@ class DemographicSampler:
         catalogs: Sequence[TokenCatalog[NameBank]],
         rng: random.Random,
         fallback_bank: str | None = None,
+        name_form: str,
     ) -> DemographicData:
 
         country = (
@@ -248,11 +247,13 @@ class DemographicSampler:
         age_range = cls._normalize_age_range(age_range, weighted=weighted, rng=rng)
 
         nb = country.namebank(subtype, catalogs=catalogs, fallback_bank=fallback_bank)
-        given_name, family_name = cls.sample_namebank(nb, gender=gender, catalogs=catalogs, rng=rng)
+        name = cls.sample_name(
+            nb, form=name_form, gender=gender, catalogs=catalogs, rng=rng,
+        )
 
         return DemographicData(
-            given_name=given_name,
-            family_name=family_name,
+            given_name=name.given_name,
+            family_name=name.family_name,
             region=region,
             country=country,
             subtype=subtype,

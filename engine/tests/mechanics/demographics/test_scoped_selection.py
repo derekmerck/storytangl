@@ -10,7 +10,8 @@ import pytest
 
 from tangl.core import Graph, Node, Selector, TokenCatalog
 from tangl.mechanics.demographics import (
-    Country, DemographicSampler, NameBank, Origin, load_pack, name_catalog,
+    Country, DemographicSampler, NameBank, NameForm, NamePart, NamePool, Origin,
+    load_pack, name_catalog,
     register_pack, select_bank, select_origin,
 )
 from tangl.persistence.serializers import JsonSerializationHandler as Json
@@ -35,7 +36,10 @@ class OriginHolder(Node):
 def bank(given: str, *, key: str | None = None) -> NameBank:
     return NameBank(
         label=f"scoped_{uuid4().hex}", selection_key=key,
-        female=[given], male=[given], surname=["Family"],
+        forms={"plain": NameForm(
+            given=NamePart(pool=NamePool(candidates=[given])),
+            family=NamePart(pool=NamePool(candidates=["Family"])),
+        )},
     )
 
 
@@ -56,7 +60,7 @@ def test_two_real_worlds_resolve_the_same_local_key_without_import_order_leakage
 ) -> None:
     builtin = register_pack(load_pack("sample"))
     original = NameBank.get_instance("fra")
-    original_pools = (list(original.xx_names), list(original.surname))
+    original_forms = dict(original.forms)
     worlds: dict[str, World] = {}
     chosen: dict[str, NameBank] = {}
     for label in order:
@@ -75,15 +79,16 @@ def test_two_real_worlds_resolve_the_same_local_key_without_import_order_leakage
             Origin(label="river", banks={"fra": 1}), catalogs=catalogs, rng=ctx.get_random(),
         )
         assert selection.bank is chosen[label]
-        assert DemographicSampler.sample_namebank(
-            selection.bank, catalogs=catalogs, rng=Random(7),
-        ) == (label, "Family")
+        assert DemographicSampler.sample_name(
+            selection.bank, form="plain", catalogs=catalogs, rng=Random(7),
+        ).full_name() == f"{label} Family"
         assert select_bank("jpn", catalogs=catalogs) is NameBank.get_instance("jpn")
         assert Country.get_instance("fra").namebank(
             "european", catalogs=catalogs, fallback_bank="fra",
         ) is chosen[label]
         profile = DemographicSampler.sample_demographic(
-            country="fra", catalogs=catalogs, fallback_bank="fra", rng=ctx.get_random(),
+            country="fra", catalogs=catalogs, fallback_bank="fra",
+            name_form="plain", rng=ctx.get_random(),
         )
         assert profile.given_name == label
         other = "B" if label == "A" else "A"
@@ -92,10 +97,12 @@ def test_two_real_worlds_resolve_the_same_local_key_without_import_order_leakage
         with pytest.raises(LookupError):
             select_bank(original, catalogs=catalogs)
         with pytest.raises(LookupError):
-            DemographicSampler.sample_xx_name(original, catalogs=catalogs, rng=Random(7))
+            DemographicSampler.sample_name(
+                original, form="female", catalogs=catalogs, rng=Random(7),
+            )
 
     assert NameBank.get_instance("fra") is original
-    assert (original.xx_names, original.surname) == original_pools
+    assert original.forms == original_forms
     assert tuple(builtin.find_all()) == (original, NameBank.get_instance("jpn"))
 
 
@@ -121,7 +128,9 @@ def test_country_exact_audit_and_explicit_fallback_remain_distinct() -> None:
     with pytest.raises(LookupError):
         france.namebank("european", catalogs=[], fallback_bank="fra")
     with pytest.raises(LookupError):
-        DemographicSampler.sample_demographic(country="fra", catalogs=[catalog], rng=Random(7))
+        DemographicSampler.sample_demographic(
+            country="fra", name_form="female", catalogs=[catalog], rng=Random(7),
+        )
     assert ("fra", "european") in load_pack("sample").uncovered_subtypes()
 
 
@@ -132,9 +141,9 @@ def test_two_origins_keep_identity_while_borrowing_one_non_geographic_bank() -> 
     selections = [select_origin(origin, catalogs=catalogs, rng=Random(7)) for origin in origins]
     assert [selection.origin.label for selection in selections] == ["river", "north"]
     assert all(selection.bank is custom for selection in selections)
-    assert DemographicSampler.sample_xy_name(custom, catalogs=catalogs, rng=Random(7)) == (
-        "Cookie", "Family",
-    )
+    assert DemographicSampler.sample_name(
+        custom, form="plain", catalogs=catalogs, rng=Random(7),
+    ).full_name() == "Cookie Family"
 
 
 def test_selector_is_scoped_uniform_stable_and_deduplicates_repeat_offers() -> None:
@@ -215,3 +224,30 @@ def test_origin_constructor_form_round_trips_through_json_without_bank_embedding
     assert restored_origin.label == "river"
     assert restored_origin.banks == {"fra": 1, "jpn": 3}
     assert "fra" not in {item.label for item in restored.values()}
+
+
+def test_compound_recipe_uses_real_world_context_and_origin_scope() -> None:
+    builtin = register_pack(load_pack("sample"))
+    recipe = NameBank(
+        label=f"sprite_{uuid4().hex}", selection_key="fra",
+        forms={"sprite": NameForm(
+            given=NamePart(pool=NamePool(candidates=["Cookie"])),
+            family=NamePart(pool=NamePool(candidates=["Winter"]),
+                            suffix=NamePool(candidates=["mint"])),
+        )},
+    )
+    authority = world(name_catalog(builtin, overrides=(recipe,)))
+    graph = authority.create_story("sprites").graph
+    ctx = PhaseCtx(graph=graph, cursor_id=graph.initial_cursor_id, random=Random(7))
+    selected = select_origin(Origin(label="grove", banks={"fra": 1}),
+                             catalogs=ctx.get_token_catalogs(), rng=ctx.get_random())
+    assert selected.origin.label == "grove"
+    assert selected.bank is recipe
+    assert graph.resolve_token_definition(NameBank, "fra") is recipe
+    assert DemographicSampler.sample_name(
+        selected.bank, form="sprite", catalogs=ctx.get_token_catalogs(), rng=ctx.get_random(),
+    ).full_name() == "Cookie Wintermint"
+    with pytest.raises(LookupError):
+        DemographicSampler.sample_name(
+            recipe, form="sprite", catalogs=[builtin], rng=Random(7),
+        )

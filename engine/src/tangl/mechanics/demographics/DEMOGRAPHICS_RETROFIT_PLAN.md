@@ -7,9 +7,9 @@
 :related: singleton, provisioning, presence, prose
 ```
 
-**Status:** SLICES 1–2 IMPLEMENTED — explicit packs plus scoped bank and origin
-selection are implemented. Slices 3–5 remain planned; the actor/name ownership
-checkpoint remains open.
+**Status:** SLICES 1–3 IMPLEMENTED — explicit packs, scoped bank/origin selection,
+and the small naming kernel are implemented. Slices 4–5 remain planned; the
+actor/name ownership checkpoint remains open.
 **Contract:** [Demographics design](DEMOGRAPHICS_DESIGN.md).
 **Tracker:** [#285](https://github.com/derekmerck/storytangl/issues/285).
 
@@ -114,6 +114,19 @@ according to the definition; a sprite need not have a country or binary name poo
 Migrate definitions, in-repo data, and callers together. Do not invent a general
 name grammar or silently rebalance the historical bank.
 
+**Implemented:** `NameBank.forms` contains `NameForm` given/family declarations,
+with `NamePart` stem/substitution/affix assembly over ordered `NamePool` candidates
+and optional positional weights. Callers choose an arbitrary form key and receive
+the existing `PersonalName`; omitted parts and neutral/unrestricted forms work
+without geography. The old binary runtime fields/samplers are removed. Historical
+fields normalize once at the import boundary, including explicit male-pool reuse,
+without changing data bytes or multiplicity. Tiny fixtures prove formation,
+substitutions, invalid declarations, fixed-RNG weighted/unweighted draws, owned
+value JSON constructor form, and real-world catalog/origin use. The read-only full
+bank audit verifies its recorded hash and all original pools/maps. Geographic
+profile complete-name requirements and canonical actor/name ownership stay at the
+slice 4 checkpoint.
+
 ## 4. Commit profiles through normal actor construction
 
 **Capability:** request missing facts once, then retain them through rendering,
@@ -171,6 +184,6 @@ paths. They are not prerequisites for completing slices 1–4.
 status and the package README then. Record still-desired advanced work as deferred
 follow-ups rather than claiming the whole synthetic-NPC/media problem is solved.
 
-Slices 1–2 are the implemented boundary. Reassess declaration and name-ownership
+Slices 1–3 are the implemented boundary. Reassess declaration and name-ownership
 checkpoints before their respective slices; this sequence is not permission to
 refactor foundational contracts opportunistically.
