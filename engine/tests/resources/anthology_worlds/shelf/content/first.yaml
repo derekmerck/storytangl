@@ -6,6 +6,9 @@ scenes:
     blocks:
       start:
         content: The first book opens.
+        media:
+          - name: picture.svg
+            media_role: narrative_im
         actions:
           - text: Read on
             successor: end

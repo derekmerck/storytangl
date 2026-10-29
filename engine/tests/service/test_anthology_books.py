@@ -50,11 +50,37 @@ def test_a_book_opens_by_its_own_id(registry: WorldRegistry) -> None:
     assert registry.get_world("shelf_second") is world
 
 
+def test_a_book_loads_with_the_metadata_it_is_listed_with(registry: WorldRegistry) -> None:
+    for listed in registry.list_worlds():
+        loaded = registry.get_world(listed["label"]).metadata
+
+        assert {key: loaded.get(key) for key in listed["metadata"]} == listed["metadata"]
+
+
 def test_the_anthology_itself_is_not_a_world(registry: WorldRegistry) -> None:
     with pytest.raises(
         ValueError, match="shelf is an anthology; open one of its books: shelf_first, shelf_second"
     ):
         registry.get_world("shelf")
+
+
+def test_an_anthology_found_again_later_brings_only_its_own_books(tmp_path: Path) -> None:
+    # A later search root's ``shelf`` replaces the earlier one, and it has one book.
+    shelf = tmp_path / "shelf"
+    (shelf / "content").mkdir(parents=True)
+    (shelf / "world.yaml").write_text(
+        "label: shelf\nstories:\n  second:\n    scripts: content/second.yaml\n",
+        encoding="utf-8",
+    )
+    (shelf / "content" / "second.yaml").write_text(
+        (SEARCH_ROOT / "shelf" / "content" / "second.yaml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    registry = WorldRegistry(world_dirs=[SEARCH_ROOT, tmp_path])
+
+    assert {world["label"] for world in registry.list_worlds()} == {"shelf_second", "pamphlet"}
+    with pytest.raises(ValueError, match="Unknown world: shelf_first"):
+        registry.get_world("shelf_first")
 
 
 @pytest.fixture
@@ -83,3 +109,9 @@ def test_the_service_creates_a_story_in_a_book_by_id(manager: ServiceManager) ->
         fragment.content for fragment in envelope.fragments if isinstance(fragment, ContentFragment)
     )
     assert "The second book opens." in text
+
+
+def test_the_service_preflights_a_book_by_id(manager: ServiceManager) -> None:
+    report = manager.preflight_world(world_id="shelf_second")
+
+    assert (report.world_id, report.status, report.diagnostics) == ("shelf_second", "ok", [])

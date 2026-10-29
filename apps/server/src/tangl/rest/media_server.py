@@ -58,9 +58,13 @@ def mount_world_media(app: FastAPI, world_id: str, media_dir: Path) -> None:
     logger.info("Mounted media for world '%s' at /media/world/%s", world_id, world_id)
 
 def initialize_media_mounts(app: FastAPI, world_registry: WorldRegistry) -> None:
-    """Mount media directories for all discovered worlds at startup."""
+    """Mount media directories for every openable world at startup.
 
-    for world_id, bundle in world_registry.bundles.items():
+    Each book mounts its anthology's shared media under its own world id, the
+    id its media URLs carry.
+    """
+
+    for world_id, (bundle, _story_key) in world_registry.openable.items():
         mount_world_media(app, world_id, bundle.media_dir)
 
 

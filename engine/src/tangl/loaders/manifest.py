@@ -100,11 +100,21 @@ class WorldManifest(BaseModel):
             return "codec" in self.stories[story_key].model_fields_set
         return "codec" in self.model_fields_set
 
-    def story_metadata(self, story_key: str) -> dict[str, Any]:
-        """Metadata one story declares for itself, over nothing the bundle says."""
-        if self.stories is not None and story_key in self.stories:
-            return dict(self.stories[story_key].metadata)
-        return {}
+    def story_metadata(self, story_key: str | None = None) -> dict[str, Any]:
+        """The metadata this manifest gives one story.
+
+        A book's is the bundle's, overlaid with what its own entry declares; a
+        book that declares no title is titled after the bundle and story key.
+        Listing a world reports this, and compiling it starts from this, under
+        whatever the decoded script declares for itself.
+        """
+        if story_key is None:
+            return dict(self.metadata)
+        own = self.stories[story_key].metadata if self.stories and story_key in self.stories else {}
+        metadata = {**self.metadata, **own}
+        if "title" not in own:
+            metadata["title"] = f"{self.metadata.get('title', self.label)}: {story_key}"
+        return metadata
 
     def story_label(self, story_key: str | None = None) -> str:
         """Normalized runtime label for a world story."""

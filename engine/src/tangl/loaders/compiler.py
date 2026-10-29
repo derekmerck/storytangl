@@ -129,7 +129,7 @@ class WorldCompiler:
         story_key: str | None,
         facets: tuple[_WorldDomainAdjuncts | None, _WorldAssetsFacet, ResourceManager | None],
     ) -> World:
-        base_metadata = bundle.manifest.metadata.copy()
+        base_metadata = bundle.manifest.story_metadata(story_key)
 
         domain_adjuncts, assets_facet, resources_facet = facets
         decode_result = self._decode_story_data(
@@ -149,10 +149,7 @@ class WorldCompiler:
             script_metadata.setdefault("codec_warnings", [])
             script_metadata["codec_warnings"].extend(decode_result.warnings)
 
-        default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
-        if story_key is not None and default_title == bundle.manifest.label:
-            default_title = bundle.manifest.story_label(story_key)
-        script_metadata.setdefault("title", default_title)
+        script_metadata.setdefault("title", script_data.get("label") or bundle.manifest.label)
 
         story_bundle = self.story_compiler.compile(
             script_data,

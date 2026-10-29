@@ -100,14 +100,15 @@ class WorldRegistry:
     def __init__(self, world_dirs: list[Path] | None = None, compiler: WorldCompiler | None = None) -> None:
         self.compiler = compiler or WorldCompiler()
         self.bundles: dict[UniqueLabel, WorldBundle] = {}
-        # Each anthology book's world id -> (anthology label, story key).
-        self.books: dict[UniqueLabel, tuple[UniqueLabel, str]] = {}
+        # Every world id a client can open -> its bundle, and its story key if a book.
+        self.openable: dict[UniqueLabel, tuple[WorldBundle, str | None]] = {}
         self.worlds: dict[UniqueLabel, World] = {}
 
         if world_dirs is None:
             world_dirs = _get_world_dirs()
 
         self._discover(world_dirs)
+        self._index_openable()
 
     def _discover(self, world_dirs: list[Path]) -> None:
         """Scan every configured search root for world bundles.
@@ -141,72 +142,70 @@ class WorldRegistry:
 
                 self.bundles[bundle.manifest.label] = bundle
                 logger.info("Discovered world: %s", bundle.manifest.label)
-                if bundle.manifest.is_anthology:
-                    for story_key in bundle.manifest.story_keys():
-                        book_id = bundle.manifest.story_label(story_key)
-                        self.books[book_id] = (bundle.manifest.label, story_key)
 
         if not scanned:
             logger.warning(
                 "No world search root exists; no worlds will be available. Searched: %s",
                 ", ".join(str(world_dir) for world_dir in world_dirs) or "(nothing configured)",
             )
-        for book_id, (anthology, _story_key) in list(self.books.items()):
-            if book_id in self.bundles:
-                logger.error(
-                    "Book %s of anthology %s has the same id as a world; the world wins",
-                    book_id,
-                    anthology,
-                )
-                del self.books[book_id]
+
+    def _index_openable(self) -> None:
+        """Index the world ids of the bundles discovery kept.
+
+        Indexed only once discovery is done, so a bundle that a later search root
+        replaced contributes none of its books.
+        """
+        for bundle in self.bundles.values():
+            manifest = bundle.manifest
+            if not manifest.is_anthology:
+                self.openable[manifest.label] = (bundle, None)
+                continue
+            for story_key in manifest.story_keys():
+                book_id = manifest.story_label(story_key)
+                if book_id in self.bundles:
+                    logger.error(
+                        "Book %s of anthology %s has the same id as a world; the world wins",
+                        book_id,
+                        manifest.label,
+                    )
+                    continue
+                self.openable[book_id] = (bundle, story_key)
 
     def list_worlds(self) -> list[dict]:
         """Every world a client can open: single worlds, and each anthology's books.
 
-        Listing compiles nothing. A book's metadata is its anthology's, overlaid
-        with what the manifest declares for that story; a book that declares no
-        title is titled after its anthology and story key.
+        Listing compiles nothing; each world is listed with the metadata its
+        manifest gives it (see :meth:`WorldManifest.story_metadata`).
         """
-        worlds: list[dict] = []
-        for bundle in self.bundles.values():
-            manifest = bundle.manifest
-            if not manifest.is_anthology:
-                worlds.append({"label": manifest.label, "metadata": manifest.metadata, "anthology": None})
-                continue
-            for book_id, story_key in self._books_of(manifest.label):
-                own = manifest.story_metadata(story_key)
-                metadata = {**manifest.metadata, **own}
-                if "title" not in own:
-                    metadata["title"] = f"{manifest.metadata.get('title', manifest.label)}: {story_key}"
-                worlds.append({"label": book_id, "metadata": metadata, "anthology": manifest.label})
-        return worlds
-
-    def _books_of(self, anthology: UniqueLabel) -> list[tuple[UniqueLabel, str]]:
-        """An anthology's books as ``(world id, story key)``, in manifest order."""
         return [
-            (book_id, story_key)
-            for book_id, (owner, story_key) in self.books.items()
-            if owner == anthology
+            {
+                "label": world_id,
+                "metadata": bundle.manifest.story_metadata(story_key),
+                "anthology": bundle.manifest.label if story_key is not None else None,
+            }
+            for world_id, (bundle, story_key) in self.openable.items()
         ]
 
     def get_world(self, label: UniqueLabel) -> World:
         if label not in self.worlds:
-            self.worlds[label] = self._compile_world(label)
+            self.worlds[label] = self.compile_world(label)
         return self.worlds[label]
 
-    def _compile_world(self, label: UniqueLabel) -> World:
-        if label in self.books:
-            anthology, story_key = self.books[label]
-            return self.compiler.compile(self.bundles[anthology], story_key=story_key)
-        bundle = self.bundles.get(label)
-        if bundle is None:
+    def compile_world(self, label: UniqueLabel) -> World:
+        """Compile one world afresh, bypassing the cache."""
+        if label not in self.openable:
+            if label in self.bundles:
+                books = ", ".join(
+                    world_id
+                    for world_id, (bundle, _story_key) in self.openable.items()
+                    if bundle.manifest.label == label
+                )
+                msg = f"{label} is an anthology; open one of its books: {books}"
+                raise ValueError(msg)
             msg = f"Unknown world: {label}"
             raise ValueError(msg)
-        if bundle.manifest.is_anthology:
-            books = ", ".join(book_id for book_id, _key in self._books_of(label))
-            msg = f"{label} is an anthology; open one of its books: {books}"
-            raise ValueError(msg)
-        return self.compiler.compile(bundle)
+        bundle, story_key = self.openable[label]
+        return self.compiler.compile(bundle, story_key=story_key)
 
     def get_anthology(
         self,

@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tangl.config import settings
+from tangl.rest import media_server
 from tangl.rest.app import app
 from tangl.rest.dependencies import reset_service_state_for_testing
 from tangl.rest.dependencies_gateway import (
@@ -97,3 +98,31 @@ def test_opening_the_anthology_itself_names_its_books(
     assert response.json()["detail"] == (
         "shelf is an anthology; open one of its books: shelf_first, shelf_second"
     )
+
+
+def test_a_book_is_preflighted_by_its_id(client: tuple[TestClient, dict[str, str]]) -> None:
+    test_client, _headers = client
+
+    response = test_client.get("world/shelf_second/preflight")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_a_book_shows_its_anthologys_media(
+    client: tuple[TestClient, dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _test_client, headers = client
+    monkeypatch.setattr(media_server.app.router, "routes", list(media_server.app.router.routes))
+
+    # Entering the client runs startup, which mounts every world's media.
+    with TestClient(app, base_url="http://test/api/v2/") as live:
+        response = live.post("story/create", params={"world_id": "shelf_first"}, headers=headers)
+        assert response.status_code == 200
+        url = next(item["url"] for item in response.json()["fragments"] if item.get("url"))
+        asset = live.get(f"http://test{url}")
+
+    assert url == "/media/world/shelf_first/picture.svg"
+    assert asset.status_code == 200
+    assert asset.content == (SEARCH_ROOT / "shelf" / "media" / "picture.svg").read_bytes()

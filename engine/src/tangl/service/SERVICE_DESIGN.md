@@ -91,6 +91,15 @@ the books, each `WorldInfo` naming its `anthology` so a client can group them, a
 compiles nothing to do it. Asking for the anthology's own label is a `ValueError`
 that names its books, which REST answers as a 400 (#610).
 
+`WorldRegistry.openable` is the one index of those ids, each mapped to its bundle
+and, for a book, its story key. It is built once discovery has settled which
+bundle wins each label, and everything that takes a world id reads it: listing,
+opening, preflight, and the REST startup that mounts each book's shared media
+under the book's id. A world's metadata is what `WorldManifest.story_metadata`
+gives it (a book's own entry over its anthology's, with a fallback title), and
+compiling starts from that under whatever the decoded script declares, so a world
+loads with the metadata it was listed with unless its script says otherwise.
+
 ### Record reading and restoration
 
 `PersistenceManager.read_record(uid)` owns storage read and serializer decode;
