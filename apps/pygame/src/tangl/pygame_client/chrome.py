@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pygame
 
+from .bindings import HELP, KeyBinding
+
 from tangl.presentation.projection import (
     BadgeListValue, BrandingValue, ItemListValue, KvListValue, ProjectedSection,
     ScalarValue, TableValue,
@@ -15,6 +17,13 @@ on a lighter box of its own, which read as a text wash laid over the bar."""
 
 SELECTED = (63, 96, 99)
 """The one entry that is lit: the one whose details are open."""
+
+CHROME_KEYS = {
+    "details": KeyBinding((pygame.K_i,), "Ctrl+I", "Open or close status details", control=True),
+    "close": KeyBinding((pygame.K_ESCAPE,), "Esc", "Close status details"),
+    "entry": KeyBinding((pygame.K_TAB,), "Tab / Shift+Tab", "Next / previous status entry"),
+    "page": KeyBinding((pygame.K_PAGEUP, pygame.K_PAGEDOWN), "PgUp / PgDn", "Page long status text"),
+}
 
 
 def section_text(section: ProjectedSection) -> str:
@@ -79,6 +88,7 @@ class Chrome:
         self.open = False
         self.page = 0
         self.detail_page = 0
+        self.detail_pages = 1
         self.hitboxes: list[tuple[pygame.Rect, str]] = []
         self.info_box = pygame.Rect(width - 12 * density, 0, 12 * density, self.height)
         self.next_box = pygame.Rect(width - 24 * density, 0, 12 * density, self.height)
@@ -281,10 +291,12 @@ class Chrome:
         text = f"{self.branding.name}\n"
         if section is not None:
             text += self._details_text(section)
-        text += "\nCtrl+I: details | Tab: next entry | Click >: next row page"
+        text += f"\n{HELP.label}: Help | {CHROME_KEYS['details'].label}: details"
+        text += "\nTab: next entry | Click >: next row page"
         lines = wrap_pixels(self.font, text, box.width - (24 if self.logo is not None else 8) * d)
         capacity = max(1, box.height // self.line_height - 3)
         pages = max(1, (len(lines) + capacity - 1) // capacity)
+        self.detail_pages = pages
         self.detail_page %= pages
         box.height = min(box.height, (min(len(lines), capacity) + 3) * self.line_height)
         pygame.draw.rect(shell, (232, 226, 205), box)
@@ -299,7 +311,7 @@ class Chrome:
             logo = pygame.transform.scale(self.logo, (max(1, round(self.logo.get_width() * factor)),
                                                        max(1, round(self.logo.get_height() * factor))))
             shell.blit(logo, (box.right - size - 2*d, box.top + 2*d))
-        help_text = f"Tab: next entry | PgUp/PgDn: text {self.detail_page + 1}/{pages} | Esc: close"
+        help_text = f"{HELP.label}: Help | Tab: entry | Text {self.detail_page + 1}/{pages} | Esc: close"
         shell.blit(self.font.render(self._clip(help_text, box.width - 8 * d), False, (63, 96, 99)),
                    (box.left + 4 * d, box.bottom - self.line_height - d))
 
@@ -317,15 +329,15 @@ class Chrome:
                 self.hovered_id, self.hover_box = hovered, None
             return changed
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_i and event.mod & pygame.KMOD_CTRL:
+            if CHROME_KEYS["details"].matches(event):
                 self.clear_hover()
                 self.open = not self.open
                 return True
             if self.open:
                 self.clear_hover()
-                if event.key == pygame.K_ESCAPE:
+                if CHROME_KEYS["close"].matches(event):
                     self.open = False
-                elif event.key == pygame.K_TAB and self.sections:
+                elif CHROME_KEYS["entry"].matches(event) and self.sections:
                     index = next(i for i, s in enumerate(self.sections)
                                  if s.section_id == self.selected_id)
                     direction = -1 if event.mod & pygame.KMOD_SHIFT else 1
@@ -334,7 +346,7 @@ class Chrome:
                     self.page = next(i for i, page in enumerate(self._pages())
                                      if self.sections[index] in page)
                     self.detail_page = 0
-                elif event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+                elif CHROME_KEYS["page"].matches(event):
                     self.detail_page += -1 if event.key == pygame.K_PAGEUP else 1
                 return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:

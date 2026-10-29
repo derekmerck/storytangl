@@ -8,7 +8,20 @@ from uuid import UUID
 import pygame
 
 from .chrome import wrap_pixels
+from .bindings import KeyBinding
 from .models import Action, CancelSelection, Choice, SubmitText
+
+
+TEXT_KEYS = {
+    "cancel": KeyBinding((pygame.K_ESCAPE,), "Esc", "Cancel text entry without submitting"),
+    "submit": KeyBinding((pygame.K_RETURN, pygame.K_KP_ENTER), "Enter / keypad Enter", "Submit text"),
+    "left": KeyBinding((pygame.K_LEFT,), "Left", "Move caret left one code point"),
+    "right": KeyBinding((pygame.K_RIGHT,), "Right", "Move caret right one code point"),
+    "home": KeyBinding((pygame.K_HOME,), "Home", "Move caret to the beginning"),
+    "end": KeyBinding((pygame.K_END,), "End", "Move caret to the end"),
+    "backspace": KeyBinding((pygame.K_BACKSPACE,), "Backspace", "Delete before the caret"),
+    "delete": KeyBinding((pygame.K_DELETE,), "Delete", "Delete after the caret"),
+}
 
 
 @dataclass(slots=True)
@@ -37,25 +50,25 @@ class PendingText:
             self.composition = event.text
             self.composition_caret = event.start
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
+            if TEXT_KEYS["cancel"].matches(event):
                 return CancelSelection()
             if self.composition:
                 return None
-            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if TEXT_KEYS["submit"].matches(event):
                 return SubmitText()
-            if event.key == pygame.K_LEFT:
+            if TEXT_KEYS["left"].matches(event):
                 self.caret = max(0, self.caret - 1)
-            elif event.key == pygame.K_RIGHT:
+            elif TEXT_KEYS["right"].matches(event):
                 self.caret = min(len(self.text), self.caret + 1)
-            elif event.key == pygame.K_HOME:
+            elif TEXT_KEYS["home"].matches(event):
                 self.caret = 0
-            elif event.key == pygame.K_END:
+            elif TEXT_KEYS["end"].matches(event):
                 self.caret = len(self.text)
-            elif event.key == pygame.K_BACKSPACE and self.caret:
+            elif TEXT_KEYS["backspace"].matches(event) and self.caret:
                 self.text = self.text[:self.caret - 1] + self.text[self.caret:]
                 self.caret -= 1
                 self.error = ""
-            elif event.key == pygame.K_DELETE:
+            elif TEXT_KEYS["delete"].matches(event):
                 self.text = self.text[:self.caret] + self.text[self.caret + 1:]
                 self.error = ""
         return None

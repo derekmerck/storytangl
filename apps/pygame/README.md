@@ -24,8 +24,56 @@ beat-synchronized audio remains deferred.
   separate from images and historical turn rendering.
 - `src/tangl/pygame_client/__main__.py` — event loop.
 - `src/tangl/pygame_client/text_entry.py` — one local text editor and bounded modal.
+- `src/tangl/pygame_client/help_page.py` — dedicated client-local Help, with bounded navigation.
 - `src/tangl/pygame_client/presentation.py` — shared stage fold and ephemeral ordered snapshots.
 - `tests/` — adapter and live-session tests.
+
+## Help and controls (#638 slice 1)
+
+Press **Ctrl+H** or click the always-visible **Help** button. Neither entry point
+depends on world branding, preferences or an opted-in status row. Status details
+also advertise Ctrl+H. Help is a dedicated read-only page, separate from the
+future About page.
+
+Within Help, Up/Down scroll a row; PgUp/PgDn, the wheel and Previous/Next buttons
+read through the complete listing. Home/End reach the first/last rows. Esc,
+Ctrl+H or Close returns to the same interaction. Window close still exits; audio
+playback and native voice completion continue. Other keys, pointer clicks, text
+input and preference/audio shortcuts are consumed while Help owns focus.
+
+The listing identifies the context **after closing Help**: scrolling, paged
+reading, piece selection, text entry or status details. Inapplicable controls are
+explicitly listed as inactive. Key descriptions are small client-local values
+beside the owning handlers; the handlers use those same values. Choice labels
+derive from the actual positional mapping, including uppercase Shift/Caps keys,
+the reserved x/X gap and choices beyond the keyboard range. Selection controls
+derive from the same numeric constants as their drawn rows. There is no universal
+keymap or server-owned shortcut authority.
+
+Help preserves the current visual page and scroll positions, picked pieces,
+status inspection and the same pending text editor, draft, caret and composition.
+Opening/closing does not submit or cancel. Queued text events in a Help focus-change
+batch are consumed, so the shortcut cannot type itself into a restored field.
+Editing resumes with its existing input rectangle and normal focus. Literal `?`
+remains ordinary typed text.
+
+World preferences have a distinct section with their declared labels/help and
+effective local boolean/enum values. Only supported F1–F12 shortcuts are shown;
+unsupported declarations remain clickable preferences rather than invented keys.
+Their keyboard shortcuts require gameplay focus, as before. Help itself is
+read-only and performs no per-draw Service queries. Reopening it after a gameplay
+preference change shows the current value.
+
+The regular preference rows now have the normal readable text backing and bounded
+labels. **Prefs N/M** identifies their clickable page control; **Ctrl+,** cycles
+those same pages while gameplay has focus. The route uses the existing
+`PagePreferences` action. Help, preference paging and the local Pages/Scroll control
+have separate top-row space; they do not consume world F-keys or choice letters.
+
+This slice adds no About metadata, backend endpoint/schema, journal content or
+stored UI state. About's World/Story, local Client and actual connected Backend
+sections, the public blurb/cover mapping and CLI/Web reconciliation remain the
+later #638 slices. `banner_media` remains text, not an image-cover field.
 
 ## Design Commitments
 
