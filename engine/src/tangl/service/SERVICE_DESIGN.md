@@ -83,6 +83,14 @@ persisted class representation; there is no legacy-name migration or alias layer
 `World` is discovered and compiled through `WorldRegistry`. Service owns world
 loading/unloading policy, not world semantics.
 
+A world id names something a client can open. A single-story bundle is one world,
+named by its label. An anthology is a collection, not a world: each of its books
+is a world named by the manifest's `story_label(key)` (`carwars_cw1`), compiled on
+first use by the same path that compiles the whole anthology. `list_worlds` lists
+the books, each `WorldInfo` naming its `anthology` so a client can group them, and
+compiles nothing to do it. Asking for the anthology's own label is a `ValueError`
+that names its books, which REST answers as a 400 (#610).
+
 ### Record reading and restoration
 
 `PersistenceManager.read_record(uid)` owns storage read and serializer decode;

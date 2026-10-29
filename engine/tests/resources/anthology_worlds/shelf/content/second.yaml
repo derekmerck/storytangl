@@ -1,0 +1,13 @@
+label: second
+metadata:
+  start_at: intro.start
+scenes:
+  intro:
+    blocks:
+      start:
+        content: The second book opens.
+        actions:
+          - text: Read on
+            successor: end
+      end:
+        content: The second book ends.

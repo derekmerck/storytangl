@@ -100,6 +100,12 @@ class WorldManifest(BaseModel):
             return "codec" in self.stories[story_key].model_fields_set
         return "codec" in self.model_fields_set
 
+    def story_metadata(self, story_key: str) -> dict[str, Any]:
+        """Metadata one story declares for itself, over nothing the bundle says."""
+        if self.stories is not None and story_key in self.stories:
+            return dict(self.stories[story_key].metadata)
+        return {}
+
     def story_label(self, story_key: str | None = None) -> str:
         """Normalized runtime label for a world story."""
         if story_key is None:

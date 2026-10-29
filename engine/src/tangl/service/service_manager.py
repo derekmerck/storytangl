@@ -847,7 +847,7 @@ class ServiceManager:
                     {
                         "label": label,
                         "metadata": world.metadata or {},
-                        "is_anthology": False,
+                        "anthology": None,
                     },
                 )
 
@@ -859,6 +859,7 @@ class ServiceManager:
                     label=world["label"],
                     title=str(metadata.get("title", world["label"])),
                     author=metadata.get("author") or "Unknown",
+                    anthology=world["anthology"],
                 ),
             )
         return info_models

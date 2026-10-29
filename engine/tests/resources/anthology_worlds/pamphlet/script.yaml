@@ -1,0 +1,8 @@
+label: pamphlet
+metadata:
+  start_at: intro.start
+scenes:
+  intro:
+    blocks:
+      start:
+        content: The pamphlet unfolds.

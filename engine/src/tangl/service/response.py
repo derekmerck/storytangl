@@ -252,6 +252,8 @@ class WorldInfo(InfoModel):
     label: str
     title: str | None = None
     author: str | list[str] | None = None
+    # The anthology a book belongs to, so a client can group its books.
+    anthology: str | None = None
 
 
 class AuthoringDiagnostic(InfoModel):
