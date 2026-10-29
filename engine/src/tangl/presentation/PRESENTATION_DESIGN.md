@@ -11,6 +11,22 @@ persistence, replay, grouping, update, and deletion semantics; they may carry
 presentation values. Service envelopes likewise carry values without owning
 them. Backend state remains authoritative for every action.
 
+## Client Help and separate About (#638)
+
+Pygame's first slice implements a dedicated client-owned Help page over existing
+handlers, actual choice mappings and `ui-preferences` declarations/effective local
+values. It is reachable without status/branding opt-in, owns modal input while
+open, and preserves pending editor/selection/page state. It adds no server keymap,
+widget vocabulary, Service call on draw, journal output or persisted UI state.
+
+About remains a separate later destination. Its three independently owned parts
+are World/Story public information from existing world-info/media paths, local
+Client self-documentation and the actual connected Backend's existing system-info.
+Player/story status and account data are not About. The minimal authored public
+blurb/optional cover mapping still needs settling; `banner_media` is text and must
+not become an image-cover alias. CLI's cmd2 help and existing info commands and
+Web's current WorldInfo/SystemInfo surfaces remain their own later integrations.
+
 ## Portrait association (#538 slice 1)
 
 Journal media's optional `speaker_id` identifies the resolved provider, while

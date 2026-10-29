@@ -18,10 +18,13 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from uuid import UUID
 
 import pygame
+
+from tangl.presentation.projection import PreferenceDeclaration
 
 from .bridge import (
     PygameSessionBridge,
@@ -58,13 +61,33 @@ from .stage import (
     Stage,
     choice_action,
     position_for_key,
+    key_for_position,
 )
+from .bindings import HELP, PREFERENCE_PAGE, PREFERENCE_SHORTCUTS, KeyBinding
+from .chrome import CHROME_KEYS
 from .presentation import merge_turns as _merge, visual_passages
 from .music import MusicPlayer
 from .voice import VoicePlayer
-from .text_entry import PendingText
+from .text_entry import PendingText, TEXT_KEYS
 
 logger = logging.getLogger(__name__)
+
+MAIN_KEYS = {
+    "pacing": KeyBinding((pygame.K_p,), "Ctrl+P", "Switch paged / scrolling reading", True),
+    "back": KeyBinding((pygame.K_UP, pygame.K_PAGEUP), "Up / PgUp", "Previous visual page"),
+    "forward": KeyBinding((pygame.K_DOWN, pygame.K_PAGEDOWN, pygame.K_SPACE, pygame.K_RETURN),
+                          "Down / PgDn / Space / Enter", "Next visual page"),
+    "end": KeyBinding((pygame.K_END,), "End", "Skip to the final page / choices"),
+    "escape": KeyBinding((pygame.K_ESCAPE,), "Esc", "Exit game, or cancel a pending selection"),
+    "panel": KeyBinding((pygame.K_TAB,), "Tab", "Next overflowing state-panel page"),
+    "scroll": KeyBinding((pygame.K_UP, pygame.K_DOWN, pygame.K_PAGEUP, pygame.K_PAGEDOWN),
+                         "Up / Down / PgUp / PgDn", "Scroll prose (page keys move a page)"),
+}
+MUSIC_KEYS = {
+    "mute": KeyBinding((pygame.K_m,), "Ctrl+M", "Mute / unmute audio", True),
+    "down": KeyBinding((pygame.K_LEFTBRACKET,), "Ctrl+[", "Lower volume by 10%", True),
+    "up": KeyBinding((pygame.K_RIGHTBRACKET,), "Ctrl+]", "Raise volume by 10%", True),
+}
 
 
 def _turns(bridge: PygameSessionBridge, envelope) -> list[Turn]:
@@ -93,23 +116,121 @@ def _frame(bridge: PygameSessionBridge, envelope, previous: Turn | None = None) 
     return frame
 
 
-def _preference_controls(bridge: PygameSessionBridge, preferences) -> tuple[PreferenceControl, ...]:
-    supported_shortcuts = {f"f{number}" for number in range(1, 13)}
+def _preference_keys(preferences: Sequence[PreferenceDeclaration]) -> dict[int, str]:
+    return {
+        PREFERENCE_SHORTCUTS[preference.shortcut.casefold()]: preference.preference_id
+        for preference in preferences
+        if preference.shortcut is not None
+        and preference.shortcut.casefold() in PREFERENCE_SHORTCUTS
+    }
+
+
+def _preference_controls(
+    bridge: PygameSessionBridge, preferences: Sequence[PreferenceDeclaration],
+) -> tuple[PreferenceControl, ...]:
+    shortcuts = {identity: pygame.key.name(key).upper()
+                 for key, identity in _preference_keys(preferences).items()}
     return tuple(
         PreferenceControl(
             preference_id=preference.preference_id,
             label=preference.label,
             help=preference.help,
             value=bridge.preferences[preference.preference_id],
-            shortcut=(
-                preference.shortcut
-                if preference.shortcut is not None
-                and preference.shortcut.casefold() in supported_shortcuts
-                else None
-            ),
+            shortcut=shortcuts.get(preference.preference_id),
         )
         for preference in preferences
     )
+
+
+def _help_lines(
+    stage: Stage, frame: Turn, pending: PendingSelection | PendingText | None, music: MusicPlayer,
+) -> list[str]:
+    """Describe the handlers applicable after Help closes, using their actual mappings."""
+    text_mode = isinstance(pending, PendingText)
+    status_mode = not text_mode and stage.chrome is not None and stage.chrome.open
+    ordinary = pending is None and not status_mode
+    mode = ("Text entry" if text_mode else "Status details" if status_mode else
+            "Piece selection" if pending is not None else "Paged reading" if stage.paged else
+            "Scrolling reading")
+    active = [f"After closing Help: {mode}", "", "Current client controls"]
+    inactive: list[str] = []
+
+    def add(binding: KeyBinding, enabled: bool = True, description: str | None = None) -> None:
+        (active if enabled else inactive).append(
+            f"{binding.label}: {description or binding.description}"
+        )
+
+    add(HELP)
+    for binding in MUSIC_KEYS.values():
+        add(binding)
+    active.append(f"Audio: {'muted' if music.muted else 'unmuted'}, volume {music.volume:.0%}")
+    active.append("Window close: exit the application without submitting pending input")
+    if text_mode:
+        for name, binding in TEXT_KEYS.items():
+            add(binding, name == "cancel" or not pending.composition)
+        active.append("Typing / TEXTINPUT: insert literal text; IME composition stays uncommitted")
+        active.append("Click Cancel: leave the current text field")
+        (inactive if pending.composition else active).append("Click Submit: submit text")
+    else:
+        add(CHROME_KEYS["details"], stage.chrome is not None)
+        if status_mode:
+            for name in ("close", "entry", "page"):
+                enabled = (len(stage.chrome.sections) > 1 if name == "entry" else
+                           stage.chrome.detail_pages > 1 if name == "page" else True)
+                add(CHROME_KEYS[name], enabled)
+            (active if stage.chrome.detail_pages > 1 else inactive).append("Wheel: page status details")
+            (active if len(stage.chrome._pages()) > 1 else inactive).append("Click >: next status-row page")
+        else:
+            add(MAIN_KEYS["escape"], description=("Cancel piece selection without submitting"
+                                                if pending is not None else "Exit game"))
+            add(MAIN_KEYS["panel"], any(isinstance(action, PagePanel)
+                                       for _box, action in stage.hitboxes))
+            if isinstance(pending, PendingSelection):
+                for index, piece in enumerate(stage.selection_page(frame, pending), 1):
+                    active.append(f"{index}: pick {piece.label or piece.text}")
+                (active if pending.satisfied else inactive).append(f"{CONFIRM_KEY}: Confirm selection")
+                (active if stage.selection_pages(frame, pending) > 1 else inactive).append(
+                    f"{PAGE_KEY}: More candidate pieces"
+                )
+                active.append(f"{CANCEL_KEY}: Cancel piece selection")
+                active.append("Click available pieces; reaching the maximum count submits automatically")
+                add(MAIN_KEYS["scroll"], stage.max_scroll > 0)
+            else:
+                add(MAIN_KEYS["pacing"])
+                if stage.paged and stage.pages:
+                    add(MAIN_KEYS["back"], stage.page_index > 0)
+                    add(MAIN_KEYS["forward"], stage.page_index < len(stage.pages) - 1)
+                    add(MAIN_KEYS["end"], stage.page_index < len(stage.pages) - 1)
+                else:
+                    add(MAIN_KEYS["scroll"], stage.max_scroll > 0)
+                (active if stage.max_choice_scroll > 0 else inactive).append(
+                    f"Shift+{MAIN_KEYS['scroll'].label}: scroll choices"
+                )
+                active.append("Choice keys follow displayed positions; uppercase uses Shift/Caps")
+                for index, choice in enumerate(frame.choices, 1):
+                    key = key_for_position(index) or "Click only"
+                    (active if stage.choices_ready and choice_action(choice) is not None
+                     else inactive).append(f"{key}: {choice.text}")
+            (active if stage.max_scroll or stage.max_choice_scroll else inactive).append(
+                "Wheel over a text list: scroll that list (not visual pages)"
+            )
+    add(PREFERENCE_PAGE, ordinary and stage.preference_pages > 1)
+    if not text_mode:
+        inactive.extend(f"{binding.label}: {binding.description} (text-entry mode)"
+                        for binding in TEXT_KEYS.values())
+    if not ordinary:
+        inactive.append(f"{MAIN_KEYS['pacing'].label}: {MAIN_KEYS['pacing'].description} (gameplay)")
+        inactive.append("Displayed choice keys and world F-keys require gameplay focus")
+    result = [*active, "", "Not active in this context", *inactive, "", "World preferences (read-only here)"]
+    if not stage.preference_controls:
+        result.append("No world preferences declared")
+    for preference in stage.preference_controls:
+        shortcut = (preference.shortcut + (" (inactive in this mode)" if not ordinary else "")
+                    if preference.shortcut else "No supported keyboard shortcut")
+        result.append(f"{preference.label}: {preference.value_label} — {shortcut}")
+        if preference.help:
+            result.append(preference.help)
+    return result
 
 
 def _keyed(
@@ -244,6 +365,14 @@ def _text_current(editor: PendingText, bridge: PygameSessionBridge, frame: Turn)
     )
 
 
+def _text_input_rect(stage: Stage, editor: PendingText) -> None:
+    rect = editor.field_rect
+    pygame.key.set_text_input_rect(pygame.Rect(
+        stage.window_point(rect.topleft),
+        (rect.width * stage.display_scale, rect.height * stage.display_scale),
+    ))
+
+
 def _commit_pending(bridge: PygameSessionBridge, pending: PendingSelection):
     payload = commit_payload(pending.choice, pending.picked)
     return bridge.choose(pending.choice.edge_id, payload)
@@ -268,12 +397,10 @@ def _next_events(stage: Stage) -> list[pygame.event.Event]:
 
 def _music_key(event: pygame.event.Event, music: MusicPlayer) -> bool:
     """Ctrl shortcuts are local and cannot collide with choice letters or F-keys."""
-    if not event.mod & pygame.KMOD_CTRL:
-        return False
-    if event.key == pygame.K_m:
+    if MUSIC_KEYS["mute"].matches(event):
         music.toggle_mute()
-    elif event.key in (pygame.K_LEFTBRACKET, pygame.K_RIGHTBRACKET):
-        music.set_volume(music.volume + (-0.1 if event.key == pygame.K_LEFTBRACKET else 0.1))
+    elif MUSIC_KEYS["down"].matches(event) or MUSIC_KEYS["up"].matches(event):
+        music.set_volume(music.volume + (-0.1 if MUSIC_KEYS["down"].matches(event) else 0.1))
     else:
         return False
     return True
@@ -330,14 +457,7 @@ def main(argv: list[str] | None = None) -> int:
 def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPlayer) -> int:
     logical_size = bridge.stage_extent(args.world)
     preferences = bridge.discover_preferences(args.world)
-    supported_preference_shortcuts = {f"f{number}" for number in range(1, 13)}
-    preference_keys = {
-        key: preference.preference_id
-        for preference in preferences
-        if preference.shortcut is not None
-        and preference.shortcut.casefold() in supported_preference_shortcuts
-        and (key := getattr(pygame, f"K_{preference.shortcut.upper()}", None)) is not None
-    }
+    preference_keys = _preference_keys(preferences)
     envelope = bridge.start(args.world)
     stage = Stage(
         asset_dir=args.assets,
@@ -402,18 +522,42 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
     running = True
     while running:
         stale_text = False
+        help_focus_changed = False
         for event in _next_events(stage):
             if event.type == pygame.QUIT:
                 running = False
                 break
+            if bridge.voice_player is not None and bridge.voice_player.handle_event(event):
+                continue
+            if event.type == pygame.NOEVENT:
+                continue
+            if stage.help.open:
+                if stage.help.handle(event, stage.display_scale):
+                    if not stage.help.open:
+                        help_focus_changed = True
+                        if isinstance(pending, PendingText):
+                            pygame.key.start_text_input()
+                    stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+                    if not stage.help.open and isinstance(pending, PendingText):
+                        _text_input_rect(stage, pending)
+                continue
+            if stage.help.requested(event, stage.display_scale):
+                stage.help.show(_help_lines(stage, frame, pending, music))
+                help_focus_changed = True
+                if isinstance(pending, PendingText):
+                    pygame.key.stop_text_input()
+                if stage.chrome is not None:
+                    stage.chrome.clear_hover()
+                stage.draw(frame, pending, media_visibility=bridge.media_visibility())
+                continue
+            if help_focus_changed and event.type in (pygame.TEXTINPUT, pygame.TEXTEDITING):
+                continue
             if isinstance(pending, PendingText) and not _text_current(pending, bridge, frame):
                 pending = None
                 stale_text = True
                 pygame.key.stop_text_input()
                 stage.draw(frame, media_visibility=bridge.media_visibility())
-            if bridge.voice_player is not None and bridge.voice_player.handle_event(event):
-                continue
-            if stale_text or event.type == pygame.NOEVENT:
+            if stale_text:
                 continue
             if event.type == pygame.KEYDOWN and _music_key(event, music):
                 continue
@@ -443,19 +587,19 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                     stage.present(frame, passages, media_visibility=bridge.media_visibility())
                     stage.draw(frame, media_visibility=bridge.media_visibility())
                     continue
-                if (pending is None and event.key == pygame.K_p
-                        and event.mod & pygame.KMOD_CTRL):
+                if (pending is None and stage.preference_pages > 1
+                        and PREFERENCE_PAGE.matches(event)):
+                    action = PagePreferences()
+                elif pending is None and MAIN_KEYS["pacing"].matches(event):
                     action = TogglePacing()
                 elif (pending is None and stage.paged and stage.pages
-                        and event.key in (pygame.K_UP, pygame.K_PAGEUP, pygame.K_DOWN,
-                                          pygame.K_PAGEDOWN, pygame.K_SPACE, pygame.K_RETURN,
-                                          pygame.K_END)
+                        and any(MAIN_KEYS[name].matches(event) for name in ("back", "forward", "end"))
                         and not event.mod & pygame.KMOD_SHIFT):
                     action = PassagePage(
-                        -1 if event.key in (pygame.K_UP, pygame.K_PAGEUP) else 1,
-                        end=event.key == pygame.K_END,
+                        -1 if MAIN_KEYS["back"].matches(event) else 1,
+                        end=MAIN_KEYS["end"].matches(event),
                     )
-                elif event.key == pygame.K_ESCAPE:
+                elif MAIN_KEYS["escape"].matches(event):
                     # Escape leaves a selection before it leaves the game: a
                     # player who opened one by mistake should not have to quit.
                     if pending is not None:
@@ -463,11 +607,9 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                         stage.draw(frame, media_visibility=bridge.media_visibility())
                     else:
                         running = False
-                elif event.key == pygame.K_TAB:
+                elif MAIN_KEYS["panel"].matches(event):
                     action = PagePanel()
-                elif event.key in (
-                    pygame.K_UP, pygame.K_PAGEUP, pygame.K_DOWN, pygame.K_PAGEDOWN,
-                ):
+                elif MAIN_KEYS["scroll"].matches(event):
                     shifted = bool(event.mod & pygame.KMOD_SHIFT)
                     if not shifted or pending is None:
                         action = ScrollText(
@@ -512,11 +654,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 pygame.display.set_caption(_world_title(bridge))
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
             if isinstance(pending, PendingText):
-                rect = pending.field_rect
-                pygame.key.set_text_input_rect(pygame.Rect(
-                    stage.window_point(rect.topleft),
-                    (rect.width * stage.display_scale, rect.height * stage.display_scale),
-                ))
+                _text_input_rect(stage, pending)
         # Due by the clock, not by a quiet queue: a moving mouse floods the queue
         # with motion events, and a redraw that waited for silence would freeze
         # every clip for as long as the pointer moved.

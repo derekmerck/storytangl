@@ -22,6 +22,7 @@ import pygame
 from tangl.presentation.projection import BrandingValue, ProjectedSection
 
 from .chrome import Chrome, wrap_pixels
+from .help_page import HelpPage
 from .text_entry import PendingText, draw_text_entry
 
 from dataclasses import dataclass
@@ -426,6 +427,7 @@ class Stage:
         self.selection_numbers: dict[str, int] = {}
         self.preference_controls: tuple[PreferenceControl, ...] = ()
         self.preference_page = 0
+        self.help = HelpPage()
         self._last_turn: Turn | None = None
         self._now: Callable[[], float] = clock or pygame.time.get_ticks
         """Milliseconds. Injected by tests, so no assertion depends on wall time."""
@@ -654,7 +656,6 @@ class Stage:
                 if turn.plate is not None:
                     for index, choice, region in self._claimed_regions(turn, turn.plate):
                         self._draw_region(index, choice, region)
-        self._draw_preferences()
         # Rows below are laid out first and always reserved, so a long exchange
         # can never push the only way to continue off the logical surface.
         # Placement is pure data -- slots against piece kinds, no pixels -- so it
@@ -752,6 +753,7 @@ class Stage:
             )
         else:
             self._draw_choices(choice_rows, top=choices_top, bottom=bottom)
+        self._draw_preferences()
         if editor is not None:
             self.hitboxes = draw_text_entry(self.surface, editor, self.text_font, self.density)
         elif len(self.pages) > 1 and not self.paged:
@@ -761,7 +763,10 @@ class Stage:
     def _draw_pacing_switch(self) -> None:
         text = self.font.render("Pages (Ctrl+P)", False, CREAM)
         bounds = self.text_bounds(self.surface.get_rect())
-        rect = text.get_rect(topright=(bounds.right, 2 * self.density))
+        right = self.logical_size[0] - self.font.size("Help")[0] - 8*self.density
+        if self.preference_pages > 1:
+            right -= self.font.size(self.preference_page_label)[0] + self.control_gap
+        rect = text.get_rect(topright=(right - self.control_gap, 2 * self.density))
         self._wash(rect, INK)
         self._blit_control(text, rect.topleft, bounds, TogglePacing())
 
@@ -854,39 +859,51 @@ class Stage:
             self.chrome.draw(self.shell)
             source = self.shell
         else:
-            source = self.surface
+            self.shell.blit(self.surface, (0, 0))
+            source = self.shell
+        self.help.draw_button(source, self.font, self.density, self.chrome_height)
+        if self.help.open:
+            self.help.draw(source, self.text_font, self.density)
         pygame.transform.scale(source, self.window.get_size(), self.window)
         pygame.display.flip()
 
+    @property
+    def preference_pages(self) -> int:
+        return max(1, -(-len(self.preference_controls) // 2))
+
+    @property
+    def preference_page_label(self) -> str:
+        return f"Prefs {self.preference_page % self.preference_pages + 1}/{self.preference_pages}"
+
     def _draw_preferences(self) -> None:
         page_size = 2
-        pages = max(1, -(-len(self.preference_controls) // page_size))
+        pages = self.preference_pages
         page = self.preference_page % pages
         controls = self.preference_controls[page * page_size : page * page_size + page_size]
+        right = self.logical_size[0] - self.font.size("Help")[0] - 8*self.density
+        if pages > 1:
+            label = self.font.render(self.preference_page_label, False, CREAM)
+            rect = label.get_rect(topright=(right, 2*self.density))
+            self._wash(rect.inflate(4*self.density, 0), INK)
+            self._blit_control(label, rect.topleft, self.surface.get_rect(), PagePreferences())
+            right = rect.left - self.control_gap
+        if len(self.pages) > 1 and not self.paged:
+            right -= self.font.size("Pages (Ctrl+P)")[0] + self.control_gap
         for index, control in enumerate(controls):
             shortcut = f"{control.shortcut}: " if control.shortcut else ""
             help_text = f" — {control.help}" if control.help else ""
-            value = "on" if control.value is True else "off" if control.value is False else control.value
-            text = f"{shortcut}{control.label}: {value}{help_text}"
-            surface = self.font.render(text, False, INK)
+            text = f"{shortcut}{control.label}: {control.value_label}{help_text}"
+            surface = self.font.render(self._clip(text, width=max(1, right - 8*self.density)),
+                                       False, CREAM)
             rect = pygame.Rect(
                 2 * self.density,
                 2 * self.density + index * self.row_height,
                 surface.get_width(),
                 self.row_height,
             )
+            self._wash(rect.inflate(4*self.density, 0), INK)
             self.surface.blit(surface, rect.topleft)
             self.hitboxes.append((rect, TogglePreference(control.preference_id)))
-        if pages > 1:
-            label = self.font.render(f"more {page + 1}/{pages}", False, ALERT)
-            rect = pygame.Rect(
-                self.logical_size[0] - label.get_width() - 2 * self.density,
-                2 * self.density,
-                label.get_width(),
-                self.row_height,
-            )
-            self.surface.blit(label, rect.topleft)
-            self.hitboxes.append((rect, PagePreferences()))
 
     # ── map view ─────────────────────────────────────────────────────────
 

@@ -285,6 +285,10 @@ class PreferenceControl:
     value: bool | str
     shortcut: str | None
 
+    @property
+    def value_label(self) -> str:
+        return "on" if self.value is True else "off" if self.value is False else self.value
+
 
 # ── input actions ────────────────────────────────────────────────────────────
 #
