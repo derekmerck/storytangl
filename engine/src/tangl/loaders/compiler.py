@@ -8,6 +8,7 @@ from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 from tangl.story.fabula.compiler import StoryTemplateBundle
 from tangl.story.episode import Block
 from tangl.presentation.hints import StagingHints
+from tangl.prose.portraits import HasPortraits
 from tangl.presentation.projection import BooleanPreference, EnumPreference, UiPreferencesValue
 
 from .bundle import WorldBundle
@@ -235,7 +236,11 @@ class WorldCompiler:
         bundle: StoryTemplateBundle,
         resources: ResourceManager | None,
     ) -> None:
-        """Check explicit staged-media delegation against world-static declarations."""
+        """Check every staging binding a world declares against its world-static
+        preferences, at load, wherever it is declared: a block's media, and the
+        staging a speaker's packed portraits give each line's portrait. A new
+        place a world declares staging hints is checked here too, so a binding
+        to an undeclared preference never reaches a client's redraw."""
         declared = UiPreferencesValue.model_validate(
             {"preferences": bundle.metadata.get("ui_preferences", [])}
         )
@@ -247,25 +252,34 @@ class WorldCompiler:
                 domains[preference.preference_id] = set(preference.values)
 
         for template in bundle.template_registry.values():
-            block = template.payload if isinstance(template.payload, Block) else None
-            if block is None:
-                continue
-            for media in block.media:
-                hints = StagingHints.model_validate(media.get("staging_hints") or {})
-                if hints.media_visibility is not None:
-                    WorldCompiler._validate_binding_values(
-                        hints.media_visibility.preference_id,
-                        hints.media_visibility.values,
-                        domains,
-                    )
-                if hints.media_clip_binding is not None:
-                    for axis in hints.media_clip_binding.axes:
-                        if axis not in domains:
-                            raise ValueError(f"Unknown ui preference {axis!r} in media clip binding")
-                    for row in hints.media_clip_binding.rows:
-                        for axis, value in zip(hints.media_clip_binding.axes, row.values, strict=True):
-                            WorldCompiler._validate_binding_values(axis, [value], domains)
-                WorldCompiler._validate_media_clips(media, hints, resources)
+            payload = template.payload
+            if isinstance(payload, Block):
+                for media in payload.media:
+                    hints = StagingHints.model_validate(media.get("staging_hints") or {})
+                    WorldCompiler._validate_staging_bindings(hints, domains)
+                    WorldCompiler._validate_media_clips(media, hints, resources)
+            if isinstance(payload, HasPortraits) and payload.portraits.staging_hints is not None:
+                WorldCompiler._validate_staging_bindings(payload.portraits.staging_hints, domains)
+
+    @staticmethod
+    def _validate_staging_bindings(
+        hints: StagingHints,
+        domains: dict[str, set[bool | str]],
+    ) -> None:
+        """Refuse a visibility or clip binding to a preference or value not declared."""
+        if hints.media_visibility is not None:
+            WorldCompiler._validate_binding_values(
+                hints.media_visibility.preference_id,
+                hints.media_visibility.values,
+                domains,
+            )
+        if hints.media_clip_binding is not None:
+            for axis in hints.media_clip_binding.axes:
+                if axis not in domains:
+                    raise ValueError(f"Unknown ui preference {axis!r} in media clip binding")
+            for row in hints.media_clip_binding.rows:
+                for axis, value in zip(hints.media_clip_binding.axes, row.values, strict=True):
+                    WorldCompiler._validate_binding_values(axis, [value], domains)
 
     @staticmethod
     def _validate_media_clips(

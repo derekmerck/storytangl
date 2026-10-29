@@ -15,6 +15,7 @@ from tangl.media.media_resource.media_provisioning import MediaInventoryProvisio
 from tangl.media.media_resource.media_resource_inv_tag import is_materialized_media_file
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.media.story_media import get_story_resource_manager
+from tangl.presentation.hints import StagingHints
 from tangl.media.system_media import get_system_resource_manager
 from tangl.story import Block, Role, Setting, StoryGraph
 from tangl.vm import Resolver
@@ -43,6 +44,10 @@ class PackedPortraits(Unstructurable, extra="forbid"):
         default_factory=dict, json_schema_extra={"include": True},
     )
     scope: Literal["world", "story", "sys"] = "world"
+    staging_hints: StagingHints | None = Field(None, json_schema_extra={"include": True})
+    """How the world stages the portrait each line brings -- say, the viewer
+    preference that hides faces. Carried on every one, so a speaker with no
+    staged portrait to take staging from is still staged as the world's others."""
 
     @model_validator(mode="after")
     def _declared_default(self) -> Self:
@@ -170,7 +175,7 @@ def compose_portraits(*, fragments: list[Record], ctx: PhaseCtx, **_kwargs: obje
             output.append(MediaFragment(
                 content=resource, content_format="rit", content_type=resource.data_type,
                 media_role="dialog_im", scope=provider.portraits.scope,
-                speaker_id=speaker_id,
+                speaker_id=speaker_id, staging_hints=provider.portraits.staging_hints,
                 source_id=fragment.source_id, origin_id=fragment.origin_id, step=ctx.step,
             ))
     return output

@@ -7,15 +7,18 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from tangl.core import EntityTemplate, Selector
 from tangl.journal.fragments import AttributedFragment, MediaFragment
+from tangl.loaders import WorldBundle, WorldCompiler
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.media import story_media, system_media
 from tangl.mechanics.presence.look.look import HasSimpleLook
 from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.presentation.hints import StagingHints
 from tangl.prose import DialogMuBlock
 from tangl.prose.naming import NamedActor, NamedLocation, ProseBlock, naming_dispatch
 from tangl.prose.portraits import HasPortraits, PackedPortraits, PortraitLook, portrait_dispatch
@@ -155,6 +158,81 @@ def test_actual_journal_emits_following_portraits_with_original_attitudes(world:
     assert ledger.graph.value_hash() == before
     assert all(resource.registry is world.resources.registry
                for resource in world.resources.registry.values())
+
+
+def test_each_lines_portrait_carries_the_worlds_staging_and_keeps_it_restored(
+        world: World) -> None:
+    # A speaker with no staged portrait has no staging to take, so the world
+    # says how a line's portrait is staged -- here, hidden with the viewer's
+    # faces -- and every one a line brings carries it, before and after restore.
+    ledger = make_ledger(world)
+    hints = StagingHints(media_visibility={"preference_id": "portraits", "values": [True]})
+    subject = actor(ledger)
+    subject.portraits = subject.portraits.model_copy(update={"staging_hints": hints})
+    restored = type(ledger.graph).structure(Json.deserialize(Json.serialize(
+        ledger.graph.unstructure())))
+    for graph in (ledger.graph, restored):
+        story = Ledger.from_graph(graph=graph, entry_id=graph.initial_cursor_id)
+        faces = [item for item in do_journal(story.cursor, ctx=prepare(story))
+                 if isinstance(item, MediaFragment) and item.media_role == "dialog_im"]
+        assert len(faces) == 2
+        assert all(face.staging_hints == hints for face in faces)
+
+
+def staged_portrait_world(root: Path, staging: dict[str, object]) -> Path:
+    """A world folder whose one speaker gives each line's portrait `staging`."""
+    root.mkdir()
+    (root / "domain.py").write_text(
+        "from tangl.prose.portraits import HasPortraits\n"
+        "from tangl.story import Actor\n\n\n"
+        "class Speaker(HasPortraits, Actor):\n    pass\n")
+    (root / "world.yaml").write_text(yaml.safe_dump({
+        "label": root.name, "scripts": "script.yaml", "domain_module": "domain",
+        "metadata": {"ui_preferences": [
+            {"id": "faces", "kind": "boolean", "label": "Faces", "default": True},
+            {"id": "pose", "kind": "enum", "label": "Pose", "values": ["still", "wave"],
+             "default": "still"},
+        ]},
+    }))
+    (root / "script.yaml").write_text(yaml.safe_dump({
+        "label": root.name, "metadata": {"start_at": "s.start"},
+        "actors": {"rin": {"kind": "Speaker", "name": "Rin", "portraits": {
+            "default_look": "day", "looks": {"day": {"base": "rin.svg"}},
+            "staging_hints": staging}}},
+        "scenes": {"s": {"roles": {"host": {"actor_ref": "rin"}},
+                         "blocks": {"start": {"content": "Hello."}}}},
+    }))
+    return root
+
+
+@pytest.mark.parametrize(("staging", "match"), [
+    ({"media_visibility": {"preference_id": "portraits", "values": [True]}},
+     "Unknown ui preference"),
+    ({"media_visibility": {"preference_id": "faces", "values": ["true"]}},
+     "outside ui preference"),
+    ({"media_clip_binding": {"axes": ["mood"], "rows": [{"values": ["happy"], "clip": "smile"}]}},
+     "Unknown ui preference"),
+    ({"media_clip_binding": {"axes": ["pose"], "rows": [{"values": ["dance"], "clip": "wave"}]}},
+     "outside ui preference"),
+], ids=["unknown preference", "value outside a boolean", "unknown clip axis",
+        "value outside an enum"])
+def test_a_portraits_staging_bindings_are_checked_when_the_world_loads(
+        tmp_path: Path, staging: dict[str, object], match: str) -> None:
+    # A speaker's packed portraits bind each line's portrait to the world's
+    # viewer preferences, as block media do, and are refused at load by the
+    # same rules -- not left for a client to trip over when it draws.
+    root = staged_portrait_world(tmp_path / "refused", staging)
+    with pytest.raises(ValueError, match=match):
+        WorldCompiler().compile(WorldBundle.load(root))
+
+
+def test_a_portrait_bound_to_a_declared_preference_loads(tmp_path: Path) -> None:
+    root = staged_portrait_world(tmp_path / "bound", {
+        "media_visibility": {"preference_id": "faces", "values": [True]}})
+    world = WorldCompiler().compile(WorldBundle.load(root))
+    speaker = next(t.payload for t in world.bundle.template_registry.values()
+                   if isinstance(t.payload, HasPortraits))
+    assert speaker.portraits.staging_hints.media_visibility.preference_id == "faces"
 
 
 @pytest.mark.parametrize("look", ["everyday", "special"])
