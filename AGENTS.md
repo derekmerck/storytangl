@@ -233,6 +233,14 @@ full type map and rationale.**
   if a local server needs static HTML at the configured service path.
 
 ## Feature workflow
+- Prospective stories and world expansions belong in `docs/src/world-designs/`;
+  issues retain implementation dependencies and acceptance criteria. Follow that
+  collection's ownership/promotion guidance rather than listing unimplemented
+  concepts as playable demos. Moving a premise into docs does not close its work.
+- A new demo world must include a README stating intent, how to run it, and the
+  capability its maintained witnesses actually demonstrate. Add an intent/brag
+  line (or optional representative image) to `worlds/README.md` in the same PR.
+  Preserve narrow fixtures when a sibling showcase would make their purpose clearer.
 - Prefer one continuous implementation task and one design/planning task in a
   shared checkout. Do not require a new thread, branch, worktree, or contract
   artifact for every implementation phase.

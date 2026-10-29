@@ -18,6 +18,12 @@ itself is tracked in
 between focused fixtures, conformance worlds, and showcase stories is described
 in [#395](https://github.com/derekmerck/storytangl/issues/395).
 
+Prospective stories and unimplemented expansions live in
+[World Designs](../docs/src/world-designs/index.rst). That collection records their
+premises, feature experiments, and first playable proofs; it does not add them to
+this executable teaching catalog. New worlds should link back to their design
+provenance while stating their actual supported behavior and maintained witnesses.
+
 ## Start Here
 
 ### [The Crossroads Inn](reference/) — `reference`
