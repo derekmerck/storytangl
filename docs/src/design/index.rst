@@ -3,6 +3,9 @@ Design Plans
 
 Stable architecture and rationale for the published StoryTangl subsystems.
 
+Prospective narratives and the capabilities they would exercise live in
+:doc:`../world-designs/index`; those briefs do not define implemented engine contracts.
+
 See also
 --------
 - :doc:`../notes/reference/code_adjacent_design_docs` for design notes that still

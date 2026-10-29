@@ -12,5 +12,6 @@ guides for the post-cutover ``tangl.story`` / ``tangl.vm`` / ``tangl.core`` /
    api/index
    mechanics/index
    design/index
+   world-designs/index
    notes/index
    contrib/index
