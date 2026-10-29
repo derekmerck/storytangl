@@ -368,6 +368,60 @@ def test_a_turn_without_state_draws_no_panel(stage) -> None:
     assert stage._has_state(_packet_turn()) is True
 
 
+@pytest.mark.parametrize("size", [(320, 200), (640, 400)])
+@pytest.mark.parametrize("preferences", [False, True])
+@pytest.mark.parametrize("chrome", [False, True])
+def test_panel_clears_top_controls_and_pages_all_disclosures(
+    size, preferences, chrome, tmp_path, monkeypatch,
+) -> None:
+    stage = Stage(logical_size=size, display_scale=1, chrome=chrome)
+    if preferences:
+        stage.preference_controls = tuple(
+            PreferenceControl(f"p{i}", f"Preference {i}", None, True, None)
+            for i in range(3)
+        )
+    turn = _crowded_turn()
+    turn.pieces.insert(0, Piece(piece_id="passenger", kind="candidate", text="",
+                                label="Passenger documentation"))
+    pages_seen = []
+    original = stage.panel_page
+
+    def record(rows, *, capacity):
+        result = original(rows, capacity=capacity)
+        pages_seen.append(result)
+        return result
+    monkeypatch.setattr(stage, "panel_page", record)
+    panel_tops = []
+    draw_panel = stage._draw_state_panel
+
+    def record_panel(turn, *, top, bottom, placed):
+        panel_tops.append(top)
+        draw_panel(turn, top=top, bottom=bottom, placed=placed)
+
+    monkeypatch.setattr(stage, "_draw_state_panel", record_panel)
+    try:
+        stage.draw(turn)
+        assert panel_tops[-1] >= stage.help.button_rect.bottom - stage.chrome_height
+        assert all(panel_tops[-1] >= rect.bottom for rect, action in stage.hitboxes
+                   if isinstance(action, (PagePreferences, TogglePreference)))
+        page, pages, visible = pages_seen[-1]
+        assert pages > 1 and any("Passenger" in text for text, _ in visible)
+        pygame.image.save(stage.window, str(tmp_path / "panel.png"))
+        seen = list(visible)
+        for _ in range(1, pages):
+            pager = next(rect for rect, action in stage.hitboxes if isinstance(action, PagePanel))
+            assert pager.top > stage.help.button_rect.bottom - stage.chrome_height
+            stage.panel_scroll += 1
+            stage.draw(turn)
+            seen.extend(pages_seen[-1][2])
+        columns = (stage.panel_width - 10 * stage.density) // (4 * stage.density)
+        assert seen == stage.panel_rows(turn, columns=columns)
+        assert all(stage.font.size(text)[0] <= stage.panel_width - 8 * stage.density
+                   for text, _ in seen)
+    finally:
+        pygame.quit()
+
+
 def test_an_empty_zone_still_renders(stage) -> None:
     """A targetable container with nothing in it is information, not absence."""
 

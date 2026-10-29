@@ -742,7 +742,10 @@ class Stage:
         if panelled:
             self._draw_state_panel(
                 turn,
-                top=2 * self.density,
+                top=2 * self.density + max(
+                    self.font.get_height(),
+                    min(2, len(self.preference_controls)) * self.row_height,
+                ) + 2 * self.density,
                 bottom=choices_top,
                 placed=placed,
             )
@@ -1991,7 +1994,9 @@ class Stage:
 
         def wrapped(text: str, colour, *, indent: str = "") -> None:
             for part in self._wrap(text, columns - len(indent)):
-                rows.append((f"{indent}{part}", colour))
+                width = self.panel_width - 8 * self.density - self.font.size(indent)[0]
+                for line in wrap_pixels(self.font, part, width):
+                    rows.append((f"{indent}{line}", colour))
 
         # Pieces outside any zone first -- in a credentials shift that is the
         # traveler, and who you are judging outranks what they handed over.
