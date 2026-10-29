@@ -295,11 +295,45 @@ values. The backend chooses entries, identities, wording, disclosure and icon
 suggestions; pygame arranges width-bounded pages of up to six entries in one row.
 Optional `hints.placement` (`start`, `middle`, `end`) groups entries, preserving
 provider order within each group; unhinted entries join the start group.
-`hints.icon_only` defaults to false. A recognized token can use just its glyph;
-unknown/missing tokens always retain readable text. Full labels and state stay
-available in details. The client does not parse English
+`hints.icon_only` defaults to false. An explicit drawable `hints.icon_media` wins
+over a recognized `hints.icon` token; otherwise icon-only fallback uses
+`hints.short_label`, then the full title. Only an actual image/glyph suppresses
+row text. Without icon-only advice, the current readable row title/value behavior
+is retained. Full labels and state stay available in details and rollover.
+The client does not parse English
 field names, inspect a graph, compute inventory rules, assume a calendar/daypart
 count, or read the host clock. Unknown icons keep their readable text floor.
+
+`icon_media` is a world-static reference such as `pass.svg`, in the same coordinate
+as the branding logo. It goes through `get_world_media` and the current media
+profile, then the existing co-located SVG/image decoder. It is not a guessed
+filename or arbitrary URL, and `icon` strings are never interpreted as media.
+Missing, unfetched, unsupported and undecodable sources follow the fallback chain.
+The bridge caches both successful and failed lookups by world/reference; Stage
+reuses its decoder cache and prepares scaled images by resolved source and size.
+Only disclosed current entries are resolved, during synchronization. Revisit,
+redraw, local preferences, hover and animation do not repeat delivery or decoding.
+Negative results last for the client cache's lifetime; a new reference can resolve
+normally. General remote loading, prefetch/manifest protocols and icon bundles are
+separate work. No icon library/font/CDN is required.
+
+For example, a provider can disclose an owned item as an ordinary section:
+
+```yaml
+section_id: pass
+title: Hall pass
+value: {value_type: scalar, value: Carried}
+hints:
+  icon_media: pass.svg
+  icon: key
+  short_label: HP
+  icon_only: true
+  placement: middle
+```
+
+The provider omits an unowned item. A world may publish its same facts to
+`ui-inventory`; that remains world policy. CLI `status ui-status` and an advertised
+`status inv` shortcut print the full title and readable value, ignoring these hints.
 
 A line, narration or a speaker's, tagged `status:<section_id>` restates
 that section (#629). When
@@ -309,6 +343,8 @@ A line that also names a section the bar does not carry, an untagged line, and
 every line in a world without `ui-status`, are kept.
 
 - Click an entry, or press `Ctrl+I`, for its full label/value/details.
+- Hover an entry for the same full title/value text in a window-bounded rollover.
+  Leaving it/window, changing page/content, or switching session clears rollover.
 - Click `i` to open/close details, including branding/logo and help on an empty row.
 - In details, `Tab` / `Shift+Tab` visits entries (including overflow pages),
   `PageUp` / `PageDown` or the wheel pages long text, and `Esc` closes.

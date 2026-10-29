@@ -18,6 +18,9 @@ class PresentationHints(BaseModel, extra="allow"):
     style_tags: list[StyleClass] = Field(default_factory=list)
     style_dict: StyleDict = Field(default_factory=dict)
     icon: str | None = None
+    icon_media: str | None = None
+    """World-static media reference, in the same coordinate as branding logo_media."""
+    short_label: str | None = None
     placement: Literal["start", "middle", "end"] | None = None
     icon_only: bool = False
 
