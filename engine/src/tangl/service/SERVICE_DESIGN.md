@@ -338,6 +338,14 @@ supported co-located image paths can supply a logo, otherwise pygame retains the
 world name. This introduces no second filename loader, descriptor schema or media
 admission policy. Remote pygame loading remains out of scope.
 
+Status `PresentationHints.icon_media` uses the same world-static reference
+coordinate and media/profile delivery as `BrandingValue.logo_media`. Pygame
+resolves only references encountered in disclosed current status sections, at
+synchronization, with transient lookup caching scoped by world and reference.
+Failures retain the normal token/text fallback. Service supplies no icon search,
+library binding, inventory rules or rollover endpoint. `ProjectedSection.title`
+and its value remain the semantic/CLI floor; `short_label` is advisory only.
+
 ## Auth and Access
 
 `UserAuthInfo` is the service auth context. Auth resolution is persistence-based

@@ -68,6 +68,27 @@ presentation only where the client can realize the icon; unknown/missing icons
 retain text. Full label/value remains inspectable. These hints introduce no
 parallel section type, mandatory layout, persistent UI state or icon-media loader.
 
+The media-icon slice adds optional typed `icon_media` and `short_label` on that
+same hints object. `icon_media` uses the world-static media reference coordinate
+of `BrandingValue.logo_media`; resolve it through ordinary world media/profile
+delivery. It is not an arbitrary URL, a client filename or an interpretation of
+the symbolic `icon`. The full semantic label stays in `ProjectedSection.title`.
+The default pygame fallback is drawable explicit media → recognized symbolic
+token → short label → full title. Only a drawable image/glyph permits icon-only
+row text suppression. `short_label` is compact advice for icon-only textual
+fallback; it does not replace full title/value in inspection or CLI output.
+
+Pygame resolves only icons in currently disclosed status entries during status
+synchronization. World/reference lookups and successful/failed image preparation
+are cached transiently; drawing, preferences, rollover and animation do no media
+delivery work. The normal image decoder/cache and resolved path/size are reused.
+Hover is client-local, bounded to the shell, and shares the details text floor.
+Leaving an entry/window, changing pages/content or switching session clears it.
+No journal, gameplay action, inventory authority or tooltip/widget framework is
+introduced. Optional binary item providers simply omit unowned entries. CLI
+`status ui-status` and an advertised `status inv` shortcut retain full labels and
+readable values and ignore icon/short-label advice.
+
 Scope resolution belongs to existing projection contributors and `PhaseCtx.get_ns`.
 A world can advertise status across ordinary blocks, including called scenes,
 without tying availability to one menu node kind. Empty sections are meaningful.

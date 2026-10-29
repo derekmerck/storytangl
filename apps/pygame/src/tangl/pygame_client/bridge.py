@@ -317,6 +317,8 @@ class PygameSessionBridge:
         self.branding: BrandingValue | None = None
         self.logo_source: str | None = None
         self.status = ProjectedState()
+        self.status_icon_sources: dict[str, str] = {}
+        self._status_icon_sources: dict[tuple[str, str], str | None] = {}
         self._world_catalogs: dict[str, ProjectedState] = {}
         self._brands: dict[str, tuple[BrandingValue, str | None]] = {}
         self._available_info: frozenset[str] | None = None
@@ -415,14 +417,7 @@ class PygameSessionBridge:
                         if isinstance(section.value, BrandingValue):
                             brand = section.value
                     if brand.logo_media:
-                        payload = self.service_manager.get_world_media(
-                            world_id=self.world_id, media=brand.logo_media,
-                            render_profile=self.media_render_profile,
-                        )
-                        if (payload is not None and payload.get("content_format") == "path"
-                                and payload.get("media_type") in ("image", "vector")
-                                and isinstance(payload.get("path"), str)):
-                            logo = payload["path"]
+                        logo = self._world_image_source(self.world_id, brand.logo_media)
                 self._brands[self.world_id] = (brand, logo)
             self.branding, self.logo_source = self._brands[self.world_id]
         marker = envelope.metadata.get("info_state")
@@ -435,6 +430,7 @@ class PygameSessionBridge:
             self._available_info = available
         if "ui-status" not in available:
             self.status = ProjectedState()
+            self.status_icon_sources = {}
             self._status_version = None
         elif newly_available or (info.version != self._status_version
                                  and "ui-status" in info.dirty_channels):
@@ -442,6 +438,27 @@ class PygameSessionBridge:
                 user_id=self.user_id, ledger_id=self.ledger_id, channels=["ui-status"],
             )
             self._status_version = info.version
+            self.status_icon_sources = {}
+            if self.world_id is not None:
+                for section in self.status.sections:
+                    ref = section.hints.icon_media if section.hints else None
+                    if ref:
+                        key = (self.world_id, ref)
+                        if key not in self._status_icon_sources:
+                            self._status_icon_sources[key] = self._world_image_source(*key)
+                        if (source := self._status_icon_sources[key]) is not None:
+                            self.status_icon_sources[ref] = source
+
+    def _world_image_source(self, world_id: str, media: str) -> str | None:
+        """Use normal profile delivery, with the current co-located transport boundary."""
+        payload = self.service_manager.get_world_media(
+            world_id=world_id, media=media, render_profile=self.media_render_profile,
+        )
+        if (payload is not None and payload.get("content_format") == "path"
+                and payload.get("media_type") in ("image", "vector")
+                and isinstance(payload.get("path"), str)):
+            return payload["path"]
+        return None
 
     @property
     def status_available(self) -> bool:
@@ -483,6 +500,7 @@ class PygameSessionBridge:
 
     def close(self) -> None:
         self.status = ProjectedState()
+        self.status_icon_sources = {}
         self.branding = None
         self.logo_source = None
         self._available_info = None

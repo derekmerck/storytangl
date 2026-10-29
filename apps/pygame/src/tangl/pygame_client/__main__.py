@@ -390,7 +390,8 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
         pygame.display.set_caption(_world_title(bridge))
 
     stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
-                   status_available=bridge.status_available, session_id=bridge.ledger_id)
+                   status_available=bridge.status_available, session_id=bridge.ledger_id,
+                   icon_sources=bridge.status_icon_sources, world_id=bridge.world_id)
     stage.draw(frame, media_visibility=bridge.media_visibility())
 
     if args.screenshot is not None:
@@ -494,6 +495,7 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 pygame.key.start_text_input()
                 if stage.chrome is not None:
                     stage.chrome.open = False
+                    stage.chrome.clear_hover()
             elif was_text and not isinstance(pending, PendingText):
                 pygame.key.stop_text_input()
             if isinstance(action, (TogglePreference, TogglePacing)):
@@ -505,7 +507,8 @@ def _play(args: argparse.Namespace, bridge: PygameSessionBridge, music: MusicPla
                 passages = visual_passages(bridge, envelope, previous)
                 stage.present(frame, passages, media_visibility=bridge.media_visibility())
                 stage.set_info(bridge.branding, bridge.status.sections, bridge.logo_source,
-                               status_available=bridge.status_available, session_id=bridge.ledger_id)
+                               status_available=bridge.status_available, session_id=bridge.ledger_id,
+                               icon_sources=bridge.status_icon_sources, world_id=bridge.world_id)
                 pygame.display.set_caption(_world_title(bridge))
             stage.draw(frame, pending, media_visibility=bridge.media_visibility())
             if isinstance(pending, PendingText):

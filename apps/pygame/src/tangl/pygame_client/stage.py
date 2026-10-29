@@ -374,8 +374,10 @@ class Stage:
         pygame.init()
         self.chrome = Chrome(logical_size[0], self.density) if chrome else None
         self._info_session: UUID | None = None
+        self._info_world: str | None = None
         self.asset_dir = asset_dir
         self._cache: dict[str, pygame.Surface | None] = {}
+        self._status_icon_cache: dict[tuple[str, int], pygame.Surface | None] = {}
         self._icon_source: str | None = logo_source
         logo = self._load(logo_source) if logo_source else None
         # Some platforms accept an icon only before the first window is shown.
@@ -799,6 +801,8 @@ class Stage:
     def set_info(
         self, branding: BrandingValue | None, sections: list[ProjectedSection],
         logo_source: str | None, *, status_available: bool, session_id: UUID | None = None,
+        icon_sources: Mapping[str, str] | None = None,
+        world_id: str | None = None,
     ) -> None:
         """Allocate shell space only for an advertised status channel, even if empty."""
         if logo_source != self._icon_source:
@@ -806,7 +810,8 @@ class Stage:
             self._icon_source = logo_source
             logo = self._load(logo_source) if logo_source else None
             pygame.display.set_icon(logo or storytangl_glyph())
-        if status_available != (self.chrome is not None) or session_id != self._info_session:
+        if (status_available != (self.chrome is not None) or session_id != self._info_session
+                or world_id != self._info_world):
             self.chrome = Chrome(self.logical_size[0], self.density) if status_available else None
             self.chrome_height = self.chrome.height if self.chrome is not None else 0
             self.shell = pygame.Surface((self.logical_size[0],
@@ -816,8 +821,32 @@ class Stage:
                 (self.logical_size[1] + self.chrome_height) * self.display_scale,
             ))
             self._info_session = session_id
+            self._info_world = world_id
         if self.chrome is not None:
-            self.chrome.set_content(branding, sections, self._load(logo_source) if logo_source else None)
+            icons: dict[str, pygame.Surface] = {}
+            for section in sections:
+                ref = section.hints.icon_media if section.hints else None
+                if not ref:
+                    continue
+                source = (icon_sources or {}).get(ref)
+                if source is None:
+                    continue
+                size = 8 * self.density
+                key = (source, size)
+                if key not in self._status_icon_cache:
+                    surface = self._load(source)
+                    if surface is not None:
+                        factor = min(size / surface.get_width(), size / surface.get_height())
+                        surface = pygame.transform.scale(surface, (
+                            max(1, round(surface.get_width() * factor)),
+                            max(1, round(surface.get_height() * factor)),
+                        ))
+                    self._status_icon_cache[key] = surface
+                if (surface := self._status_icon_cache[key]) is not None:
+                    icons[ref] = surface
+            self.chrome.set_content(
+                branding, sections, self._load(logo_source) if logo_source else None, icons,
+            )
 
     def _present(self) -> None:
         if self.chrome is not None:

@@ -71,6 +71,10 @@ class Chrome:
         self.sections: list[ProjectedSection] = []
         self.branding = BrandingValue(name="StoryTangl")
         self.logo: pygame.Surface | None = None
+        self.icons: dict[str, pygame.Surface] = {}
+        self.hovered_id: str | None = None
+        self.hover_box: pygame.Rect | None = None
+        self._drawn_page: int | None = None
         self.selected_id: str | None = None
         self.open = False
         self.page = 0
@@ -82,9 +86,13 @@ class Chrome:
     def set_content(
         self, branding: BrandingValue | None, sections: list[ProjectedSection],
         logo: pygame.Surface | None,
+        icons: dict[str, pygame.Surface] | None = None,
     ) -> None:
+        if sections != self.sections or (icons or {}) != self.icons:
+            self.clear_hover()
         self.branding = branding or BrandingValue(name="StoryTangl")
         self.sections, self.logo = sections, logo
+        self.icons = icons or {}
         if self.selected_id not in {section.section_id for section in sections}:
             self.selected_id = sections[0].section_id if sections else None
             self.detail_page = 0
@@ -95,15 +103,20 @@ class Chrome:
     def _entry_text(self, section: ProjectedSection) -> str:
         value = section_text(section)
         hints = section.hints
+        if hints and hints.icon_only and hints.short_label:
+            return hints.short_label
         if hints and hints.placement and not hints.icon_only:
             return value or section.title
         return f"{section.title}: {value}" if value else section.title
 
     def _entry_width(self, section: ProjectedSection) -> int:
         hints = section.hints
-        if hints and hints.icon_only and hints.icon in self.ICON_TOKENS:
+        drawable = hints is not None and (
+            hints.icon_media in self.icons or hints.icon in self.ICON_TOKENS
+        )
+        if hints and hints.icon_only and drawable:
             return 12 * self.density
-        icon = 10 * self.density if hints and hints.icon in self.ICON_TOKENS else 0
+        icon = 10 * self.density if drawable else 0
         return min(self.width // 3, self.font.size(self._entry_text(section))[0]
                    + icon + 6 * self.density)
 
@@ -144,6 +157,9 @@ class Chrome:
         self.hitboxes.clear()
         pages = self._pages()
         self.page %= len(pages)
+        if self.page != self._drawn_page:
+            self.clear_hover()
+            self._drawn_page = self.page
         entries = pages[self.page]
         left, right = 2 * d, self.width - 26 * d
         for placement in ("start", "middle", "end"):
@@ -165,7 +181,14 @@ class Chrome:
                 pygame.draw.rect(shell, ground, box)
                 hints = section.hints
                 token = hints.icon if hints else None
-                inset = self._icon(shell, token, x + 2 * d, (self.height - 8 * d) // 2, ground)
+                image = self.icons.get(hints.icon_media) if hints else None
+                if image is not None:
+                    shell.blit(image, (x + 2*d, (self.height - image.get_height()) // 2))
+                    inset = 10 * d
+                else:
+                    inset = self._icon(
+                        shell, token, x + 2 * d, (self.height - 8 * d) // 2, ground,
+                    )
                 if not (hints and hints.icon_only and inset):
                     text = self._clip(self._entry_text(section), box.width - inset - 4 * d)
                     shell.blit(self.font.render(text, False, (232, 226, 205)),
@@ -178,6 +201,43 @@ class Chrome:
                        (box.left + 2 * d, (self.height - self.font.get_height()) // 2))
         if self.open:
             self._draw_details(shell)
+        elif self.hovered_id is not None:
+            self._draw_hover(shell)
+
+    def clear_hover(self) -> None:
+        self.hovered_id, self.hover_box = None, None
+
+    @property
+    def hover_text(self) -> str:
+        section = next((s for s in self.sections if s.section_id == self.hovered_id), None)
+        return self._details_text(section) if section is not None else ""
+
+    @staticmethod
+    def _details_text(section: ProjectedSection) -> str:
+        return f"{section.title}\n{section_text(section)}"
+
+    def _draw_hover(self, shell: pygame.Surface) -> None:
+        anchor = next((box for box, identity in self.hitboxes if identity == self.hovered_id), None)
+        if anchor is None:
+            self.clear_hover()
+            return
+        d = self.density
+        width = self.width - 12*d
+        lines = wrap_pixels(self.font, self.hover_text, width - 8*d)
+        capacity = max(1, (shell.get_height() - self.height - 8*d) // self.line_height)
+        if len(lines) > capacity:
+            lines = [*lines[:capacity - 1], "..."]
+        width = min(width, max(self.font.size(line)[0] for line in lines) + 8*d)
+        box = pygame.Rect(
+            min(anchor.left, self.width - width - 6*d), self.height + 2*d,
+            width, len(lines) * self.line_height + 4*d,
+        )
+        self.hover_box = box
+        pygame.draw.rect(shell, (232, 226, 205), box)
+        pygame.draw.rect(shell, (63, 96, 99), box, d)
+        for index, line in enumerate(lines):
+            shell.blit(self.font.render(line, False, BAR),
+                       (box.left + 4*d, box.top + 2*d + index * self.line_height))
 
     ICON_TOKENS = frozenset({"sun", "sunset", "moon", "scene", "calendar", "inventory",
                              "lamp", "key", "bag"})
@@ -220,7 +280,7 @@ class Chrome:
                           self.width - 12 * d, shell.get_height() - self.height - 12 * d)
         text = f"{self.branding.name}\n"
         if section is not None:
-            text += f"{section.title}\n{section_text(section)}"
+            text += self._details_text(section)
         text += "\nCtrl+I: details | Tab: next entry | Click >: next row page"
         lines = wrap_pixels(self.font, text, box.width - (24 if self.logo is not None else 8) * d)
         capacity = max(1, box.height // self.line_height - 3)
@@ -244,11 +304,25 @@ class Chrome:
                    (box.left + 4 * d, box.bottom - self.line_height - d))
 
     def handle_event(self, event: pygame.event.Event, scale: int) -> bool:
+        if event.type == pygame.WINDOWLEAVE:
+            changed = self.hovered_id is not None
+            self.clear_hover()
+            return changed
+        if event.type == pygame.MOUSEMOTION:
+            point = (event.pos[0] // scale, event.pos[1] // scale)
+            hovered = next((identity for box, identity in self.hitboxes
+                            if box.collidepoint(point)), None) if not self.open else None
+            changed = hovered != self.hovered_id
+            if changed:
+                self.hovered_id, self.hover_box = hovered, None
+            return changed
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_i and event.mod & pygame.KMOD_CTRL:
+                self.clear_hover()
                 self.open = not self.open
                 return True
             if self.open:
+                self.clear_hover()
                 if event.key == pygame.K_ESCAPE:
                     self.open = False
                 elif event.key == pygame.K_TAB and self.sections:
@@ -264,12 +338,14 @@ class Chrome:
                     self.detail_page += -1 if event.key == pygame.K_PAGEUP else 1
                 return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.clear_hover()
             point = (event.pos[0] // scale, event.pos[1] // scale)
             if self.info_box.collidepoint(point):
                 self.open = not self.open
                 return True
             if self.next_box.collidepoint(point):
                 self.page = (self.page + 1) % len(self._pages())
+                self.hitboxes.clear()
                 return True
             for box, section_id in self.hitboxes:
                 if box.collidepoint(point):
