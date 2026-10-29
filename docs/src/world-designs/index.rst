@@ -99,6 +99,10 @@ brief space when its characters, pressure, and vertical need development. Issues
 own actionable decomposition and live progress. Extracting narrative intent does
 not close unfinished or parked issues or put an experiment on the critical path.
 
+When a concept is selected for implementation, open or designate an issue for its
+first bounded playable proof; do not create implementation issues merely because
+a concept enters this catalog.
+
 When a bounded world is ready for ``worlds/``:
 
 * Supply a stated purpose, runnable bundle, honest README, and maintained witness

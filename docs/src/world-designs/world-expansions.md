@@ -23,6 +23,13 @@ escalating dragon rumors, a prince with an objective, and endings recalling spec
 choices. [Salon Season](salon-season.md) is a separate story; grafting its revolution
 onto this fixture remains deferred.
 
+**Concrete presentation opportunity.** The existing burning-valley plate
+deliberately contains no dragon: the creature was intended to occupy the air as a
+separate staged sprite. Supplying that sprite would complete an explicit visual
+design, rather than require repainting the background or changing the preparation
+mechanics. See the world's
+[art note](https://github.com/derekmerck/storytangl/blob/main/worlds/coronate_the_regent/README.md#two-things-the-art-deliberately-does-not-do).
+
 **First playable proof / unlock.** One connective scene and one attributable ending
 callback, retaining the existing preparation/outcome witnesses. This is the lowest-
 risk test of authored rhythm and voice over current mechanics. Choose a sibling
@@ -46,6 +53,19 @@ or reward that repertoire matter outside the immediate contest.
 aftermath. Island/station packs share prose, graph, and staging semantics; music
 and optional animation are existing presentation evidence, not new requirements
 invented by this brief. Optional art still needs a playable text/still floor.
+
+**Concrete media baseline and opportunities.** The spaceport pack already has
+`idle`, `call`, and `response` animation sheets; the quayside pack stages the same
+clips but currently draws stills. Adding quayside sheets is a specific presentation
+completion opportunity over the same graph and client contract.
+
+Persistent BGM playback in pygame, including the Marmoset opening cue, landed in
+[#583](https://github.com/derekmerck/storytangl/pull/583).
+[#571](https://github.com/derekmerck/storytangl/issues/571) retains the separate
+unimplemented Web BGM consumer: browser unlock, fetch/decode/play, and reconnect
+behavior.
+The remaining delivery gap is Web playback, alongside the pack-specific artwork
+opportunities above.
 
 **First playable proof / unlock.** Choose one opponent and add a before/after
 callback keyed to a learned response or outcome. Test whether social continuity

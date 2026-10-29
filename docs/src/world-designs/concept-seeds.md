@@ -15,6 +15,20 @@ eliminates possible histories; the player forecloses unacceptable accounts or
 exposes inconsistent declared truths. They determine which accounts can still be
 true, rather than discover one answer fixed all along.
 
+**Presentation lineage and mechanic.** Inspired by *Umineko*'s red/blue truth
+distinction, this original mystery makes the colors derive from the remaining
+admissible histories. A proposition is **blue** while true in some but not all
+remaining histories, **red** when every remaining history entails it, and
+**excluded** when none does. An empty solution set is a **paradox**, not a state
+where vacuous entailment makes every proposition red. The visible transformation
+is how the reader experiences possibility contracting; it is not just decoration.
+The statuses also need a readable expression for clients that do not show color.
+
+Earlier journal passages may retain their emission-time colors/statuses while a
+retrospective reading projects the current status of the same claims. That later
+reading is another projection, not a rewrite of historical journal fragments.
+This borrows a presentation distinction, not *Umineko*'s plot or its exact rules.
+
 **StoryTangl connection.** Ordinary state, choices, history, and JOURNAL could carry
 an explicitly finite authored possibility set. Constraint commitments and necessary
 versus possible propositions would pressure a later solver-backed realization.
@@ -25,6 +39,8 @@ deduction game needs its own bounded contract under #210.
 **Unresolved question.** What makes investigation legitimately establish a
 constraint rather than permit arbitrary player declarations? How does contradiction
 remain legible without silently rewriting established events?
+Which authored claims receive checkable status, and how do retrospective readings
+keep their references while changing the presentation?
 
 **First playable proof / unlock.** A tiny original mystery with multiple consistent
 solutions, a meaningful exclusion path, and an intentionally modeled paradox. Start
