@@ -85,22 +85,19 @@ def test_old_pickled_rit_cache_is_invalidated_before_projection(
         assert "mime_type" not in stored.__dict__
         assert check_value == (stat.st_mtime_ns, stat.st_size)
     monkeypatch.setattr(shelved2, "SHELVED_CACHE_ENABLED", True)
-    try:
-        hits, misses = shelved2.hit_count, shelved2.miss_count
-        fresh = MediaResourceInventoryTag.from_source(path)
-        assert fresh.uid != legacy.uid
-        assert fresh.data_type is expected_type
-        assert fresh.media_format == ("ogg" if extension == "ogg" else None)
-        assert fresh.mime_type == ("audio/ogg" if extension == "ogg" else None)
-        fragment = MediaFragment(
-            content=fresh, content_format="rit", content_type=fresh.data_type,
-        )
-        assert media_fragment_to_payload(fragment, world_id="cache_test")["url"].endswith(path.name)
-        reused = MediaResourceInventoryTag.from_source(path)
-        assert reused.uid == fresh.uid
-        assert reused.preset_content_hash == fresh.preset_content_hash
-        assert (shelved2.hit_count, shelved2.miss_count) == (hits + 1, misses + 1)
-        assert path.stat() == stat
-    finally:
-        shelved2.close_shelves()
+    hits, misses = shelved2.hit_count, shelved2.miss_count
+    fresh = MediaResourceInventoryTag.from_source(path)
+    assert fresh.uid != legacy.uid
+    assert fresh.data_type is expected_type
+    assert fresh.media_format == ("ogg" if extension == "ogg" else None)
+    assert fresh.mime_type == ("audio/ogg" if extension == "ogg" else None)
+    fragment = MediaFragment(
+        content=fresh, content_format="rit", content_type=fresh.data_type,
+    )
+    assert media_fragment_to_payload(fragment, world_id="cache_test")["url"].endswith(path.name)
+    reused = MediaResourceInventoryTag.from_source(path)
+    assert reused.uid == fresh.uid
+    assert reused.preset_content_hash == fresh.preset_content_hash
+    assert (shelved2.hit_count, shelved2.miss_count) == (hits + 1, misses + 1)
+    assert path.stat() == stat
 

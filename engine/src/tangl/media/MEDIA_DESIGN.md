@@ -44,6 +44,12 @@
 > deterministic in-process checker harness and a first real ComfyUI worker
 > backend. This note describes the implemented
 > architecture and the design commitments for the still-evolving creator layer.
+> Shelf operations open, access and close their backend on the calling thread,
+> serialized per canonical path within one process. Clearing empties a shelf
+> through its backend; errors propagate without deleting files. Offline disposal
+> requires exclusive ownership with all users closed. This lock does not provide
+> cross-process writer coordination. Shared-server restart and concurrency
+> witnesses remain follow-up work under #645; HTTP tests retain cache disabling.
 > A standalone `scripts/comfy_batch.py` helper also supports templated workflow
 > jobs, source uploads, resumable JSON receipts, and optional collection without
 > entering the forge/provisioning lifecycle.

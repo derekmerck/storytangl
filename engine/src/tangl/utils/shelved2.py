@@ -1,140 +1,92 @@
-import os
+"""Small process-local, operation-scoped shelf cache."""
+from __future__ import annotations
+
 import hashlib
+import shelve
+import threading
 from functools import wraps
 from pathlib import Path
-import atexit
-import threading
-import logging
 
 from tangl.config import settings
 
-try:
-    import dbm
-except ImportError:  # pragma: no cover
-    dbm = None
-
-try:
-    import shelve
-except ImportError:  # pragma: no cover
-    shelve = None
-
 cache_dir: Path = settings.service.paths.cache_data
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
-
 SHELVED_CACHE_ENABLED = bool(settings.get("service.caches.shelved", True))
-SHELVED_BACKEND_AVAILABLE = shelve is not None and dbm is not None
 
-opened_shelves: dict[str, object] = {}
-shelf_locks: dict[str, threading.Lock] = {}
-
+_locks_guard = threading.Lock()
+_shelf_locks: dict[Path, threading.Lock] = {}
 hit_count = 0
 miss_count = 0
 
 
 class CacheMissError(KeyError):
-    """Exception raised when a cache miss occurs and computation is declined."""
+    """A requested cached value is unavailable and computation was declined."""
 
 
-def close_shelves():
-    for shelf in opened_shelves.values():
-        shelf.close()
-    opened_shelves.clear()
-    # Clear the dictionary after closing all shelves to indicate proper clean-up
+def _path_and_lock(fn: str) -> tuple[Path, threading.Lock]:
+    path = (cache_dir / fn).resolve()
+    with _locks_guard:
+        lock = _shelf_locks.setdefault(path, threading.Lock())
+    return path, lock
 
-atexit.register(close_shelves)
 
-def generate_key(*args):
+def _exists(path: Path) -> bool:
+    # dbm backends may use the bare name or files such as .db, .dat and .dir.
+    return path.exists() or any(path.parent.glob(f"{path.name}.*"))
+
+
+def generate_key(*args: object) -> str:
     hash_input = "".join(str(arg) for arg in args)
-    return hashlib.sha224(hash_input.encode('utf8')).hexdigest()
+    return hashlib.sha224(hash_input.encode("utf8")).hexdigest()
 
-def shelved(fn, keep_open=True, skip_if_not_cached=False):
+
+def shelved(fn: str, skip_if_not_cached: bool = False):
+    """Cache results by arguments, optionally rejecting a miss.
+
+    ``check_value`` invalidates a stored result when its value changes. Each
+    operation opens and closes its shelf on the caller's thread while holding
+    the process-local lock for its canonical path.
     """
-    Decorator pattern for simple file-based return-value caching.
-
-    Options:
-
-    - `keep_open=True`: defer write-outs for this shelf until the
-       program exits.  This will be much faster than opening and
-       closing the shelve cache-file each time.
-    - `skip_if_not_cached=False`: decline to compute new values for
-      the wrapped function.  Useful for x-failing tests without
-      regenerating unnecessary caches for fresh installations.
-
-    Wrapper accepts only string-able arguments the 'check_value' kw.
-
-    - `check_value`: attach a validation key to the result.
-      When making another otherwise _identical_ query, if the validation
-      key doesn't match, the wrapped function will be recomputed.
-    """
-
     def decorator(f):
         @wraps(f)
         def cache(*args, check_value=None):
-            global opened_shelves, shelf_locks, hit_count, miss_count
+            global hit_count, miss_count
 
-            if not SHELVED_CACHE_ENABLED or not SHELVED_BACKEND_AVAILABLE:
+            if not SHELVED_CACHE_ENABLED:
                 if skip_if_not_cached:
                     raise CacheMissError(f"Cache disabled for shelf: {fn}")
                 return f(*args)
 
             key = generate_key(*args)
-
-            if str(fn) not in opened_shelves:
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                fp = cache_dir / fn
-                try:
-                    opened_shelves[str(fn)] = shelve.open(str(fp), 'c')
-                except dbm.error:
-                    logger.warning("resetting corrupt shelf %s", fp)
-                    clear_shelf(str(fn))
-                    opened_shelves[str(fn)] = shelve.open(str(fp), 'c')
-                shelf_locks[str(fn)] = threading.Lock()
-
-            with shelf_locks[str(fn)]:
-                shelf = opened_shelves[str(fn)]
-                if key not in shelf or (check_value is not None and shelf[key][1] != check_value):
-                    miss_count += 1
-                    if skip_if_not_cached:
-                        raise CacheMissError(f"Cache miss for key: {key}")
-                    shelf[key] = (f(*args), check_value)
-                else:
-                    hit_count += 1
-
-                result = shelf[key][0]
-
-            if not keep_open:
-                opened_shelves[str(fn)].close()
-                del opened_shelves[str(fn)]
-                del shelf_locks[str(fn)]
-
-            return result
-
+            path, lock = _path_and_lock(fn)
+            with lock:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with shelve.open(str(path), flag="c") as shelf:
+                    if key not in shelf or (check_value is not None and shelf[key][1] != check_value):
+                        miss_count += 1
+                        if skip_if_not_cached:
+                            raise CacheMissError(f"Cache miss for key: {key}")
+                        shelf[key] = (f(*args), check_value)
+                    else:
+                        hit_count += 1
+                    return shelf[key][0]
         return cache
     return decorator
 
-def unshelf(fn, *args):
-    key = generate_key(*args)
 
-    if str(fn) in opened_shelves:
-        shelf = opened_shelves[str(fn)]
-        if key in shelf:
-            del shelf[key]
+def unshelf(fn: str, *args: object) -> None:
+    path, lock = _path_and_lock(fn)
+    with lock:
+        if _exists(path):
+            with shelve.open(str(path), flag="w") as shelf:
+                key = generate_key(*args)
+                if key in shelf:
+                    del shelf[key]
 
-def clear_shelf(fn: str):
 
-    logger.warning("clearing shelf %s", fn)
-    if str(fn) in opened_shelves:
-        opened_shelves[str(fn)].clear()
-        opened_shelves[str(fn)].close()
-        del opened_shelves[str(fn)]
-        del shelf_locks[str(fn)]
-
-    matches = [cache_dir / fn, *cache_dir.glob(f"{fn}.*")]
-    for fp in matches:
-        if not fp.exists():
-            continue
-        logger.warning( "removing %s", fp)
-        os.remove(fp)
-    # raise RuntimeError(f"No such shelf {fn}")
+def clear_shelf(fn: str) -> None:
+    """Invalidate an existing shelf without unlinking its database files."""
+    path, lock = _path_and_lock(fn)
+    with lock:
+        if _exists(path):
+            with shelve.open(str(path), flag="w") as shelf:
+                shelf.clear()

@@ -8,8 +8,6 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-import pytest
-
 from tangl.config import settings
 from tangl.utils import shelved2
 
@@ -28,15 +26,11 @@ def test_cache_lifetimes_are_independent(
 
     with cache_lifecycle(first):
         cached("first")
-        handle = shelved2.opened_shelves["witness"]
         assert shelved2.miss_count == 1
-    with pytest.raises(ValueError):
-        len(handle)
     with cache_lifecycle(second):
-        assert not shelved2.opened_shelves and not shelved2.shelf_locks
+        assert not second.exists()
         cached("first")
         assert (shelved2.hit_count, shelved2.miss_count) == (0, 1)
-    assert not shelved2.opened_shelves and not shelved2.shelf_locks
 
 
 def test_overlapping_processes_clear_only_their_own_cache(tmp_path: Path) -> None:
@@ -55,7 +49,6 @@ print('ready', flush=True)
 sys.stdin.readline()
 shelved2.clear_shelf('witness')
 assert cached('second') == 'second'
-shelved2.close_shelves()
 """
     processes = []
     try:
