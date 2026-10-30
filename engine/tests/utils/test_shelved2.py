@@ -1,4 +1,3 @@
-import importlib
 from unittest.mock import MagicMock
 import time
 import os
@@ -7,14 +6,7 @@ import pytest
 
 import tangl.utils.shelved2 as shelved
 
-@pytest.fixture(scope="function")
-def patch_shelved(monkeypatch, tmp_path):
-    # Reload the module to ensure it uses the modified cache_dir
-    importlib.reload(shelved)
-    monkeypatch.setattr('tangl.utils.shelved2.cache_dir', tmp_path / "cache")
-
-
-def test_caching_with_shelved(patch_shelved):
+def test_caching_with_shelved():
     assert not shelved.cache_dir.exists()
 
     shelf_name = 'test_cache'
@@ -43,7 +35,7 @@ def test_caching_with_shelved(patch_shelved):
     assert shelved.opened_shelves[str(shelf_name)].get(shelf_key) == (4, None)
 
 
-def test_file_closure(patch_shelved):
+def test_file_closure():
     shelf_name = 'test_cache'
 
     @shelved.shelved(shelf_name)
@@ -60,7 +52,7 @@ def test_file_closure(patch_shelved):
     assert not shelved.opened_shelves
 
 
-def test_cache_invalidation(patch_shelved):
+def test_cache_invalidation():
     shelf_name = 'test_cache'
     computation_mock = MagicMock(return_value=9)
 
@@ -82,7 +74,7 @@ def test_cache_invalidation(patch_shelved):
     assert computation_mock.call_count == 2
 
 
-def test_expensive_computation(patch_shelved):
+def test_expensive_computation():
     @shelved.shelved('test_cache', skip_if_not_cached=True)
     def expensive_computation(x):
         # Long-running operation
@@ -96,7 +88,7 @@ def test_expensive_computation(patch_shelved):
 
 @pytest.mark.skip(reason="only for benchmarking")
 @pytest.mark.parametrize("keep_open", [True, False])
-def test_shelve_performance(patch_shelved, keep_open):
+def test_shelve_performance(keep_open):
 
     @shelved.shelved('test_cache', keep_open=keep_open)
     def cached_operation(x):
@@ -115,7 +107,7 @@ def test_shelve_performance(patch_shelved, keep_open):
     assert True  # Placeholder assertion
 
 
-def test_unshelf(patch_shelved):
+def test_unshelf():
 
     shelf_name = 'test_cache'
     computation_mock = MagicMock(return_value=9)
@@ -141,7 +133,7 @@ def test_unshelf(patch_shelved):
     assert computation_mock.call_count == 2
 
 
-def test_clear_shelf(patch_shelved):
+def test_clear_shelf():
 
     shelf_name = 'test_cache'
     computation_mock = MagicMock(return_value=9)

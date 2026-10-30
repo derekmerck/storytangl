@@ -56,15 +56,9 @@ def test_compute_hash_caching(temp_image_fp):
 def test_media_registry_reuses_shelved_file_hashes_for_reindexing(
     temp_image_fp,
     monkeypatch,
-    tmp_path,
 ):
     import tangl.utils.shelved2 as shelved
     import tangl.media.media_resource.media_resource_inv_tag as media_rit_module
-
-    shelf_dir = tmp_path / "shelf"
-    shelf_dir.mkdir()
-    monkeypatch.setattr(shelved, "cache_dir", shelf_dir)
-    MediaRIT.clear_from_source_cache()
 
     starting_hits, starting_misses = shelved.hit_count, shelved.miss_count
     hash_calls = 0
@@ -77,22 +71,19 @@ def test_media_registry_reuses_shelved_file_hashes_for_reindexing(
 
     monkeypatch.setattr(media_rit_module, "compute_data_hash", spy_compute_data_hash)
 
-    try:
-        registry = MediaResourceRegistry(label="cached_media")
+    registry = MediaResourceRegistry(label="cached_media")
 
-        first = registry.index([temp_image_fp])[0]
-        assert hash_calls == 1
-        assert first.content_hash() == first.get_content_hash()
-        assert hash_calls == 1
+    first = registry.index([temp_image_fp])[0]
+    assert hash_calls == 1
+    assert first.content_hash() == first.get_content_hash()
+    assert hash_calls == 1
 
-        second = registry.index([temp_image_fp])[0]
-        assert second.uid == first.uid
-        assert len(registry) == 1
-        assert hash_calls == 1
-        assert second.content_hash() == first.content_hash()
-        assert hash_calls == 1
+    second = registry.index([temp_image_fp])[0]
+    assert second.uid == first.uid
+    assert len(registry) == 1
+    assert hash_calls == 1
+    assert second.content_hash() == first.content_hash()
+    assert hash_calls == 1
 
-        assert shelved.miss_count == starting_misses + 1
-        assert shelved.hit_count == starting_hits + 1
-    finally:
-        MediaRIT.clear_from_source_cache()
+    assert shelved.miss_count == starting_misses + 1
+    assert shelved.hit_count == starting_hits + 1
