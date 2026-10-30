@@ -102,9 +102,36 @@ class WorldCompiler:
         bundle: WorldBundle,
         story_key: str | None = None,
     ) -> World:
-        base_metadata = bundle.manifest.metadata.copy()
+        return self._compile_story(bundle, story_key, self._build_world_facets(bundle))
 
-        domain_adjuncts, assets_facet, resources_facet = self._build_world_facets(bundle)
+    def compile_anthology(
+        self,
+        bundle: WorldBundle,
+    ) -> dict[str, World]:
+        """Compile every book, each exactly as opening it by id would.
+
+        The books share one set of world facets, so the domain module, asset
+        catalogs and media index are loaded once for the anthology; each book is
+        then built by the same path ``compile(bundle, story_key=key)`` takes.
+        """
+        if not bundle.manifest.is_anthology:
+            msg = f"{bundle.manifest.label} is not an anthology"
+            raise ValueError(msg)
+        facets = self._build_world_facets(bundle)
+        return {
+            story_key: self._compile_story(bundle, story_key, facets)
+            for story_key in bundle.manifest.story_keys()
+        }
+
+    def _compile_story(
+        self,
+        bundle: WorldBundle,
+        story_key: str | None,
+        facets: tuple[_WorldDomainAdjuncts | None, _WorldAssetsFacet, ResourceManager | None],
+    ) -> World:
+        base_metadata = bundle.manifest.story_metadata(story_key)
+
+        domain_adjuncts, assets_facet, resources_facet = facets
         decode_result = self._decode_story_data(
             bundle=bundle,
             story_key=story_key,
@@ -122,10 +149,7 @@ class WorldCompiler:
             script_metadata.setdefault("codec_warnings", [])
             script_metadata["codec_warnings"].extend(decode_result.warnings)
 
-        default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
-        if story_key is not None and default_title == bundle.manifest.label:
-            default_title = bundle.manifest.story_label(story_key)
-        script_metadata.setdefault("title", default_title)
+        script_metadata.setdefault("title", script_data.get("label") or bundle.manifest.label)
 
         story_bundle = self.story_compiler.compile(
             script_data,
@@ -148,88 +172,6 @@ class WorldCompiler:
             modules=domain_adjuncts.modules if domain_adjuncts is not None else None,
         )
         return world
-
-    def compile_anthology(
-        self,
-        bundle: WorldBundle,
-    ) -> dict[str, World]:
-        if not bundle.manifest.is_anthology:
-            msg = f"{bundle.manifest.label} is not an anthology"
-            raise ValueError(msg)
-
-        base_metadata = bundle.manifest.metadata.copy()
-
-        (
-            world_domain_adjuncts,
-            world_assets_facet,
-            world_resources_facet,
-        ) = self._build_world_facets(bundle)
-
-        worlds: dict[str, World] = {}
-        for story_key in bundle.manifest.story_keys():
-            decode_result = self._decode_story_data(
-                bundle=bundle,
-                story_key=story_key,
-                local_codecs=(
-                    world_domain_adjuncts.story_codecs
-                    if world_domain_adjuncts is not None
-                    else {}
-                ),
-            )
-            self._propagate_loss_records(decode_result)
-            script_data = decode_result.story_data
-            codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
-
-            script_metadata = script_data.setdefault("metadata", {})
-            for key, value in base_metadata.items():
-                script_metadata.setdefault(key, value)
-            script_metadata.setdefault("codec_id", codec_id)
-            if decode_result.warnings:
-                script_metadata.setdefault("codec_warnings", [])
-                script_metadata["codec_warnings"].extend(decode_result.warnings)
-
-            default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
-            if default_title == bundle.manifest.label:
-                default_title = bundle.manifest.story_label(story_key)
-            script_metadata.setdefault("title", default_title)
-
-            story_bundle = self.story_compiler.compile(
-                script_data,
-                source_map=decode_result.source_map,
-                codec_state=decode_result.codec_state,
-                codec_id=codec_id,
-                class_registry=(
-                    world_domain_adjuncts.class_registry
-                    if world_domain_adjuncts is not None
-                    else None
-                ),
-            )
-            self._validate_preference_bindings(story_bundle, world_resources_facet)
-            world = WorldBuilder().build(
-                label=bundle.manifest.story_label(story_key),
-                bundle=story_bundle,
-                assets=world_assets_facet,
-                resources=world_resources_facet,
-                dispatch=(
-                    world_domain_adjuncts.dispatch_registry
-                    if world_domain_adjuncts is not None
-                    else None
-                ),
-                extra_authorities=(
-                    world_domain_adjuncts.get_authorities()
-                    if world_domain_adjuncts is not None
-                    else None
-                ),
-                class_registry=(
-                    world_domain_adjuncts.class_registry
-                    if world_domain_adjuncts is not None
-                    else None
-                ),
-                modules=world_domain_adjuncts.modules if world_domain_adjuncts is not None else None,
-            )
-            worlds[story_key] = world
-
-        return worlds
 
     @staticmethod
     def _validate_preference_bindings(

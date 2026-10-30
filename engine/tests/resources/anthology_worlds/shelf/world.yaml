@@ -1,0 +1,11 @@
+label: shelf
+metadata:
+  title: The Shelf
+  author: Tests
+stories:
+  first:
+    metadata:
+      title: The First Book
+    scripts: content/first.yaml
+  second:
+    scripts: content/second.yaml

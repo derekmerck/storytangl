@@ -847,7 +847,7 @@ class ServiceManager:
                     {
                         "label": label,
                         "metadata": world.metadata or {},
-                        "is_anthology": False,
+                        "anthology": None,
                     },
                 )
 
@@ -859,6 +859,7 @@ class ServiceManager:
                     label=world["label"],
                     title=str(metadata.get("title", world["label"])),
                     author=metadata.get("author") or "Unknown",
+                    anthology=world["anthology"],
                 ),
             )
         return info_models
@@ -902,20 +903,17 @@ class ServiceManager:
         operation_id="world.preflight",
     )
     def preflight_world(self, *, world_id: str) -> PreflightReport:
-        """Compile one discovered world bundle and return authoring diagnostics."""
+        """Compile one discovered world afresh and return authoring diagnostics."""
 
         registry = WorldRegistry()
-        bundle = registry.bundles.get(world_id)
-        if bundle is None:
-            if world_id in dict(iter_manual_worlds()):
-                return PreflightReport(
-                    world_id=world_id,
-                    status="ok",
-                    diagnostics=[],
-                )
-            raise ValueError(f"Unknown world: {world_id}")
+        if world_id not in registry.openable and world_id in dict(iter_manual_worlds()):
+            return PreflightReport(
+                world_id=world_id,
+                status="ok",
+                diagnostics=[],
+            )
 
-        world = registry.compiler.compile(bundle)
+        world = registry.compile_world(world_id)
         diagnostics = [
             *diagnostics_from_codec_state(world.bundle.codec_state),
             *diagnostics_from_compile_issues(world.bundle.issues),

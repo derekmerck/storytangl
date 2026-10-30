@@ -1,0 +1,16 @@
+label: first
+metadata:
+  start_at: intro.start
+scenes:
+  intro:
+    blocks:
+      start:
+        content: The first book opens.
+        media:
+          - name: picture.svg
+            media_role: narrative_im
+        actions:
+          - text: Read on
+            successor: end
+      end:
+        content: The first book ends.

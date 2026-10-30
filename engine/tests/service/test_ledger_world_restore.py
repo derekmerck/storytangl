@@ -55,9 +55,11 @@ def test_service_prepares_only_the_referenced_world(
     compiled = []
     compile_world = WorldCompiler.compile
 
-    def record_compile(self: WorldCompiler, bundle: WorldBundle) -> World:
+    def record_compile(
+        self: WorldCompiler, bundle: WorldBundle, story_key: str | None = None
+    ) -> World:
         compiled.append(bundle.manifest.label)
-        return compile_world(self, bundle)
+        return compile_world(self, bundle, story_key=story_key)
 
     monkeypatch.setattr(WorldCompiler, "compile", record_compile)
     if entry == "load":

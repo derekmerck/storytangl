@@ -1,0 +1,5 @@
+label: pamphlet
+metadata:
+  title: The Pamphlet
+  author: Tests
+scripts: script.yaml
