@@ -18,29 +18,22 @@ os.environ[_cache_env] = f"@path {_collection_cache.name}"
 
 @contextmanager
 def shelf_cache(cache: Path) -> Iterator[Path]:
-    """Own a cache directory and close its handles before restoring state."""
+    """Use a temporary cache directory and reset per-test counters."""
     from tangl.config import settings
     from tangl.utils import shelved2
 
-    shelved2.close_shelves()
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv(_cache_env, f"@path {cache}")
         patch.setitem(settings.service.paths, "cache_data", cache)
         patch.setattr(shelved2, "cache_dir", cache)
-        patch.setattr(shelved2, "opened_shelves", {})
-        patch.setattr(shelved2, "shelf_locks", {})
         patch.setattr(shelved2, "hit_count", 0)
         patch.setattr(shelved2, "miss_count", 0)
-        try:
-            yield cache
-        finally:
-            shelved2.close_shelves()
-            shelved2.shelf_locks.clear()
+        yield cache
 
 
 @pytest.fixture(autouse=True)
 def isolated_shelf_cache(tmp_path: Path) -> Iterator[Path]:
-    """Give each test its own shelf files, counters, and live handles."""
+    """Give each test its own shelf files and counters."""
     with shelf_cache(tmp_path / "cache") as cache:
         yield cache
 
@@ -51,9 +44,6 @@ def cache_lifecycle() -> Callable[[Path], AbstractContextManager[Path]]:
 
 
 def pytest_unconfigure() -> None:
-    from tangl.utils import shelved2
-
-    shelved2.close_shelves()
     _collection_cache.cleanup()
     if _previous_cache_env is None:
         os.environ.pop(_cache_env, None)

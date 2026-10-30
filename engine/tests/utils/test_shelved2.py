@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
-import time
 import os
+import shelve as stdlib_shelve
 
 import pytest
 
@@ -31,25 +31,27 @@ def test_caching_with_shelved():
 
     # Check if the cache is being used (result should be the same)
     shelf_key = shelved.generate_key(2)
-    assert shelf_key in shelved.opened_shelves[shelf_name]
-    assert shelved.opened_shelves[str(shelf_name)].get(shelf_key) == (4, None)
+    with stdlib_shelve.open(str(shelved.cache_dir / shelf_name), flag="r") as shelf:
+        assert shelf.get(shelf_key) == (4, None)
 
 
-def test_file_closure():
+def test_file_closure(monkeypatch):
     shelf_name = 'test_cache'
 
     @shelved.shelved(shelf_name)
     def expensive_computation(x):
         return x * x
 
+    handles = []
+    original = stdlib_shelve.open
+    def record(*args, **kwargs):
+        handle = original(*args, **kwargs)
+        handles.append(handle)
+        return handle
+    monkeypatch.setattr(stdlib_shelve, "open", record)
     expensive_computation(5)
-    assert shelf_name in shelved.opened_shelves
-
-    # Simulate program exit
-    shelved.close_shelves()  # Assuming close_shelves is your atexit registered function
-
-    # Open-shelves should have been cleared
-    assert not shelved.opened_shelves
+    with pytest.raises(ValueError):
+        len(handles[0])
 
 
 def test_cache_invalidation():
@@ -85,27 +87,6 @@ def test_expensive_computation():
 
     # Tests can use pytest's `xfail` in combination with this approach
     # @pytest.xfail("Expected cache miss on fresh install")
-
-@pytest.mark.skip(reason="only for benchmarking")
-@pytest.mark.parametrize("keep_open", [True, False])
-def test_shelve_performance(keep_open):
-
-    @shelved.shelved('test_cache', keep_open=keep_open)
-    def cached_operation(x):
-        return x * x
-
-    start_time = time.time()
-
-    # Simulate read-write operations
-    for i in range(10000):
-        cached_operation(i)
-        cached_operation(i)  # Intentional repeat to test cache hit
-
-    end_time = time.time()
-    print(f"Execution time with {'keep open' if keep_open else 'close on access'}: {end_time - start_time} seconds")
-
-    assert True  # Placeholder assertion
-
 
 def test_unshelf():
 
@@ -148,12 +129,7 @@ def test_clear_shelf():
     result2 = computation_with_check(4)
     assert (shelved.hit_count, shelved.miss_count) == (0, 2)
 
-    # shelved.close_shelves()  # Ensure all shelves are closed before clearing
-
-    try:
-        shelved.clear_shelf(shelf_name)
-    except Exception as e:
-        pytest.fail(f"Failed to clear shelf: {e}")
+    shelved.clear_shelf(shelf_name)
 
     # Call again
     result3 = computation_with_check(3)
