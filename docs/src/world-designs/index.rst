@@ -29,8 +29,9 @@ The collection
      - Recovering a companion's capabilities restores their ability to refuse.
      - One persistent person shared by configuration, resources, willingness, and narration.
 
-:doc:`concept-seeds` collects Constraint-Collapse Mystery, Two Readers, One Graph,
-Automata Chop-Shop, Second Bell, and a Fogbound Manifest showcase.
+:doc:`concept-seeds` collects Constraint-Collapse Mystery, The Council in Your Head,
+The Long Way There, Two Readers, One Graph, Automata Chop-Shop, Second Bell, and
+a Fogbound Manifest showcase.
 :doc:`world-expansions` records possible extensions to Coronate the Regent,
 Marmoset Island, the Grand Grotto companion story, and Hungry Colony. Existing
 worlds remain playable independently of these proposals.
@@ -52,9 +53,12 @@ test social continuity while reusing its current contest and presentation paths.
 Automata Chop-Shop and Patient Zero ask the stronger composition question: do
 several mechanics actually agree on one durable individual? Two Readers and the
 Constraint-Collapse Mystery carry larger open channel/coordination and runtime
-constraint questions. Their story value does not make those contracts implemented
-or make them the cheapest next demo. These are selection considerations, not an
-execution order or a replacement for the linked issues.
+constraint questions. The Council in Your Head proposes a compact #340
+attributed-contributor proof; The Long Way There is a broader journey, passenger,
+and presentation composition, with its precedent recorded in the research matrix.
+Their story value does not make those contracts implemented or make them the
+cheapest next demo. These are selection considerations, not an execution order
+or a replacement for the linked issues.
 
 How to develop a design
 -----------------------
