@@ -1,12 +1,10 @@
-import importlib
-
 import os
-from pathlib import Path
 
 import pytest
+from dynaconf import Dynaconf
 
 
-def test_conf():
+def test_conf(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # reads config files
     import tangl.config
@@ -23,17 +21,12 @@ def test_conf():
         assert settings.service.hello == "mars"
 
     # env overrides work
-    os.environ['TANGL_MY_VAR'] = "jupiter"
-    os.environ['TANGL_SERVICE__HELLO'] = "mars"
+    monkeypatch.setenv('TANGL_MY_VAR', "jupiter")
+    monkeypatch.setenv('TANGL_SERVICE__HELLO', "mars")
     assert os.environ['TANGL_SERVICE__HELLO'] == "mars"
 
-    importlib.reload(tangl.config)
-    from tangl.config import settings
+    settings = Dynaconf(envvar_prefix="TANGL", preload=[tangl.config.default_settings])
 
     assert settings.my_var == "jupiter"
     assert str(settings.service.paths.docs).endswith("docs/build/html")
     assert settings.service.hello == "mars"
-
-
-if __name__ == "__main__":
-    test_conf()

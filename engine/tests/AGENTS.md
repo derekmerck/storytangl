@@ -4,6 +4,10 @@ This document provides guidelines and best practices for writing and organizing 
 
 ## Core Principles
 
+Pytest isolates shelf caches per test in temporary directories, including the
+configured cache path inherited by subprocesses. Tests that start subprocesses
+with a custom environment must supply their own temporary cache path.
+
 ### 1. Organization by Concept, Not by File Size
 
 Tests should be organized around **architectural concepts**, not implementation details or arbitrary file sizes.

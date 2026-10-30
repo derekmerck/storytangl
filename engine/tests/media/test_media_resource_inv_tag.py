@@ -75,7 +75,7 @@ def test_old_pickled_rit_cache_is_invalidated_before_projection(
     legacy.preset_content_hash = legacy.get_content_hash()
     legacy.__dict__.pop("media_format")
     legacy.__dict__.pop("mime_type")
-    cache_dir = tmp_path / "cache"
+    cache_dir = shelved2.cache_dir
     cache_dir.mkdir()
     key = shelved2.generate_key(MediaResourceInventoryTag, path)
     with shelve.open(str(cache_dir / "rits")) as shelf:
@@ -84,9 +84,6 @@ def test_old_pickled_rit_cache_is_invalidated_before_projection(
         stored, check_value = shelf[key]
         assert "mime_type" not in stored.__dict__
         assert check_value == (stat.st_mtime_ns, stat.st_size)
-    monkeypatch.setattr(shelved2, "cache_dir", cache_dir)
-    monkeypatch.setattr(shelved2, "opened_shelves", {})
-    monkeypatch.setattr(shelved2, "shelf_locks", {})
     monkeypatch.setattr(shelved2, "SHELVED_CACHE_ENABLED", True)
     try:
         hits, misses = shelved2.hit_count, shelved2.miss_count
