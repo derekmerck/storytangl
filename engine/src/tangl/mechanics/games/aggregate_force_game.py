@@ -123,6 +123,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
         json_schema_extra={
             "reset_field": True,
             "include": True,
+            "unstructurable": True,
         },
     )
     opponent_reserve: AssetWallet = Field(
@@ -130,6 +131,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
         json_schema_extra={
             "reset_field": True,
             "include": True,
+            "unstructurable": True,
         },
     )
     player_active: AssetWallet = Field(
@@ -137,6 +139,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
         json_schema_extra={
             "reset_field": True,
             "include": True,
+            "unstructurable": True,
         },
     )
     opponent_active: AssetWallet = Field(
@@ -144,6 +147,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
         json_schema_extra={
             "reset_field": True,
             "include": True,
+            "unstructurable": True,
         },
     )
     player_eliminated: AssetWallet = Field(
@@ -151,6 +155,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
         json_schema_extra={
             "reset_field": True,
             "include": True,
+            "unstructurable": True,
         },
     )
     opponent_eliminated: AssetWallet = Field(
@@ -158,6 +163,7 @@ class AggregateForceGame(Game[ForceCommitMove]):
         json_schema_extra={
             "reset_field": True,
             "include": True,
+            "unstructurable": True,
         },
     )
     round_detail: dict[str, object] | None = Field(

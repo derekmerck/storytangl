@@ -154,16 +154,9 @@ class NimGame(Game[NimMove]):
         default_factory=AssetWallet,
         json_schema_extra={
             "reset_field": True,
-            # gain()/spend() mutate the wallet in place, so without an explicit
-            # include the recursive exclude_unset dump emits an empty bag and a
-            # saved game reloads with no board.
-            #
-            # Deliberately NOT unstructurable: AssetWallet is a plain
-            # BaseModelPlus with no constructor form, so that marker would leave
-            # the live object in the dump and only survive an in-process
-            # hand-back. The field annotation rebuilds it from an ordinary
-            # mapping instead.
+            # The mutable wallet persists through constructor form.
             "include": True,
+            "unstructurable": True,
         },
     )
     opponent_next_move: NimMove | None = Field(

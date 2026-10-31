@@ -15,7 +15,7 @@ class HasAssets(HasNamespace):
 
     wallet: AssetWallet = Field(
         default_factory=AssetWallet,
-        json_schema_extra={"include": True},
+        json_schema_extra={"include": True, "unstructurable": True},
     )
     assets: dict[str, Token] = Field(default_factory=dict, exclude=True)
 

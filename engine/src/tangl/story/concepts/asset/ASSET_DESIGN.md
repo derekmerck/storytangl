@@ -1,7 +1,7 @@
 # tangl.story.concepts.asset - Design Notes
 
-> Status: Discrete wallet foundation implemented; holder integration, singleton-keyed
-> countable holdings, and assembly convergence remain planned under #652.
+> Status: Discrete wallet foundation and singleton-keyed countable holdings implemented;
+> holder integration and assembly convergence remain planned under #652.
 
 ## Position
 
@@ -17,7 +17,7 @@ This package currently defines:
   the existing singleton/type and token delegation mechanisms. It is advisory,
   not a filename or media reference; a provider may copy it to section hints.
 - `CountableAsset`: a fungible asset definition tracked by quantity.
-- `AssetWallet`: the current string-keyed counter for fungible assets.
+- `AssetWallet`: a counter for singleton definitions and explicit named game pools.
 - `DiscreteAssetWallet`: a graph-owned, ordered UUID group of discrete graph members.
 - `HasAssets`: a story-level facet for nodes that hold wallet counts and
   nominate discrete asset tokens into namespaces.
@@ -39,10 +39,13 @@ Those symbols are intentionally ordinary namespace contributions, so roles,
 settings, sandbox scopes, and other story machinery can prefix or inspect them
 without learning a separate inventory engine.
 
-`AssetWallet` is a plain embedded typed value object. Its owning `HasAssets`
-field opts into constructor-form persistence after in-place count mutation; the
-field annotation reconstructs the wallet from its ordinary mapping. It does not
-need an independent constructor-form protocol.
+`AssetWallet` is an embedded constructor-form value. Its owning fields opt into
+recursive unstructuring and in-place mutation retention. It persists a canonical
+ordered list of entries: singleton keys use their normal `(kind, label)`
+references, while explicit string keys remain distinct named pools. World/catalog
+bootstrap must establish live singleton definitions before graph restoration.
+The sequence is a JSON representation of an unordered mapping, not acquisition
+order. Named game pools retain their explicit local definition maps.
 
 The deferred discrete `assets` map remains explicitly excluded from persistence:
 it is not yet the graph-backed ownership model.
@@ -57,11 +60,10 @@ an item can belong to both a possession group and an equipment group. They do
 not reparent members or impose universal exclusive custody. Checks are pure;
 create wallets at accepted setup or mutation boundaries, never during reads.
 
-The next slices migrate the existing `HasAssets` surface to compose discrete
-wallet references and countable singleton-keyed quantities, resolving the graph
-anchors for embedded sandbox holders. The current excluded holder map and
-string-keyed `AssetWallet` remain pre-migration implementations, not a second
-permanent source of truth. Countable JSON representation is a separate decision.
+The next slices migrate the existing `HasAssets` surface to compose independent
+discrete and countable capabilities, resolving the graph anchors for embedded
+sandbox holders. The current excluded holder map remains a pre-migration
+implementation, not a second permanent source of truth.
 Assembly must then build graph-backed slot membership on this same primitive,
 while retaining slot policy and owner binding. Transactions coordinate checked
 exchanges across holders; they do not define another membership store.
