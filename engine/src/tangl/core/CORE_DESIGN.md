@@ -102,7 +102,7 @@ state behavior of every object in the graph:
 | `Unstructurable` | What am I?      | `eq_by_value`    | No        |
 | `HasContent`     | What do I hold? | `eq_by_content`  | No        |
 | `HasOrder`       | When was I?     | (none)           | No        |
-| `HasState`       | Runtime scratch | (none)           | No        |
+| `HasState`       | Runtime state   | (none)           | No        |
 
 *HasIdentity overrides `__eq__`, so Pydantic sets `__hash__ = None`. Singletons and
 Records restore `__hash__` explicitly.
@@ -136,10 +136,11 @@ including it in `get_identifiers()` would conflate state comparison with identit
 comparison. It remains a plain method used by `eq_by_value()` but does not appear in
 the identifier set.
 
-**`HasState.locals` is invisible to identity.** The `locals` dict is a mutable
-scratchpad for runtime working memory. It is not used for identity, content hashing,
-or equality by any trait — it exists purely for runtime state that higher layers
-manage. The VM's `HasEffects._sync_locals()` is responsible for writing effect
+**`HasState.locals` is invisible to identity.** The `locals` dict is mutable runtime
+state, persisted when its owner participates in constructor-form persistence. It
+is not an identifier or content hash input; constructor-form value comparison does
+observe it. Transient rendering and cache scratch belong outside this mapping.
+The VM's `HasEffects._sync_locals()` is responsible for writing effect
 mutations back to `locals` after they run — this is the node's concern, not
 `RuntimeOp`'s.
 
