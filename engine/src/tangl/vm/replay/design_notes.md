@@ -1,7 +1,7 @@
 # Replay Architecture — Patches, Step Records, and Reconstruction
 
-Status: current MVP replay contract, including insertion-order preservation for
-new graph members.
+Status: current MVP replay contract, including registry-owned constructor state
+and insertion-order preservation for new graph members.
 
 ## Context
 
@@ -27,9 +27,13 @@ why single-phase patches are sufficient for MVP.
 - `initial_registry_value_hash: bytes` — hash guard before application
 - `final_registry_value_hash: bytes` — hash guard after application
 - `events: list[Event]` — ordered CRUD operations on registry items
+- `registry_state` — optional member-free constructor form when owner state changes
 
-`Patch.apply(registry)` validates the initial hash, applies events, then
-validates the final hash.  This provides built-in determinism verification:
+`Patch.apply(registry)` validates the initial hash, applies member events and
+restores changed owner fields on the same live registry, then validates the final
+hash. Fields omitted from the new owner form return to their structured defaults;
+excluded runtime state and member bindings remain owned by the live registry. This
+provides built-in determinism verification:
 if the hash doesn't match, something went wrong.
 
 ``hashing_func`` sorts mapping keys and encodes sets/frozensets as ordered
@@ -47,6 +51,8 @@ preserve both their logical IDs and their insertion order, so the final hash and
 the next patch's initial guard agree. Existing DELETE/UPDATE behavior is unchanged:
 deletion preserves survivor order and replacement retains the member's position.
 This does not add support for arbitrary reordering of existing registry members.
+Owner headers use the same constructor-form and factory-reference path as the
+full graph, without walking members. Graph kind and UID must match across a diff.
 
 ### RegistryObserver (vm/replay/observer.py)
 

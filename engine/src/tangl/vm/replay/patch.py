@@ -80,6 +80,7 @@ class Patch(Record):
     final_registry_value_hash: bytes
 
     events: list[Event] = Field(default_factory=list)
+    registry_state: dict[str, Any] | None = None
     # patch event chains can definitely be canonicalized, reduced by removing
     # updates followed by deletes, and condensed into single multi-field/key
     # updates for an item, but that is an optimization concern.
@@ -98,8 +99,22 @@ class Patch(Record):
 
     def apply(self, registry: Registry) -> Registry:
         self._validate_registry_pre(registry)
+        if self.registry_state is not None:
+            payload = dict(self.registry_state)
+            kind = payload.get("kind")
+            if kind == type(registry).__fqn__():
+                payload["kind"] = type(registry)
+            if payload.get("kind") is not type(registry) or payload.get("uid") != registry.uid:
+                raise ValueError("Registry state has an incompatible identity or kind")
+            if "members" in payload:
+                raise ValueError("Registry state must not contain members")
+            previous = registry.unstructure(include_members=False)
+            restored = type(registry).structure(payload)
         for event in self.events:
             event.apply(registry)
+        if self.registry_state is not None:
+            for name in (previous.keys() | payload.keys()) - {"kind", "uid", "members"}:
+                setattr(registry, name, getattr(restored, name))
         self._validate_registry_post(registry)
         return registry
 

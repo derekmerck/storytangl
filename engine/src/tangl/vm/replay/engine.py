@@ -26,6 +26,10 @@ class DiffReplayEngine:
         return DEFAULT_ALGORITHM_ID
 
     def build_delta(self, *, before_graph: Graph, after_graph: Graph) -> Patch | None:
+        if type(before_graph) is not type(after_graph) or before_graph.uid != after_graph.uid:
+            raise ValueError("Cannot diff registries with different identities or kinds")
+        before_state = before_graph.unstructure(include_members=False)
+        after_state = after_graph.unstructure(include_members=False)
         events: list[Event] = []
 
         before_ids = set(before_graph.members.keys())
@@ -65,7 +69,7 @@ class DiffReplayEngine:
                 )
             )
 
-        if not events:
+        if not events and before_state == after_state:
             return None
 
         return Patch(
@@ -73,6 +77,7 @@ class DiffReplayEngine:
             initial_registry_value_hash=before_graph.value_hash(),
             final_registry_value_hash=after_graph.value_hash(),
             events=events,
+            registry_state=after_state if before_state != after_state else None,
         )
 
     def apply_delta(self, *, graph: Graph, delta: ReplayDelta) -> Graph:

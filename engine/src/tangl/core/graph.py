@@ -370,9 +370,9 @@ class Graph(Registry[GraphItem]):
             graph=self,
         )
 
-    def unstructure(self):
+    def unstructure(self, *, include_members: bool = True):
         """Return constructor-form graph data including a singleton factory reference."""
-        data = super().unstructure()
+        data = super().unstructure(include_members=include_members)
         if self.factory is None or not isinstance(self.factory, Singleton):
             return data
         data["factory"] = self.factory.unstructure()
