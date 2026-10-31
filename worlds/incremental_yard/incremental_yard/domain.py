@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from tangl.core import Selector
 from tangl.mechanics.games import BuildSpec, HasGame, IncrementalGame, IncrementalGameHandler, TaskSpec
 from tangl.story import Block
+from tangl.vm import VmPhaseCtx, on_update
 
 
 class YardGame(IncrementalGame):
@@ -28,6 +30,17 @@ class IncrementalYardBlock(HasGame, Block):
 
     _game_class = YardGame
     _game_handler_class = IncrementalGameHandler
+
+
+class ResetYardBlock(Block):
+    """Reset a completed attempt when the player explicitly retries."""
+
+
+@on_update(wants_caller_kind=ResetYardBlock, wants_exact_kind=False)
+def reset_yard(*, caller: ResetYardBlock, ctx: VmPhaseCtx, **_kw: object) -> None:
+    challenge = ctx.graph.find_one(Selector(has_kind=IncrementalYardBlock))
+    assert isinstance(challenge, IncrementalYardBlock)
+    challenge.game.reset()
 
 
 IncrementalYardBlock.model_rebuild(_types_namespace={"UUID": UUID})
