@@ -81,6 +81,20 @@ def test_batch_policy_refusal_and_invalid_counts_are_atomic() -> None:
         wallet.remove_asset("locked")
     assert wallet.amounts == before
 
+    class PermissiveWallet(AssetWallet):
+        def can_add_asset(self, asset, count=1):
+            return True
+
+        def can_remove_asset(self, asset, count=1):
+            return True
+
+    permissive = PermissiveWallet()
+    with pytest.raises(ValueError):
+        permissive.gain({"valid": 2, "invalid": -1})
+    with pytest.raises(ValueError):
+        permissive.spend({"missing": 1})
+    assert permissive.amounts == {}
+
 
 def _cold(root: Path, mode: str) -> None:
     source = root / "coins.yaml"

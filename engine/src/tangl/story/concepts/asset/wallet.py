@@ -50,7 +50,7 @@ class AssetWallet(Unstructurable):
         """Add counts atomically after checking every entry."""
         deltas = dict(assets or {}) | kwargs
         for asset, amount in deltas.items():
-            if not self.can_add_asset(asset, amount):
+            if type(amount) is not int or amount < 0 or not self.can_add_asset(asset, amount):
                 raise ValueError(f"Cannot gain negative amount or refused asset: {asset!r}")
         for asset, amount in deltas.items():
             if amount:
@@ -58,7 +58,10 @@ class AssetWallet(Unstructurable):
 
     def can_afford(self, assets: Mapping[AssetKey, int] | None = None, **kwargs: int) -> bool:
         cost = dict(assets or {}) | kwargs
-        return all(self.can_remove_asset(asset, amount) for asset, amount in cost.items())
+        return all(
+            self.has_asset(asset, amount) and self.can_remove_asset(asset, amount)
+            for asset, amount in cost.items()
+        )
 
     def spend(self, assets: Mapping[AssetKey, int] | None = None, **kwargs: int) -> None:
         """Deduct counts atomically after checking every entry."""
@@ -66,7 +69,7 @@ class AssetWallet(Unstructurable):
         for asset, amount in cost.items():
             if type(amount) is not int or amount < 0:
                 raise ValueError(f"Cannot spend negative amount or invalid count: {asset!r}")
-            if not self.can_remove_asset(asset, amount):
+            if not self.has_asset(asset, amount) or not self.can_remove_asset(asset, amount):
                 raise ValueError(f"Insufficient assets or refused removal: {asset!r}")
         for asset, amount in cost.items():
             next_amount = self[asset] - amount
