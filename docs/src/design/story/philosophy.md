@@ -494,6 +494,32 @@ testable claims, and the engine provides the apparatus to test them.
 For implementation-specific follow-up, see the subpackage design notes and the
 research-direction summary in the root README.
 
+### Crawford's Erasmatron — research antecedent
+
+Chris Crawford, "[Assumptions Underlying the Erasmatron Interactive Storytelling
+Engine](https://www.cs.cmu.edu/~michaelm/nidocs/Crawford.pdf)" (1999), in *Narrative Intelligence*, AAAI Fall Symposium,
+Technical Report FS-99-01, pp. 112–114, argues for **verb-centered**
+interactive drama rather than choosing character or plot as its primary atom.
+An authored dramatic *sentence* binds a verb to participating actors and
+secondary objects; each role carries options for plausible reactions. The
+engine automates comparatively mundane behavior, such as movement and gossip,
+while artist-specified decision equations guide dramatically significant verb
+choices. Crawford's proposed **assisted storytelling** instead lets the user
+direct characters by selecting among viable actions.
+
+His example of Lancelot's gossip algorithm telling Arthur about the affair
+with Guinevere illustrates how a locally sensible decision can fail against
+the larger relationship context. His **complexity-threshold** argument and
+reported difficulty getting authors to finish storyworlds are useful warnings
+about the gap between correct transitions and believable drama, and about the
+cost of authoring behavioral policies.
+
+This is historical prior art for the parked [Project Deikto research issue](https://github.com/derekmerck/storytangl/issues/643):
+dramatic situation schemas, role-bound action/reaction affordances, and
+navigation/selection policy are separable concerns. It is **not** a claim that
+Erasmatron's historical language or autonomous dramatic behavior is already
+implemented in StoryTangl.
+
 ---
 
 ## What This Document Does Not Cover
