@@ -17,8 +17,7 @@ AssetKey = str | Singleton
 class AssetWallet(Unstructurable):
     """Count named pools and singleton-defined fungible assets independently."""
 
-    # Singleton keys use constructor references in ``entries``, not mapping keys.
-    amounts: dict[AssetKey, int] = Field(default_factory=dict, exclude=True)
+    amounts: dict[AssetKey, int] = Field(default_factory=dict)
 
     def __contains__(self, asset: AssetKey) -> bool:
         return self.has_asset(asset)
@@ -86,7 +85,10 @@ class AssetWallet(Unstructurable):
             kind = f"{type(asset).__module__}.{type(asset).__qualname__}"
             return ("singleton", kind, asset.label)
 
-        data = super().unstructure()
+        # Let the base handle subclass fields without dumping singleton map keys.
+        without_balances = self.model_copy(update={"amounts": {}})
+        data = super(AssetWallet, without_balances).unstructure()
+        data.pop("amounts", None)
         data["entries"] = [
             {"asset": asset if isinstance(asset, str) else asset.unstructure(), "count": count}
             for asset, count in sorted(
