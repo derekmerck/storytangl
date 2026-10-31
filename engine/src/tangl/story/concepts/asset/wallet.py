@@ -17,7 +17,8 @@ AssetKey = str | Singleton
 class AssetWallet(Unstructurable):
     """Count named pools and singleton-defined fungible assets independently."""
 
-    amounts: dict[AssetKey, int] = Field(default_factory=dict)
+    # Singleton keys use constructor references in ``entries``, not mapping keys.
+    amounts: dict[AssetKey, int] = Field(default_factory=dict, exclude=True)
 
     def __contains__(self, asset: AssetKey) -> bool:
         return self.has_asset(asset)
@@ -85,20 +86,20 @@ class AssetWallet(Unstructurable):
             kind = f"{type(asset).__module__}.{type(asset).__qualname__}"
             return ("singleton", kind, asset.label)
 
-        return {
-            "kind": type(self),
-            "entries": [
-                {"asset": asset if isinstance(asset, str) else asset.unstructure(), "count": count}
-                for asset, count in sorted(
-                    self.amounts.items(), key=lambda entry: sort_key(entry[0])
-                )
-            ],
-        }
+        data = super().unstructure()
+        data["entries"] = [
+            {"asset": asset if isinstance(asset, str) else asset.unstructure(), "count": count}
+            for asset, count in sorted(
+                self.amounts.items(), key=lambda entry: sort_key(entry[0])
+            )
+        ]
+        return data
 
     @classmethod
     def structure(cls, data: dict, _ctx=None) -> Self:
         amounts: dict[AssetKey, int] = {}
-        for entry in data["entries"]:
+        payload = dict(data)
+        for entry in payload.pop("entries"):
             asset = entry["asset"]
             if isinstance(asset, dict):
                 reference = dict(asset)
@@ -109,7 +110,8 @@ class AssetWallet(Unstructurable):
             elif isinstance(asset, UUID):
                 asset = str(asset)
             amounts[asset] = entry["count"]
-        return cls(amounts=amounts)
+        payload["amounts"] = amounts
+        return super().structure(payload, _ctx=_ctx)
 
     def total_value(self, asset_types: Mapping[str, CountableAsset] | None = None) -> float:
         """Return aggregate value for singleton keys and known named definitions."""

@@ -5,11 +5,14 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import ClassVar
 from uuid import uuid4
 
 import pytest
+from pydantic import Field
 
 from tangl.core import Graph, Node
+from tangl.core.bases import Unstructurable
 from tangl.loaders.compilers import AssetCompiler
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.story.concepts.asset import AssetWallet, CountableAsset, HasAssets
@@ -25,6 +28,53 @@ class OtherCoin(CountableAsset):
 
 class Holder(HasAssets, Node):
     pass
+
+
+class WalletSettings(Unstructurable):
+    message: str = "default"
+
+
+class CappedWallet(AssetWallet):
+    limit: int = 100
+    notes: list[str] = Field(default_factory=list, json_schema_extra={"include": True})
+    settings: WalletSettings = Field(
+        default_factory=WalletSettings,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+    transient: str = Field(default="default", exclude=True)
+    category: ClassVar[str] = "wallet-policy"
+
+    def can_add_asset(self, asset, count=1):
+        return super().can_add_asset(asset, count) and self[asset] + count <= self.limit
+
+
+class CappedHost(Node):
+    wallet: CappedWallet = Field(
+        default_factory=CappedWallet,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+
+
+@pytest.mark.parametrize("through_json", [False, True])
+def test_declared_wallet_subclass_state_survives_graph_restore(through_json: bool) -> None:
+    graph = Graph()
+    host = CappedHost(registry=graph, wallet=CappedWallet(limit=2, transient="temporary"))
+    host.wallet.notes.append("kept")
+    host.wallet.settings.message = "kept too"
+    host.wallet.add_asset("gold", 2)
+    payload = graph.unstructure()
+    wallet_data = next(item for item in payload["members"] if item["uid"] == host.uid)["wallet"]
+    assert "amounts" not in wallet_data and "category" not in wallet_data
+    assert "transient" not in wallet_data
+    if through_json:
+        payload = Json.deserialize(Json.serialize(payload))
+    wallet = Graph.structure(payload).get(host.uid).wallet
+    assert isinstance(wallet, CappedWallet) and wallet.limit == 2
+    assert wallet.notes == ["kept"] and wallet.settings.message == "kept too"
+    assert wallet.transient == "default" and wallet.category == "wallet-policy"
+    assert wallet["gold"] == 2 and not wallet.can_add_asset("gold")
+    with pytest.raises(ValueError):
+        wallet.add_asset("gold")
 
 
 def test_owner_json_identity_canonical_order_and_empty() -> None:
