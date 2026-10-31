@@ -8,6 +8,7 @@ resources, and ``AssetWallet`` stores fungible counts.
 from __future__ import annotations
 
 from .asset_type import AssetType, CountableAsset, Fungible
+from .discrete_wallet import DiscreteAssetWallet
 from .holder import HasAssets
 from .transaction import AssetTransactionManager, AssetTransactionResult
 from .wallet import AssetWallet
@@ -18,6 +19,7 @@ __all__ = [
     "AssetType",
     "AssetWallet",
     "CountableAsset",
+    "DiscreteAssetWallet",
     "Fungible",
     "HasAssets",
 ]
