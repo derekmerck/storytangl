@@ -17,6 +17,8 @@ def test_json_auth_and_story_recovery_in_a_fresh_process(tmp_path: Path) -> None
     script = Path(__file__).parent / "helpers_server/json_auth_restart.py"
     sources = [repo / "engine/src", repo / "apps/server/src"]
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(map(str, sources))}
+    env["TANGL_SERVICE__PATHS__CACHE_DATA"] = f"@path {tmp_path / 'cache_data'}"
+    env["TANGL_SERVICE__CACHES__SHELVED"] = "true"
     for phase in ("seed", "restore"):
         result = subprocess.run(
             [sys.executable, str(script), phase, str(tmp_path)],

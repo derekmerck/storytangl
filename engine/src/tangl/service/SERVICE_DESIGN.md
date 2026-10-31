@@ -3,6 +3,10 @@
 > Status: Current manager-first contract; persisted class references retain module identity
 > Authentication now reads decoded records before restoring matching Users;
 > Service ledger opening prepares its referenced World before constructor restoration.
+> #645's cache-enabled REST witness interleaves two users and media-backed worlds,
+> then restores both from JSON in a fresh process and continues their stories.
+> Sibling anthology books retain separate public IDs and shared media. Shelf locks
+> coordinate threads in one process, not concurrent writers in multiple processes.
 > Authority: The canonical public service surface is `ServiceManager`,
 > `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
 > helpers, and the typed response models in `response.py`.
