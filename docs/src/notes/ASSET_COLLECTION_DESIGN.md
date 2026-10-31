@@ -1,7 +1,6 @@
 > Historical proposal: this draft is not current architecture. Its ABC, dispatch,
 > and layer sketches are not implementation authority. See
-> [asset design](../../../engine/src/tangl/story/concepts/asset/ASSET_DESIGN.md)
-> and [assembly design](../../../engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md)
+> {ref}`asset design <asset-design>` and {ref}`assembly design <assembly-design>`
 > for the approved contract and staged migration in #652.
 
 # Asset Collection System Design

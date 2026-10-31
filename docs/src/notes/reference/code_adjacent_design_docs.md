@@ -19,6 +19,20 @@ design section over time.
 - `engine/src/tangl/vm/VM_DESIGN.md`
 - `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md`
 
+(asset-design)=
+
+### Asset design
+
+The canonical [asset design note](https://github.com/derekmerck/storytangl/blob/main/engine/src/tangl/story/concepts/asset/ASSET_DESIGN.md)
+describes wallet ownership, holder migration, and transaction boundaries.
+
+(assembly-design)=
+
+### Assembly design
+
+The canonical [component design note](https://github.com/derekmerck/storytangl/blob/main/engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md)
+describes owner-bound managers and their planned use of shared membership.
+
 ## Intended follow-up
 
 - Move stable architectural content into `docs/src/design/`.
