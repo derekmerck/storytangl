@@ -1,6 +1,7 @@
 # Geopolitical Constellations: a Balance of Power pastiche
 
 **Stage:** selected world-design / implementation proposal; not yet an executable world.  
+**Implementation:** [#654 — Crawford-inspired geopolitical incidents (first vertical)](https://github.com/derekmerck/storytangl/issues/654).  
 **Purpose:** bounded world-and-mechanics demonstration; a semantic port of Crawford-style geopolitical interactions into StoryTangl.  
 **Reference:** Chris Crawford, *Balance of Power* (1985), and *Balance of Power: International Politics as the Ultimate Global Game* (1986).  
 **Research lineage:** [showcase portfolio #395](https://github.com/derekmerck/storytangl/issues/395), [scoped concept projection #255](https://github.com/derekmerck/storytangl/issues/255), [mechanics convergence #332](https://github.com/derekmerck/storytangl/issues/332), and the separately parked [Project Deikto #643](https://github.com/derekmerck/storytangl/issues/643).
