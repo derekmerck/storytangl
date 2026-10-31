@@ -43,6 +43,9 @@ def test_owner_json_identity_canonical_order_and_empty() -> None:
     host.wallet.amounts.clear()
     host.wallet.gain({label: 5, second: 4, first: 3})
     assert graph.value_hash() == before_hash
+    native = Graph.structure(graph.unstructure()).get(host.uid).wallet
+    assert any(key is first for key in native.amounts)
+    assert any(key is second for key in native.amounts)
     restored = Graph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
     wallet = restored.get(host.uid).wallet
     assert wallet[first] == 3 and wallet[second] == 4 and wallet[label] == 5
