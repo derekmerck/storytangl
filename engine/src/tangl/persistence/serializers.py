@@ -1,5 +1,8 @@
 """
-This is the ONLY place that should be flattening/unflattening data.
+This is the ONLY place that should be flattening/unflattening data. Keep UUIDs,
+dates, and datetimes native in runtime and constructor-form data. Decoding
+intentionally coerces recognized UUID and datetime values; wire spelling is not
+a persistence guarantee. Display and explicit transport strings are boundaries.
 """
 
 from enum import Enum
