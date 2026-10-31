@@ -407,8 +407,13 @@ def test_lazy_provider_preparation_and_repeated_journal_are_read_only(world: Wor
         fragments = do_journal(ledger.cursor, ctx=ctx)
         assert any(isinstance(item, MediaFragment) and item.media_role == "dialog_im"
                    for item in fragments)
-    prepare(ledger)
     assert len(ledger.graph) == size and ledger.graph.value_hash() == before
+    visits = ledger.cursor.locals["_visit_count"]
+    dependencies = list(subject.portrait_dependency_ids)
+    prepare(ledger)  # UPDATE is another visit; it must not create more portraits.
+    assert ledger.cursor.locals["_visit_count"] == visits + 1
+    assert list(subject.portrait_dependency_ids) == dependencies
+    assert len(ledger.graph) == size
 
 
 def test_service_json_reopen_reuses_graph_owned_history_without_nomination(

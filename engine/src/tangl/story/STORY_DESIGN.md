@@ -243,7 +243,8 @@ not implement their own target materialization path.
 
 `StoryGraph` is the runtime graph specialization for story execution.
 
-- `locals` holds authored story globals exposed to runtime namespace assembly.
+- `locals` holds durable story globals exposed to runtime namespace assembly;
+  in-place changes persist even when the mapping began empty.
 - `initial_cursor_ids` carries one or more story entry points.
 - `wired_node_ids` records which runtime-created traversable nodes have already
   had story topology passes applied.

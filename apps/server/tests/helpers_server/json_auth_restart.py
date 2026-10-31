@@ -16,7 +16,6 @@ def main(phase: str, root: Path) -> None:
     for key in ("user_data", "story_media", "cache_data"):
         settings.set(f"service.paths.{key}", root / key)
     settings.set("service.persistence", "json_file")
-    settings.set("service.caches.shelved", False)
     settings.set("client.secret", "json-auth-bootstrap")
 
     from tangl.rest.app import app

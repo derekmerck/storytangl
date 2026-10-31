@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.core import EntityTemplate, Selector, TemplateRegistry
+from tangl.core.bases import HasState
 from tangl.presentation.dispatch import presentation_dispatch
 from tangl.vm import TraversableGraph
 
@@ -26,7 +27,7 @@ def _runtime_wiring_symbols():
     return TraversableNode, (Action, Role, Setting, MediaDep, Fanout)
 
 
-class StoryGraph(TraversableGraph):
+class StoryGraph(TraversableGraph, HasState):
     """StoryGraph()
 
     Runtime graph specialization for story-layer execution state.
@@ -41,8 +42,8 @@ class StoryGraph(TraversableGraph):
     Key Features
     ------------
     * Tracks one or more initial cursor ids for entry into the runtime graph.
-    * Carries story locals plus runtime lineage state outside serialized graph
-      payloads.
+    * Persists story locals and keeps rebuildable runtime lineage outside
+      serialized graph payloads.
     * Records template lineage for each materialized entity so provisioning can
       recover template scope.
 
@@ -57,7 +58,6 @@ class StoryGraph(TraversableGraph):
 
     initial_cursor_ids: list[UUID] = Field(default_factory=list)
     frozen_shape: bool = False
-    locals: dict[str, Any] = Field(default_factory=dict)
     world_ref: Any | None = Field(default=None, exclude=True, validation_alias="world")
     story_id: UUID | None = Field(default=None, exclude=True)
     story_resources: Any | None = Field(default=None, exclude=True)

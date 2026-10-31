@@ -1,6 +1,7 @@
 """Serve the built client and real REST app in one isolated smoke-test process."""
 
 import argparse
+import os
 from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
@@ -31,7 +32,8 @@ if __name__ == "__main__":
             directory.mkdir(exist_ok=True)
             settings.set(f"service.paths.{key}", directory)
         settings.set("service.persistence", args.profile)
-        settings.set("service.caches.shelved", False)
+        os.environ["TANGL_SERVICE__PATHS__CACHE_DATA"] = f"@path {root / 'cache_data'}"
+        settings.set("service.caches.shelved", True)
         settings.set("client.secret", "browser-server-bootstrap")
 
         from tangl.rest.app import app

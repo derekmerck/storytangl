@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from tangl.core import Node
@@ -21,6 +23,25 @@ def _build_scene_with_block() -> tuple[StoryGraph, Scene, Block]:
     graph.add(block)
     scene.add_child(block)
     return graph, scene, block
+
+
+def test_world_story_and_nearer_node_namespace_precedence() -> None:
+    graph, scene, block = _build_scene_with_block()
+    graph.world = SimpleNamespace(locals={"scope": "world", "world_only": "world"})
+    graph.locals.update(scope="story", story_only="story")
+    scene.locals.update(scope="scene", scene_only="scene")
+    block.locals.update(scope="block", block_only="block")
+    ns = PhaseCtx(graph=graph, cursor_id=block.uid).get_ns()
+    assert ns["scope"] == "block"
+    assert (ns["world_only"], ns["story_only"], ns["scene_only"], ns["block_only"]) == (
+        "world", "story", "scene", "block",
+    )
+    block.locals.pop("scope")
+    assert PhaseCtx(graph=graph, cursor_id=block.uid).get_ns()["scope"] == "scene"
+    scene.locals.pop("scope")
+    assert PhaseCtx(graph=graph, cursor_id=block.uid).get_ns()["scope"] == "story"
+    graph.locals.pop("scope")
+    assert PhaseCtx(graph=graph, cursor_id=block.uid).get_ns()["scope"] == "world"
 
 
 def test_role_and_setting_publish_provider_symbols_into_namespace() -> None:

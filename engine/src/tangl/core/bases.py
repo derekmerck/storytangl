@@ -659,12 +659,12 @@ class HasState(BaseModelPlus):
 
     Why
     ---
-    Runtime execution frequently needs a scratchpad for transient values. This trait
-    provides that scratchpad as a mutable mapping.
+    Runtime execution needs a mutable mapping for state owned by an entity.
 
     Notes
     -----
-    - `locals` is mutable working memory.
+    - `locals` is durable runtime state when the owner participates in persistence.
+      Transient rendering and cache scratch belong outside this mapping.
     - Identity, content hashing, and ordering traits do not consume `locals`.
 
     Example:
@@ -676,5 +676,5 @@ class HasState(BaseModelPlus):
 
     locals: StringMap = Field(
         default_factory=dict,
-        json_schema_extra={"contribute_ns": True},
+        json_schema_extra={"contribute_ns": True, "include": True},
     )

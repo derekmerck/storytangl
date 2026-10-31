@@ -247,10 +247,11 @@ class Registry(Entity, Generic[ET]):
         values = itertools.chain.from_iterable(r.members.values() for r in registries)
         return cls._filter_and_sort(values, selector=selector, sort_key=sort_key)
 
-    def unstructure(self) -> UnstructuredData:
-        """Return constructor-form data including explicitly unstructured members."""
+    def unstructure(self, *, include_members: bool = True) -> UnstructuredData:
+        """Return constructor-form data, optionally without the member collection."""
         data = super().unstructure()
-        data["members"] = [value.unstructure() for value in self.members.values()]
+        if include_members:
+            data["members"] = [value.unstructure() for value in self.members.values()]
         return data
 
     @classmethod

@@ -162,5 +162,33 @@ def test_patch_apply_to_updates_factory_built_traversable_graph() -> None:
 
         patch.apply_to(graph)
         assert graph.get(node.uid).label == "retitled"
+
+        # An owner-state patch keeps the live factory, graph and member bindings.
+        target = type(graph).structure(graph.unstructure())
+        target.label = "renamed graph"
+        delta = get_replay_engine("diff_v1").build_delta(before_graph=graph, after_graph=target)
+        flattened = Json.deserialize(Json.serialize(delta.unstructure()))
+        flattened["kind"] = Patch
+        restored_delta = Patch.structure(flattened)
+        old_members = list(graph.values())
+        assert restored_delta.apply_to(graph) is graph
+        assert graph.label == "renamed graph" and graph.factory is factory
+        assert all(actual is original for actual, original in zip(graph.values(), old_members))
+        assert all(member.registry is graph for member in graph.values())
+        assert graph.value_hash() == target.value_hash()
+
+        unbound = type(graph).structure(graph.unstructure())
+        unbound.bind_factory(None)
+        delta = get_replay_engine("diff_v1").build_delta(before_graph=graph, after_graph=unbound)
+        delta.apply_to(graph)
+        assert graph.factory is None and graph.value_hash() == unbound.value_hash()
+        rebound = type(graph).structure(graph.unstructure())
+        rebound.bind_factory(factory)
+        delta = get_replay_engine("diff_v1").build_delta(before_graph=graph, after_graph=rebound)
+        flattened = Json.deserialize(Json.serialize(delta.unstructure()))
+        flattened["kind"] = Patch
+        Patch.structure(flattened).apply_to(graph)
+        assert graph.factory is factory and graph.value_hash() == rebound.value_hash()
+        assert all(member.registry is graph for member in graph.values())
     finally:
         ReplayFactoryTestDouble.clear_instances()
