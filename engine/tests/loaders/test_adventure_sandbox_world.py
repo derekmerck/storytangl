@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tangl.core import Selector
+from tangl.core import Selector, Token
 from tangl.journal.fragments import ContentFragment
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
-from tangl.mechanics.sandbox import SandboxLocation
+from tangl.mechanics.sandbox import SandboxCompiledAssetType, SandboxLocation
 from tangl.presentation.projection import KvListValue, ProjectionRequest
 from tangl.service.dispatch import do_get_story_info
 from tangl.service.world_registry import WorldRegistry
@@ -58,6 +58,29 @@ class TestAdventureSandboxWorld:
         bundle = registry.bundles["adventure_sandbox_slice"]
         assert bundle.manifest.label == "adventure_sandbox_slice"
         assert bundle.manifest.metadata["title"] == "Grand Grotto"
+
+    def test_catalog_is_world_owned_and_story_token_state_is_isolated(self) -> None:
+        world = WorldCompiler().compile(WorldBundle.load(_adventure_root()))
+        catalog = next(c for c in world.get_token_catalogs() if c.label == "adventure")
+        definition = next(catalog.find_all(Selector(catalog_id="brass_lamp")))
+        assert definition.label == "adventure_sandbox_slice:adventure:brass_lamp"
+        assert definition.charge.current == 330
+
+        ledgers = [
+            Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+            for result in (world.create_story("first"), world.create_story("second"))
+        ]
+        for ledger in ledgers:
+            enter = next(a for a in ledger.cursor.edges_out() if isinstance(a, Action))
+            ledger.resolve_choice(enter.uid)
+        lamps = [ledger.graph.find_one(Selector(label="brass_lamp")) for ledger in ledgers]
+        assert all(isinstance(lamp, Token[SandboxCompiledAssetType]) for lamp in lamps)
+        assert lamps[0].uid != lamps[1].uid
+        assert lamps[0].reference_singleton is lamps[1].reference_singleton is definition
+        lamps[0].lit = True
+        lamps[0].charge.current = 12
+        assert not lamps[1].lit and lamps[1].charge.current == 330
+        assert definition.charge.current == 330
 
     def test_adventure_sandbox_world_runs_core_walkthrough(self) -> None:
         bundle = WorldBundle.load(_adventure_root())
