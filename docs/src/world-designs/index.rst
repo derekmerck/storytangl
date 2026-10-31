@@ -28,6 +28,9 @@ The collection
    * - :doc:`patient-zero`
      - Recovering a companion's capabilities restores their ability to refuse.
      - One persistent person shared by configuration, resources, willingness, and narration.
+   * - :doc:`geopolitical-constellations`
+     - Competing interventions create consequential international crises and changing political possibilities.
+     - Role-bound incident episodes, scoped affordance fanout, re-entrant world updates, and causal replay.
 
 :doc:`concept-seeds` collects Constraint-Collapse Mystery, The Council in Your Head,
 The Long Way There, Two Readers, One Graph, Automata Chop-Shop, Second Bell, and
@@ -41,6 +44,7 @@ worlds remain playable independently of these proposals.
 
    salon-season
    patient-zero
+   geopolitical-constellations
    concept-seeds
    world-expansions
 
