@@ -30,6 +30,18 @@ order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with
 
 ---
 
+## Approved Asset Foundation Migration (#652)
+
+Story's `DiscreteAssetWallet` supplies non-hierarchical, graph-owned UUID
+membership. Graph-backed component managers must build on that shared primitive
+in a later slice, adding slots, eligibility, capacities, budgets and facet
+behavior without a second authoritative membership store. Preserve owner binding,
+slot ordering, multi-assignment and transaction semantics during that migration.
+Standalone in-memory `SlottedContainer` remains a distinct non-graph instrument.
+Countable singleton quantities belong to the countable wallet, and coordinated
+exchanges remain in the existing transaction mechanism. The current assignment
+maps described below are the implemented pre-migration state.
+
 ## Implementation Status: Owner-Bound Managers
 
 The authoritative ownership contract is

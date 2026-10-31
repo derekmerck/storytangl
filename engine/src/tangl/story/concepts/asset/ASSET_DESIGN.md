@@ -1,7 +1,7 @@
 # tangl.story.concepts.asset - Design Notes
 
-> Status: Implemented vocabulary, holder, transaction, and sandbox integration slice;
-> optional icon-token disclosure added for #581's compact-row follow-up.
+> Status: Discrete wallet foundation implemented; holder integration, singleton-keyed
+> countable holdings, and assembly convergence remain planned under #652.
 
 ## Position
 
@@ -17,14 +17,15 @@ This package currently defines:
   the existing singleton/type and token delegation mechanisms. It is advisory,
   not a filename or media reference; a provider may copy it to section hints.
 - `CountableAsset`: a fungible asset definition tracked by quantity.
-- `AssetWallet`: a compact counter for fungible assets.
+- `AssetWallet`: the current string-keyed counter for fungible assets.
+- `DiscreteAssetWallet`: a graph-owned, ordered UUID group of discrete graph members.
 - `HasAssets`: a story-level facet for nodes that hold wallet counts and
   nominate discrete asset tokens into namespaces.
 - `AssetTransactionManager`: a small preflight-and-mutate service for transfers
   between `HasAssets` holders.
 
-Discrete assets should be represented as `Token[AssetTypeSubclass]`. The
-singleton describes the platonic item, while the token holds graph-local state.
+Discrete members may be ordinary graph nodes or `Token[AssetTypeSubclass]` objects.
+A token refers to its singleton definition and carries graph-local state.
 
 ## Holder Model
 
@@ -46,24 +47,24 @@ need an independent constructor-form protocol.
 The deferred discrete `assets` map remains explicitly excluded from persistence:
 it is not yet the graph-backed ownership model.
 
-## Deferred Relationship Model
+## Approved Membership Model and Migration
 
-The current `HasAssets.assets` map is a lightweight staging surface. The later
-relationship-backed shape is:
+A `DiscreteAssetWallet` is a non-hierarchical `Subgraph` owned by the graph.
+Its host refers to the wallet by UID; the graph serializes wallet and items once
+apiece. Membership is ordered and unique, references resolve to the actual graph
+members, and missing references fail visibly. Groups express their own meanings:
+an item can belong to both a possession group and an equipment group. They do
+not reparent members or impose universal exclusive custody. Checks are pure;
+create wallets at accepted setup or mutation boundaries, never during reads.
 
-- locations, actors, players, containers, and other story nodes may opt in as
-  asset holders; the sandbox package now uses this directly by making
-  `SandboxLocation` a holder and `SandboxScope.player_assets` a lightweight
-  ready-at-hand holder;
-- fungible assets live in a wallet on the holder;
-- discrete assets are graph nodes linked by an ownership or holding relation;
-- inventory affordances are projected from the current cursor namespace plus
-  ready-at-hand holders such as the player avatar.
-
-The sandbox package currently uses `ContainerFacet` as a mechanics-level
-holder/policy object for first-slice container behavior. That is intentionally
-not the final ownership model; it is a compact way to pressure-test transfer
-preflight before promoting container membership into graph relationships.
+The next slices migrate the existing `HasAssets` surface to compose discrete
+wallet references and countable singleton-keyed quantities, resolving the graph
+anchors for embedded sandbox holders. The current excluded holder map and
+string-keyed `AssetWallet` remain pre-migration implementations, not a second
+permanent source of truth. Countable JSON representation is a separate decision.
+Assembly must then build graph-backed slot membership on this same primitive,
+while retaining slot policy and owner binding. Transactions coordinate checked
+exchanges across holders; they do not define another membership store.
 
 ### ContainerFacet Validation Criteria
 
@@ -80,29 +81,6 @@ the following against sandbox examples:
   ordinary action availability and `ui_hints`;
 - the Adventure cage/chest pressure tests remain deterministic under replay.
 
-### Migration Plan
-
-The target model is a graph-relationship ownership/holding relation. Promote to
-that model once sandbox needs persisted container membership across broader
-graph operations, actor inventories, or nested/ambiguous containment. The
-migration should:
-
-1. Add a general holding relation with preflight/acceptance hooks, not an
-   asset-only edge type.
-2. Move `HasAssets.assets` storage behind that relation while preserving the
-   same `HasAssets` public holder methods.
-3. Teach `AssetTransactionManager` to mutate holding edges instead of holder
-   maps.
-4. Update sandbox container callers to use the relationship-backed holder
-   surface directly.
-5. Remove `ContainerFacet`'s holder-map responsibility, leaving only container
-   policy fields or deleting the facet if the relation owns all needed policy.
-
-The holding relation should be built as a general relationship mechanism, not
-as asset-only code. The old `Associating` and `Connection` scratch designs are
-better prior art for relationship preflight and acceptance than for inventory
-storage itself.
-
 ## Transaction Model
 
 `AssetTransactionManager` validates a complete transfer before mutating wallets
@@ -112,13 +90,9 @@ the shared spec/offer/commitment/receipt shape for broader shops, services,
 assembly assignment, holder-local asset movement, catalog-backed token creation,
 and mixed writeback.
 
-Once the graph relationship model exists, asset transfers should bind to that
-offer/commitment helper rather than grow a parallel trade framework. The asset
-side can then:
-
-- move discrete asset tokens by updating holding/ownership links;
-- debit and credit `AssetWallet` counts;
-- use existing `on_link` and `on_unlink` hooks for registration and cleanup.
+The holder migration should use that existing transaction mechanism to coordinate
+preflight and mutations of the discrete and countable wallets, preserving holder
+and counterpart policy and rollback behavior.
 
 A higher-level trade manager can later compare aggregate values and actor
 biases before delegating to the transaction manager.
@@ -127,13 +101,6 @@ See `../../../mechanics/TRANSACTION_OFFER_DESIGN.md` for the shared
 spec/offer/commitment/receipt vocabulary that generalizes this manager across
 provisioning, shops, services, assembly assignment, and future relationship
 writeback.
-
-## Future Core Hooks
-
-Core currently observes link changes with `on_link` and `on_unlink`. Asset
-holding will eventually want preflight hooks shaped like `on_can_link` and
-`on_can_unlink`, but those should be introduced as general graph relationship
-hooks when a concrete relationship slice needs them.
 
 ## Known Limitations
 
@@ -145,16 +112,13 @@ experiments, not a complete inventory system.
   sandbox containers, but not enough for full persistence of room inventories
   or ownership history.
 - Discrete transfers currently move tokens between holder maps. Slice 2 should
-  replace or back this with a first-class holding relation so graph topology is
-  the source of truth.
+  migrate this to the graph-owned discrete wallet, with one authoritative
+  membership representation.
 - Transaction preflight asks holder policy methods (`can_give_*` and
-  `can_receive_*`) directly. A later relationship framework should generalize
-  this into preflight/acceptance rules that assets, connections, attachments,
-  and other mutable associations can share.
+  `can_receive_*`) directly; preserve these policies during holder migration.
 - Existing holder-map asset moves and catalog-backed token creation can now be
   expressed with `AssetMoveCommitment` and `CatalogAssetCommitment`. The
-  remaining work is to express future holding-edge changes with equivalent
-  commitments once graph-backed ownership replaces holder-local maps.
+  remaining work is to use wallet membership with equivalent commitments.
 - `HasAssets` nominates `inv` and `assets` into local namespaces, but there is
   no story-level `Player`/avatar concept yet. Sandbox currently uses
   `SandboxScope.player_assets` as the explicit player stand-in; promote a real
@@ -165,4 +129,4 @@ experiments, not a complete inventory system.
 - Sandbox integration now has a first narrow affordance set: location-held
   tokens project take/read choices, player-held tokens project drop choices, and
   held key tokens satisfy generated unlock actions. The next asset slice should
-  replace holder-local maps with a relationship-backed holding subgraph.
+  replace holder-local maps with the graph-owned discrete wallet.

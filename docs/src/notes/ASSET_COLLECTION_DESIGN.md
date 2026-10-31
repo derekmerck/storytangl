@@ -1,3 +1,8 @@
+> Historical proposal: this draft is not current architecture. Its ABC, dispatch,
+> and layer sketches are not implementation authority. See
+> {ref}`asset design <asset-design>` and {ref}`assembly design <assembly-design>`
+> for the approved contract and staged migration in #652.
+
 # Asset Collection System Design
 ## Generic Story-Layer Framework for Managing Asset Collections
 
