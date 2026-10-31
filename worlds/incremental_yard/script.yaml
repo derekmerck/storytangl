@@ -36,11 +36,17 @@ scenes:
           doubt.
         actions:
           - text: "Reset the yard"
-            successor: entrance
+            successor: reset
 
       defeat:
         content: |
           The yard stalls out before anything lasting can be built.
         actions:
           - text: "Try again"
-            successor: entrance
+            successor: reset
+
+      reset:
+        kind: "incremental_yard.domain.ResetYardBlock"
+        continues:
+          - successor: entrance
+            trigger: last
