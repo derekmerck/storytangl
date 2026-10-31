@@ -31,6 +31,7 @@ from .visibility import SandboxVisibilityRule
 class SandboxCompiledAssetType(AssetType):
     """Asset type used by the compact sandbox slice compiler."""
 
+    catalog_id: str = ""
     name: str = ""
     kind: str = ""
     traits: set[str] = Field(default_factory=set)

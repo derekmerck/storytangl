@@ -1,6 +1,10 @@
 label: adventure_sandbox_slice
 scripts: script.yaml
 domain_module: adventure_sandbox_slice.domain
+assets:
+  - asset_kind: SandboxCompiledAssetType
+    catalog: adventure
+    source: assets.yaml
 
 metadata:
   title: "Grand Grotto"

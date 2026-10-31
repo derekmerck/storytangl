@@ -1,0 +1,50 @@
+keys:
+  name: set of keys
+  kind: keyring
+  traits: [portable, tiny]
+  portable: true
+  read_text: "It's just a normal-looking set of keys."
+  take_text: Taken.
+  drop_text: Dropped.
+brass_lamp:
+  name: brass lantern
+  kind: lamp
+  traits: [portable, switchable, provides_light, requires_charge]
+  portable: true
+  switchable: {}
+  light_source:
+    requires_switch: true
+  lit: false
+  charge:
+    current: 330
+    maximum: 330
+    charge_name: oil
+  read_text: It is a shiny brass lamp.
+  turn_on_text: Your lamp is now on.
+  turn_off_text: Your lamp is now off.
+  take_text: Taken.
+  drop_text: Dropped.
+wicker_cage:
+  name: wicker cage
+  kind: container
+  traits: [portable, container]
+  portable: true
+  container:
+    is_open: true
+    max_items: 1
+    accepts_traits: [tiny]
+    open_text: The cage opens.
+    close_text: The cage snaps shut.
+  read_text: It's a small wicker cage.
+  take_text: Taken.
+  drop_text: Dropped.
+gold_nugget:
+  name: gold nugget
+  kind: treasure
+  traits: [portable, treasure]
+  portable: true
+  treasure_score: 10
+  treasure_loss_penalty: 5
+  read_text: It is a large sparkling nugget of gold.
+  take_text: Taken.
+  drop_text: Dropped.

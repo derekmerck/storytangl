@@ -13,9 +13,6 @@ from tangl.presentation.projection import (
 )
 from tangl.presentation.values import KvRow
 from tangl.mechanics.sandbox import (
-    ChargeFacet,
-    ContainerFacet,
-    LightSourceFacet,
     LockableFacet,
     OpenableFacet,
     SandboxCompiledAssetType,
@@ -25,7 +22,6 @@ from tangl.mechanics.sandbox import (
     SandboxMobAffordance,
     SandboxScope,
     SandboxVisibilityRule,
-    SwitchableFacet,
 )
 
 # Load-bearing composition import: the sandbox package does not register its
@@ -41,6 +37,8 @@ from tangl.vm.ctx import VmPhaseCtx
 
 TREASURE_LABEL = "gold_nugget"
 adventure_dispatch = BehaviorRegistry(label="adventure_sandbox.presentation_dispatch")
+# Register the existing wrapper before a saved graph is structured.
+Token[SandboxCompiledAssetType]
 
 
 class AdventureMagicAnchor(BaseModel):
@@ -76,13 +74,6 @@ def _location(graph: Graph, label: str) -> AdventureSandboxLocation:
     return location
 
 
-def _asset_type(label: str, **values: object) -> SandboxCompiledAssetType:
-    existing = SandboxCompiledAssetType.get_instance(label)
-    if existing is not None:
-        return existing
-    return SandboxCompiledAssetType(label=label, **values)
-
-
 def _graph_frozen_shape(graph: Graph) -> bool:
     return isinstance(graph, StoryGraph) and graph.frozen_shape
 
@@ -91,10 +82,10 @@ def _add_asset(
     graph: Graph,
     label: str,
     location: AdventureSandboxLocation,
-    **values: object,
 ) -> Token[SandboxCompiledAssetType]:
-    asset_type = _asset_type(label, **values)
-    asset = Token[SandboxCompiledAssetType](token_from=label, label=label)
+    catalog = next(c for c in graph.factory.get_token_catalogs() if c.label == "adventure")
+    asset_type = next(catalog.find_all(Selector(catalog_id=label)))
+    asset = catalog.materialize_one(asset_type, label=label)
     graph.add(asset)
     location.add_asset(asset)
     return asset
@@ -361,69 +352,10 @@ def _ensure_adventure_sandbox(graph: Graph) -> None:
     below_grate = _location(graph, "below_grate")
     cobble_crawl = _location(graph, "cobble_crawl")
 
-    _add_asset(
-        graph,
-        "keys",
-        building,
-        name="set of keys",
-        kind="keyring",
-        traits={"portable", "tiny"},
-        portable=True,
-        read_text="It's just a normal-looking set of keys.",
-        take_text="Taken.",
-        drop_text="Dropped.",
-    )
-    _add_asset(
-        graph,
-        "brass_lamp",
-        building,
-        name="brass lantern",
-        kind="lamp",
-        traits={"portable", "switchable", "provides_light", "requires_charge"},
-        portable=True,
-        switchable=SwitchableFacet(),
-        light_source=LightSourceFacet(requires_switch=True),
-        lit=False,
-        charge=ChargeFacet(current=330, maximum=330, charge_name="oil"),
-        read_text="It is a shiny brass lamp.",
-        turn_on_text="Your lamp is now on.",
-        turn_off_text="Your lamp is now off.",
-        take_text="Taken.",
-        drop_text="Dropped.",
-    )
-    _add_asset(
-        graph,
-        "wicker_cage",
-        cobble_crawl,
-        name="wicker cage",
-        kind="container",
-        traits={"portable", "container"},
-        portable=True,
-        container=ContainerFacet(
-            is_open=True,
-            max_items=1,
-            accepts_traits={"tiny"},
-            open_text="The cage opens.",
-            close_text="The cage snaps shut.",
-        ),
-        read_text="It's a small wicker cage.",
-        take_text="Taken.",
-        drop_text="Dropped.",
-    )
-    _add_asset(
-        graph,
-        TREASURE_LABEL,
-        cobble_crawl,
-        name="gold nugget",
-        kind="treasure",
-        traits={"portable", "treasure"},
-        portable=True,
-        treasure_score=10,
-        treasure_loss_penalty=5,
-        read_text="It is a large sparkling nugget of gold.",
-        take_text="Taken.",
-        drop_text="Dropped.",
-    )
+    _add_asset(graph, "keys", building)
+    _add_asset(graph, "brass_lamp", building)
+    _add_asset(graph, "wicker_cage", cobble_crawl)
+    _add_asset(graph, TREASURE_LABEL, cobble_crawl)
 
     grate = SandboxFixture(
         label="grate",
