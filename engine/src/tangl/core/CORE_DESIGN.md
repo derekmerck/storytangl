@@ -337,6 +337,9 @@ annotation belong to individual token instances rather than the shared type defi
 class. The same annotation drives `TokenProvisioner._partition()`, which splits
 requirement parameters into type-level selector criteria (used to filter singletons) and
 token locals (passed through to the minted token).
+Implicitly hydrated values that change in place and explicit overrides use the same
+constructor-form representation, including embedded-field markers. Reconstructing a
+graph must preserve both the local value and its hash without copying the definition.
 
 **`load_instances_from_yaml()` is the authoring entry point.** World asset managers
 call this during initialization to populate singleton registries from authored YAML
