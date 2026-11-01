@@ -183,6 +183,11 @@ The trace, not authored dialogue or a polished map, is the initial acceptance wi
 
 **Later and separately:** alien/historical data swap; national / incumbent / opposition resource pools; richer event types such as natural disasters; further behavioral substitution; extraction of common ConceptConstellation responsibilities; genuinely different-domain validation; multiplayer navigator lanes (use [#346](https://github.com/derekmerck/storytangl/issues/346) / the Lost Worlds proof rather than inventing this infrastructure here); sophisticated agent models; full map/polish. Project Deikto remains a possible future consumer, not a prerequisite.
 
+Two crisis refinements to revisit once the plain escalate/back-down ladder works:
+
+- **Incident escrow.** Each incident holds its own stake pot: it opens in proportion to the challenged policy's magnitude and the contested nation's prestige value, and each escalation step pays more in. The winner takes the pot; a side that backs down claws back a share that shrinks as CrisisLevel rises. This makes Crawford's "loss increases with the severity of the crisis" explicit, inspectable state. Keep it a holding the principals pay into, with "winner takes" an ordinary transfer, so prestige stays a projection over relations rather than becoming a balance.
+- **Attention budget.** Each principal has a bounded pool of attention or soft power per world interval, refreshed on the world tick. Escrowed attention stays locked while its incident is open, so a crisis held open in one region weakens a principal's reach elsewhere. This couples concurrent crises through opportunity cost, which Crawford's independent, sequential crises lack. Consequences: the opponent's decision rule gains an opportunity-cost term alongside Outrage Excess (record this as a deliberate departure from Crawford); crisis ordering within a turn becomes an allocation problem; and incidents may stay open across turns with their escrow intact. A strategy of continually raising stakes until the opponent can't keep up, short of war, should then emerge from the rules rather than being scripted.
+
 ## Packaging: three swappable axes
 
 Start as a demo world (`worlds/balance_of_power/` with a `domain.py`, like `colony_loop`), but keep three axes separate from the first PR, because each planned follow-up swaps exactly one of them:
