@@ -67,8 +67,22 @@ presentation (renderers, web/UI)
 - **Store types in their native form; serialize only at boundaries.**
   - Hash digests are `bytes`, not hex strings (`content_hash: bytes`).
   - UUIDs are `UUID` objects, not strings.
-  - Datetimes are `datetime` objects, not ISO strings.
+  - Dates and datetimes are `date` and `datetime` objects, not ISO strings.
   - Entity types are Python `Type` objects, not fully‑qualified name strings.
+- UUID- and date-looking strings represent UUIDs or temporal values, not opaque
+  names. Converting those values to strings before runtime or constructor-form
+  serialization is misuse. The persistence serializer handles wire formats and
+  its decoder intentionally coerces recognized UUID and datetime values; their
+  original lexical spelling is not a persistence guarantee. Format values for
+  display, logging, or an explicit transport-string DTO field at that boundary.
+
+  ```python
+  # Correct: keep the UUID native through unstructure and persistence.
+  payload = {"owner_id": owner.uid}
+  # Incorrect: do not pre-format persistence data.
+  payload = {"owner_id": str(owner.uid)}
+  ```
+
 - **Enums at authored boundaries.** Runtime and model fields remain typed as
   `Enum`/`IntEnum`, never string unions. When YAML, JSON, or Pydantic input
   accepts human-readable enum names or values, inherit `EnumPlusMixin` before
@@ -77,10 +91,12 @@ presentation (renderers, web/UI)
   string-to-enum validators in individual domain models. Unknown values still
   fail unless that specific enum documents a fallback.
 
-- **Use Pydantic serializers for JSON/YAML output.**
+- **Use Pydantic serializers for DTO or local schema JSON/YAML output.**
   - Add `@field_serializer` for rich types needing string form (e.g., `bytes.hex()`).
   - Keep in‑memory types pure for comparisons, hashing, and fast operations.
   - Example: `content_hash: bytes` serializes to hex via a serializer, not by storing hex internally.
+  - Graph persistence uses `unstructure()` → persistence serializer → `structure()`,
+    not a Pydantic output serializer as its round-trip contract.
 
 - **Expose convenience accessors when appropriate.**
   - Properties such as `.content_hash_hex` for logs/UI.

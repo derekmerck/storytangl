@@ -177,6 +177,12 @@ full type map and rationale.**
   proof that graph-owned state survives. Any type that points at another entity
   must persist an explicit reference form (usually ids) and restore live
   pointers through the owning registry/graph.
+- **Keep persistence values native.** UUID- and date-looking strings denote
+  UUIDs or temporal values, not opaque names. Keep UUIDs, dates, and datetimes
+  typed through runtime and `unstructure()`; serializer decoding intentionally
+  coerces recognized values, so original spelling is not guaranteed. Formatting
+  belongs at display or explicit DTO boundaries. See
+  [type purity](docs/src/contrib/coding_style.md#4a-type-purity-on-attributes).
 - **Embedded constructor-form fields must opt in explicitly.** Field
   `include=True` only says "persist this field even if it was mutated in
   place." A separate marker such as `unstructurable=True` should mean "this field

@@ -1,99 +1,138 @@
 from __future__ import annotations
 
 from collections.abc import ItemsView, Mapping
+from typing import Self
+from uuid import UUID
 
 from pydantic import Field
 
-from tangl.core.bases import BaseModelPlus
+from tangl.core.bases import Unstructurable
+from tangl.core.singleton import Singleton
 
 from .asset_type import CountableAsset
 
+AssetKey = str | Singleton
 
-class AssetWallet(BaseModelPlus):
-    """Small counter for fungible story assets."""
 
-    amounts: dict[str, int] = Field(default_factory=dict)
+class AssetWallet(Unstructurable):
+    """Count named pools and singleton-defined fungible assets independently."""
 
-    def __contains__(self, label: str) -> bool:
-        return self.amounts.get(label, 0) > 0
+    amounts: dict[AssetKey, int] = Field(default_factory=dict)
 
-    def __getitem__(self, label: str) -> int:
-        return self.amounts.get(label, 0)
+    def __contains__(self, asset: AssetKey) -> bool:
+        return self.has_asset(asset)
+
+    def __getitem__(self, asset: AssetKey) -> int:
+        return self.amounts.get(asset, 0)
 
     def __len__(self) -> int:
         return len(self.amounts)
 
-    def items(self) -> ItemsView[str, int]:
+    def items(self) -> ItemsView[AssetKey, int]:
         return self.amounts.items()
 
-    def gain(self, assets: Mapping[str, int] | None = None, **kwargs: int) -> None:
-        """Add positive asset counts to the wallet."""
-        deltas = dict(assets or {}) | kwargs
-        for label, amount in deltas.items():
-            if amount < 0:
-                raise ValueError(f"Cannot gain negative amount for {label}")
-        for label, amount in deltas.items():
-            if amount == 0:
-                continue
-            self.amounts[label] = self.amounts.get(label, 0) + amount
+    def has_asset(self, asset: AssetKey, count: int = 1) -> bool:
+        return type(count) is int and count >= 0 and self[asset] >= count
 
-    def can_afford(self, assets: Mapping[str, int] | None = None, **kwargs: int) -> bool:
-        """Return whether the wallet has at least the requested counts."""
+    def can_add_asset(self, asset: AssetKey, count: int = 1) -> bool:
+        return type(count) is int and count >= 0
+
+    def can_remove_asset(self, asset: AssetKey, count: int = 1) -> bool:
+        return self.has_asset(asset, count)
+
+    def add_asset(self, asset: AssetKey, count: int = 1) -> None:
+        self.gain({asset: count})
+
+    def remove_asset(self, asset: AssetKey, count: int = 1) -> None:
+        self.spend({asset: count})
+
+    def gain(self, assets: Mapping[AssetKey, int] | None = None, **kwargs: int) -> None:
+        """Add counts atomically after checking every entry."""
+        deltas = dict(assets or {}) | kwargs
+        for asset, amount in deltas.items():
+            if type(amount) is not int or amount < 0 or not self.can_add_asset(asset, amount):
+                raise ValueError(f"Cannot gain negative amount or refused asset: {asset!r}")
+        for asset, amount in deltas.items():
+            if amount:
+                self.amounts[asset] = self[asset] + amount
+
+    def can_afford(self, assets: Mapping[AssetKey, int] | None = None, **kwargs: int) -> bool:
         cost = dict(assets or {}) | kwargs
         return all(
-            amount >= 0 and self.amounts.get(label, 0) >= amount
-            for label, amount in cost.items()
+            self.has_asset(asset, amount) and self.can_remove_asset(asset, amount)
+            for asset, amount in cost.items()
         )
 
-    def spend(self, assets: Mapping[str, int] | None = None, **kwargs: int) -> None:
-        """Deduct asset counts, raising without mutation if any count is short."""
+    def spend(self, assets: Mapping[AssetKey, int] | None = None, **kwargs: int) -> None:
+        """Deduct counts atomically after checking every entry."""
         cost = dict(assets or {}) | kwargs
-        negative = [
-            label
-            for label, amount in cost.items()
-            if amount < 0
-        ]
-        if negative:
-            raise ValueError(f"Cannot spend negative amount for: {', '.join(sorted(negative))}")
-        missing = [
-            label
-            for label, amount in cost.items()
-            if self.amounts.get(label, 0) < amount
-        ]
-        if missing:
-            raise ValueError(f"Insufficient assets: {', '.join(sorted(missing))}")
-        for label, amount in cost.items():
-            next_amount = self.amounts.get(label, 0) - amount
+        for asset, amount in cost.items():
+            if type(amount) is not int or amount < 0:
+                raise ValueError(f"Cannot spend negative amount or invalid count: {asset!r}")
+            if not self.has_asset(asset, amount) or not self.can_remove_asset(asset, amount):
+                raise ValueError(f"Insufficient assets or refused removal: {asset!r}")
+        for asset, amount in cost.items():
+            next_amount = self[asset] - amount
             if next_amount:
-                self.amounts[label] = next_amount
+                self.amounts[asset] = next_amount
             else:
-                self.amounts.pop(label, None)
+                self.amounts.pop(asset, None)
+
+    def unstructure(self) -> dict:
+        def sort_key(asset: AssetKey) -> tuple[str, str, str]:
+            if isinstance(asset, str):
+                return ("string", "", asset)
+            kind = f"{type(asset).__module__}.{type(asset).__qualname__}"
+            return ("singleton", kind, asset.label)
+
+        # Let the base handle subclass fields without dumping singleton map keys.
+        without_balances = self.model_copy(update={"amounts": {}})
+        data = super(AssetWallet, without_balances).unstructure()
+        data.pop("amounts", None)
+        data["entries"] = [
+            {"asset": asset if isinstance(asset, str) else asset.unstructure(), "count": count}
+            for asset, count in sorted(
+                self.amounts.items(), key=lambda entry: sort_key(entry[0])
+            )
+        ]
+        return data
+
+    @classmethod
+    def structure(cls, data: dict, _ctx=None) -> Self:
+        amounts: dict[AssetKey, int] = {}
+        payload = dict(data)
+        for entry in payload.pop("entries"):
+            asset = entry["asset"]
+            if isinstance(asset, dict):
+                reference = dict(asset)
+                reference["label"] = str(reference["label"])
+                asset = Singleton.structure(reference)
+                if asset is None:
+                    raise LookupError(f"Unregistered wallet asset: {entry['asset']!r}")
+            elif isinstance(asset, UUID):
+                asset = str(asset)
+            amounts[asset] = entry["count"]
+        payload["amounts"] = amounts
+        return super().structure(payload, _ctx=_ctx)
 
     def total_value(self, asset_types: Mapping[str, CountableAsset] | None = None) -> float:
-        """Return aggregate value for known countable asset definitions."""
-        known = (
-            asset_types
-            if asset_types is not None
-            else {
-                asset.label: asset
-                for asset in CountableAsset.all_instances()
-            }
-        )
+        """Return aggregate value for singleton keys and known named definitions."""
+        known = asset_types if asset_types is not None else {
+            asset.label: asset for asset in CountableAsset.all_instances()
+        }
         return sum(
-            amount * known[label].value
-            for label, amount in self.amounts.items()
-            if label in known
+            amount * (asset.value if isinstance(asset, CountableAsset) else known[asset].value)
+            for asset, amount in self.amounts.items()
+            if isinstance(asset, CountableAsset) or (isinstance(asset, str) and asset in known)
         )
 
     def describe(self) -> str:
-        """Render a compact human-facing wallet summary."""
         if not self.amounts:
             return "empty"
         parts = [
-            f"{amount} {label}"
-            for label, amount in sorted(
-                self.amounts.items(),
-                key=lambda item: (-item[1], item[0]),
-            )
+            (asset if isinstance(asset, str) else asset.label, count)
+            for asset, count in self.amounts.items()
         ]
-        return ", ".join(parts)
+        return ", ".join(
+            f"{count} {label}" for label, count in sorted(parts, key=lambda x: (-x[1], x[0]))
+        )
