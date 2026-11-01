@@ -29,8 +29,9 @@ The near-term question is whether a small amount of world-specific code, express
 | Diplomatic relationship, treaty, alignment | Persistent relationships/commitments and associated state | World model |
 | Intervention, destabilization, treaty/policy change | Scoped affordances and normal Actions/effects | Domain handlers on existing VM |
 | Insurgency, coup, Finlandization | World-update rules and possible incident/opportunity triggers | Domain-specific behavior |
-| Crisis, challenge, escalation, retreat | Re-entrant GeopoliticalIncident episode with participant bindings, hosting an escalation-ladder game round (CrisisLevel 9 → 1; back down or escalate) | Incident: world/story; ladder: generic `mechanics/games` kernel |
+| Crisis, challenge, escalation, retreat | Re-entrant GeopoliticalIncident episode with participant bindings, hosting an escalation ladder (CrisisLevel 9 → 1; back down or escalate) | Incident: world/story; ladder: crisis-specific game logic first, a reusable `mechanics/games` kernel if extraction is earned |
 | Outrage, Hurt, bluffing, anticipation | Opponent strategy and per-policy Hurt functions over world state | World rules module |
+| Adventurousness, Pugnacity | Per-principal state carried across crises: boldness record, and the momentum a crisis winner gains that intimidates the loser next time | World rules module |
 | Prestige | Projection over nations' regard for each principal, weighted by military strength; not a wallet balance | World rules module |
 | Computer-controlled opposing superpower | Deterministic actor policy choosing from available Actions | World behavior; not a second game engine |
 | Annual/periodic world updates | Explicit world-tick transitions | World scene and domain handlers |
@@ -100,9 +101,19 @@ Keep three semantics distinct:
 
 An incident needs **stable instance identity, causal provenance, and a lifecycle**. A repeated visit to the world hub must not duplicate an incident; a later, genuinely new challenge involving the same nations is allowed. Identity must include a causal subject/occurrence or equivalent stable instance key, not merely type + participants.
 
-**Policies are data, not incident subclasses.** In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. What differs per policy is its *Hurt* (signed harm or help to the contested nation, scaled by magnitude and the nation's vulnerability) and whether it is an intervention (which raises the respondent's sphere-of-influence weight). A policy is therefore a data entry plus a small Hurt function. Separate incident shapes are warranted only when the *constellation of participants* differs, e.g. a natural disaster with a beneficiary and two rival aid sponsors.
+**Policies are data, not incident subclasses.** In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. Keep three things distinct for each policy:
 
-**The escalation ladder is a game kernel.** Inside an incident, the crisis is a two-sided ladder from CrisisLevel 9 down to 1 (nuclear war): on each step the side holding the ball backs down (losing prestige and adventurousness) or escalates. This is a generic brinkmanship contest and belongs in `mechanics/games` as an ordinary `Game`/`GameHandler` using the landed move contract, so a human and the computer opponent choose from the same offered moves. Crawford's decision rule (Outrage computed for *both* sides and summed into an Outrage Excess, plus a bluff term that shrinks as the crisis worsens) is a strategy supplied by the world rules, not part of the kernel. The incident owns bindings and cause; the kernel owns the ladder; the rules own the judgment.
+1. **Policy definition:** eligible sponsor, target, magnitude, cost, and its *direct world effects* (arms reach the insurgents, aid changes the economy, a treaty creates an obligation, troops change military strength). These are what make the world move; without them the simulation degenerates into prestige optimization with cosmetic policy labels.
+2. **Reaction model:** how another principal judges the policy: *Hurt* (signed harm or help to the contested nation, scaled by magnitude and the nation's vulnerability), interests, obligations, the intervention weighting, and so the likelihood of a challenge.
+3. **Incident resolution:** whether the policy survives a challenge, and what escalation or concession costs each side.
+
+All eight policies belong in the behavioral inventory; the first vertical needs only one.
+
+A new incident specialization is warranted when its required roles, local state, behavior, or lifecycle differ meaningfully, not because a policy name changes. These vary independently: a diplomatic crisis and a long-running trade negotiation could bind the same three nations yet need different procedures (and a natural disaster with a beneficiary and two rival aid sponsors differs in roles as well). That independence is itself an argument for the eventual constellation generalization.
+
+**The escalation ladder: likely kernel, not yet a prerequisite.** Inside an incident, the crisis is a two-sided ladder from CrisisLevel 9 down to 1 (nuclear war): on each step the side holding the ball backs down (losing prestige and adventurousness) or escalates. Crawford's decision rule (Outrage computed for *both* sides and summed into an Outrage Excess, plus a bluff term that shrinks as the crisis worsens) is a strategy supplied by the world rules. The incident owns bindings and cause; the ladder owns the escalation sequence and terminal conditions; the rules own the judgment.
+
+Implement the ladder initially with the existing `Game`/`HasGame` integration where practical, with crisis-specific state and handler logic. Extract a reusable escalation/brinkmanship kernel after the alternating-decision semantics are settled and a second consumer appears. The open question: `GameHandler.receive_move()` resolves a player move together with a preselected opponent move in one round. A human-versus-computer crisis may fit that as "my stand-firm or back-down, then your reply", but a computer-initiated or fully readerless crisis may not.
 
 Use the ordinary affordance system: incident type, bound roles, participating nations/powers, and world context may contribute or constrain actions. The incident is the scoped interaction receiver, *not* a private game state machine or another action bus. Preserve provider/source, acting authority, and mutation-target provenance where needed. Whether intro/choice/outro requires multiple Episode nodes is an implementation choice; **begin with one self-reentrant incident and ordinary JOURNAL projections** unless distinct graph identities prove useful.
 
@@ -125,7 +136,11 @@ Crawford's own turn order gives the scene two modes:
 3. **Objections:** the opponent evaluates the player's policies and may question them, opening crises.
 4. **World processes:** insurgency, coups, and Finlandization update each minor.
 5. **News phase:** headlines report the opponent's actions and process outcomes; the player may question any of them, opening crises.
-6. Return to the policy phase. An explicit advancing action invokes autonomous country updates and opportunity discovery. Incident escalation can take multiple local rounds within a single world interval, consistent with StoryTangl's game-round versus story-turn precedent.
+6. Return to the policy phase.
+
+Incident escalation can take multiple local rounds within a single world interval, consistent with StoryTangl's game-round versus story-turn precedent.
+
+**When policies take effect.** Policies chosen in the policy phase are *provisional commitments*: recorded and challengeable, with no world effects yet. The objection step settles each one (tolerated, survived a crisis, or countermanded by backing down), and only settled policies apply their direct effects in the world-process step, which is also the first point at which world-update rules observe them. Crawford's own sample turn has this shape: policies set, Next Turn, then the challenges. A single rule for when effects occur means backing down never has to reverse a journaled transfer, and revisiting a crisis cannot apply a policy twice. Open for Pass 0: whether a news-phase challenge that the opponent loses reverses an already-applied effect or only stops the policy carrying into the next turn.
 
 Urgency is a scheduling predicate/priority, not an inherent incident subtype. A newly offered foreign-aid action may be discretionary; responding to an escalated challenge may be mandatory. An urgent incident without a legally resolvable response needs a defined automatic outcome or a clear validation failure, never an inescapable hub.
 
@@ -144,11 +159,11 @@ Illustrative expected semantic trace:
 ~~~text
 t0: USA, USSR, Nicaragua + political powers/materialized state
 t1: world hub offers eligible intervention toward Nicaragua
-t2: USA commits aid/intervention -> resource and relationship effects
-t3: USSR policy selects challenge -> Incident #42 binds roles/cause
-t4: USA/USSR respond within Incident #42 -> escalate or concede
-t5: crisis resolves -> prestige/affinity/commitment change
-t6: explicit world tick -> government/opposition/stability update
+t2: USA nominates aid/intervention -> provisional, challengeable commitment
+t3: explicit advance; USSR policy selects challenge -> Incident #42 binds roles/cause
+t4: USA/USSR alternate within Incident #42 -> escalate or back down
+t5: crisis resolves -> policy survives or is countermanded; prestige/affinity change
+t6: world processes -> surviving policies apply effects; government/opposition/stability update
 t7: hub offers a changed frontier because earlier choices mattered
 ~~~
 
@@ -156,7 +171,7 @@ The trace, not authored dialogue or a polished map, is the initial acceptance wi
 
 ## First implementation passes
 
-**Pass 0 — audit and translation.** Inspect currently landed Episode, Role, dependency/provisioning, fanout, scoped namespace, asset-wallet, assembly, VM, journaling, and re-entrant game/sandbox contracts. Build a small Crawford-process-to-handler inventory, noting deliberate simplifications and any true missing capability. Don't mistake aspirational design notes for shipped APIs.
+**Pass 0 — audit and translation.** Inspect currently landed Episode, Role, dependency/provisioning, fanout, scoped namespace, asset-wallet, assembly, VM, journaling, and re-entrant game/sandbox contracts. Build a small Crawford-process-to-handler inventory, noting deliberate simplifications and any true missing capability; include the policy commitment/effect timing rule and how the alternating crisis maps onto the current game round contract. Don't mistake aspirational design notes for shipped APIs.
 
 **Pass 1 — static fixture and one interaction.** Seed principals/minors/powers and relationships; construct one incident explicitly; render choices through ordinary VM/Service; execute one challenge/concession and obtain a meaningful journal receipt. No automatic generation required yet.
 
@@ -174,13 +189,23 @@ Start as a demo world (`worlds/balance_of_power/` with a `domain.py`, like `colo
 
 | Axis | Lives in | Swap test |
 | --- | --- | --- |
-| **Kernel:** escalation ladder | `mechanics/games` | Reusable with no Balance of Power knowledge |
+| **Kernel:** escalation ladder | Crisis-specific game logic at first; `mechanics/games` once extracted | Reusable with no Balance of Power knowledge |
 | **Rules:** Outrage/Hurt, world processes, opponent strategy, prestige projection | World-local rules module that reads state only through the bound concepts, never the fixture directly | *Same rules, different world* |
 | **World:** nations, powers, relations, prestige values | YAML fixture | *Different rules/events, same world* |
 
-The third follow-up, *different rules and events in a different world*, is the genuinely-different-domain test. When the first swap arrives, promote the rules module out of the world (into `mechanics/` or a sibling example package); a clean move is the evidence that the seam held. Do not start in a separate repository: the point is to surface engine friction, not to hide it behind a consumer boundary.
+The third follow-up, *different rules and events in a different world*, is the genuinely-different-domain test. Promote code out of the world (into `mechanics/` or a sibling example package) when there is demonstrated reuse or the world-local placement becomes awkward. A data-only world swap that needs no code move is itself evidence that the separation already works. Do not start in a separate repository: the point is to surface engine friction, not to hide it behind a consumer boundary.
 
 ## Evidence and acceptance
+
+The core witness for the first vertical is deliberately narrow:
+
+1. **A policy is offered and selected:** the USA proposes military aid to an opposition faction in a minor.
+2. **A response is generated from world state:** the USSR evaluates Hurt, relationships, and interests, then challenges or tolerates.
+3. **A crisis can resolve:** the parties alternate escalate/back-down decisions until one backs down or a terminal state is reached.
+4. **Consequences are committed:** the policy survives or is countermanded; resources and relationships change accordingly.
+5. **Re-entry shows a different opportunity space:** the world scene reflects the consequences with no duplicated incidents, hidden ticks, or repeated mutations.
+
+Coups, a full resource economy, a map, all eight policies, and a second world are not needed to recognize success.
 
 Record focused automated tests and an inspectable supported-client/service transcript demonstrating:
 
