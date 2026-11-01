@@ -222,6 +222,22 @@ Record focused automated tests and an inspectable supported-client/service trans
 
 **Failure is informative.** If this requires bespoke parallel scheduling, action dispatch, hidden state duplication, or per-incident graph reconstruction, document the friction before promoting an engine abstraction.
 
+## Related structure: wallets, assemblies, and incidents
+
+An observation to keep in view, not a reason to change the plan. A wallet, an assembly, and an incident are all ways of binding existing concepts into a configuration whose relationships carry meaning and sponsor behavior:
+
+| Structure | Binding semantics | What the configuration affords |
+| --- | --- | --- |
+| Wallet | Holder possesses quantities or tokens | Spend, transfer, acquire |
+| Assembly | Components occupy constrained functional slots | Install, replace, activate capabilities |
+| Incident | Participants occupy contextual roles in a situation | Challenge, escalate, concede, resolve |
+
+The assembly already sits closest to a constellation: a structure of requirement slots whose occupants contribute affordances. The [component design note](https://github.com/derekmerck/storytangl/blob/main/engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md) has most of the vocabulary. Its *context-bound facets* are this point stated for components: the same concept contributes different behavior depending on the binding through which it is encountered (a sword in a bag offers *drop*; in a weapon slot, *attack*; in a `disputed_property` role, *claim* or *return*). Its association substrate covers when and whether a binding is admitted, and it explicitly defers an N-party generalization, which is roughly the shape an incident needs.
+
+This world already layers the structures: a Nation is an assembly (governing and opposition slots), an incident is a constellation over nations and a policy, and a policy moves wallet quantities. The causal cascade (incident settles policy → policy changes wallets → wallets change capabilities → capabilities change the next realizable incidents) runs through ordinary concepts and bindings, and one concept can sit in several of these structures at once without being duplicated.
+
+Two cautions keep the analogy honest. The structures are not one class: fungible wallet quantities are not individually identified participants, and an assembly is mostly static while an incident has temporal identity, progression, and resolution. What may generalize is the shared machinery (role-constrained membership, scoped contribution, binding changes, affordance projection), not a superclass. So when GeopoliticalIncident needs slot or binding behavior, look at assembly first as the example to copy, and record where it fits and where it doesn't. *ConceptConstellation* may turn out to name a capability that emerges from composing existing primitives rather than a new mechanic family.
+
 ## Scope boundaries and open choices
 
 - **No first-round multiplayer** or simultaneous-action arbitration. Lost Worlds is the independent first-class multi-lane test; this world can adopt those navigator facilities later.
