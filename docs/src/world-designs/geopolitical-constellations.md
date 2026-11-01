@@ -16,6 +16,8 @@ This is a **pastiche and semantic port**, not a reconstruction of the original e
 
 The near-term question is whether a small amount of world-specific code, expressed in existing StoryTangl vocabulary, yields *recognizably similar causal behavior*. The broader 90%-of-the-narrative-with-10%-of-the-domain-code intuition is a research hypothesis, not a performance claim.
 
+**Direction of travel.** This world is an incremental step toward a general *concept constellation with emergent choices* framework, in the line of Crawford's later Erasmatron and Storytron work: actors bound into roles around a cause, with available verbs and other actors' reactions emerging from state rather than from authored branches. Balance of Power is the starting point because its vocabulary is precisely bounded (a handful of policies, one crisis procedure, three world processes) and fully documented. Choices made here should not foreclose that generalization, but the framework is extracted from this and later consumers, not designed ahead of them.
+
 ## Crawford-ese to StoryTangl-ese
 
 | Crawford concept/process | Proposed StoryTangl representation | Ownership |
@@ -27,10 +29,14 @@ The near-term question is whether a small amount of world-specific code, express
 | Diplomatic relationship, treaty, alignment | Persistent relationships/commitments and associated state | World model |
 | Intervention, destabilization, treaty/policy change | Scoped affordances and normal Actions/effects | Domain handlers on existing VM |
 | Insurgency, coup, Finlandization | World-update rules and possible incident/opportunity triggers | Domain-specific behavior |
-| Crisis, challenge, escalation, retreat | Re-entrant GeopoliticalIncident episode with participant bindings | First concrete mechanic |
+| Crisis, challenge, escalation, retreat | Re-entrant GeopoliticalIncident episode with participant bindings, hosting an escalation-ladder game round (CrisisLevel 9 → 1; back down or escalate) | Incident: world/story; ladder: generic `mechanics/games` kernel |
+| Outrage, Hurt, bluffing, anticipation | Opponent strategy and per-policy Hurt functions over world state | World rules module |
+| Prestige | Projection over nations' regard for each principal, weighted by military strength; not a wallet balance | World rules module |
 | Computer-controlled opposing superpower | Deterministic actor policy choosing from available Actions | World behavior; not a second game engine |
 | Annual/periodic world updates | Explicit world-tick transitions | World scene and domain handlers |
 | Map and reports | Presentation of the same state, choices, and journal receipts | Client projection |
+
+This is the *shell + spikes* shape described in the [composite game loops note](https://github.com/derekmerck/storytangl/blob/main/engine/src/tangl/mechanics/games/COMPOSITE_GAME_LOOPS_DESIGN.md): the re-entrant world scene is the shell (policies, annual processes, prestige), and the crisis is the spike (a short contest whose outcome feeds back into the shell).
 
 Crawford's core processes are insurgency, coups, Finlandization/coerced alignment, and diplomatic crises. We can start with a much smaller subset and add the others after the first interaction works. A natural disaster creating rival relief and intervention opportunities is an attractive **later StoryTangl extension**, not a claimed feature of Crawford's original implementation. Likewise, the priest-versus-fruit-companies moral dilemma discussed in brainstorming is a useful design inspiration, **not an established Balance of Power scenario**.
 
@@ -43,6 +49,8 @@ Crawford's core processes are insurgency, coups, Finlandization/coerced alignmen
 **Participant** is a role contract in an incident: challenger, respondent, contested state, beneficiary, sponsor, or other incident-specific participant. Its occupant need not have a fixed object shape; it must satisfy the applicable requirement. The first implementation can use current Role/Selector/dependency facilities. Avoid a new universal political type hierarchy.
 
 **Resources:** money, arms, or force counts may use CountableAsset/AssetWallet/HasAssets when the semantics are fungible and transactional; population, geographic control, approval, and legitimacy are ordinarily state variables, not inventory. Decide whether soldiers are a count, asset, or derived military-strength quantity according to the rule being translated. Government and opposition wallets should not silently become the same wallet, nor should government-held funds imply ownership of all national resources.
+
+*Later refinement, not part of the simple framework:* each nation can hold three resource pools: **national** (stays with the Nation through any change of regime: the police are still the police), **incumbent-bound**, and **opposition-bound**. When the balance of power shifts, some fraction of the incumbent and opposition pools trade places, so a coup captures specific resources rather than the whole country. The first slices may treat national resources as a single state block; nothing in them should assume that a regime change moves every resource.
 
 A **principal** can sponsor great-power policies and diplomatic challenges; a **minor** is usually the affected party and may have its own responses, political updates, and limited actions. Start with USA and USSR as two configured principals and a few minors. Avoid encoding 'exactly two superpowers' as an engine invariant.
 
@@ -92,6 +100,10 @@ Keep three semantics distinct:
 
 An incident needs **stable instance identity, causal provenance, and a lifecycle**. A repeated visit to the world hub must not duplicate an incident; a later, genuinely new challenge involving the same nations is allowed. Identity must include a causal subject/occurrence or equivalent stable instance key, not merely type + participants.
 
+**Policies are data, not incident subclasses.** In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. What differs per policy is its *Hurt* (signed harm or help to the contested nation, scaled by magnitude and the nation's vulnerability) and whether it is an intervention (which raises the respondent's sphere-of-influence weight). A policy is therefore a data entry plus a small Hurt function. Separate incident shapes are warranted only when the *constellation of participants* differs, e.g. a natural disaster with a beneficiary and two rival aid sponsors.
+
+**The escalation ladder is a game kernel.** Inside an incident, the crisis is a two-sided ladder from CrisisLevel 9 down to 1 (nuclear war): on each step the side holding the ball backs down (losing prestige and adventurousness) or escalates. This is a generic brinkmanship contest and belongs in `mechanics/games` as an ordinary `Game`/`GameHandler` using the landed move contract, so a human and the computer opponent choose from the same offered moves. Crawford's decision rule (Outrage computed for *both* sides and summed into an Outrage Excess, plus a bluff term that shrinks as the crisis worsens) is a strategy supplied by the world rules, not part of the kernel. The incident owns bindings and cause; the kernel owns the ladder; the rules own the judgment.
+
 Use the ordinary affordance system: incident type, bound roles, participating nations/powers, and world context may contribute or constrain actions. The incident is the scoped interaction receiver, *not* a private game state machine or another action bus. Preserve provider/source, acting authority, and mutation-target provenance where needed. Whether intro/choice/outro requires multiple Episode nodes is an implementation choice; **begin with one self-reentrant incident and ordinary JOURNAL projections** unless distinct graph identities prove useful.
 
 ## World scene: re-entrant coordinator
@@ -104,7 +116,16 @@ A world-scoped scene or menu is the repeatedly visited continuation point. It do
 4. Surface a required urgent incident, or offer available non-urgent incidents and ordinary policies.
 5. Return from an interaction, project resulting state, and offer an explicit **advance world** action.
 
-**Re-entry is observation/planning, not a world tick.** Inspecting the map, reviewing incidents, or returning from a choice must not trigger repeated annual updates or resources. An explicit advancing action invokes autonomous country updates and opportunity discovery. Incident escalation can take multiple local rounds within a single world interval, consistent with StoryTangl's game-round versus story-turn precedent.
+**Re-entry is observation/planning, not a world tick.** Inspecting the map, reviewing incidents, or returning from a choice must not trigger repeated annual updates or resources. In particular, world updates do not run in the scene's enter or exit handlers; those may journal, but only the advance action mutates world time.
+
+Crawford's own turn order gives the scene two modes:
+
+1. **Policy phase:** the player sets policies toward nations, each an ordinary action.
+2. **Advance ("next turn"):** the only world-time mutation; its UPDATE runs the rest of the turn.
+3. **Objections:** the opponent evaluates the player's policies and may question them, opening crises.
+4. **World processes:** insurgency, coups, and Finlandization update each minor.
+5. **News phase:** headlines report the opponent's actions and process outcomes; the player may question any of them, opening crises.
+6. Return to the policy phase. An explicit advancing action invokes autonomous country updates and opportunity discovery. Incident escalation can take multiple local rounds within a single world interval, consistent with StoryTangl's game-round versus story-turn precedent.
 
 Urgency is a scheduling predicate/priority, not an inherent incident subtype. A newly offered foreign-aid action may be discretionary; responding to an escalated challenge may be mandatory. An urgent incident without a legally resolvable response needs a defined automatic outcome or a clear validation failure, never an inescapable hub.
 
@@ -145,7 +166,19 @@ The trace, not authored dialogue or a polished map, is the initial acceptance wi
 
 **Pass 4 — recognizable BoP behavior.** Add an additional world-update process (insurgency or coup) and test that government/opposition slots can change while the Nation persists. Refine equations, data coverage, and presentation only after the narrow mechanics work.
 
-**Later and separately:** alien/historical data swap; richer event types such as natural disasters; further behavioral substitution; extraction of common ConceptConstellation responsibilities; genuinely different-domain validation; multiplayer navigator lanes (use [#346](https://github.com/derekmerck/storytangl/issues/346) / the Lost Worlds proof rather than inventing this infrastructure here); sophisticated agent models; full map/polish. Project Deikto remains a possible future consumer, not a prerequisite.
+**Later and separately:** alien/historical data swap; national / incumbent / opposition resource pools; richer event types such as natural disasters; further behavioral substitution; extraction of common ConceptConstellation responsibilities; genuinely different-domain validation; multiplayer navigator lanes (use [#346](https://github.com/derekmerck/storytangl/issues/346) / the Lost Worlds proof rather than inventing this infrastructure here); sophisticated agent models; full map/polish. Project Deikto remains a possible future consumer, not a prerequisite.
+
+## Packaging: three swappable axes
+
+Start as a demo world (`worlds/balance_of_power/` with a `domain.py`, like `colony_loop`), but keep three axes separate from the first PR, because each planned follow-up swaps exactly one of them:
+
+| Axis | Lives in | Swap test |
+| --- | --- | --- |
+| **Kernel:** escalation ladder | `mechanics/games` | Reusable with no Balance of Power knowledge |
+| **Rules:** Outrage/Hurt, world processes, opponent strategy, prestige projection | World-local rules module that reads state only through the bound concepts, never the fixture directly | *Same rules, different world* |
+| **World:** nations, powers, relations, prestige values | YAML fixture | *Different rules/events, same world* |
+
+The third follow-up, *different rules and events in a different world*, is the genuinely-different-domain test. When the first swap arrives, promote the rules module out of the world (into `mechanics/` or a sibling example package); a clean move is the evidence that the seam held. Do not start in a separate repository: the point is to surface engine friction, not to hide it behind a consumer boundary.
 
 ## Evidence and acceptance
 
