@@ -183,13 +183,22 @@ class Token(Node, Generic[WST]):
         referent = self._hydrated_referent_value()
         if referent is None:
             return data
+        excluded = set(self._match_fields(exclude=True))
+        embedded = set(self._match_fields(unstructurable=True))
         for field_name in self._instance_vars(self.wrapped_cls):
-            if field_name in self.model_fields_set:
+            if field_name in excluded:
                 continue
-            if getattr(self, field_name) != getattr(referent, field_name):
-                data[field_name] = self.model_dump(include={field_name})[field_name]
-            else:
+            value = getattr(self, field_name)
+            if field_name not in self.model_fields_set and value == getattr(referent, field_name):
                 data.pop(field_name, None)
+                continue
+            if field_name in embedded:
+                data[field_name] = self._unstructure_unstructurable_value(value)
+            else:
+                field = self.model_dump(include={field_name}, exclude_defaults=True)
+                if field_name not in field:
+                    field = self.model_dump(include={field_name})
+                data[field_name] = field[field_name]
         return data
 
     # conflate/delegate identity matching
