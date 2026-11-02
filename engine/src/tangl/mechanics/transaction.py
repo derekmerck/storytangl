@@ -365,11 +365,8 @@ class ComponentSlotAssetHolder:
     def _local_label(self, item: Entity) -> str | None:
         return self._slot_labels().get(item.uid)
 
-    def _slot_ids(self) -> list[UUID]:
-        return self.manager.assignment_ids.setdefault(self.slot_name, [])
-
     def _slot_labels(self) -> dict[UUID, str]:
-        return self.manager._holder_labels.setdefault(self.slot_name, {})
+        return self.manager._holder_labels.get(self.slot_name, {})
 
     def _index_of(self, asset: Entity) -> int | None:
         for index, item in enumerate(self.manager.get_slot(self.slot_name)):
@@ -414,7 +411,7 @@ class ComponentSlotAssetHolder:
     ) -> bool:
         _ = giver
         if self.has_asset(asset):
-            return True
+            return False
         can_accept_registry, _reason = self.manager.can_accept_component_registry(asset)
         if not can_accept_registry:
             return False
@@ -427,17 +424,14 @@ class ComponentSlotAssetHolder:
         if existing is not None and existing is not asset:
             raise ValueError(f"Component slot holder already contains key: {key}")
 
-        if self._index_of(asset) is None:
-            self.manager.assign(self.slot_name, asset)
-            index = self._removed_indices_by_uid.pop(asset.uid, None)
-            if index is not None:
-                slot_ids = self._slot_ids()
-                if asset.uid not in slot_ids:
-                    raise ValueError("Component slot assignment did not record asset UID")
-                slot_ids.remove(asset.uid)
-                slot_ids.insert(min(index, len(slot_ids)), asset.uid)
+        if self._index_of(asset) is not None:
+            raise ValueError("Component is already assigned to this slot")
+        self.manager.assign(self.slot_name, asset)
+        index = self._removed_indices_by_uid.pop(asset.uid, None)
+        if index is not None:
+            self.manager.move_within_slot(self.slot_name, asset, index)
         if label is not None:
-            self._slot_labels()[asset.uid] = label
+            self.manager._holder_labels.setdefault(self.slot_name, {})[asset.uid] = label
 
     def remove_asset(self, asset: Entity | str) -> Entity:
         resolved = self.get_asset(asset) if isinstance(asset, str) else asset
@@ -559,6 +553,8 @@ class AssetMoveCommitment:
     _giver_label: str | None = field(default=None, init=False, repr=False)
     _giver_index: int | None = field(default=None, init=False, repr=False)
     _receiver_wallet_created: bool = field(default=False, init=False, repr=False)
+    _giver_slot_wallets: dict[str, UUID] | None = field(default=None, init=False, repr=False)
+    _receiver_slot_wallets: dict[str, UUID] | None = field(default=None, init=False, repr=False)
     _committed: bool = field(default=False, init=False, repr=False)
 
     def _asset(self) -> Entity | None:
@@ -619,18 +615,29 @@ class AssetMoveCommitment:
         if asset is None:
             raise ValueError("giver does not hold asset")
         giver_label = self.giver.get_asset_key(asset)
+        if isinstance(self.giver, ComponentSlotAssetHolder):
+            self._giver_slot_wallets = dict(self.giver.manager.slot_wallet_ids)
+        if isinstance(self.receiver, ComponentSlotAssetHolder):
+            self._receiver_slot_wallets = dict(self.receiver.manager.slot_wallet_ids)
         if isinstance(self.giver, HasDiscreteAssets):
             self._giver_index = self.giver.discrete_wallet.member_ids.index(asset.uid)
         receiver_had_wallet = (
             not isinstance(self.receiver, HasDiscreteAssets)
             or self.receiver.discrete_wallet_id is not None
         )
+        if isinstance(self.receiver, ComponentSlotAssetHolder):
+            receiver_had_wallet = (
+                self.receiver.manager._owner_registry() is None
+                or self.receiver.slot_name in self.receiver.manager.slot_wallet_ids
+            )
         moved = self.giver.remove_asset(asset)
         try:
             self.receiver.add_asset(moved, label=self.receiver_label)
         except Exception:
             self.giver.add_asset(moved, label=giver_label)
             self._restore_giver_order(moved)
+            if self._giver_slot_wallets is not None:
+                self.giver.manager.slot_wallet_ids = self._giver_slot_wallets
             raise
         self._moved = moved
         self._giver_label = giver_label
@@ -654,10 +661,23 @@ class AssetMoveCommitment:
                 raise ValueError("Cannot remove nonempty rollback wallet")
             wallet.graph.remove(wallet.uid)
             self.receiver.discrete_wallet_id = None
+        elif self._receiver_wallet_created and isinstance(self.receiver, ComponentSlotAssetHolder):
+            manager = self.receiver.manager
+            wallet = manager.slot_wallet(self.receiver.slot_name)
+            if wallet.member_ids:
+                raise ValueError("Cannot remove nonempty rollback wallet")
+            wallet.graph.remove(wallet.uid)
+            del manager.slot_wallet_ids[self.receiver.slot_name]
+        if self._giver_slot_wallets is not None:
+            self.giver.manager.slot_wallet_ids = self._giver_slot_wallets
+        if self._receiver_slot_wallets is not None:
+            self.receiver.manager.slot_wallet_ids = self._receiver_slot_wallets
         self._moved = None
         self._giver_label = None
         self._giver_index = None
         self._receiver_wallet_created = False
+        self._giver_slot_wallets = None
+        self._receiver_slot_wallets = None
         self._committed = False
 
     def _restore_giver_order(self, moved: Entity) -> None:
@@ -683,7 +703,9 @@ class CatalogAssetCommitment:
     can_create: Callable[[], TransactionCheck | bool] | None = None
     _created: Entity | None = field(default=None, init=False, repr=False)
     _registered: bool = field(default=False, init=False, repr=False)
+    _registered_by_receiver: bool = field(default=False, init=False, repr=False)
     _receiver_wallet_created: bool = field(default=False, init=False, repr=False)
+    _receiver_slot_wallets: dict[str, UUID] | None = field(default=None, init=False, repr=False)
     _committed: bool = field(default=False, init=False, repr=False)
 
     def can_commit(self) -> TransactionCheck:
@@ -729,6 +751,16 @@ class CatalogAssetCommitment:
             not isinstance(self.receiver, HasDiscreteAssets)
             or self.receiver.discrete_wallet_id is not None
         )
+        if isinstance(self.receiver, ComponentSlotAssetHolder):
+            self._receiver_slot_wallets = dict(self.receiver.manager.slot_wallet_ids)
+            receiver_had_wallet = (
+                self.receiver.manager._owner_registry() is None
+                or self.receiver.slot_name in self.receiver.manager.slot_wallet_ids
+            )
+            self._registered_by_receiver = (
+                self.receiver.manager._owner_registry() is not None
+                and item.registry is None
+            )
         try:
             self.receiver.add_asset(item, label=self.receiver_label)
         except Exception:
@@ -755,11 +787,24 @@ class CatalogAssetCommitment:
                 raise ValueError("Cannot remove nonempty rollback wallet")
             wallet.graph.remove(wallet.uid)
             self.receiver.discrete_wallet_id = None
+        elif self._receiver_wallet_created and isinstance(self.receiver, ComponentSlotAssetHolder):
+            manager = self.receiver.manager
+            wallet = manager.slot_wallet(self.receiver.slot_name)
+            if wallet.member_ids:
+                raise ValueError("Cannot remove nonempty rollback wallet")
+            wallet.graph.remove(wallet.uid)
+            del manager.slot_wallet_ids[self.receiver.slot_name]
+        if self._receiver_slot_wallets is not None:
+            self.receiver.manager.slot_wallet_ids = self._receiver_slot_wallets
         if self._registered and self.registry is not None:
             self.registry.remove(self._created.uid)
+        elif self._registered_by_receiver and isinstance(self.receiver, ComponentSlotAssetHolder):
+            self.receiver.manager._owner_registry().remove(self._created.uid)
         self._created = None
         self._registered = False
+        self._registered_by_receiver = False
         self._receiver_wallet_created = False
+        self._receiver_slot_wallets = None
         self._committed = False
 
 
@@ -1083,9 +1128,12 @@ class ComponentAssignmentCommitment:
     validate_after: bool = False
     allow_replace: bool = False
     _previous: list[Entity] = field(default_factory=list)
+    _previous_labels: dict[UUID, str] = field(default_factory=dict, init=False, repr=False)
+    _previous_wallets: dict[str, UUID] = field(default_factory=dict, init=False, repr=False)
     _committed: bool = False
     _registered_by_assignment: Entity | None = field(default=None, repr=False)
     _resolved: Entity | None = field(default=None, repr=False)
+    _created_wallet: bool = field(default=False, init=False, repr=False)
 
     def _component(self) -> Entity:
         if self._resolved is None:
@@ -1099,6 +1147,9 @@ class ComponentAssignmentCommitment:
     def _can_replace(self, component: Entity) -> TransactionCheck:
         if not self.allow_replace:
             return TransactionCheck.reject("replacement disabled")
+        accepted, reason = self.manager.can_accept_component_registry(component)
+        if not accepted:
+            return TransactionCheck.reject(reason)
         if self.slot_name not in self.manager.slots:
             return TransactionCheck.reject(f"No such slot: {self.slot_name}")
 
@@ -1159,6 +1210,9 @@ class ComponentAssignmentCommitment:
 
         component = self._component()
         self._previous = list(self.manager.get_slot(self.slot_name))
+        self._previous_wallets = dict(self.manager.slot_wallet_ids)
+        self._previous_labels = dict(self.manager._holder_labels.get(self.slot_name, {}))
+        self._created_wallet = self.slot_name not in self.manager.slot_wallet_ids
         component_registry = getattr(component, "registry", None)
         slot = self.manager.slots[self.slot_name]
         replacing = self.allow_replace and slot.max_count == 1 and bool(self._previous)
@@ -1171,6 +1225,9 @@ class ComponentAssignmentCommitment:
             if replacing:
                 for item in self._previous:
                     self.manager.assign(self.slot_name, item)
+                if self._previous_labels:
+                    self.manager._holder_labels[self.slot_name] = dict(self._previous_labels)
+                self.manager.slot_wallet_ids = self._previous_wallets
             raise
         self._committed = True
         owner_registry = self.manager._owner_registry()
@@ -1201,11 +1258,22 @@ class ComponentAssignmentCommitment:
             self.manager.unassign(self.slot_name, item)
         for item in self._previous:
             self.manager.assign(self.slot_name, item)
+        if self._previous_labels:
+            self.manager._holder_labels[self.slot_name] = dict(self._previous_labels)
         owner_registry = self.manager._owner_registry()
         if self._registered_by_assignment is not None and owner_registry is not None:
             owner_registry.remove(self._registered_by_assignment.uid)
+        if self._created_wallet and owner_registry is not None:
+            wallet = self.manager.slot_wallet(self.slot_name)
+            if wallet is not None and not wallet.member_ids:
+                owner_registry.remove(wallet.uid)
+                del self.manager.slot_wallet_ids[self.slot_name]
+        self.manager.slot_wallet_ids = self._previous_wallets
+        self._created_wallet = False
         self._registered_by_assignment = None
         self._previous = []
+        self._previous_labels = {}
+        self._previous_wallets = {}
         self._committed = False
 
 

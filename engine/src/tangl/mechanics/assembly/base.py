@@ -9,8 +9,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
-from tangl.core import Entity, Selector
+from tangl.core import Entity, Graph, GraphItem, Selector
 from tangl.core.bases import Unstructurable
+from tangl.story import StoryGraph
+from tangl.story.concepts.asset import DiscreteAssetWallet
 from tangl.type_hints import Tag, UnstructuredData
 from .budget import BudgetTracker
 from .component import Component, ComponentFacet
@@ -326,7 +328,7 @@ class ComponentManager(Unstructurable, SlottedContainer[CT], Generic[CT]):
         default_factory=lambda: defaultdict(list),
         exclude=True,
     )
-    assignment_ids: dict[str, list[UUID]] = Field(
+    slot_wallet_ids: dict[str, UUID] = Field(
         default_factory=dict,
         json_schema_extra={"include": True},
     )
@@ -335,15 +337,31 @@ class ComponentManager(Unstructurable, SlottedContainer[CT], Generic[CT]):
 
     def bind_owner(self, owner: Any) -> "ComponentManager[CT]":
         self.owner = owner
-        for component_ids in self.assignment_ids.values():
-            for component_id in component_ids:
-                component = self._component_cache.get(component_id)
-                if component is not None:
+        if self._owner_registry() is not None and self.assignments:
+            pending = self.assignments
+            components_by_id: dict[UUID, CT] = {}
+            for components in pending.values():
+                for component in components:
+                    accepted, reason = self.can_accept_component_registry(component)
+                    if not accepted:
+                        raise ValueError(reason)
+                    existing = components_by_id.setdefault(component.uid, component)
+                    if existing is not component:
+                        raise ValueError("Assigned component UID belongs to another item")
+            for components in pending.values():
+                for component in components:
                     self._validate_component_registry(component)
+            for slot_name, components in pending.items():
+                wallet = self.prepare_slot(slot_name)
+                for component in components:
+                    wallet.add_asset(component)
+            self.assignments = defaultdict(list)
+        if self._owner_registry() is not None:
+            self._component_cache.clear()
         return self
 
     def _slot_names(self) -> list[str]:
-        return list(self.assignment_ids)
+        return list(self.slot_wallet_ids) if self._owner_registry() is not None else list(self.assignments)
 
     def _owner_registry(self):
         if self.owner is None:
@@ -356,27 +374,79 @@ class ComponentManager(Unstructurable, SlottedContainer[CT], Generic[CT]):
             component = registry.get(component_id)
             if component is not None:
                 return cast(CT, component)
-        if component_id in self._component_cache:
+        elif component_id in self._component_cache:
             return self._component_cache[component_id]
         raise KeyError(f"Component {component_id} is not available through the owner registry")
 
+    def slot_wallet(self, slot_name: str) -> DiscreteAssetWallet | None:
+        wallet_id = self.slot_wallet_ids.get(slot_name)
+        if wallet_id is None:
+            return None
+        graph = self._owner_registry()
+        if graph is None:
+            raise ValueError("Slot wallet requires a graph owner")
+        wallet = graph.get(wallet_id)
+        if not isinstance(wallet, DiscreteAssetWallet):
+            raise KeyError(f"Slot wallet {wallet_id} is missing from the owner graph")
+        return wallet
+
+    def prepare_slot(self, slot_name: str) -> DiscreteAssetWallet:
+        """Create a graph-owned slot group at setup or an accepted mutation."""
+        if slot_name not in self.slots:
+            raise KeyError(f"No such slot: {slot_name}")
+        wallet = self.slot_wallet(slot_name)
+        if wallet is None:
+            graph = self._owner_registry()
+            if not isinstance(graph, Graph):
+                raise ValueError("Slot wallet requires a graph owner")
+            wallet = graph.add_subgraph(kind=DiscreteAssetWallet)
+            self.slot_wallet_ids[slot_name] = wallet.uid
+        return wallet
+
     def _slot_components(self, slot_name: str) -> list[CT]:
-        return [
-            self._resolve_component(component_id)
-            for component_id in self.assignment_ids.get(slot_name, [])
-        ]
+        if self._owner_registry() is None:
+            return list(self.assignments.get(slot_name, []))
+        wallet = self.slot_wallet(slot_name)
+        return list(wallet.members()) if wallet else []
 
     def _has_slot_components(self, slot_name: str) -> bool:
-        return bool(self.assignment_ids.get(slot_name))
+        return bool(self._slot_components(slot_name))
 
     def _slot_count(self, slot_name: str) -> int:
-        return len(self.assignment_ids.get(slot_name, []))
+        return len(self._slot_components(slot_name))
+
+    def move_within_slot(self, slot_name: str, component: CT, index: int) -> None:
+        """Restore the position of an assigned component after a transfer."""
+        if self._owner_registry() is None:
+            items = self.assignments[slot_name]
+            items.remove(component)
+            items.insert(min(index, len(items)), component)
+        else:
+            members = self.slot_wallet(slot_name).member_ids
+            members.remove(component.uid)
+            members.insert(min(index, len(members)), component.uid)
+
+    def can_assign(self, slot_name: str, component: CT) -> tuple[bool, str]:
+        accepted, reason = super().can_assign(slot_name, component)
+        if not accepted:
+            return accepted, reason
+        if any(item.uid == component.uid for item in self._slot_components(slot_name)):
+            return False, "Component is already assigned to this slot"
+        accepted, reason = self.can_accept_component_registry(component)
+        if not accepted:
+            return accepted, reason
+        graph = self._owner_registry()
+        if isinstance(graph, StoryGraph) and graph.frozen_shape and slot_name not in self.slot_wallet_ids:
+            return False, "Slot wallet must be prepared before graph shape is frozen"
+        return True, ""
 
     def can_accept_component_registry(self, component: CT) -> tuple[bool, str]:
         registry = self._owner_registry()
         if registry is None:
             return True, ""
-        component_registry = getattr(component, "registry", None)
+        if not isinstance(registry, Graph) or not isinstance(component, GraphItem):
+            return False, "Graph-bound components must be graph items"
+        component_registry = component.registry
         registered_component = registry.get(component.uid)
         if component_registry is None:
             if registered_component is not None and registered_component is not component:
@@ -394,26 +464,38 @@ class ComponentManager(Unstructurable, SlottedContainer[CT], Generic[CT]):
             raise ValueError(reason)
 
         registry = self._owner_registry()
-        component_registry = getattr(component, "registry", None)
         if registry is not None and (
-            component_registry is None or registry.get(component.uid) is None
+            component.registry is None or registry.get(component.uid) is None
         ):
             registry.add(component)
 
     def _add_to_slot(self, slot_name: str, component: CT) -> None:
-        self._validate_component_registry(component)
-        self.assignment_ids.setdefault(slot_name, []).append(component.uid)
-        self._component_cache[component.uid] = component
+        if self._owner_registry() is None:
+            self.assignments[slot_name].append(component)
+            self._component_cache[component.uid] = component
+        else:
+            self._validate_component_registry(component)
+            wallet = self.prepare_slot(slot_name)
+            if not wallet.member_ids:
+                self.slot_wallet_ids.pop(slot_name)
+                self.slot_wallet_ids[slot_name] = wallet.uid
+            wallet.add_asset(component)
 
     def _remove_from_slot(self, slot_name: str, component: CT) -> bool:
-        component_ids = self.assignment_ids.get(slot_name)
-        if not component_ids or component.uid not in component_ids:
-            return False
-        component_ids.remove(component.uid)
-        if not component_ids:
-            self.assignment_ids.pop(slot_name, None)
-        if not any(component.uid in ids for ids in self.assignment_ids.values()):
-            self._component_cache.pop(component.uid, None)
+        if self._owner_registry() is None:
+            components = self.assignments.get(slot_name, [])
+            if component not in components:
+                return False
+            components.remove(component)
+            if not components:
+                self.assignments.pop(slot_name, None)
+            if not any(component in items for items in self.assignments.values()):
+                self._component_cache.pop(component.uid, None)
+        else:
+            wallet = self.slot_wallet(slot_name)
+            if wallet is None or not wallet.has_asset(component):
+                return False
+            wallet.remove_asset(component)
         self._holder_labels.get(slot_name, {}).pop(component.uid, None)
         return True
 

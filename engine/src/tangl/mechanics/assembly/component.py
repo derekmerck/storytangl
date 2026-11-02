@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from tangl.core import Entity
+from tangl.core import Node
 
 ConnectorPolarity = Literal["plug", "socket"]
 
@@ -43,7 +43,7 @@ class ComponentFacet(BaseModel):
         )
 
 
-class Component(Entity):
+class Component(Node):
     """Assembly component that carries facets."""
 
     facets: list[ComponentFacet] = Field(default_factory=list)

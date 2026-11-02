@@ -177,7 +177,7 @@ class TestOutfitSerialization:
         restored_shirt = restored.find_one(Selector(label="guide-shirt"))
         restored_coat = restored.find_one(Selector(label="guide-coat"))
 
-        assert actor_data["outfit"]["assignment_ids"] == {
+        assert {name: actor.outfit.slot_wallet(name).member_ids for name in actor_data["outfit"]["slot_wallet_ids"]} == {
             "top_60": [shirt.uid],
             "top_80": [coat.uid],
         }

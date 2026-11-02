@@ -22,7 +22,7 @@ from tangl.mechanics.credentials import (
 )
 from tangl.mechanics.games import CredentialsGame, HasGame
 from tangl.mechanics.games.credentials_game import CredentialCase
-from tangl.mechanics.presence.look import HairColor, HairStyle, Look, SkinTone
+from tangl.mechanics.presence.look import HairColor, HairStyle, HasSimpleLook, Look, SkinTone
 from tangl.story import Block
 from tangl.story.presentation import render_text_as
 from tangl.vm.runtime.frame import PhaseCtx
@@ -99,7 +99,8 @@ def _identity_document_graph(
     owner = graph.add_node(kind=CredentialPacketOwner, label="checkpoint")
     packet = owner.packet_manager
     packet.bind_owner(owner)
-    bearer = packet.resolve_subject(packet.bearer_id)
+    bearer = HasSimpleLook(uid=packet.bearer_id)
+    graph.add(bearer)
     bearer.look = _look(HairColor.RED)
     document = graph.add_node(
         kind=CredentialComponent,
@@ -329,7 +330,8 @@ def test_document_renders_from_the_hosted_credentials_namespace() -> None:
         game_state=game,
     )
     packet = block.game.active_case.packet_manager
-    bearer = packet.resolve_subject(packet.bearer_id)
+    bearer = HasSimpleLook(uid=packet.bearer_id)
+    graph.add(bearer)
     bearer.look = _look(HairColor.RED)
     document = graph.add_node(
         kind=CredentialComponent,

@@ -437,7 +437,7 @@ def test_packet_manager_graph_roundtrip_preserves_credential_assignments_by_id()
     restored_permit = restored.find_one(Selector(label="roundtrip-work-permit"))
 
     assert restored_manager.owner is restored_owner
-    assert restored_manager.assignment_ids == {
+    assert {name: restored_manager.slot_wallet(name).member_ids for name in restored_manager.slot_wallet_ids} == {
         CREDENTIAL_ID_SLOT: [id_card.uid],
         CREDENTIAL_PACKET_SLOT: [work_permit.uid],
     }
@@ -685,7 +685,7 @@ def test_facet_catalogue_loads_before_graph_structure() -> None:
     restored_owner = restored.find_one(Selector(label="checkpoint"))
     restored_credential = restored.find_one(Selector(label="catalogued-faceted-permit"))
 
-    assert restored_owner.packet_manager.assignment_ids == {
+    assert {name: restored_owner.packet_manager.slot_wallet(name).member_ids for name in restored_owner.packet_manager.slot_wallet_ids} == {
         CREDENTIAL_PACKET_SLOT: [credential.uid],
     }
     assert restored_owner.packet_manager.get_slot(CREDENTIAL_PACKET_SLOT) == [restored_credential]

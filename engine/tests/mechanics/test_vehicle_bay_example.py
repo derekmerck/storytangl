@@ -392,6 +392,7 @@ def test_catalog_install_commitment_rolls_back_assignment_validation_failure() -
     vehicle = graph.add_node(label="demo-car", kind=Vehicle)
     bay = VehicleBay(vehicle=vehicle, cash=1000)
     install_baseline(bay)
+    before = graph.value_hash(), len(graph.members)
     starting_tires = list(bay.vehicle.loadout.get_slot("tires"))
     created = []
 
@@ -411,7 +412,7 @@ def test_catalog_install_commitment_rolls_back_assignment_validation_failure() -
         commitment.commit()
 
     assert bay.vehicle.loadout.get_slot("tires") == starting_tires
-    assert len(graph.members) == 5
+    assert (graph.value_hash(), len(graph.members)) == before
     assert created == []
 
 

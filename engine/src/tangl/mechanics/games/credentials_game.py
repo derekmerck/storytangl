@@ -79,6 +79,7 @@ from tangl.mechanics.transaction import (
     ComponentSlotAssetHolder,
     TransactionOffer,
 )
+from tangl.mechanics.presence.look import HasSimpleLook
 from tangl.prose import TextRenderSession
 from tangl.story.presentation import render_text_as
 from tangl.vm.ctx import VmPhaseCtx
@@ -1278,6 +1279,17 @@ class CredentialsGameHandler(PickingGameHandler[CredentialsGame]):
     def on_setup(self, game: CredentialsGame) -> None:
         """Prepare graph-owned offers, without sampling an unresolved lazy roster."""
 
+        if game.has_component_manager_owner:
+            game.bind_component_managers(game._component_manager_owner)
+            for case in game.roster:
+                packet = case.packet_manager
+                graph = packet._owner_registry()
+                if graph is not None:
+                    subject = graph.get(packet.bearer_id)
+                    if subject is None:
+                        graph.add(HasSimpleLook(uid=packet.bearer_id, label=case.candidate_name))
+                    elif not isinstance(subject, HasSimpleLook):
+                        raise ValueError("Credential bearer UID belongs to another graph item")
         if game.has_component_manager_owner and game.offers:
             case = game.prepare_case(game.case_index)
             if not case.presented_documents:

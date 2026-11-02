@@ -33,14 +33,14 @@ order via a produces/consumes DAG (topo-sort), sharing its acyclicity check with
 ## Approved Asset Foundation Migration (#652)
 
 Story's `DiscreteAssetWallet` supplies non-hierarchical, graph-owned UUID
-membership. Graph-backed component managers must build on that shared primitive
-in a later slice, adding slots, eligibility, capacities, budgets and facet
-behavior without a second authoritative membership store. Preserve owner binding,
-slot ordering, multi-assignment and transaction semantics during that migration.
+membership. Graph-backed component managers build on that shared primitive, adding
+slots, eligibility, capacities, budgets and facet behavior without a second
+authoritative membership store. They preserve owner binding, slot ordering,
+multi-assignment and transaction semantics.
 Standalone in-memory `SlottedContainer` remains a distinct non-graph instrument.
 Countable singleton quantities belong to the countable wallet, and coordinated
-exchanges remain in the existing transaction mechanism. The current assignment
-maps described below are the implemented pre-migration state.
+exchanges remain in the existing transaction mechanism. Each slot refers to a
+graph-owned wallet; empty prepared wallets persist.
 
 ## Implementation Status: Owner-Bound Managers
 
@@ -52,7 +52,7 @@ for graph hierarchy. Concrete supported embedded variants must be declared at
 the owning field for flat JSON recovery, with separate `include=True` (in-place
 state retention) and `unstructurable=True` (constructor recursion) markers.
 Excluded owner pointers/caches are rebound normally. Component entities remain
-registry-owned and are persisted once through assignment_ids, not inline copies.
+graph-owned and are persisted once alongside their slot wallets, not inline copies.
 Embedding carries value semantics, not a shared Python-alias identity guarantee;
 do not infer embedding from Entity type or add pickle-style memoization.
 
@@ -62,11 +62,13 @@ validation, budget, and facet-discovery APIs:
 - `SlottedContainer[CT]` is the direct in-memory instrument used by demos, tests, and
   non-graph consumers. It stores component objects in its slots.
 - `ComponentManager[CT]` is the owner-bound graph-aware specialization. It is embedded
-  on a full graph member, persists with that owner, stores slot membership as component
-  UUIDs, and dereferences those UUIDs through the owner's registry. Its `owner` pointer,
-  live `assignments` view, and transient construction cache are not constructor-form
+  on a full graph member, persists with that owner, stores slot-to-wallet UUID
+  references, and resolves wallet members through the owner's graph. Its `owner`
+  pointer, detached assignments, and transient construction cache are not constructor-form
   data. Manager subclasses use the normal constructor-form path for local value fields;
-  graph-member component relationships are the `assignment_ids` reference map.
+  graph-member component relationships are stored in the slot wallets. Detached
+  construction uses transient in-memory assignments until explicit owner adoption;
+  this CarWars dependency remains until [carwars-gamebooks #41](https://github.com/derekmerck/carwars-gamebooks/issues/41).
 
 This is the intended middle between "full graph member" and "plain Pydantic blob":
 components remain full graph members when they need graph identity; embedded managers

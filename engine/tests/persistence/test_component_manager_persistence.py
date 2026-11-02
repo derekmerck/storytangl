@@ -202,7 +202,7 @@ def test_component_manager_graph_roundtrip_all_backends(manager) -> None:
     assert packet.get_contraband() == [
         ContrabandItem(indication=Indication.DRUGS, concealed=True),
     ]
-    assert packet.assignment_ids == {
+    assert {name: packet.slot_wallet(name).member_ids for name in packet.slot_wallet_ids} == {
         CREDENTIAL_ID_SLOT: [id_card.uid],
         CREDENTIAL_PACKET_SLOT: [work_permit.uid, second_work_permit.uid],
     }
