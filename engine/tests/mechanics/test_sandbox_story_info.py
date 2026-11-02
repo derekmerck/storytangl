@@ -174,14 +174,6 @@ def test_sandbox_story_info_projects_disclosed_location_state() -> None:
         label="road",
         location_name="End of Road",
         links={"east": "building"},
-        fixtures=[
-            SandboxFixture(
-                label="grate",
-                name="steel grate",
-                openable=OpenableFacet(is_open=False),
-                lockable=LockableFacet(is_locked=True),
-            )
-        ],
     )
     building = SandboxLocation(label="building", location_name="Inside Building")
     pirate = SandboxMob(
@@ -199,10 +191,20 @@ def test_sandbox_story_info_projects_disclosed_location_state() -> None:
     SandboxInfoItemType(label="keys", name="set of keys", traits={"portable", "tiny"})
     lamp = Token[SandboxInfoItemType](token_from="lamp", label="lamp")
     keys = Token[SandboxInfoItemType](token_from="keys", label="keys")
-    scope.player_assets.add_asset(lamp)
-    road.add_asset(keys)
     for item in (scope, road, building, pirate, lamp, keys):
         graph.add(item)
+    scope.player_assets.add_asset(lamp)
+    road.add_asset(keys)
+    for fixture in [
+        SandboxFixture(
+            label="grate",
+            name="steel grate",
+            openable=OpenableFacet(is_open=False),
+            lockable=LockableFacet(is_locked=True),
+        )
+    ]:
+        graph.add(fixture)
+        road.add_fixture(fixture)
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
@@ -250,7 +252,6 @@ def test_sandbox_story_info_hides_suppressed_surroundings_but_keeps_inventory() 
         label="dark_cave",
         location_name="Dark Cave",
         links={"west": "deeper_cave"},
-        fixtures=[SandboxFixture(label="grate", name="steel grate")],
     )
     deeper = SandboxLocation(label="deeper_cave", location_name="Deeper Cave")
     pirate = SandboxMob(label="pirate", name="wounded pirate", location="dark_cave")
@@ -258,10 +259,13 @@ def test_sandbox_story_info_hides_suppressed_surroundings_but_keeps_inventory() 
     SandboxInfoItemType(label="nugget", name="gold nugget")
     lamp = Token[SandboxInfoItemType](token_from="lamp", label="lamp")
     nugget = Token[SandboxInfoItemType](token_from="nugget", label="nugget")
-    scope.player_assets.add_asset(lamp)
-    cave.add_asset(nugget)
     for item in (scope, cave, deeper, pirate, lamp, nugget):
         graph.add(item)
+    scope.player_assets.add_asset(lamp)
+    cave.add_asset(nugget)
+    for fixture in [SandboxFixture(label="grate", name="steel grate")]:
+        graph.add(fixture)
+        cave.add_fixture(fixture)
     scope.add_child(cave)
     scope.add_child(deeper)
     scope.add_child(pirate)
@@ -320,9 +324,9 @@ def test_sandbox_dispatch_projects_requested_status_channels() -> None:
     pirate = SandboxMob(label="pirate", name="wounded pirate", location="road")
     SandboxInfoItemType(label="lamp", name="brass lantern", traits={"portable"})
     lamp = Token[SandboxInfoItemType](token_from="lamp", label="lamp")
-    scope.player_assets.add_asset(lamp)
     for item in (scope, road, building, pirate, lamp):
         graph.add(item)
+    scope.player_assets.add_asset(lamp)
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
@@ -422,19 +426,21 @@ def test_sandbox_map_projects_known_geography_as_portable_sections() -> None:
             "east": "building",
             "down": SandboxExit(target="below_grate", through="grate"),
         },
-        fixtures=[
+    )
+    building = SandboxLocation(label="building", location_name="Inside Building")
+    below = SandboxLocation(label="below_grate", location_name="Below the Grate")
+    for item in (road, building, below):
+        graph.add(item)
+    for fixture in [
             SandboxFixture(
                 label="grate",
                 name="steel grate",
                 openable=OpenableFacet(is_open=False),
                 lockable=LockableFacet(is_locked=True),
             )
-        ],
-    )
-    building = SandboxLocation(label="building", location_name="Inside Building")
-    below = SandboxLocation(label="below_grate", location_name="Below the Grate")
-    for item in (road, building, below):
-        graph.add(item)
+        ]:
+        graph.add(fixture)
+        road.add_fixture(fixture)
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 

@@ -16,7 +16,13 @@ scenes:
           wounded pirate, all projected through ordinary StoryTangl choices.
         actions:
           - text: "Stand at the end of the road"
-            successor: road
+            successor: setup
+
+      setup:
+        kind: "adventure_sandbox_slice.domain.AdventureEntrance"
+        continues:
+          - successor: road
+            trigger: last
 
       road:
         kind: "adventure_sandbox_slice.domain.AdventureSandboxLocation"

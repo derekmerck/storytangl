@@ -80,10 +80,10 @@ class TaggedEntity(Protocol):
     tags: set[Any]
 
 
-class SandboxAssetSurface(Protocol):
-    """Token surface expected by sandbox asset affordance projection."""
+@runtime_checkable
+class SandboxAssetDefinition(Protocol):
+    """Definition fields consumed by sandbox asset affordances."""
 
-    token_from: str
     name: str
     traits: set[str]
     portable: bool
@@ -104,6 +104,12 @@ class SandboxAssetSurface(Protocol):
     def get_label(self) -> str | None:
         """Return the graph/token label."""
         ...
+
+
+class SandboxAssetSurface(SandboxAssetDefinition, Protocol):
+    """Token surface expected by sandbox asset affordance projection."""
+
+    token_from: str
 
 
 @dataclass(slots=True)
@@ -521,7 +527,7 @@ def _scheduled_event_contributions(
                 for event in mob.scheduled_events
             )
     if not projection_state.suppress_asset_affordances:
-        for asset_label, asset in sorted(location.assets.items()):
+        for asset_label, asset in _sandbox_assets(location):
             contributions.extend(
                 ScheduledEventContribution(
                     event=event,
@@ -534,7 +540,7 @@ def _scheduled_event_contributions(
             )
     player_assets = _player_asset_holder(location)
     if player_assets is not None and not projection_state.suppress_asset_affordances:
-        for asset_label, asset in sorted(player_assets.assets.items()):
+        for asset_label, asset in _sandbox_assets(player_assets):
             contributions.extend(
                 ScheduledEventContribution(
                     event=event,
@@ -1090,13 +1096,21 @@ def sandbox_player_assets(location: SandboxLocation) -> HasAssets | None:
     return _player_asset_holder(location)
 
 
+def _sandbox_assets(holder: HasAssets) -> list[tuple[str, Token]]:
+    """Select sandbox token surfaces while retaining other member sources."""
+    return sorted((label, asset) for label, asset in holder.assets.items()
+                  if isinstance(asset, Token)
+                  and isinstance(asset.reference_singleton, SandboxAssetDefinition))
+
+
 def _asset_inventory(holder: HasAssets | None) -> set[str]:
     if holder is None:
         return set()
     labels: set[str] = set()
     for key, asset in holder.assets.items():
         labels.add(str(key))
-        labels.add(str(asset.token_from))
+        if isinstance(asset, Token):
+            labels.add(asset.token_from)
         label = asset.get_label()
         if label:
             labels.add(str(label))
@@ -1106,7 +1120,7 @@ def _asset_inventory(holder: HasAssets | None) -> set[str]:
 def _holder_has_lit_light_source(holder: HasAssets | None) -> bool:
     if holder is None:
         return False
-    return any(_asset_illuminates(asset) for asset in holder.assets.values())
+    return any(_asset_illuminates(asset) for _, asset in _sandbox_assets(holder))
 
 
 def _location_lit(location: SandboxLocation) -> bool:
@@ -1225,7 +1239,10 @@ def _player_asset_container(
     asset = _player_asset(location, container_label)
     if asset is None:
         return None
-    return asset.container
+    container = asset.container
+    if container is not None:
+        container.bind_asset_owner(asset)
+    return container
 
 
 def _take_asset(location: SandboxLocation, asset_label: str) -> Token:
@@ -1757,7 +1774,7 @@ def _project_location_asset_actions(
     graph: Graph,
     ctx: VmPhaseCtx,
 ) -> None:
-    for asset_label, asset in sorted(location.assets.items()):
+    for asset_label, asset in _sandbox_assets(location):
         asset_name = _asset_name(asset)
         _project_asset_interactions(
             location,
@@ -1817,7 +1834,7 @@ def _project_carried_asset_actions(
     player_assets: HasAssets,
     projection_state: SandboxProjectionState,
 ) -> None:
-    for asset_label, asset in sorted(player_assets.assets.items()):
+    for asset_label, asset in _sandbox_assets(player_assets):
         asset_name = _asset_name(asset)
         if _asset_is_switchable(asset):
             lit = _asset_lit(asset)
@@ -1990,7 +2007,7 @@ def _project_fixture_container_actions(
     for fixture in location.fixtures:
         if fixture.container is None:
             continue
-        for asset_label, asset in sorted(player_assets.assets.items()):
+        for asset_label, asset in _sandbox_assets(player_assets):
             asset_name = _asset_name(asset)
             Action(
                 registry=graph,
@@ -2031,7 +2048,7 @@ def _project_fixture_container_actions(
             )
         if not fixture.container_accessible():
             continue
-        for asset_label, asset in sorted(fixture.assets.items()):
+        for asset_label, asset in _sandbox_assets(fixture):
             asset_name = _asset_name(asset)
             Action(
                 registry=graph,
@@ -2070,11 +2087,12 @@ def _project_asset_container_actions(
     graph: Graph,
     player_assets: HasAssets,
 ) -> None:
-    for container_label, container_asset in sorted(player_assets.assets.items()):
+    for container_label, container_asset in _sandbox_assets(player_assets):
         container = container_asset.container
         if container is None:
             continue
-        for asset_label, asset in sorted(player_assets.assets.items()):
+        container.bind_asset_owner(container_asset)
+        for asset_label, asset in _sandbox_assets(player_assets):
             if asset_label == container_label:
                 continue
             asset_name = _asset_name(asset)
@@ -2118,7 +2136,7 @@ def _project_asset_container_actions(
             )
         if not container.is_open:
             continue
-        for asset_label, asset in sorted(container.assets.items()):
+        for asset_label, asset in _sandbox_assets(container):
             asset_name = _asset_name(asset)
             container_name = _asset_name(container_asset)
             Action(
@@ -2163,7 +2181,7 @@ def _project_mob_asset_actions(
     if not mob_label:
         return
     mob_name = mob.name or mob_label
-    for asset_label, asset in sorted(player_assets.assets.items()):
+    for asset_label, asset in _sandbox_assets(player_assets):
         asset_name = _asset_name(asset)
         Action(
             registry=graph,
@@ -2200,7 +2218,7 @@ def _project_mob_asset_actions(
                 target=mob_label,
             ),
         )
-    for asset_label, asset in sorted(mob.assets.items()):
+    for asset_label, asset in _sandbox_assets(mob):
         asset_name = _asset_name(asset)
         Action(
             registry=graph,
@@ -2707,6 +2725,22 @@ def advance_sandbox_time_on_action(*, caller, ctx, **_kw):
         return None
     _sandbox_time_advance(caller, ctx=ctx, cost=cost)
     return None
+
+
+@on_update(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+    dispatch_layer=DispatchLayer.LOCAL,
+    priority=Priority.LAST,
+)
+def refresh_sandbox_actions_after_update(*, caller: SandboxLocation, ctx: VmPhaseCtx, **_kw):
+    """Refresh current-state choices after effects and sandbox time have settled."""
+    ctx.invalidate_namespaces()
+    project_sandbox_asset_actions(caller=caller, ctx=ctx)
+    project_sandbox_unlocks(caller=caller, ctx=ctx)
+    project_sandbox_fixture_actions(caller=caller, ctx=ctx)
+    project_sandbox_mob_actions(caller=caller, ctx=ctx)
+    project_sandbox_scheduled_events(caller=caller, ctx=ctx)
 
 
 @on_update(wants_caller_kind=Block, wants_exact_kind=False, priority=Priority.LATE)
