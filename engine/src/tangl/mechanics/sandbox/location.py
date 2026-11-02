@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from tangl.core import Token, contribute_ns
+from tangl.core import Node, Token, contribute_ns
 from tangl.presentation.geometry import NormalizedRect
 from tangl.story import MenuBlock
 from tangl.story.concepts.asset import HasAssets
@@ -79,7 +80,7 @@ class SandboxMap(BaseModel):
     regions: dict[str, SandboxMapRegion] = Field(default_factory=dict)
 
 
-class SandboxFixture(HasAssets):
+class SandboxFixture(HasAssets, Node):
     """Place-bound sandbox fixture composed from typed capability facets."""
 
     label: str
@@ -207,7 +208,9 @@ class SandboxFixture(HasAssets):
         _ = giver
         if self.container is None or not self.container_accessible():
             return False
-        return self.container.can_accept_asset(asset, current_count=len(self.assets))
+        return super().can_receive_asset(asset, giver) and self.container.can_accept_asset(
+            asset, current_count=len(self.assets)
+        )
 
     def can_give_asset(self, asset: Token, receiver: HasAssets | None = None) -> bool:
         """Return whether this fixture can release a discrete asset."""
@@ -251,7 +254,7 @@ class SandboxLocation(HasAssets, MenuBlock):
     links: dict[str, str | SandboxExit] = Field(default_factory=dict)
     interactions: list[SandboxInteraction] = Field(default_factory=list)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
-    fixtures: list[SandboxFixture] = Field(default_factory=list)
+    fixture_ids: list[UUID] = Field(default_factory=list, json_schema_extra={"include": True})
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     sandbox_scope: str | None = None
     location_name: str = ""
@@ -274,6 +277,23 @@ class SandboxLocation(HasAssets, MenuBlock):
     wait_enabled: bool | None = None
     wait_text: str | None = None
     wait_turn_delta: int | None = None
+
+    @property
+    def fixtures(self) -> tuple[SandboxFixture, ...]:
+        result = []
+        for uid in self.fixture_ids:
+            fixture = self.graph.get(uid)
+            if not isinstance(fixture, SandboxFixture):
+                raise ValueError(f"Sandbox fixture {uid} is missing from its graph")
+            result.append(fixture)
+        return tuple(result)
+
+    def add_fixture(self, fixture: SandboxFixture) -> None:
+        if self.graph.get(fixture.uid) is not fixture:
+            raise ValueError("Fixture must belong to the same graph")
+        if fixture.uid in self.fixture_ids:
+            raise ValueError("Fixture is already nominated by this location")
+        self.fixture_ids.append(fixture.uid)
 
     @field_validator("plates")
     @classmethod

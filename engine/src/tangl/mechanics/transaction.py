@@ -9,6 +9,8 @@ from pydantic import Field
 
 from tangl.core import Entity, Registry, Token
 from tangl.core.bases import BaseModelPlus
+from tangl.story.concepts.asset import HasDiscreteAssets
+from tangl.story.concepts.asset.wallet import AssetKey
 
 from .assembly import ComponentManager
 
@@ -195,7 +197,7 @@ class CountableHolder(Protocol):
 
     def can_give_countable(
         self,
-        asset_label: str,
+        asset_label: AssetKey,
         amount: int,
         receiver: object | None = None,
     ) -> bool:
@@ -203,16 +205,16 @@ class CountableHolder(Protocol):
 
     def can_receive_countable(
         self,
-        asset_label: str,
+        asset_label: AssetKey,
         amount: int,
         giver: object | None = None,
     ) -> bool:
         ...
 
-    def spend_countable(self, asset_label: str, amount: int) -> None:
+    def spend_countable(self, asset_label: AssetKey, amount: int) -> None:
         ...
 
-    def gain_countable(self, asset_label: str, amount: int) -> None:
+    def gain_countable(self, asset_label: AssetKey, amount: int) -> None:
         ...
 
 
@@ -471,7 +473,7 @@ class CountableTransferCommitment:
 
     giver: CountableHolder
     receiver: CountableHolder
-    asset_label: str
+    asset_label: AssetKey
     amount: int
     label: str = "transfer countable"
     _committed: bool = False
@@ -555,6 +557,8 @@ class AssetMoveCommitment:
     receiver_label: str | None = None
     _moved: Entity | None = field(default=None, init=False, repr=False)
     _giver_label: str | None = field(default=None, init=False, repr=False)
+    _giver_index: int | None = field(default=None, init=False, repr=False)
+    _receiver_wallet_created: bool = field(default=False, init=False, repr=False)
     _committed: bool = field(default=False, init=False, repr=False)
 
     def _asset(self) -> Entity | None:
@@ -569,6 +573,10 @@ class AssetMoveCommitment:
         if not self.giver.can_give_asset(asset, self.receiver):
             return TransactionCheck.reject("giver cannot give asset")
         if not self.receiver.can_receive_asset(asset, self.giver):
+            return TransactionCheck.reject("receiver cannot receive asset")
+        if isinstance(self.receiver, HasDiscreteAssets) and not self.receiver.can_add_asset(
+            asset, label=self.receiver_label,
+        ):
             return TransactionCheck.reject("receiver cannot receive asset")
         return _receiver_key_available(self.receiver, asset, self.receiver_label)
 
@@ -611,14 +619,22 @@ class AssetMoveCommitment:
         if asset is None:
             raise ValueError("giver does not hold asset")
         giver_label = self.giver.get_asset_key(asset)
+        if isinstance(self.giver, HasDiscreteAssets):
+            self._giver_index = self.giver.discrete_wallet.member_ids.index(asset.uid)
+        receiver_had_wallet = (
+            not isinstance(self.receiver, HasDiscreteAssets)
+            or self.receiver.discrete_wallet_id is not None
+        )
         moved = self.giver.remove_asset(asset)
         try:
             self.receiver.add_asset(moved, label=self.receiver_label)
         except Exception:
             self.giver.add_asset(moved, label=giver_label)
+            self._restore_giver_order(moved)
             raise
         self._moved = moved
         self._giver_label = giver_label
+        self._receiver_wallet_created = not receiver_had_wallet
         self._committed = True
         return {
             "kind": "asset_move",
@@ -631,9 +647,24 @@ class AssetMoveCommitment:
             return
         moved = self.receiver.remove_asset(self._moved)
         self.giver.add_asset(moved, label=self._giver_label)
+        self._restore_giver_order(moved)
+        if self._receiver_wallet_created and isinstance(self.receiver, HasDiscreteAssets):
+            wallet = self.receiver.discrete_wallet
+            if wallet.member_ids:
+                raise ValueError("Cannot remove nonempty rollback wallet")
+            wallet.graph.remove(wallet.uid)
+            self.receiver.discrete_wallet_id = None
         self._moved = None
         self._giver_label = None
+        self._giver_index = None
+        self._receiver_wallet_created = False
         self._committed = False
+
+    def _restore_giver_order(self, moved: Entity) -> None:
+        if self._giver_index is not None and isinstance(self.giver, HasDiscreteAssets):
+            members = self.giver.discrete_wallet.member_ids
+            members.remove(moved.uid)
+            members.insert(self._giver_index, moved.uid)
 
 
 AssetSupplier = Callable[[], Entity]
@@ -652,6 +683,7 @@ class CatalogAssetCommitment:
     can_create: Callable[[], TransactionCheck | bool] | None = None
     _created: Entity | None = field(default=None, init=False, repr=False)
     _registered: bool = field(default=False, init=False, repr=False)
+    _receiver_wallet_created: bool = field(default=False, init=False, repr=False)
     _committed: bool = field(default=False, init=False, repr=False)
 
     def can_commit(self) -> TransactionCheck:
@@ -693,6 +725,10 @@ class CatalogAssetCommitment:
         if self.registry is not None:
             self.registry.add(item)
             self._registered = True
+        receiver_had_wallet = (
+            not isinstance(self.receiver, HasDiscreteAssets)
+            or self.receiver.discrete_wallet_id is not None
+        )
         try:
             self.receiver.add_asset(item, label=self.receiver_label)
         except Exception:
@@ -701,6 +737,7 @@ class CatalogAssetCommitment:
                 self._registered = False
             raise
         self._created = item
+        self._receiver_wallet_created = not receiver_had_wallet
         self._committed = True
         return {
             "kind": "catalog_asset",
@@ -712,10 +749,17 @@ class CatalogAssetCommitment:
         if not self._committed or self._created is None:
             return
         self.receiver.remove_asset(self._created)
+        if self._receiver_wallet_created and isinstance(self.receiver, HasDiscreteAssets):
+            wallet = self.receiver.discrete_wallet
+            if wallet.member_ids:
+                raise ValueError("Cannot remove nonempty rollback wallet")
+            wallet.graph.remove(wallet.uid)
+            self.receiver.discrete_wallet_id = None
         if self._registered and self.registry is not None:
             self.registry.remove(self._created.uid)
         self._created = None
         self._registered = False
+        self._receiver_wallet_created = False
         self._committed = False
 
 

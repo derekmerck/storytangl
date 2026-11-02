@@ -59,6 +59,39 @@ class TestAdventureSandboxWorld:
         assert bundle.manifest.label == "adventure_sandbox_slice"
         assert bundle.manifest.metadata["title"] == "Grand Grotto"
 
+    def test_shared_grate_is_local_to_each_story(self) -> None:
+        world = WorldCompiler().compile(WorldBundle.load(_adventure_root()))
+        ledgers = []
+        for label in ("first", "second"):
+            graph = world.create_story(label).graph
+            ledger = Ledger.from_graph(graph, entry_id=graph.initial_cursor_id)
+            enter = next(edge for edge in ledger.cursor.edges_out() if isinstance(edge, Action))
+            ledger.resolve_choice(enter.uid)
+            ledgers.append(ledger)
+        fixtures = []
+        for ledger in ledgers:
+            outside = ledger.graph.find_one(Selector(label="outside_grate"))
+            below = ledger.graph.find_one(Selector(label="below_grate"))
+            fixture = outside.fixture_by_label("grate")
+            assert fixture is below.fixture_by_label("grate")
+            fixtures.append(fixture)
+        assert fixtures[0].uid != fixtures[1].uid
+        fixtures[0].lockable.is_locked = False
+        fixtures[0].openable.is_open = True
+        assert fixtures[1].locked and not fixtures[1].open
+
+    def test_frozen_sandbox_prepares_wallets_during_story_setup(self) -> None:
+        world = WorldCompiler().compile(WorldBundle.load(_adventure_root()))
+        graph = world.create_story("frozen", freeze_shape=True).graph
+        scope = graph.find_one(Selector(label="cave"))
+        building = graph.find_one(Selector(label="building"))
+        assert scope.player_assets.discrete_wallet_id is not None
+        assert building.discrete_wallet_id is not None
+        before = graph.value_hash(), len(graph.members)
+        assert building.get_asset("brass_lamp") is not None
+        assert not scope.player_assets.assets
+        assert (graph.value_hash(), len(graph.members)) == before
+
     def test_catalog_is_world_owned_and_story_token_state_is_isolated(self) -> None:
         world = WorldCompiler().compile(WorldBundle.load(_adventure_root()))
         catalog = next(c for c in world.get_token_catalogs() if c.label == "adventure")

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol, cast
+from typing import Protocol, cast, runtime_checkable
 
 from tangl.core import Selector, Token
 from tangl.presentation.dispatch import (
@@ -73,6 +73,7 @@ SANDBOX_CHANNELS = {
 }
 
 
+@runtime_checkable
 class ProjectedAssetSurface(Protocol):
     """Minimal asset-token surface disclosed through story-info projection."""
 
@@ -616,6 +617,8 @@ def sandbox_asset_items(holder: HasAssets | None) -> list[ProjectedItem]:
         return []
     return [
         _asset_item(asset_label, asset)
+        if isinstance(asset, Token) and isinstance(asset.reference_singleton, ProjectedAssetSurface)
+        else ProjectedItem(label=asset.get_label() or asset_label)
         for asset_label, asset in sorted(holder.assets.items())
     ]
 

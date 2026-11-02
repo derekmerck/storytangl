@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from .asset_type import AssetType, CountableAsset, Fungible
 from .discrete_wallet import DiscreteAssetWallet
-from .holder import HasAssets
+from .holder import HasAssets, HasDiscreteAssets, HasFungibleAssets
 from .transaction import AssetTransactionManager, AssetTransactionResult
 from .wallet import AssetWallet
 
@@ -22,4 +22,6 @@ __all__ = [
     "DiscreteAssetWallet",
     "Fungible",
     "HasAssets",
+    "HasDiscreteAssets",
+    "HasFungibleAssets",
 ]

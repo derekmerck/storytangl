@@ -350,6 +350,7 @@ def test_asset_move_commitment_rejects_receiver_policy_before_mutation() -> None
         accepted_assets={"permit"},
     )
     medkit = shop_token("medkit")
+    graph.add(medkit)
     giver.add_asset(medkit)
 
     offer = TransactionOffer(
@@ -373,6 +374,7 @@ def test_asset_move_commitment_rejects_duplicate_planned_move() -> None:
     first_receiver = graph.add_node(kind=GarageActor, label="first buyer")
     second_receiver = graph.add_node(kind=GarageActor, label="second buyer")
     medkit = shop_token("medkit")
+    graph.add(medkit)
     giver.add_asset(medkit)
 
     offer = TransactionOffer(
@@ -400,6 +402,8 @@ def test_asset_move_commitment_rejects_duplicate_planned_receiver_key() -> None:
     receiver = graph.add_node(kind=GarageActor, label="buyer")
     medkit = shop_token("medkit")
     permit = shop_token("permit")
+    graph.add(medkit)
+    graph.add(permit)
     giver.add_asset(medkit)
     giver.add_asset(permit)
 
@@ -425,6 +429,7 @@ def test_asset_move_commitment_rolls_back_after_late_failure() -> None:
     giver = graph.add_node(kind=GarageActor, label="shop")
     receiver = graph.add_node(kind=GarageActor, label="buyer")
     medkit = shop_token("medkit")
+    graph.add(medkit)
     giver.add_asset(medkit, label="sale-bin")
 
     offer = TransactionOffer(
@@ -662,6 +667,7 @@ def test_catalog_asset_commitment_rolls_back_stock_holder_and_registry() -> None
     stock = {"medkit": 1}
     created: list[Token] = []
     ShopItemType(label="medkit")
+    before = graph.value_hash(), len(graph.members)
 
     def make_medkit() -> Token:
         token = Token[ShopItemType](token_from="medkit", label="catalog_medkit")
@@ -684,6 +690,8 @@ def test_catalog_asset_commitment_rolls_back_stock_holder_and_registry() -> None
     assert stock == {"medkit": 1}
     assert not buyer.has_asset("medkit")
     assert graph.get(medkit.uid) is None
+    assert buyer.discrete_wallet_id is None
+    assert (graph.value_hash(), len(graph.members)) == before
 
 
 def test_transaction_offer_buys_installs_and_round_trips_vehicle_component() -> None:

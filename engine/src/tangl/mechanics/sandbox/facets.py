@@ -203,7 +203,9 @@ class ContainerFacet(HasAssets):
     def can_receive_asset(self, asset: Token, giver: HasAssets | None = None) -> bool:
         """Return whether this container can receive a discrete asset."""
         _ = giver
-        return self.can_accept_asset(asset, current_count=len(self.assets))
+        return super().can_receive_asset(asset, giver) and self.can_accept_asset(
+            asset, current_count=len(self.assets)
+        )
 
     def can_give_asset(self, asset: Token, receiver: HasAssets | None = None) -> bool:
         """Return whether this container can release a discrete asset."""

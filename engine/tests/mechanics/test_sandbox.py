@@ -244,10 +244,10 @@ def test_depleted_charged_asset_does_not_project_turn_on_choice() -> None:
         charge=ChargeFacet(current=0, maximum=3),
     )
     lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
-    scope.player_assets.add_asset(lamp)
     graph.add(scope)
     graph.add(cave)
     graph.add(lamp)
+    scope.player_assets.add_asset(lamp)
     scope.add_child(cave)
 
     do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
@@ -771,14 +771,14 @@ def test_assets_project_sponsored_interactions_when_present_or_carried() -> None
     )
     flute = Token[SandboxItemType](token_from="flute", label="flute")
     book = Token[SandboxItemType](token_from="book", label="book")
-    scope.player_assets.add_asset(flute)
-    road.add_asset(book)
     graph.add(scope)
     graph.add(road)
     graph.add(flute_scene)
     graph.add(book_scene)
     graph.add(flute)
     graph.add(book)
+    scope.player_assets.add_asset(flute)
+    road.add_asset(book)
     scope.add_child(road)
 
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
@@ -807,23 +807,25 @@ def test_fixture_projects_sponsored_interaction() -> None:
         label="road",
         location_name="Road",
         locals={"blessed": False},
-        fixtures=[
-            SandboxFixture(
-                label="altar",
-                name="altar",
-                interactions=[
-                    SandboxInteraction(
-                        label="pray",
-                        text="Pray at the altar",
-                        target="current",
-                        journal_text="The stone warms under your hands.",
-                        effects=[Effect(expr="blessed = True")],
-                    )
-                ],
-            )
-        ],
     )
     graph.add(road)
+    for fixture in [
+        SandboxFixture(
+            label="altar",
+            name="altar",
+            interactions=[
+                SandboxInteraction(
+                    label="pray",
+                    text="Pray at the altar",
+                    target="current",
+                    journal_text="The stone warms under your hands.",
+                    effects=[Effect(expr="blessed = True")],
+                )
+            ],
+        )
+    ]:
+        graph.add(fixture)
+        road.add_fixture(fixture)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
 
     do_provision(road, ctx=ctx)
@@ -852,13 +854,13 @@ def test_present_mob_projects_asset_transfer_actions() -> None:
     SandboxItemType(label="coin", name="coin")
     keys = Token[SandboxItemType](token_from="keys", label="keys")
     coin = Token[SandboxItemType](token_from="coin", label="coin")
-    scope.player_assets.add_asset(keys)
-    pirate.add_asset(coin)
     graph.add(scope)
     graph.add(road)
     graph.add(pirate)
     graph.add(keys)
     graph.add(coin)
+    scope.player_assets.add_asset(keys)
+    pirate.add_asset(coin)
     scope.add_child(road)
     scope.add_child(pirate)
     scope.mobs.append(pirate)
@@ -913,12 +915,12 @@ def test_absent_mob_does_not_project_asset_transfer_actions() -> None:
     pirate = SandboxMob(label="pirate", name="pirate", location="building")
     SandboxItemType(label="coin", name="coin")
     coin = Token[SandboxItemType](token_from="coin", label="coin")
-    pirate.add_asset(coin)
     graph.add(scope)
     graph.add(road)
     graph.add(building)
     graph.add(pirate)
     graph.add(coin)
+    pirate.add_asset(coin)
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
@@ -951,12 +953,12 @@ def test_stale_mob_transfer_actions_are_unavailable_after_mob_moves() -> None:
     )
     SandboxItemType(label="coin", name="coin")
     coin = Token[SandboxItemType](token_from="coin", label="coin")
-    pirate.add_asset(coin)
     graph.add(scope)
     graph.add(road)
     graph.add(building)
     graph.add(pirate)
     graph.add(coin)
+    pirate.add_asset(coin)
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
@@ -2204,7 +2206,8 @@ def test_replacing_static_event_prunes_only_its_binding_and_refreshes_dynamic_ev
     fixture = SandboxFixture(label="clock")
     graph.add(road)
     graph.add(target)
-    road.fixtures = [fixture]
+    graph.add(fixture)
+    road.add_fixture(fixture)
     keep = ScheduledEvent(label="keep", target="target", text="Keep")
     replace = ScheduledEvent(label="replace", target="target", text="Replace")
     fixture.scheduled_events = [
@@ -2492,11 +2495,11 @@ def test_suppressed_carried_asset_affordances_do_not_project_scheduled_events() 
         ],
     )
     amulet = Token[SandboxItemType](token_from="amulet", label="amulet")
-    scope.player_assets.add_asset(amulet)
     graph.add(scope)
     graph.add(cave)
     graph.add(whisper)
     graph.add(amulet)
+    scope.player_assets.add_asset(amulet)
     scope.add_child(cave)
 
     do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
@@ -2506,7 +2509,7 @@ def test_suppressed_carried_asset_affordances_do_not_project_scheduled_events() 
 
 def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
     graph, _road, _building, cave_entrance = _sandbox_graph()
-    cave_entrance.fixtures = [
+    fixtures = [
         SandboxFixture(
             label="grate",
             name="grate",
@@ -2516,6 +2519,9 @@ def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
             ),
         )
     ]
+    for fixture in fixtures:
+        graph.add(fixture)
+        cave_entrance.add_fixture(fixture)
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
 
     do_provision(cave_entrance, ctx=ctx)
@@ -2540,23 +2546,25 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
         location_name="Cave Entrance",
         content="The grate is {grate_state}.",
         locals={"grate_state": "locked"},
-        fixtures=[
-            SandboxFixture(
-                label="grate",
-                name="grate",
-                lockable=LockableFacet(
-                    key="keys",
-                    unlock_text="The key turns with a click. The grate unlocks.",
-                ),
-            )
-        ],
     )
     SandboxItemType(label="keys", name="keys")
     keys = Token[SandboxItemType](token_from="keys", label="keys")
-    scope.player_assets.add_asset(keys)
     graph.add(scope)
     graph.add(cave_entrance)
+    for fixture in [
+        SandboxFixture(
+            label="grate",
+            name="grate",
+            lockable=LockableFacet(
+                key="keys",
+                unlock_text="The key turns with a click. The grate unlocks.",
+            ),
+        )
+    ]:
+        graph.add(fixture)
+        cave_entrance.add_fixture(fixture)
     graph.add(keys)
+    scope.player_assets.add_asset(keys)
     scope.add_child(cave_entrance)
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
     do_provision(cave_entrance, ctx=ctx)
@@ -2593,21 +2601,23 @@ def test_open_fixture_cannot_lock_until_closed() -> None:
     cave_entrance = SandboxLocation(
         label="cave_entrance",
         location_name="Cave Entrance",
-        fixtures=[
-            SandboxFixture(
-                label="grate",
-                name="grate",
-                openable=OpenableFacet(is_open=True),
-                lockable=LockableFacet(key="keys", is_locked=False),
-            )
-        ],
     )
     SandboxItemType(label="keys", name="keys")
     keys = Token[SandboxItemType](token_from="keys", label="keys")
-    scope.player_assets.add_asset(keys)
     graph.add(scope)
     graph.add(cave_entrance)
+    for fixture in [
+        SandboxFixture(
+            label="grate",
+            name="grate",
+            openable=OpenableFacet(is_open=True),
+            lockable=LockableFacet(key="keys", is_locked=False),
+        )
+    ]:
+        graph.add(fixture)
+        cave_entrance.add_fixture(fixture)
     graph.add(keys)
+    scope.player_assets.add_asset(keys)
     scope.add_child(cave_entrance)
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
 
@@ -2640,23 +2650,25 @@ def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> Non
     cave_entrance = SandboxLocation(
         label="cave_entrance",
         location_name="Cave Entrance",
-        fixtures=[
-            SandboxFixture(
-                label="grate",
-                name="grate",
-                lockable=LockableFacet(
-                    key="keys",
-                    unlock_text="The key turns with a click. The grate unlocks.",
-                ),
-            )
-        ],
     )
     SandboxItemType(label="keys", name="keys")
     keys = Token[SandboxItemType](token_from="keys", label="keys")
-    scope.player_assets.add_asset(keys)
     graph.add(scope)
     graph.add(cave_entrance)
+    for fixture in [
+        SandboxFixture(
+            label="grate",
+            name="grate",
+            lockable=LockableFacet(
+                key="keys",
+                unlock_text="The key turns with a click. The grate unlocks.",
+            ),
+        )
+    ]:
+        graph.add(fixture)
+        cave_entrance.add_fixture(fixture)
     graph.add(keys)
+    scope.player_assets.add_asset(keys)
     scope.add_child(cave_entrance)
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
 
@@ -2673,15 +2685,17 @@ def test_openable_fixture_projects_without_lockable_facet() -> None:
     cave_entrance = SandboxLocation(
         label="cave_entrance",
         location_name="Cave Entrance",
-        fixtures=[
-            SandboxFixture(
-                label="hatch",
-                name="hatch",
-                openable=OpenableFacet(open_text="The hatch swings open."),
-            )
-        ],
     )
     graph.add(cave_entrance)
+    for fixture in [
+        SandboxFixture(
+            label="hatch",
+            name="hatch",
+            openable=OpenableFacet(open_text="The hatch swings open."),
+        )
+    ]:
+        graph.add(fixture)
+        cave_entrance.add_fixture(fixture)
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
 
     do_provision(cave_entrance, ctx=ctx)
@@ -2704,12 +2718,12 @@ def test_location_assets_project_take_read_and_drop_actions() -> None:
     )
     keys = Token[SandboxItemType](token_from="keys", label="keys")
     leaflet = Token[SandboxItemType](token_from="leaflet", label="leaflet")
-    building.add_asset(keys)
-    building.add_asset(leaflet)
     graph.add(scope)
     graph.add(building)
     graph.add(keys)
     graph.add(leaflet)
+    building.add_asset(keys)
+    building.add_asset(leaflet)
     scope.add_child(building)
     ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
 
@@ -2754,10 +2768,10 @@ def test_carried_readable_asset_projects_read_action() -> None:
         read_text="Welcome to Adventure!",
     )
     leaflet = Token[SandboxItemType](token_from="leaflet", label="leaflet")
-    scope.player_assets.add_asset(leaflet)
     graph.add(scope)
     graph.add(building)
     graph.add(leaflet)
+    scope.player_assets.add_asset(leaflet)
     scope.add_child(building)
     ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
 
@@ -2774,24 +2788,26 @@ def test_fixture_container_accepts_matching_assets_through_preflight() -> None:
     building = SandboxLocation(
         label="building",
         location_name="Building",
-        fixtures=[
-            SandboxFixture(
-                label="basket",
-                name="basket",
-                container=ContainerFacet(max_items=1, accepts_traits={"tiny"}),
-            )
-        ],
     )
     SandboxItemType(label="keys", name="keys", traits={"tiny"})
     SandboxItemType(label="lamp", name="lamp")
     keys = Token[SandboxItemType](token_from="keys", label="keys")
     lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
-    scope.player_assets.add_asset(keys)
-    scope.player_assets.add_asset(lamp)
     graph.add(scope)
     graph.add(building)
+    for fixture in [
+        SandboxFixture(
+            label="basket",
+            name="basket",
+            container=ContainerFacet(max_items=1, accepts_traits={"tiny"}),
+        )
+    ]:
+        graph.add(fixture)
+        building.add_fixture(fixture)
     graph.add(keys)
     graph.add(lamp)
+    scope.player_assets.add_asset(keys)
+    scope.player_assets.add_asset(lamp)
     scope.add_child(building)
     ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
 
@@ -2830,18 +2846,20 @@ def test_closed_fixture_container_hides_contents_and_rejects_receive() -> None:
     building = SandboxLocation(
         label="building",
         location_name="Building",
-        fixtures=[chest],
     )
     SandboxItemType(label="keys", name="keys", traits={"tiny"})
     SandboxItemType(label="coin", name="coin", traits={"tiny"})
     keys = Token[SandboxItemType](token_from="keys", label="keys")
     coin = Token[SandboxItemType](token_from="coin", label="coin")
-    scope.player_assets.add_asset(keys)
-    chest.add_asset(coin)
     graph.add(scope)
     graph.add(building)
+    for fixture in [chest]:
+        graph.add(fixture)
+        building.add_fixture(fixture)
     graph.add(keys)
     graph.add(coin)
+    scope.player_assets.add_asset(keys)
+    chest.add_asset(coin)
     scope.add_child(building)
     ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
 
@@ -2894,7 +2912,12 @@ def test_portable_container_rejects_nested_container_without_mutation() -> None:
     )
     cage = Token[SandboxItemType](token_from="cage", label="cage")
     bag = Token[SandboxItemType](token_from="bag", label="bag")
-    holder = SandboxScope(label="tiny_cave_scope").player_assets
+    graph = Graph()
+    scope = SandboxScope(label="tiny_cave_scope", registry=graph)
+    graph.add(cage)
+    graph.add(bag)
+    holder = scope.player_assets
+    cage.container.bind_asset_owner(cage)
     holder.add_asset(cage)
     holder.add_asset(bag)
 
@@ -2919,12 +2942,13 @@ def test_portable_container_open_state_controls_contained_asset_projection() -> 
     SandboxItemType(label="keys", name="keys", traits={"tiny"})
     cage = Token[SandboxItemType](token_from="cage", label="cage")
     keys = Token[SandboxItemType](token_from="keys", label="keys")
-    cage.container.add_asset(keys)
-    scope.player_assets.add_asset(cage)
     graph.add(scope)
     graph.add(building)
     graph.add(cage)
     graph.add(keys)
+    cage.container.bind_asset_owner(cage)
+    cage.container.add_asset(keys)
+    scope.player_assets.add_asset(cage)
     scope.add_child(building)
     ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
 
@@ -2966,12 +2990,13 @@ def test_light_source_inside_carried_container_can_be_reached_in_darkness() -> N
     )
     bag = Token[SandboxItemType](token_from="bag", label="bag")
     lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
-    bag.container.add_asset(lamp)
-    scope.player_assets.add_asset(bag)
     graph.add(scope)
     graph.add(cave)
     graph.add(bag)
     graph.add(lamp)
+    bag.container.bind_asset_owner(bag)
+    bag.container.add_asset(lamp)
+    scope.player_assets.add_asset(bag)
     scope.add_child(cave)
     ctx = PhaseCtx(graph=graph, cursor_id=cave.uid)
 
@@ -3008,11 +3033,11 @@ def test_darkness_rule_substitutes_journal_and_suppresses_local_asset_actions() 
     start = Block(label="start", content="Begin.")
     SandboxItemType(label="nugget", name="nugget")
     nugget = Token[SandboxItemType](token_from="nugget", label="nugget")
-    cave.add_asset(nugget)
     graph.add(scope)
     graph.add(start)
     graph.add(cave)
     graph.add(nugget)
+    cave.add_asset(nugget)
     scope.add_child(cave)
     enter_cave = Action(
         registry=graph,
@@ -3057,10 +3082,10 @@ def test_tick_fragments_do_not_replace_suppressed_location_description() -> None
         charge=ChargeFacet(current=1, maximum=1),
     )
     lamp = Token[SandboxItemType](token_from="lamp", label="lamp", lit=True)
-    scope.player_assets.add_asset(lamp)
     graph.add(scope)
     graph.add(cave)
     graph.add(lamp)
+    scope.player_assets.add_asset(lamp)
     scope.add_child(cave)
 
     do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
@@ -3105,12 +3130,12 @@ def test_carried_lamp_restores_dark_location_detail_and_asset_affordances() -> N
     SandboxItemType(label="nugget", name="nugget")
     lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
     nugget = Token[SandboxItemType](token_from="nugget", label="nugget")
-    scope.player_assets.add_asset(lamp)
-    cave.add_asset(nugget)
     graph.add(scope)
     graph.add(cave)
     graph.add(lamp)
     graph.add(nugget)
+    scope.player_assets.add_asset(lamp)
+    cave.add_asset(nugget)
     scope.add_child(cave)
     ctx = PhaseCtx(graph=graph, cursor_id=cave.uid)
 

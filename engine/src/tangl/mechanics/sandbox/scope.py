@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from pydantic import Field
 
-from tangl.core import contribute_ns
+from tangl.core import GraphItem, Registry, Selector, Token, contribute_ns
+from tangl.core.bases import Unstructurable
 from tangl.story.concepts.asset import HasAssets
 from tangl.vm import TraversableNode
 
@@ -16,8 +18,15 @@ from .time import SandboxClockPolicy, current_world_time
 from .visibility import SandboxVisibilityRule
 
 
-class SandboxInventory(HasAssets):
+class SandboxInventory(HasAssets, Unstructurable):
     """Lightweight ready-at-hand asset holder for sandbox player inventory."""
+
+    def member_sources(self, selector: Selector | None = None) -> Iterator[GraphItem]:
+        for member in super().member_sources(selector):
+            if isinstance(member, Token) and "container" in type(member).model_fields:
+                if member.container is not None:
+                    member.container.bind_asset_owner(member)
+            yield member
 
 
 class SandboxScope(TraversableNode):
@@ -29,12 +38,16 @@ class SandboxScope(TraversableNode):
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     player_assets: SandboxInventory = Field(
         default_factory=SandboxInventory,
-        json_schema_extra={"include": True},
+        json_schema_extra={"include": True, "unstructurable": True},
     )
     clock_policy: SandboxClockPolicy = Field(default_factory=SandboxClockPolicy)
     wait_enabled: bool | None = True
     wait_text: str | None = "Wait"
     wait_turn_delta: int | None = 1
+
+    def bind_registry(self, registry: Registry | None) -> None:
+        super().bind_registry(registry)
+        self.player_assets.bind_asset_owner(self)
 
     @contribute_ns
     def provide_sandbox_scope_symbols(self) -> dict[str, Any]:
