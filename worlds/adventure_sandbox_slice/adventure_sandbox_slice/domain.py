@@ -29,7 +29,7 @@ from tangl.mechanics.sandbox import (
 # Carrying, Map, and surrounding-state affordances.
 import tangl.mechanics.sandbox.story_info  # noqa: F401
 from tangl.mechanics.sandbox.handlers import sandbox_player_assets
-from tangl.story import Action, StoryGraph
+from tangl.story import Action, Block, StoryGraph
 from tangl.story.concepts.asset import AssetTransactionManager
 from tangl.vm import on_gather_ns, on_provision, on_update
 from tangl.vm.ctx import VmPhaseCtx
@@ -67,6 +67,10 @@ class AdventureSandboxLocation(SandboxLocation):
     movement_hazards: list[AdventureMovementHazard] = Field(default_factory=list)
 
 
+class AdventureEntrance(Block):
+    """Initialize the sandbox on accepted entry to the story."""
+
+
 def _location(graph: Graph, label: str) -> AdventureSandboxLocation:
     location = graph.find_one(Selector.from_identifier(label))
     if not isinstance(location, AdventureSandboxLocation):
@@ -87,6 +91,9 @@ def _add_asset(
     asset_type = next(catalog.find_all(Selector(catalog_id=label)))
     asset = catalog.materialize_one(asset_type, label=label)
     graph.add(asset)
+    if _graph_frozen_shape(graph) and asset.container is not None:
+        asset.container.bind_asset_owner(asset)
+        asset.container.prepare_discrete_wallet()
     location.add_asset(asset)
     return asset
 
@@ -338,6 +345,8 @@ def _ensure_adventure_sandbox(graph: Graph) -> None:
         wait_turn_delta=1,
     )
     graph.add(scope)
+    if _graph_frozen_shape(graph):
+        scope.player_assets.prepare_discrete_wallet()
 
     locations = [
         location
@@ -346,6 +355,8 @@ def _ensure_adventure_sandbox(graph: Graph) -> None:
     for location in locations:
         location.sandbox_scope = "cave"
         scope.add_child(location)
+        if _graph_frozen_shape(graph):
+            location.prepare_discrete_wallet()
 
     building = _location(graph, "building")
     outside_grate = _location(graph, "outside_grate")
@@ -371,8 +382,11 @@ def _ensure_adventure_sandbox(graph: Graph) -> None:
             close_text="The grate closes.",
         ),
     )
-    outside_grate.fixtures.append(grate)
-    below_grate.fixtures.append(grate)
+    graph.add(grate)
+    if _graph_frozen_shape(graph):
+        grate.prepare_discrete_wallet()
+    outside_grate.add_fixture(grate)
+    below_grate.add_fixture(grate)
 
     pirate = SandboxMob(
         label="wounded_pirate",
@@ -393,22 +407,32 @@ def _ensure_adventure_sandbox(graph: Graph) -> None:
         ],
     )
     graph.add(pirate)
+    if _graph_frozen_shape(graph):
+        pirate.prepare_discrete_wallet()
     scope.add_child(pirate)
     scope.mobs.append(pirate)
 
 
-@on_provision(
-    wants_caller_kind=AdventureSandboxLocation,
+@adventure_dispatch.register(task="story_ready", wants_caller_kind=StoryGraph,
+                             wants_exact_kind=False, priority=Priority.FIRST)
+def setup_frozen_adventure(*, caller: StoryGraph, **_kw: object) -> None:
+    """Materialize fixed-shape sandbox state before play begins."""
+    if caller.frozen_shape and caller.factory and caller.factory.label == "adventure_sandbox_slice":
+        _ensure_adventure_sandbox(caller)
+
+
+@on_update(
+    wants_caller_kind=AdventureEntrance,
     wants_exact_kind=False,
     priority=Priority.FIRST,
 )
 def setup_adventure_sandbox(
     *,
-    caller: AdventureSandboxLocation,
+    caller: AdventureEntrance,
     ctx: VmPhaseCtx,
     **_kw: object,
 ) -> None:
-    """Attach the demo's shared sandbox state before location planning."""
+    """Attach the demo's sandbox state on accepted initial entry."""
 
     _ = ctx
     _ensure_adventure_sandbox(caller.graph)

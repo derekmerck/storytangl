@@ -40,8 +40,9 @@ The current implementation covers the first-spike path: sandbox scopes,
 locations, generated movement/message exits, held asset affordances, lockable
 fixture affordances, visibility/darkness projection, scheduled wait/events,
 basic mob projection, and a compact Adventure-style compiler fixture. Parser
-matching, relationship-backed inventory, hybrid lazy materialization, and full
-legacy IF extraction remain research or follow-up work.
+matching, hybrid lazy materialization, and full legacy IF extraction remain
+research or follow-up work. Discrete holder membership now references graph-owned
+wallets and members; shared runtime fixtures are graph nodes nominated by UID.
 
 Parser UI is optional. It does not create actions. It only maps user text to
 the closest current choice, diagnostic choice, or no match.
@@ -464,8 +465,9 @@ gate access on open state, and reject nested containers. Richer object
 ontologies, supporters, quantities, actor inventory, and parser/client matching
 remain later slices.
 
-Local fixture projection is similarly narrow. `SandboxFixture` is a place-bound
-object composed from typed facets. This is the shortest correct shape for the
+Local fixture projection is similarly narrow. `SandboxFixture` is a graph-owned
+node composed from typed facets. Multiple locations can nominate the same fixture
+without duplicating it or changing its parent. This is the shortest correct shape for the
 current slice because it avoids monolithic fixture variants such as
 openable-only, lockable-only, and openable+lockable while still supporting the
 second use case of containers. Implemented facet uses are:
@@ -491,8 +493,8 @@ reachable. Portable container assets carry their own `ContainerFacet`; their
 sub-inventory is exposed only while the facet is open. Both paths call
 `AssetTransactionManager`, so "put in" and "take from" are transfer preflight
 problems, not bespoke inventory mutation. For now nested containers are
-rejected by policy to avoid bag-in-bag ambiguity until a relationship-backed
-holding model exists.
+rejected by policy until recursive exposure and nested-container behavior are
+specified.
 
 Mob projection is the first answer to offscreen actors. `SandboxMob` is a
 graph-backed actor-like concept with a stable fallback sandbox `location`,

@@ -1,7 +1,7 @@
 # tangl.story.concepts.asset - Design Notes
 
-> Status: Discrete wallet foundation and singleton-keyed countable holdings implemented;
-> holder integration and assembly convergence remain planned under #652.
+> Status: Graph-owned discrete and singleton-keyed countable holder integration is
+> implemented; assembly convergence remains planned under #652.
 
 ## Position
 
@@ -19,8 +19,8 @@ This package currently defines:
 - `CountableAsset`: a fungible asset definition tracked by quantity.
 - `AssetWallet`: a counter for singleton definitions and explicit named game pools.
 - `DiscreteAssetWallet`: a graph-owned, ordered UUID group of discrete graph members.
-- `HasAssets`: a story-level facet for nodes that hold wallet counts and
-  nominate discrete asset tokens into namespaces.
+- `HasFungibleAssets` and `HasDiscreteAssets`: independent holder capabilities.
+- `HasAssets`: the combined facade over those capabilities.
 - `AssetTransactionManager`: a small preflight-and-mutate service for transfers
   between `HasAssets` holders.
 
@@ -33,7 +33,8 @@ A token refers to its singleton definition and carries graph-local state.
 
 - `asset_holder`: the holder itself;
 - `asset_wallet` and `wallet`: the fungible wallet;
-- `assets` and `inv`: the holder's nominated discrete asset tokens.
+- `assets` and `inv`: resolved views of graph-owned discrete members;
+- `asset_sources`: live member objects available for typed contribution discovery.
 
 Those symbols are intentionally ordinary namespace contributions, so roles,
 settings, sandbox scopes, and other story machinery can prefix or inspect them
@@ -47,8 +48,11 @@ bootstrap must establish live singleton definitions before graph restoration.
 The sequence is a JSON representation of an unordered mapping, not acquisition
 order. Named game pools retain their explicit local definition maps.
 
-The deferred discrete `assets` map remains explicitly excluded from persistence:
-it is not yet the graph-backed ownership model.
+Discrete holders persist the wallet UID and any holder-local aliases; `assets` is
+a resolved view, not a second stored inventory. Embedded holders bind to an
+explicit graph owner, while graph-node holders use their own graph. Source views
+expose distinct live objects without flattening their namespaces or recursively
+exposing the contents of containers.
 
 ## Approved Membership Model and Migration
 
@@ -60,13 +64,12 @@ an item can belong to both a possession group and an equipment group. They do
 not reparent members or impose universal exclusive custody. Checks are pure;
 create wallets at accepted setup or mutation boundaries, never during reads.
 
-The next slices migrate the existing `HasAssets` surface to compose independent
-discrete and countable capabilities, resolving the graph anchors for embedded
-sandbox holders. The current excluded holder map remains a pre-migration
-implementation, not a second permanent source of truth.
-Assembly must then build graph-backed slot membership on this same primitive,
-while retaining slot policy and owner binding. Transactions coordinate checked
-exchanges across holders; they do not define another membership store.
+`HasAssets` composes the independent counted and discrete capabilities. A
+singleton definition selects counted holdings; graph items, including tokens,
+select discrete holdings. String pool keys remain explicit counted-wallet usage.
+The sandbox binds its player holder to the scope and portable containers to their
+owning tokens. Assembly still needs to build its graph-backed slot membership on
+this same primitive, retaining slot policy and owner binding.
 
 ### ContainerFacet Validation Criteria
 
@@ -86,15 +89,14 @@ the following against sandbox examples:
 ## Transaction Model
 
 `AssetTransactionManager` validates a complete transfer before mutating wallets
-or holder asset maps. It remains the story-level convenience for the current
+or discrete wallet membership. It remains the story-level convenience for the current
 holder surface. The cross-family `tangl.mechanics.transaction` helper now carries
 the shared spec/offer/commitment/receipt shape for broader shops, services,
 assembly assignment, holder-local asset movement, catalog-backed token creation,
 and mixed writeback.
 
-The holder migration should use that existing transaction mechanism to coordinate
-preflight and mutations of the discrete and countable wallets, preserving holder
-and counterpart policy and rollback behavior.
+The existing transaction mechanism coordinates preflight and mutations of the
+discrete and countable wallets, preserving holder and counterpart policy.
 
 A higher-level trade manager can later compare aggregate values and actor
 biases before delegating to the transaction manager.
@@ -106,29 +108,12 @@ writeback.
 
 ## Known Limitations
 
-The current slice is intentionally sufficient for sandbox affordance
-experiments, not a complete inventory system.
+Graph-backed holder integration now supports the Grotto custody witness. It is
+not a complete inventory system:
 
-- `HasAssets.assets` is a holder-local map, not yet a graph-backed ownership
-  subgraph. It is good enough for "player has key" checks and first-slice
-  sandbox containers, but not enough for full persistence of room inventories
-  or ownership history.
-- Discrete transfers currently move tokens between holder maps. Slice 2 should
-  migrate this to the graph-owned discrete wallet, with one authoritative
-  membership representation.
-- Transaction preflight asks holder policy methods (`can_give_*` and
-  `can_receive_*`) directly; preserve these policies during holder migration.
-- Existing holder-map asset moves and catalog-backed token creation can now be
-  expressed with `AssetMoveCommitment` and `CatalogAssetCommitment`. The
-  remaining work is to use wallet membership with equivalent commitments.
-- `HasAssets` nominates `inv` and `assets` into local namespaces, but there is
-  no story-level `Player`/avatar concept yet. Sandbox currently uses
-  `SandboxScope.player_assets` as the explicit player stand-in; promote a real
-  player/avatar concept once the namespace policy is clearer.
-- Ambiguity is deferred. Multiple matching keys, multiple lockable objects,
-  quantities, and parser-style disambiguation should remain UI/compiler
-  concerns until a concrete sandbox example demands them.
-- Sandbox integration now has a first narrow affordance set: location-held
-  tokens project take/read choices, player-held tokens project drop choices, and
-  held key tokens satisfy generated unlock actions. The next asset slice should
-  replace holder-local maps with the graph-owned discrete wallet.
+- Assembly slot membership still uses its existing owner-bound assignment maps;
+  convergence with the shared discrete wallet is a separate slice.
+- Sandbox `SandboxScope.player_assets` remains the ready-at-hand player stand-in.
+- Ambiguous matching and nested-container exposure remain consumer policy rather
+  than a universal namespace-flattening rule.
+- Isolated JSON Patch member-event restoration remains tracked separately in #655.

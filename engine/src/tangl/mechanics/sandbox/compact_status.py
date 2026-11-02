@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tangl.core import Selector
+from tangl.core import Selector, Token
 from tangl.presentation.hints import PresentationHints
 from tangl.presentation.projection import (
     InfoAffordance, ProjectedSection, ProjectedState, ProjectionRequest, ScalarValue,
@@ -12,7 +12,10 @@ from tangl.vm.runtime.frame import PhaseCtx
 
 from .scope import SandboxScope
 from .location import SandboxLocation
-from .story_info import DEFAULT_PERIOD_LABELS, _asset_surface, _period_label, sandbox_asset_items
+from .story_info import (
+    DEFAULT_PERIOD_LABELS, ProjectedAssetSurface, _asset_surface, _period_label,
+    sandbox_asset_items,
+)
 from .time import current_world_time
 
 
@@ -56,10 +59,17 @@ def project_compact_status(
     # This provider chooses entries and order; the client never joins private inventory.
     items = sandbox_asset_items(scope.player_assets)
     for asset, item in zip(sorted(scope.player_assets.assets), items):
+        member = scope.player_assets.assets[asset]
+        icon = (
+            _asset_surface(member).icon
+            if isinstance(member, Token)
+            and isinstance(member.reference_singleton, ProjectedAssetSurface)
+            else None
+        )
         sections.append(ProjectedSection(
             section_id=f"item:{asset}", title=item.label,
             value=ScalarValue(value=item.detail or "carried"),
-            hints=PresentationHints(icon=_asset_surface(scope.player_assets.assets[asset]).icon,
+            hints=PresentationHints(icon=icon,
                                     placement="middle", icon_only=True),
         ))
     return sections

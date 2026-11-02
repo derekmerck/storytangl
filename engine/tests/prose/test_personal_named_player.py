@@ -123,8 +123,16 @@ def advance(ledger: Ledger) -> None:
     ledger.resolve_choice(next(ledger.cursor.edges_out(Selector(has_kind=Action))).uid)
 
 
+def normalize_fragment_tags(fragments: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [
+        {**fragment, "tags": sorted(fragment["tags"])} if "tags" in fragment else fragment
+        for fragment in fragments
+    ]
+
+
 def journal_dto(ledger: Ledger) -> list[dict[str, object]]:
-    return RuntimeEnvelope(fragments=list(ledger.get_journal())).to_dto()["fragments"]
+    fragments = RuntimeEnvelope(fragments=list(ledger.get_journal())).to_dto()["fragments"]
+    return normalize_fragment_tags(fragments)
 
 
 def test_reusable_player_forms_use_context_policy_overrides_and_per_narrator_knowledge(
@@ -271,7 +279,8 @@ def test_service_json_reopen_preserves_rename_and_history_without_reset(
     reopened = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path / "sessions"))
     # Normal live registration, not a reset or a cold bootstrap.
     assert World.get_instance(world.label) is world
-    assert reopened.get_story_update(user_id=user.uid).to_dto()["fragments"] == historical
+    fragments = reopened.get_story_update(user_id=user.uid).to_dto()["fragments"]
+    assert normalize_fragment_tags(fragments) == historical
     with reopened.open_session(user_id=user.uid) as session:
         subject = player(session.ledger)
         assert subject.uid == identity and not isinstance(subject, Actor)

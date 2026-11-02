@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import Field
 
-from tangl.core import Entity, Token
+from tangl.core import Graph, Node, Token
 from tangl.mechanics.presence.wearable import Wearable, WearableType
 from tangl.story.concepts.asset import (
     AssetTransactionManager,
@@ -18,7 +18,7 @@ class WeaponType(AssetType):
     damage: int = 1
 
 
-class AssetHolder(Entity, HasAssets):
+class AssetHolder(Node, HasAssets):
     accepted_assets: set[str] = Field(default_factory=set)
     accepted_counts: set[str] = Field(default_factory=set)
     countable_events: list[str] = Field(default_factory=list)
@@ -154,9 +154,10 @@ def test_asset_wallet_total_value_and_description() -> None:
 
 
 def test_has_assets_nominates_inventory_into_namespace() -> None:
+    graph = Graph()
     WeaponType(label="sword", value=12.5)
-    sword = Token[WeaponType](token_from="sword", label="training_sword")
-    holder = AssetHolder(label="hero")
+    sword = Token[WeaponType](token_from="sword", label="training_sword", registry=graph)
+    holder = AssetHolder(label="hero", registry=graph)
 
     holder.add_asset(sword, label="primary")
     holder.wallet.gain(gold=10)
@@ -170,10 +171,11 @@ def test_has_assets_nominates_inventory_into_namespace() -> None:
 
 
 def test_transaction_manager_moves_discrete_asset_after_preflight() -> None:
+    graph = Graph()
     WeaponType(label="sword")
-    sword = Token[WeaponType](token_from="sword", label="training_sword")
-    giver = AssetHolder(label="giver")
-    receiver = AssetHolder(label="receiver", accepted_assets={"sword"})
+    sword = Token[WeaponType](token_from="sword", label="training_sword", registry=graph)
+    giver = AssetHolder(label="giver", registry=graph)
+    receiver = AssetHolder(label="receiver", accepted_assets={"sword"}, registry=graph)
     manager = AssetTransactionManager()
     giver.add_asset(sword)
 
@@ -187,10 +189,11 @@ def test_transaction_manager_moves_discrete_asset_after_preflight() -> None:
 
 
 def test_transaction_manager_rejects_discrete_asset_without_mutation() -> None:
+    graph = Graph()
     WeaponType(label="sword")
-    sword = Token[WeaponType](token_from="sword")
-    giver = AssetHolder(label="giver")
-    receiver = AssetHolder(label="receiver", accepted_assets={"shield"})
+    sword = Token[WeaponType](token_from="sword", registry=graph)
+    giver = AssetHolder(label="giver", registry=graph)
+    receiver = AssetHolder(label="receiver", accepted_assets={"shield"}, registry=graph)
     manager = AssetTransactionManager()
     giver.add_asset(sword)
 
@@ -203,10 +206,11 @@ def test_transaction_manager_rejects_discrete_asset_without_mutation() -> None:
 
 
 def test_transaction_manager_rolls_back_discrete_asset_if_receive_fails() -> None:
+    graph = Graph()
     WeaponType(label="sword")
-    sword = Token[WeaponType](token_from="sword")
-    giver = AssetHolder(label="giver")
-    receiver = RejectingAssetHolder(label="receiver")
+    sword = Token[WeaponType](token_from="sword", registry=graph)
+    giver = AssetHolder(label="giver", registry=graph)
+    receiver = RejectingAssetHolder(label="receiver", registry=graph)
     manager = AssetTransactionManager()
     giver.add_asset(sword)
 

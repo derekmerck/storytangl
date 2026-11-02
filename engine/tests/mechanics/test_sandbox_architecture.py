@@ -340,12 +340,15 @@ def test_generated_actions_match_exactly_one_family_discriminator() -> None:
 
     # Unlock/lock families: one locked fixture (projects unlock) and one
     # unlocked lockable fixture (projects lock).
-    compiled.locations["cave"].fixtures = [
+    fixtures = [
         SandboxFixture(label="grate", name="grate", lockable=LockableFacet(key="keys")),
         SandboxFixture(
             label="gate", name="gate", lockable=LockableFacet(key="keys", is_locked=False)
         ),
     ]
+    for fixture in fixtures:
+        compiled.graph.add(fixture)
+        compiled.locations["cave"].add_fixture(fixture)
 
     # Incremental family: host a minimal incremental game under the scope.
     class _ColonyGame(IncrementalGame):

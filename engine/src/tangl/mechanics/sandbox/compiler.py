@@ -408,7 +408,7 @@ class SandboxSliceCompiler:
         graph.add(scope)
 
         locations = self._compile_locations(graph=graph, scope=scope, spec=spec)
-        fixtures = self._compile_fixtures(locations=locations, spec=spec)
+        fixtures = self._compile_fixtures(graph=graph, locations=locations, spec=spec)
         mobs = self._compile_mobs(
             graph=graph,
             scope=scope,
@@ -704,6 +704,7 @@ class SandboxSliceCompiler:
     def _compile_fixtures(
         self,
         *,
+        graph: StoryGraph,
         locations: dict[str, SandboxLocation],
         spec: SandboxSliceSpec,
     ) -> dict[str, SandboxFixture]:
@@ -754,6 +755,7 @@ class SandboxSliceCompiler:
                     fixture_spec.contributes.scheduled_events
                 ),
             )
+            graph.add(fixture)
             for location_label in fixture_spec.initial.locations:
                 self._require_location(
                     locations,
@@ -761,7 +763,7 @@ class SandboxSliceCompiler:
                     source_kind="Fixture",
                     source_label=label,
                     relation="is placed in",
-                ).fixtures.append(fixture)
+                ).add_fixture(fixture)
             fixtures[label] = fixture
         return fixtures
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from tangl.core import Token
+from tangl.core import GraphItem
 from tangl.core.bases import BaseModelPlus
 
-from .holder import HasAssets
+from .holder import HasAssets, HasDiscreteAssets
+from .wallet import AssetKey
 
 
 class AssetTransactionResult(BaseModelPlus):
@@ -11,7 +12,7 @@ class AssetTransactionResult(BaseModelPlus):
 
     accepted: bool
     reason: str | None = None
-    asset: Token | None = None
+    asset: GraphItem | None = None
 
 
 class AssetTransactionManager:
@@ -21,7 +22,7 @@ class AssetTransactionManager:
         self,
         giver: HasAssets,
         receiver: HasAssets,
-        asset: Token | str,
+        asset: GraphItem | str,
     ) -> AssetTransactionResult:
         """Return whether a discrete asset can move from giver to receiver."""
         resolved = giver.get_asset(asset) if isinstance(asset, str) else asset
@@ -42,18 +43,27 @@ class AssetTransactionManager:
                 reason="receiver cannot receive asset",
                 asset=resolved,
             )
+        if isinstance(receiver, HasDiscreteAssets) and not receiver.can_add_asset(resolved):
+            return AssetTransactionResult(
+                accepted=False, reason="receiver cannot receive asset", asset=resolved,
+            )
         return AssetTransactionResult(accepted=True, asset=resolved)
 
-    def give_asset(self, giver: HasAssets, receiver: HasAssets, asset: Token | str) -> Token:
+    def give_asset(self, giver: HasAssets, receiver: HasAssets, asset: GraphItem | str) -> GraphItem:
         """Move a discrete asset after preflight succeeds."""
         result = self.can_give_asset(giver, receiver, asset)
         if not result.accepted or result.asset is None:
             raise ValueError(result.reason or "asset transaction rejected")
+        label = giver.get_asset_key(result.asset)
+        index = giver.discrete_wallet.member_ids.index(result.asset.uid)
         moved = giver.remove_asset(result.asset)
         try:
             receiver.add_asset(moved)
         except Exception:
-            giver.add_asset(moved)
+            giver.add_asset(moved, label=label)
+            members = giver.discrete_wallet.member_ids
+            members.remove(moved.uid)
+            members.insert(index, moved.uid)
             raise
         return moved
 
@@ -61,7 +71,7 @@ class AssetTransactionManager:
         self,
         giver: HasAssets,
         receiver: HasAssets,
-        asset_label: str,
+        asset_label: AssetKey,
         amount: int,
     ) -> AssetTransactionResult:
         """Return whether a fungible asset count can move between wallets."""
@@ -86,7 +96,7 @@ class AssetTransactionManager:
         self,
         giver: HasAssets,
         receiver: HasAssets,
-        asset_label: str,
+        asset_label: AssetKey,
         amount: int,
     ) -> None:
         """Move a fungible asset count after preflight succeeds."""

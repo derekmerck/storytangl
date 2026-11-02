@@ -438,7 +438,7 @@ def test_sandbox_interaction_cleanup_is_scoped_to_owning_family() -> None:
         for action in _dynamic_actions(road, "dynamic", "sandbox", kind)
     }
 
-    road.fixtures.clear()
+    road.fixture_ids.clear()
     project_sandbox_fixture_actions(
         caller=road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid)
     )
