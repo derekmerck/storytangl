@@ -46,7 +46,7 @@ class ConnectionGroupManager(ComponentManager[Connector]):
         )
 
     def _drop_unassigned_cache(self, connector_id: UUID) -> None:
-        if not any(connector_id in ids for ids in self.assignment_ids.values()):
+        if not any(connector.uid == connector_id for connector in self.all_components()):
             self._component_cache.pop(connector_id, None)
 
     def is_connected(self, connector: Connector) -> bool:
@@ -99,10 +99,11 @@ class ConnectionGroupManager(ComponentManager[Connector]):
 
         self._validate_component_registry(first)
         second_manager._validate_component_registry(second)
-        self._component_cache[first.uid] = first
-        self._component_cache[second.uid] = second
-        second_manager._component_cache[second.uid] = second
-        second_manager._component_cache[first.uid] = first
+        if self._owner_registry() is None:
+            self._component_cache[first.uid] = first
+            self._component_cache[second.uid] = second
+            second_manager._component_cache[second.uid] = second
+            second_manager._component_cache[first.uid] = first
 
         self.connection_ids[first.uid] = second.uid
         second_manager.connection_ids[second.uid] = first.uid

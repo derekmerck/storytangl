@@ -164,7 +164,8 @@ def test_connector_group_roundtrip_preserves_pair_ids() -> None:
     cable.add_connector("power", cable_power)
     pc.connections.connect(pc_power, cable_power, other_manager=cable.connections)
 
-    restored = Graph.structure(graph.unstructure())
+    data = JsonSerializationHandler.deserialize(JsonSerializationHandler.serialize(graph.unstructure()))
+    restored = Graph.structure(data)
     restored_pc = restored.find_one(Selector(label="pc"))
     restored_cable = restored.find_one(Selector(label="cable"))
     restored_pc_power = restored.find_one(Selector(label="pc-power-socket"))
@@ -176,6 +177,7 @@ def test_connector_group_roundtrip_preserves_pair_ids() -> None:
     assert restored_cable.connections.connection_ids == {cable_power.uid: pc_power.uid}
     assert restored_pc.connections.connected_to(restored_pc_power) is restored_cable_power
     assert restored_cable.connections.connected_to(restored_cable_power) is restored_pc_power
+    assert restored.value_hash() == graph.value_hash()
     assert restored_pc.connections.is_complete
 
 

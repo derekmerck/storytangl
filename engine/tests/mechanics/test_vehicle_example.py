@@ -68,7 +68,7 @@ def test_vehicle_loadout_replaces_single_slot_occupant() -> None:
 
     assert len(installed_tires) == 1
     assert installed_tires[0].token_from == "slicks"
-    assert cheap_tires.uid not in loadout.assignment_ids["tires"]
+    assert cheap_tires not in loadout.get_slot("tires")
 
 
 def test_heavy_vehicle_requires_big_powerplant() -> None:
@@ -157,7 +157,7 @@ def test_vehicle_graph_roundtrip_preserves_loadout_assignments_by_graph_id() -> 
     restored_vehicle = restored.find_one(Selector(label="demo-car"))
     restored_tires = restored.find_one(Selector(label="demo-tires"))
 
-    assert vehicle_data["loadout"]["assignment_ids"] == {
+    assert {name: vehicle.loadout.slot_wallet(name).member_ids for name in vehicle_data["loadout"]["slot_wallet_ids"]} == {
         "chassis": [chassis.uid],
         "powerplant": [powerplant.uid],
         "suspension": [suspension.uid],

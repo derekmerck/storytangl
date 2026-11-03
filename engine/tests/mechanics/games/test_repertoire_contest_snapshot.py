@@ -1205,7 +1205,7 @@ def test_prize_grant_history_survives_transfer_and_blocks_a_second_award() -> No
     assert player.prizes.prizes() == []
     assert player.prizes.granted_prize_ids == {"golden_trophy"}
     assert opponent.prizes.prizes() == [prize]
-    assert prize.uid in opponent.prizes.assignment_ids[KNOWN_PRIZES_SLOT]
+    assert prize in opponent.prizes.get_slot(KNOWN_PRIZES_SLOT)
     assert another_aftermath.locals["awarded_prize_ids"] == []
     assert {
         token.uid

@@ -20,15 +20,14 @@ presentation remains incomplete; broader body-attachment unification remains ope
 ## Implementation status
 
 `OutfitManager` now uses the assembly-layer `ComponentManager` path: it is still
-embedded on `HasOutfit`, but its assigned wearables are graph members stored by UUID
-and dereferenced through the owning actor's registry. `HasOutfit.outfit` opts into
+embedded on `HasOutfit`, but its assigned wearables are graph members held in slot wallets owned by the
+actor's graph. `HasOutfit.outfit` opts into
 constructor-form persistence with `json_schema_extra={"include": True,
 "unstructurable": True}`, so mutated outfit state survives graph round-trips without
 making the outfit manager a graph item.
 
 `WardrobeManager` applies the same identity rule to inactive clothing storage. It is
-embedded on `HasWardrobe`, persists by constructor-form recursion, stores wearable
-UUIDs in a single broad storage slot, and can expose that slot through the transaction
+embedded on `HasWardrobe`, persists by constructor-form recursion, references a graph-owned wallet for its broad storage slot, and can expose that slot through the transaction
 layer's component-slot holder adapter. A dressing offer moves one stored wearable out
 of the wardrobe and assigns it into the active outfit; the outfit manager still owns
 body-region/layer legality and validation.

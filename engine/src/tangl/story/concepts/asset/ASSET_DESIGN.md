@@ -68,8 +68,8 @@ create wallets at accepted setup or mutation boundaries, never during reads.
 singleton definition selects counted holdings; graph items, including tokens,
 select discrete holdings. String pool keys remain explicit counted-wallet usage.
 The sandbox binds its player holder to the scope and portable containers to their
-owning tokens. Assembly still needs to build its graph-backed slot membership on
-this same primitive, retaining slot policy and owner binding.
+owning tokens. Assembly uses the same primitive for graph-bound slot membership, while retaining
+slot policy and owner binding.
 
 ### ContainerFacet Validation Criteria
 
@@ -111,8 +111,8 @@ writeback.
 Graph-backed holder integration now supports the Grotto custody witness. It is
 not a complete inventory system:
 
-- Assembly slot membership still uses its existing owner-bound assignment maps;
-  convergence with the shared discrete wallet is a separate slice.
+- Detached component construction remains temporary until CarWars #41 removes its
+  dependency on provisional loadouts.
 - Sandbox `SandboxScope.player_assets` remains the ready-at-hand player stand-in.
 - Ambiguous matching and nested-container exposure remain consumer policy rather
   than a universal namespace-flattening rule.

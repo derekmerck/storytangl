@@ -140,17 +140,16 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
     def bind_owner(self, owner: object) -> "CredentialPacketManager":
         """Bind cached components and subject references to a graph owner."""
 
+        pending = [
+            component for components in self.assignments.values() for component in components
+        ]
         super().bind_owner(owner)
         registry = self._owner_registry()
-        if registry is None:
+        if registry is None or not pending:
             return self
 
         subject_ids = {self.bearer_id}
-        for component_ids in self.assignment_ids.values():
-            for component_id in component_ids:
-                component = registry.get(component_id) or self._component_cache.get(component_id)
-                if component is not None:
-                    subject_ids.add(component.subject_id)
+        subject_ids.update(component.subject_id for component in pending)
         for subject_id in subject_ids:
             if registry.get(subject_id) is None:
                 registry.add(
@@ -372,12 +371,12 @@ def materialize_packet(
         bearer_id=resolved_bearer_id,
     )
     manager.bind_owner(owner)
-    if bearer_id is None and manager._owner_registry() is None:
+    if bearer_id is None:
         bearer = HasSimpleLook(uid=resolved_bearer_id, label=f"{label_prefix}:bearer")
+        if manager._owner_registry() is not None:
+            manager._owner_registry().add(bearer)
     else:
         bearer = manager.resolve_subject(resolved_bearer_id)
-        if bearer_id is None:
-            bearer.label = f"{label_prefix}:bearer"
     id_subject = bearer
     if id_card is not None and id_card.status is CredentialStatus.WRONG_HOLDER:
         id_subject = manager.materialize_subject(f"{label_prefix}:id-subject")

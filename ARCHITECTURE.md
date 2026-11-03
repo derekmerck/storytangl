@@ -176,9 +176,9 @@ does not make every graph member an afforded name in the rendering namespace.
 Assembly and prose share this ownership pattern, but own different data:
 
 - `ComponentManager` is embedded on its graph owner. It persists its local
-  manager state and slot-to-component `assignment_ids`; the components themselves
-  remain registry-owned entities. It resolves those UUIDs through the owner's
-  registry. Live-object caches and the owner pointer are not persisted.
+  manager state and slot-to-wallet UUID references. Each graph-owned discrete
+  wallet contains the assigned component UUIDs; the graph owns wallets and
+  components. The owner pointer and detached-construction state are not persisted.
 - Authored `MuBlock`/`DialogMuBlock` values are embedded on a block in the shared
   prose foundation. They persist their authored parts, symbolic references,
   classes, and style hints with that owner. They are not graph entities;

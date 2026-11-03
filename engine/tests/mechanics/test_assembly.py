@@ -40,6 +40,10 @@ class TestComponent(Entity):
         return 0.0
 
 
+class GraphTestComponent(TestComponent, Node):
+    pass
+
+
 class TestContainer(SlottedContainer[TestComponent]):
     slots: ClassVar[dict[str, Slot]] = {
         "alpha": Slot.for_type("alpha", TestComponent, tags={"alpha"}, required=True),
@@ -308,12 +312,12 @@ def test_component_manager_registers_fresh_component_with_owner_registry() -> No
     owner = Node(label="owner")
     graph.add(owner)
     manager = TestComponentManager(owner=owner)
-    component = TestComponent(label="part")
+    component = GraphTestComponent(label="part")
 
     manager.assign("alpha", component)
 
     assert graph.get(component.uid) is component
-    assert manager.assignment_ids == {"alpha": [component.uid]}
+    assert manager.slot_wallet("alpha").member_ids == [component.uid]
     assert manager.get_slot("alpha") == [component]
 
 
@@ -324,7 +328,7 @@ def test_component_manager_unassigns_transient_cache_entry() -> None:
     manager.assign("alpha", component)
     manager.unassign("alpha", component)
 
-    assert manager.assignment_ids == {}
+    assert manager.slot_wallet_ids == {}
     assert component.uid not in manager._component_cache
 
 

@@ -86,7 +86,7 @@ def test_repertoire_graph_roundtrip_rebinds_badge_and_owner() -> None:
     assert isinstance(restored_badge, PhraseBadge)
     assert isinstance(restored_owner.repertoire, RepertoireManager)
     assert restored_owner.repertoire.owner is restored_owner
-    assert restored_owner.repertoire.assignment_ids == {
+    assert {name: restored_owner.repertoire.slot_wallet(name).member_ids for name in restored_owner.repertoire.slot_wallet_ids} == {
         KNOWN_PHRASES_SLOT: [badge.uid],
     }
     assert restored_owner.repertoire.badges() == [restored_badge]
