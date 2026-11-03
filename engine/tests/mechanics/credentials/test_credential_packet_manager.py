@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import Field, model_validator
@@ -44,6 +44,8 @@ from tangl.mechanics.games.credentials_game import (
 from tangl.mechanics.games.credentials_roster import ScenarioOffer
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.story import Block
+from tangl.story.presentation import render_text_as
+from tangl.vm.runtime.frame import PhaseCtx
 
 D = CredentialDisposition
 S = CredentialStatus
@@ -467,6 +469,71 @@ def test_unbound_packet_materializes_subjects_when_its_owner_becomes_graph_bound
 
     assert restored_manager.resolve_subject(restored_manager.bearer_id).uid == manager.bearer_id
     assert restored_manager.resolve_subject(restored_id.subject_id).uid == id_card.subject_id
+
+
+def test_detached_owner_adopts_packet_subjects_and_restores_without_reseeding() -> None:
+    manager, card, permit = valid_work_packet()
+    permit.subject_id = uuid4()
+    owner = CredentialPacketNode(label="packet-owner", packet_manager=manager)
+    assert manager.owner is owner
+    graph = Graph()
+    graph.add(owner)
+    manager.bind_owner(owner)
+
+    bearer = manager.resolve_subject(manager.bearer_id)
+    subject = manager.resolve_subject(permit.subject_id)
+    assert bearer is graph.get(manager.bearer_id)
+    assert subject is graph.get(permit.subject_id) and subject is not bearer
+    assert manager.resolve_subject(card.subject_id) is bearer
+    assert bearer.adapt_look_media_spec() is not None
+    assert subject.adapt_look_media_spec() is not None
+    ctx = PhaseCtx(graph=graph, cursor_id=owner.uid)
+    assert render_text_as(permit, "document_description", ctx=ctx, bindings={"packet": manager})
+    assert manager.get_slot(CREDENTIAL_ID_SLOT) == [card]
+    assert manager.get_slot(CREDENTIAL_PACKET_SLOT) == [permit]
+    assert graph.get(card.uid) is card and graph.get(permit.uid) is permit
+    wallet_ids = dict(manager.slot_wallet_ids)
+    before = graph.value_hash(), len(graph.members)
+    manager.bind_owner(owner)
+    assert (graph.value_hash(), len(graph.members)) == before
+    assert manager.slot_wallet_ids == wallet_ids
+
+    data = JsonSerializationHandler.deserialize(
+        JsonSerializationHandler.serialize(graph.unstructure())
+    )
+    restored = Graph.structure(data)
+    restored_owner = restored.get(owner.uid)
+    restored_manager = restored_owner.packet_manager
+    restored_card = restored.get(card.uid)
+    restored_permit = restored.get(permit.uid)
+    assert restored_manager.owner is restored_owner
+    assert restored_manager.slot_wallet_ids == wallet_ids
+    assert all(
+        restored_manager.slot_wallet(slot) is restored.get(uid)
+        for slot, uid in wallet_ids.items()
+    )
+    assert restored_manager.get_slot(CREDENTIAL_ID_SLOT)[0] is restored_card
+    assert restored_manager.get_slot(CREDENTIAL_PACKET_SLOT)[0] is restored_permit
+    assert restored_manager.resolve_subject(restored_card.subject_id) is restored.get(bearer.uid)
+    assert restored_manager.resolve_subject(restored_permit.subject_id) is restored.get(subject.uid)
+    restored_subject = restored_manager.resolve_subject(restored_permit.subject_id)
+    assert restored_subject.adapt_look_media_spec() is not None
+    ctx = PhaseCtx(graph=restored, cursor_id=restored_owner.uid)
+    assert render_text_as(
+        restored_permit, "document_description", ctx=ctx, bindings={"packet": restored_manager}
+    )
+    assert restored.value_hash() == graph.value_hash()
+    before = restored.value_hash(), len(restored.members)
+    restored_manager.bind_owner(restored_owner)
+    assert (restored.value_hash(), len(restored.members)) == before
+    assert restored_manager.slot_wallet_ids == wallet_ids
+
+    restored.remove(subject.uid)
+    before = restored.value_hash(), len(restored.members)
+    restored_manager.bind_owner(restored_owner)
+    assert (restored.value_hash(), len(restored.members)) == before
+    with pytest.raises(KeyError, match="not a presence entity"):
+        restored_manager.resolve_subject(subject.uid)
 
 
 def test_defects_recompute_from_a_restored_packet_manager() -> None:

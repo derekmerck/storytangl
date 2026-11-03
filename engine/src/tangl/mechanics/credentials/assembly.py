@@ -140,7 +140,9 @@ class CredentialPacketManager(ComponentManager[CredentialComponent]):
     def bind_owner(self, owner: object) -> "CredentialPacketManager":
         """Bind cached components and subject references to a graph owner."""
 
-        pending = list(self.all_components()) if self._owner_registry() is None else []
+        pending = [
+            component for components in self.assignments.values() for component in components
+        ]
         super().bind_owner(owner)
         registry = self._owner_registry()
         if registry is None or not pending:

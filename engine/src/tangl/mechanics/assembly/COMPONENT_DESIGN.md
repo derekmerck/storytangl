@@ -37,7 +37,9 @@ membership. Graph-backed component managers build on that shared primitive, addi
 slots, eligibility, capacities, budgets and facet behavior without a second
 authoritative membership store. They preserve owner binding, slot ordering,
 multi-assignment and transaction semantics.
-Standalone in-memory `SlottedContainer` remains a distinct non-graph instrument.
+The standalone `SlottedContainer` owning backing is retained temporarily until
+[CarWars #41](https://github.com/derekmerck/carwars-gamebooks/issues/41); its
+shared slot, budget and eligibility policy remains after that backing retires.
 Countable singleton quantities belong to the countable wallet, and coordinated
 exchanges remain in the existing transaction mechanism. Each slot refers to a
 graph-owned wallet; empty prepared wallets persist.
