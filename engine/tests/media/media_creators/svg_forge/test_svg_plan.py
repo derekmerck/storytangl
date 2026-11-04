@@ -110,6 +110,25 @@ def test_error_catalog_and_invalid_override_cannot_succeed(tmp_path: Path) -> No
     assert {d.code for d in result.diagnostics} == {"missing_group", "undeclared_palette_channel"}
 
 
+def test_unique_alias_with_colliding_canonical_key_returns_diagnostics(tmp_path: Path) -> None:
+    source = tmp_path / "parts.svg"
+    source.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">'
+                      '<g id="a"/><g id="b"/></svg>')
+    rit = ResourceManager(tmp_path).register_file(source)
+    catalog = index_svg_catalog(rit, (
+        SvgGroupDeclaration(key="x", source_id="a", aliases=("unique",)),
+        SvgGroupDeclaration(key="y", source_id="b", aliases=("x",)),
+    ))
+    recipe = Recipe(selections=("unique",), palette="day")
+    before = recipe.model_dump(), catalog.model_dump()
+
+    plan = resolve_plan(catalog, recipe, palettes={"day": {}})
+
+    assert not plan.ok and plan.entries == ()
+    assert any(d.code == "key_collision" and d.subject == "x" for d in plan.diagnostics)
+    assert (recipe.model_dump(), catalog.model_dump()) == before
+
+
 def test_independent_figure_overrides_do_not_leak(tmp_path: Path) -> None:
     catalog = make_catalog(tmp_path)
     palettes = {"day": {"ink": {"fill": "red"}}}

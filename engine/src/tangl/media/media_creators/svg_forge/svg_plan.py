@@ -178,7 +178,7 @@ def resolve_plan(
                 bindings.setdefault(channel, {})[prop] = value
                 sources.setdefault(channel, {})[prop] = origin
 
-    entries = [catalog.lookup(key) for key in selected]
+    entries = [catalog.lookup(key) for key in selected] if not errors else []
     entries.sort(key=lambda entry: entry.order)
     def canonical_operation(operation: Operation) -> dict[str, object]:
         data = operation.model_dump(mode="json")
