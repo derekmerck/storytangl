@@ -20,7 +20,8 @@ from ..media_creators.composition_forge.composition_inputs import (
     resolve_composition_inputs,
     with_composition_inputs,
 )
-from ..media_creators.composition_forge.composition_spec import CompositionSpec
+from ..media_creators.composition_forge.composition_spec import CompositionInputRef, CompositionSpec
+from ..media_creators.svg_forge.vector_spec import VectorSpec
 from ..media_creators.media_spec import MediaResolutionClass, MediaSpec
 from ..media_data_type import MediaDataType
 from ..story_media import get_story_resource_manager
@@ -246,6 +247,12 @@ def materialize_rit_from_spec(
             ctx_ns,
             resolve_composition_inputs(spec, graph=graph),
         )
+    if isinstance(spec, VectorSpec) and spec.source_id is not None:
+        source_spec = CompositionSpec(inputs=[CompositionInputRef(
+            role="source", rit_id=spec.source_id, content_hash=spec.source_hash,
+        )])
+        source = resolve_composition_inputs(source_spec, graph=graph)[0].svg
+        creation_ctx = dict(ctx_ns or {}, vector_source=source)
     media, realized_spec = spec.create_media(
         ref=parent,
         ctx=creation_ctx,

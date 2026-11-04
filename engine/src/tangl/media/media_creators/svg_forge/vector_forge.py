@@ -1,10 +1,11 @@
 from pathlib import Path
 import copy
 import logging
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 import importlib
 import io
 import re
+from hashlib import sha256
 
 # from bson.binary import VECTOR_SUBTYPE
 from pydantic import field_validator, ValidationInfo, Field
@@ -15,6 +16,9 @@ from PIL.Image import Image
 
 from tangl.config import settings
 from tangl.core.singleton import Singleton
+from tangl.core import Priority
+from tangl.media.media_creators.media_spec import on_create_media
+from .vector_spec import VectorSpec
 from . import __title__, __version__
 from .svg_source_manager import SvgSourceManager
 from .svg_group import SvgGroup
@@ -47,8 +51,77 @@ class VectorForge:
         # convenience accessor
         return self.source_manager.get_svg_structure()
 
-    def create_media(self, spec: SvgSpec) -> tuple[Svg, SvgSpec]:
-        ...
+    def create_media(self, spec: VectorSpec, *, source: str | None = None) -> tuple[str, VectorSpec]:
+        """Assemble selected source groups without changing their registration."""
+        from .svg_catalog import _URL_REF
+
+        if source is None:
+            raise ValueError("Vector creation requires a resolved source")
+        if not spec.plan_identity or not spec.locators:
+            raise ValueError("Vector creation requires a resolved plan")
+        if sha256(source.encode()).hexdigest() != spec.source_sha256:
+            raise ValueError("Vector source content changed")
+        root = etree.fromstring(source.encode(), etree.XMLParser(resolve_entities=False, no_network=True))
+        if root.tag != "{http://www.w3.org/2000/svg}svg":
+            raise ValueError("Vector source must be SVG")
+        box = tuple(float(v) for v in root.get("viewBox", "").replace(",", " ").split())
+        if spec.registration is None or box != spec.registration:
+            raise ValueError("Vector source registration does not match plan")
+        result = etree.Element(root.tag, nsmap=root.nsmap, attrib=dict(root.attrib))
+        for child in root:
+            if isinstance(child.tag, str) and etree.QName(child).localname in {"defs", "style"}:
+                result.append(copy.deepcopy(child))
+        for locator in spec.locators:
+            if not locator.startswith("#"):
+                raise ValueError(f"Invalid SVG locator: {locator}")
+            matches = root.xpath("//*[@id=$value]", value=locator[1:])
+            if len(matches) != 1 or etree.QName(matches[0]).localname != "g":
+                raise ValueError(f"Missing or ambiguous SVG group: {locator}")
+            group = matches[0]
+            parent = result
+            for ancestor in reversed(list(group.iterancestors())):
+                if ancestor is root:
+                    continue
+                attributes = {k: v for k, v in ancestor.attrib.items() if k != "id"}
+                parent = etree.SubElement(parent, ancestor.tag, attrib=attributes)
+            selected = copy.deepcopy(group)
+            declarations = [part.strip() for part in selected.get("style", "").split(";") if part.strip()]
+            declarations = [part for part in declarations if part.split(":", 1)[0].strip() != "display"]
+            declarations.append("display:inline")
+            selected.set("style", ";".join(declarations))
+            parent.append(selected)
+        seen_targets = set()
+        for channel, prop, identifier, indices in spec.targets:
+            key = identifier, indices, prop
+            if key in seen_targets:
+                raise ValueError(f"Conflicting palette target: {identifier}")
+            seen_targets.add(key)
+            matches = result.xpath("//*[@id=$value]", value=identifier)
+            if len(matches) != 1 or channel not in spec.bindings or prop not in spec.bindings[channel]:
+                raise ValueError(f"Missing or ambiguous palette target: {identifier}")
+            target = matches[0]
+            for index in indices:
+                if index < 0 or index >= len(target):
+                    raise ValueError(f"Missing palette target under: {identifier}")
+                target = target[index]
+            declarations = [part.strip() for part in target.get("style", "").split(";") if part.strip()]
+            declarations = [part for part in declarations if part.split(":", 1)[0].strip() != prop]
+            declarations.append(f"{prop}:{spec.bindings[channel][prop]}")
+            target.set("style", ";".join(declarations))
+        identifiers = [element.get("id") for element in result.iter() if element.get("id")]
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError("Duplicate SVG IDs in assembled figure")
+        for element in result.iter():
+            for name, value in element.attrib.items():
+                refs = _URL_REF.findall(value)
+                if etree.QName(name).localname == "href" and value.startswith("#"):
+                    refs.append(value[1:])
+                if any(ref not in identifiers for ref in refs):
+                    raise ValueError(f"Unresolved SVG reference in {value}")
+            if isinstance(element.tag, str) and etree.QName(element).localname == "style" and element.text:
+                if any(ref not in identifiers for ref in _URL_REF.findall(element.text)):
+                    raise ValueError("Unresolved SVG reference in style")
+        return etree.tostring(result, encoding="unicode"), spec
 
     @field_validator('source_manager', mode="before")
     def _create_source_manager_if_req(cls, value, info: ValidationInfo):
@@ -163,3 +236,15 @@ class VectorForge:
             im.save(output_fp)
 
         return im
+
+
+@on_create_media.register(priority=Priority.NORMAL)
+def create_vector_media(spec: VectorSpec, ctx: dict[str, Any] | None = None) -> tuple[str, VectorSpec] | None:
+    if spec.source_id is None:
+        return None
+    if ctx is None or "vector_source" not in ctx:
+        raise ValueError("Vector creation requires a resolved source")
+    return VectorForge().create_media(spec, source=ctx["vector_source"])
+
+
+create_vector_media._behavior.wants_caller_kind = VectorSpec

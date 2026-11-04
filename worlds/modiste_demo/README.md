@@ -5,8 +5,9 @@ catalogue for the [Salon Season design](../../docs/src/world-designs/salon-seaso
 and [#661](https://github.com/derekmerck/storytangl/issues/661). Maintained witnesses
 are `engine/tests/loaders/test_modiste_demo_world.py`,
 `engine/tests/loaders/test_modiste_service.py`, and
-`engine/tests/media/media_creators/svg_forge/test_svg_plan.py`. The story provides a
-textual recipe and resolved-plan exhibit; it does not render or assemble a character.
+`engine/tests/media/media_creators/svg_forge/test_svg_plan.py`, and
+`engine/tests/media/media_creators/svg_forge/test_vector_figure.py`. The story
+delivers an assembled SVG figure alongside the textual plan.
 
 From a normal CLI session, run `create_user modiste-reader` followed by
 `create_story modiste_demo`; use the outfit and palette choices to update the
@@ -23,7 +24,9 @@ the generic media code does not interpret those names.
 
 Palette bindings are maps from declared channel names to nonempty CSS property
 strings. This slice checks colors, local paint references and opacity values;
-the pure resolver merges them into effective plan bindings without recoloring art.
+the pure resolver merges them into effective plan bindings. The world interprets
+source annotations into explicit element targets; VectorForge applies the bindings
+to those targets and preserves the source's registration, definitions and shading.
 
 The committed SVG is a 250 KB text extraction from the historical Afreet
 `paperdoll_shapes.forge.svg`, SHA-256
@@ -38,7 +41,7 @@ Coverage is deliberately narrow: a base common body, Toulouse hair, underwear an
 camisole, with rose and blue palette choices. The historical common body's `top+a`
 and its flag substitutions are omitted; the choices are a simplified selection,
 not a claim of complete collection parity. Morphology variants, other body
-models, rendering and a Look/outfit adapter remain explicit future work.
+models, PNG rasterization and a Look/outfit adapter remain explicit future work.
 No unsupported choice changes character state or receives an invented fallback.
 
 To audit a separately available historical SVG without adding it to this repo:
@@ -51,11 +54,14 @@ The report prints the source hash, viewBox, structural counts and integrity
 diagnostic counts. CI uses only the committed subset and temporary SVG fixtures.
 
 The world authority prepares its catalog from its own resource manager and reuses
-it across journal reads. Accepted choices persist only the outfit and palette.
+it across journal reads. Accepted choices persist the outfit, palette and ordinary
+media dependency.
 The resolved plan contains source references, ordered groups, effective bindings,
 provenance and diagnostics; it contains no XML tree or live media resource. A
-JSON-backed Service witness changes both choices, reopens the session and confirms
-the same plan identity. This is P1, not assembled SVG delivery.
+JSON-backed Service witness changes both choices, inspects the delivered SVG,
+reopens the session and reuses an earlier figure. Rendering occurs at UPDATE;
+journal and restore reads do not generate media. Hard-light raster fidelity is
+not certified by this SVG slice.
 
 The media resolver canonicalizes declared aliases, applies ordered add, remove,
 substitute and suppress operations, then sorts by declared layer with stable ties.
