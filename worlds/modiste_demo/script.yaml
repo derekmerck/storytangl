@@ -10,7 +10,7 @@ scenes:
               Parts: {{ modiste_parts }}. Bindings: {{ modiste_bindings }}.
               Plan: {{ modiste_plan_id }}.
               {% if modiste_diagnostics %}Diagnostics: {{ modiste_diagnostics }}.{% endif %}
-              This catalogue records a plan; assembled portraits are under development.
+              The catalogue displays the selected assembled figure when available.
         actions:
           - {label: underwear, text: Select underwear, successor: catalogue}
           - {label: camisole, text: Select camisole, successor: catalogue}
