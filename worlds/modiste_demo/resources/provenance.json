@@ -1,0 +1,52 @@
+{
+  "source": "afreet_city/engine/src/tangl/media/paperdolls/resources/paperdoll_shapes.forge.svg",
+  "source_sha256": "3bab82e9077895b325c3e33c154e44a373e1d70a10eab7fdc68299d99ccb52ad",
+  "subset_sha256": "d976a7e9cb6571816c2799c9a007b4b9bd081d2afbd5e36c9cb83ae30fe4a8da",
+  "selection": {
+    "body_1_": [
+      "bottom_2_",
+      "top",
+      "arms",
+      "head-base"
+    ],
+    "feet": [
+      "slippers"
+    ],
+    "head": [
+      "hair-toulouse"
+    ],
+    "top_2_": [
+      "underwear",
+      "camisole_2_"
+    ],
+    "bottom": [
+      "underwear_1_",
+      "camisole_1_"
+    ]
+  },
+  "method": "Original SVG groups and parent attributes copied in source order; geometry and IDs unchanged.",
+  "collection_sources": {
+    "body_type.yaml": "d473cfc4030ab0ee37c5de3135257d149d549854faa1c34fa6e985828dcf2b69",
+    "hair_style.yaml": "f2aa7174e05bb1f2a01abaf62f16260393b2f52cbda54da6ba91d882ece72ea0",
+    "outfit.yaml": "a8b2a8f9ce32484e8c809be445fc7bad7859843e223c1c116f34555a8216079e"
+  },
+  "palette_source_sha256": "fa9cc4e2e848304be5d0231b83771ba6fb2fa621df5c3d7a66119783b2c7af9d",
+  "selected_collections": {
+    "body_type": [
+      "common"
+    ],
+    "hair_style": [
+      "toulouse"
+    ],
+    "outfit": [
+      "underwear",
+      "camisole"
+    ]
+  },
+  "palette_note": "Selected and simplified from historical skin, hair and outfit palettes; fixed trim and secondary values are explicit demo choices.",
+  "selection_notes": [
+    "The common body omits top+a and all flag substitutions; only base morphology is claimed.",
+    "Underwear and camisole use their base groups; flag substitutions are not included.",
+    "The historical palettes are simplified and the outfit colors are explicit demo choices."
+  ]
+}

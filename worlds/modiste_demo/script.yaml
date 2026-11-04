@@ -1,0 +1,12 @@
+label: modiste_demo
+scenes:
+  studio:
+    blocks:
+      catalogue:
+        content: >-
+          The modiste's catalogue lists one mannequin, Toulouse hair, two outfits,
+          and two palettes. This exhibit records the source catalogue; its assembled
+          portraits are still under development.
+        actions:
+          - text: Review the collection
+            successor: catalogue

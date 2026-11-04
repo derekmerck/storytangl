@@ -1,0 +1,9 @@
+label: modiste_demo
+scripts: script.yaml
+domain_module: modiste_demo.domain
+media_dir: resources
+metadata:
+  title: The Modiste's Catalogue
+  description: A small catalogue-ingestion witness for the Salon Season prototype.
+  start_at: studio.catalogue
+  proof_class: fixture
