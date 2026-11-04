@@ -3,10 +3,16 @@ scenes:
   studio:
     blocks:
       catalogue:
-        content: >-
-          The modiste's catalogue lists one mannequin, Toulouse hair, two outfits,
-          and two palettes. This exhibit records the source catalogue; its assembled
-          portraits are still under development.
+        kind: ModisteDesk
+        prose:
+          - template: >-
+              Outfit: {{ modiste_outfit }}. Palette: {{ modiste_palette }}.
+              Parts: {{ modiste_parts }}. Bindings: {{ modiste_bindings }}.
+              Plan: {{ modiste_plan_id }}.
+              {% if modiste_diagnostics %}Diagnostics: {{ modiste_diagnostics }}.{% endif %}
+              This catalogue records a plan; assembled portraits are under development.
         actions:
-          - text: Review the collection
-            successor: catalogue
+          - {label: underwear, text: Select underwear, successor: catalogue}
+          - {label: camisole, text: Select camisole, successor: catalogue}
+          - {label: rose, text: Select rose palette, successor: catalogue}
+          - {label: blue, text: Select blue palette, successor: catalogue}
