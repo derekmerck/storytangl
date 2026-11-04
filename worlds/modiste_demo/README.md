@@ -27,6 +27,8 @@ strings. This slice checks colors, local paint references and opacity values;
 the pure resolver merges them into effective plan bindings. The world interprets
 source annotations into explicit element targets; VectorForge applies the bindings
 to those targets and preserves the source's registration, definitions and shading.
+Shared ancestor IDs and compositing are retained. A requested order that would
+split a shared ancestor is reported as an error.
 
 The committed SVG is a 250 KB text extraction from the historical Afreet
 `paperdoll_shapes.forge.svg`, SHA-256

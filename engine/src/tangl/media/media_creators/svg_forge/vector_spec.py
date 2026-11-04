@@ -38,7 +38,7 @@ class VectorSpec(MediaSpec):
     locators: tuple[str, ...] = ()
     bindings: dict[str, dict[str, str]] = Field(default_factory=dict)
     targets: tuple[tuple[str, str, str, tuple[int, ...]], ...] = ()
-    renderer_version: str = "1"
+    renderer_version: str = "2"
 
     def fingerprint_payload(self) -> dict[str, Any]:
         payload = self.normalized_spec_payload()

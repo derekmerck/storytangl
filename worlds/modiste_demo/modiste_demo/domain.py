@@ -21,7 +21,7 @@ from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.prose.naming import ProseBlock, get_authorities as naming_authorities
 from tangl.story import Action, StoryGraph
 from tangl.vm.runtime.frame import PhaseCtx
-from tangl.vm import Resolver
+from tangl.vm import ProvisionPolicy, Resolver
 
 
 class Collection(BaseModel):
@@ -274,6 +274,13 @@ def get_authorities() -> list[BehaviorRegistry]:
 
     @dispatch.register(task="apply_update", wants_caller_kind=ModisteDesk, wants_exact_kind=False)
     def select(*, caller: ModisteDesk, ctx: PhaseCtx, **_kwargs: object) -> None:
+        def suspend() -> None:
+            if caller.media:
+                dep = ctx.graph.get(caller.media[0]["dependency_id"])
+                # The next PLANNING precedes UPDATE's replacement request.
+                dep.requirement.provision_policy = ProvisionPolicy(0)
+                dep.set_provider(None, _ctx=ctx)
+
         edge = ctx.selected_edge
         if isinstance(edge, Action):
             if edge.label in {"underwear", "camisole"}:
@@ -283,14 +290,12 @@ def get_authorities() -> list[BehaviorRegistry]:
         pack, catalog = catalog_for(ctx.graph)
         plan = resolve_modiste(pack, catalog, outfit=caller.outfit, palette=caller.palette)
         if not plan.ok:
-            if caller.media:
-                ctx.graph.get(caller.media[0]["dependency_id"]).set_provider(None, _ctx=ctx)
+            suspend()
             caller.render_error = ""
             return
         source = ctx.graph.factory.resources.get_rit(catalog.source_label)
         if source is None or source.path is None or not source.path.is_file():
-            if caller.media:
-                ctx.graph.get(caller.media[0]["dependency_id"]).set_provider(None, _ctx=ctx)
+            suspend()
             caller.render_error = "Figure source is unavailable"
             return
         local = MediaInventoryProvisioner.graph_local_copy(source, _ctx=ctx)
@@ -299,8 +304,7 @@ def get_authorities() -> list[BehaviorRegistry]:
         try:
             targets = palette_targets(source.path, plan, frozenset(pack.channels))
         except (ValueError, OSError, etree.XMLSyntaxError) as exc:
-            if caller.media:
-                ctx.graph.get(caller.media[0]["dependency_id"]).set_provider(None, _ctx=ctx)
+            suspend()
             caller.render_error = str(exc)
             return
         spec = VectorSpec(
@@ -323,11 +327,15 @@ def get_authorities() -> list[BehaviorRegistry]:
                 "media_role": "narrative_im", "scope": "story",
             }).materialize(registry=ctx.graph)
             caller.media = [{"dependency_id": dependency.uid, "media_role": "narrative_im"}]
+        dependency.requirement.provision_policy = ProvisionPolicy.ANY
         try:
             resolved = Resolver.from_ctx(ctx).resolve_dependency(dependency, _ctx=ctx)
         except ValueError as exc:
+            suspend()
             caller.render_error = str(exc)
             return
+        if not resolved:
+            suspend()
         caller.render_error = "" if resolved else "Figure could not be provisioned"
 
     @dispatch.register(task="gather_ns", wants_caller_kind=ModisteDesk, wants_exact_kind=False)

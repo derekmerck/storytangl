@@ -36,7 +36,8 @@ def test_figure_preserves_geometry_and_applies_only_explicit_target() -> None:
     root = etree.fromstring(rendered.encode())
     ns = {"s": "http://www.w3.org/2000/svg"}
     assert root.get("viewBox") == "0 0 10 10"
-    assert [e.get("id") for e in root.xpath("//s:g[@id]", namespaces=ns)] == ["back", "front"]
+    assert [e.get("id") for e in root.xpath("//s:g[@id]", namespaces=ns)] == ["ancestor", "back", "front"]
+    assert root.xpath("//*[@id='back']")[0].getparent() is root.xpath("//*[@id='front']")[0].getparent()
     assert root.xpath("//*[@id='back']")[0].getparent().get("transform") == "translate(2 3)"
     assert root.xpath("//*[@id='front']")[0].getparent().get("style") == "opacity:0.5"
     assert root.xpath("//*[@id='front']")[0].get("style") == "opacity:0.8;display:inline"
@@ -62,6 +63,7 @@ def test_vector_spec_constructor_roundtrip_and_identity() -> None:
     assert request("blue").spec_fingerprint() != spec.spec_fingerprint()
     assert spec.model_copy(update={"source_hash": b"changed"}).spec_fingerprint() != spec.spec_fingerprint()
     assert spec.model_copy(update={"targets": ()}).spec_fingerprint() != spec.spec_fingerprint()
+    assert spec.model_copy(update={"renderer_version": "1"}).spec_fingerprint() != spec.spec_fingerprint()
 
 
 @pytest.mark.parametrize("changes", [
@@ -84,3 +86,31 @@ def test_unresolved_reference_fails() -> None:
 def test_changed_source_is_rejected() -> None:
     with pytest.raises(ValueError, match="source content changed"):
         VectorForge().create_media(request(), source=SOURCE.replace("fill:red", "fill:green"))
+
+
+def test_ancestor_id_styles_and_shared_compositing_are_preserved() -> None:
+    source = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+    <style>#ancestor {fill:red}</style><g id="ancestor" opacity="0.5">
+      <g id="back"><rect width="10" height="10"/></g>
+      <g id="unused"><rect id="unwanted"/></g>
+      <g id="front"><rect width="10" height="10" fill="blue"/></g>
+    </g></svg>'''
+    spec = request().model_copy(update={"source_sha256": sha256(source.encode()).hexdigest(),
+        "locators": ("#front", "#back"), "targets": ()})
+    result, _ = VectorForge().create_media(spec, source=source)
+    root = etree.fromstring(result.encode())
+    ancestor = root.xpath("//*[@id='ancestor']")
+    assert len(ancestor) == 1 and ancestor[0].get("opacity") == "0.5"
+    assert [child.get("id") for child in ancestor[0]] == ["front", "back"]
+    assert "#ancestor {fill:red}" in root.xpath("//*[local-name()='style']")[0].text
+    assert not root.xpath("//*[@id='unwanted']")
+
+
+def test_interleaving_shared_ancestor_fails_explicitly() -> None:
+    source = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+      <g id="a" opacity="0.5"><g id="a1"/><g id="a2"/></g>
+      <g id="b"><g id="b1"/></g></svg>'''
+    spec = request().model_copy(update={"source_sha256": sha256(source.encode()).hexdigest(),
+        "locators": ("#a1", "#b1", "#a2"), "targets": ()})
+    with pytest.raises(ValueError, match="split a shared SVG ancestor"):
+        VectorForge().create_media(spec, source=source)

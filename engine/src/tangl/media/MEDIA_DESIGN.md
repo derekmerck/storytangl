@@ -16,6 +16,8 @@
 > #661 P2 assembles the selected source groups into a palette-bound SVG via
 > VectorSpec, ordinary media provisioning and JOURNAL delivery. World-owned
 > annotations specify exact source targets; selected hidden groups are activated.
+> Assembly retains shared ancestors and their IDs; an order that would split one
+> shared ancestor is rejected rather than changing its compositing semantics.
 > PNG rendering fidelity and semantic Look projection remain future work.
 > #602 preserves structured JSON placeholder content through DTO and constructor-form
 > serialization; CLI renders only the named resource and unresolved reason.

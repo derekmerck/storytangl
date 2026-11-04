@@ -71,6 +71,8 @@ class VectorForge:
         for child in root:
             if isinstance(child.tag, str) and etree.QName(child).localname in {"defs", "style"}:
                 result.append(copy.deepcopy(child))
+        ancestors = {root: result}
+        selected_order = {}
         for locator in spec.locators:
             if not locator.startswith("#"):
                 raise ValueError(f"Invalid SVG locator: {locator}")
@@ -82,14 +84,19 @@ class VectorForge:
             for ancestor in reversed(list(group.iterancestors())):
                 if ancestor is root:
                     continue
-                attributes = {k: v for k, v in ancestor.attrib.items() if k != "id"}
-                parent = etree.SubElement(parent, ancestor.tag, attrib=attributes)
+                if ancestor not in ancestors:
+                    ancestors[ancestor] = etree.SubElement(parent, ancestor.tag, attrib=dict(ancestor.attrib))
+                parent = ancestors[ancestor]
             selected = copy.deepcopy(group)
             declarations = [part.strip() for part in selected.get("style", "").split(";") if part.strip()]
             declarations = [part for part in declarations if part.split(":", 1)[0].strip() != "display"]
             declarations.append("display:inline")
             selected.set("style", ";".join(declarations))
             parent.append(selected)
+            selected_order[selected] = len(selected_order)
+        actual_order = [selected_order[element] for element in result.iter() if element in selected_order]
+        if actual_order != list(range(len(selected_order))):
+            raise ValueError("Selected order would split a shared SVG ancestor")
         seen_targets = set()
         for channel, prop, identifier, indices in spec.targets:
             key = identifier, indices, prop
