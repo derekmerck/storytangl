@@ -22,7 +22,7 @@ def test_world_pack_admits_and_indexes_selected_source(monkeypatch) -> None:
     graph = world.create_story("modiste-catalogue").graph
     ledger = Ledger.from_graph(graph, entry_id=graph.initial_cursor_id)
     assert next(edge for edge in ledger.cursor.edges_out() if isinstance(edge, Action)).text == (
-        "Review the collection"
+        "Select underwear"
     )
     pack, catalog = load_pack(world.resources)
     again_pack, again = load_pack(world.resources)
@@ -105,3 +105,16 @@ def test_audit_accepts_svg_comments(tmp_path: Path, monkeypatch, capsys) -> None
     )
     audit(source)
     assert "top_groups=1" in capsys.readouterr().out
+
+
+def test_world_variants_report_unavailable_geometry_without_changing_choices(monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(ROOT))
+    from modiste_demo.domain import load_pack, resolve_modiste
+
+    pack, catalog = load_pack(ResourceManager(ROOT / "resources"))
+    before = pack.model_dump(), catalog.digest
+    plan = resolve_modiste(pack, catalog, outfit="camisole", variants=("h",))
+    assert not plan.ok and not plan.entries
+    assert any(d.code == "unsupported_variant" for d in plan.diagnostics)
+    assert "outfit:camisole" in plan.recipe.facts
+    assert (pack.model_dump(), catalog.digest) == before

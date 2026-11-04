@@ -54,6 +54,7 @@ class SvgCatalog(BaseModel):
     declared_channels: tuple[str, ...]
     palette_sha256: str
     source_groups: tuple[tuple[str, ...], ...]
+    source_ids: tuple[str, ...]
     entries: tuple[SvgCatalogEntry, ...]
     diagnostics: tuple[SvgCatalogDiagnostic, ...]
 
@@ -157,6 +158,36 @@ def index_svg_catalog(
             **declaration.model_dump(), locator=f"#{declaration.source_id}",
         ))
 
+    palette_diagnostics, valid_palettes = validate_palette_bindings(
+        palettes, channels=channels, source_ids=frozenset(elements),
+    )
+    diagnostics.extend(palette_diagnostics)
+
+    return SvgCatalog(
+        source_label=source.label or source.path.name,
+        resource_hash=source.content_hash.hex(),
+        source_sha256=sha256(raw).hexdigest(),
+        view_box=view_box,
+        declared_channels=tuple(sorted(channels)),
+        palette_sha256=sha256(json.dumps(valid_palettes, sort_keys=True,
+                                           separators=(",", ":")).encode()).hexdigest(),
+        source_groups=tuple(source_groups),
+        source_ids=tuple(sorted(elements)),
+        entries=tuple(entries),
+        diagnostics=tuple(sorted(diagnostics, key=lambda d: (d.code, d.subject, d.detail))),
+    )
+
+
+def validate_palette_bindings(
+    palettes: Mapping[str, Mapping[str, Mapping[str, str]]] | None, *,
+    channels: frozenset[str], source_ids: frozenset[str],
+) -> tuple[list[SvgCatalogDiagnostic], dict[str, dict[str, dict[str, str]]]]:
+    """Validate palette data without modifying it or loading SVG geometry."""
+    diagnostics: list[SvgCatalogDiagnostic] = []
+
+    def report(code: str, subject: str, detail: str) -> None:
+        diagnostics.append(SvgCatalogDiagnostic(code=code, subject=subject, detail=detail))
+
     if palettes is not None and not isinstance(palettes, Mapping):
         report("malformed_palette", "palettes", "Expected named palettes")
         palettes = {}
@@ -194,7 +225,7 @@ def index_svg_catalog(
                     local_refs = _URL_REF.findall(value)
                     if local_refs:
                         for identifier in local_refs:
-                            if identifier not in elements:
+                            if identifier not in source_ids:
                                 report("unresolved_reference", identifier, f"Palette {palette}")
                     elif value not in {"none", "currentColor"}:
                         try:
@@ -209,15 +240,4 @@ def index_svg_catalog(
                                 "malformed_palette_binding", palette, f"{channel}.{prop}: {value}",
                             )
 
-    return SvgCatalog(
-        source_label=source.label or source.path.name,
-        resource_hash=source.content_hash.hex(),
-        source_sha256=sha256(raw).hexdigest(),
-        view_box=view_box,
-        declared_channels=tuple(sorted(channels)),
-        palette_sha256=sha256(json.dumps(valid_palettes, sort_keys=True,
-                                           separators=(",", ":")).encode()).hexdigest(),
-        source_groups=tuple(source_groups),
-        entries=tuple(entries),
-        diagnostics=tuple(sorted(diagnostics, key=lambda d: (d.code, d.subject, d.detail))),
-    )
+    return diagnostics, valid_palettes

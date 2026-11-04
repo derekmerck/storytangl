@@ -10,8 +10,10 @@
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
 > #661 P0 indexes selected groups from an admitted SVG resource with original IDs,
 > registration, channel metadata and integrity diagnostics. The [Modiste catalogue](../../../../worlds/modiste_demo/README.md)
-> witnesses world-owned Afreet conventions and bounded coverage; recipe resolution
-> and assembled media remain future work.
+> witnesses world-owned Afreet conventions and bounded coverage.
+> #661 P1 adds pure explicit selection/rule and palette resolution to ordered,
+> source-referenced plans; Modiste exercises choices and JSON Service reopen.
+> SVG rendering and provisioning remain future work.
 > #602 preserves structured JSON placeholder content through DTO and constructor-form
 > serialization; CLI renders only the named resource and unresolved reason.
 > #562's opt-in prose portrait backend selects packed look variants from pre-admitted
