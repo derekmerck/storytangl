@@ -1,0 +1,12 @@
+rose:
+  skin: {fill: '#FCE1D5'}
+  hair: {fill: '#9a3300'}
+  primary: {fill: '#92282E'}
+  secondary: {fill: '#F1B3A4'}
+  trim: {fill: '#d4ac6e'}
+blue:
+  skin: {fill: '#B98150'}
+  hair: {fill: '#241c11'}
+  primary: {fill: '#18345c'}
+  secondary: {fill: '#a8cae0'}
+  trim: {fill: '#d4ac6e'}

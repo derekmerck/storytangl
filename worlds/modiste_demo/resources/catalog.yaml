@@ -1,0 +1,26 @@
+registration: [0, 0, 496, 665]
+channels: [skin, hair, primary, secondary, trim]
+groups:
+  body.bottom: {id: bottom_2_, order: 10}
+  body.top: {id: top, order: 11}
+  body.arms: {id: arms, order: 12}
+  body.head-base: {id: head-base, order: 13}
+  feet.slippers: {id: slippers, order: 15}
+  bottom.underwear: {id: underwear_1_, order: 20}
+  bottom.camisole: {id: camisole_1_, order: 20}
+  top.underwear: {id: underwear, order: 30}
+  top.camisole: {id: camisole_2_, order: 30}
+  head.hair-toulouse: {id: hair-toulouse, order: 40}
+collections:
+  body:
+    common:
+      shapes: [body.bottom, body.top, body.arms, body.head-base]
+      flags: {f: false, h: false, p: false, d: false}
+  hair:
+    toulouse: {shapes: [head.hair-toulouse]}
+  outfit:
+    underwear: {shapes: [bottom.underwear, top.underwear], tags: [lingerie]}
+    camisole: {shapes: [feet.slippers, bottom.camisole, top.camisole], tags: [lingerie]}
+coverage:
+  unsupported_morphologies: [f, h, p, d, g, s]
+  note: The historical common body includes top+a; it and all flag substitutions are outside this subset.
