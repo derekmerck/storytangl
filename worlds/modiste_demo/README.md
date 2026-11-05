@@ -7,7 +7,8 @@ are `engine/tests/loaders/test_modiste_demo_world.py`,
 `engine/tests/loaders/test_modiste_service.py`, and
 `engine/tests/media/media_creators/svg_forge/test_svg_plan.py`, and
 `engine/tests/media/media_creators/svg_forge/test_vector_figure.py`. The story
-delivers an assembled SVG figure alongside the textual plan.
+delivers an assembled SVG figure alongside the textual plan, and optionally a
+PNG derivative when the browser renderer is installed.
 
 From a normal CLI session, run `create_user modiste-reader` followed by
 `create_story modiste_demo`; use the outfit and palette choices to update the
@@ -43,7 +44,7 @@ Coverage is deliberately narrow: a base common body, Toulouse hair, underwear an
 camisole, with rose and blue palette choices. The historical common body's `top+a`
 and its flag substitutions are omitted; the choices are a simplified selection,
 not a claim of complete collection parity. Morphology variants, other body
-models, PNG rasterization and a Look/outfit adapter remain explicit future work.
+models, semantic masks, depth passes and a Look/outfit adapter remain future work.
 No unsupported choice changes character state or receives an invented fallback.
 
 To audit a separately available historical SVG without adding it to this repo:
@@ -62,8 +63,21 @@ The resolved plan contains source references, ordered groups, effective bindings
 provenance and diagnostics; it contains no XML tree or live media resource. A
 JSON-backed Service witness changes both choices, inspects the delivered SVG,
 reopens the session and reuses an earlier figure. Rendering occurs at UPDATE;
-journal and restore reads do not generate media. Hard-light raster fidelity is
-not certified by this SVG slice.
+journal and restore reads do not generate media. The optional PNG is a
+496 x 665 transparent image, with the complete SVG viewBox centered and fit
+without clipping or distortion. Its identity includes the SVG content hash,
+dimensions, background, fit, and Chromium and Playwright versions. If Chromium
+is unavailable or fails, the SVG and text remain usable, and a later choice can
+retry.
+
+Install the optional package with `poetry install -E svg-png`, and provision
+Playwright's Chromium separately with `poetry run playwright install chromium`.
+No browser is downloaded by the engine. Ordinary engine tests do not require a
+browser; run the fidelity and real Service witnesses explicitly with
+`STORYTANGL_TEST_SVG_BROWSER=1 PYTHONPATH=engine/src poetry run pytest engine/tests/media/media_creators/svg_forge/test_svg_png.py engine/tests/loaders/test_modiste_png_service.py`.
+Those tests check hard-light blending, gradient, clipping, opacity, transparent
+padding, Service delivery and JSON recovery. The subset's own SVG annotations
+and artwork determine its actual shading.
 
 The media resolver canonicalizes declared aliases, applies ordered add, remove,
 substitute and suppress operations, then sorts by declared layer with stable ties.

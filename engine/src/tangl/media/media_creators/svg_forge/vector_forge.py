@@ -28,7 +28,7 @@ Svg = str  # xml format string
 SvgSpec = object
 SVG_RENDERER = Literal["cairosvg", "playwright"]
 
-DEFAULT_SVG_RENDERER = settings.content.svg.renderer
+DEFAULT_SVG_RENDERER = "playwright"
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
@@ -213,7 +213,7 @@ class VectorForge:
         if svg_fp:
             with open(svg_fp, 'r') as f:
                 svg = f.read()
-        elif svg_root:
+        elif svg_root is not None:
             svg = cls.to_string(svg_root, encoding="unicode")
         else:
             raise ValueError("Requires `svg_root` or `svg_file` path")
@@ -226,16 +226,19 @@ class VectorForge:
 
         match renderer:
             case "cairosvg":
-                from .cairosvg_render import render_svg
+                from .render_cairosvg import render_svg
                 png_bytes = render_svg(svg, dims=dims)
             case "playwright":
-                from .playwright_render import render_svg
-                import asyncio
-                png_bytes = asyncio.run(render_svg(svg, dims))
+                from .render_playwright import render_svg
+                if dims is None:
+                    raise ValueError("PNG dimensions are required")
+                png_bytes = render_svg(svg, tuple(dims))
             case _:
                 raise TypeError(f"No svg renderer for {renderer}")
 
         if as_bytes:
+            if output_fp is not None:
+                Path(output_fp).write_bytes(png_bytes)
             return png_bytes
 
         im = PIL.Image.open(io.BytesIO(png_bytes))

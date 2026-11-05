@@ -31,6 +31,7 @@ _SPEC_ALIAS_MAP = {
     "printable_text": "tangl.media.media_creators.printable_text_spec.PrintableTextSpec",
     "stable": "tangl.media.media_creators.stable_forge.stable_spec.StableSpec",
     "vector": "tangl.media.media_creators.svg_forge.vector_spec.VectorSpec",
+    "svg_png": "tangl.media.media_creators.svg_forge.svg_png_spec.SvgPngSpec",
     "tts": "tangl.media.media_creators.tts_forge.tts_spec.TtsSpec",
 }
 

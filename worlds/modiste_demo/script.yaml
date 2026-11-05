@@ -4,6 +4,7 @@ scenes:
     blocks:
       catalogue:
         kind: ModisteDesk
+        render_png: true
         prose:
           - template: >-
               Outfit: {{ modiste_outfit }}. Palette: {{ modiste_palette }}.

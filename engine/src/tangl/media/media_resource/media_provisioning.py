@@ -22,6 +22,7 @@ from ..media_creators.composition_forge.composition_inputs import (
 )
 from ..media_creators.composition_forge.composition_spec import CompositionInputRef, CompositionSpec
 from ..media_creators.svg_forge.vector_spec import VectorSpec
+from ..media_creators.svg_forge.svg_png_spec import SvgPngSpec
 from ..media_creators.media_spec import MediaResolutionClass, MediaSpec
 from ..media_data_type import MediaDataType
 from ..story_media import get_story_resource_manager
@@ -247,7 +248,7 @@ def materialize_rit_from_spec(
             ctx_ns,
             resolve_composition_inputs(spec, graph=graph),
         )
-    if isinstance(spec, VectorSpec) and spec.source_id is not None:
+    if isinstance(spec, (VectorSpec, SvgPngSpec)) and spec.source_id is not None:
         source_spec = CompositionSpec(inputs=[CompositionInputRef(
             role="source", rit_id=spec.source_id, content_hash=spec.source_hash,
         )])
@@ -496,6 +497,9 @@ class MediaSpecProvisioner:
         parent = _resolve_media_parent(requirement, _ctx=_ctx)
         ctx_ns = _resolve_media_namespace(parent, _ctx=_ctx)
         adapted_spec = base_spec.model_copy(deep=True).adapt_spec(ref=parent, ctx=ctx_ns)
+        if isinstance(adapted_spec, SvgPngSpec):
+            from ..media_creators.svg_forge.render_playwright import renderer_identity
+            adapted_spec.renderer_version = renderer_identity()
         fingerprint = adapted_spec.spec_fingerprint()
         extra["has_identifier"] = fingerprint
         extra.setdefault("authored_path", fingerprint)
