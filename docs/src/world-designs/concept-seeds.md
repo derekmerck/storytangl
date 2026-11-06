@@ -92,6 +92,44 @@ explanation, with honest scope/horizon limits. This may inform authors,
 playtesting, or carefully disclosed in-game hints; it is not automatically
 a live engine authority that suppresses choices or reveals hidden story facts.
 
+**Second research direction: iterative narrative/symbolic fitting.** The
+same constraint analysis could support *construction* as well as testing.
+An author starts with a scene, plot outline, or a handful of canonical
+narrative anchors, makes a provisional symbolic account of its people,
+resources, chronology, knowledge, causal requirements, and negotiable
+assumptions, and asks how it could be **grafted into the existing world**.
+A bounded solver can search for admissible connecting sequences or explain
+why an intended sequence cannot occur. The author then revises both the
+story representation **and the prose/plot material**, rechecks the new
+model, and repeats until the supported constraints and authored experience
+fit closely enough to play and read coherently.
+
+This is a **MAP-like interpretation and refinement loop**, not a claim that
+the archived ASP driver estimates probabilities or generates dialogue.
+Hard constraints determine admissibility; narrative plausibility, minimal
+contrivance, character fidelity, and preservation of authored anchors are
+soft preferences that initially require human judgment. There may be several
+equally plausible realizations and no unique or guaranteed convergence.
+Do not silently rewrite an established event just to make a solver pass.
+The intended long-term result is **content and causality bound to the same
+world**, with stable links from authored passages to represented facts,
+witness paths, and explicitly unrepresented material. A provisional symbolic
+sketch may help authoring, but any eventual generated analysis contract must
+come from the canonical StoryTangl world rather than become a competing,
+hand-maintained runtime model.
+
+For example, an author may have already written Gwen's reconciliation
+with her partner after a disruptive eviction. The symbolic model can test
+whether the partner is discoverable, the room can become available, and the
+reunion remains reachable alongside other tenants' commitments. If not,
+the author may repair a missing introduction or revise the scene's timing
+and motivation, then render and reread the updated sequence. This is the
+human-assisted **narrative reconstruction / constrained interpolation**
+research candidate in [#210](https://github.com/derekmerck/storytangl/issues/210),
+with [#396](https://github.com/derekmerck/storytangl/issues/396) supplying
+only the observational, source-mapped feasibility-analysis side when its
+contract is established. It is not a current end-to-end authoring feature.
+
 **The archived "Apartment Summit" slice.** The proof's deliberately artificial
 global goal is to house **mother, Gwen, and Gwen's partner simultaneously** in
 two rooms. Meeting Alice exposes the park, which introduces Tom and an ice-cream
