@@ -3,7 +3,9 @@ from hashlib import sha256
 from io import BytesIO
 import asyncio
 import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 from uuid import uuid4
 
 from PIL import Image
@@ -112,3 +114,38 @@ def test_real_chromium_inside_event_loop_preserves_gradient_clip_and_opacity() -
     assert image.getpixel((0, 0))[3] == 0 and image.getpixel((10, 10))[3] == 128
     left, right = image.getpixel((5, 10)), image.getpixel((14, 10))
     assert left[0] > left[2] and right[2] > right[0]
+
+
+@pytest.mark.skipif(os.environ.get("STORYTANGL_TEST_SVG_BROWSER") != "1",
+                    reason="optional Chromium fidelity test")
+def test_real_chromium_nested_svg_and_external_content_are_isolated() -> None:
+    requests = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            requests.append(self.path)
+            self.send_response(204)
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    url = f"http://127.0.0.1:{server.server_port}"
+    source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+      <script>fetch('{url}/script')</script>
+      <image href="{url}/image" x="0" y="0" width="20" height="20"/>
+      <svg x="5" y="5" width="5" height="5" viewBox="0 0 5 5">
+        <rect width="5" height="5" fill="red"/></svg>
+    </svg>'''
+    try:
+        image = Image.open(BytesIO(render_svg(source, (20, 20)))).convert("RGBA")
+        assert image.getpixel((7, 7)) == (255, 0, 0, 255)
+        assert image.getpixel((15, 15))[3] == 0
+        assert requests == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join()

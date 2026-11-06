@@ -20,11 +20,13 @@
 > shared ancestor is rejected rather than changing its compositing semantics.
 > #661 P3a optionally derives a PNG from an admitted SVG using Chromium through
 > Playwright. The source content hash, requested dimensions, transparent or white
-> background, centered contain fit, browser version and Playwright version enter
+> background, centered contain fit, renderer revision, browser and Playwright versions enter
 > derivative identity; graph UUIDs and local paths do not. Browser availability
 > and version are checked before reuse. A missing or failed renderer leaves the
 > SVG available, and reads and restore do not render. Semantic Look projection,
 > masks and depth passes remain future work.
+> Chromium loads the SVG as an isolated image, so scripts and external resources
+> do not contribute to the derivative; contain fit affects the outer image only.
 > #602 preserves structured JSON placeholder content through DTO and constructor-form
 > serialization; CLI renders only the named resource and unresolved reason.
 > #562's opt-in prose portrait backend selects packed look variants from pre-admitted

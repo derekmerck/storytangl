@@ -34,29 +34,33 @@ class SvgPngSpec(MediaSpec):
         return data
 
 
+class SvgPngInputError(ValueError):
+    """A PNG request cannot use its referenced SVG source."""
+
+
 @on_create_media.register(priority=Priority.NORMAL)
 def create_svg_png(spec: SvgPngSpec, ctx: dict[str, Any] | None = None) -> tuple[bytes, SvgPngSpec]:
     from .render_playwright import render_svg
 
     if ctx is None or "vector_source" not in ctx:
-        raise ValueError("PNG creation requires a resolved SVG source")
+        raise SvgPngInputError("PNG creation requires a resolved SVG source")
     if not spec.renderer_version:
-        raise ValueError("PNG creation requires a resolved renderer version")
+        raise SvgPngInputError("PNG creation requires a resolved renderer version")
     source = ctx["vector_source"]
     if sha256(source.encode()).hexdigest() != spec.source_sha256:
-        raise ValueError("PNG source content changed")
+        raise SvgPngInputError("PNG source content changed")
     try:
         root = etree.fromstring(source.encode(), etree.XMLParser(resolve_entities=False, no_network=True))
     except etree.XMLSyntaxError as exc:
-        raise ValueError("PNG source must be valid SVG") from exc
+        raise SvgPngInputError("PNG source must be valid SVG") from exc
     if root.tag != "{http://www.w3.org/2000/svg}svg":
-        raise ValueError("PNG source must be SVG")
+        raise SvgPngInputError("PNG source must be SVG")
     try:
         box = tuple(float(item) for item in root.get("viewBox", "").replace(",", " ").split())
     except ValueError as exc:
-        raise ValueError("PNG source requires a valid viewBox") from exc
+        raise SvgPngInputError("PNG source requires a valid viewBox") from exc
     if len(box) != 4 or not all(math.isfinite(item) for item in box) or box[2] <= 0 or box[3] <= 0:
-        raise ValueError("PNG source requires a valid viewBox")
+        raise SvgPngInputError("PNG source requires a valid viewBox")
     return render_svg(source, (spec.width, spec.height), background=spec.background,
                       identity=spec.renderer_version), spec
 

@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 import asyncio
+from base64 import b64encode
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from importlib.util import find_spec
 from pathlib import Path
 import subprocess
 from typing import Callable, Coroutine, TypeVar
+from lxml import etree
 
 T = TypeVar("T")
+_RENDERER_REVISION = "svg-image:2"
 
 
 class RendererUnavailable(ValueError):
@@ -37,10 +40,14 @@ async def _browser_info() -> tuple[str, str]:
         raise RendererUnavailable("Playwright is unavailable") from exc
     if not Path(executable).is_file():
         raise RendererUnavailable("Playwright Chromium is not installed")
-    result = subprocess.run([executable, "--version"], capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run([executable, "--version"], capture_output=True, text=True, check=False)
+    except OSError as exc:
+        raise RendererUnavailable("Cannot determine Chromium version") from exc
     if result.returncode or not result.stdout.strip():
         raise RendererUnavailable("Cannot determine Chromium version")
-    return executable, f"chromium:{result.stdout.split()[-1]};playwright:{version('playwright')}"
+    return executable, (f"chromium:{result.stdout.split()[-1]};"
+                        f"playwright:{version('playwright')};{_RENDERER_REVISION}")
 
 
 def renderer_identity() -> str:
@@ -57,23 +64,21 @@ async def _render(svg: str, dims: tuple[int, int], background: str, identity: st
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(executable_path=executable)
             try:
-                if f"chromium:{browser.version};playwright:{version('playwright')}" != identity:
+                if (f"chromium:{browser.version};playwright:{version('playwright')};"
+                        f"{_RENDERER_REVISION}") != identity:
                     raise RendererUnavailable("Chromium version changed before rendering")
                 page = await browser.new_page(viewport={"width": dims[0], "height": dims[1]},
                                               device_scale_factor=1)
                 await page.set_content('<!doctype html><html><head><style>'
                     f'html,body{{margin:0;width:100%;height:100%;background:{background}}}'
-                    'svg{display:block;width:100%;height:100%}'
-                    '</style></head><body></body></html>')
-                await page.evaluate("""svg => {
-                    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
-                    const root = doc.documentElement;
-                    if (root.localName !== 'svg') throw new Error('Invalid SVG');
-                    root.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                    root.style.setProperty('width', '100%', 'important');
-                    root.style.setProperty('height', '100%', 'important');
-                    document.body.appendChild(document.importNode(root, true));
-                }""", svg)
+                    'img{display:block;width:100%;height:100%;object-fit:contain}'
+                    '</style></head><body><img></body></html>')
+                data = b64encode(svg.encode("utf-8")).decode("ascii")
+                await page.evaluate("""async data => {
+                    const image = document.querySelector('img');
+                    image.src = 'data:image/svg+xml;base64,' + data;
+                    await image.decode();
+                }""", data)
                 return await page.screenshot(omit_background=background == "transparent")
             finally:
                 await browser.close()
@@ -87,6 +92,14 @@ def render_svg(svg: str, dims: tuple[int, int], *, background: str = "transparen
         raise ValueError("PNG dimensions must be positive integers")
     if background not in {"transparent", "white"}:
         raise ValueError("PNG background must be transparent or white")
+    root = etree.fromstring(svg.encode("utf-8"), etree.XMLParser(resolve_entities=False, no_network=True))
+    view_box = root.get("viewBox", "").replace(",", " ").split()
+    if len(view_box) != 4:
+        raise ValueError("PNG source requires a valid viewBox")
+    root.set("width", view_box[2])
+    root.set("height", view_box[3])
+    root.set("preserveAspectRatio", "xMidYMid meet")
+    svg = etree.tostring(root, encoding="unicode")
     identity = identity or renderer_identity()
     return _run(lambda: _render(svg, dims, background, identity))
 

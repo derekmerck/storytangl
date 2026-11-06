@@ -65,7 +65,8 @@ JSON-backed Service witness changes both choices, inspects the delivered SVG,
 reopens the session and reuses an earlier figure. Rendering occurs at UPDATE;
 journal and restore reads do not generate media. The optional PNG is a
 496 x 665 transparent image, with the complete SVG viewBox centered and fit
-without clipping or distortion. Its identity includes the SVG content hash,
+without clipping or distortion. It renders the SVG in image mode with no active
+or external content. Its identity includes the SVG content hash,
 dimensions, background, fit, and Chromium and Playwright versions. If Chromium
 is unavailable or fails, the SVG and text remain usable, and a later choice can
 retry.
