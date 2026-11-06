@@ -193,6 +193,91 @@ playable. For the supported, bounded subset, compare ASP witnesses with actual
 opaque transitions. Preserve "Apartment Summit" as the historical POC, not the
 commune's organizing objective.
 
+## Causal Spine and Narrative Grafting
+
+**Stage:** authoring/reconstruction research seed, not a playable world or
+implemented corpus-conversion tool.
+**Research lineage:** [#210, theory-validation artifacts](https://github.com/derekmerck/storytangl/issues/210)
+(the bounded narrative-reconstruction and constrained-interpolation charter),
+[#396, optional formal analysis](https://github.com/derekmerck/storytangl/issues/396),
+and [#331, exemplar decomposition](https://github.com/derekmerck/storytangl/issues/331).
+**Related direction:** [the Apartment Commune](#the-apartment-commune-tenant-quests-and-foreclosed-possibilities)
+uses reachability to understand intersecting resident quests; this reverses
+the process by beginning with a *given linear story*.
+
+**Premise and experiential invariant.** Begin with an existing original or
+public-domain narrative, treated as **one witnessed causal thread**, not as a
+whole branching graph. Extract the smallest defensible symbolic account of
+its canonical events, ordering, character identities, knowledge, resources,
+and explicit dependencies. Preserve the originating passages as provenance
+for each modeled anchor. The author can now grow an interactive story around
+that spine, knowing which additions leave the original outcomes intact and
+which require a genuinely different history. **New stories grow from explicit
+constraints on what must still be true, rather than from uncontrolled forks
+of a linear script.**
+
+**Graft classifications.** For each candidate insertion point and proposed
+sequence, a scoped formal check asks whether an admissible continuation can
+rejoin the canonical next anchor:
+
+- **Outcome-preserving / locally inert:** the graft may change dialogue,
+  relationships, or local state, but preserves a *declared projection* of
+  canonical facts and still reaches the protected subsequent anchors. This
+  is not necessarily emotionally or mechanically inert.
+- **Consequential:** the graft modifies a fact relied on later by the spine,
+  so the author must add or revise downstream consequences, alternative
+  anchors, or endings. The solver can identify the first violated dependency
+  or exhibit the resulting path, not write its literary aftermath.
+- **Incompatible under current constraints:** no supported witness survives
+  without changing a protected anchor, repairing an assumption, or expanding
+  the admitted model. A horizon-bounded absence is only bounded evidence,
+  not a universal impossibility claim.
+
+An insertion that rejoins successfully on *one* path does not prove all
+possible reader choices rejoin. Authors should explicitly test both
+existential reachability and the stronger guarantee that relevant admitted
+branches preserve their protected outcomes, with completeness claims limited
+to the modeled scope.
+
+**Bidirectional authoring loop.** Work may start from the prose (extract
+anchors, model a possible insertion, solve, then revise the text), or from
+a desired symbolic branch (find a consistent graft and author its realized
+scenes). Iterate between narrative material and symbolic structure until
+the proposed content has a playable, source-mapped causal witness. As in
+the [Apartment Commune's MAP-like fitting proposal](#the-apartment-commune-tenant-quests-and-foreclosed-possibilities),
+hard constraints establish admissibility; plausibility, voice, and dramatic
+fitness remain human-judged preferences. Neither a unique inferred fabula
+nor algorithmic convergence is presumed.
+
+**StoryTangl connection.** A short annotated source supplies canonical anchors
+and deliberate omissions. Candidate additions must ultimately lower to
+ordinary StoryTangl graph, action, state, and JOURNAL paths. The authoring
+analyzer may inspect a generated solver-independent contract for a supported
+transition subset (#396), but must not become a second hand-maintained
+runtime story or a Clingo-specific compiler. Replaying accepted and rejected
+traces through ordinary `Ledger`/Service behavior supplies the differential
+check. Stable passage-to-anchor and anchor-to-world provenance makes
+diagnostics explain *which* source commitment would be broken. Unmodeled prose
+remains explicitly opaque instead of silently treated as unconstrained.
+
+**Unresolved questions.** What counts as the protected observable projection:
+events alone, their causes, knowledge at each point, or the intended final
+state? How can a side story remain consequential to its own participants while
+rejoining the spine? Where must branches reconcile, and where should authors
+accept alternate histories? How much human annotation is necessary before
+the cost of modeling exceeds the value of the solver's guidance?
+
+**First playable proof / unlock.** Take one short original or public-domain
+story with **4–8 manually annotated causal anchors**. Lower only its supported
+subset, preserve source references, then propose two grafts: one with a
+bounded witness that rejoins the original spine on protected facts, and one
+that violates a specific later dependency and therefore needs a new
+consequence thread or explicit rejection. Produce at least one realized
+reading sample and one source-mapped diagnostic, checked against normal
+StoryTangl traversal. This tests reproducible narrative expansion without
+promising automatic corpus understanding, exhaustive path coverage, or a
+general grafting engine.
+
 ## The Council in Your Head: competing inner voices
 
 **Stage:** concept seed; no new implementation selected.
