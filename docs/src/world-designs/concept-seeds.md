@@ -161,7 +161,9 @@ later generated compatible ASP from an actual world and replayed a solver
 plan through a normal `Ledger`, establishing a partial differential-validation
 precedent.
 
-**StoryTangl connection.** Residents can carry state, relationships, holdings,
+**StoryTangl connection.** This is one author-facing use of
+[Specialized Projections](../design/story/SEMANTIC_PROJECTIONS.md).
+Residents can carry state, relationships, holdings,
 and contributions; locations and the building supply available rooms and
 situations; scoped actions and scheduled events produce ordinary journaled
 consequences. Optional, **observational** formal analysis (#396) could
@@ -253,14 +255,19 @@ nor algorithmic convergence is presumed.
 
 **StoryTangl connection.** A short annotated source supplies canonical anchors
 and deliberate omissions. Candidate additions must ultimately lower to
-ordinary StoryTangl graph, action, state, and JOURNAL paths. The authoring
-analyzer may inspect a generated solver-independent contract for a supported
-transition subset (#396), but must not become a second hand-maintained
-runtime story or a Clingo-specific compiler. Replaying accepted and rejected
-traces through ordinary `Ledger`/Service behavior supplies the differential
-check. Stable passage-to-anchor and anchor-to-world provenance makes
-diagnostics explain *which* source commitment would be broken. Unmodeled prose
-remains explicitly opaque instead of silently treated as unconstrained.
+ordinary StoryTangl graph, action, state, and JOURNAL paths. The
+[Specialized Projections](../design/story/SEMANTIC_PROJECTIONS.md)
+principle applies: a task-specific Clingo/ASP export is a legitimate
+complementary representation, just as a bounded Twee codec or a future
+speech-synthesis projection serves a different task. #396 proposes a
+generated solver-independent analysis contract for its observational
+consumer; neither a target-specific exporter nor an intermediate annotation
+may become a second hand-maintained authority over the running world.
+Replaying accepted and rejected traces through ordinary `Ledger`/Service
+behavior supplies the differential check. Stable passage-to-anchor and
+anchor-to-world provenance make diagnostics explain *which* source
+commitment would be broken. Unmodeled prose remains explicitly opaque
+instead of silently treated as unconstrained.
 
 **Unresolved questions.** What counts as the protected observable projection:
 events alone, their causes, knowledge at each point, or the intended final
