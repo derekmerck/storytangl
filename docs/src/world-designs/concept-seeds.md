@@ -4,6 +4,7 @@ Prospective designs, not executable worlds or newly scheduled work. They share a
 page until one needs a developed brief. Existing issues retain implementation
 scope; an open issue does not establish that its consumer or architecture exists.
 
+(wd-constraint-collapse)=
 ## Constraint-Collapse Mystery
 
 **Stage:** concept seed. **Implementation:** none selected.
@@ -47,6 +48,7 @@ solutions, a meaningful exclusion path, and an intentionally modeled paradox. St
 with an inspectable finite set and normal runtime choices. This tests evidence,
 commitment, and admissible fabula without making a new solver VM a prerequisite.
 
+(wd-apartment-commune)=
 ## The Apartment Commune: tenant quests and foreclosed possibilities
 
 **Stage:** open-ended cozy community-world concept with an archived, narrower
@@ -130,7 +132,7 @@ with [#396](https://github.com/derekmerck/storytangl/issues/396) supplying
 only the observational, source-mapped feasibility-analysis side when its
 contract is established. It is not a current end-to-end authoring feature.
 The inverse, corpus-first approach is preserved separately as
-[Causal Spine and Narrative Grafting](#causal-spine-and-narrative-grafting).
+{ref}`Causal Spine and Narrative Grafting <wd-causal-spine>`.
 
 **The archived "Apartment Summit" slice.** The proof's deliberately artificial
 global goal is to house **mother, Gwen, and Gwen's partner simultaneously** in
@@ -173,7 +175,7 @@ identify foreclosure points. The actual StoryTangl transition remains the
 semantic oracle. Querying a solver from the UI for every step, or making it
 authoritative over the world's choices, would be a separate design decision.
 This is also distinct from the
-[Constraint-Collapse Mystery](#constraint-collapse-mystery), where narrowing
+{ref}`Constraint-Collapse Mystery <wd-constraint-collapse>`, where narrowing
 possible histories *is* the player's explicit game mechanic.
 
 **Unresolved questions.** How are tenant milestones and acceptable alternate
@@ -197,6 +199,7 @@ playable. For the supported, bounded subset, compare ASP witnesses with actual
 opaque transitions. Preserve "Apartment Summit" as the historical POC, not the
 commune's organizing objective.
 
+(wd-causal-spine)=
 ## Causal Spine and Narrative Grafting
 
 **Stage:** authoring/reconstruction research seed, not a playable world or
@@ -205,7 +208,7 @@ implemented corpus-conversion tool.
 (the bounded narrative-reconstruction and constrained-interpolation charter),
 [#396, optional formal analysis](https://github.com/derekmerck/storytangl/issues/396),
 and [#331, exemplar decomposition](https://github.com/derekmerck/storytangl/issues/331).
-**Related direction:** [the Apartment Commune](#the-apartment-commune-tenant-quests-and-foreclosed-possibilities)
+**Related direction:** {ref}`the Apartment Commune <wd-apartment-commune>`
 uses reachability to understand intersecting resident quests; this reverses
 the process by beginning with a *given linear story*.
 
@@ -248,7 +251,7 @@ anchors, model a possible insertion, solve, then revise the text), or from
 a desired symbolic branch (find a consistent graft and author its realized
 scenes). Iterate between narrative material and symbolic structure until
 the proposed content has a playable, source-mapped causal witness. As in
-the [Apartment Commune's MAP-like fitting proposal](#the-apartment-commune-tenant-quests-and-foreclosed-possibilities),
+the {ref}`Apartment Commune's MAP-like fitting proposal <wd-apartment-commune>`,
 hard constraints establish admissibility; plausibility, voice, and dramatic
 fitness remain human-judged preferences. Neither a unique inferred fabula
 nor algorithmic convergence is presumed.
