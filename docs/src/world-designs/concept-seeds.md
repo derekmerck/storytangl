@@ -106,19 +106,19 @@ not the full game design or a real calendar-based tenant schedule.
 
 **Archived artifacts and measured result.** The original research record
 retains the hand-authored
-[apartment scenario (\`world.lp\`)](../notes/research/formal_solver_poc/world.lp),
-[generic ASP transitions (\`engine.lp\`)](../notes/research/formal_solver_poc/engine.lp),
-and [query driver (\`driver.py\`)](../notes/research/formal_solver_poc/driver.py).
+[apartment scenario (`world.lp`)](../notes/research/formal_solver_poc/world.lp),
+[generic ASP transitions (`engine.lp`)](../notes/research/formal_solver_poc/engine.lp),
+and [query driver (`driver.py`)](../notes/research/formal_solver_poc/driver.py).
 The archived Clingo run reports minimum goal horizon **15**, with **13 player
 moves and three forced transitions** (some sharing a step); requiring
-\`eat_icecream\` makes the goal unreachable at every checked horizon through
+`eat_icecream` makes the goal unreachable at every checked horizon through
 **20**. It also identifies mother and partner as cascade-bound discoveries,
-and flags two introduced \`known\` facts not consumed by the modeled rules.
+and flags two introduced `known` facts not consumed by the modeled rules.
 Those are **bounded results for the hand-written toy**, not a proof of
 unbounded deadlock, live questline analysis, or equivalence to StoryTangl.
 A different proof, [One Red Paperclip](https://github.com/derekmerck/storytangl/tree/main/worlds/red_paperclip),
 later generated compatible ASP from an actual world and replayed a solver
-plan through a normal \`Ledger\`, establishing a partial differential-validation
+plan through a normal `Ledger`, establishing a partial differential-validation
 precedent.
 
 **StoryTangl connection.** Residents can carry state, relationships, holdings,
@@ -139,7 +139,7 @@ ways of helping expressed without scripting every cross-character combination?
 Which questlines are mutually exclusive by design, and which are accidentally
 soft-locked by a scarce resource or automatic eviction? Can a solver report
 the specific action or minimal dependency cut that foreclosed a questline,
-rather than merely \`UNSAT\` within a horizon? How do optional side stories,
+rather than merely `UNSAT` within a horizon? How do optional side stories,
 repeatable work, scheduling, and newly introduced residents constrain any
 claim of completeness? Should players receive such diagnostics at all, or
 should they remain an authoring and testing tool?
@@ -151,7 +151,7 @@ for someone not chosen. No compulsory summit or final verdict. Demonstrate
 that an authored questline is reachable from one state and foreclosed by a
 particular choice in another, while at least one other resident story remains
 playable. For the supported, bounded subset, compare ASP witnesses with actual
-\`Ledger\`/Service execution; report incompleteness rather than guessing over
+`Ledger`/Service execution; report incompleteness rather than guessing over
 opaque transitions. Preserve "Apartment Summit" as the historical POC, not the
 commune's organizing objective.
 
