@@ -33,7 +33,8 @@ The collection
      - Role-bound incident episodes, scoped affordance fanout, re-entrant world updates, and causal replay.
 
 :doc:`concept-seeds` collects Constraint-Collapse Mystery, The Apartment
-Commune (an open-ended tenant story with an archived Clingo questline proof),
+Commune (open-ended tenant stories, Clingo questline reachability, and
+iterative narrative/symbolic reconstruction),
 The Council in Your Head, The Long Way There, Two Readers, One Graph,
 Automata Chop-Shop, Second Bell, and a Fogbound Manifest showcase.
 :doc:`world-expansions` records possible extensions to Coronate the Regent,
