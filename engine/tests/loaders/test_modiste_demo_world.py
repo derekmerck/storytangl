@@ -118,3 +118,12 @@ def test_world_variants_report_unavailable_geometry_without_changing_choices(mon
     assert any(d.code == "unsupported_variant" for d in plan.diagnostics)
     assert "outfit:camisole" in plan.recipe.facts
     assert (pack.model_dump(), catalog.digest) == before
+
+
+def test_region_assignments_do_not_change_beauty_plan(monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(ROOT))
+    from modiste_demo.domain import load_pack, resolve_modiste
+
+    pack, catalog = load_pack(ResourceManager(ROOT / "resources"))
+    changed = pack.model_copy(update={"regions": {"other": ("body.arms",)}})
+    assert resolve_modiste(pack, catalog).identity == resolve_modiste(changed, catalog).identity

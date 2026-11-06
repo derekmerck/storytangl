@@ -80,6 +80,18 @@ Those tests check hard-light blending, gradient, clipping, opacity, transparent
 padding, Service delivery and JSON recovery. The subset's own SVG annotations
 and artwork determine its actual shading.
 
+The **Export visible regions** choice explicitly creates lower-body and torso
+mask PNGs, using world-owned group nominations and the current figure's layer
+order. Each export records the source and beauty resource IDs, mask resource IDs,
+viewBox, dimensions, contain fit, renderer and mask revisions, coverage status,
+and absent depth. White denotes the region and black denotes other nominated
+foreground; multiply the red channel by alpha for the mask value, including
+anti-aliased edges. Missing selections are marked unrepresented, fully hidden
+regions occluded, and incomplete group coverage partial. This is an opaque-fill
+approximation: transparency, strokes, filters, stylesheet-driven geometry or
+clipping, use/image/text and depth are reported as limits. Reading, restoration
+and routine display do not generate masks.
+
 The media resolver canonicalizes declared aliases, applies ordered add, remove,
 substitute and suppress operations, then sorts by declared layer with stable ties.
 World-authored finite rules can require or exclude facts. Palette properties merge
