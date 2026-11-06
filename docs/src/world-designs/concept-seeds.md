@@ -129,6 +129,8 @@ research candidate in [#210](https://github.com/derekmerck/storytangl/issues/210
 with [#396](https://github.com/derekmerck/storytangl/issues/396) supplying
 only the observational, source-mapped feasibility-analysis side when its
 contract is established. It is not a current end-to-end authoring feature.
+The inverse, corpus-first approach is preserved separately as
+[Causal Spine and Narrative Grafting](#causal-spine-and-narrative-grafting).
 
 **The archived "Apartment Summit" slice.** The proof's deliberately artificial
 global goal is to house **mother, Gwen, and Gwen's partner simultaneously** in
