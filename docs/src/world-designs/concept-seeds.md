@@ -47,6 +47,82 @@ solutions, a meaningful exclusion path, and an intentionally modeled paradox. St
 with an inspectable finite set and normal runtime choices. This tests evidence,
 commitment, and admissible fabula without making a new solver VM a prerequisite.
 
+## The Apartment Summit: a solver-backed tenant cascade
+
+**Stage:** archived executable ASP research proof and prospective world seed;
+**not** a playable StoryTangl world.
+**Lineage:** [formal solver POC](../notes/research/formal_solver_poc/index.md),
+[formal narrative analysis #396](https://github.com/derekmerck/storytangl/issues/396),
+and [theory-validation artifacts #210](https://github.com/derekmerck/storytangl/issues/210).
+
+**Original artifacts.** The research note retains the actual
+[apartment scenario (`world.lp`)](../notes/research/formal_solver_poc/world.lp),
+[generic transition rules (`engine.lp`)](../notes/research/formal_solver_poc/engine.lp),
+and [query driver (`driver.py`)](../notes/research/formal_solver_poc/driver.py).
+These are hand-authored Answer Set Programming inputs, not compiled StoryTangl
+source. The scenario is a *step-indexed causal plan* involving apartments and
+tenants, not yet a calendar-based household schedule or a complete narrative.
+
+**Premise and experiential invariant.** A protagonist managing **two rooms**
+must eventually accommodate their mother, Gwen, and Gwen's partner. Finding
+tenants is not a menu of independent appointments: meeting and befriending
+Alice reveals the park; visiting it introduces Tom and the shop; spending
+the shop's **only ice cream** befriends Tom and introduces Gwen and the
+hardware store. Tools prepare rooms, Gwen moves in, and her occupancy reveals
+the mother. Inviting the mother then automatically **evicts Gwen**, exposing
+Gwen's previously unseen partner; the protagonist must rebuild the arrangement
+and reunite the household. **A locally helpful decision changes which people
+exist in the actionable story and may undo an earlier apparent success.**
+This is a useful story seed for an escalating small-scale social comedy, but
+the archived proof contains symbolic actions, not a written cast or playable
+dialogue.
+
+**The adversarial resource trap.** Eating the one ice cream consumes the
+only resource capable of befriending Tom. Because Tom gates Gwen and the
+subsequent cascade, that innocent-looking action strands the summit. The
+model distinguishes monotone knowledge/unlocks, consumable objects, occupied
+room slots, and automatic one-shot events. The goal is `housed(mom)`,
+`housed(gwen)`, and `housed(partner)` simultaneously, not merely meeting
+all three or having housed them at different points.
+
+**What was actually verified.** The archived note reports a **minimum horizon
+of 15** for reaching the goal, with **13 player moves and three forced
+transitions** (some can share a step); forcing `eat_icecream` into a trace
+makes the goal unreachable through horizon 20. It also reports that mother
+and partner are **cascade-bound** and identifies two `known` facts offered
+but never consumed. These are **bounded solver results**, not an
+unbounded impossibility theorem or proof that StoryTangl itself executes
+these ASP rules. The same ASP vocabulary has separately been generated from
+[One Red Paperclip](https://github.com/derekmerck/storytangl/tree/main/worlds/red_paperclip):
+its solver plan was subsequently exercised through an ordinary StoryTangl
+`Ledger`, providing a partial differential-validation precedent.
+
+**StoryTangl connection.** This illustrates two related but distinct
+applications of a solver: (1) *observational authoring analysis* for
+finishability, soft locks, automatic trigger cascades, and source-mapped
+producer/consumer diagnostics; and (2) a possible *solver-owned world
+mechanic* in which constraints shape the available narrative. The current
+[#396 contract](https://github.com/derekmerck/storytangl/issues/396)
+pursues the first, with optional Clingo and StoryTangl's settled transitions
+remaining authoritative. Neither that contract nor this apartment example
+establishes a generic runtime solver, and this should not be conflated with
+the distinct [Constraint-Collapse Mystery](#constraint-collapse-mystery).
+
+**Unresolved questions.** Can a normal StoryTangl world reproduce the
+room, introduction, resource, and triggered-displacement semantics without
+a parallel scheduler? Which proof results can be source-mapped to authored
+choices, and which must be reported as bounded or opaque? How can a player
+recognize a coming cascade, decide whether to risk the ice cream, and feel
+the human cost of the eviction rather than merely solve a symbol puzzle?
+
+**First playable proof / unlock.** Materialize a compact, original apartment
+story using existing Story/VM actions, ordinary state, and authored aftermath.
+Test at least one successful cascade and one resource-stranding trace through
+a normal `Ledger`/Service witness, comparing the *supported* transition subset
+with the archived solver. Add character voices and a visible consequence for
+Gwen's eviction, but retain the narrow research artifact alongside any
+adaptation. No new generic scheduling or solver authority is a prerequisite.
+
 ## The Council in Your Head: competing inner voices
 
 **Stage:** concept seed; no new implementation selected.
