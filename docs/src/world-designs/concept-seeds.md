@@ -47,81 +47,113 @@ solutions, a meaningful exclusion path, and an intentionally modeled paradox. St
 with an inspectable finite set and normal runtime choices. This tests evidence,
 commitment, and admissible fabula without making a new solver VM a prerequisite.
 
-## The Apartment Summit: a solver-backed tenant cascade
+## The Apartment Commune: tenant quests and foreclosed possibilities
 
-**Stage:** archived executable ASP research proof and prospective world seed;
-**not** a playable StoryTangl world.
-**Lineage:** [formal solver POC](../notes/research/formal_solver_poc/index.md),
+**Stage:** open-ended cozy community-world concept with an archived, narrower
+Clingo planning proof. No playable StoryTangl apartment world is claimed.
+**Research lineage:** [formal solver POC](../notes/research/formal_solver_poc/index.md),
 [formal narrative analysis #396](https://github.com/derekmerck/storytangl/issues/396),
 and [theory-validation artifacts #210](https://github.com/derekmerck/storytangl/issues/210).
 
-**Original artifacts.** The research note retains the actual
-[apartment scenario (`world.lp`)](../notes/research/formal_solver_poc/world.lp),
-[generic transition rules (`engine.lp`)](../notes/research/formal_solver_poc/engine.lp),
-and [query driver (`driver.py`)](../notes/research/formal_solver_poc/driver.py).
-These are hand-authored Answer Set Programming inputs, not compiled StoryTangl
-source. The scenario is a *step-indexed causal plan* involving apartments and
-tenants, not yet a calendar-based household schedule or a complete narrative.
+**Creative provenance: the original world idea.** A small,
+[Kairosoft](https://kairosoft.net/steam/)-style residential building or commune:
+the player makes rooms habitable, invites residents, learns their eccentricities,
+and helps whichever people they choose. Residents have intersecting questlines,
+relationships, resources, histories, arrivals, and departures. The desired
+literary register owes something to [Fredrik Backman's *My Grandmother Asked Me
+to Tell You She's Sorry*](https://www.simonandschuster.net/books/My-Grandmother-Asked-Me-to-Tell-You-Shes-Sorry/Fredrik-Backman/9781501115073):
+a neighborhood of apparently odd or difficult people whose private lives and
+connections become intelligible through accumulated encounters. These are
+experience/genre precedents, not proposed adaptations of either source.
 
-**Premise and experiential invariant.** A protagonist managing **two rooms**
-must eventually accommodate their mother, Gwen, and Gwen's partner. Finding
-tenants is not a menu of independent appointments: meeting and befriending
-Alice reveals the park; visiting it introduces Tom and the shop; spending
-the shop's **only ice cream** befriends Tom and introduces Gwen and the
-hardware store. Tools prepare rooms, Gwen moves in, and her occupancy reveals
-the mother. Inviting the mother then automatically **evicts Gwen**, exposing
-Gwen's previously unseen partner; the protagonist must rebuild the arrangement
-and reunite the household. **A locally helpful decision changes which people
-exist in the actionable story and may undo an earlier apparent success.**
-This is a useful story seed for an escalating small-scale social comedy, but
-the archived proof contains symbolic actions, not a written cast or playable
-dialogue.
+**Premise and experiential invariant.** There is **no single mandatory win
+condition or final tenant arrangement**. Progress means discovering a person,
+understanding their needs, helping or refusing them, and seeing how that choice
+affects the other residents. You can pursue one relationship and ignore another,
+improve the building, or simply live with an imperfect community. Each resident's
+questline has its own attainable or foreclosable milestones; many stories overlap,
+so housing, befriending, evicting, or neglecting one person changes what is
+possible for others. The consequential question is not "have you beaten the
+commune?" but **"who can you still help, and what did your earlier decisions
+make impossible?"** The fictional payoff should remain humane and cozy even
+where the underlying constraint system is unforgiving.
 
-**The adversarial resource trap.** Eating the one ice cream consumes the
-only resource capable of befriending Tom. Because Tom gates Gwen and the
-subsequent cascade, that innocent-looking action strands the summit. The
-model distinguishes monotone knowledge/unlocks, consumable objects, occupied
-room slots, and automatic one-shot events. The goal is `housed(mom)`,
-`housed(gwen)`, and `housed(partner)` simultaneously, not merely meeting
-all three or having housed them at different points.
+**Why Clingo entered the idea.** The solver was intended to analyze
+*finishability of individual questlines from the current world state*,
+not to choose a canonical ending, dictate a fixed schedule, or drive an
+obligatory campaign victory. For each resident milestone or local goal, ask
+whether **any admissible continuation** reaches it given current relationships,
+available objects, space, time, committed choices, and triggered events.
+Compare before and after a contemplated or completed action to locate
+**nexuses**: choices where one or more previously reachable questlines become
+unreachable, or where obtaining one outcome precludes another. Ideally the
+analysis supplies a witness path or a concrete conflicting resource/dependency
+explanation, with honest scope/horizon limits. This may inform authors,
+playtesting, or carefully disclosed in-game hints; it is not automatically
+a live engine authority that suppresses choices or reveals hidden story facts.
 
-**What was actually verified.** The archived note reports a **minimum horizon
-of 15** for reaching the goal, with **13 player moves and three forced
-transitions** (some can share a step); forcing `eat_icecream` into a trace
-makes the goal unreachable through horizon 20. It also reports that mother
-and partner are **cascade-bound** and identifies two `known` facts offered
-but never consumed. These are **bounded solver results**, not an
-unbounded impossibility theorem or proof that StoryTangl itself executes
-these ASP rules. The same ASP vocabulary has separately been generated from
-[One Red Paperclip](https://github.com/derekmerck/storytangl/tree/main/worlds/red_paperclip):
-its solver plan was subsequently exercised through an ordinary StoryTangl
-`Ledger`, providing a partial differential-validation precedent.
+**The archived "Apartment Summit" slice.** The proof's deliberately artificial
+global goal is to house **mother, Gwen, and Gwen's partner simultaneously** in
+two rooms. Meeting Alice exposes the park, which introduces Tom and an ice-cream
+shop; the shop has **one ice cream**, needed to befriend Tom and reach Gwen.
+Preparing rooms and housing Gwen reveals the mother. Inviting the mother
+triggers Gwen's eviction, which makes Gwen's partner discoverable, after which
+the player can reunite the household. Eating the ice cream personally is a
+**soft lock for this one modeled goal**, not a declaration that an open-ended
+commune must become unwinnable. These intertwined introductions, resources,
+and displacement effects are a small formal witness of questline interaction,
+not the full game design or a real calendar-based tenant schedule.
 
-**StoryTangl connection.** This illustrates two related but distinct
-applications of a solver: (1) *observational authoring analysis* for
-finishability, soft locks, automatic trigger cascades, and source-mapped
-producer/consumer diagnostics; and (2) a possible *solver-owned world
-mechanic* in which constraints shape the available narrative. The current
-[#396 contract](https://github.com/derekmerck/storytangl/issues/396)
-pursues the first, with optional Clingo and StoryTangl's settled transitions
-remaining authoritative. Neither that contract nor this apartment example
-establishes a generic runtime solver, and this should not be conflated with
-the distinct [Constraint-Collapse Mystery](#constraint-collapse-mystery).
+**Archived artifacts and measured result.** The original research record
+retains the hand-authored
+[apartment scenario (\`world.lp\`)](../notes/research/formal_solver_poc/world.lp),
+[generic ASP transitions (\`engine.lp\`)](../notes/research/formal_solver_poc/engine.lp),
+and [query driver (\`driver.py\`)](../notes/research/formal_solver_poc/driver.py).
+The archived Clingo run reports minimum goal horizon **15**, with **13 player
+moves and three forced transitions** (some sharing a step); requiring
+\`eat_icecream\` makes the goal unreachable at every checked horizon through
+**20**. It also identifies mother and partner as cascade-bound discoveries,
+and flags two introduced \`known\` facts not consumed by the modeled rules.
+Those are **bounded results for the hand-written toy**, not a proof of
+unbounded deadlock, live questline analysis, or equivalence to StoryTangl.
+A different proof, [One Red Paperclip](https://github.com/derekmerck/storytangl/tree/main/worlds/red_paperclip),
+later generated compatible ASP from an actual world and replayed a solver
+plan through a normal \`Ledger\`, establishing a partial differential-validation
+precedent.
 
-**Unresolved questions.** Can a normal StoryTangl world reproduce the
-room, introduction, resource, and triggered-displacement semantics without
-a parallel scheduler? Which proof results can be source-mapped to authored
-choices, and which must be reported as bounded or opaque? How can a player
-recognize a coming cascade, decide whether to risk the ice cream, and feel
-the human cost of the eviction rather than merely solve a symbol puzzle?
+**StoryTangl connection.** Residents can carry state, relationships, holdings,
+and contributions; locations and the building supply available rooms and
+situations; scoped actions and scheduled events produce ordinary journaled
+consequences. Optional, **observational** formal analysis (#396) could
+generate a solver-independent description of the supported transition subset,
+then answer many **local** reachability questions against a snapshot and
+identify foreclosure points. The actual StoryTangl transition remains the
+semantic oracle. Querying a solver from the UI for every step, or making it
+authoritative over the world's choices, would be a separate design decision.
+This is also distinct from the
+[Constraint-Collapse Mystery](#constraint-collapse-mystery), where narrowing
+possible histories *is* the player's explicit game mechanic.
 
-**First playable proof / unlock.** Materialize a compact, original apartment
-story using existing Story/VM actions, ordinary state, and authored aftermath.
-Test at least one successful cascade and one resource-stranding trace through
-a normal `Ledger`/Service witness, comparing the *supported* transition subset
-with the archived solver. Add character voices and a visible consequence for
-Gwen's eviction, but retain the narrow research artifact alongside any
-adaptation. No new generic scheduling or solver authority is a prerequisite.
+**Unresolved questions.** How are tenant milestones and acceptable alternate
+ways of helping expressed without scripting every cross-character combination?
+Which questlines are mutually exclusive by design, and which are accidentally
+soft-locked by a scarce resource or automatic eviction? Can a solver report
+the specific action or minimal dependency cut that foreclosed a questline,
+rather than merely \`UNSAT\` within a horizon? How do optional side stories,
+repeatable work, scheduling, and newly introduced residents constrain any
+claim of completeness? Should players receive such diagnostics at all, or
+should they remain an authoring and testing tool?
+
+**First playable proof / unlock.** Build a tiny **open-ended** apartment world
+with two or three residents, overlapping local goals, one scarce resource,
+one relationship- or occupancy-triggered cascade, and a meaningful consequence
+for someone not chosen. No compulsory summit or final verdict. Demonstrate
+that an authored questline is reachable from one state and foreclosed by a
+particular choice in another, while at least one other resident story remains
+playable. For the supported, bounded subset, compare ASP witnesses with actual
+\`Ledger\`/Service execution; report incompleteness rather than guessing over
+opaque transitions. Preserve "Apartment Summit" as the historical POC, not the
+commune's organizing objective.
 
 ## The Council in Your Head: competing inner voices
 
