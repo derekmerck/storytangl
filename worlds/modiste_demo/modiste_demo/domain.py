@@ -10,6 +10,8 @@ import yaml
 
 from tangl.core import BehaviorRegistry, EntityTemplate
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
+from tangl.media.media_creators.svg_forge.svg_png_spec import SvgPngSpec
+from tangl.media.media_creators.svg_forge.render_playwright import renderer_identity
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
 from tangl.media.media_creators.svg_forge.svg_catalog import (
@@ -212,6 +214,7 @@ class ModisteDesk(ProseBlock):
 
     outfit: str = Field(default="underwear", json_schema_extra={"include": True})
     palette: str = Field(default="rose", json_schema_extra={"include": True})
+    render_png: bool = False
     render_error: str = Field(default="", json_schema_extra={"include": True})
 
 
@@ -275,8 +278,8 @@ def get_authorities() -> list[BehaviorRegistry]:
     @dispatch.register(task="apply_update", wants_caller_kind=ModisteDesk, wants_exact_kind=False)
     def select(*, caller: ModisteDesk, ctx: PhaseCtx, **_kwargs: object) -> None:
         def suspend() -> None:
-            if caller.media:
-                dep = ctx.graph.get(caller.media[0]["dependency_id"])
+            for item in caller.media:
+                dep = ctx.graph.get(item["dependency_id"])
                 # The next PLANNING precedes UPDATE's replacement request.
                 dep.requirement.provision_policy = ProvisionPolicy(0)
                 dep.set_provider(None, _ctx=ctx)
@@ -316,27 +319,66 @@ def get_authorities() -> list[BehaviorRegistry]:
         )
         if caller.media:
             dependency = ctx.graph.get(caller.media[0]["dependency_id"])
-            if (dependency.render_ready
-                    and dependency.requirement.media_spec.spec_fingerprint() == spec.spec_fingerprint()):
-                return
-            dependency.set_provider(None, _ctx=ctx)
-            dependency.requirement.media_spec = spec
+            same = (dependency.render_ready
+                    and dependency.requirement.media_spec.spec_fingerprint() == spec.spec_fingerprint())
+            if not same:
+                dependency.set_provider(None, _ctx=ctx)
+                dependency.requirement.media_spec = spec
         else:
+            same = False
             dependency = EntityTemplate.from_data({
                 "kind": MediaDep, "predecessor_id": caller.uid, "media_spec": spec,
                 "media_role": "narrative_im", "scope": "story",
             }).materialize(registry=ctx.graph)
             caller.media = [{"dependency_id": dependency.uid, "media_role": "narrative_im"}]
-        dependency.requirement.provision_policy = ProvisionPolicy.ANY
-        try:
-            resolved = Resolver.from_ctx(ctx).resolve_dependency(dependency, _ctx=ctx)
-        except ValueError as exc:
-            suspend()
-            caller.render_error = str(exc)
+        if not same:
+            dependency.requirement.provision_policy = ProvisionPolicy.ANY
+            try:
+                resolved = Resolver.from_ctx(ctx).resolve_dependency(dependency, _ctx=ctx)
+            except ValueError as exc:
+                suspend()
+                caller.render_error = str(exc)
+                return
+            if not resolved:
+                suspend()
+                caller.render_error = "Figure could not be provisioned"
+                return
+        if not caller.render_png:
+            caller.render_error = ""
             return
-        if not resolved:
-            suspend()
-        caller.render_error = "" if resolved else "Figure could not be provisioned"
+        from hashlib import sha256
+
+        try:
+            figure = dependency.provider
+            png = SvgPngSpec(
+                label="modiste-figure-png", source_id=figure.uid,
+                source_hash=figure.get_content_hash(), source_sha256=sha256(figure.path.read_bytes()).hexdigest(),
+                width=496, height=665, renderer_version=renderer_identity(),
+            )
+            if len(caller.media) > 1:
+                raster_dep = ctx.graph.get(caller.media[1]["dependency_id"])
+                if (raster_dep.render_ready
+                        and raster_dep.requirement.media_spec.spec_fingerprint() == png.spec_fingerprint()):
+                    caller.render_error = ""
+                    return
+                raster_dep.set_provider(None, _ctx=ctx)
+                raster_dep.requirement.media_spec = png
+            else:
+                raster_dep = EntityTemplate.from_data({
+                    "kind": MediaDep, "predecessor_id": caller.uid, "media_spec": png,
+                    "media_role": "narrative_im", "scope": "story",
+                }).materialize(registry=ctx.graph)
+                caller.media = [*caller.media, {"dependency_id": raster_dep.uid, "media_role": "narrative_im"}]
+            raster_dep.requirement.provision_policy = ProvisionPolicy.ANY
+            if not Resolver.from_ctx(ctx).resolve_dependency(raster_dep, _ctx=ctx):
+                raise ValueError("PNG figure could not be provisioned")
+            caller.render_error = ""
+        except (ValueError, OSError) as exc:
+            if len(caller.media) > 1:
+                raster_dep = ctx.graph.get(caller.media[1]["dependency_id"])
+                raster_dep.requirement.provision_policy = ProvisionPolicy(0)
+                raster_dep.set_provider(None, _ctx=ctx)
+            caller.render_error = str(exc)
 
     @dispatch.register(task="gather_ns", wants_caller_kind=ModisteDesk, wants_exact_kind=False)
     def describe(*, caller: ModisteDesk, **_kwargs: object) -> dict[str, object]:
