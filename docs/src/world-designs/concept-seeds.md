@@ -4,6 +4,7 @@ Prospective designs, not executable worlds or newly scheduled work. They share a
 page until one needs a developed brief. Existing issues retain implementation
 scope; an open issue does not establish that its consumer or architecture exists.
 
+(wd-constraint-collapse)=
 ## Constraint-Collapse Mystery
 
 **Stage:** concept seed. **Implementation:** none selected.
@@ -46,6 +47,248 @@ keep their references while changing the presentation?
 solutions, a meaningful exclusion path, and an intentionally modeled paradox. Start
 with an inspectable finite set and normal runtime choices. This tests evidence,
 commitment, and admissible fabula without making a new solver VM a prerequisite.
+
+(wd-apartment-commune)=
+## The Apartment Commune: tenant quests and foreclosed possibilities
+
+**Stage:** open-ended cozy community-world concept with an archived, narrower
+Clingo planning proof. No playable StoryTangl apartment world is claimed.
+**Research lineage:** [formal solver POC](../notes/research/formal_solver_poc/index.md),
+[formal narrative analysis #396](https://github.com/derekmerck/storytangl/issues/396),
+and [theory-validation artifacts #210](https://github.com/derekmerck/storytangl/issues/210).
+
+**Creative provenance: the original world idea.** A small,
+[Kairosoft](https://kairosoft.net/steam/)-style residential building or commune:
+the player makes rooms habitable, invites residents, learns their eccentricities,
+and helps whichever people they choose. Residents have intersecting questlines,
+relationships, resources, histories, arrivals, and departures. The desired
+literary register owes something to [Fredrik Backman's *My Grandmother Asked Me
+to Tell You She's Sorry*](https://www.simonandschuster.net/books/My-Grandmother-Asked-Me-to-Tell-You-Shes-Sorry/Fredrik-Backman/9781501115073):
+a neighborhood of apparently odd or difficult people whose private lives and
+connections become intelligible through accumulated encounters. These are
+experience/genre precedents, not proposed adaptations of either source.
+
+**Premise and experiential invariant.** There is **no single mandatory win
+condition or final tenant arrangement**. Progress means discovering a person,
+understanding their needs, helping or refusing them, and seeing how that choice
+affects the other residents. You can pursue one relationship and ignore another,
+improve the building, or simply live with an imperfect community. Each resident's
+questline has its own attainable or foreclosable milestones; many stories overlap,
+so housing, befriending, evicting, or neglecting one person changes what is
+possible for others. The consequential question is not "have you beaten the
+commune?" but **"who can you still help, and what did your earlier decisions
+make impossible?"** The fictional payoff should remain humane and cozy even
+where the underlying constraint system is unforgiving.
+
+**Why Clingo entered the idea.** The solver was intended to analyze
+*finishability of individual questlines from the current world state*,
+not to choose a canonical ending, dictate a fixed schedule, or drive an
+obligatory campaign victory. For each resident milestone or local goal, ask
+whether **any admissible continuation** reaches it given current relationships,
+available objects, space, time, committed choices, and triggered events.
+Compare before and after a contemplated or completed action to locate
+**nexuses**: choices where one or more previously reachable questlines become
+unreachable, or where obtaining one outcome precludes another. Ideally the
+analysis supplies a witness path or a concrete conflicting resource/dependency
+explanation, with honest scope/horizon limits. This may inform authors,
+playtesting, or carefully disclosed in-game hints; it is not automatically
+a live engine authority that suppresses choices or reveals hidden story facts.
+
+**Second research direction: iterative narrative/symbolic fitting.** The
+same constraint analysis could support *construction* as well as testing.
+An author starts with a scene, plot outline, or a handful of canonical
+narrative anchors, makes a provisional symbolic account of its people,
+resources, chronology, knowledge, causal requirements, and negotiable
+assumptions, and asks how it could be **grafted into the existing world**.
+A bounded solver can search for admissible connecting sequences or explain
+why an intended sequence cannot occur. The author then revises both the
+story representation **and the prose/plot material**, rechecks the new
+model, and repeats until the supported constraints and authored experience
+fit closely enough to play and read coherently.
+
+This is a **MAP-like interpretation and refinement loop**, not a claim that
+the archived ASP driver estimates probabilities or generates dialogue.
+Hard constraints determine admissibility; narrative plausibility, minimal
+contrivance, character fidelity, and preservation of authored anchors are
+soft preferences that initially require human judgment. There may be several
+equally plausible realizations and no unique or guaranteed convergence.
+Do not silently rewrite an established event just to make a solver pass.
+The intended long-term result is **content and causality bound to the same
+world**, with stable links from authored passages to represented facts,
+witness paths, and explicitly unrepresented material. A provisional symbolic
+sketch may help authoring, but any eventual generated analysis contract must
+come from the canonical StoryTangl world rather than become a competing,
+hand-maintained runtime model.
+
+For example, an author may have already written Gwen's reconciliation
+with her partner after a disruptive eviction. The symbolic model can test
+whether the partner is discoverable, the room can become available, and the
+reunion remains reachable alongside other tenants' commitments. If not,
+the author may repair a missing introduction or revise the scene's timing
+and motivation, then render and reread the updated sequence. This is the
+human-assisted **narrative reconstruction / constrained interpolation**
+research candidate in [#210](https://github.com/derekmerck/storytangl/issues/210),
+with [#396](https://github.com/derekmerck/storytangl/issues/396) supplying
+only the observational, source-mapped feasibility-analysis side when its
+contract is established. It is not a current end-to-end authoring feature.
+The inverse, corpus-first approach is preserved separately as
+{ref}`Causal Spine and Narrative Grafting <wd-causal-spine>`.
+
+**The archived "Apartment Summit" slice.** The proof's deliberately artificial
+global goal is to house **mother, Gwen, and Gwen's partner simultaneously** in
+two rooms. Meeting Alice exposes the park, which introduces Tom and an ice-cream
+shop; the shop has **one ice cream**, needed to befriend Tom and reach Gwen.
+Preparing rooms and housing Gwen reveals the mother. Inviting the mother
+triggers Gwen's eviction, which makes Gwen's partner discoverable, after which
+the player can reunite the household. Eating the ice cream personally is a
+**soft lock for this one modeled goal**, not a declaration that an open-ended
+commune must become unwinnable. These intertwined introductions, resources,
+and displacement effects are a small formal witness of questline interaction,
+not the full game design or a real calendar-based tenant schedule.
+
+**Archived artifacts and measured result.** The original research record
+retains the hand-authored
+[apartment scenario (`world.lp`)](../notes/research/formal_solver_poc/world.lp),
+[generic ASP transitions (`engine.lp`)](../notes/research/formal_solver_poc/engine.lp),
+and [query driver (`driver.py`)](../notes/research/formal_solver_poc/driver.py).
+The archived Clingo run reports minimum goal horizon **15**, with **13 player
+moves and three forced transitions** (some sharing a step); requiring
+`eat_icecream` makes the goal unreachable at every checked horizon through
+**20**. It also identifies mother and partner as cascade-bound discoveries,
+and flags two introduced `known` facts not consumed by the modeled rules.
+Those are **bounded results for the hand-written toy**, not a proof of
+unbounded deadlock, live questline analysis, or equivalence to StoryTangl.
+A different proof, [One Red Paperclip](https://github.com/derekmerck/storytangl/tree/main/worlds/red_paperclip),
+later generated compatible ASP from an actual world and replayed a solver
+plan through a normal `Ledger`, establishing a partial differential-validation
+precedent.
+
+**StoryTangl connection.** This is one author-facing use of
+[Specialized Projections](../design/story/SEMANTIC_PROJECTIONS.md).
+Residents can carry state, relationships, holdings,
+and contributions; locations and the building supply available rooms and
+situations; scoped actions and scheduled events produce ordinary journaled
+consequences. Optional, **observational** formal analysis (#396) could
+generate a solver-independent description of the supported transition subset,
+then answer many **local** reachability questions against a snapshot and
+identify foreclosure points. The actual StoryTangl transition remains the
+semantic oracle. Querying a solver from the UI for every step, or making it
+authoritative over the world's choices, would be a separate design decision.
+This is also distinct from the
+{ref}`Constraint-Collapse Mystery <wd-constraint-collapse>`, where narrowing
+possible histories *is* the player's explicit game mechanic.
+
+**Unresolved questions.** How are tenant milestones and acceptable alternate
+ways of helping expressed without scripting every cross-character combination?
+Which questlines are mutually exclusive by design, and which are accidentally
+soft-locked by a scarce resource or automatic eviction? Can a solver report
+the specific action or minimal dependency cut that foreclosed a questline,
+rather than merely `UNSAT` within a horizon? How do optional side stories,
+repeatable work, scheduling, and newly introduced residents constrain any
+claim of completeness? Should players receive such diagnostics at all, or
+should they remain an authoring and testing tool?
+
+**First playable proof / unlock.** Build a tiny **open-ended** apartment world
+with two or three residents, overlapping local goals, one scarce resource,
+one relationship- or occupancy-triggered cascade, and a meaningful consequence
+for someone not chosen. No compulsory summit or final verdict. Demonstrate
+that an authored questline is reachable from one state and foreclosed by a
+particular choice in another, while at least one other resident story remains
+playable. For the supported, bounded subset, compare ASP witnesses with actual
+`Ledger`/Service execution; report incompleteness rather than guessing over
+opaque transitions. Preserve "Apartment Summit" as the historical POC, not the
+commune's organizing objective.
+
+(wd-causal-spine)=
+## Causal Spine and Narrative Grafting
+
+**Stage:** authoring/reconstruction research seed, not a playable world or
+implemented corpus-conversion tool.
+**Research lineage:** [#210, theory-validation artifacts](https://github.com/derekmerck/storytangl/issues/210)
+(the bounded narrative-reconstruction and constrained-interpolation charter),
+[#396, optional formal analysis](https://github.com/derekmerck/storytangl/issues/396),
+and [#331, exemplar decomposition](https://github.com/derekmerck/storytangl/issues/331).
+**Related direction:** {ref}`the Apartment Commune <wd-apartment-commune>`
+uses reachability to understand intersecting resident quests; this reverses
+the process by beginning with a *given linear story*.
+
+**Premise and experiential invariant.** Begin with an existing original or
+public-domain narrative, treated as **one witnessed causal thread**, not as a
+whole branching graph. Extract the smallest defensible symbolic account of
+its canonical events, ordering, character identities, knowledge, resources,
+and explicit dependencies. Preserve the originating passages as provenance
+for each modeled anchor. The author can now grow an interactive story around
+that spine, knowing which additions leave the original outcomes intact and
+which require a genuinely different history. **New stories grow from explicit
+constraints on what must still be true, rather than from uncontrolled forks
+of a linear script.**
+
+**Graft classifications.** For each candidate insertion point and proposed
+sequence, a scoped formal check asks whether an admissible continuation can
+rejoin the canonical next anchor:
+
+- **Outcome-preserving / locally inert:** the graft may change dialogue,
+  relationships, or local state, but preserves a *declared projection* of
+  canonical facts and still reaches the protected subsequent anchors. This
+  is not necessarily emotionally or mechanically inert.
+- **Consequential:** the graft modifies a fact relied on later by the spine,
+  so the author must add or revise downstream consequences, alternative
+  anchors, or endings. The solver can identify the first violated dependency
+  or exhibit the resulting path, not write its literary aftermath.
+- **Incompatible under current constraints:** no supported witness survives
+  without changing a protected anchor, repairing an assumption, or expanding
+  the admitted model. A horizon-bounded absence is only bounded evidence,
+  not a universal impossibility claim.
+
+An insertion that rejoins successfully on *one* path does not prove all
+possible reader choices rejoin. Authors should explicitly test both
+existential reachability and the stronger guarantee that relevant admitted
+branches preserve their protected outcomes, with completeness claims limited
+to the modeled scope.
+
+**Bidirectional authoring loop.** Work may start from the prose (extract
+anchors, model a possible insertion, solve, then revise the text), or from
+a desired symbolic branch (find a consistent graft and author its realized
+scenes). Iterate between narrative material and symbolic structure until
+the proposed content has a playable, source-mapped causal witness. As in
+the {ref}`Apartment Commune's MAP-like fitting proposal <wd-apartment-commune>`,
+hard constraints establish admissibility; plausibility, voice, and dramatic
+fitness remain human-judged preferences. Neither a unique inferred fabula
+nor algorithmic convergence is presumed.
+
+**StoryTangl connection.** A short annotated source supplies canonical anchors
+and deliberate omissions. Candidate additions must ultimately lower to
+ordinary StoryTangl graph, action, state, and JOURNAL paths. The
+[Specialized Projections](../design/story/SEMANTIC_PROJECTIONS.md)
+principle applies: a task-specific Clingo/ASP export is a legitimate
+complementary representation, just as a bounded Twee codec or a future
+speech-synthesis projection serves a different task. #396 proposes a
+generated solver-independent analysis contract for its observational
+consumer; neither a target-specific exporter nor an intermediate annotation
+may become a second hand-maintained authority over the running world.
+Replaying accepted and rejected traces through ordinary `Ledger`/Service
+behavior supplies the differential check. Stable passage-to-anchor and
+anchor-to-world provenance make diagnostics explain *which* source
+commitment would be broken. Unmodeled prose remains explicitly opaque
+instead of silently treated as unconstrained.
+
+**Unresolved questions.** What counts as the protected observable projection:
+events alone, their causes, knowledge at each point, or the intended final
+state? How can a side story remain consequential to its own participants while
+rejoining the spine? Where must branches reconcile, and where should authors
+accept alternate histories? How much human annotation is necessary before
+the cost of modeling exceeds the value of the solver's guidance?
+
+**First playable proof / unlock.** Take one short original or public-domain
+story with **4–8 manually annotated causal anchors**. Lower only its supported
+subset, preserve source references, then propose two grafts: one with a
+bounded witness that rejoins the original spine on protected facts, and one
+that violates a specific later dependency and therefore needs a new
+consequence thread or explicit rejection. Produce at least one realized
+reading sample and one source-mapped diagnostic, checked against normal
+StoryTangl traversal. This tests reproducible narrative expansion without
+promising automatic corpus understanding, exhaustive path coverage, or a
+general grafting engine.
 
 ## The Council in Your Head: competing inner voices
 

@@ -18,6 +18,7 @@ See also
 
    story/philosophy
    story/NARRATIVE_CONTROL
+   story/SEMANTIC_PROJECTIONS
    SIMPLIFICATION_SPEC
    CANON_AND_REALIZATION
 

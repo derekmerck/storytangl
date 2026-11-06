@@ -32,9 +32,12 @@ The collection
      - Competing interventions create consequential international crises and changing political possibilities.
      - Role-bound incident episodes, scoped affordance fanout, re-entrant world updates, and causal replay.
 
-:doc:`concept-seeds` collects Constraint-Collapse Mystery, The Council in Your Head,
-The Long Way There, Two Readers, One Graph, Automata Chop-Shop, Second Bell, and
-a Fogbound Manifest showcase.
+:doc:`concept-seeds` collects Constraint-Collapse Mystery, The Apartment
+Commune (open-ended tenant stories, Clingo questline reachability, and
+iterative narrative/symbolic reconstruction), Causal Spine and Narrative
+Grafting (source-anchored branching from a linear corpus), The Council in Your
+Head, The Long Way There, Two Readers, One Graph,
+Automata Chop-Shop, Second Bell, and a Fogbound Manifest showcase.
 :doc:`world-expansions` records possible extensions to Coronate the Regent,
 Marmoset Island, the Grand Grotto companion story, and Hungry Colony. Existing
 worlds remain playable independently of these proposals.
