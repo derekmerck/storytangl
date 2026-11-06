@@ -35,10 +35,10 @@ in **semantic intent and provenance**, not necessarily identical interfaces.
 
 | Target / use | What is projected | Consumer and present status |
 | --- | --- | --- |
-| Twee/Twine | A bounded passage/link representation | **Implemented subset:** the [Twine codec](../../../../engine/src/tangl/loaders/codecs/twine.py) decodes supported Twee source and strictly exports a limited zero-loss subset. Not a general SugarCube runtime or full round-trip for arbitrary macros. |
+| Twee/Twine | A bounded passage/link representation | **Implemented subset:** the [Twine codec](https://github.com/derekmerck/storytangl/blob/main/engine/src/tangl/loaders/codecs/twine.py) decodes supported Twee source and strictly exports a limited zero-loss subset. Not a general SugarCube runtime or full round-trip for arbitrary macros. |
 | Client presentation (CLI, pygame, Ren'Py) | Ordinary choices, JOURNAL fragments, supported staging and interaction hints | **Existing client/adaptation paths** with differing presentation floors; none acquires authority over story causality by rendering it. |
 | Chatterbox or another TTS system | Annotated utterances, speaker identity, voice/style guidance, timing or resource requests | **Potential generation consumer.** StoryTangl's media/resource lifecycle provides related precedent, but this note does not claim a shipped Chatterbox adapter or universal spoken-dialogue exporter. |
-| ASP/Clingo | A supported abstraction of state, actions, resources, triggers, and goals | **Partial precedent:** the archived [apartment POC](../../notes/research/formal_solver_poc/index.md) is hand-authored ASP; [One Red Paperclip](../../../../worlds/red_paperclip/README.md) emits compatible ASP and validates a solver plan through an ordinary Ledger. A general generated analysis contract remains [#396](https://github.com/derekmerck/storytangl/issues/396) work. |
+| ASP/Clingo | A supported abstraction of state, actions, resources, triggers, and goals | **Partial precedent:** the archived [apartment POC](../../notes/research/formal_solver_poc/index.md) is hand-authored ASP; [One Red Paperclip](https://github.com/derekmerck/storytangl/blob/main/worlds/red_paperclip/README.md) emits compatible ASP and validates a solver plan through an ordinary Ledger. A general generated analysis contract remains [#396](https://github.com/derekmerck/storytangl/issues/396) work. |
 | Diagrams and structural reports | Topology, dependencies, provenance, or analysis results | **Representation-dependent** authoring/inspection artifacts, not independent state authority. |
 
 The author-facing versus reader-facing distinction describes **who uses the
@@ -102,8 +102,8 @@ generic solver VM, an ASP source language for the whole engine, or a shared
 Chatterbox/Twine/Clingo plugin superclass. Introduce common code only after
 multiple concrete consumers expose the same necessary contract.
 
-See [the Apartment Commune](../../world-designs/concept-seeds.md#the-apartment-commune-tenant-quests-and-foreclosed-possibilities)
-and [Causal Spine and Narrative Grafting](../../world-designs/concept-seeds.md#causal-spine-and-narrative-grafting)
+See {ref}`the Apartment Commune <wd-apartment-commune>`
+and {ref}`Causal Spine and Narrative Grafting <wd-causal-spine>`
 for the narrative research examples, and
 [#210](https://github.com/derekmerck/storytangl/issues/210) for the
 bounded, human-assisted reconstruction experiment.
