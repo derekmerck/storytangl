@@ -1,14 +1,16 @@
 """World-owned catalog, finite applicant slots and explicit UPDATE completion."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import cast
 
 from pydantic import Field
+import yaml
 
 from tangl.core import BehaviorRegistry, TokenCatalog
 from tangl.mechanics.demographics import (
-    GenerationReceipt, GenerationRequest, HasDemographics, NameBank, NameForm,
-    NamePart, NamePool, complete_generation, load_pack, name_catalog, register_pack,
+    GenerationReceipt, GenerationRequest, HasDemographics, NameBank,
+    complete_generation, name_catalog,
 )
 from tangl.prose.naming import (
     PersonalNamedActor, ProseBlock, get_authorities as naming_authorities,
@@ -16,21 +18,13 @@ from tangl.prose.naming import (
 from tangl.vm.runtime.frame import PhaseCtx
 
 
-# Loading this world explicitly adopts the small regular-git sample pack.
-# The generic demographics package still loads no definitions on import.
-SPRITE_BANK = NameBank(
-    label="casting_desk.sprite", selection_key="sprite", revision="casting-desk-v1",
-    forms={"plain": NameForm(
-        given=NamePart(pool=NamePool(
-            candidates=["Cookie", "Pepper", "Clover"], weights=[2, 1, 1],
-        )),
-        family=NamePart(
-            pool=NamePool(candidates=["Winter", "Summer", "Moon"]),
-            suffix=NamePool(candidates=["green", "mint", "bloom"]),
-        ),
-    )},
-)
-NAMES = name_catalog(register_pack(load_pack("sample")), overrides=(SPRITE_BANK,))
+# Loading this world adopts its own authored banks and nothing else: no national
+# pack is registered. Each resource file holds one authored NameBank.
+BANK_DIR = Path(__file__).resolve().parents[1] / "resources" / "names"
+NAMES = name_catalog(overrides=tuple(
+    NameBank.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    for path in sorted(BANK_DIR.glob("*.yaml"))
+))
 
 
 def get_token_catalogs(**_kwargs: object) -> list[TokenCatalog[NameBank]]:

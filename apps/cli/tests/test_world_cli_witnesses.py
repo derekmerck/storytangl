@@ -132,18 +132,18 @@ def test_casting_desk_cli_witness_completes_inspects_and_revisits() -> None:
     assert len(ready) == 4
     assert ready[0] == ready[3]
     assert inspected == [ready[0], ready[0], ready[1], ready[2], ready[0]]
-    human = NameBank.get_instance("fra").forms["female"]
+    human = NameBank.get_instance("casting_desk.salon").forms["female"]
     assert ready[0] in {f"Ari {family}" for family in human.family.pool.candidates}
     assert ready[1] in human.given.pool.candidates
-    sprite = NameBank.get_instance("casting_desk.sprite").forms["plain"]
-    assert ready[2] in {
-        f"{given} {stem}{suffix}"
-        for given in sprite.given.pool.candidates
+    sprite = NameBank.get_instance("casting_desk.sprite").forms["female"]
+    given, family = ready[2].rsplit(" ", 1)
+    assert given in sprite.given.pool.candidates
+    assert any(
+        family.startswith(stem) and family[len(stem):] in sprite.family.suffix.candidates
         for stem in sprite.family.pool.candidates
-        for suffix in sprite.family.suffix.candidates
-    }
-    assert "Naming source: fra; form female; revision sample-v1." in unwrapped
-    assert "Naming source: sprite; form plain; revision casting-desk-v1." in unwrapped
+    )
+    assert "Naming source: salon; form female; revision salon-season-v1." in unwrapped
+    assert "Naming source: sprite; form female; revision faie-cities-v1." in unwrapped
     assert "Gender: neutral." in transcript
     assert "Age band: not requested. Gender: not requested. Country: not requested." in unwrapped
     assert "The desk closes. The three files remain themselves." in transcript

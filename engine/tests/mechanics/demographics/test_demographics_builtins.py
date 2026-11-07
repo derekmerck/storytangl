@@ -19,6 +19,7 @@ from tangl.mechanics.demographics import (
     load_pack, parse_pack, register_pack,
 )
 from tangl.mechanics.demographics import packs
+from tangl.utils import shelved2
 
 
 @pytest.fixture
@@ -136,6 +137,18 @@ assert set(NameBank.all_instance_labels()) == {"fra", "jpn"}
         [sys.executable, "-c", script, str(root)], capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_repeat_pack_loads_are_served_from_the_shelved_yaml_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(shelved2, "cache_dir", tmp_path)
+    monkeypatch.setattr(shelved2, "SHELVED_CACHE_ENABLED", True)
+    first = load_pack("sample")
+    hits = shelved2.hit_count
+    assert load_pack("sample") == first
+    # Metadata, geography and names: every resource read is a cache hit.
+    assert shelved2.hit_count == hits + 3
 
 
 @pytest.mark.parametrize("contents", ["[broken", "- wrong shape", "fra: {female: []}"])
