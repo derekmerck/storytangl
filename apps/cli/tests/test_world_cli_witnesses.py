@@ -136,12 +136,12 @@ def test_casting_desk_cli_witness_completes_inspects_and_revisits() -> None:
     assert ready[0] in {f"Ari {family}" for family in human.family.pool.candidates}
     assert ready[1] in human.given.pool.candidates
     sprite = NameBank.get_instance("casting_desk.sprite").forms["female"]
-    assert ready[2] in {
-        f"{given} {stem}{suffix}"
-        for given in sprite.given.pool.candidates
+    given, family = ready[2].rsplit(" ", 1)
+    assert given in sprite.given.pool.candidates
+    assert any(
+        family.startswith(stem) and family[len(stem):] in sprite.family.suffix.candidates
         for stem in sprite.family.pool.candidates
-        for suffix in sprite.family.suffix.candidates
-    }
+    )
     assert "Naming source: salon; form female; revision salon-season-v1." in unwrapped
     assert "Naming source: sprite; form female; revision faie-cities-v1." in unwrapped
     assert "Gender: neutral." in transcript

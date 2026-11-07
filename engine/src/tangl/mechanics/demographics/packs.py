@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from tangl.core import TokenCatalog
-from tangl.utils.load_yaml_resource import load_yaml_resource
+from tangl.utils.load_yaml_resource import load_yaml_path
 
 from .data_models import Country, NameBank, NameForm, NamePart, NamePool, Region, Subtype
 
@@ -130,7 +130,8 @@ def parse_pack(
 def _read_yaml(filename: str) -> object:
     """Parse one pack resource through the shelved YAML cache.
 
-    Absence and LFS pointers are refused before the cache, so neither is ever stored.
+    The checked path is the parsed path. Absence and LFS pointers are refused before
+    the cache, so neither is ever stored.
     """
     resource = files(__package__).joinpath("resources", filename)
     try:
@@ -143,7 +144,7 @@ def _read_yaml(filename: str) -> object:
             f"Demographics resource {filename!r} is a Git LFS pointer; "
             "fetch the optional full pack or explicitly choose 'sample'"
         )
-    return load_yaml_resource(__package__, f"resources/{filename}")
+    return load_yaml_path(resource)
 
 
 def load_pack(pack: Literal["sample", "full"]) -> DemographicPack:

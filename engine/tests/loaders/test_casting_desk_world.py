@@ -115,10 +115,11 @@ def test_service_walkthrough_preserves_authored_values_and_targeted_completion(
         assert grove.generation_receipt.bank is NameBank.get_instance("casting_desk.sprite")
         form = grove.generation_receipt.bank.forms["female"]
         assert grove.personal_name.given_name in form.given.pool.candidates
-        assert grove.personal_name.family_name in {
-            stem + suffix for stem in form.family.pool.candidates
-            for suffix in form.family.suffix.candidates
-        }
+        family = grove.personal_name.family_name
+        assert any(
+            family.startswith(stem) and family[len(stem):] in form.family.suffix.candidates
+            for stem in form.family.pool.candidates
+        )
         saved = values(session.ledger)
     complete_cast(manager, user_id)
     with manager.open_session(user_id=user_id) as session:
