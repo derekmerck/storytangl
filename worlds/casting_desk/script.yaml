@@ -10,7 +10,7 @@ actors:
     generation_request:
       facts: [gender, age_range]
       name_parts: {given_name: true, family_name: true}
-      origin: {label: River Guild, banks: {fra: 1}}
+      origin: {label: River Guild, banks: {salon: 1}}
       form: female
   hill_applicant:
     kind: Applicant
@@ -18,7 +18,7 @@ actors:
     generation_request:
       facts: [gender, age_range]
       name_parts: {given_name: true, family_name: false}
-      origin: {label: Hill Guild, banks: {fra: 1}}
+      origin: {label: Hill Guild, banks: {salon: 1}}
       form: female
   grove_applicant:
     kind: Applicant
@@ -26,7 +26,7 @@ actors:
     generation_request:
       name_parts: {given_name: true, family_name: true}
       origin: {label: Grove Kin, banks: {sprite: 1}}
-      form: plain
+      form: female
 scenes:
   desk:
     blocks:
@@ -97,7 +97,7 @@ scenes:
         kind: CompleteApplicant
         prose:
           - template: "Application ready: {{ reference(applicant, 'proper', form='full') }}."
-          - text: The sprite's family name joins a seasonal stem to a leafy ending.
+          - text: The sprite's family name joins a stem to an ending, as grove kin do.
         actions:
           - {label: inspect, text: Inspect profile, successor: inspect}
           - {label: return, text: Return to desk, successor: desk.start}

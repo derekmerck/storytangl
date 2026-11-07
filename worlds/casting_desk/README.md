@@ -10,11 +10,11 @@ Three files wait on the desk:
 - **Hill Guild:** another human keeps an authored neutral gender and intentional
   absence of a family name. Only the given name and age band are generated.
 - **Grove Kin:** a sprite gets a given name and compound family name, such as
-  Cookie Wintergreen. No country, gender or age is requested or invented.
+  Hydrangea Cinnamontwinkle. No country, gender or age is requested or invented.
 
 The two guilds are distinct authored `Origin` values that deliberately share the
-sample `fra` bank. Origin does not imply nationality. Both select the `female`
-form explicitly, independently of profile gender. These are illustrative sample
+world's `salon` bank. Origin does not imply nationality. All three applicants select
+the `female` form explicitly, independently of profile gender. These are illustrative
 pools and simple age/gender policies, not representative population data.
 
 ## Play
@@ -39,10 +39,32 @@ creating a user. Its assertions live in the CLI witness harness.
 
 `script.yaml` declares all actors, roles, requested dimensions, partial values,
 and forms. Ordinary eager template materialization creates the three
-slots before generation. The world domain explicitly adopts the regular-git sample
-pack, adds one compound sprite recipe and publishes its bounded catalog through
-the existing module authority seam. Importing the generic demographics package
-does not adopt this world or load its data.
+slots before generation. The world domain reads its own banks from
+`resources/names/` and publishes that bounded catalog through the existing module
+authority seam. It registers no national pack: a world that brings its own banks
+needs none. Importing the generic demographics package does not adopt this world
+or load its data.
+
+## Name banks
+
+Each file in `resources/names/` is one authored `NameBank`: a label, a world-local
+`selection_key`, a revision and its forms. Pools shared between forms use a YAML
+anchor rather than a second copy.
+
+| File | Key | Shape | Provenance |
+| --- | --- | --- | --- |
+| `salon.yaml` | `salon` | given + surname, `female`/`male` | Salon Season remix resources, entries verbatim |
+| `sprite.yaml` | `sprite` | given + stem·suffix family, `female`/`male` | the retired faie-cities sketch |
+
+These banks are parked here so they are not lost. When the Salon Season or a
+faie-cities world lands, move its bank into that world and have Casting Desk borrow
+it rather than keep a second copy. Leaving them here as references is also fine;
+the rule is one copy, not where it lives.
+
+Borrowing a bank from another sideloaded world, rather than from a pack, is not
+built yet. Today a world can only compose catalogs it constructs itself, so the
+direction to settle is how one world names another world's published banks without
+importing its domain module.
 
 An explicit world UPDATE handler completes only the current `applicant` role and
 commits the returned `personal_name`, facts and receipt using the VM-supplied frame

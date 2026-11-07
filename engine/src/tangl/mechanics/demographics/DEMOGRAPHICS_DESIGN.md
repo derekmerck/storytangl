@@ -288,7 +288,8 @@ sampling weights during conversion.
 
 The implemented text-first [Casting Desk](../../../../../worlds/casting_desk/README.md)
 demo leaves Hall Monitor's fixed proofs untouched. Two distinct human origins
-share the sample bank, and a grove sprite uses a world-local compound recipe.
+share one world-authored bank, and a grove sprite uses a world-local compound recipe.
+Its banks are authored YAML resources; it registers no national pack.
 Authors pin name parts and facts, explicitly request missing values, inspect the
 same individual and save/restore without changing identity.
 
