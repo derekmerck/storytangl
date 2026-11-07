@@ -60,6 +60,10 @@ name = DemographicSampler.sample_name(
   `PackUnavailableError`. Callers can catch that exception and explicitly select
   `sample`. Malformed YAML/schema data raises its normal parse/validation error
   and never falls back.
+- Pack resources are parsed through the shelved YAML cache
+  (`tangl.utils.load_yaml_resource`), keyed by content hash and mtime, so repeat
+  loads of the multi-megabyte full bank skip parsing. Absent files and LFS pointers
+  are refused before the cache and are never stored.
 - Both packs use unchanged `nationalities.yaml` (approximately 2021, 215 countries,
   nine regions). `sample` contains only the two illustrative `fra`/`jpn` pools
   previously embedded in the loader. It does not support arbitrary country sampling.

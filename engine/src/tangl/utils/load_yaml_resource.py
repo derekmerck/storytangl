@@ -13,7 +13,7 @@ SHELF_FN = "yaml_loader"
 @shelved(fn=SHELF_FN)
 def cached_yaml_loader(path: Path, check_value=None):
     # check_value is used to invalidate stale entries
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 def load_yaml_resource(resource_module, yaml_fn, clear_cache=False):
