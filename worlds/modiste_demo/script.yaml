@@ -11,9 +11,11 @@ scenes:
               Parts: {{ modiste_parts }}. Bindings: {{ modiste_bindings }}.
               Plan: {{ modiste_plan_id }}.
               {% if modiste_diagnostics %}Diagnostics: {{ modiste_diagnostics }}.{% endif %}
+              {% if modiste_export %}Region export: {{ modiste_export }}.{% endif %}
               The catalogue displays the selected assembled figure when available.
         actions:
           - {label: underwear, text: Select underwear, successor: catalogue}
           - {label: camisole, text: Select camisole, successor: catalogue}
           - {label: rose, text: Select rose palette, successor: catalogue}
           - {label: blue, text: Select blue palette, successor: catalogue}
+          - {label: export_regions, text: Export visible regions, successor: catalogue}

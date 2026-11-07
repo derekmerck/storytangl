@@ -23,8 +23,18 @@
 > background, centered contain fit, renderer revision, browser and Playwright versions enter
 > derivative identity; graph UUIDs and local paths do not. Browser availability
 > and version are checked before reuse. A missing or failed renderer leaves the
-> SVG available, and reads and restore do not render. Semantic Look projection,
-> masks and depth passes remain future work.
+> SVG available, and reads and restore do not render. #661 P3b adds an explicit
+> Modiste export with world-declared region targets, graph-owned PNG references,
+> per-region coverage, registration and absent depth metadata. Its bounded mask
+> path paints nominated opaque fills white for the region and black for other
+> nominated geometry in source layer order. The mask value is red multiplied by
+> alpha; anti-aliased edge pixels have intermediate values. Source transparency,
+> strokes, filters, stylesheet-driven geometry and clipping, use/image/text and
+> depth are outside this approximation and reported as limits. Semantic Look
+> projection and depth synthesis remain future work.
+> Coverage uses the same inherited-fill rules as mask generation; partial passes
+> record visible-pixel presence separately. A selected `fill:none` palette is
+> rejected for export because it changes coverage, while beauty remains available.
 > Chromium loads the SVG as an isolated image, so scripts and external resources
 > do not contribute to the derivative; contain fit affects the outer image only.
 > #602 preserves structured JSON placeholder content through DTO and constructor-form

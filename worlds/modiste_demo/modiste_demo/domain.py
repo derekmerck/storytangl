@@ -3,14 +3,16 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from lxml import etree
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
 from tangl.core import BehaviorRegistry, EntityTemplate
+from tangl.core.bases import Unstructurable
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
-from tangl.media.media_creators.svg_forge.svg_png_spec import SvgPngSpec
+from tangl.media.media_creators.svg_forge.svg_png_spec import MASK_REVISION, SvgPngSpec
 from tangl.media.media_creators.svg_forge.render_playwright import renderer_identity
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
@@ -19,6 +21,7 @@ from tangl.media.media_creators.svg_forge.svg_catalog import (
 )
 from tangl.media.media_creators.svg_forge.svg_source_manager import SvgSourceManager
 from tangl.media.media_creators.svg_forge.svg_plan import RenderPlan
+from tangl.media.media_creators.svg_forge.region_mask import region_fill_coverage
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.prose.naming import ProseBlock, get_authorities as naming_authorities
 from tangl.story import Action, StoryGraph
@@ -49,6 +52,7 @@ class Pack(BaseModel):
     collections: dict[str, dict[str, Collection]]
     coverage: dict[str, Any]
     palettes: dict[str, Any]
+    regions: dict[str, tuple[str, ...]] = Field(default_factory=dict)
 
 
 def parse_annotation(
@@ -203,10 +207,31 @@ def resolve_modiste(
         palette=palette,
         overrides=overrides or {},
     )
-    revision = sha256(json.dumps(pack.model_dump(mode="json"), sort_keys=True,
+    revision = sha256(json.dumps(pack.model_dump(mode="json", exclude={"regions"}), sort_keys=True,
                                  separators=(",", ":")).encode()).hexdigest()
     return resolve_plan(catalog, recipe, palettes=pack.palettes, operations=tuple(operations),
                         diagnostics=tuple(diagnostics), policy_revision=revision)
+
+
+class RegionExport(Unstructurable):
+    source_id: UUID
+    beauty_id: UUID
+    plan_identity: str
+    masks: dict[str, UUID]
+    coverage: dict[str, str]
+    visible_pixels: dict[str, bool] = Field(default_factory=dict)
+    view_box: tuple[float, float, float, float]
+    dimensions: tuple[int, int]
+    renderer: str
+    mask_revision: str = "1"
+    fit: str = "contain"
+    encoding: str = "white=region; black=occluder; multiply red by alpha"
+    depth: str = "absent"
+    limits: tuple[str, ...] = (
+        "opaque fill approximation; source transparency, strokes and filters are not represented",
+        "only path and primitive fills are supported; use, image and text are not represented",
+        "stylesheet-driven geometry and clipping are not represented",
+    )
 
 
 class ModisteDesk(ProseBlock):
@@ -216,6 +241,8 @@ class ModisteDesk(ProseBlock):
     palette: str = Field(default="rose", json_schema_extra={"include": True})
     render_png: bool = False
     render_error: str = Field(default="", json_schema_extra={"include": True})
+    exports: list[RegionExport] = Field(default_factory=list,
+        json_schema_extra={"include": True, "unstructurable": True})
 
 
 def palette_targets(
@@ -285,6 +312,83 @@ def get_authorities() -> list[BehaviorRegistry]:
                 dep.set_provider(None, _ctx=ctx)
 
         edge = ctx.selected_edge
+        if isinstance(edge, Action) and edge.label == "export_regions":
+            from hashlib import sha256
+            from PIL import Image, ImageChops
+
+            pack, catalog = catalog_for(ctx.graph)
+            plan = resolve_modiste(pack, catalog, outfit=caller.outfit, palette=caller.palette)
+            if not pack.regions:
+                caller.render_error = "Missing region coverage metadata"
+                return
+            if not plan.ok or len(caller.media) < 2:
+                caller.render_error = "A valid figure and beauty PNG are required for export"
+                return
+            channels = {channel for entry in plan.entries for channel in entry.channels}
+            if any(properties.get("fill", "").strip().lower() == "none"
+                   for channel, properties in plan.bindings.items() if channel in channels):
+                caller.render_error = "Region export does not support palette fill:none"
+                return
+            svg_dep = ctx.graph.get(caller.media[0]["dependency_id"])
+            png_dep = ctx.graph.get(caller.media[1]["dependency_id"])
+            if not svg_dep.render_ready or not png_dep.render_ready:
+                caller.render_error = "A valid figure and beauty PNG are required for export"
+                return
+            source, beauty = svg_dep.provider, png_dep.provider
+            selected = {entry.key: entry.source_id for entry in plan.entries}
+            regions = {name: tuple(selected[key] for key in keys if key in selected)
+                       for name, keys in pack.regions.items()}
+            used = {item for ids in regions.values() for item in ids}
+            occluders = tuple(entry.source_id for entry in plan.entries if entry.source_id not in used)
+            coverage = {name: "unrepresented" for name, ids in regions.items() if not ids}
+            visible_pixels = {name: False for name in coverage}
+            masks = {}
+            try:
+                version = renderer_identity()
+                tree = etree.parse(str(source.path), etree.XMLParser(resolve_entities=False, no_network=True))
+                dimensions = (png_dep.requirement.media_spec.width, png_dep.requirement.media_spec.height)
+                with Image.open(beauty.path) as image:
+                    if image.size != dimensions:
+                        raise ValueError("Beauty PNG dimensions do not match its request")
+                for name, ids in regions.items():
+                    if not ids:
+                        continue
+                    supported, unsupported = region_fill_coverage(tree.getroot(), ids)
+                    if not supported:
+                        coverage[name] = "unrepresented"
+                        visible_pixels[name] = False
+                        continue
+                    spec = SvgPngSpec(label=f"region-{name}", source_id=source.uid,
+                        source_hash=source.get_content_hash(),
+                        source_sha256=sha256(source.path.read_bytes()).hexdigest(),
+                        width=dimensions[0], height=dimensions[1], renderer_version=version,
+                        mask_region=name, mask_regions=regions, mask_occluders=occluders)
+                    dep = EntityTemplate.from_data({"kind": MediaDep, "predecessor_id": caller.uid,
+                        "media_spec": spec, "scope": "story"}).materialize(registry=ctx.graph)
+                    try:
+                        resolved = Resolver.from_ctx(ctx).resolve_dependency(dep, _ctx=ctx)
+                    except (ValueError, OSError):
+                        dep.requirement.provision_policy = ProvisionPolicy(0)
+                        raise
+                    if not resolved:
+                        dep.requirement.provision_policy = ProvisionPolicy(0)
+                        raise ValueError(f"Region export failed: {name}")
+                    masks[name] = dep.provider.uid
+                    with Image.open(dep.provider.path) as image:
+                        red, _, _, alpha = image.convert("RGBA").split()
+                        visible_pixels[name] = bool(ImageChops.multiply(red, alpha).getbbox())
+                        if len(ids) < len(pack.regions[name]) or unsupported:
+                            coverage[name] = "partial"
+                        else:
+                            coverage[name] = "visible" if visible_pixels[name] else "occluded"
+                caller.exports = [*caller.exports, RegionExport(source_id=source.uid, beauty_id=beauty.uid,
+                    plan_identity=plan.identity, masks=masks, coverage=coverage, visible_pixels=visible_pixels,
+                    mask_revision=MASK_REVISION, view_box=plan.registration,
+                    dimensions=dimensions, renderer=version)]
+                caller.render_error = ""
+            except (ValueError, OSError) as exc:
+                caller.render_error = str(exc)
+            return
         if isinstance(edge, Action):
             if edge.label in {"underwear", "camisole"}:
                 caller.outfit = edge.label
@@ -394,6 +498,10 @@ def get_authorities() -> list[BehaviorRegistry]:
                 for prop, value in sorted(properties.items())
             ),
             "modiste_plan_id": plan.identity,
+            "modiste_export": (
+                ", ".join(f"{name}: {status}" for name, status in caller.exports[-1].coverage.items())
+                + "; depth: absent" if caller.exports else ""
+            ),
             "modiste_diagnostics": "; ".join(filter(None, [caller.render_error, *(
                 f"{item.code}: {item.subject} {item.detail}" for item in plan.diagnostics
             )])),

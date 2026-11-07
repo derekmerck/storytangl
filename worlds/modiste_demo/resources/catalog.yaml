@@ -1,5 +1,8 @@
 registration: [0, 0, 496, 665]
 channels: [skin, hair, primary, secondary, trim]
+regions:
+  lower_body: [body.bottom]
+  torso: [body.top]
 groups:
   body.bottom: {id: bottom_2_, order: 10}
   body.top: {id: top, order: 11}
