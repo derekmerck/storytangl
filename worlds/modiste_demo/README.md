@@ -4,9 +4,9 @@
 catalogue for the [Salon Season design](../../docs/src/world-designs/salon-season.md)
 and [#661](https://github.com/derekmerck/storytangl/issues/661). Maintained witnesses
 are `engine/tests/loaders/test_modiste_demo_world.py`,
-`engine/tests/loaders/test_modiste_service.py`, and
-`engine/tests/media/media_creators/svg_forge/test_svg_plan.py`, and
-`engine/tests/media/media_creators/svg_forge/test_vector_figure.py`. The story
+`engine/tests/loaders/test_modiste_service.py`,
+`engine/tests/loaders/test_modiste_region_export.py`, and the SVG forge tests
+`test_svg_plan.py`, `test_vector_figure.py`, and `test_region_mask.py`. The story
 delivers an assembled SVG figure alongside the textual plan, and optionally a
 PNG derivative when the browser renderer is installed.
 
@@ -44,7 +44,7 @@ Coverage is deliberately narrow: a base common body, Toulouse hair, underwear an
 camisole, with rose and blue palette choices. The historical common body's `top+a`
 and its flag substitutions are omitted; the choices are a simplified selection,
 not a claim of complete collection parity. Morphology variants, other body
-models, semantic masks, depth passes and a Look/outfit adapter remain future work.
+models, general semantic masks, depth passes and a Look/outfit adapter remain future work.
 No unsupported choice changes character state or receives an invented fallback.
 
 To audit a separately available historical SVG without adding it to this repo:
@@ -75,7 +75,7 @@ Install the optional package with `poetry install -E svg-png`, and provision
 Playwright's Chromium separately with `poetry run playwright install chromium`.
 No browser is downloaded by the engine. Ordinary engine tests do not require a
 browser; run the fidelity and real Service witnesses explicitly with
-`STORYTANGL_TEST_SVG_BROWSER=1 PYTHONPATH=engine/src poetry run pytest engine/tests/media/media_creators/svg_forge/test_svg_png.py engine/tests/loaders/test_modiste_png_service.py`.
+`STORYTANGL_TEST_SVG_BROWSER=1 PYTHONPATH=engine/src poetry run pytest engine/tests/media/media_creators/svg_forge/test_svg_png.py engine/tests/media/media_creators/svg_forge/test_region_mask.py engine/tests/loaders/test_modiste_png_service.py engine/tests/loaders/test_modiste_region_export.py`.
 Those tests check hard-light blending, gradient, clipping, opacity, transparent
 padding, Service delivery and JSON recovery. The subset's own SVG annotations
 and artwork determine its actual shading.
@@ -91,6 +91,11 @@ regions occluded, and incomplete group coverage partial. This is an opaque-fill
 approximation: transparency, strokes, filters, stylesheet-driven geometry or
 clipping, use/image/text and depth are reported as limits. Reading, restoration
 and routine display do not generate masks.
+The export rejects a selected palette channel with `fill:none` because that
+paint would otherwise change coverage; the beauty figure remains available.
+Per-region `visible_pixels` also records whether a partial pass has any visible
+coverage, so an incomplete hidden pass remains distinguishable from a complete
+occluded one.
 
 The media resolver canonicalizes declared aliases, applies ordered add, remove,
 substitute and suppress operations, then sorts by declared layer with stable ties.

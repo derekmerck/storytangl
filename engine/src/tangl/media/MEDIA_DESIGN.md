@@ -32,6 +32,9 @@
 > strokes, filters, stylesheet-driven geometry and clipping, use/image/text and
 > depth are outside this approximation and reported as limits. Semantic Look
 > projection and depth synthesis remain future work.
+> Coverage uses the same inherited-fill rules as mask generation; partial passes
+> record visible-pixel presence separately. A selected `fill:none` palette is
+> rejected for export because it changes coverage, while beauty remains available.
 > Chromium loads the SVG as an isolated image, so scripts and external resources
 > do not contribute to the derivative; contain fit affects the outer image only.
 > #602 preserves structured JSON placeholder content through DTO and constructor-form

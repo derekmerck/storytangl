@@ -13,6 +13,8 @@ from tangl.core import Priority
 from tangl.media.media_creators.media_spec import MediaResolutionClass, MediaSpec, on_create_media
 from tangl.media.media_data_type import MediaDataType
 
+MASK_REVISION = "2"
+
 
 class SvgPngSpec(MediaSpec):
     resolution_class: MediaResolutionClass = MediaResolutionClass.FAST_SYNC
@@ -29,7 +31,7 @@ class SvgPngSpec(MediaSpec):
     mask_region: str | None = None
     mask_regions: dict[str, tuple[str, ...]] = Field(default_factory=dict)
     mask_occluders: tuple[str, ...] = ()
-    mask_revision: str = "1"
+    mask_revision: str = MASK_REVISION
 
     def fingerprint_payload(self) -> dict[str, Any]:
         data = self.normalized_spec_payload()

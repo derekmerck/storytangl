@@ -12,7 +12,7 @@ import yaml
 from tangl.core import BehaviorRegistry, EntityTemplate
 from tangl.core.bases import Unstructurable
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
-from tangl.media.media_creators.svg_forge.svg_png_spec import SvgPngSpec
+from tangl.media.media_creators.svg_forge.svg_png_spec import MASK_REVISION, SvgPngSpec
 from tangl.media.media_creators.svg_forge.render_playwright import renderer_identity
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
@@ -21,6 +21,7 @@ from tangl.media.media_creators.svg_forge.svg_catalog import (
 )
 from tangl.media.media_creators.svg_forge.svg_source_manager import SvgSourceManager
 from tangl.media.media_creators.svg_forge.svg_plan import RenderPlan
+from tangl.media.media_creators.svg_forge.region_mask import region_fill_coverage
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.prose.naming import ProseBlock, get_authorities as naming_authorities
 from tangl.story import Action, StoryGraph
@@ -218,6 +219,7 @@ class RegionExport(Unstructurable):
     plan_identity: str
     masks: dict[str, UUID]
     coverage: dict[str, str]
+    visible_pixels: dict[str, bool] = Field(default_factory=dict)
     view_box: tuple[float, float, float, float]
     dimensions: tuple[int, int]
     renderer: str
@@ -322,6 +324,11 @@ def get_authorities() -> list[BehaviorRegistry]:
             if not plan.ok or len(caller.media) < 2:
                 caller.render_error = "A valid figure and beauty PNG are required for export"
                 return
+            channels = {channel for entry in plan.entries for channel in entry.channels}
+            if any(properties.get("fill", "").strip().lower() == "none"
+                   for channel, properties in plan.bindings.items() if channel in channels):
+                caller.render_error = "Region export does not support palette fill:none"
+                return
             svg_dep = ctx.graph.get(caller.media[0]["dependency_id"])
             png_dep = ctx.graph.get(caller.media[1]["dependency_id"])
             if not svg_dep.render_ready or not png_dep.render_ready:
@@ -334,12 +341,11 @@ def get_authorities() -> list[BehaviorRegistry]:
             used = {item for ids in regions.values() for item in ids}
             occluders = tuple(entry.source_id for entry in plan.entries if entry.source_id not in used)
             coverage = {name: "unrepresented" for name, ids in regions.items() if not ids}
+            visible_pixels = {name: False for name in coverage}
             masks = {}
             try:
                 version = renderer_identity()
                 tree = etree.parse(str(source.path), etree.XMLParser(resolve_entities=False, no_network=True))
-                shapes = {"path", "rect", "circle", "ellipse", "polygon", "polyline"}
-                unsupported = {"use", "image", "text", "foreignObject", "line"}
                 dimensions = (png_dep.requirement.media_spec.width, png_dep.requirement.media_spec.height)
                 with Image.open(beauty.path) as image:
                     if image.size != dimensions:
@@ -347,12 +353,10 @@ def get_authorities() -> list[BehaviorRegistry]:
                 for name, ids in regions.items():
                     if not ids:
                         continue
-                    elements = [element for identifier in ids
-                                for group in tree.xpath("//*[@id=$id]", id=identifier)
-                                for element in group.iter() if isinstance(element.tag, str)]
-                    kinds = {etree.QName(element).localname for element in elements}
-                    if not kinds & shapes:
+                    supported, unsupported = region_fill_coverage(tree.getroot(), ids)
+                    if not supported:
                         coverage[name] = "unrepresented"
+                        visible_pixels[name] = False
                         continue
                     spec = SvgPngSpec(label=f"region-{name}", source_id=source.uid,
                         source_hash=source.get_content_hash(),
@@ -372,12 +376,14 @@ def get_authorities() -> list[BehaviorRegistry]:
                     masks[name] = dep.provider.uid
                     with Image.open(dep.provider.path) as image:
                         red, _, _, alpha = image.convert("RGBA").split()
-                        if len(ids) < len(pack.regions[name]) or kinds & unsupported:
+                        visible_pixels[name] = bool(ImageChops.multiply(red, alpha).getbbox())
+                        if len(ids) < len(pack.regions[name]) or unsupported:
                             coverage[name] = "partial"
                         else:
-                            coverage[name] = "visible" if ImageChops.multiply(red, alpha).getbbox() else "occluded"
+                            coverage[name] = "visible" if visible_pixels[name] else "occluded"
                 caller.exports = [*caller.exports, RegionExport(source_id=source.uid, beauty_id=beauty.uid,
-                    plan_identity=plan.identity, masks=masks, coverage=coverage, view_box=plan.registration,
+                    plan_identity=plan.identity, masks=masks, coverage=coverage, visible_pixels=visible_pixels,
+                    mask_revision=MASK_REVISION, view_box=plan.registration,
                     dimensions=dimensions, renderer=version)]
                 caller.render_error = ""
             except (ValueError, OSError) as exc:
