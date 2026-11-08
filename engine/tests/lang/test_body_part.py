@@ -1,6 +1,14 @@
 import pytest
 
 from tangl.lang.body_parts import BodyRegion, BodyPart
+
+
+def test_body_part_combines_regions_without_named_alias() -> None:
+    coverage = BodyPart.TOP | BodyPart.BOTTOM
+    assert coverage & BodyPart.TOP == BodyPart.TOP
+    assert coverage & BodyPart.BOTTOM == BodyPart.BOTTOM
+    assert BodyPart(coverage.value) == coverage
+    assert BodyPart("top") is BodyPart.TOP
 from tangl.core import Entity
 
 

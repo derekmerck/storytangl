@@ -46,6 +46,14 @@ def test_modiste_choices_restore_and_continue(tmp_path: Path, monkeypatch) -> No
         return manager.resolve_choice(user_id=user, request=request)
 
     assert len(generated) == 1
+    with service.open_session(user_id=user) as session:
+        graph = session.ledger.graph
+        wearer = graph.find_one(Selector(label="modiste_wearer"))
+        wearer_id = wearer.uid
+        garments = {item.token_from: item.uid for item in
+                    wearer.outfit.components() + wearer.wardrobe.components()}
+        assert set(garments) == {"modiste-underwear", "modiste-camisole"}
+        assert wearer.adapt_look_media_spec().wearables[0].instance_id == garments["modiste-underwear"]
     first = choose(service, "camisole")
     first_resource = next(f.content for f in first.fragments if isinstance(f, MediaFragment) and f.content_format == "rit")
     first_svg = first_resource.path.read_text()
@@ -62,6 +70,7 @@ def test_modiste_choices_restore_and_continue(tmp_path: Path, monkeypatch) -> No
     assert resource.uid != first_resource.uid and len(generated) == 3
     text = " ".join(f.content for f in response.fragments if isinstance(f, ContentFragment) and isinstance(f.content, str))
     assert "Outfit: camisole" in text and "Palette: blue" in text
+    assert "brown skin and dark hair" in text
     assert "top.camisole" in text and "feet.slippers" in text
     identity = re.search(r"Plan: ([a-f0-9]{64})", text).group(1)
     with service.open_session(user_id=user) as session:
@@ -72,7 +81,12 @@ def test_modiste_choices_restore_and_continue(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr(ResourceManager, "register_file", no_admission)
     reopened = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path / "store"))
     with reopened.open_session(user_id=user) as session:
-        assert session.ledger.cursor.outfit == "camisole" and session.ledger.cursor.palette == "blue"
+        wearer = session.ledger.graph.find_one(Selector(label="modiste_wearer"))
+        assert wearer.uid == wearer_id
+        assert {item.token_from: item.uid for item in
+                wearer.outfit.components() + wearer.wardrobe.components()} == garments
+        assert wearer.describe_outfit() == "camisole" and wearer.look.preset == "blue"
+        assert wearer.adapt_look_media_spec().wearables[0].instance_id == garments["modiste-camisole"]
         dep = session.ledger.graph.get(session.ledger.cursor.media[0]["dependency_id"])
         assert dep.provider.uid == resource.uid and dep.provider.path.read_text() == svg
         before = session.ledger.graph.value_hash(), len(session.ledger.graph.members)
@@ -90,8 +104,16 @@ def test_modiste_choices_restore_and_continue(tmp_path: Path, monkeypatch) -> No
     assert len(generated) == 3
     again = choose(reopened, "rose")
     restored = next(f.content for f in again.fragments if isinstance(f, MediaFragment) and f.content_format == "rit")
+    text = " ".join(f.content for f in again.fragments if isinstance(f, ContentFragment)
+                    and isinstance(f.content, str))
+    assert "fair skin and auburn hair" in text
     assert restored.uid == first_resource.uid and restored.path.read_text() == first_svg
     assert len(generated) == 3
+    choose(reopened, "underwear")
+    with reopened.open_session(user_id=user) as session:
+        wearer = session.ledger.graph.find_one(Selector(label="modiste_wearer"))
+        assert wearer.uid == wearer_id
+        assert wearer.outfit.components()[0].uid == garments["modiste-underwear"]
     monkeypatch.setattr(domain, "palette_targets", lambda *_: (("skin", "fill", "absent", ()),))
     failed = choose(reopened, "blue")
     assert not any(isinstance(f, MediaFragment) and f.content_format == "rit" for f in failed.fragments)
