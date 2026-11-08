@@ -108,17 +108,18 @@ def test_service_walkthrough_preserves_authored_values_and_targeted_completion(
         assert river.generation_receipt.origin == "River Guild"
         assert hill.generation_receipt.origin == "Hill Guild"
         assert river.generation_receipt.bank is hill.generation_receipt.bank
-        assert river.generation_receipt.bank is NameBank.get_instance("fra")
-        assert river.generation_receipt.revision == "sample-v1"
+        assert river.generation_receipt.bank is NameBank.get_instance("casting_desk.salon")
+        assert river.generation_receipt.revision == "salon-season-v1"
         assert grove.demographic.unstructure() == {"kind": type(grove.demographic)}
         assert grove.generation_receipt.generated == ["given_name", "family_name"]
         assert grove.generation_receipt.bank is NameBank.get_instance("casting_desk.sprite")
-        form = grove.generation_receipt.bank.forms["plain"]
+        form = grove.generation_receipt.bank.forms["female"]
         assert grove.personal_name.given_name in form.given.pool.candidates
-        assert grove.personal_name.family_name in {
-            stem + suffix for stem in form.family.pool.candidates
-            for suffix in form.family.suffix.candidates
-        }
+        family = grove.personal_name.family_name
+        assert any(
+            family.startswith(stem) and family[len(stem):] in form.family.suffix.candidates
+            for stem in form.family.pool.candidates
+        )
         saved = values(session.ledger)
     complete_cast(manager, user_id)
     with manager.open_session(user_id=user_id) as session:
@@ -255,7 +256,7 @@ def check(ledger):
             "receipt": actor.generation_receipt.unstructure(),
         }
         assert Json.deserialize(Json.serialize(actual)) == saved
-        bank = "casting_desk.sprite" if slot == "grove" else "fra"
+        bank = "casting_desk.sprite" if slot == "grove" else "casting_desk.salon"
         assert actor.generation_receipt.bank is NameBank.get_instance(bank)
 with patch("tangl.mechanics.demographics.complete_generation",
            side_effect=AssertionError("resampled")):
@@ -267,6 +268,8 @@ with patch("tangl.mechanics.demographics.complete_generation",
         manager.resolve_choice(user_id=user, request=DirectEdgeRequest(edge_id=edge.uid))
     with manager.open_session(user_id=user) as session:
         check(session.ledger)
+# The world needs no national pack: its own banks are the whole catalog.
+assert NameBank.get_instance("fra") is None
 '''
     result = subprocess.run(
         [sys.executable, "-c", code, str(tmp_path), str(user_id), str(expected_path)],

@@ -1,0 +1,72 @@
+# Salon-culture names for unmemorable NPCs in a 1789 Paris season.
+# Provenance: the minuet remix resources (salon_culture_names.yaml), entries verbatim.
+# Titles by rank and faction (Madame, la comtesse, Citoyenne) are the consuming
+# world's naming policy, applied after the draw; this bank supplies no titles.
+# Kept here so the bank is not lost. When the Salon Season world lands, move this
+# file there and have Casting Desk borrow it; until then it stays a reference.
+label: casting_desk.salon
+selection_key: salon
+revision: salon-season-v1
+forms:
+  female:
+    given:
+      pool:
+        candidates:
+        - Agnes
+        - Juliet
+        - Audrey
+        - Isabella
+        - Maria
+        - Mary
+        - Margaret
+        - Catherine
+        - Jeanne
+        - Eleanor
+        - Joanna
+        - Anne
+        - Suzanne
+        - Marie Therese
+        - Carmen
+    family: &family
+      pool:
+        candidates:
+        - Albert
+        - Albon
+        - Amboise
+        - Bernadotte
+        - Conradin
+        - Dampierre
+        - Evreux
+        - Foix
+        - Gontaut
+        - Hottinguer
+        - Ingelger
+        - Lusignan
+        - Maiziere
+        - Montfort
+        - Noailles
+        - Orleans
+        - Poitiers
+        - Rouergue
+        - Taillefer
+        - Uzes
+        - Valois
+  male:
+    given:
+      pool:
+        candidates:
+        - Jean
+        - Daniel
+        - Henri
+        - Pierre
+        - Bernard
+        - Richard
+        - Mathieu
+        - Jean-Pierre
+        - Gaspard
+        - Ferdinand
+        - Charles
+        - Claude
+        - Oscar
+        - Emile
+    family: *family

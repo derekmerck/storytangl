@@ -186,7 +186,7 @@ NPC/token factory or global rollback policy is implied.
 or credential fixtures.
 
 `worlds/casting_desk` completes and inspects three authored slots: two humans with
-distinct origins sharing the sample bank, and a compound-name sprite. Ordinary
+distinct origins sharing one world-authored bank, and a compound-name sprite. Ordinary
 templates materialize the cast before UPDATE. Choosing another application selects
 another allocated slot; it does not create a new actor at runtime. This deliberately
 narrows the original dynamic-creation aspiration to the landed completion contract.

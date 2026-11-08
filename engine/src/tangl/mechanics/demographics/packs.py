@@ -11,11 +11,14 @@ from importlib.resources import files
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
-import yaml
 
 from tangl.core import TokenCatalog
+from tangl.utils.load_yaml_resource import load_yaml_path
 
 from .data_models import Country, NameBank, NameForm, NamePart, NamePool, Region, Subtype
+
+
+_LFS_POINTER = b"version https://git-lfs.github.com/spec/v1\n"
 
 
 class PackUnavailableError(FileNotFoundError):
@@ -125,17 +128,23 @@ def parse_pack(
 
 
 def _read_yaml(filename: str) -> object:
+    """Parse one pack resource through the shelved YAML cache.
+
+    The checked path is the parsed path. Absence and LFS pointers are refused before
+    the cache, so neither is ever stored.
+    """
     resource = files(__package__).joinpath("resources", filename)
     try:
-        text = resource.read_text(encoding="utf-8")
+        with resource.open("rb") as stream:
+            head = stream.read(len(_LFS_POINTER))
     except FileNotFoundError as exc:
         raise PackUnavailableError(f"Demographics resource {filename!r} is absent") from exc
-    if text.startswith("version https://git-lfs.github.com/spec/v1\n"):
+    if head == _LFS_POINTER:
         raise PackUnavailableError(
             f"Demographics resource {filename!r} is a Git LFS pointer; "
             "fetch the optional full pack or explicitly choose 'sample'"
         )
-    return yaml.safe_load(text)
+    return load_yaml_path(resource)
 
 
 def load_pack(pack: Literal["sample", "full"]) -> DemographicPack:
