@@ -47,7 +47,7 @@ robot parts, vehicles, and credential packets.
 - `Ornament` is an `Entity` with `body_part: BodyPart`, `ornament_type: OrnamentType`, `text: str`.
 - `Look` uses `OutfitManager.covered_mask()` for ornament descriptions and tokens;
   bundled ornament namespace and presence text use the same coverage decision.
-- `LookMediaPayload` carries assigned wearable instance IDs, singleton kind and
+- `LookMediaPayload` carries assigned wearable instance IDs, fully qualified singleton kind and
   label, state, coverage, layer, and color. Assigned items remain in the handoff
   when open, off, or covered; a world adapter interprets those facts against its
   own catalog. Off items are omitted from worn-outfit prose. The upcoming Modiste

@@ -333,7 +333,7 @@ class TestLookMediaPayload:
             assert "crescent" in payload.description
             assert [item.instance_id for item in payload.wearables] == [shirt.uid, coat.uid]
             assert payload.wearables[1].type_label == coat.token_from
-            assert payload.wearables[1].type_kind is WearableType
+            assert payload.wearables[1].type_kind == WearableType.__fqn__()
             assert payload.wearables[1].state == state
             assert payload.wearables[1].color == "blue"
             assert payload.wearables[1].covers == {BodyRegion.TOP}

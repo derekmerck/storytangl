@@ -27,7 +27,7 @@ from tangl.core.bases import BaseModelPlus
 from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
 from ..ornaments import Ornamentation
 from ..outfit import OutfitManager
-from ..wearable import WearableLayer, WearableState, WearableType
+from ..wearable import WearableLayer, WearableState
 
 
 def _ctx_value(ctx: Any, key: str) -> Any:
@@ -70,7 +70,7 @@ class WearableMediaPayload(BaseModelPlus):
     """Committed garment identity and state for a world media adapter."""
 
     instance_id: UUID
-    type_kind: type[WearableType]
+    type_kind: str
     type_label: str
     state: WearableState
     covers: set[BodyRegion]
@@ -316,7 +316,7 @@ class Look(Entity):
             wearables=[
                 WearableMediaPayload(
                     instance_id=item.uid,
-                    type_kind=type(item.reference_singleton),
+                    type_kind=type(item.reference_singleton).__fqn__(),
                     type_label=item.token_from,
                     state=item.state,
                     covers=item.covers,
