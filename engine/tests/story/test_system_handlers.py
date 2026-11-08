@@ -872,7 +872,7 @@ def test_render_block_content_uses_role_prefixed_presence_symbols() -> None:
         content = next(fragment for fragment in fragments if isinstance(fragment, ContentFragment))
     assert "olive skin" in content.content
     assert "shirt and coat" in content.content
-    assert "a dragon tattoo on their left arm" in content.content
+    assert "a dragon tattoo on their left arm" not in content.content
 
 
 def test_render_block_media_emits_canonical_formats(tmp_path) -> None:
@@ -936,7 +936,7 @@ def test_render_block_media_supports_facet_source_kind() -> None:
     assert fragments[1].media_role == "paperdoll_im"
     assert fragments[1].content["items"] == ["shirt", "coat"]
     assert fragments[2].media_role == "detail_im"
-    assert fragments[2].content["items"] == ["a dragon tattoo on their left arm"]
+    assert fragments[2].content.get("items", []) == []
 
 
 def test_render_block_media_facet_missing_subject_uses_fallback_text() -> None:

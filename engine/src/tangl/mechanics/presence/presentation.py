@@ -42,7 +42,10 @@ def render_ornament_text(
 ) -> str | None:
     """Provide the default ornament-description leaf."""
     _ = ctx
-    return caller.describe_summary() if aspect == "ornament_description" else None
+    return (
+        "{{ subject.describe_summary(covered_mask=covered_mask|default(0)) }}"
+        if aspect == "ornament_description" else None
+    )
 
 
 @on_render_text(wants_caller_kind=HasSimpleLook, wants_exact_kind=False)
@@ -75,7 +78,8 @@ def render_bundle_presence_text(
     return (
         "{% set body = render_as(subject.look, 'body_description') %}"
         "{% set outfit = render_as(subject.outfit, 'outfit_description') %}"
-        "{% set ornaments = render_as(subject.ornamentation, 'ornament_description') %}"
+        "{% set ornaments = render_as(subject.ornamentation, 'ornament_description', "
+        "bindings={'covered_mask': subject.outfit.covered_mask()}) %}"
         "{{ body }}{% if outfit %}, wearing {{ outfit }}{% endif %}"
         "{% if ornaments %}, marked by {{ ornaments }}{% endif %}"
     )

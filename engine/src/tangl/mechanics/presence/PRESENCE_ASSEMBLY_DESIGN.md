@@ -9,9 +9,9 @@
 
 **Status:** IMPLEMENTED FOUNDATION + ACTIVE GENERALIZATION. Outfit and wardrobe
 managers use the shared owner-bound assembly path; presence text and portrait
-projections are active consumers, including credential-card composition. Ornament
-coverage primitives are implemented, but automatic outfit-aware filtering in
-presentation remains incomplete; broader body-attachment unification remains open.
+projections are active consumers, including credential-card composition. Outfit
+coverage filters ornaments in Look, namespace, and presence text projections;
+broader body-attachment unification remains open.
 
 > Current issue tracking: #283. The earlier assembly issues #131 and
 > #194/#195/#196 are closed implementation history. This doc holds the *what and
@@ -43,11 +43,15 @@ robot parts, vehicles, and credential packets.
 - `WardrobeManager` is a storage-side `ComponentManager[Wearable]` for graph-member
   wearables not currently assigned to the active outfit.
 - `WearableType` is an `AssetType`; `Wearable` is a token wrapper over that type.
-- `Ornamentation` is still a plain `Node` with `collection: list[Ornament]`.
+- `Ornamentation` is an embedded `Entity` with `collection: list[Ornament]`.
 - `Ornament` is an `Entity` with `body_part: BodyPart`, `ornament_type: OrnamentType`, `text: str`.
-- `Look` composes `Look`, `OutfitManager`, and `Ornamentation` into prose and media
-  payloads, but does not yet pass `OutfitManager.covered_mask()` to ornament
-  descriptions or tokens. Direct ornament namespace projections also omit it.
+- `Look` uses `OutfitManager.covered_mask()` for ornament descriptions and tokens;
+  bundled ornament namespace and presence text use the same coverage decision.
+- `LookMediaPayload` carries assigned wearable instance IDs, singleton kind and
+  label, state, coverage, layer, and color. Assigned items remain in the handoff
+  when open, off, or covered; a world adapter interprets those facts against its
+  own catalog. Off items are omitted from worn-outfit prose. The upcoming Modiste
+  adapter owns that mapping, not Presence.
 - `BodyRegion`/`BodyPart` support coarse/fine masks. `WearableLayer.BODY` exists;
   `WearableLayer.INNER` is documented as hiding the body.
 
@@ -57,6 +61,11 @@ Actor-bound distinguishing marks: tattoos, scars, burns, brands, piercings, mark
 ink. They are not assets because they are unique to an actor's body and are not
 inventory/transfer objects. A red dragon tattoo can be token-like and state-bearing
 without becoming a transferable asset.
+
+The actor embeds its ornament manager, and the manager exclusively owns its mutable
+marks. Both fields use constructor-form embedding, preserving each local identity and
+concrete kind with the actor. Neither manager nor marks is registered in the graph.
+This ownership policy is separate from possible future shared body attachments.
 
 ## Design options
 
@@ -125,9 +134,5 @@ to tokens vs assets vs body-layer:
 
 - `OutfitManager.covered_mask()` uses ON/CLOSED worn items at `INNER`+.
 - Ornament description accepts the resulting covered-part mask.
-- Tests cover open and closed layers, body-layer marks, and visible/hidden regions
-  when the caller explicitly supplies the coverage mask.
-- Automatic filtering in `Look` prose, namespace, media, and presence rendering
-  remains follow-up work. The focused ornament/Look suites pass, but currently
-  do not prove that integration: a covered arm tattoo is omitted by explicit-mask
-  description and still included in the same actor's Look media payload.
+- Look prose, media, namespace and presence rendering apply the coverage mask;
+  direct body-only and ornament-only facets remain usable without an outfit.

@@ -82,6 +82,7 @@ class OutfitManager(ComponentManager[Wearable]):
         return [
             desc
             for component in self.components()
+            if component.state != WearableState.OFF
             if (desc := component.render_desc())
         ]
 

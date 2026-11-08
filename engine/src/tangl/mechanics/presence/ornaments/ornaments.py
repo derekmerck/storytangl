@@ -14,7 +14,7 @@ from collections.abc import Sequence
 
 from pydantic import Field
 
-from tangl.core import Entity, Node
+from tangl.core import Entity
 # from tangl.core import Renderable, on_render
 # from tangl.story.story_node import StoryNode
 from tangl.lang.helpers import oxford_join
@@ -87,9 +87,12 @@ class Ornament(Entity):
         )
 
 
-class Ornamentation(Node):
+class Ornamentation(Entity):
 
-    collection: list[Ornament] = Field(default_factory=list)
+    collection: list[Ornament] = Field(
+        default_factory=list,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
     @staticmethod
     def _covered_mask(
