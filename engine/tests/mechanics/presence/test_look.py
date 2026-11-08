@@ -28,8 +28,10 @@ from tangl.mechanics.presence.look import (
 )
 from tangl.mechanics.presence.look.look import HasLook
 from tangl.mechanics.presence.ornaments import Ornament, OrnamentType
-from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableType
+from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableState, WearableType
 from tangl.story.concepts import Actor as StoryActor
+from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.persistence.structuring import StructuringHandler
 
 
 @pytest.fixture(autouse=True)
@@ -51,6 +53,7 @@ def _build_outfit(actor: HasOutfit | HasLook) -> None:
         noun="coat",
         covers={BodyRegion.TOP},
         layer=WearableLayer.OVER,
+        color="blue",
     )
 
     actor.outfit.assign("top_60", Wearable(token_from=shirt_type.label))
@@ -81,6 +84,16 @@ class DemoOrnamentActor(StoryActor, HasOrnamentation):
 
 class DemoActor(StoryActor, HasLook):
     """Story actor used to exercise the look facet contract."""
+
+
+class HornedLook(Look):
+    horns: str = "curved"
+
+    def trait_tokens(self) -> list[str]:
+        return [*super().trait_tokens(), f"{self.horns} horns"]
+
+    def media_traits(self) -> dict:
+        return {**super().media_traits(), "horns": self.horns}
 
 
 class TestDirectPresenceFacets:
@@ -140,6 +153,48 @@ class TestDirectPresenceFacets:
 
 class TestOutfitSerialization:
     """Graph-backed outfit manager persistence contract."""
+
+    def test_actor_look_subtype_and_outfit_survive_json(self) -> None:
+        graph = Graph()
+        actor = graph.add_node(kind=DemoActor, label="guide", look=HornedLook(horns="spiral"))
+        _build_outfit(actor)
+        _build_ornaments(actor)
+        mark = actor.ornamentation.collection[0]
+        assert actor.ornamentation.uid not in graph.members
+        assert mark.uid not in graph.members
+        graph_before = graph.unstructure()
+        hashes_before = {uid: item.value_hash() for uid, item in graph.members.items()}
+        before = actor.adapt_look_media_spec()
+        assert "spiral horns" in actor.describe_look()
+        assert before.traits["horns"] == "spiral"
+        actor.get_ns()
+        assert graph.unstructure() == graph_before
+        assert {uid: item.value_hash() for uid, item in graph.members.items()} == hashes_before
+        direct = Graph.structure(graph_before)
+        assert direct.get(actor.uid).adapt_look_media_spec() == before
+        data = Json.deserialize(Json.serialize(graph_before))
+        restored = StructuringHandler.structure(
+            data, kind_map={cls.__fqn__(): cls for cls in (Graph, DemoActor, HornedLook)}
+        )
+        restored_actor = restored.get(actor.uid)
+        assert isinstance(restored_actor.look, HornedLook)
+        restored_mark = restored_actor.ornamentation.collection[0]
+        assert type(restored_mark) is type(mark)
+        assert (restored_mark.uid, restored_mark.body_part, restored_mark.ornament_type,
+                restored_mark.text) == (mark.uid, mark.body_part, mark.ornament_type, mark.text)
+        assert restored_actor.ornamentation.uid == actor.ornamentation.uid
+        assert restored_actor.ornamentation.uid not in restored.members
+        assert restored_mark.uid not in restored.members
+        assert restored_actor.adapt_look_media_spec() == before
+        for wearable in restored_actor.outfit.components():
+            wearable.state = WearableState.OPEN
+        restored_before = restored.unstructure()
+        restored_hashes = {uid: item.value_hash() for uid, item in restored.members.items()}
+        assert "dragon" in restored_actor.describe_look()
+        assert "dragon" in " ".join(restored_actor.adapt_look_media_spec().ornament_tokens)
+        assert "dragon" in " ".join(restored_actor.get_ns()["ornament_tokens"])
+        assert restored.unstructure() == restored_before
+        assert {uid: item.value_hash() for uid, item in restored.members.items()} == restored_hashes
 
     def test_graph_roundtrip_preserves_outfit_assignments_by_graph_id(self) -> None:
         shirt_type = WearableType(
@@ -213,7 +268,7 @@ class TestLookDescription:
         assert "red long hair" in description
         assert "fit build" in description
         assert "wearing shirt and coat" in description
-        assert "a dragon tattoo on their left arm" in description
+        assert "a dragon tattoo on their left arm" not in description
         assert "calm demeanor" in description
 
     def test_default_bundle_attachments_are_constructed_and_bound(self) -> None:
@@ -256,7 +311,34 @@ class TestLookMediaPayload:
         assert payload.traits["eye_color"] == "blue"
         assert payload.traits["skin_tone"] == "light"
         assert payload.outfit_tokens == ["shirt", "coat"]
-        assert payload.ornament_tokens == ["a dragon tattoo on their left arm"]
+        assert payload.ornament_tokens == []
+
+    def test_outfit_coverage_and_wearable_identity_are_consistent(self) -> None:
+        actor = DemoActor(label="guide")
+        _build_outfit(actor)
+        _build_ornaments(actor)
+        actor.ornamentation.add_ornament(
+            Ornament(body_part=BodyPart.FACE, ornament_type=OrnamentType.MARKER, text="a crescent")
+        )
+        shirt, coat = actor.outfit.components()
+        shirt.state = WearableState.OPEN
+        for state, visible in ((WearableState.ON, False), (WearableState.OPEN, True),
+                               (WearableState.OFF, True)):
+            coat.state = state
+            payload = actor.adapt_look_media_spec()
+            namespace = actor.get_ns()
+            assert ("dragon" in actor.describe_look()) is visible
+            assert ("dragon" in " ".join(payload.ornament_tokens)) is visible
+            assert ("dragon" in " ".join(namespace["ornament_tokens"])) is visible
+            assert "crescent" in payload.description
+            assert [item.instance_id for item in payload.wearables] == [shirt.uid, coat.uid]
+            assert payload.wearables[1].type_label == coat.token_from
+            assert payload.wearables[1].type_kind == WearableType.__fqn__()
+            assert payload.wearables[1].state == state
+            assert payload.wearables[1].color == "blue"
+            assert payload.wearables[1].covers == {BodyRegion.TOP}
+            assert payload.wearables[1].layer == WearableLayer.OVER
+            assert ("coat" in payload.outfit_tokens) is (state != WearableState.OFF)
 
 
 class TestHasLookNamespace:

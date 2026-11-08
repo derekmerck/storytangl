@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
@@ -20,11 +21,13 @@ from tangl.lang.age_range import AgeRange
 from tangl.core import Entity, contribute_ns
 from tangl.lang.gens import Gens
 from tangl.lang.helpers import oxford_join
+from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.core.bases import BaseModelPlus
 
 from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
 from ..ornaments import Ornamentation
 from ..outfit import OutfitManager
+from ..wearable import WearableLayer, WearableState
 
 
 def _ctx_value(ctx: Any, key: str) -> Any:
@@ -63,6 +66,18 @@ def _raw_value_text(value: Any) -> str | None:
     return str(value)
 
 
+class WearableMediaPayload(BaseModelPlus):
+    """Committed garment identity and state for a world media adapter."""
+
+    instance_id: UUID
+    type_kind: str
+    type_label: str
+    state: WearableState
+    covers: set[BodyRegion]
+    layer: WearableLayer
+    color: str | None = None
+
+
 class LookMediaPayload(BaseModelPlus):
     """Structured appearance payload for media adaptation.
 
@@ -77,6 +92,7 @@ class LookMediaPayload(BaseModelPlus):
     description: str = ""
     traits: dict[str, Any] = Field(default_factory=dict)
     outfit_tokens: list[str] = Field(default_factory=list)
+    wearables: list[WearableMediaPayload] = Field(default_factory=list)
     ornament_tokens: list[str] = Field(default_factory=list)
     pose: str | None = None
     attitude: str | None = None
@@ -240,7 +256,10 @@ class Look(Entity):
             modifiers.append(f"wearing {outfit_description}")
 
         ornament_description = (
-            ornamentation.describe_summary(possessive="their")
+            ornamentation.describe_summary(
+                possessive="their",
+                covered_mask=outfit.covered_mask() if outfit is not None else BodyPart.NONE,
+            )
             if ornamentation is not None
             else ""
         )
@@ -294,8 +313,23 @@ class Look(Entity):
             ),
             traits=self.media_traits(),
             outfit_tokens=outfit.describe_items() if outfit is not None else [],
+            wearables=[
+                WearableMediaPayload(
+                    instance_id=item.uid,
+                    type_kind=type(item.reference_singleton).__fqn__(),
+                    type_label=item.token_from,
+                    state=item.state,
+                    covers=item.covers,
+                    layer=item.layer,
+                    color=item.color,
+                )
+                for item in outfit.components()
+            ] if outfit is not None else [],
             ornament_tokens=(
-                ornamentation.describe_items(possessive="their")
+                ornamentation.describe_items(
+                    possessive="their",
+                    covered_mask=outfit.covered_mask() if outfit is not None else BodyPart.NONE,
+                )
                 if ornamentation is not None
                 else []
             ),
@@ -308,7 +342,10 @@ class Look(Entity):
 class HasSimpleLook(Entity):
     """Direct facet exposing body-trait look data and look-driven adapters."""
 
-    look: Look = Field(default_factory=Look)
+    look: Look = Field(
+        default_factory=Look,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
     def describe_look(
         self,
@@ -404,7 +441,10 @@ class HasOutfit(Entity):
 class HasOrnamentation(Entity):
     """Direct facet exposing ornament state and ornament-driven adapters."""
 
-    ornamentation: Ornamentation = Field(default_factory=Ornamentation)
+    ornamentation: Ornamentation = Field(
+        default_factory=Ornamentation,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
 
     def describe_ornamentation(self, *, possessive: str = "their") -> str:
         """Return a compact phrase describing current ornamentation."""
@@ -447,6 +487,22 @@ class HasLook(HasSimpleLook, HasOutfit, HasOrnamentation):
     It keeps the richer visual contract ergonomic while still allowing worlds to
     opt into the direct subfacets independently.
     """
+
+    def describe_ornamentation(self, *, possessive: str = "their") -> str:
+        return self.ornamentation.describe_summary(
+            possessive=possessive, covered_mask=self.outfit.covered_mask()
+        )
+
+    def adapt_ornament_media_spec(
+        self, *, ctx: Any = None, media_role: Any = None,
+    ) -> OrnamentMediaPayload:
+        return OrnamentMediaPayload(
+            description=self.describe_ornamentation(),
+            items=self.ornamentation.describe_items(
+                possessive="their", covered_mask=self.outfit.covered_mask()
+            ),
+            media_role=_raw_value_text(media_role),
+        )
 
     def describe_look(
         self,
@@ -511,4 +567,5 @@ __all__ = [
     "LookMediaPayload",
     "OrnamentMediaPayload",
     "OutfitMediaPayload",
+    "WearableMediaPayload",
 ]

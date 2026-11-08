@@ -21,12 +21,13 @@ from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.presence.look import BodyPhenotype, EyeColor, HairColor, HairStyle, Look, SkinTone
 from tangl.mechanics.presence.look.look import HasLook
 from tangl.mechanics.presence.ornaments import Ornament, OrnamentType
-from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableType
+from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableState, WearableType
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.persistence.structuring import StructuringHandler
 from tangl.service.media import media_fragment_to_payload
+from tangl.service.response import RuntimeEnvelope
 from tangl.story import Actor, InitMode, Role, Scene, StoryGraph, World
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
@@ -45,8 +46,10 @@ from tangl.vm.runtime.frame import PhaseCtx
 @pytest.fixture(autouse=True)
 def reset_wearable_types():
     WearableType.clear_instances()
+    WorldWearableType.clear_instances()
     yield
     WearableType.clear_instances()
+    WorldWearableType.clear_instances()
 
 
 def _ctx_with_ns(ns: dict[str, object] | None = None) -> PhaseCtx:
@@ -148,6 +151,13 @@ class DemoGuide(Actor, HasLook):
         if dialog_class and dialog_class.lower().endswith(".annoyed"):
             return {"font-weight": "700", "letter-spacing": "0.02em"}
         return {"font-weight": "600"}
+
+
+class WorldWearableType(WearableType):
+    """World-specific wearable definition for transport identity."""
+
+
+WorldWearable = Wearable._create_wrapper_cls(WorldWearableType, "WorldWearable")
 
 
 def _build_outfit(actor: HasLook) -> None:
@@ -872,7 +882,7 @@ def test_render_block_content_uses_role_prefixed_presence_symbols() -> None:
         content = next(fragment for fragment in fragments if isinstance(fragment, ContentFragment))
     assert "olive skin" in content.content
     assert "shirt and coat" in content.content
-    assert "a dragon tattoo on their left arm" in content.content
+    assert "a dragon tattoo on their left arm" not in content.content
 
 
 def test_render_block_media_emits_canonical_formats(tmp_path) -> None:
@@ -936,7 +946,31 @@ def test_render_block_media_supports_facet_source_kind() -> None:
     assert fragments[1].media_role == "paperdoll_im"
     assert fragments[1].content["items"] == ["shirt", "coat"]
     assert fragments[2].media_role == "detail_im"
-    assert fragments[2].content["items"] == ["a dragon tattoo on their left arm"]
+    assert fragments[2].content.get("items", []) == []
+
+
+def test_look_facet_runtime_envelope_serializes_world_wearable() -> None:
+    graph, block, guide = _presence_story(
+        media=[{"source_kind": "facet", "subject": "guide", "facet": "look"}],
+        with_outfit=False,
+    )
+    definition = WorldWearableType(
+        label="world_coat", noun="mantle", color="blue",
+        covers={BodyRegion.TOP}, layer=WearableLayer.OVER,
+    )
+    garment = WorldWearable(token_from=definition.label, state=WearableState.OPEN)
+    guide.outfit.assign("top_80", garment)
+
+    fragments = render_block_media(caller=block, ctx=PhaseCtx(graph=graph, cursor_id=block.uid))
+    payload = json.loads(json.dumps(RuntimeEnvelope(fragments=fragments).to_dto()))
+    wearable = payload["fragments"][0]["content"]["wearables"][0]
+    assert wearable["instance_id"] == str(garment.uid)
+    assert wearable["type_kind"] == WorldWearableType.__fqn__()
+    assert wearable["type_label"] == "world_coat"
+    assert wearable["state"] == WearableState.OPEN.value
+    assert wearable["covers"] == [BodyRegion.TOP.value]
+    assert wearable["layer"] == WearableLayer.OVER.value
+    assert wearable["color"] == "blue"
 
 
 def test_render_block_media_facet_missing_subject_uses_fallback_text() -> None:

@@ -342,4 +342,4 @@ class TestComfySpecAdaptation:
 
         assert adapted.workflow_template == "portrait_txt2img"
         assert "shirt and coat" in adapted.prompt
-        assert "a dragon tattoo on their left arm" in adapted.prompt
+        assert "a dragon tattoo on their left arm" not in adapted.prompt

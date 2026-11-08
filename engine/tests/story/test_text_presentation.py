@@ -19,7 +19,7 @@ from tangl.mechanics.presence.look import (
     SkinTone,
 )
 from tangl.mechanics.presence.ornaments import Ornament, OrnamentType
-from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableType
+from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableState, WearableType
 from tangl.prose import TextRenderSession
 from tangl.story import Actor
 from tangl.story.dispatch import do_render_text
@@ -115,6 +115,10 @@ def test_has_look_recursively_composes_body_outfit_and_ornaments() -> None:
 
     assert "olive skin" in rendered
     assert "wearing shirt and coat" in rendered
+    assert "a dragon tattoo on their left arm" not in rendered
+    for wearable in actor.outfit.components():
+        wearable.state = WearableState.OPEN
+    rendered = render_text_as(actor, "presence_description", ctx=_TextCtx())
     assert "a dragon tattoo on their left arm" in rendered
 
 
