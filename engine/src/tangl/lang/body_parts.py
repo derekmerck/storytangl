@@ -93,6 +93,13 @@ class BodyPart(EnumPlusMixin, IntFlag):
 
     ANYWHERE = HEAD | TOP | BOTTOM
 
+    @classmethod
+    def _missing_(cls, value: object) -> Self | None:
+        resolved = super()._missing_(value)
+        if resolved is not None:
+            return resolved
+        return super(EnumPlusMixin, cls)._missing_(value)
+
     def __bool__(self):
         return self is not BodyPart.NONE
 

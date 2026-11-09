@@ -50,8 +50,11 @@ robot parts, vehicles, and credential packets.
 - `LookMediaPayload` carries assigned wearable instance IDs, fully qualified singleton kind and
   label, state, coverage, layer, and color. Assigned items remain in the handoff
   when open, off, or covered; a world adapter interprets those facts against its
-  own catalog. Off items are omitted from worn-outfit prose. The upcoming Modiste
-  adapter owns that mapping, not Presence.
+  own catalog. Off items are omitted from worn-outfit prose. The Modiste
+  adapter owns that mapping, not Presence. A garment's assignment slot and its
+  covered body regions are separate facts, and renderer masks derive from the selected
+  artwork. Current slot validation requires the garment to cover its slot's region;
+  an upper-slot garment covering only legs needs a future eligibility design.
 - `BodyRegion`/`BodyPart` support coarse/fine masks. `WearableLayer.BODY` exists;
   `WearableLayer.INNER` is documented as hiding the body.
 

@@ -30,8 +30,10 @@
 > nominated geometry in source layer order. The mask value is red multiplied by
 > alpha; anti-aliased edge pixels have intermediate values. Source transparency,
 > strokes, filters, stylesheet-driven geometry and clipping, use/image/text and
-> depth are outside this approximation and reported as limits. Semantic Look
-> projection and depth synthesis remain future work.
+> depth are outside this approximation and reported as limits. #661 P4b maps a
+> committed Modiste wearer and structured Look through world-owned ensemble and
+> appearance-preset mappings into the existing recipe and plan. Depth synthesis
+> remains future work.
 > Coverage uses the same inherited-fill rules as mask generation; partial passes
 > record visible-pixel presence separately. A selected `fill:none` palette is
 > rejected for export because it changes coverage, while beauty remains available.

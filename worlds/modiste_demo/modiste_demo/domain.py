@@ -2,15 +2,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from lxml import etree
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
-from tangl.core import BehaviorRegistry, EntityTemplate
+from tangl.core import BehaviorRegistry, EntityTemplate, Selector, TokenCatalog
 from tangl.core.bases import Unstructurable
+from tangl.lang.body_parts import BodyRegion
+from tangl.mechanics.presence.look import HasLook, Look, LookMediaPayload
+from tangl.mechanics.presence.outfit import HasWardrobe, WARDROBE_SLOT, build_wardrobe_dress_offer
+from tangl.mechanics.presence.wearable import Wearable, WearableLayer, WearableState, WearableType
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
 from tangl.media.media_creators.svg_forge.svg_png_spec import MASK_REVISION, SvgPngSpec
 from tangl.media.media_creators.svg_forge.render_playwright import renderer_identity
@@ -24,7 +28,7 @@ from tangl.media.media_creators.svg_forge.svg_plan import RenderPlan
 from tangl.media.media_creators.svg_forge.region_mask import region_fill_coverage
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.prose.naming import ProseBlock, get_authorities as naming_authorities
-from tangl.story import Action, StoryGraph
+from tangl.story import Action, Actor, StoryGraph
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm import ProvisionPolicy, Resolver
 
@@ -53,6 +57,48 @@ class Pack(BaseModel):
     coverage: dict[str, Any]
     palettes: dict[str, Any]
     regions: dict[str, tuple[str, ...]] = Field(default_factory=dict)
+
+
+class ModisteGarmentType(WearableType):
+    """World-owned definition for one complete illustrated ensemble."""
+
+
+ModisteGarment = Wearable._create_wrapper_cls(ModisteGarmentType, "ModisteGarment")
+GARMENTS = TokenCatalog(ModisteGarmentType, members=tuple(
+    ModisteGarmentType(label=f"modiste-{name}", noun=name,
+                       covers={BodyRegion.TOP, BodyRegion.BOTTOM}, layer=WearableLayer.INNER)
+    for name in ("underwear", "camisole")
+))
+GARMENT_COLLECTIONS = {
+    (ModisteGarmentType.__fqn__(), f"modiste-{name}"): name
+    for name in ("underwear", "camisole")
+}
+
+
+def get_token_catalogs(**_kwargs: object) -> list[TokenCatalog[ModisteGarmentType]]:
+    return [GARMENTS]
+
+
+class ModisteLook(Look):
+    preset: str = Field(default="rose", json_schema_extra={"include": True})
+
+    def trait_tokens(self) -> list[str]:
+        descriptions = {
+            "rose": "fair skin and auburn hair in the rose palette",
+            "blue": "brown skin and dark hair in the blue palette",
+        }
+        return [*super().trait_tokens(), descriptions.get(self.preset, self.preset)]
+
+    def media_traits(self) -> dict[str, Any]:
+        return {**super().media_traits(), "appearance_preset": self.preset}
+
+
+class ModisteWearer(Actor, HasLook, HasWardrobe):
+    look: ModisteLook = Field(
+        default_factory=ModisteLook,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
+    garments_prepared: bool = Field(default=False, json_schema_extra={"include": True})
 
 
 def parse_annotation(
@@ -213,6 +259,37 @@ def resolve_modiste(
                         diagnostics=tuple(diagnostics), policy_revision=revision)
 
 
+def plan_for_look(pack: Pack, catalog: SvgCatalog, look: LookMediaPayload) -> RenderPlan:
+    """Map committed world appearance facts to the finite illustrated collection."""
+    diagnostics = []
+    outfits = []
+    for item in look.wearables:
+        if item.state == WearableState.OFF:
+            continue
+        if item.state != WearableState.ON:
+            diagnostics.append(SvgCatalogDiagnostic(
+                code="unsupported_wearable_state", subject=item.type_label, detail=item.state.name,
+            ))
+            continue
+        outfit = GARMENT_COLLECTIONS.get((item.type_kind, item.type_label))
+        if outfit is None:
+            diagnostics.append(SvgCatalogDiagnostic(
+                code="unmapped_wearable", subject=item.type_label, detail=item.type_kind,
+            ))
+        else:
+            outfits.append(outfit)
+    if len(outfits) != 1:
+        diagnostics.append(SvgCatalogDiagnostic(
+            code="unsupported_outfit", subject="wearer", detail=f"{len(outfits)} mapped ensembles",
+        ))
+    preset = look.traits.get("appearance_preset", "")
+    plan = resolve_modiste(pack, catalog, outfit=outfits[0] if len(outfits) == 1 else "",
+                           palette=preset)
+    if diagnostics:
+        return plan.model_copy(update={"entries": (), "diagnostics": (*plan.diagnostics, *diagnostics)})
+    return plan
+
+
 class RegionExport(Unstructurable):
     source_id: UUID
     beauty_id: UUID
@@ -235,10 +312,8 @@ class RegionExport(Unstructurable):
 
 
 class ModisteDesk(ProseBlock):
-    """The accepted selections for the catalogue's one demonstrator."""
+    """Preparation and exports for the catalogue's one demonstrator."""
 
-    outfit: str = Field(default="underwear", json_schema_extra={"include": True})
-    palette: str = Field(default="rose", json_schema_extra={"include": True})
     render_png: bool = False
     render_error: str = Field(default="", json_schema_extra={"include": True})
     exports: list[RegionExport] = Field(default_factory=list,
@@ -304,6 +379,34 @@ def get_authorities() -> list[BehaviorRegistry]:
 
     @dispatch.register(task="apply_update", wants_caller_kind=ModisteDesk, wants_exact_kind=False)
     def select(*, caller: ModisteDesk, ctx: PhaseCtx, **_kwargs: object) -> None:
+        wearer = cast(ModisteWearer, ctx.get_ns()["wearer"])
+
+        if not wearer.garments_prepared:
+            for name in ("underwear", "camisole"):
+                label = f"wearer-{name}"
+                template = ctx.graph.world.find_template(f"studio.{label}")
+                if not isinstance(template, EntityTemplate):
+                    raise ValueError(f"Missing authored garment template: {label}")
+                garment = template.materialize(registry=ctx.graph)
+                wearer.wardrobe.assign(WARDROBE_SLOT, garment)
+
+        def dress(name: str) -> None:
+            if any(item.token_from == f"modiste-{name}" for item in wearer.outfit.components()):
+                return
+            for item in wearer.outfit.get_slot("top_40"):
+                wearer.outfit.unassign("top_40", item)
+                wearer.wardrobe.assign(WARDROBE_SLOT, item)
+            garment = next(item for item in wearer.wardrobe.components()
+                           if item.token_from == f"modiste-{name}")
+            build_wardrobe_dress_offer(
+                wardrobe=wearer.wardrobe, outfit=wearer.outfit,
+                wearable_key=garment.get_label(), slot_name="top_40",
+            ).accept()
+
+        if not wearer.garments_prepared:
+            dress("underwear")
+            wearer.garments_prepared = True
+
         def suspend() -> None:
             for item in caller.media:
                 dep = ctx.graph.get(item["dependency_id"])
@@ -317,7 +420,7 @@ def get_authorities() -> list[BehaviorRegistry]:
             from PIL import Image, ImageChops
 
             pack, catalog = catalog_for(ctx.graph)
-            plan = resolve_modiste(pack, catalog, outfit=caller.outfit, palette=caller.palette)
+            plan = plan_for_look(pack, catalog, wearer.adapt_look_media_spec())
             if not pack.regions:
                 caller.render_error = "Missing region coverage metadata"
                 return
@@ -391,11 +494,12 @@ def get_authorities() -> list[BehaviorRegistry]:
             return
         if isinstance(edge, Action):
             if edge.label in {"underwear", "camisole"}:
-                caller.outfit = edge.label
+                dress(edge.label)
             elif edge.label in {"rose", "blue"}:
-                caller.palette = edge.label
+                wearer.look.preset = edge.label
+        ctx.invalidate_namespaces()
         pack, catalog = catalog_for(ctx.graph)
-        plan = resolve_modiste(pack, catalog, outfit=caller.outfit, palette=caller.palette)
+        plan = plan_for_look(pack, catalog, wearer.adapt_look_media_spec())
         if not plan.ok:
             suspend()
             caller.render_error = ""
@@ -487,10 +591,12 @@ def get_authorities() -> list[BehaviorRegistry]:
     @dispatch.register(task="gather_ns", wants_caller_kind=ModisteDesk, wants_exact_kind=False)
     def describe(*, caller: ModisteDesk, **_kwargs: object) -> dict[str, object]:
         pack, catalog = catalog_for(caller.graph)
-        plan = resolve_modiste(pack, catalog, outfit=caller.outfit, palette=caller.palette)
+        wearer = cast(ModisteWearer, caller.graph.find_one(Selector(label="modiste_wearer")))
+        payload = wearer.adapt_look_media_spec()
+        plan = plan_for_look(pack, catalog, payload)
         return {
-            "modiste_outfit": caller.outfit,
-            "modiste_palette": caller.palette,
+            "modiste_outfit": wearer.describe_outfit(),
+            "modiste_palette": wearer.look.preset,
             "modiste_parts": ", ".join(entry.key for entry in plan.entries),
             "modiste_bindings": ", ".join(
                 f"{channel}.{prop}={value}"

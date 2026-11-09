@@ -44,7 +44,7 @@ Coverage is deliberately narrow: a base common body, Toulouse hair, underwear an
 camisole, with rose and blue palette choices. The historical common body's `top+a`
 and its flag substitutions are omitted; the choices are a simplified selection,
 not a claim of complete collection parity. Morphology variants, other body
-models, general semantic masks, depth passes and a Look/outfit adapter remain future work.
+models, general semantic masks and depth passes remain future work.
 No unsupported choice changes character state or receives an invented fallback.
 
 To audit a separately available historical SVG without adding it to this repo:
@@ -57,8 +57,16 @@ The report prints the source hash, viewBox, structural counts and integrity
 diagnostic counts. CI uses only the committed subset and temporary SVG fixtures.
 
 The world authority prepares its catalog from its own resource manager and reuses
-it across journal reads. Accepted choices persist the outfit, palette and ordinary
-media dependency.
+it across journal reads. A template-materialized wearer owns an outfit and wardrobe;
+accepted choices move the same graph-owned ensemble items and commit a whole-appearance
+preset on the wearer's Look. The shared structured Look handoff feeds this world's
+type-to-collection mapping, then the existing recipe and render plan prepare ordinary
+media dependencies. Assignment slot, semantic body coverage, and artwork-derived
+region masks are distinct: an item can occupy an upper slot while covering other
+regions when it also covers the slot's region. The current outfit validator requires
+that overlap; it does not yet support an upper-slot item covering legs alone.
+Unsupported garment states and missing mappings return diagnostics without changing
+the wearer to fit the artwork.
 The resolved plan contains source references, ordered groups, effective bindings,
 provenance and diagnostics; it contains no XML tree or live media resource. A
 JSON-backed Service witness changes both choices, inspects the delivered SVG,

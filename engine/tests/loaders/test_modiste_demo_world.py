@@ -120,6 +120,40 @@ def test_world_variants_report_unavailable_geometry_without_changing_choices(mon
     assert (pack.model_dump(), catalog.digest) == before
 
 
+def test_look_mapping_uses_type_identity_and_reports_unsupported_states(monkeypatch) -> None:
+    from uuid import uuid4
+    from tangl.lang.body_parts import BodyRegion
+    from tangl.mechanics.presence.look import LookMediaPayload, WearableMediaPayload
+    from tangl.mechanics.presence.wearable import WearableLayer, WearableState
+
+    monkeypatch.syspath_prepend(str(ROOT))
+    from modiste_demo.domain import GARMENT_COLLECTIONS, ModisteGarmentType, load_pack, plan_for_look
+
+    pack, catalog = load_pack(ResourceManager(ROOT / "resources"))
+    item = WearableMediaPayload(
+        instance_id=uuid4(), type_kind=ModisteGarmentType.__fqn__(),
+        type_label="modiste-camisole", state=WearableState.ON,
+        covers={BodyRegion.TOP, BodyRegion.BOTTOM}, layer=WearableLayer.INNER,
+    )
+    payload = LookMediaPayload(traits={"appearance_preset": "rose"}, wearables=[item])
+    plan = plan_for_look(pack, catalog, payload)
+    assert plan.ok and "top.camisole" in plan.canonical_selections
+    renamed = payload.model_copy(update={"description": "different name", "outfit_tokens": ["gown"]})
+    assert plan_for_look(pack, catalog, renamed).identity == plan.identity
+
+    # A world extension reuses the existing camisole and slippers geometry.
+    monkeypatch.setitem(GARMENT_COLLECTIONS, (item.type_kind, "alternate-camisole"), "camisole")
+    variant = payload.model_copy(update={"wearables": [item.model_copy(update={
+        "type_label": "alternate-camisole",
+    })]})
+    assert plan_for_look(pack, catalog, variant).identity == plan.identity
+    unknown = payload.model_copy(update={"wearables": [item.model_copy(update={"type_label": "missing"})]})
+    assert "unmapped_wearable" in {d.code for d in plan_for_look(pack, catalog, unknown).diagnostics}
+    opened = payload.model_copy(update={"wearables": [item.model_copy(update={"state": WearableState.OPEN})]})
+    assert "unsupported_wearable_state" in {d.code for d in plan_for_look(pack, catalog, opened).diagnostics}
+    assert item.state == WearableState.ON
+
+
 def test_region_assignments_do_not_change_beauty_plan(monkeypatch) -> None:
     monkeypatch.syspath_prepend(str(ROOT))
     from modiste_demo.domain import load_pack, resolve_modiste

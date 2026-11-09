@@ -1,13 +1,28 @@
 label: modiste_demo
+actors:
+  modiste_wearer:
+    kind: ModisteWearer
+    name: The model
 scenes:
   studio:
+    templates:
+      wearer-underwear:
+        kind: modiste_demo.domain.ModisteGarment
+        label: wearer-underwear
+        token_from: modiste-underwear
+      wearer-camisole:
+        kind: modiste_demo.domain.ModisteGarment
+        label: wearer-camisole
+        token_from: modiste-camisole
+    roles:
+      wearer: {actor_ref: modiste_wearer}
     blocks:
       catalogue:
         kind: ModisteDesk
         render_png: true
         prose:
           - template: >-
-              Outfit: {{ modiste_outfit }}. Palette: {{ modiste_palette }}.
+              {{ wearer.describe_look() }}. Outfit: {{ modiste_outfit }}. Palette: {{ modiste_palette }}.
               Parts: {{ modiste_parts }}. Bindings: {{ modiste_bindings }}.
               Plan: {{ modiste_plan_id }}.
               {% if modiste_diagnostics %}Diagnostics: {{ modiste_diagnostics }}.{% endif %}

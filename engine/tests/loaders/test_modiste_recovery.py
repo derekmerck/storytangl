@@ -12,6 +12,7 @@ from tangl.persistence import PersistenceManagerFactory
 from tangl.service import ServiceManager, world_registry
 from tangl.service.response import DirectEdgeRequest
 from tangl.story import Action
+from tangl.mechanics.presence.wearable import WearableState
 
 
 @pytest.mark.parametrize("failure", ["creator", "targets", "source", "plan"])
@@ -69,3 +70,36 @@ def test_failed_figure_recovers_on_next_choice(tmp_path: Path, monkeypatch, fail
     resource = next(f.content for f in response.fragments
                     if isinstance(f, MediaFragment) and f.content_format == "rit")
     assert "#B98150" in resource.path.read_text()
+
+
+@pytest.mark.parametrize("failure", ["mapping", "state"])
+def test_unsupported_appearance_keeps_committed_wearable(tmp_path: Path, monkeypatch, failure: str) -> None:
+    monkeypatch.setattr(world_registry, "get_world_dirs", lambda: [Path(__file__).resolve().parents[3] / "worlds"])
+    monkeypatch.setattr("tangl.media.story_media.get_story_media_dir",
+                        lambda story_id=None: tmp_path / "media" / str(story_id))
+    service = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path / "store"))
+    user = service.create_user(secret="coverage").details["user_id"]
+    service.create_story(user_id=user, world_id="modiste_demo")
+    from modiste_demo import domain
+
+    with service.open_session(user_id=user, write_back=True) as session:
+        wearer = session.ledger.graph.find_one(Selector(label="modiste_wearer"))
+        garment = wearer.outfit.components()[0]
+        garment_id = garment.uid
+        if failure == "state":
+            garment.state = WearableState.OPEN
+        action = next(edge for edge in session.ledger.cursor.edges_out(Selector(has_kind=Action))
+                      if edge.label == "blue")
+        request = DirectEdgeRequest(edge_id=action.uid, payload=action.payload)
+    if failure == "mapping":
+        monkeypatch.delitem(domain.GARMENT_COLLECTIONS,
+                            (domain.ModisteGarmentType.__fqn__(), "modiste-underwear"))
+    response = service.resolve_choice(user_id=user, request=request)
+    text = " ".join(f.content for f in response.fragments if isinstance(f, ContentFragment)
+                    and isinstance(f.content, str))
+    assert ("unmapped_wearable" if failure == "mapping" else "unsupported_wearable_state") in text
+    with service.open_session(user_id=user) as session:
+        wearer = session.ledger.graph.find_one(Selector(label="modiste_wearer"))
+        garment = wearer.outfit.components()[0]
+        assert garment.uid == garment_id
+        assert garment.state == (WearableState.OPEN if failure == "state" else WearableState.ON)
