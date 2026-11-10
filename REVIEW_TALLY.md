@@ -600,7 +600,7 @@ Sizes are guesses.
 | 3l | Drop unread whole-graph hashes in the journal phase and frame seed (P7.3) | perf | S |
 | 3m | Identity equality for graph items; explicit value equality (#548) | perf | M |
 | 3n | Large-graph timing guard test with a per-choice budget | test | S |
-| 20 | Dependabot pass: GitHub reports 250 dependency alerts on the default branch, 17 critical | fix | S |
+| 20 | Dependency alerts (248 open, about 42 packages). Raise the Pillow constraint past `^11` (closes 111, including 10 of 17 critical); `poetry update` for the server stack; `yarn upgrade` in `apps/web`; add a grouped weekly `dependabot.yml` | fix | S |
 | 3c | Ledger scalars derived in one place; remove the service-side copy of the frame sync | simplify | S |
 | 3d | Inline `follow_edge` helpers; move media and section knowledge out of the VM ledger | simplify | S |
 | 3e | Games default their seed from the frame RNG so a replayed story deals the same hand | fix | S |
