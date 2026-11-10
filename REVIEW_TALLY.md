@@ -280,6 +280,43 @@ matters to the engine:
     ledger, stream and checkpoints included, so storage per save grows with
     every choice. Raising the cadence fixes most of it. (I)
 
+### Performance (measured 2026-11-10)
+
+Workload: a large downstream world, about 4,800 graph members, driven through
+the service layer. A choice is about three cursor hops.
+
+| Configuration | Seconds per choice |
+|---|---|
+| As shipped | 5.41 |
+| Checkpoints off (cadence raised) | 4.05 |
+| Checkpoints and per-hop step tracing off | 0.74 |
+
+50. **About 86% of a turn is replay bookkeeping, not story work.** Under a
+    profiler: the two graph snapshots per hop are 37% of the time and building
+    the patch from them is 32%. `value_hash` accounts for 52% overall, almost
+    all of it inside those. The phases themselves are small: journal 8%,
+    dispatch receipts 7%, planning below that. Selection is about 2%. (V)
+51. **Derek's hypothesis, checked.** "Selection and materialization of stuff
+    that never gets used" is right about the waste and wrong about where it
+    is. What is materialized and never used is the snapshot, the patch and the
+    checkpoint: rollback has no caller outside tests (finding 24). (V)
+52. **Equality serializes.** `Unstructurable.__eq__` calls `eq_by_value`,
+    which calls `value_hash()` on both sides, which unstructures and hashes
+    each time with no caching. Any `==` or `in` on entities pays that; on a
+    graph or ledger it is the whole graph. The profile shows 486,000 model
+    equality calls in six choices. Relates to #548. (V)
+53. **Hashes taken that nobody reads.** `_run_journal_phase` hashes the whole
+    graph before the journal runs on every hop; the comparison after it is
+    debug-only. `Frame.__post_init__` hashes the whole graph to seed the RNG
+    on every choice. (V)
+54. **Random ids are minted on every restore.** Six choices made 424,000
+    calls to the system random source, from the `uuid4` default on entities
+    being built during `structure`. It goes away with the snapshots. (V)
+55. **No timing guard found.** Derek recalls a large-graph choice timing test.
+    A search of `engine/tests` for timing calls and test names finds none for
+    a turn; the nearest is a sandbox test that path work scales with eligible
+    candidates. Search was by name, not exhaustive. (I)
+
 ### Core, story, docs, tooling
 
 16. **Residue. Core legacy aliases:** `Registry.keys/items`,
@@ -449,6 +486,27 @@ Not one port of a codec; each piece goes where its operator lives.
    one sandbox hub by a short codec with no staging. That is the "sandbox
    enumeration" demo.
 
+### P7. Performance track (new)
+
+Derek's stance: do not optimize until the behaviour is settled, but playable
+demos are converging and the pain points are now measured. Ordered by return:
+
+1. **Trace per choice, on a cadence, not per hop.** The ledger attaches the
+   step observer on every choice. Attach it only when a checkpoint is due, or
+   make it opt-in. Measured ceiling: 5.4 s to 0.74 s.
+2. **Raise the checkpoint cadence** (item 3b).
+3. **Drop the unread hashes** (finding 53): gate the journal hash behind the
+   debug check; seed the RNG from the recorded seed and step, which P1 needs
+   anyway.
+4. **Identity equality for graph items; value equality by explicit call**
+   (finding 52, #548).
+5. **A timing guard**: one synthetic large graph and a per-choice budget, so a
+   naive addition shows up in CI.
+6. Later, if replay is wanted cheaply: record changed members through the
+   existing registry observer, not by copying and diffing the graph.
+
+Then profile again; the remaining 0.74 s has not been broken down.
+
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
 With P1 in place, a session is (world, seed, list of chosen edge ids and
@@ -515,7 +573,7 @@ the todo table below.
 
 | Day | Theme | Items |
 |---|---|---|
-| 1 | Cheap fixes and writing things down | 3b cadence; 15 cold-process tests; 3g `ancestors`; 3i compose-journal field; 9 and 3j design notes; 13 ROADMAP; 16 devref labels (issues agent) |
+| 1 | Cheap fixes and writing things down | 3k step tracing; 3l unread hashes; 3n timing guard; 20 Dependabot; 3b cadence; 15 cold-process tests; 3g `ancestors`; 3i compose-journal field; 9 and 3j design notes; 13 ROADMAP; 16 devref labels (issues agent) |
 | 2 | Provisioning made smaller | 1 offer sources via dispatch; 2 single binding; 5 naming |
 | 3 | Ids and seeds | 3 thumbprint ids with a recorded seed; 3e games seed from the frame |
 | 4 | Hubs | 4 shared clear-and-project helper; 6a arbitration |
@@ -538,6 +596,11 @@ Sizes are guesses.
 | 3 | Thumbprint ids from story creation down, with a recorded seed (optional input); no random fallback | fix | L |
 | 3a | Choice payload on `StepRecord`; re-execution verifier (deprioritized, see P4) | feature | M |
 | 3b | Checkpoint cadence above 1 by default; one snapshot per hop, not two | fix | S |
+| 3k | Step tracing on a cadence or opt-in, not on every hop (P7.1) | perf | S |
+| 3l | Drop unread whole-graph hashes in the journal phase and frame seed (P7.3) | perf | S |
+| 3m | Identity equality for graph items; explicit value equality (#548) | perf | M |
+| 3n | Large-graph timing guard test with a per-choice budget | test | S |
+| 20 | Dependabot pass: GitHub reports 250 dependency alerts on the default branch, 17 critical | fix | S |
 | 3c | Ledger scalars derived in one place; remove the service-side copy of the frame sync | simplify | S |
 | 3d | Inline `follow_edge` helpers; move media and section knowledge out of the VM ledger | simplify | S |
 | 3e | Games default their seed from the frame RNG so a replayed story deals the same hand | fix | S |
@@ -601,8 +664,9 @@ Candidate issues, none filed yet. Existing issues to link are in brackets.
 - Single stored binding on open edges (findings 3, 4). Topic: provisioning.
 - Thumbprint ids, recorded seed, no random fallback (findings 11 to 15, 23,
   P1). Topic: provisioning, replay. [#548]
-- Checkpoint cadence and per-hop snapshot cost (finding 25). Topic: replay,
-  ledger.
+- Checkpoint cadence and per-hop snapshot cost (findings 25, 50 to 55, P7).
+  Topic: replay, ledger. [#548]
+- Large-graph timing guard test (finding 55).
 - Ledger scalars as a fold; duplicate frame sync in service (finding 26).
   Topic: ledger.
 - Shared hub projection helper and offer arbitration (findings 9, 38). Topic:
