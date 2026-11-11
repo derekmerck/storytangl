@@ -50,7 +50,7 @@ humanize = "^4.12.2"
 requests = "^2.32.3"
 
 # raster images
-pillow = "^11.1.0"
+pillow = "^13.0.0"
 
 # vector images
 lxml = "^5.3.1"
