@@ -151,6 +151,13 @@ still expressible as a query. Keeping fragments out of the graph is also what
 lets story state be compared without the journal (P5), and it is why the
 JOURNAL phase is expected not to change the graph (finding 53).
 
+Derek's caveat: the split disguises the synergy between world, story and
+journal as progressive orderings of the same space. The other reason for it
+is size: static journal entries have no business staying in the mutable story
+registry. The full graph, rooted at the world, through the story graph, down
+to every fragment leaf, can still be reassembled from the ledger; it is just
+not represented that way in practice.
+
 What follows from it (mine, for discussion):
 
 - The two voices are two readings of one rule, from the state side or from the
@@ -974,6 +981,7 @@ Sizes are guesses.
 | 3g | Decide one shape for `ancestors` (method or property, self included or not), then delete the three probes | cleanup | S |
 | 3h | One scope chain per context, read by namespace, candidate and template folds | simplify | M |
 | 3i | Compose-journal feeds forward through the phase context (Derek's preference): a named, typed field for the batch so far, replaced each step so it holds the settled batch after culling; `ctx.results` stays the append-only history; drop the argument rewriting | simplify | S |
+| 3u | State the four levels (world, story graph, episode DAG, journal) as progressive orderings of one space in ARCHITECTURE.md, since the storage split hides it. Optional: an analysis projection that reassembles the full tree from a ledger, world to fragment leaves | docs | S |
 | 3j | Write the "intrinsic contribution, extrinsic assembly" pattern and the phase-manager recipe idea into VM_DESIGN.md | docs | S |
 | 3o | Control-flow intent table in VM_DESIGN.md with one witness test per intent (P8) | docs, test | M |
 | 3s | Resume: a triggered call returns to the phase it fired in and evaluation continues from the edge after it (finding 68, #556). The return edge carries the call's id; the two redirect handlers start after it. Static blocks first; hubs need item 3 or 4 so a rebuilt edge keeps its id | fix | S |
