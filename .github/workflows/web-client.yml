@@ -43,7 +43,10 @@ jobs:
   web-client-tests:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
+    # Pinned: on ubuntu-26.04 (what ubuntu-latest resolved to on 2026-11-11) apt
+    # could not resolve the Ubuntu mirrors while installing Playwright's browser
+    # dependencies. Return to ubuntu-latest once that image installs cleanly.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
