@@ -104,6 +104,38 @@ The pull side is one mechanism in the VM. The push side is implemented three
 times in story and mechanics and again in a downstream world. The overhaul's
 centre of gravity is making push as much a VM operator as pull.
 
+### The stance behind the push side (Derek, 2026-11-11)
+
+The push side is hard to articulate because it is the declarative versus
+imperative stance, "wanting to both have and eat cake."
+
+- A world can be made entirely of dependencies, CYOA style: "if this and this
+  condition, then go there."
+- Or declaratively: "this is the thing you can reach if that and that state."
+- Eager materialization declares "here are all the affordances; assemble them
+  so we can pass through them imperatively."
+- Provisional materialization is a smaller step of the same: what affordances
+  are here and coming up; assemble the neighbourhood.
+- Templates are affordances for the provisioner to create concepts and
+  episodes when their conditions are met. They feel imperative only because
+  they are created when needed, and because Python is imperative.
+
+What follows from it (mine, for discussion):
+
+- The two voices are two readings of one rule, from the state side or from the
+  goal side. Both lower to the same edge record (pattern 1). Neither is
+  second-class.
+- Materialization is grounding, in the solver sense: turning declared rules
+  into concrete edges against the current state. Eager grounds everything;
+  provisional grounds the frontier. PLANNING is "ground the neighbourhood".
+- A template is a rule that says "there exists a thing such that...". The
+  thumbprint id (P1) is the standard name for such a thing: a function of the
+  rule and what it was bound to. That is why the id must not be random.
+- The property the VM needs from grounding is that it is repeatable:
+  grounding the same declarations against the same state changes nothing.
+  Pattern 3 is this property failing. It is testable directly: plan a node
+  twice and compare the graph.
+
 ### A lens: linker plus interpreter
 
 Provisioning is linking: a requirement is a symbol, scope is the search path,
@@ -917,6 +949,7 @@ Sizes are guesses.
 | 3q | Scope call frames to their callee: discard or refuse on leaving by another route (finding 65) | fix | S |
 | 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
+| 3t | Invariant test: planning the same node twice against unchanged state leaves the graph unchanged (ids and order). Expected to fail on hubs today; passes once items 3 and 4 land | test | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
 | 6 | Fan-in in VM; witnesses: site arrivals (site plus due-when) and "go home / call mom" | feature | L |
