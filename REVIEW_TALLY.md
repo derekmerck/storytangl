@@ -471,6 +471,20 @@ matters to the engine:
     decorator's operation table could drive the remote client and the routes.
     For the TypeScript bootstrap that table is the language-neutral API
     contract. (V)
+    History (Derek): an earlier version generated the library API from
+    decorated functions and bound it into the web framework and the CLI,
+    with endpoints as entities and dispatch for pre- and post-processing. It
+    was dropped in rewrites for legibility and to avoid Python magic, once
+    the API had settled and agents could do the copying. He agrees it should
+    be a single source of authority.
+    What survives: `ServiceMethodSpec` still carries name, access, context,
+    write-back, capability and operation id. The remote client's paths
+    already follow the operation ids (`story.do` is `POST /story/do`,
+    `story.update` is `GET /story/update`), and the verb follows write-back
+    in the cases read. A low-magic route back, in two steps: first a test
+    that the remote client and REST routes agree with the spec table, which
+    stops drift without generating anything; then, if wanted, one explicit
+    loop over the table that registers routes.
 49. **Cost, follows from finding 25.** A session write-back saves the whole
     ledger, stream and checkpoints included, so storage per save grows with
     every choice. Raising the cadence fixes most of it. (I)
@@ -1302,7 +1316,7 @@ Sizes are guesses.
 | 15 | Cold-process tests pass the source path explicitly | fix | S |
 | 16 | devref: filter noisy pack headings; make the query test independent of a local issue snapshot (labelling was done in the 2026-11-10 board audit) | tooling | S |
 | 17 | Small drift: Python version, `tangldev` URLs, eight world READMEs | cleanup | S |
-| 18 | Service operation table drives the remote client and REST routes | simplify | M |
+| 18 | Service operation table as the single source: first a conformance test that remote client and REST routes match it; later an explicit loop that binds them | test, simplify | S then M |
 | 19 | Promotion ledger for the calendar world, seeded with P6; cached YAML path loading from the gamebook ledger | docs, fix | S |
 
 Demo ideas:
