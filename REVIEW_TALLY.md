@@ -424,9 +424,11 @@ has no redirect and no selectable choice; a return re-enters the call site at
     - This is where two earlier items pay off: with thumbprint ids (P1) a
       rebuilt edge has the same id, and with a set-difference clear (todo 4)
       an unchanged edge is never removed. Either keeps the marker valid.
-    - Open: what to do when the taken edge is truly gone. Evaluating from the
-      start is the conservative fallback, but it can fire an earlier edge that
-      the side trip made available.
+    - Decided (Derek, 2026-11-11): when the taken edge is truly gone,
+      evaluate from the first edge. It is the principled fallback, the case is
+      probably an authoring error, and it is not worth more machinery. The
+      real fix is for re-entrant provisioning to re-use existing assignments
+      when it can, so edges are not rebuilt in the first place (todo 4).
 69. **Concepts cannot contribute updates.** Every UPDATE and FINALIZE handler
     is keyed to the cursor: edge effects, node effects, visit marking, game
     moves, stat challenges, sandbox time on block entry. Nothing lets an
@@ -847,7 +849,7 @@ Sizes are guesses.
 | 3q | Scope call frames to their callee: discard or refuse on leaving by another route (finding 65) | fix | S |
 | 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
-| 4 | One shared clear-and-project helper for menu, sandbox and game hubs | simplify | M |
+| 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
 | 6 | Fan-in in VM; witnesses: site arrivals (site plus due-when) and "go home / call mom" | feature | L |
 | 6a | Offer arbitration in hub projection: contended provider plus rank | feature | M |
