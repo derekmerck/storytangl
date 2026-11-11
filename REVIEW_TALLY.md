@@ -61,6 +61,14 @@ Open-link vocabulary, as agreed in this review:
 | Downstream calendar world codec | done (private repo, read-only) |
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
+Not yet read in any depth (as of 2026-11-11): the story compile path
+(`story/fabula` compiler and materializer), `tangl.media` beyond its
+provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
+other than sandbox and game handlers (assemblies and components, progression,
+demographics, credentials internals), the four apps (CLI, pygame, web,
+server), the loaders, and the docs site as a whole. Core was read for
+registry, graph, behaviour and entity basics only.
+
 ## Findings
 
 Marked **V** when read in code, **I** when inferred.
@@ -279,6 +287,79 @@ matters to the engine:
 49. **Cost, follows from finding 25.** A session write-back saves the whole
     ledger, stream and checkpoints included, so storage per save grows with
     every choice. Raising the cadence fixes most of it. (I)
+
+### Jumps, calls and redirects (probe 2026-11-11)
+
+Derek: "I keep claiming it's simple when it's actually bundling a lot of
+different functionality under the same name."
+
+The mechanism is small. An edge has three independent settings and the frame
+has four rules.
+
+| Edge setting | Meaning |
+|---|---|
+| `trigger_phase` (none, PREREQS, POSTREQS) | followed automatically at that phase instead of being offered |
+| `return_phase` | the edge is a call: pushed on the return stack, returned to its origin later |
+| `entry_phase` | which phase the destination starts at |
+
+Frame rules: the first available triggered edge wins, in edge order; a
+redirect restarts the pipeline at the new node; a call returns when the callee
+has no redirect and no selectable choice; a return re-enters the call site at
+`return_phase`.
+
+56. **Those few parts carry at least ten authoring intents.** (V)
+
+    | Intent | How it is spelled today |
+    |---|---|
+    | Descend into a container | PREREQS handler, anonymous edge to the entry member |
+    | Skip a node before its content (gate) | authored `first` edge |
+    | Interrupt on arrival (appointment) | scheduled event with activation `first` |
+    | Subroutine before content | `first` edge that is also a call |
+    | Auto-advance after content (pacing) | authored `last` edge |
+    | Play the first eligible of several blocks (switch) | several `last` edges with conditions, in order |
+    | Route a game by its outcome | POSTREQS edges on the game node |
+    | Leave a scene back to its hub | `last` edge to the hub |
+    | Go there and come back (chosen) | `return: true` action, sandbox `return_to_location` |
+    | Refresh the call site on return | every return re-enters at PLANNING |
+
+57. **Return is implicit and means "ran out of choices".**
+    `_complete_exhausted_call` pops the stack when the callee has no redirect
+    and no selectable continuation. A callee therefore has to be able to end
+    itself, and one stray available choice keeps the call open. (V)
+58. **Return also means refresh.** Both real call sites set `return_phase` to
+    PLANNING, so a return re-plans the call site, re-runs its PREREQS, applies
+    its UPDATE effects again and journals it again. That is why a still-due
+    triggered call fires again on return (#556) and why `_visit_count` on the
+    call site goes up per return. The docstring's example, returning at
+    UPDATE, is not what any caller does. (V)
+59. **Unification candidate. Containers and calls are two subroutine
+    mechanisms.** A container has a declared entry (`source_id`), a declared
+    exit (`sink_id`) and a `default_egress_id`. Entry is used: descent is a
+    jump into the entry member. The exit is not: `sink_id` is read only by
+    softlock detection and set by one line in `story/episode/scene.py`, and
+    nothing returns by reaching it. Calls return by exhaustion. "Return when
+    the callee reaches its sink" would be a structural, checkable rule in
+    place of an inferred one. (V)
+60. **"Visited" counts pass-throughs.** `visited()` and `once` read the
+    ledger's cursor history, and the cursor advances before PREREQS. A node
+    that a PREREQS redirect skips, and every container descended through, is
+    in the history although its content never rendered. The per-node
+    `_visit_count` is set in UPDATE and so counts only rendered visits. Two
+    counters with different meanings. (V)
+61. **Priority is edge order.** "First available triggered edge" follows
+    `edges_out()` order, which is graph insertion order, which is authoring
+    order. Nothing states a priority, and container descent beats triggered
+    edges only by handler registration order, as its own comment says. (V)
+62. **A redirect drops choices by filtering afterwards.** When POSTREQS
+    redirects, the frame removes fragments whose type is "choice" from the
+    journal batch it already rendered. (V)
+63. **Triggered edges are previewed at redirect time.** `_target_viable` runs
+    a resolver preview from PREREQS or POSTREQS for any target with unresolved
+    dependencies or a container entry, so provisioning work happens outside
+    PLANNING. (V)
+64. **The activation vocabulary is two words for three axes.** Authors write
+    `first`, `last` and `return: true`; `entry_phase` is not authorable and
+    `return_phase` is always PLANNING. (V)
 
 ### Performance (measured 2026-11-10)
 
@@ -507,6 +588,26 @@ demos are converging and the pain points are now measured. Ordered by return:
 
 Then profile again; the remaining 0.74 s has not been broken down.
 
+### P8. Name the control-flow intents (new)
+
+Keep the three edge settings as the machine level. Above them, give each
+intent in finding 56 a name, a row in one table (trigger, call, entry phase,
+what "visited" means, what the journal shows) and one witness test. The
+compiler already lowers `first` and `last`; it would lower the named intents
+the same way. Then decide three semantics once, in the table:
+
+1. **When a call returns:** on reaching the callee's sink (finding 59), with
+   exhaustion kept as the fallback for callees that declare none.
+2. **Whether return refreshes:** a return that resumes after the call
+   (no re-run of PREREQS, no second UPDATE) versus one that re-enters the hub.
+   Hubs want the second; subroutines before content want the first. Today
+   both get the second.
+3. **What counts as a visit:** rendered, or passed through. One counter, or
+   two with different names.
+
+This is documentation and a compiler table first. Frame changes follow only
+where the table shows two intents that need different behaviour.
+
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
 With P1 in place, a session is (world, seed, list of chosen edge ids and
@@ -574,7 +675,7 @@ the todo table below.
 | Day | Theme | Items |
 |---|---|---|
 | 1 | Cheap fixes and writing things down | 3k step tracing; 3l unread hashes; 3n timing guard; 20 Dependabot; 3b cadence; 15 cold-process tests; 3g `ancestors`; 3i compose-journal field; 9 and 3j design notes; 13 ROADMAP; 16 devref labels (issues agent) |
-| 2 | Provisioning made smaller | 1 offer sources via dispatch; 2 single binding; 5 naming |
+| 2 | Control flow named; provisioning made smaller | 3o intent table and witnesses; 1 offer sources via dispatch; 2 single binding; 5 naming |
 | 3 | Ids and seeds | 3 thumbprint ids with a recorded seed; 3e games seed from the frame |
 | 4 | Hubs | 4 shared clear-and-project helper; 6a arbitration |
 | 5 | Fan-in | 6 VM fan-in with site arrivals as witness; 6d sandbox gaps |
@@ -609,6 +710,8 @@ Sizes are guesses.
 | 3h | One scope chain per context, read by namespace, candidate and template folds | simplify | M |
 | 3i | Compose-journal feeds forward through the phase context (Derek's preference): a named, typed field for the batch so far, replaced each step so it holds the settled batch after culling; `ctx.results` stays the append-only history; drop the argument rewriting | simplify | S |
 | 3j | Write the "intrinsic contribution, extrinsic assembly" pattern and the phase-manager recipe idea into VM_DESIGN.md | docs | S |
+| 3o | Control-flow intent table in VM_DESIGN.md with one witness test per intent (P8) | docs, test | M |
+| 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
 | 6 | Fan-in in VM; witnesses: site arrivals (site plus due-when) and "go home / call mom" | feature | L |
@@ -676,6 +779,8 @@ Candidate issues, none filed yet. Existing issues to link are in brackets.
 - Read-set analysis and equivalence classes in story (findings 39, 40).
 - Calendar demo world (P6).
 - Sandbox clock namespace and scope creation (finding 41).
+- Control-flow intent table; return at sink; resume versus refresh; meaning
+  of visited (findings 56 to 64, P8). Topic: traversal, frame. [#556]
 - Resolver split (finding 5). [#450]
 - `ancestors` shape (finding 31); compose-journal context field (finding 34).
 - Service operation table (finding 48).
