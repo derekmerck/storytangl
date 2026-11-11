@@ -1128,6 +1128,25 @@ discussion:
   of view. It needs no dice: the outcome is an authored table over two
   simultaneous choices, which suits "games are narrative devices".
 
+- Derek's sizing of multi-lane: one ledger, one frame, two cursors, two
+  journals, and a "both lanes ready" step held by an orchestrator in the
+  service layer. The VM does not care when the lanes are ready; it steps when
+  signalled. Clients: a hot-seat CLI and perhaps a Discord plugin, which
+  brings networking and identity with it.
+- From this review, what is per-cursor on the ledger today and would move
+  into a per-lane record: cursor id, cursor history, call stack, the step
+  counters, the redirect trace and the output stream. Finding 26 already says
+  the scalars are a fold over step records; a lane id on each record makes
+  that fold per lane.
+- One interaction to settle: a lane that has committed its move and is
+  waiting for the other has no selectable choice, and "no selectable choice"
+  is what the frame reads as exhaustion (finding 57). Waiting has to be
+  distinguishable from finished.
+- "Both ready" can be an ordinary condition. Each lane's move is recorded on
+  the shared node; a triggered edge to the result page is available once both
+  are recorded; the orchestrator only has to step the waiting lane again when
+  the other commits.
+
 Open: whether source and sink are designated members with extra duties, or
 return as dedicated nodes; and how the sink learns where to forward.
 
