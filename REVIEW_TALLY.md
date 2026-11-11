@@ -1147,6 +1147,26 @@ discussion:
   are recorded; the orchestrator only has to step the waiting lane again when
   the other commits.
 
+- Derek's refinement: cursor history, call stack, step counter and journal
+  are properties of the ledger having a cursor, and should extend by
+  definition to n cursors. The step counter is per cursor, since lanes take
+  different redirects and routes. The choice counter is shared in this plan:
+  it is what the orchestrator blocks on, until both lanes are ready for the
+  next choice. A MUD would not block. Open, his to think about: the VM may
+  need to spin several steps, a different number per cursor, before settling.
+- For that open point (mine): one lane already settles this way. A frame
+  follows redirects until it reaches a selectable choice or runs out, under a
+  depth cap. With two lanes the same loop moves up a level: step any lane
+  that has a due triggered edge, until none has. Two things then need
+  stating. Lane order, since one lane settling can make an edge due in the
+  other; a fixed order keeps it repeatable. And where a joint outcome is
+  computed: once, on the shared node, so that the second lane reads a result
+  and does not recompute it.
+- Three clocks, to keep the names apart: per-lane steps (cursor hops), the
+  shared choice count (the blocking turn), and arrival order (a MUD, which
+  would have to be recorded to replay). `Ledger.turn` already means something
+  else: distinct position changes in one cursor's history.
+
 Open: whether source and sink are designated members with extra duties, or
 return as dedicated nodes; and how the sink learns where to forward.
 
