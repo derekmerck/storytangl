@@ -734,6 +734,30 @@ routed from one.
     member skips descent, and nothing runs at the sink. This is why shared
     intros and outros were built from calls. (V)
 
+Derek, continuing: in that sense the whole graph is just a big container. A
+story always starts on the graph's source, which decides where the cursor
+should land and forwards it, and always ends at the story's terminal sink,
+which updates the user account and whatever else. Today there is bespoke
+logic for the first graph entry, where it should be the ordinary source
+pattern any scene might have. Scenes have the same problem; it has not been
+hit hard enough to solve yet.
+
+79. **First entry is special-cased in at least five places.** (V)
+    - `StoryGraph.initial_cursor_id` and `initial_cursor_ids`, set and
+      overridden in `story/fabula/world.py`;
+    - a separate `story_ready` dispatch task, used by three demo worlds to do
+      setup before play, which is the source's job under another name;
+    - `Ledger._resolve_entry_id`, `_seed_counters`, `initialize_entry` and the
+      legacy `initialize_ledger`;
+    - `ServiceManager._prime_initial_update`, which calls `goto_node` on the
+      cursor if nothing has been journaled yet;
+    - `Frame.goto_node`, which skips validation and enters at PLANNING.
+80. **The end of a story has no place at all.** Nothing marks a story as
+    finished. `stories_finished` is read from the user with a default of zero
+    and written nowhere in engine or apps. There is no end-of-story hook; a
+    walk that runs out of choices simply stops. The terminal sink Derek
+    describes, the one that updates the user account, does not exist. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1084,6 +1108,15 @@ discussion:
   its real destination. `HasContainerEntryProjection` already has entry
   rules.
 
+- **The story is the outermost container.** Its source does what
+  `story_ready`, entry selection and the service's priming step do now, as
+  one ordinary setup-and-forward. Its sink is the missing end of story: where
+  the user account learns a story finished. Seen as a call, the session is
+  the caller of the root container, so reaching the root sink is a return to
+  the service, and the existing call-completion hook is where the account
+  update would go.
+- The same contract then holds at every level: world, story, scene, block.
+
 Open: whether source and sink are designated members with extra duties, or
 return as dedicated nodes; and how the sink learns where to forward.
 
@@ -1199,6 +1232,7 @@ Sizes are guesses.
 | 3v | Lower the singular `predicate:` key to a condition in the compiler and drop the edge field and its branch in `source_available`; state the vocabulary once (authors write `conditions` and `effects`) (finding 72) | cleanup | S |
 | 3w | Witness worlds for new operators as they land (P9) | demo | S each |
 | 3x | Validator reports edges that enter a container at a member or leave from a non-sink member (finding 77); report only at first | test | S |
+| 3z | Story as the root container: fold `story_ready`, entry selection and priming into its source; add its sink as the end-of-story point that updates the user (findings 79, 80) | design | M |
 | 3y | Container setup at the source and cleanup at the sink, with cross-container edges lowered through them (P10) | design | M |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
