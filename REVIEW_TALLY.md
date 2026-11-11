@@ -707,6 +707,33 @@ Coverage of the sketch's coordinates by in-repo worlds:
 | Arbitration among offers | none |
 | Call that ends at a declared exit | none |
 
+### Containers: one source, one sink (2026-11-11)
+
+Derek's intent: source and sink exist to bottleneck setup and cleanup without
+anticipating every exit pattern. Enter on the source and exit on the sink,
+and a whole container reduces to a single node at the next level up. The
+source sets up wherever the reader should land and forwards the cursor there.
+The sink finalizes the container and wherever the reader just was, then
+forwards them out, back or onward; it does not care which. The idea came from
+a discrete-math teacher: however many sources and sinks a graph has, it needs
+only one of each, since all sinks can drain to one and all sources can be
+routed from one.
+
+77. **The stated contract is not enforced or followed.** VM_DESIGN.md says
+    edges into a container target the container and edges out originate from
+    its sink. The validator checks only that source and sink resolve and are
+    members. Across the 23 demo worlds, 19 worlds have a single container and
+    no cross-container traffic. In the four that have more (`casting_desk`,
+    `concept_naming_demo`, `logic_demo`, `reference`), all 19 entering edges
+    target a member directly, and 9 of 19 leaving edges start at a member
+    that is not the sink. (V, measured on eagerly materialized stories)
+78. **Neither end does its job today.** The source is the first child and the
+    sink is the last child, by default. Earlier versions had synthetic source
+    and sink nodes; v38 designates existing members to avoid extra nodes, so
+    no node exists whose job is setup or cleanup. An edge that enters at a
+    member skips descent, and nothing runs at the sink. This is why shared
+    intros and outros were built from calls. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1037,6 +1064,29 @@ block class where possible:
 - **Effects in script**: one world whose state changes are all authored in
   YAML.
 
+### P10. Use the container contract for setup, cleanup and call extent (new)
+
+The source and sink already describe most of what P8 asks for. For
+discussion:
+
+- **Shared intro and outro become structural.** Setup belongs to the source
+  and cleanup to the sink, once per container, however the reader gets in or
+  out. The theater example needs no call and no fan-in.
+- **A call's extent is a container.** "Reaches a declared end" is reaching the
+  sink. A call frame that outlives its callee is an exit that bypassed the
+  sink, which a validator can report at load.
+- **A container is one node a level up.** That is the coarse resolution of the
+  story-resolution notes, and it lets analysis treat a container as a single
+  step from entry state to exit state.
+- **Lowering, not policing.** Authors keep writing edges to and from members.
+  The compiler can route an entering edge through the container, with an
+  entry rule naming the member, and a leaving edge through the sink, carrying
+  its real destination. `HasContainerEntryProjection` already has entry
+  rules.
+
+Open: whether source and sink are designated members with extra duties, or
+return as dedicated nodes; and how the sink learns where to forward.
+
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
 With P1 in place, a session is (world, seed, list of chosen edge ids and
@@ -1148,6 +1198,8 @@ Sizes are guesses.
 | 3t | Invariant test: planning the same node twice against unchanged state leaves the graph unchanged (ids and order). Expected to fail on hubs today; passes once items 3 and 4 land | test | S |
 | 3v | Lower the singular `predicate:` key to a condition in the compiler and drop the edge field and its branch in `source_available`; state the vocabulary once (authors write `conditions` and `effects`) (finding 72) | cleanup | S |
 | 3w | Witness worlds for new operators as they land (P9) | demo | S each |
+| 3x | Validator reports edges that enter a container at a member or leave from a non-sink member (finding 77); report only at first | test | S |
+| 3y | Container setup at the source and cleanup at the sink, with cross-container edges lowered through them (P10) | design | M |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
 | 6 | Fan-in in VM; witnesses: site arrivals (site plus due-when) and "go home / call mom" | feature | L |
