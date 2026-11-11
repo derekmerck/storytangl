@@ -386,9 +386,20 @@ has no redirect and no selectable choice; a return re-enters the call site at
       updating and journaling again, until the depth limit of 50;
     - returning at POSTREQS also loops: the exit block is not re-run, but the
       same call edge is first in line again and fires until the limit.
-    What is missing is small: a triggered call fires at most once per visit
-    (#556), and a return may land on the phase the call fired in. With both,
-    the trace would be exit block, cleanup, next scene. (V)
+    What is missing is small, and Derek's rule for it replaces my "once per
+    visit" suggestion, which he judged probably incorrect: the frame knows
+    which edge it left by, so on return it re-enters at the phase the call
+    fired in, walks the caller's edges in order, discards everything up to and
+    including that edge, and evaluates from the next one. The return address
+    is (node, phase, position in the edge list).
+    Prototyped outside the engine with an edge subclass, three cases, all
+    correct, each node updated and journaled exactly once, stack empty at the
+    end:
+    - one shared outro: exit block, cleanup, next scene;
+    - two shared outros: exit block, cleanup A, cleanup B, next scene;
+    - two shared intros before content: intro A, intro B, then the block.
+    Consequence: edge order becomes part of the contract (finding 61), so it
+    should be stated, not incidental. (V)
 69. **Concepts cannot contribute updates.** Every UPDATE and FINALIZE handler
     is keyed to the cursor: edge effects, node effects, visit marking, game
     moves, stat challenges, sandbox time on block entry. Nothing lets an
@@ -662,9 +673,8 @@ patterns to come back to. That gives the table two axes.
 Today every return is a refresh at PLANNING and every termination is
 "ran out". Two cases need care:
 
-- **Several intros due at once.** Resuming at UPDATE would skip the remaining
-  PREREQS edges; refreshing re-fires the one just played. "Once per visit"
-  for a triggered call, as #556 proposes, is the same fix from the other side.
+- **Several intros due at once.** Solved by Derek's resume rule (finding 68):
+  return to the firing phase and continue from the edge after the one taken.
 - **An outro before the choices.** The frame has already dropped the caller's
   choice fragments when POSTREQS redirected (finding 62), so a plain resume
   would return to a node with no menu shown.
@@ -806,7 +816,7 @@ Sizes are guesses.
 | 3i | Compose-journal feeds forward through the phase context (Derek's preference): a named, typed field for the batch so far, replaced each step so it holds the settled batch after culling; `ctx.results` stays the append-only history; drop the argument rewriting | simplify | S |
 | 3j | Write the "intrinsic contribution, extrinsic assembly" pattern and the phase-manager recipe idea into VM_DESIGN.md | docs | S |
 | 3o | Control-flow intent table in VM_DESIGN.md with one witness test per intent (P8) | docs, test | M |
-| 3s | Resume: a triggered call fires once per visit and may return to the phase it fired in (finding 68, #556) | fix | S |
+| 3s | Resume: a triggered call returns to the phase it fired in and evaluation continues from the edge after it (finding 68, #556). The return edge carries the call's id; the two redirect handlers start after it | fix | S |
 | 3q | Scope call frames to their callee: discard or refuse on leaving by another route (finding 65) | fix | S |
 | 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
