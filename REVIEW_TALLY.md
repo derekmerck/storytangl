@@ -21,6 +21,34 @@ Last updated: 2026-11-10.
 - The sketch feeds a planned clean TypeScript bootstrap, then a Python 3.9
   rewrite. Tests are not the parity basis.
 
+## Corrections after the board comparison (2026-11-11)
+
+The issues-board agent compared this tally with the roadmap. Checked against
+the code and the issues, these of its points are errors or omissions here:
+
+- **#560 already owns jump, resume and re-enter.** Opened 2026-10-14. It
+  specifies resuming a redirect scan strictly after the calling edge, keeps
+  re-entry at PLANNING for hubs, names the late-choice gap after a POSTREQS
+  return, and uses the companion and dream examples. Findings 56 to 68 and
+  P8 were written without reading it. They add reproductions, not a design.
+- **#560 states that a jump inside an open call does not unwind it.** So the
+  frame that outlives its callee (finding 65) is the documented floor, and the
+  teleport is its consequence. "Discard or refuse" is a change to an agreed
+  position, to be raised there with the reproduction, not a bug fix.
+- **Retained bindings already exist.** Sandbox scheduled events re-use their
+  action across re-provisioning (`reuse_retained_binding`, from #527). The
+  claim under finding 68 that hubs rebuild every dynamic edge with a new id is
+  too broad. That retained path is the prior art for the shared hub helper.
+- **`_visit_count` counts executed visits, not rendered ones** (finding 60).
+  It is incremented in UPDATE, before JOURNAL. There are three facts, not
+  two: traversed, executed, presented.
+- **The count of issues without devref labels is out of date** (finding 19);
+  the board was audited on 2026-11-10.
+
+Provenance, to read the rest by: statements attributed to Derek are design
+intent. Items marked measured or reproduced are evidence. Items marked "mine"
+and both clean-slate sketches are hypotheses.
+
 ## Clean-slate sketch (v1)
 
 | Layer | Operators |
