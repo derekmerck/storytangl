@@ -377,6 +377,25 @@ has no redirect and no selectable choice; a return re-enters the call site at
     needs no stack. The hazard in finding 65 is the opposite case, a call
     whose callee is allowed to leave. (V)
 
+68. **Resume does not exist today (reproduced).** Derek's example: shared
+    cleanup on any scene's exit at the theater, written as a silent jump and
+    return from the exit block to a block with its own UPDATE, after which the
+    exit block picks up where it left off. Built at the VM level with a `last`
+    call and the scene's own `last` edge behind it:
+    - returning at PLANNING loops: exit block and cleanup alternate, each
+      updating and journaling again, until the depth limit of 50;
+    - returning at POSTREQS also loops: the exit block is not re-run, but the
+      same call edge is first in line again and fires until the limit.
+    What is missing is small: a triggered call fires at most once per visit
+    (#556), and a return may land on the phase the call fired in. With both,
+    the trace would be exit block, cleanup, next scene. (V)
+69. **Concepts cannot contribute updates.** Every UPDATE and FINALIZE handler
+    is keyed to the cursor: edge effects, node effects, visit marking, game
+    moves, stat challenges, sandbox time on block entry. Nothing lets an
+    in-scope concept add an effect. Derek's position: a moment that mutates
+    state should do it in its own UPDATE phase; concept-contributed updates
+    would be acceptable but are not how it works. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -666,6 +685,16 @@ Derek's two cases, 2026-11-11, and where they land:
   because it is `once`. That is a jump (`return_phase` none) plus history, no
   stack.
 
+- **Shared outro with bookkeeping** (Derek, same day). The cleanup block
+  keeps its own UPDATE phase, so it is a real call, and the caller must
+  resume, not restart (finding 68). Hardcoding the call into every exit block
+  is the copy-per-scene form. The setting-conditioned form is fan-in: the
+  theater offers the call on any exit block whose setting is the theater.
+  Fan-in attaches the edge, the call runs the callee's own UPDATE, resume
+  returns. No concept-contributed updates are needed.
+- The trivial interjection can still be a journal enrichment when it changes
+  no state. When it does, it is the same shape as the shared outro.
+
 So a third axis: **does the edge intend a return at all?** Jump, call, or
 contribution. And one rule to add for calls: a frame is tied to what it
 called, so leaving the callee by anything other than its return either
@@ -777,6 +806,7 @@ Sizes are guesses.
 | 3i | Compose-journal feeds forward through the phase context (Derek's preference): a named, typed field for the batch so far, replaced each step so it holds the settled batch after culling; `ctx.results` stays the append-only history; drop the argument rewriting | simplify | S |
 | 3j | Write the "intrinsic contribution, extrinsic assembly" pattern and the phase-manager recipe idea into VM_DESIGN.md | docs | S |
 | 3o | Control-flow intent table in VM_DESIGN.md with one witness test per intent (P8) | docs, test | M |
+| 3s | Resume: a triggered call fires once per visit and may return to the phase it fired in (finding 68, #556) | fix | S |
 | 3q | Scope call frames to their callee: discard or refuse on leaving by another route (finding 65) | fix | S |
 | 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
