@@ -743,8 +743,10 @@ pattern any scene might have. Scenes have the same problem; it has not been
 hit hard enough to solve yet.
 
 79. **First entry is special-cased in at least five places.** (V)
-    - `StoryGraph.initial_cursor_id` and `initial_cursor_ids`, set and
-      overridden in `story/fabula/world.py`;
+    - `StoryGraph.initial_cursor_id`, set and overridden in
+      `story/fabula/world.py`. (`initial_cursor_ids`, plural, is not a
+      duplicate: Derek, it is for several cursors landing on one graph, the
+      multi-lane case, #346.)
     - a separate `story_ready` dispatch task, used by three demo worlds to do
       setup before play, which is the source's job under another name;
     - `Ledger._resolve_entry_id`, `_seed_counters`, `initialize_entry` and the
@@ -1116,6 +1118,15 @@ discussion:
   the service, and the existing call-completion hook is where the account
   update would go.
 - The same contract then holds at every level: world, story, scene, block.
+- **Multi-lane fits the same picture.** Derek: the same story world
+  experienced across two different episode DAGs that share the grounded
+  concept space. The story's source forwards one cursor per lane. In the four
+  levels, the story graph is shared and there is one partial order and one
+  journal per lane. The first small demo is to be the Lost Worlds gamebooks:
+  each reader holds the other's book, both call a move, a result grid sends
+  each to the page showing what happened to the opponent from their own point
+  of view. It needs no dice: the outcome is an authored table over two
+  simultaneous choices, which suits "games are narrative devices".
 
 Open: whether source and sink are designated members with extra duties, or
 return as dedicated nodes; and how the sink learns where to forward.
