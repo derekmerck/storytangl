@@ -400,6 +400,33 @@ has no redirect and no selectable choice; a return re-enters the call site at
     - two shared intros before content: intro A, intro B, then the block.
     Consequence: edge order becomes part of the contract (finding 61), so it
     should be stated, not incidental. (V)
+    Derek's hangup, same day: re-entrant nodes are forcibly re-provisioned on
+    return, because a side trip may have added concepts or changed the graph's
+    shape and re-entry cannot be predicted. Existing edges normally keep their
+    order, since their dependencies are still met. But if a dependent episode
+    or concept was disconnected, not merely made unavailable, the order might
+    change. Nodes and edges are only ever unlinked and unregistered, never
+    destroyed in place.
+    Checked:
+    - **The marker is independent of the return phase.** A hub with two due
+      arrivals that return at PLANNING, plus the marker: the hub is re-planned
+      on each return, arrival A then arrival B play once each, and the hub
+      updates and journals once at the end. That is #556 without a
+      `not visited` guard. (V, prototype)
+    - **Return at PLANNING still refreshes.** The same outro returning at
+      PLANNING updates and journals its exit block twice. So intros and outros
+      return to the firing phase; hubs return to PLANNING. (V, prototype)
+    - **Real hubs delete the edge the marker names.** Menu, sandbox and game
+      hubs each call `graph.remove` on their dynamic actions and rebuild them
+      on every provision. A rebuilt action has a new random id today, so a
+      marker held across a re-plan would not find its edge. Not run end to end
+      on a real hub. (V for the removal, I for the consequence)
+    - This is where two earlier items pay off: with thumbprint ids (P1) a
+      rebuilt edge has the same id, and with a set-difference clear (todo 4)
+      an unchanged edge is never removed. Either keeps the marker valid.
+    - Open: what to do when the taken edge is truly gone. Evaluating from the
+      start is the conservative fallback, but it can fire an earlier edge that
+      the side trip made available.
 69. **Concepts cannot contribute updates.** Every UPDATE and FINALIZE handler
     is keyed to the cursor: edge effects, node effects, visit marking, game
     moves, stat challenges, sandbox time on block entry. Nothing lets an
@@ -816,7 +843,7 @@ Sizes are guesses.
 | 3i | Compose-journal feeds forward through the phase context (Derek's preference): a named, typed field for the batch so far, replaced each step so it holds the settled batch after culling; `ctx.results` stays the append-only history; drop the argument rewriting | simplify | S |
 | 3j | Write the "intrinsic contribution, extrinsic assembly" pattern and the phase-manager recipe idea into VM_DESIGN.md | docs | S |
 | 3o | Control-flow intent table in VM_DESIGN.md with one witness test per intent (P8) | docs, test | M |
-| 3s | Resume: a triggered call returns to the phase it fired in and evaluation continues from the edge after it (finding 68, #556). The return edge carries the call's id; the two redirect handlers start after it | fix | S |
+| 3s | Resume: a triggered call returns to the phase it fired in and evaluation continues from the edge after it (finding 68, #556). The return edge carries the call's id; the two redirect handlers start after it. Static blocks first; hubs need item 3 or 4 so a rebuilt edge keeps its id | fix | S |
 | 3q | Scope call frames to their callee: discard or refuse on leaving by another route (finding 65) | fix | S |
 | 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
