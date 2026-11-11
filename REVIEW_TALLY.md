@@ -605,6 +605,35 @@ the same way. Then decide three semantics once, in the table:
 3. **What counts as a visit:** rendered, or passed through. One counter, or
    two with different names.
 
+Derek, 2026-11-11: the mechanism is mostly for two things. Shared intros and
+outros, and re-entrant scenes: a menu of choices, play one, return when done.
+So there are several termination conditions and several restored-state
+patterns to come back to. That gives the table two axes.
+
+| How the callee ends | Examples |
+|---|---|
+| Runs out of content | a linear shared intro or outro |
+| Reaches a declared end | a scene's last block; a container's sink |
+| The reader says so | an "all done here" choice in a hub |
+| An outcome is reached | a game won or lost |
+
+| What the caller gets back | Wanted by |
+|---|---|
+| Resume: carry on from just after the call | intro before content; outro after it |
+| Refresh: re-plan and re-render the caller with new state | a menu or hub |
+| Refresh plus a charge or effect on completion | a scheduled event that costs time |
+| Leave: go on to somewhere else | a scene handing back to its hub |
+
+Today every return is a refresh at PLANNING and every termination is
+"ran out". Two cases need care:
+
+- **Several intros due at once.** Resuming at UPDATE would skip the remaining
+  PREREQS edges; refreshing re-fires the one just played. "Once per visit"
+  for a triggered call, as #556 proposes, is the same fix from the other side.
+- **An outro before the choices.** The frame has already dropped the caller's
+  choice fragments when POSTREQS redirected (finding 62), so a plain resume
+  would return to a node with no menu shown.
+
 This is documentation and a compiler table first. Frame changes follow only
 where the table shows two intents that need different behaviour.
 
