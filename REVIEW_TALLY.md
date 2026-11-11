@@ -45,6 +45,17 @@ the code and the issues, these of its points are errors or omissions here:
 - **The count of issues without devref labels is out of date** (finding 19);
   the board was audited on 2026-11-10.
 
+- **Why #560 was missed.** It carries `devref:traversal` and `devref:frame`
+  today, but it is not in the issue snapshot this review synced on
+  2026-11-09, and the review did not re-sync or query those topics before the
+  control-flow probe. The channel worked once the board was relabelled; the
+  review did not use it. Habit to keep: re-sync and `map` the topic before
+  each probe.
+- **One devref test reads the local issue snapshot.**
+  `test_manual_topic_facets_drive_find_map_and_pack` fails when
+  `tmp/devref/issues.json` exists, because synced issues fill the notes pack.
+  The test should build from a fixture, not from a disposable local file.
+
 Provenance, to read the rest by: statements attributed to Derek are design
 intent. Items marked measured or reproduced are evidence. Items marked "mine"
 and both clean-slate sketches are hypotheses.
@@ -1144,7 +1155,7 @@ Sizes are guesses.
 | 13 | Replace #402 with a short ROADMAP; retitle stale issues; prune finished handoff docs | docs | S |
 | 14 | Tutorial path for a new author | docs | M |
 | 15 | Cold-process tests pass the source path explicitly | fix | S |
-| 16 | devref: label unlabelled issues; filter noisy pack headings | tooling | S |
+| 16 | devref: filter noisy pack headings; make the query test independent of a local issue snapshot (labelling was done in the 2026-11-10 board audit) | tooling | S |
 | 17 | Small drift: Python version, `tangldev` URLs, eight world READMEs | cleanup | S |
 | 18 | Service operation table drives the remote client and REST routes | simplify | M |
 | 19 | Promotion ledger for the calendar world, seeded with P6; cached YAML path loading from the gamebook ledger | docs, fix | S |
