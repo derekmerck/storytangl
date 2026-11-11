@@ -56,6 +56,15 @@ the code and the issues, these of its points are errors or omissions here:
   `tmp/devref/issues.json` exists, because synced issues fill the notes pack.
   The test should build from a fixture, not from a disposable local file.
 
+Derek's caution on the above, same day: do not overweight the board either.
+It is not authoritative even when it is not stale; it is another view, focused
+on tasks where the design notes are focused on tropes. Rediscovering what
+#560 says, independently and with reproductions, is confirmation that #560 is
+not stale. The reverse does not hold: some old issues track aspirations that
+now have better approaches, and some describe a better design than the one
+that was implemented as an expedient. An issue is read like a guideline: one
+view, to be classified against the code and the stated intent.
+
 Provenance, to read the rest by: statements attributed to Derek are design
 intent. Items marked measured or reproduced are evidence. Items marked "mine"
 and both clean-slate sketches are hypotheses.
